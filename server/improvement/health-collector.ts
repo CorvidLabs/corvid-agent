@@ -253,16 +253,16 @@ export class CodebaseHealthCollector {
 
     private async countTodos(cwd: string): Promise<{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }> {
         const { stdout } = await spawnAndCapture(
-            ['grep', '-rn', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
+            ['grep', '-rn', '--exclude-dir=node_modules', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
             cwd,
         );
         return parseTodoOutput(stdout);
     }
 
     private async findLargeFiles(cwd: string): Promise<LargeFile[]> {
-        // Find all .ts files and count their lines
+        // Find all .ts files and count their lines (excluding node_modules)
         const { stdout: findOutput } = await spawnAndCapture(
-            ['find', 'server/', 'client/', 'shared/', '-name', '*.ts', '-type', 'f'],
+            ['find', 'server/', 'client/', 'shared/', '-name', 'node_modules', '-prune', '-o', '-name', '*.ts', '-type', 'f', '-print'],
             cwd,
         );
 

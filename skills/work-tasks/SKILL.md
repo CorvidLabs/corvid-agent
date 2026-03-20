@@ -12,15 +12,19 @@ Create work tasks that spawn autonomous agent sessions. Each task gets its own b
 
 ## MCP Tools
 
-- `corvid_create_work_task` — Create a work task
+- `corvid_create_work_task` — Create a work task that spawns a new agent session on a dedicated branch
   - Parameters: `project` (project name), `description` (what to implement), `agent` (optional, agent to use)
+- `corvid_check_work_status` — Check the status of a work task by ID
+  - Parameters: `task_id` (the task ID returned from creation)
+- `corvid_list_work_tasks` — List work tasks for this agent
+  - Parameters: `status` (optional: "pending", "running", "completed", "failed"), `project` (optional, filter by project)
 
 ## Workflow
 
 1. Describe the task clearly — what to change, where, and why
 2. Call `corvid_create_work_task` with the project and description
 3. The agent creates a branch, implements changes, runs tests, and opens a PR
-4. Monitor progress on the dashboard or via `corvid_manage_schedule`
+4. Monitor progress via `corvid_check_work_status` or `corvid_list_work_tasks`
 
 ## Examples
 
