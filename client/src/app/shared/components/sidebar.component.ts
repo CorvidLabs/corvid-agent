@@ -8,6 +8,7 @@ import {
     AfterViewInit,
     OnDestroy,
     signal,
+    effect,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
@@ -668,10 +669,8 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Two-way binding with parent for open/close state */
     readonly sidebarOpen = model(false);
 
-    /** Collapsed state — persisted in localStorage */
-    readonly collapsed = signal(
-        typeof localStorage !== 'undefined' && localStorage.getItem('sidebar_collapsed') === 'true',
-    );
+    /** Collapsed state — persisted in localStorage; auto-collapse for normal audience */
+    readonly collapsed = signal(this.loadCollapsed());
 
     /** Section collapsed states — persisted in localStorage */
     readonly sectionStates = signal<Record<string, boolean>>(this.loadSectionStates());
@@ -682,6 +681,17 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private readonly sidebarEl = viewChild<ElementRef<HTMLElement>>('sidebarEl');
     private routerSub: Subscription | null = null;
+
+    /** Auto-collapse sidebar when audience changes (skip initial) */
+    private initialAudience = this.audienceService.audience();
+    private readonly audienceEffect = effect(() => {
+        const audience = this.audienceService.audience();
+        if (audience === this.initialAudience) return;
+        this.initialAudience = audience;
+        const shouldCollapse = audience === 'normal';
+        this.collapsed.set(shouldCollapse);
+        localStorage.setItem('sidebar_collapsed', String(shouldCollapse));
+    });
 
     /** Reference to the hamburger button for focus return — set by parent */
     private hamburgerRef: HTMLElement | null = null;
@@ -775,6 +785,25 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
             event.preventDefault();
             first.focus();
         }
+    }
+
+    /** Sync sidebar collapse state when audience changes */
+    syncCollapseWithAudience(): void {
+        const shouldCollapse = this.audienceService.audience() === 'normal';
+        // Only auto-collapse if user hasn't explicitly set a preference
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('sidebar_collapsed') : null;
+        if (stored === null) {
+            this.collapsed.set(shouldCollapse);
+        }
+    }
+
+    private loadCollapsed(): boolean {
+        if (typeof localStorage !== 'undefined') {
+            const stored = localStorage.getItem('sidebar_collapsed');
+            if (stored !== null) return stored === 'true';
+        }
+        // Default: collapsed for normal audience, expanded otherwise
+        return this.audienceService.audience() === 'normal';
     }
 
     /** Load section states from localStorage, falling back to defaults */

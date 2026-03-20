@@ -43,11 +43,11 @@ export class AudienceService {
     }
 
     private load(): Audience {
-        if (typeof localStorage === 'undefined') return 'developer';
+        if (typeof localStorage === 'undefined') return 'normal';
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored === 'normal' || stored === 'developer' || stored === 'enterprise') {
             return stored;
         }
-        return 'developer';
+        return 'normal';
     }
 }
