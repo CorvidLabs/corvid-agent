@@ -131,8 +131,9 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
         });
     }
 
-    const text = data.content;
-    if (!text) return;
+    const text = data.content ?? '';
+    const hasAttachments = (data.attachments?.length ?? 0) > 0;
+    if (!text && !hasAttachments) return;
 
     const userId = data.author.id;
     const channelId = data.channel_id;
