@@ -489,6 +489,18 @@ export async function removeReaction(botToken: string, channelId: string, messag
     }
 }
 
+/**
+ * Convert a hex color string (e.g. '#ff00aa' or 'ff00aa') to a Discord
+ * embed color integer.  Returns `null` for invalid input so callers can
+ * fall back to the hash-based color.
+ */
+export function hexColorToInt(hex: string | null | undefined): number | null {
+    if (!hex) return null;
+    const cleaned = hex.replace(/^#/, '');
+    if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
+    return parseInt(cleaned, 16);
+}
+
 /** Generate a consistent color for an agent name. */
 export function agentColor(name: string): number {
     let hash = 0;

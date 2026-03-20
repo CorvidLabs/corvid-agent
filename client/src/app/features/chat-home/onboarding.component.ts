@@ -175,32 +175,38 @@ const TEMPLATES: AgentTemplate[] = [
             align-items: center;
             gap: 0.5rem;
             padding: 1.25rem 1rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius, 6px);
+            background: rgba(15, 16, 24, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-lg, 10px);
             color: var(--text-secondary);
             font-family: inherit;
             cursor: pointer;
-            transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+            transition: border-color 0.25s, background 0.25s, box-shadow 0.25s, transform 0.2s;
             text-align: center;
+            position: relative;
         }
         .tpl-card:hover {
-            border-color: var(--accent-cyan);
-            background: var(--accent-cyan-dim);
-            box-shadow: 0 0 16px rgba(0, 229, 255, 0.12);
+            border-color: rgba(0, 229, 255, 0.3);
+            background: rgba(0, 229, 255, 0.06);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 229, 255, 0.08);
+            transform: translateY(-2px);
         }
         .tpl-card__icon {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--accent-cyan-dim);
-            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.06));
+            border: 1px solid rgba(0, 229, 255, 0.15);
+            border-radius: 12px;
             font-size: 0.7rem;
             font-weight: 800;
             color: var(--accent-cyan);
             letter-spacing: 0.05em;
+            box-shadow: 0 2px 12px rgba(0, 229, 255, 0.08);
         }
         .tpl-card__name {
             font-size: 0.82rem;
@@ -275,13 +281,13 @@ const TEMPLATES: AgentTemplate[] = [
             transition: background 0.15s, box-shadow 0.15s;
         }
         .btn--primary {
-            background: transparent;
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(0, 229, 255, 0.06));
             color: var(--accent-cyan);
-            border-color: var(--accent-cyan);
+            border-color: rgba(0, 229, 255, 0.3);
         }
         .btn--primary:hover:not(:disabled) {
-            background: var(--accent-cyan-dim);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 229, 255, 0.1));
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
         }
         .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn--ghost {

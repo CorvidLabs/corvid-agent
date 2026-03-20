@@ -204,9 +204,11 @@ const TABS: NavTab[] = [
             align-items: center;
             justify-content: space-between;
             height: 48px;
-            padding: 0 1rem;
-            background: var(--bg-surface);
-            border-bottom: 1px solid var(--border);
+            padding: 0 1.25rem;
+            background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             position: relative;
             z-index: 100;
         }
@@ -224,8 +226,12 @@ const TABS: NavTab[] = [
             font-family: 'Dogica Pixel', 'Dogica', monospace;
             font-size: 1rem;
             font-weight: 700;
-            color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 8s ease infinite;
             letter-spacing: 0.06em;
         }
         .topnav__tabs {
@@ -262,6 +268,7 @@ const TABS: NavTab[] = [
             color: var(--accent-cyan);
             border-bottom-color: var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+            background: linear-gradient(180deg, transparent 0%, rgba(0, 229, 255, 0.04) 100%);
         }
         .topnav__tab-chevron {
             font-size: 0.6rem;
@@ -276,13 +283,20 @@ const TABS: NavTab[] = [
             position: absolute;
             top: 100%;
             left: 0;
-            min-width: 180px;
-            background: var(--bg-raised);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius, 6px);
-            padding: 0.35rem 0;
+            min-width: 190px;
+            background: rgba(22, 24, 34, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius-lg, 10px);
+            padding: 0.4rem 0;
             z-index: 200;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.04);
+            animation: dropdownIn 0.15s ease-out;
+        }
+        @keyframes dropdownIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .topnav__dropdown-item {
             display: block;
@@ -368,20 +382,21 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.3rem 0.6rem;
-            background: var(--bg-input, #1a1a2e);
-            border: 1px solid var(--border, #333);
-            border-radius: var(--radius, 6px);
+            padding: 0.3rem 0.7rem;
+            background: rgba(12, 13, 20, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-lg, 10px);
             color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.7rem;
             cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
+            transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
             min-width: 160px;
         }
         .topnav__search-btn:hover {
-            border-color: var(--accent-cyan);
+            border-color: rgba(0, 229, 255, 0.3);
             color: var(--text-secondary);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.06);
         }
         .topnav__search-label {
             flex: 1;

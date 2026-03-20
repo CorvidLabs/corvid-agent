@@ -27,7 +27,9 @@ import { OnboardingComponent } from './onboarding.component';
             <app-onboarding (done)="onboardingSkipped.set(true)" />
         } @else {
         <div class="chat-home">
+            <div class="chat-home__bg-glow" aria-hidden="true"></div>
             <div class="chat-home__center">
+                <div class="chat-home__logo-mark" aria-hidden="true">C</div>
                 <h1 class="chat-home__title">CorvidAgent</h1>
                 <p class="chat-home__subtitle">What would you like to work on?</p>
 
@@ -63,14 +65,23 @@ import { OnboardingComponent } from './onboarding.component';
                             [disabled]="!prompt().trim() || launching()"
                             (click)="onSend()"
                         >
-                            {{ launching() ? 'Starting...' : 'Send' }}
+                            @if (launching()) {
+                                <span class="chat-home__send-spinner"></span>
+                                Starting...
+                            } @else {
+                                Send
+                                <span class="chat-home__send-arrow">&rarr;</span>
+                            }
                         </button>
                     </div>
                 </div>
 
                 <div class="chat-home__hints">
                     @for (hint of hints; track hint) {
-                        <button class="chat-home__hint" (click)="useHint(hint)">{{ hint }}</button>
+                        <button class="chat-home__hint" (click)="useHint(hint)">
+                            <span class="chat-home__hint-icon">&rsaquo;</span>
+                            {{ hint }}
+                        </button>
                     }
                 </div>
             </div>
@@ -90,6 +101,24 @@ import { OnboardingComponent } from './onboarding.component';
             justify-content: center;
             padding: 2rem;
             background: var(--bg-deep);
+            position: relative;
+            overflow: hidden;
+        }
+        .chat-home__bg-glow {
+            position: absolute;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(
+                circle,
+                rgba(0, 229, 255, 0.06) 0%,
+                rgba(255, 0, 170, 0.03) 40%,
+                transparent 70%
+            );
+            pointer-events: none;
+            animation: subtlePulse 8s ease-in-out infinite;
         }
         .chat-home__center {
             width: 100%;
@@ -97,40 +126,66 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             flex-direction: column;
             align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+        .chat-home__logo-mark {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-xl, 16px);
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.08));
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 16px rgba(0, 229, 255, 0.5);
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 24px rgba(0, 229, 255, 0.1);
         }
         .chat-home__title {
-            font-size: 1.75rem;
+            font-size: 2rem;
             font-weight: 700;
-            color: var(--text-primary);
-            margin: 0 0 0.5rem;
-            letter-spacing: 0.02em;
+            margin: 0 0 0.4rem;
+            letter-spacing: 0.03em;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 6s ease infinite;
         }
         .chat-home__subtitle {
             color: var(--text-secondary);
             font-size: 0.9rem;
-            margin: 0 0 1.5rem;
+            margin: 0 0 2rem;
         }
         .chat-home__input-card {
             width: 100%;
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg, 12px);
+            background: rgba(15, 16, 24, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+            border-radius: var(--radius-xl, 16px);
             overflow: hidden;
-            transition: border-color 0.15s;
+            transition: border-color 0.25s, box-shadow 0.25s;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
         }
         .chat-home__input-card:focus-within {
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 1px var(--accent-cyan), var(--glow-cyan);
+            border-color: rgba(0, 229, 255, 0.4);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 229, 255, 0.15), 0 0 30px rgba(0, 229, 255, 0.06);
         }
         .chat-home__textarea {
             width: 100%;
-            padding: 1rem 1rem 0.5rem;
+            padding: 1.25rem 1.25rem 0.5rem;
             border: none;
             background: transparent;
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.9rem;
-            line-height: 1.5;
+            line-height: 1.6;
             resize: none;
             outline: none;
         }
@@ -144,7 +199,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.5rem 1rem 0.75rem;
+            padding: 0.5rem 1.25rem 0.85rem;
             gap: 0.75rem;
         }
         .chat-home__agent-picker {
@@ -160,7 +215,7 @@ import { OnboardingComponent } from './onboarding.component';
             letter-spacing: 0.05em;
         }
         .chat-home__select {
-            padding: 0.3rem 0.5rem;
+            padding: 0.35rem 0.6rem;
             border: 1px solid var(--border);
             border-radius: var(--radius, 6px);
             background: var(--bg-input, var(--bg-deep));
@@ -168,16 +223,20 @@ import { OnboardingComponent } from './onboarding.component';
             font-family: inherit;
             font-size: 0.8rem;
             cursor: pointer;
+            transition: border-color 0.15s;
         }
         .chat-home__select:focus {
             outline: none;
             border-color: var(--accent-cyan);
         }
         .chat-home__send {
-            padding: 0.45rem 1.25rem;
-            border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius, 6px);
-            background: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.5rem 1.4rem;
+            border: none;
+            border-radius: var(--radius-lg, 10px);
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(0, 229, 255, 0.08));
             color: var(--accent-cyan);
             font-family: inherit;
             font-size: 0.8rem;
@@ -185,43 +244,83 @@ import { OnboardingComponent } from './onboarding.component';
             text-transform: uppercase;
             letter-spacing: 0.05em;
             cursor: pointer;
-            transition: background 0.15s, box-shadow 0.15s;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
         }
         .chat-home__send:hover:not(:disabled) {
-            background: var(--accent-cyan-dim);
-            box-shadow: var(--glow-cyan);
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(0, 229, 255, 0.12));
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+        }
+        .chat-home__send:active:not(:disabled) {
+            transform: scale(0.97);
         }
         .chat-home__send:disabled {
             opacity: 0.3;
             cursor: not-allowed;
         }
+        .chat-home__send-arrow {
+            font-size: 1rem;
+            line-height: 1;
+            transition: transform 0.15s;
+        }
+        .chat-home__send:hover:not(:disabled) .chat-home__send-arrow {
+            transform: translateX(2px);
+        }
+        .chat-home__send-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(0, 229, 255, 0.2);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         .chat-home__hints {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
-            margin-top: 1.25rem;
+            margin-top: 1.5rem;
             justify-content: center;
         }
         .chat-home__hint {
-            padding: 0.4rem 0.75rem;
-            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.45rem 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 999px;
-            background: transparent;
+            background: rgba(15, 16, 24, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             color: var(--text-secondary);
             font-family: inherit;
             font-size: 0.75rem;
             cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
+            transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.15s;
         }
         .chat-home__hint:hover {
-            border-color: var(--accent-cyan);
+            border-color: rgba(0, 229, 255, 0.3);
+            color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.05);
+            transform: translateY(-1px);
+        }
+        .chat-home__hint-icon {
+            font-size: 0.9rem;
+            line-height: 1;
+            color: var(--text-tertiary);
+            transition: color 0.2s;
+        }
+        .chat-home__hint:hover .chat-home__hint-icon {
             color: var(--accent-cyan);
         }
         @media (max-width: 480px) {
             .chat-home { padding: 1rem; }
-            .chat-home__title { font-size: 1.25rem; }
+            .chat-home__title { font-size: 1.5rem; }
+            .chat-home__logo-mark { width: 44px; height: 44px; font-size: 1.2rem; }
             .chat-home__actions { flex-direction: column; align-items: stretch; }
             .chat-home__agent-picker { justify-content: space-between; }
+            .chat-home__bg-glow { width: 300px; height: 300px; }
         }
     `,
 })

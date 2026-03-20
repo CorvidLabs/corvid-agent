@@ -19,6 +19,7 @@ import {
     sendEmbedWithButtons,
     buildActionRow,
     agentColor,
+    hexColorToInt,
     buildFooterText,
 } from '../embeds';
 
@@ -127,16 +128,17 @@ export async function handleSessionCommand(
         ownerUserId: userId,
         topic,
         projectName: project.name,
+        displayColor: agent.displayColor,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
     ctx.processManager.startProcess(session, topic);
-    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name);
+    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name, agent.displayColor);
 
     // Post a welcome embed with Stop button in the thread
     sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
         description: `**${agent.name}** is working on: ${topic}`,
-        color: agentColor(agent.name),
+        color: hexColorToInt(agent.displayColor) ?? agentColor(agent.name),
         footer: { text: buildFooterText({ agentName: agent.name, agentModel: agent.model || 'unknown', sessionId: session.id, projectName: project.name }) },
     }, [
         buildActionRow(

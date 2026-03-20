@@ -390,10 +390,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         }
         .sidebar {
             width: 200px;
-            background: var(--bg-surface);
+            background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
             min-height: 100%;
             padding: 1rem 0;
-            border-right: 1px solid var(--border);
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
             display: flex;
             flex-direction: column;
             transition: width 0.2s ease;
@@ -422,7 +422,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         }
         .sidebar__link--active {
             color: var(--accent-cyan);
-            background: var(--bg-raised);
+            background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
         }

@@ -21,6 +21,7 @@ import {
     buildActionRow,
     sendTypingIndicator,
     agentColor,
+    hexColorToInt,
     assertSnowflake,
     splitEmbedDescription,
     buildFooterText,
@@ -57,6 +58,7 @@ export interface ThreadSessionInfo {
     ownerUserId: string;
     topic?: string;
     projectName?: string;
+    displayColor?: string | null;
 }
 
 export interface ThreadCallbackInfo {
@@ -79,6 +81,7 @@ export function subscribeForResponseWithEmbed(
     agentName: string,
     agentModel: string,
     projectName?: string,
+    displayColor?: string | null,
 ): void {
     // Unsubscribe the previous callback for this thread to prevent duplicates
     const prev = threadCallbacks.get(threadId);
@@ -144,7 +147,7 @@ export function subscribeForResponseWithEmbed(
         clearTimeout(typingSafetyTimeout);
     };
 
-    const color = agentColor(agentName);
+    const color = hexColorToInt(displayColor) ?? agentColor(agentName);
 
     const flush = async () => {
         if (!buffer) return;
@@ -413,6 +416,7 @@ export function subscribeForInlineResponse(
     agentModel: string,
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
+    displayColor?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -420,7 +424,7 @@ export function subscribeForInlineResponse(
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
     let receivedAnyActivity = false; // tracks any activity (content OR tool use)
-    const color = agentColor(agentName);
+    const color = hexColorToInt(displayColor) ?? agentColor(agentName);
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -543,6 +547,7 @@ export function subscribeForAdaptiveInlineResponse(
     agentModel: string,
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
+    displayColor?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -552,7 +557,7 @@ export function subscribeForAdaptiveInlineResponse(
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
     let receivedAnyActivity = false;
-    const color = agentColor(agentName);
+    const color = hexColorToInt(displayColor) ?? agentColor(agentName);
 
     // Progress embed state — only created when tool use is detected
     let progressMessageId: string | null = null;
@@ -713,6 +718,7 @@ export function subscribeForInlineProgressResponse(
     agentModel: string,
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
+    displayColor?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -722,7 +728,7 @@ export function subscribeForInlineProgressResponse(
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
     let receivedAnyActivity = false;
-    const color = agentColor(agentName);
+    const color = hexColorToInt(displayColor) ?? agentColor(agentName);
     let progressMessageId: string | null = null;
 
     // Post the initial progress embed immediately
@@ -870,13 +876,13 @@ export function tryRecoverThread(
 ): ThreadSessionInfo | null {
     try {
         const row = db.query(
-            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, p.name as project_name
+            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, a.display_color, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
              LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.name = ? AND s.source = 'discord'
              ORDER BY s.created_at DESC LIMIT 1`,
-        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; project_name: string | null } | null;
+        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; display_color: string | null; project_name: string | null } | null;
 
         if (!row) return null;
 
@@ -887,6 +893,7 @@ export function tryRecoverThread(
             ownerUserId: '',
             topic: row.initial_prompt || undefined,
             projectName: row.project_name || undefined,
+            displayColor: row.display_color ?? undefined,
         };
         threadSessions.set(threadId, info);
         log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
@@ -910,13 +917,13 @@ export function recoverActiveThreadSubscriptions(
 ): void {
     try {
         const rows = db.query(
-            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model, p.name as project_name
+            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model, a.display_color, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
              LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.source = 'discord' AND s.status = 'running'
                AND s.name LIKE 'Discord thread:%'`,
-        ).all() as { id: string; name: string; agent_name: string; agent_model: string; project_name: string | null }[];
+        ).all() as { id: string; name: string; agent_name: string; agent_model: string; display_color: string | null; project_name: string | null }[];
 
         let recovered = 0;
         for (const row of rows) {
@@ -930,6 +937,7 @@ export function recoverActiveThreadSubscriptions(
                     agentModel: row.agent_model || 'unknown',
                     ownerUserId: '',
                     projectName: row.project_name || undefined,
+                    displayColor: row.display_color ?? undefined,
                 });
             }
 
@@ -937,6 +945,7 @@ export function recoverActiveThreadSubscriptions(
                 processManager, delivery, botToken, db, threadCallbacks,
                 row.id, threadId, row.agent_name || 'Agent', row.agent_model || 'unknown',
                 row.project_name || undefined,
+                row.display_color,
             );
             recovered++;
         }

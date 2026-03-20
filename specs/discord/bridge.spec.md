@@ -145,6 +145,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `editEmbed` | `(delivery, botToken, channelId, messageId, embed)` | `Promise<void>` | Edit an existing embed message in-place via PATCH |
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a clean footer: `agentName` or `agentName · status` |
+| `buildFooterWithStats` | `(ctx: FooterContext, stats?: FooterStats)` | `string` | Build footer with session context AND run stats (files, turns, tools, commits) |
+| `hexColorToInt` | `(hex: string)` | `number \| null` | Convert a hex color string (e.g. '#ff00aa') to a Discord embed color integer |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
 | `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field notifications |
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
@@ -172,10 +174,10 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, threadCallbacks, sessionId, threadId, agentName, agentModel)` | `void` | Subscribe to agent events and stream responses as embeds |
-| `subscribeForInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel)` | `void` | Subscribe for inline reply responses (one-off @mention) |
-| `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
-| `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
+| `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, db, threadCallbacks, sessionId, threadId, agentName, agentModel, projectName?, displayColor?)` | `void` | Subscribe to agent events and stream responses as embeds |
+| `subscribeForInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, displayColor?)` | `void` | Subscribe for inline reply responses (one-off @mention) |
+| `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
+| `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
@@ -266,6 +268,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `InteractionContext` | `commands.ts` | Context object for interaction handler delegation |
 | `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer, timestamp, image?, thumbnail?) |
 | `FooterContext` | `embeds.ts` | Metadata for building rich embed footers (agentName, agentModel?, status?) |
+| `FooterStats` | `embeds.ts` | Optional run statistics for embed footers (filesChanged?, turns?, tools?, commits?) |
 | `DiscordFileAttachment` | `embeds.ts` | File attachment for Discord uploads (name, data, contentType?) |
 | `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
 | `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?) |
