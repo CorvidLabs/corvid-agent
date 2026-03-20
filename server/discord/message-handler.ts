@@ -112,6 +112,8 @@ export interface MessageHandlerContext {
     threadLastActivity: Map<string, number>;
     /** Maps bot reply message IDs → session info for mention-reply context. */
     mentionSessions: Map<string, MentionSessionInfo>;
+    /** Recently processed Discord message IDs — prevents duplicate handling. */
+    processedMessageIds: Set<string>;
 }
 
 /** Cooldown for permission-denial replies: only notify a user once per window. */
@@ -121,6 +123,19 @@ const permDenyCooldowns = new Map<string, number>();
 export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMessageData): Promise<void> {
     // Ignore bot messages
     if (data.author.bot) return;
+
+    // Deduplicate: skip if we've already processed this Discord message ID.
+    // Guards against dual delivery from overlapping gateway connections
+    // (e.g., during deploys or gateway resumes).
+    if (ctx.processedMessageIds.has(data.id)) {
+        log.debug('Skipping duplicate MESSAGE_CREATE', { messageId: data.id, channelId: data.channel_id });
+        return;
+    }
+    ctx.processedMessageIds.add(data.id);
+    if (ctx.processedMessageIds.size > 1000) {
+        const first = ctx.processedMessageIds.values().next().value;
+        if (first) ctx.processedMessageIds.delete(first);
+    }
 
     // Auto-link Discord user to contact identity (best-effort, non-blocking)
     try {
