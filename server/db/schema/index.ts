@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 95;
+const SCHEMA_VERSION = 96;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -105,6 +105,10 @@ const MIGRATIONS: Record<number, string[]> = {
         // Memory observations: short-term insights for graduation to long-term
         ...memory.tables.filter((s) => s.includes('memory_observations')),
         ...memory.indexes.filter((s) => s.includes('observations')),
+    ],
+    96: [
+        // Add channel_id to mention sessions for channel tracking
+        `ALTER TABLE discord_mention_sessions ADD COLUMN channel_id TEXT`,
     ],
 };
 

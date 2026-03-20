@@ -7,6 +7,7 @@ interface MentionSessionRow {
     agent_name: string;
     agent_model: string;
     project_name: string | null;
+    channel_id: string | null;
     created_at: string;
 }
 
@@ -19,9 +20,9 @@ export function saveMentionSession(
     info: MentionSessionInfo,
 ): void {
     db.query(
-        `INSERT OR REPLACE INTO discord_mention_sessions (bot_message_id, session_id, agent_name, agent_model, project_name)
-         VALUES (?, ?, ?, ?, ?)`,
-    ).run(botMessageId, info.sessionId, info.agentName, info.agentModel, info.projectName ?? null);
+        `INSERT OR REPLACE INTO discord_mention_sessions (bot_message_id, session_id, agent_name, agent_model, project_name, channel_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(botMessageId, info.sessionId, info.agentName, info.agentModel, info.projectName ?? null, info.channelId ?? null);
 }
 
 /**
@@ -48,6 +49,7 @@ export function getMentionSession(
         agentModel: row.agent_model,
         projectName: row.project_name || undefined,
         displayColor: row.display_color ?? undefined,
+        channelId: row.channel_id || undefined,
     };
 }
 
