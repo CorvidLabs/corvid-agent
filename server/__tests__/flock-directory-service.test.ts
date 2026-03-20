@@ -42,9 +42,11 @@ describe('register', () => {
         expect(agent.lastHeartbeat).toBeTruthy();
     });
 
-    test('enforces unique address', () => {
-        svc.register({ address: 'ALGO_UNIQUE', name: 'Agent1' });
-        expect(() => svc.register({ address: 'ALGO_UNIQUE', name: 'Agent2' })).toThrow();
+    test('re-registration with same address updates existing record', () => {
+        const first = svc.register({ address: 'ALGO_UNIQUE', name: 'Agent1' });
+        const second = svc.register({ address: 'ALGO_UNIQUE', name: 'Agent2' });
+        expect(second.id).toBe(first.id);
+        expect(second.name).toBe('Agent2');
     });
 
     test('defaults capabilities to empty array', () => {
