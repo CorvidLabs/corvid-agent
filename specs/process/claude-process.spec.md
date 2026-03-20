@@ -26,6 +26,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 |----------|-----------|---------|-------------|
 | `spawnClaudeProcess` | `options: ClaudeProcessOptions` | `ClaudeProcess` | **(Deprecated)** Spawns a Claude CLI process with stream-json I/O, wires up stdout/stderr parsing, stdin message delivery, and exit monitoring. Retained for reference; all agents now use the SDK path. |
 | `extractContentText` | `content: string \| ContentBlock[] \| undefined` | `string` | Extracts plain text from a content value — returns the string directly, or concatenates all `text`-type blocks from an array. Returns `''` for `undefined`. |
+| `extractContentImageUrls` | `content: string \| ContentBlock[] \| undefined` | `string[]` | Extracts image URLs from content blocks (blocks with `type: 'image'` and a `source.url`). Returns `[]` for strings or undefined. |
 | `isResultEvent` | `e: ClaudeStreamEvent` | `e is ResultEvent` | Type guard: returns `true` if the event is a `result` event. |
 | `isErrorEvent` | `e: ClaudeStreamEvent` | `e is ErrorEvent` | Type guard: returns `true` if the event is an `error` event. |
 | `isApprovalEvent` | `e: ClaudeStreamEvent` | `e is ApprovalRequestEvent` | Type guard: returns `true` if the event is an `approval_request` event. |
@@ -174,3 +175,4 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-20 | corvid-agent | Documented `extractContentImageUrls` export |
