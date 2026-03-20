@@ -125,6 +125,20 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                 </div>
             }
 
+            <!-- Chat-first hero for Creator mode -->
+            @if (audienceService.isNormal() && agentSummaries().length > 0) {
+                <div class="creator-hero">
+                    <h2 class="creator-hero__title">What would you like to build?</h2>
+                    <p class="creator-hero__desc">Tell your agent what you need and it will handle the rest.</p>
+                    <div class="creator-hero__prompts">
+                        @for (suggestion of promptSuggestions; track suggestion) {
+                            <button class="creator-hero__prompt-btn" (click)="startChatWithPrompt(suggestion)">{{ suggestion }}</button>
+                        }
+                    </div>
+                    <button class="creator-hero__start-btn" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
+                </div>
+            }
+
             <!-- Widget grid: render visible widgets in order -->
             <div class="widget-grid">
                 @for (widget of layoutService.visibleWidgets(); track widget.id; let i = $index) {
@@ -414,11 +428,15 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <h3>Quick Actions</h3>
                                 <div class="quick-actions">
                                     <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
-                                    <button class="action-btn" (click)="navigateTo('/councils')">Launch Council</button>
+                                    @if (!audienceService.isNormal()) {
+                                        <button class="action-btn" (click)="navigateTo('/councils')">Launch Council</button>
+                                    }
                                     <button class="action-btn" (click)="navigateTo('/work-tasks')">Create Work Task</button>
-                                    <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
-                                        {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
-                                    </button>
+                                    @if (!audienceService.isNormal()) {
+                                        <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
+                                            {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
+                                        </button>
+                                    }
                                 </div>
                             </div>
                         }
@@ -676,6 +694,33 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             background: rgba(0,229,255,.06); cursor: pointer; text-transform: uppercase; letter-spacing: .05em; transition: all .15s;
         }
         .simple-hero__btn:hover { background: rgba(0,229,255,.14); box-shadow: 0 0 16px rgba(0,229,255,.15); }
+
+        /* Creator hero */
+        .creator-hero {
+            background: var(--bg-surface); border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-lg); padding: 2rem; text-align: center;
+            margin-bottom: 1.25rem;
+            background-image: radial-gradient(ellipse at top, rgba(0,229,255,.04) 0%, transparent 60%);
+        }
+        .creator-hero__title { margin: 0 0 .5rem; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+        .creator-hero__desc { margin: 0 0 1.25rem; font-size: .85rem; color: var(--text-tertiary); max-width: 480px; margin-left: auto; margin-right: auto; }
+        .creator-hero__prompts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-bottom: 1.25rem; }
+        .creator-hero__prompt-btn {
+            padding: .45rem .85rem; border-radius: 9999px; font-size: .75rem; font-weight: 500;
+            font-family: inherit; border: 1px solid var(--border-bright); color: var(--text-secondary);
+            background: var(--bg-raised); cursor: pointer; transition: all .15s;
+        }
+        .creator-hero__prompt-btn:hover {
+            border-color: var(--accent-cyan); color: var(--accent-cyan);
+            background: rgba(0,229,255,.06); box-shadow: 0 0 12px rgba(0,229,255,.1);
+        }
+        .creator-hero__start-btn {
+            padding: .65rem 1.75rem; border-radius: var(--radius); font-size: .85rem; font-weight: 600;
+            font-family: inherit; border: 1px solid var(--accent-cyan); color: var(--accent-cyan);
+            background: rgba(0,229,255,.08); cursor: pointer; text-transform: uppercase; letter-spacing: .05em;
+            transition: all .15s;
+        }
+        .creator-hero__start-btn:hover { background: rgba(0,229,255,.16); box-shadow: 0 0 20px rgba(0,229,255,.15); }
 
         /* Agent grid */
         .agent-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: .75rem; }
@@ -946,6 +991,9 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             .metric-card { padding: .5rem .75rem; }
             .metric-card__value { font-size: 1.2rem; }
             .section { padding: .75rem; }
+            .creator-hero { padding: 1.25rem; }
+            .creator-hero__title { font-size: 1.1rem; }
+            .creator-hero__prompts { flex-direction: column; }
         }
     `,
 })
@@ -992,6 +1040,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Drag state for widget grid
     protected readonly widgetDragIndex = signal(-1);
     protected readonly widgetDragOver = signal(-1);
+
+    protected readonly promptSuggestions = [
+        'Build me a portfolio website',
+        'Create a REST API for my project',
+        'Help me debug my application',
+        'Set up a CI/CD pipeline',
+    ];
 
     protected readonly activeWorkTaskCount = computed(() => {
         const tasks = this.overview()?.workTasks;
@@ -1199,6 +1254,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     protected navigateTo(path: string): void {
         this.router.navigate([path]);
+    }
+
+    protected startChatWithPrompt(prompt: string): void {
+        const firstAgent = this.agentSummaries()[0]?.agent;
+        if (firstAgent) {
+            this.router.navigate(['/sessions/new'], { queryParams: { agentId: firstAgent.id, prompt } });
+        } else {
+            this.router.navigate(['/sessions/new'], { queryParams: { prompt } });
+        }
     }
 
     protected startChat(agentId: string, event: Event): void {
