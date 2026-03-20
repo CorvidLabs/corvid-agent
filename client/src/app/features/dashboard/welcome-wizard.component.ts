@@ -5,7 +5,6 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
-import { AudienceService, type Audience } from '../../core/services/audience.service';
 import type { ProviderInfo } from '../../core/models/agent.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -24,39 +23,9 @@ interface AgentTemplate {
     description: string;
     icon: string;
     skillBundleIds: string[];
-    audience: Audience[];
 }
 
 const TEMPLATES: AgentTemplate[] = [
-    // Normal user templates
-    {
-        id: 'website-builder',
-        name: 'Website Builder',
-        suggestedName: 'WebBuilder',
-        description: 'Builds websites, landing pages, and portfolios. Just describe what you want.',
-        icon: '[]',
-        skillBundleIds: ['preset-full-stack'],
-        audience: ['normal'],
-    },
-    {
-        id: 'app-creator',
-        name: 'App Creator',
-        suggestedName: 'AppMaker',
-        description: 'Creates apps and tools from your ideas. Habit trackers, dashboards, calculators.',
-        icon: '<>',
-        skillBundleIds: ['preset-full-stack'],
-        audience: ['normal'],
-    },
-    {
-        id: 'assistant',
-        name: 'Personal Assistant',
-        suggestedName: 'Assistant',
-        description: 'Research, writing, analysis, and automation. Your AI helper for everyday tasks.',
-        icon: '>>',
-        skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
-        audience: ['normal'],
-    },
-    // Developer templates
     {
         id: 'full-stack',
         name: 'Full Stack Developer',
@@ -64,7 +33,6 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'Reads and edits code, manages PRs and issues, creates work tasks. The all-rounder.',
         icon: '{}',
         skillBundleIds: ['preset-full-stack'],
-        audience: ['developer', 'enterprise'],
     },
     {
         id: 'code-reviewer',
@@ -73,7 +41,6 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'Reviews pull requests, catches bugs, and provides actionable feedback.',
         icon: '?!',
         skillBundleIds: ['preset-code-reviewer', 'preset-github-ops'],
-        audience: ['developer', 'enterprise'],
     },
     {
         id: 'researcher',
@@ -82,7 +49,6 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'Deep web research, information gathering, and knowledge management.',
         icon: '>>',
         skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
-        audience: ['developer', 'enterprise'],
     },
     {
         id: 'devops',
@@ -91,7 +57,6 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'CI/CD automation, infrastructure tasks, deployment pipelines, and repo management.',
         icon: '#!',
         skillBundleIds: ['preset-devops', 'preset-github-ops'],
-        audience: ['developer', 'enterprise'],
     },
     {
         id: 'custom',
@@ -100,7 +65,6 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'Start from scratch. Pick your own name, model, and skills.',
         icon: '**',
         skillBundleIds: [],
-        audience: ['developer', 'enterprise'],
     },
 ];
 
@@ -132,34 +96,10 @@ const TEMPLATES: AgentTemplate[] = [
             </div>
 
             @switch (step()) {
-                @case ('audience') {
+                @case ('create') {
                     <div class="wizard__step wizard__step--wide">
-                        <h2 class="step__title">How will you use Corvid?</h2>
-                        <p class="step__desc">This shapes your dashboard. You can change it anytime in Settings.</p>
-
-                        <div class="audience-grid">
-                            <button class="audience-card"
-                                    [attr.data-selected]="selectedAudience() === 'normal'"
-                                    (click)="selectedAudience.set('normal')">
-                                <span class="audience-card__icon">&gt;_</span>
-                                <span class="audience-card__name">Creator</span>
-                                <span class="audience-card__desc">I have ideas but don't code. Show me the simple view with just agents and chat.</span>
-                            </button>
-                            <button class="audience-card"
-                                    [attr.data-selected]="selectedAudience() === 'developer'"
-                                    (click)="selectedAudience.set('developer')">
-                                <span class="audience-card__icon">{{ '{' }}{{ '}' }}</span>
-                                <span class="audience-card__name">Developer</span>
-                                <span class="audience-card__desc">I write code. Show me metrics, sessions, logs, and developer tools.</span>
-                            </button>
-                            <button class="audience-card"
-                                    [attr.data-selected]="selectedAudience() === 'enterprise'"
-                                    (click)="selectedAudience.set('enterprise')">
-                                <span class="audience-card__icon">::</span>
-                                <span class="audience-card__name">Enterprise</span>
-                                <span class="audience-card__desc">I manage teams. Show me governance, security, spending, and full config.</span>
-                            </button>
-                        </div>
+                        <h2 class="step__title">Create Your First Agent</h2>
+                        <p class="step__desc">Pick a template, then customize.</p>
 
                         @if (!healthReady()) {
                             <div class="wizard__warning">
@@ -171,23 +111,8 @@ const TEMPLATES: AgentTemplate[] = [
                             </div>
                         }
 
-                        <div class="wizard__actions">
-                            <button class="wizard__btn wizard__btn--primary"
-                                    [disabled]="!selectedAudience()"
-                                    (click)="confirmAudience()">
-                                Next
-                            </button>
-                        </div>
-                    </div>
-                }
-
-                @case ('create') {
-                    <div class="wizard__step wizard__step--wide">
-                        <h2 class="step__title">Create Your First Agent</h2>
-                        <p class="step__desc">Pick a template, then customize.</p>
-
                         <div class="template-grid">
-                            @for (t of filteredTemplates(); track t.id) {
+                            @for (t of TEMPLATES; track t.id) {
                                 <button class="template-card"
                                         [attr.data-selected]="selectedTemplate()?.id === t.id"
                                         (click)="selectTemplate(t)">
@@ -246,17 +171,12 @@ const TEMPLATES: AgentTemplate[] = [
                                 }
 
                                 <div class="wizard__actions">
-                                    <button type="button" class="wizard__btn" (click)="step.set('audience')">Back</button>
                                     <button type="submit" class="wizard__btn wizard__btn--primary"
                                             [disabled]="form.invalid || creating()">
                                         {{ creating() ? 'Creating...' : 'Create Agent' }}
                                     </button>
                                 </div>
                             </form>
-                        } @else {
-                            <div class="wizard__actions">
-                                <button type="button" class="wizard__btn" (click)="step.set('audience')">Back</button>
-                            </div>
                         }
                     </div>
                 }
@@ -273,18 +193,14 @@ const TEMPLATES: AgentTemplate[] = [
                                 <span class="done__value done__value--ok">{{ createdAgentName() }}</span>
                             </div>
                             <div class="done__row">
-                                <span class="done__label">Mode</span>
-                                <span class="done__value">{{ selectedAudience() === 'normal' ? 'Creator' : selectedAudience() === 'developer' ? 'Developer' : 'Enterprise' }}</span>
-                            </div>
-                            <div class="done__row">
                                 <span class="done__label">LLM</span>
                                 <span class="done__value" [class.done__value--ok]="health()?.llm" [class.done__value--warn]="!health()?.llm">{{ health()?.llm ? 'Connected' : 'Not configured' }}</span>
                             </div>
                         </div>
 
                         <div class="done__actions">
-                            <button class="wizard__btn wizard__btn--primary" (click)="startSession()">
-                                Start a Conversation
+                            <button class="wizard__btn wizard__btn--primary" (click)="startChat()">
+                                Start Chatting
                             </button>
                             <button class="wizard__btn" (click)="goToDashboard()">
                                 Go to Dashboard
@@ -372,52 +288,6 @@ const TEMPLATES: AgentTemplate[] = [
             margin: 0 0 1.25rem;
             font-size: 0.8rem;
             color: var(--text-tertiary);
-        }
-
-        /* Audience cards */
-        .audience-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 0.65rem;
-            margin-bottom: 1.25rem;
-            text-align: left;
-        }
-        .audience-card {
-            display: flex;
-            flex-direction: column;
-            gap: 0.3rem;
-            padding: 1rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-family: inherit;
-            color: var(--text-primary);
-            transition: border-color 0.15s, background 0.15s;
-        }
-        .audience-card:hover {
-            border-color: var(--border-bright);
-            background: var(--bg-hover);
-        }
-        .audience-card[data-selected="true"] {
-            border-color: var(--accent-cyan);
-            background: rgba(0, 229, 255, 0.06);
-            box-shadow: var(--glow-cyan);
-        }
-        .audience-card__icon {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
-            font-family: monospace;
-        }
-        .audience-card__name {
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        .audience-card__desc {
-            font-size: 0.7rem;
-            color: var(--text-tertiary);
-            line-height: 1.35;
         }
 
         /* Template Grid */
@@ -640,7 +510,6 @@ const TEMPLATES: AgentTemplate[] = [
             .wizard { padding: 1rem; }
             .wizard__logo { font-size: 0.25rem; }
             .wizard__step { padding: 1rem; }
-            .audience-grid { grid-template-columns: 1fr; }
             .template-grid { grid-template-columns: 1fr; }
             .field-row { grid-template-columns: 1fr; }
         }
@@ -653,12 +522,12 @@ export class WelcomeWizardComponent implements OnInit {
     protected readonly projectService = inject(ProjectService);
     private readonly sessionService = inject(SessionService);
     private readonly apiService = inject(ApiService);
-    private readonly audienceService = inject(AudienceService);
 
     readonly agentCreated = output<void>();
 
-    protected readonly steps = ['audience', 'create', 'done'];
-    protected readonly step = signal<'audience' | 'create' | 'done'>('audience');
+    protected readonly TEMPLATES = TEMPLATES;
+    protected readonly steps = ['create', 'done'];
+    protected readonly step = signal<'create' | 'done'>('create');
     protected readonly stepIndex = signal(0);
     protected readonly health = signal<HealthStatus | null>(null);
     protected readonly healthReady = signal(false);
@@ -667,8 +536,6 @@ export class WelcomeWizardComponent implements OnInit {
     protected readonly creating = signal(false);
     protected readonly createdAgentName = signal('');
     protected readonly selectedTemplate = signal<AgentTemplate | null>(null);
-    protected readonly selectedAudience = signal<Audience | null>(null);
-    protected readonly filteredTemplates = signal<AgentTemplate[]>([]);
     private createdAgentId = '';
 
     protected readonly form = this.fb.nonNullable.group({
@@ -722,15 +589,6 @@ export class WelcomeWizardComponent implements OnInit {
         }
     }
 
-    protected confirmAudience(): void {
-        const audience = this.selectedAudience();
-        if (!audience) return;
-        this.audienceService.setAudience(audience);
-        this.filteredTemplates.set(TEMPLATES.filter((t) => t.audience.includes(audience)));
-        this.step.set('create');
-        this.stepIndex.set(1);
-    }
-
     protected selectTemplate(template: AgentTemplate): void {
         this.selectedTemplate.set(template);
         if (template.suggestedName) {
@@ -770,7 +628,7 @@ export class WelcomeWizardComponent implements OnInit {
 
             this.agentCreated.emit();
             this.step.set('done');
-            this.stepIndex.set(2);
+            this.stepIndex.set(1);
         } finally {
             this.creating.set(false);
         }
@@ -797,10 +655,8 @@ export class WelcomeWizardComponent implements OnInit {
         ).join(' ');
     }
 
-    protected startSession(): void {
-        this.router.navigate(['/sessions/new'], {
-            queryParams: { agentId: this.createdAgentId },
-        });
+    protected startChat(): void {
+        this.router.navigate(['/chat']);
     }
 
     protected goToDashboard(): void {

@@ -8,12 +8,10 @@ import {
     AfterViewInit,
     OnDestroy,
     signal,
-    effect,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
-import { AudienceService } from '../../core/services/audience.service';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -25,7 +23,7 @@ interface SidebarSection {
 }
 
 const SECTIONS: SidebarSection[] = [
-    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles'] },
+    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles'] },
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions', '/work-tasks', '/councils'] },
     { key: 'automation', label: 'Automation', collapsible: true, defaultCollapsed: true, routes: ['/schedules', '/workflows', '/webhooks', '/mention-polling'] },
     { key: 'integrations', label: 'Integrations', collapsible: true, defaultCollapsed: true, routes: ['/mcp-servers'] },
@@ -56,18 +54,24 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             aria-label="Main navigation"
             #sidebarEl>
             <ul class="sidebar__list">
-                <!-- Core (always visible) -->
+                <!-- Core -->
                 <li class="sidebar__section">
                     <span class="sidebar__section-label">Core</span>
                 </li>
                 <li>
                     <a
                         class="sidebar__link"
-                        routerLink="/dashboard"
+                        routerLink="/chat"
                         routerLinkActive="sidebar__link--active"
                         aria-current="page"
-                        title="Dashboard"
+                        title="Chat"
                         #firstLink>
+                        <span class="sidebar__label">Chat</span>
+                        <span class="sidebar__abbr">Ch</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/dashboard" routerLinkActive="sidebar__link--active" title="Dashboard">
                         <span class="sidebar__label">Dashboard</span>
                         <span class="sidebar__abbr">D</span>
                     </a>
@@ -84,30 +88,24 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         <span class="sidebar__abbr">P</span>
                     </a>
                 </li>
-                @if (audienceService.isCoreLinkVisible('/models')) {
                 <li>
                     <a class="sidebar__link" routerLink="/models" routerLinkActive="sidebar__link--active" title="Models">
                         <span class="sidebar__label">Models</span>
                         <span class="sidebar__abbr">M</span>
                     </a>
                 </li>
-                }
-                @if (audienceService.isCoreLinkVisible('/personas')) {
                 <li>
                     <a class="sidebar__link" routerLink="/personas" routerLinkActive="sidebar__link--active" title="Personas">
                         <span class="sidebar__label">Personas</span>
                         <span class="sidebar__abbr">Ps</span>
                     </a>
                 </li>
-                }
-                @if (audienceService.isCoreLinkVisible('/skill-bundles')) {
                 <li>
                     <a class="sidebar__link" routerLink="/skill-bundles" routerLinkActive="sidebar__link--active" title="Skill Bundles">
                         <span class="sidebar__label">Skill Bundles</span>
                         <span class="sidebar__abbr">Sk</span>
                     </a>
                 </li>
-                }
 
                 <!-- Sessions (collapsible) -->
                 <li class="sidebar__section sidebar__section--collapsible">
@@ -149,7 +147,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     </ul>
                 </li>
 
-                @if (audienceService.isSectionVisible('automation')) {
                 <!-- Automation (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -195,9 +192,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
 
-                @if (audienceService.isSectionVisible('integrations')) {
                 <!-- Integrations (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -225,9 +220,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
 
-                @if (audienceService.isSectionVisible('monitoring')) {
                 <!-- Monitoring (collapsible) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -273,9 +266,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
 
-                @if (audienceService.isSectionVisible('community')) {
                 <!-- Community (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -309,9 +300,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
 
-                @if (audienceService.isSectionVisible('config')) {
                 <!-- Config (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -375,7 +364,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
             </ul>
             <button
                 class="sidebar__help-btn"
@@ -677,21 +665,9 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
-    protected readonly audienceService = inject(AudienceService);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private readonly sidebarEl = viewChild<ElementRef<HTMLElement>>('sidebarEl');
     private routerSub: Subscription | null = null;
-
-    /** Auto-collapse sidebar when audience changes (skip initial) */
-    private initialAudience = this.audienceService.audience();
-    private readonly audienceEffect = effect(() => {
-        const audience = this.audienceService.audience();
-        if (audience === this.initialAudience) return;
-        this.initialAudience = audience;
-        const shouldCollapse = audience === 'normal';
-        this.collapsed.set(shouldCollapse);
-        localStorage.setItem('sidebar_collapsed', String(shouldCollapse));
-    });
 
     /** Reference to the hamburger button for focus return — set by parent */
     private hamburgerRef: HTMLElement | null = null;
@@ -787,23 +763,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         }
     }
 
-    /** Sync sidebar collapse state when audience changes */
-    syncCollapseWithAudience(): void {
-        const shouldCollapse = this.audienceService.audience() === 'normal';
-        // Only auto-collapse if user hasn't explicitly set a preference
-        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('sidebar_collapsed') : null;
-        if (stored === null) {
-            this.collapsed.set(shouldCollapse);
-        }
-    }
-
     private loadCollapsed(): boolean {
         if (typeof localStorage !== 'undefined') {
             const stored = localStorage.getItem('sidebar_collapsed');
             if (stored !== null) return stored === 'true';
         }
-        // Default: collapsed for normal audience, expanded otherwise
-        return this.audienceService.audience() === 'normal';
+        return false;
     }
 
     /** Load section states from localStorage, falling back to defaults */

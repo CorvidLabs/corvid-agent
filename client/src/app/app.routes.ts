@@ -1,7 +1,12 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-    { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+    { path: '', redirectTo: 'chat', pathMatch: 'full' },
+    {
+        path: 'chat',
+        loadComponent: () =>
+            import('./features/chat-home/chat-home.component').then((m) => m.ChatHomeComponent),
+    },
     {
         path: 'dashboard',
         loadComponent: () =>
@@ -197,5 +202,5 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/brain-viewer/brain-viewer.component').then((m) => m.BrainViewerComponent),
     },
-    { path: '**', redirectTo: 'dashboard' },
+    { path: '**', redirectTo: 'chat' },
 ];
