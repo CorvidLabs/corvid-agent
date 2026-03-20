@@ -165,6 +165,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const shutdownCoordinator = new ShutdownCoordinator(SHUTDOWN_GRACE_MS);
 
     // Non-blocking, opt-in — logs warnings internally when OTLP endpoint is unavailable
+    /* c8 ignore next 3 -- defensive catch on optional init */
     initObservability().catch((err) => {
         log.warn('Observability init failed', { error: err instanceof Error ? err.message : String(err) });
     });

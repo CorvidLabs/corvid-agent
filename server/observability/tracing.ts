@@ -51,6 +51,7 @@ export async function initTracing(): Promise<void> {
         sdk.start();
 
         // Graceful shutdown
+        /* c8 ignore next 3 -- defensive catch on SIGTERM shutdown */
         process.on('SIGTERM', () => sdk.shutdown().catch((err) => {
             console.warn('[Tracing] OTEL SDK shutdown failed:', err instanceof Error ? err.message : String(err));
         }));
