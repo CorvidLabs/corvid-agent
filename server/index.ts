@@ -102,6 +102,7 @@ const {
     astParserService,
     permissionBroker,
     flockDirectoryService,
+    browserService,
     discordBridge,
 } = await bootstrapServices(db, startTime);
 
@@ -112,7 +113,7 @@ const algochatInitDeps: AlgoChatInitDeps = {
     questionDispatcher, reputationScorer, reputationAttestation, reputationVerifier,
     astParserService, permissionBroker, shutdownCoordinator, memorySyncService,
     graduationService, responsePollingService, usageMeter, healthMonitorService,
-    mentionPollingService, flockDirectoryService,
+    mentionPollingService, flockDirectoryService, browserService,
 };
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {

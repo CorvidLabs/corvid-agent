@@ -81,6 +81,9 @@ export { handleLookupContact } from './contacts';
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
 
+// ─── Browser automation ────────────────────────────────────────────────────
+export { handleBrowser } from './browser';
+
 // ─── Observations (memory graduation) ──────────────────────────────────────
 export {
     handleRecordObservation,

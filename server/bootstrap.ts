@@ -57,6 +57,7 @@ import { OllamaProvider } from './providers/ollama/provider';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
 import { FlockDirectoryService } from './flock-directory/service';
+import { BrowserService } from './browser/service';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
 
@@ -139,6 +140,9 @@ export interface ServiceContainer {
 
     // Agent directory
     flockDirectoryService: FlockDirectoryService;
+
+    // Browser automation
+    browserService: BrowserService;
 }
 
 /**
@@ -267,6 +271,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const marketplaceService = new MarketplaceService(db);
     const marketplaceFederation = new MarketplaceFederation(db);
     const flockDirectoryService = new FlockDirectoryService(db);
+    const browserService = new BrowserService();
 
     const reputationScorer = new ReputationScorer(db);
     const reputationAttestation = new ReputationAttestation(db);
@@ -471,5 +476,6 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         slackBridge,
         permissionBroker,
         flockDirectoryService,
+        browserService,
     };
 }
