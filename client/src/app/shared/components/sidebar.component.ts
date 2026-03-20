@@ -12,6 +12,7 @@ import {
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
+import { AudienceService } from '../../core/services/audience.service';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -82,24 +83,30 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         <span class="sidebar__abbr">P</span>
                     </a>
                 </li>
+                @if (audienceService.isCoreLinkVisible('/models')) {
                 <li>
                     <a class="sidebar__link" routerLink="/models" routerLinkActive="sidebar__link--active" title="Models">
                         <span class="sidebar__label">Models</span>
                         <span class="sidebar__abbr">M</span>
                     </a>
                 </li>
+                }
+                @if (audienceService.isCoreLinkVisible('/personas')) {
                 <li>
                     <a class="sidebar__link" routerLink="/personas" routerLinkActive="sidebar__link--active" title="Personas">
                         <span class="sidebar__label">Personas</span>
                         <span class="sidebar__abbr">Ps</span>
                     </a>
                 </li>
+                }
+                @if (audienceService.isCoreLinkVisible('/skill-bundles')) {
                 <li>
                     <a class="sidebar__link" routerLink="/skill-bundles" routerLinkActive="sidebar__link--active" title="Skill Bundles">
                         <span class="sidebar__label">Skill Bundles</span>
                         <span class="sidebar__abbr">Sk</span>
                     </a>
                 </li>
+                }
 
                 <!-- Sessions (collapsible) -->
                 <li class="sidebar__section sidebar__section--collapsible">
@@ -141,6 +148,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     </ul>
                 </li>
 
+                @if (audienceService.isSectionVisible('automation')) {
                 <!-- Automation (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -186,7 +194,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
 
+                @if (audienceService.isSectionVisible('integrations')) {
                 <!-- Integrations (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -214,7 +224,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
 
+                @if (audienceService.isSectionVisible('monitoring')) {
                 <!-- Monitoring (collapsible) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -260,7 +272,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
 
+                @if (audienceService.isSectionVisible('community')) {
                 <!-- Community (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -294,7 +308,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
 
+                @if (audienceService.isSectionVisible('config')) {
                 <!-- Config (collapsible, collapsed by default) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
@@ -358,6 +374,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
             </ul>
             <button
                 class="sidebar__help-btn"
@@ -661,6 +678,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
+    protected readonly audienceService = inject(AudienceService);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private readonly sidebarEl = viewChild<ElementRef<HTMLElement>>('sidebarEl');
     private routerSub: Subscription | null = null;

@@ -5,6 +5,7 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
+import { AudienceService, type Audience } from '../../core/services/audience.service';
 import type { ProviderInfo } from '../../core/models/agent.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -23,9 +24,11 @@ interface AgentTemplate {
     description: string;
     icon: string;
     skillBundleIds: string[];
+    audience: Audience[];
 }
 
-const CREATOR_TEMPLATES: AgentTemplate[] = [
+const TEMPLATES: AgentTemplate[] = [
+    // Normal user templates
     {
         id: 'website-builder',
         name: 'Website Builder',
@@ -33,14 +36,16 @@ const CREATOR_TEMPLATES: AgentTemplate[] = [
         description: 'Builds websites, landing pages, and portfolios. Just describe what you want.',
         icon: '[]',
         skillBundleIds: ['preset-full-stack'],
+        audience: ['normal'],
     },
     {
         id: 'app-creator',
         name: 'App Creator',
         suggestedName: 'AppMaker',
-        description: 'Creates apps and tools from your ideas. Habit trackers, dashboards, calculators — anything.',
+        description: 'Creates apps and tools from your ideas. Habit trackers, dashboards, calculators.',
         icon: '<>',
         skillBundleIds: ['preset-full-stack'],
+        audience: ['normal'],
     },
     {
         id: 'assistant',
@@ -49,10 +54,9 @@ const CREATOR_TEMPLATES: AgentTemplate[] = [
         description: 'Research, writing, analysis, and automation. Your AI helper for everyday tasks.',
         icon: '>>',
         skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
+        audience: ['normal'],
     },
-];
-
-const DEVELOPER_TEMPLATES: AgentTemplate[] = [
+    // Developer templates
     {
         id: 'full-stack',
         name: 'Full Stack Developer',
@@ -60,14 +64,16 @@ const DEVELOPER_TEMPLATES: AgentTemplate[] = [
         description: 'Reads and edits code, manages PRs and issues, creates work tasks. The all-rounder.',
         icon: '{}',
         skillBundleIds: ['preset-full-stack'],
+        audience: ['developer', 'enterprise'],
     },
     {
         id: 'code-reviewer',
         name: 'Code Reviewer',
         suggestedName: 'Reviewer',
-        description: 'Reviews pull requests, catches bugs, and provides actionable feedback on code quality.',
+        description: 'Reviews pull requests, catches bugs, and provides actionable feedback.',
         icon: '?!',
         skillBundleIds: ['preset-code-reviewer', 'preset-github-ops'],
+        audience: ['developer', 'enterprise'],
     },
     {
         id: 'researcher',
@@ -76,6 +82,7 @@ const DEVELOPER_TEMPLATES: AgentTemplate[] = [
         description: 'Deep web research, information gathering, and knowledge management.',
         icon: '>>',
         skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
+        audience: ['developer', 'enterprise'],
     },
     {
         id: 'devops',
@@ -84,6 +91,7 @@ const DEVELOPER_TEMPLATES: AgentTemplate[] = [
         description: 'CI/CD automation, infrastructure tasks, deployment pipelines, and repo management.',
         icon: '#!',
         skillBundleIds: ['preset-devops', 'preset-github-ops'],
+        audience: ['developer', 'enterprise'],
     },
     {
         id: 'custom',
@@ -92,10 +100,9 @@ const DEVELOPER_TEMPLATES: AgentTemplate[] = [
         description: 'Start from scratch. Pick your own name, model, and skills.',
         icon: '**',
         skillBundleIds: [],
+        audience: ['developer', 'enterprise'],
     },
 ];
-
-const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEMPLATES];
 
 @Component({
     selector: 'app-welcome-wizard',
@@ -112,89 +119,62 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
 ╚██████╗╚██████╔╝██║  ██║ ╚████╔╝ ██║██████╔╝
  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═════╝</pre>
                 <h1 class="wizard__title">Welcome to Corvid Agent</h1>
-                <p class="wizard__subtitle">Your own AI developer — tell it what to build, fix, or figure out</p>
+                <p class="wizard__subtitle">Your own AI developer &mdash; tell it what to build, fix, or figure out</p>
+            </div>
+
+            <!-- Progress indicator -->
+            <div class="wizard__progress">
+                @for (s of steps; track s; let i = $index) {
+                    <span class="progress-dot"
+                          [attr.data-active]="stepIndex() === i"
+                          [attr.data-done]="stepIndex() > i"></span>
+                }
             </div>
 
             @switch (step()) {
-                @case ('status') {
-                    <div class="wizard__step">
-                        <h2 class="step__title">System Status</h2>
-                        <p class="step__desc">Checking your environment...</p>
+                @case ('audience') {
+                    <div class="wizard__step wizard__step--wide">
+                        <h2 class="step__title">How will you use Corvid?</h2>
+                        <p class="step__desc">This shapes your dashboard. You can change it anytime in Settings.</p>
 
-                        <div class="status-grid">
-                            <div class="status-check" [attr.data-ok]="health()?.apiKey">
-                                <span class="status-check__icon">{{ health()?.apiKey ? '>' : '!' }}</span>
-                                <span class="status-check__label">API Key</span>
-                                <span class="status-check__value">{{ health()?.apiKey ? 'Configured' : 'Missing' }}</span>
-                            </div>
-                            <div class="status-check" [attr.data-ok]="health()?.llm">
-                                <span class="status-check__icon">{{ health()?.llm ? '>' : '!' }}</span>
-                                <span class="status-check__label">LLM Provider</span>
-                                <span class="status-check__value">{{ health()?.llm ? 'Available' : 'Unavailable' }}</span>
-                            </div>
-                            <div class="status-check" [attr.data-ok]="health()?.github">
-                                <span class="status-check__icon">{{ health()?.github ? '>' : '~' }}</span>
-                                <span class="status-check__label">GitHub</span>
-                                <span class="status-check__value">{{ health()?.github ? 'Connected' : 'Optional' }}</span>
-                            </div>
-                            <div class="status-check" [attr.data-ok]="health()?.algorand">
-                                <span class="status-check__icon">{{ health()?.algorand ? '>' : '~' }}</span>
-                                <span class="status-check__label">AlgoChat</span>
-                                <span class="status-check__value">{{ health()?.algorand ? 'Connected' : 'Optional' }}</span>
-                            </div>
+                        <div class="audience-grid">
+                            <button class="audience-card"
+                                    [attr.data-selected]="selectedAudience() === 'normal'"
+                                    (click)="selectedAudience.set('normal')">
+                                <span class="audience-card__icon">&gt;_</span>
+                                <span class="audience-card__name">Creator</span>
+                                <span class="audience-card__desc">I have ideas but don't code. Show me the simple view with just agents and chat.</span>
+                            </button>
+                            <button class="audience-card"
+                                    [attr.data-selected]="selectedAudience() === 'developer'"
+                                    (click)="selectedAudience.set('developer')">
+                                <span class="audience-card__icon">{{ '{' }}{{ '}' }}</span>
+                                <span class="audience-card__name">Developer</span>
+                                <span class="audience-card__desc">I write code. Show me metrics, sessions, logs, and developer tools.</span>
+                            </button>
+                            <button class="audience-card"
+                                    [attr.data-selected]="selectedAudience() === 'enterprise'"
+                                    (click)="selectedAudience.set('enterprise')">
+                                <span class="audience-card__icon">::</span>
+                                <span class="audience-card__name">Enterprise</span>
+                                <span class="audience-card__desc">I manage teams. Show me governance, security, spending, and full config.</span>
+                            </button>
                         </div>
 
-                        @if (health()?.apiKey || health()?.llm) {
-                            <button class="wizard__btn wizard__btn--primary" (click)="step.set('templates')">
-                                Create Your First Agent
-                            </button>
-                        } @else {
+                        @if (!healthReady()) {
+                            <div class="wizard__warning">
+                                <p>Checking system status...</p>
+                            </div>
+                        } @else if (!health()?.apiKey && !health()?.llm) {
                             <div class="wizard__warning">
                                 <p>No AI provider detected. Install <a href="https://claude.com/claude-code" target="_blank">Claude Code CLI</a> or <a href="https://ollama.com" target="_blank">Ollama</a>, or set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> file.</p>
                             </div>
-                            <button class="wizard__btn" (click)="step.set('templates')">
-                                Continue Anyway
-                            </button>
                         }
-                    </div>
-                }
-
-                @case ('templates') {
-                    <div class="wizard__step wizard__step--wide">
-                        <h2 class="step__title">What do you want to do?</h2>
-                        <p class="step__desc">Pick a starting point &mdash; you can customize everything later.</p>
-
-                        <p class="template-section-label">I have ideas but don&rsquo;t code</p>
-                        <div class="template-grid">
-                            @for (t of creatorTemplates; track t.id) {
-                                <button class="template-card"
-                                        [attr.data-selected]="selectedTemplate()?.id === t.id"
-                                        (click)="selectTemplate(t)">
-                                    <span class="template-card__icon">{{ t.icon }}</span>
-                                    <span class="template-card__name">{{ t.name }}</span>
-                                    <span class="template-card__desc">{{ t.description }}</span>
-                                </button>
-                            }
-                        </div>
-
-                        <p class="template-section-label" style="margin-top: 0.75rem;">I&rsquo;m a developer</p>
-                        <div class="template-grid">
-                            @for (t of developerTemplates; track t.id) {
-                                <button class="template-card"
-                                        [attr.data-selected]="selectedTemplate()?.id === t.id"
-                                        (click)="selectTemplate(t)">
-                                    <span class="template-card__icon">{{ t.icon }}</span>
-                                    <span class="template-card__name">{{ t.name }}</span>
-                                    <span class="template-card__desc">{{ t.description }}</span>
-                                </button>
-                            }
-                        </div>
 
                         <div class="wizard__actions">
-                            <button type="button" class="wizard__btn" (click)="step.set('status')">Back</button>
                             <button class="wizard__btn wizard__btn--primary"
-                                    [disabled]="!selectedTemplate()"
-                                    (click)="applyTemplate()">
+                                    [disabled]="!selectedAudience()"
+                                    (click)="confirmAudience()">
                                 Next
                             </button>
                         </div>
@@ -202,148 +182,103 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
                 }
 
                 @case ('create') {
-                    <div class="wizard__step">
+                    <div class="wizard__step wizard__step--wide">
                         <h2 class="step__title">Create Your First Agent</h2>
-                        <p class="step__desc">
-                            @if (selectedTemplate() && selectedTemplate()!.id !== 'custom') {
-                                Customize your {{ selectedTemplate()!.name }} agent.
-                            } @else {
-                                Give your agent a name and choose a model.
+                        <p class="step__desc">Pick a template, then customize.</p>
+
+                        <div class="template-grid">
+                            @for (t of filteredTemplates(); track t.id) {
+                                <button class="template-card"
+                                        [attr.data-selected]="selectedTemplate()?.id === t.id"
+                                        (click)="selectTemplate(t)">
+                                    <span class="template-card__icon">{{ t.icon }}</span>
+                                    <span class="template-card__name">{{ t.name }}</span>
+                                    <span class="template-card__desc">{{ t.description }}</span>
+                                </button>
                             }
-                        </p>
+                        </div>
 
-                        <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form">
-                            <div class="field">
-                                <label for="wiz-name" class="field__label">Agent Name</label>
-                                <input id="wiz-name" formControlName="name" class="field__input"
-                                       placeholder="e.g. Corvid, Scout, Builder" autocomplete="off" />
-                            </div>
+                        @if (selectedTemplate()) {
+                            <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form">
+                                <div class="field-row">
+                                    <div class="field">
+                                        <label for="wiz-name" class="field__label">Name</label>
+                                        <input id="wiz-name" formControlName="name" class="field__input"
+                                               placeholder="e.g. Corvid, Scout" autocomplete="off" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="wiz-provider" class="field__label">Provider</label>
+                                        <select id="wiz-provider" formControlName="provider" class="field__input"
+                                                (change)="onProviderChange()">
+                                            @for (p of providers(); track p.type) {
+                                                <option [value]="p.type">{{ p.name }}</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
 
-                            <div class="field">
-                                <label for="wiz-provider" class="field__label">Provider</label>
-                                <select id="wiz-provider" formControlName="provider" class="field__input"
-                                        (change)="onProviderChange()">
-                                    @for (p of providers(); track p.type) {
-                                        <option [value]="p.type">{{ p.name }}</option>
-                                    }
-                                </select>
-                            </div>
+                                <div class="field-row">
+                                    <div class="field">
+                                        <label for="wiz-model" class="field__label">Model</label>
+                                        <select id="wiz-model" formControlName="model" class="field__input">
+                                            @for (m of availableModels(); track m) {
+                                                <option [value]="m">{{ m }}</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label for="wiz-project" class="field__label">Project</label>
+                                        <select id="wiz-project" formControlName="defaultProjectId" class="field__input">
+                                            <option [value]="null">None</option>
+                                            @for (p of projectService.projects(); track p.id) {
+                                                <option [value]="p.id">{{ p.name }}</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
 
-                            <div class="field">
-                                <label for="wiz-model" class="field__label">Model</label>
-                                <select id="wiz-model" formControlName="model" class="field__input">
-                                    @for (m of availableModels(); track m) {
-                                        <option [value]="m">{{ m }}</option>
-                                    }
-                                </select>
-                            </div>
-
-                            <div class="field">
-                                <label for="wiz-project" class="field__label">Project</label>
-                                <select id="wiz-project" formControlName="defaultProjectId" class="field__input">
-                                    <option [value]="null">None</option>
-                                    @for (p of projectService.projects(); track p.id) {
-                                        <option [value]="p.id">{{ p.name }}</option>
-                                    }
-                                </select>
-                            </div>
-
-                            @if (selectedTemplate() && selectedTemplate()!.skillBundleIds.length > 0) {
-                                <div class="field">
-                                    <span class="field__label">Skills</span>
+                                @if (selectedTemplate()!.skillBundleIds.length > 0) {
                                     <div class="skill-tags">
                                         @for (id of selectedTemplate()!.skillBundleIds; track id) {
                                             <span class="skill-tag">{{ formatBundleId(id) }}</span>
                                         }
                                     </div>
+                                }
+
+                                <div class="wizard__actions">
+                                    <button type="button" class="wizard__btn" (click)="step.set('audience')">Back</button>
+                                    <button type="submit" class="wizard__btn wizard__btn--primary"
+                                            [disabled]="form.invalid || creating()">
+                                        {{ creating() ? 'Creating...' : 'Create Agent' }}
+                                    </button>
                                 </div>
-                            }
-
+                            </form>
+                        } @else {
                             <div class="wizard__actions">
-                                <button type="button" class="wizard__btn" (click)="step.set('templates')">Back</button>
-                                <button type="submit" class="wizard__btn wizard__btn--primary"
-                                        [disabled]="form.invalid || creating()">
-                                    {{ creating() ? 'Creating...' : 'Create Agent' }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                }
-
-                @case ('flock') {
-                    <div class="wizard__step">
-                        <h2 class="step__title">Join the Flock</h2>
-                        <p class="step__desc">Register your agent on the Algorand network to discover and collaborate with other agents.</p>
-
-                        <div class="network-grid">
-                            <button class="network-card"
-                                    [attr.data-selected]="selectedNetwork() === 'localnet'"
-                                    (click)="selectedNetwork.set('localnet')">
-                                <span class="network-card__icon">[]</span>
-                                <span class="network-card__name">Localnet</span>
-                                <span class="network-card__desc">Development mode. Run a local Algorand network for testing.</span>
-                            </button>
-                            <button class="network-card"
-                                    [attr.data-selected]="selectedNetwork() === 'testnet'"
-                                    (click)="selectedNetwork.set('testnet')">
-                                <span class="network-card__icon">&lt;&gt;</span>
-                                <span class="network-card__name">Testnet</span>
-                                <span class="network-card__desc">Connect to Algorand TestNet. Interact with real agents in a sandbox.</span>
-                            </button>
-                        </div>
-
-                        @if (flockError()) {
-                            <div class="wizard__warning">
-                                <p>Registration failed, but you can continue setup.</p>
+                                <button type="button" class="wizard__btn" (click)="step.set('audience')">Back</button>
                             </div>
                         }
-
-                        <div class="wizard__actions">
-                            <button type="button" class="wizard__btn" (click)="step.set('create')">Back</button>
-                            <button type="button" class="wizard__btn" (click)="step.set('done')">Skip for now</button>
-                            <button class="wizard__btn wizard__btn--primary"
-                                    [disabled]="!selectedNetwork() || flockRegistering()"
-                                    (click)="registerFlock()">
-                                {{ flockRegistering() ? 'Registering...' : 'Register' }}
-                            </button>
-                        </div>
                     </div>
                 }
 
                 @case ('done') {
                     <div class="wizard__step wizard__step--done">
                         <div class="done__icon">&check;</div>
-                        <h2 class="step__title">Agent Created</h2>
-                        <p class="step__desc">{{ createdAgentName() }} is ready to go.</p>
+                        <h2 class="step__title">{{ createdAgentName() }} is ready</h2>
+                        <p class="step__desc">Your agent is set up and waiting for instructions.</p>
 
-                        <div class="setup-summary">
-                            <h3 class="setup-summary__title">Setup Summary</h3>
-                            <div class="setup-summary__list">
-                                <div class="setup-summary__item" data-status="ok">
-                                    <span class="setup-summary__icon">&check;</span>
-                                    <span class="setup-summary__label">Agent</span>
-                                    <span class="setup-summary__value setup-summary__value--ok">Created &mdash; {{ createdAgentName() }}</span>
-                                </div>
-                                <div class="setup-summary__item" [attr.data-status]="health()?.llm ? 'ok' : 'warn'">
-                                    <span class="setup-summary__icon">{{ health()?.llm ? '&check;' : '!' }}</span>
-                                    <span class="setup-summary__label">LLM Provider</span>
-                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.llm" [class.setup-summary__value--warn]="!health()?.llm">{{ health()?.llm ? 'Connected' : 'Not configured' }}</span>
-                                </div>
-                                <div class="setup-summary__item" [attr.data-status]="health()?.github ? 'ok' : 'optional'">
-                                    <span class="setup-summary__icon">{{ health()?.github ? '&check;' : '~' }}</span>
-                                    <span class="setup-summary__label">GitHub</span>
-                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.github" [class.setup-summary__value--optional]="!health()?.github">{{ health()?.github ? 'Connected' : 'Optional' }}</span>
-                                </div>
-                                <div class="setup-summary__item" [attr.data-status]="health()?.algorand ? 'ok' : 'optional'">
-                                    <span class="setup-summary__icon">{{ health()?.algorand ? '&check;' : '~' }}</span>
-                                    <span class="setup-summary__label">AlgoChat</span>
-                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.algorand" [class.setup-summary__value--optional]="!health()?.algorand">{{ health()?.algorand ? 'Connected' : 'Optional' }}</span>
-                                </div>
-                                <div class="setup-summary__item" [attr.data-status]="flockRegistered() ? 'ok' : 'optional'">
-                                    <span class="setup-summary__icon">{{ flockRegistered() ? '&check;' : '~' }}</span>
-                                    <span class="setup-summary__label">Flock Directory</span>
-                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="flockRegistered()" [class.setup-summary__value--optional]="!flockRegistered()">{{ flockRegistered() ? 'Registered' : 'Skipped' }}</span>
-                                </div>
+                        <div class="done__summary">
+                            <div class="done__row">
+                                <span class="done__label">Agent</span>
+                                <span class="done__value done__value--ok">{{ createdAgentName() }}</span>
+                            </div>
+                            <div class="done__row">
+                                <span class="done__label">Mode</span>
+                                <span class="done__value">{{ selectedAudience() === 'normal' ? 'Creator' : selectedAudience() === 'developer' ? 'Developer' : 'Enterprise' }}</span>
+                            </div>
+                            <div class="done__row">
+                                <span class="done__label">LLM</span>
+                                <span class="done__value" [class.done__value--ok]="health()?.llm" [class.done__value--warn]="!health()?.llm">{{ health()?.llm ? 'Connected' : 'Not configured' }}</span>
                             </div>
                         </div>
 
@@ -376,7 +311,7 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             text-align: center;
         }
 
-        .wizard__header { margin-bottom: 2rem; }
+        .wizard__header { margin-bottom: 1.5rem; }
         .wizard__logo {
             font-size: 0.35rem;
             line-height: 1.1;
@@ -396,6 +331,27 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             color: var(--text-tertiary);
         }
 
+        /* Progress dots */
+        .wizard__progress {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .progress-dot[data-active="true"] {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+        }
+        .progress-dot[data-done="true"] {
+            background: var(--accent-green);
+        }
+
         .wizard__step {
             width: 100%;
             max-width: 480px;
@@ -404,7 +360,7 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             border-radius: var(--radius-lg);
             padding: 1.5rem;
         }
-        .wizard__step--wide { max-width: 560px; }
+        .wizard__step--wide { max-width: 580px; }
         .wizard__step--done { text-align: center; }
 
         .step__title {
@@ -418,86 +374,50 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             color: var(--text-tertiary);
         }
 
-        /* Status Checks */
-        .status-grid {
+        /* Audience cards */
+        .audience-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.65rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .audience-card {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 1.25rem;
-        }
-        .status-check {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 0.75rem;
+            gap: 0.3rem;
+            padding: 1rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            text-align: left;
-        }
-        .status-check__icon {
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 700;
-            border-radius: 50%;
-            flex-shrink: 0;
-            border: 1px solid;
-        }
-        .status-check[data-ok="true"] .status-check__icon {
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-        .status-check[data-ok="false"] .status-check__icon {
-            color: var(--accent-amber, #ffc107);
-            border-color: var(--accent-amber, #ffc107);
-        }
-        .status-check__label {
-            flex: 1;
-            font-size: 0.8rem;
-            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
             color: var(--text-primary);
+            transition: border-color 0.15s, background 0.15s;
         }
-        .status-check__value {
-            font-size: 0.75rem;
+        .audience-card:hover {
+            border-color: var(--border-bright);
+            background: var(--bg-hover);
+        }
+        .audience-card[data-selected="true"] {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.06);
+            box-shadow: var(--glow-cyan);
+        }
+        .audience-card__icon {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            font-family: monospace;
+        }
+        .audience-card__name {
+            font-size: 0.85rem;
             font-weight: 600;
         }
-        .status-check[data-ok="true"] .status-check__value { color: var(--accent-green); }
-        .status-check[data-ok="false"] .status-check__value { color: var(--text-tertiary); }
-
-        /* Warning */
-        .wizard__warning {
-            background: rgba(255, 193, 7, 0.08);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            border-radius: var(--radius);
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        .wizard__warning p {
-            margin: 0;
-            font-size: 0.8rem;
-            color: var(--accent-amber, #ffc107);
-            text-align: left;
-        }
-        .wizard__warning code {
-            background: var(--bg-raised);
-            padding: 0.1rem 0.35rem;
-            border-radius: 3px;
-            font-size: 0.75rem;
-        }
-
-        /* Template Section Labels */
-        .template-section-label {
-            margin: 0 0 0.5rem;
+        .audience-card__desc {
             font-size: 0.7rem;
-            font-weight: 600;
             color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            text-align: left;
+            line-height: 1.35;
         }
 
         /* Template Grid */
@@ -549,28 +469,17 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             line-height: 1.35;
         }
 
-        /* Skill Tags */
-        .skill-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-        }
-        .skill-tag {
-            padding: 0.2rem 0.5rem;
-            background: rgba(0, 229, 255, 0.08);
-            border: 1px solid rgba(0, 229, 255, 0.2);
-            border-radius: var(--radius);
-            font-size: 0.7rem;
-            color: var(--accent-cyan);
-            font-weight: 600;
-        }
-
         /* Form */
         .wizard__form {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
             text-align: left;
+        }
+        .field-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
         }
         .field { display: flex; flex-direction: column; gap: 0.25rem; }
         .field__label {
@@ -593,6 +502,22 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             outline: none;
             border-color: var(--accent-cyan);
             box-shadow: var(--glow-cyan);
+        }
+
+        /* Skill Tags */
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+        .skill-tag {
+            padding: 0.2rem 0.5rem;
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: var(--radius);
+            font-size: 0.7rem;
+            color: var(--accent-cyan);
+            font-weight: 600;
         }
 
         /* Buttons */
@@ -628,6 +553,27 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
         }
         .wizard__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        /* Warning */
+        .wizard__warning {
+            background: rgba(255, 193, 7, 0.08);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .wizard__warning p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--accent-amber, #ffc107);
+            text-align: left;
+        }
+        .wizard__warning code {
+            background: var(--bg-raised);
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+        }
+
         /* Done */
         .done__icon {
             width: 48px;
@@ -643,123 +589,40 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             border: 2px solid var(--accent-green);
             background: rgba(0, 255, 136, 0.08);
         }
+        .done__summary {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .done__row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0.75rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .done__label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .done__value {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .done__value--ok { color: var(--accent-green); }
+        .done__value--warn { color: var(--accent-amber, #ffc107); }
         .done__actions {
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
             margin-top: 1.25rem;
         }
-
-        /* Network Grid (Flock Step) */
-        .network-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.65rem;
-            margin-bottom: 1.25rem;
-            text-align: left;
-        }
-        .network-card {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            padding: 0.75rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-family: inherit;
-            color: var(--text-primary);
-            transition: border-color 0.15s, background 0.15s;
-        }
-        .network-card:hover {
-            border-color: var(--border-bright);
-            background: var(--bg-hover);
-        }
-        .network-card[data-selected="true"] {
-            border-color: var(--accent-cyan);
-            background: rgba(0, 229, 255, 0.06);
-            box-shadow: var(--glow-cyan);
-        }
-        .network-card__icon {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
-            font-family: monospace;
-        }
-        .network-card__name {
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        .network-card__desc {
-            font-size: 0.7rem;
-            color: var(--text-tertiary);
-            line-height: 1.35;
-        }
-
-        /* Setup Summary (Done Step) */
-        .setup-summary {
-            text-align: left;
-            margin-bottom: 1.25rem;
-        }
-        .setup-summary__title {
-            margin: 0 0 0.65rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-        .setup-summary__list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .setup-summary__item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 0.75rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-        }
-        .setup-summary__icon {
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 700;
-            border-radius: 50%;
-            flex-shrink: 0;
-            border: 1px solid;
-        }
-        .setup-summary__item[data-status="ok"] .setup-summary__icon {
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-        .setup-summary__item[data-status="warn"] .setup-summary__icon {
-            color: var(--accent-amber, #ffc107);
-            border-color: var(--accent-amber, #ffc107);
-        }
-        .setup-summary__item[data-status="optional"] .setup-summary__icon {
-            color: var(--text-tertiary);
-            border-color: var(--text-tertiary);
-        }
-        .setup-summary__label {
-            flex: 1;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        .setup-summary__value {
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .setup-summary__value--ok { color: var(--accent-green); }
-        .setup-summary__value--warn { color: var(--accent-amber, #ffc107); }
-        .setup-summary__value--optional { color: var(--text-tertiary); }
 
         /* Footer */
         .wizard__footer {
@@ -777,8 +640,9 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
             .wizard { padding: 1rem; }
             .wizard__logo { font-size: 0.25rem; }
             .wizard__step { padding: 1rem; }
+            .audience-grid { grid-template-columns: 1fr; }
             .template-grid { grid-template-columns: 1fr; }
-            .network-grid { grid-template-columns: 1fr; }
+            .field-row { grid-template-columns: 1fr; }
         }
     `,
 })
@@ -789,23 +653,22 @@ export class WelcomeWizardComponent implements OnInit {
     protected readonly projectService = inject(ProjectService);
     private readonly sessionService = inject(SessionService);
     private readonly apiService = inject(ApiService);
+    private readonly audienceService = inject(AudienceService);
 
     readonly agentCreated = output<void>();
 
-    protected readonly step = signal<'status' | 'templates' | 'create' | 'flock' | 'done'>('status');
+    protected readonly steps = ['audience', 'create', 'done'];
+    protected readonly step = signal<'audience' | 'create' | 'done'>('audience');
+    protected readonly stepIndex = signal(0);
     protected readonly health = signal<HealthStatus | null>(null);
+    protected readonly healthReady = signal(false);
     protected readonly providers = signal<ProviderInfo[]>([]);
     protected readonly availableModels = signal<string[]>([]);
     protected readonly creating = signal(false);
     protected readonly createdAgentName = signal('');
     protected readonly selectedTemplate = signal<AgentTemplate | null>(null);
-    protected readonly selectedNetwork = signal<'localnet' | 'testnet' | null>(null);
-    protected readonly flockRegistering = signal(false);
-    protected readonly flockRegistered = signal(false);
-    protected readonly flockError = signal(false);
-    protected readonly templates = AGENT_TEMPLATES;
-    protected readonly creatorTemplates = CREATOR_TEMPLATES;
-    protected readonly developerTemplates = DEVELOPER_TEMPLATES;
+    protected readonly selectedAudience = signal<Audience | null>(null);
+    protected readonly filteredTemplates = signal<AgentTemplate[]>([]);
     private createdAgentId = '';
 
     protected readonly form = this.fb.nonNullable.group({
@@ -841,6 +704,7 @@ export class WelcomeWizardComponent implements OnInit {
         } catch {
             this.health.set({ database: false, github: false, algorand: false, llm: false, apiKey: false });
         }
+        this.healthReady.set(true);
     }
 
     private async loadProviders(): Promise<void> {
@@ -858,19 +722,22 @@ export class WelcomeWizardComponent implements OnInit {
         }
     }
 
-    protected selectTemplate(template: AgentTemplate): void {
-        this.selectedTemplate.set(template);
+    protected confirmAudience(): void {
+        const audience = this.selectedAudience();
+        if (!audience) return;
+        this.audienceService.setAudience(audience);
+        this.filteredTemplates.set(TEMPLATES.filter((t) => t.audience.includes(audience)));
+        this.step.set('create');
+        this.stepIndex.set(1);
     }
 
-    protected applyTemplate(): void {
-        const template = this.selectedTemplate();
-        if (!template) return;
+    protected selectTemplate(template: AgentTemplate): void {
+        this.selectedTemplate.set(template);
         if (template.suggestedName) {
             this.form.patchValue({ name: template.suggestedName });
         } else {
             this.form.patchValue({ name: '' });
         }
-        this.step.set('create');
     }
 
     protected onProviderChange(): void {
@@ -896,14 +763,14 @@ export class WelcomeWizardComponent implements OnInit {
             this.createdAgentId = agent.id;
             this.createdAgentName.set(agent.name);
 
-            // Assign skill bundles from the selected template
             const template = this.selectedTemplate();
             if (template) {
                 await this.assignSkillBundles(agent.id, template.skillBundleIds);
             }
 
             this.agentCreated.emit();
-            this.step.set('flock');
+            this.step.set('done');
+            this.stepIndex.set(2);
         } finally {
             this.creating.set(false);
         }
@@ -928,27 +795,6 @@ export class WelcomeWizardComponent implements OnInit {
         return id.replace('preset-', '').split('-').map(
             (w) => w.charAt(0).toUpperCase() + w.slice(1),
         ).join(' ');
-    }
-
-    protected async registerFlock(): Promise<void> {
-        if (!this.selectedNetwork() || this.flockRegistering()) return;
-        this.flockRegistering.set(true);
-        this.flockError.set(false);
-
-        try {
-            await firstValueFrom(
-                this.apiService.post('/flock-directory/agents', {
-                    name: this.createdAgentName(),
-                    capabilities: ['code', 'review', 'test'],
-                }),
-            );
-            this.flockRegistered.set(true);
-            this.step.set('done');
-        } catch {
-            this.flockError.set(true);
-        } finally {
-            this.flockRegistering.set(false);
-        }
     }
 
     protected startSession(): void {
