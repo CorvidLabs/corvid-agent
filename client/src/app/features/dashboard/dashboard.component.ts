@@ -77,7 +77,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
         <div class="dashboard">
             <!-- Top bar: customize toggle -->
             <div class="dash-toolbar">
-                <span class="dash-toolbar__title">Dashboard</span>
                 <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
                     {{ layoutService.customizing() ? 'Done' : 'Customize' }}
                 </button>
@@ -179,7 +178,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             @if (agentSummaries().length > 0) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3>Agent Activity</h3>
+                                        <h3>Agents</h3>
                                         <a class="section__link" routerLink="/agents">View all agents</a>
                                     </div>
                                     <div class="agent-grid">
@@ -552,24 +551,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
         .dashboard { padding: 1.25rem; overflow-y: auto; height: 100%; }
 
         /* Toolbar */
-        .dash-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: .5rem; flex-wrap: wrap; }
-        .dash-toolbar__title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
-        .view-toggle {
-            display: flex; gap: .25rem;
-            background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: .15rem; width: fit-content;
-        }
-        .view-toggle__btn {
-            padding: .35rem .75rem; border: none; border-radius: var(--radius-sm);
-            font-size: .7rem; font-weight: 600; font-family: inherit;
-            background: transparent; color: var(--text-tertiary); cursor: pointer;
-            text-transform: uppercase; letter-spacing: .06em; transition: all .15s;
-        }
-        .view-toggle__btn[data-active="true"] {
-            background: rgba(0,229,255,.1); color: var(--accent-cyan);
-            border: 1px solid rgba(0,229,255,.2);
-        }
-        .view-toggle__btn:hover:not([data-active="true"]) { color: var(--text-secondary); }
+        .dash-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: .5rem; flex-wrap: wrap; }
 
         .customize-btn {
             padding: .35rem .85rem; border-radius: var(--radius); font-size: .7rem;
@@ -666,33 +648,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             background: rgba(0,229,255,.06); cursor: pointer; text-transform: uppercase; letter-spacing: .05em; transition: all .15s;
         }
         .simple-hero__btn:hover { background: rgba(0,229,255,.14); box-shadow: 0 0 16px rgba(0,229,255,.15); }
-
-        /* Creator hero */
-        .creator-hero {
-            background: var(--bg-surface); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-lg); padding: 2rem; text-align: center;
-            margin-bottom: 1.25rem;
-            background-image: radial-gradient(ellipse at top, rgba(0,229,255,.04) 0%, transparent 60%);
-        }
-        .creator-hero__title { margin: 0 0 .5rem; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-        .creator-hero__desc { margin: 0 0 1.25rem; font-size: .85rem; color: var(--text-tertiary); max-width: 480px; margin-left: auto; margin-right: auto; }
-        .creator-hero__prompts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-bottom: 1.25rem; }
-        .creator-hero__prompt-btn {
-            padding: .45rem .85rem; border-radius: 9999px; font-size: .75rem; font-weight: 500;
-            font-family: inherit; border: 1px solid var(--border-bright); color: var(--text-secondary);
-            background: var(--bg-raised); cursor: pointer; transition: all .15s;
-        }
-        .creator-hero__prompt-btn:hover {
-            border-color: var(--accent-cyan); color: var(--accent-cyan);
-            background: rgba(0,229,255,.06); box-shadow: 0 0 12px rgba(0,229,255,.1);
-        }
-        .creator-hero__start-btn {
-            padding: .65rem 1.75rem; border-radius: var(--radius); font-size: .85rem; font-weight: 600;
-            font-family: inherit; border: 1px solid var(--accent-cyan); color: var(--accent-cyan);
-            background: rgba(0,229,255,.08); cursor: pointer; text-transform: uppercase; letter-spacing: .05em;
-            transition: all .15s;
-        }
-        .creator-hero__start-btn:hover { background: rgba(0,229,255,.16); box-shadow: 0 0 20px rgba(0,229,255,.15); }
 
         /* Agent grid */
         .agent-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: .75rem; }
@@ -963,9 +918,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             .metric-card { padding: .5rem .75rem; }
             .metric-card__value { font-size: 1.2rem; }
             .section { padding: .75rem; }
-            .creator-hero { padding: 1.25rem; }
-            .creator-hero__title { font-size: 1.1rem; }
-            .creator-hero__prompts { flex-direction: column; }
         }
     `,
 })
@@ -980,7 +932,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly notify = inject(NotificationService);
-
     protected readonly layoutService = inject(WidgetLayoutService);
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
@@ -1012,13 +963,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Drag state for widget grid
     protected readonly widgetDragIndex = signal(-1);
     protected readonly widgetDragOver = signal(-1);
-
-    protected readonly promptSuggestions = [
-        'Build me a portfolio website',
-        'Create a REST API for my project',
-        'Help me debug my application',
-        'Set up a CI/CD pipeline',
-    ];
 
     protected readonly activeWorkTaskCount = computed(() => {
         const tasks = this.overview()?.workTasks;
@@ -1221,15 +1165,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     protected navigateTo(path: string): void {
         this.router.navigate([path]);
-    }
-
-    protected startChatWithPrompt(prompt: string): void {
-        const firstAgent = this.agentSummaries()[0]?.agent;
-        if (firstAgent) {
-            this.router.navigate(['/sessions/new'], { queryParams: { agentId: firstAgent.id, prompt } });
-        } else {
-            this.router.navigate(['/sessions/new'], { queryParams: { prompt } });
-        }
     }
 
     protected startChat(agentId: string, event: Event): void {

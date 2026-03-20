@@ -35,6 +35,14 @@ const TEMPLATES: AgentTemplate[] = [
         skillBundleIds: ['preset-full-stack'],
     },
     {
+        id: 'website-builder',
+        name: 'Website Builder',
+        suggestedName: 'WebBuilder',
+        description: 'Builds websites, landing pages, and portfolios. Just describe what you want.',
+        icon: '[]',
+        skillBundleIds: ['preset-full-stack'],
+    },
+    {
         id: 'code-reviewer',
         name: 'Code Reviewer',
         suggestedName: 'Reviewer',
@@ -57,6 +65,14 @@ const TEMPLATES: AgentTemplate[] = [
         description: 'CI/CD automation, infrastructure tasks, deployment pipelines, and repo management.',
         icon: '#!',
         skillBundleIds: ['preset-devops', 'preset-github-ops'],
+    },
+    {
+        id: 'assistant',
+        name: 'Personal Assistant',
+        suggestedName: 'Assistant',
+        description: 'Research, writing, analysis, and automation. Your AI helper for everyday tasks.',
+        icon: '>_',
+        skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
     },
     {
         id: 'custom',
@@ -112,7 +128,7 @@ const TEMPLATES: AgentTemplate[] = [
                         }
 
                         <div class="template-grid">
-                            @for (t of TEMPLATES; track t.id) {
+                            @for (t of templates; track t.id) {
                                 <button class="template-card"
                                         [attr.data-selected]="selectedTemplate()?.id === t.id"
                                         (click)="selectTemplate(t)">
@@ -199,8 +215,8 @@ const TEMPLATES: AgentTemplate[] = [
                         </div>
 
                         <div class="done__actions">
-                            <button class="wizard__btn wizard__btn--primary" (click)="startChat()">
-                                Start Chatting
+                            <button class="wizard__btn wizard__btn--primary" (click)="startSession()">
+                                Start a Conversation
                             </button>
                             <button class="wizard__btn" (click)="goToDashboard()">
                                 Go to Dashboard
@@ -525,7 +541,6 @@ export class WelcomeWizardComponent implements OnInit {
 
     readonly agentCreated = output<void>();
 
-    protected readonly TEMPLATES = TEMPLATES;
     protected readonly steps = ['create', 'done'];
     protected readonly step = signal<'create' | 'done'>('create');
     protected readonly stepIndex = signal(0);
@@ -536,6 +551,7 @@ export class WelcomeWizardComponent implements OnInit {
     protected readonly creating = signal(false);
     protected readonly createdAgentName = signal('');
     protected readonly selectedTemplate = signal<AgentTemplate | null>(null);
+    protected readonly templates = TEMPLATES;
     private createdAgentId = '';
 
     protected readonly form = this.fb.nonNullable.group({
@@ -655,8 +671,10 @@ export class WelcomeWizardComponent implements OnInit {
         ).join(' ');
     }
 
-    protected startChat(): void {
-        this.router.navigate(['/chat']);
+    protected startSession(): void {
+        this.router.navigate(['/sessions/new'], {
+            queryParams: { agentId: this.createdAgentId },
+        });
     }
 
     protected goToDashboard(): void {
