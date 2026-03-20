@@ -29,3 +29,7 @@ signal/
 corvid-agent-chat/
 corvid-reputation/
 client/package-lock.json
+
+# Scratch/prototype files
+dashboard-preview.html
+pc-upgrade-dashboard*.html

@@ -293,7 +293,10 @@ export class OllamaProvider extends BaseLlmProvider {
         log.info(`Slot released for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
         // Probe GPU after first release to potentially upgrade concurrency
         if (this.gpuDetected === null) {
-            this.probeGpuMode().catch(() => {});
+            /* c8 ignore next 3 -- defensive catch on GPU probe */
+            this.probeGpuMode().catch((err) => {
+                log.warn('GPU probe failed', { error: err instanceof Error ? err.message : String(err) });
+            });
         }
         this.releaseWaiters();
     }

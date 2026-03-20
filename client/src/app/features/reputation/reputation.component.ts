@@ -5,12 +5,13 @@ import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -30,7 +31,13 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     <p>Reputation service unavailable (503). Scores may not be computed yet.</p>
                 </div>
             } @else if (reputationService.scores().length === 0) {
-                <p class="empty">No reputation scores available. Scores are computed from agent activity.</p>
+                <app-empty-state
+                    icon="  [***]\n  [** ]\n  [*  ]"
+                    title="No reputation scores yet."
+                    description="Reputation scores are computed from agent activity, session outcomes, and peer reviews."
+                    actionLabel="View Agents"
+                    actionRoute="/agents"
+                    actionAriaLabel="View agents to start building reputation" />
             } @else {
                 <div class="card-grid">
                     @for (score of reputationService.scores(); track score.agentId) {

@@ -83,6 +83,8 @@ export class DiscordBridge {
     private threadLastActivity: Map<string, number> = new Map();
     /** Maps bot reply message IDs → session info for mention-reply context in channels. */
     private mentionSessions: Map<string, import('./message-handler').MentionSessionInfo> = new Map();
+    /** Recently processed Discord message IDs — prevents duplicate handling across overlapping gateway connections. */
+    private processedMessageIds: Set<string> = new Set();
     private staleCheckTimer: ReturnType<typeof setInterval> | null = null;
     /** Stale thread auto-archive after 2 hours of inactivity */
     private readonly STALE_THREAD_MS = 2 * 60 * 60 * 1000;
@@ -349,6 +351,7 @@ export class DiscordBridge {
             threadCallbacks: this.threadCallbacks,
             threadLastActivity: this.threadLastActivity,
             mentionSessions: this.mentionSessions,
+            processedMessageIds: this.processedMessageIds,
         };
         await handleMessageImpl(ctx, data);
     }
@@ -383,6 +386,7 @@ export class DiscordBridge {
             threadCallbacks: this.threadCallbacks,
             threadLastActivity: this.threadLastActivity,
             mentionSessions: this.mentionSessions,
+            processedMessageIds: this.processedMessageIds,
         };
         await sendTaskResultImpl(ctx, channelId, task, mentionUserId);
     }

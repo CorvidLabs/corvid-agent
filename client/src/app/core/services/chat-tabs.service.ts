@@ -73,6 +73,24 @@ export class ChatTabsService {
         this.saveTabs();
     }
 
+    /** Switch to a tab by 0-based index. Returns the sessionId or null if out of range. */
+    switchToTabByIndex(index: number): string | null {
+        const current = this.tabs();
+        if (index < 0 || index >= current.length) return null;
+        const tab = current[index];
+        this.activeSessionId.set(tab.sessionId);
+        return tab.sessionId;
+    }
+
+    /** Switch to the last tab (Cmd+9 convention). */
+    switchToLastTab(): string | null {
+        const current = this.tabs();
+        if (current.length === 0) return null;
+        const tab = current[current.length - 1];
+        this.activeSessionId.set(tab.sessionId);
+        return tab.sessionId;
+    }
+
     private saveTabs(): void {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.tabs()));

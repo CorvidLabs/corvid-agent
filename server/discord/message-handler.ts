@@ -114,39 +114,30 @@ export interface MessageHandlerContext {
     threadLastActivity: Map<string, number>;
     /** Maps bot reply message IDs → session info for mention-reply context. */
     mentionSessions: Map<string, MentionSessionInfo>;
+    /** Recently processed Discord message IDs — prevents duplicate handling. */
+    processedMessageIds: Set<string>;
 }
 
 /** Cooldown for permission-denial replies: only notify a user once per window. */
 const PERM_DENY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 const permDenyCooldowns = new Map<string, number>();
 
-/** Dedup: track recently handled Discord message IDs to prevent double-processing. */
-const recentlyHandledMessages = new Map<string, number>();
-const DEDUP_WINDOW_MS = 60_000; // 60 seconds
-const DEDUP_MAX_ENTRIES = 1000;
-
-/** Evict stale entries from the dedup map when it grows too large. */
-function pruneDedup(): void {
-    if (recentlyHandledMessages.size < DEDUP_MAX_ENTRIES) return;
-    const cutoff = Date.now() - DEDUP_WINDOW_MS;
-    for (const [id, ts] of recentlyHandledMessages) {
-        if (ts < cutoff) recentlyHandledMessages.delete(id);
-    }
-}
 
 export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMessageData): Promise<void> {
     // Ignore bot messages
     if (data.author.bot) return;
 
-    // Deduplicate: skip if we've already processed this exact message ID recently
-    const msgId = data.id;
-    if (msgId && recentlyHandledMessages.has(msgId)) {
-        log.debug('Skipping duplicate message', { messageId: msgId });
+    // Deduplicate: skip if we've already processed this Discord message ID.
+    // Guards against dual delivery from overlapping gateway connections
+    // (e.g., during deploys or gateway resumes).
+    if (ctx.processedMessageIds.has(data.id)) {
+        log.debug('Skipping duplicate MESSAGE_CREATE', { messageId: data.id, channelId: data.channel_id });
         return;
     }
-    if (msgId) {
-        pruneDedup();
-        recentlyHandledMessages.set(msgId, Date.now());
+    ctx.processedMessageIds.add(data.id);
+    if (ctx.processedMessageIds.size > 1000) {
+        const first = ctx.processedMessageIds.values().next().value;
+        if (first) ctx.processedMessageIds.delete(first);
     }
 
     // Auto-link Discord user to contact identity (best-effort, non-blocking)
