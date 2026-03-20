@@ -9,24 +9,25 @@ import type { McpServerConfig as DbMcpServerConfig } from '../../shared/types';
 import { getMessagingSafetyPrompt, getResponseRoutingPrompt, getWorktreeIsolationPrompt } from '../providers/ollama/tool-prompt-templates';
 import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
-import { existsSync, readdirSync } from 'fs';
-import { userInfo } from 'os';
+import { existsSync, readFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 const log = createLogger('SdkProcess');
 
 /**
- * Check if the Chrome extension bridge socket exists, indicating the
- * Claude-in-Chrome extension is available for browser automation.
- * The bridge lives at /tmp/claude-mcp-browser-bridge-{username}/.
+ * Check if the Chrome extension bridge is configured and enabled.
+ * Reads ~/.claude.json to check cachedChromeExtensionInstalled and
+ * claudeInChromeDefaultEnabled — these are set by Claude Code when
+ * the user completes Chrome extension onboarding.
  */
 function isChromeExtensionAvailable(): boolean {
     try {
-        const username = userInfo().username;
-        const bridgeDir = `/tmp/claude-mcp-browser-bridge-${username}`;
-        if (!existsSync(bridgeDir)) return false;
-        // Check that there's at least one socket file inside
-        const entries = readdirSync(bridgeDir);
-        return entries.length > 0;
+        const configPath = join(homedir(), '.claude.json');
+        if (!existsSync(configPath)) return false;
+        const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+        return config.cachedChromeExtensionInstalled === true
+            && config.claudeInChromeDefaultEnabled === true;
     } catch {
         return false;
     }
