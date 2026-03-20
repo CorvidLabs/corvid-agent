@@ -4,14 +4,10 @@ import {
     inject,
     OnInit,
     OnDestroy,
-    signal,
-    viewChild,
-    AfterViewInit,
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { HeaderComponent } from './shared/components/header.component';
-import { SidebarComponent } from './shared/components/sidebar.component';
-import { BreadcrumbComponent } from './shared/components/breadcrumb.component';
+import { TopNavComponent } from './shared/components/top-nav.component';
+import { ActivityRailComponent } from './shared/components/activity-rail.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { WebSocketService } from './core/services/websocket.service';
@@ -21,12 +17,10 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
+    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
     template: `
         <div class="app-layout">
-            <app-header
-                [sidebarOpen]="sidebarOpen()"
-                (hamburgerClick)="toggleSidebar()" />
+            <app-top-nav />
             @if (wsService.serverRestarting()) {
                 <div class="app-layout__banner app-layout__banner--restart" role="alert">
                     Server is restarting — reconnecting automatically...
@@ -37,13 +31,10 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 </div>
             }
             <div class="app-layout__body">
-                <app-sidebar [(sidebarOpen)]="sidebarOpen" />
                 <main class="app-layout__content" role="main">
-                    <app-breadcrumb />
-                    <div class="app-layout__page page-enter">
-                        <router-outlet />
-                    </div>
+                    <router-outlet />
                 </main>
+                <app-activity-rail />
             </div>
         </div>
         <app-keyboard-shortcuts-overlay />
@@ -65,13 +56,9 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         .app-layout__content {
             flex: 1;
             min-height: 0;
+            min-width: 0;
             position: relative;
             background: var(--bg-deep);
-            display: flex;
-            flex-direction: column;
-        }
-        .app-layout__page {
-            flex: 1;
             overflow-y: auto;
         }
         .app-layout__banner {
@@ -91,44 +78,18 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         }
     `,
 })
-export class App implements OnInit, OnDestroy, AfterViewInit {
+export class App implements OnInit, OnDestroy {
     protected readonly wsService = inject(WebSocketService);
     private readonly sessionService = inject(SessionService);
-    // Inject to ensure service is instantiated and listening for keyboard events
     private readonly _shortcuts = inject(KeyboardShortcutsService);
-
-    protected readonly sidebarOpen = signal(false);
-
-    private readonly sidebarComponent = viewChild(SidebarComponent);
 
     ngOnInit(): void {
         this.wsService.connect();
         this.sessionService.init();
     }
 
-    ngAfterViewInit(): void {
-        // Supply the hamburger button ref to sidebar for focus management
-        setTimeout(() => {
-            const btn = document.querySelector('.header__hamburger') as HTMLElement;
-            if (btn) {
-                this.sidebarComponent()?.setHamburgerRef(btn);
-            }
-        });
-    }
-
     ngOnDestroy(): void {
         this.sessionService.destroy();
         this.wsService.disconnect();
-    }
-
-    protected toggleSidebar(): void {
-        const sidebar = this.sidebarComponent();
-        if (!sidebar) return;
-
-        if (this.sidebarOpen()) {
-            sidebar.closeSidebar();
-        } else {
-            sidebar.openSidebar();
-        }
     }
 }
