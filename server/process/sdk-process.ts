@@ -9,8 +9,28 @@ import type { McpServerConfig as DbMcpServerConfig } from '../../shared/types';
 import { getMessagingSafetyPrompt, getResponseRoutingPrompt, getWorktreeIsolationPrompt } from '../providers/ollama/tool-prompt-templates';
 import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
+import { existsSync, readdirSync } from 'fs';
+import { userInfo } from 'os';
 
 const log = createLogger('SdkProcess');
+
+/**
+ * Check if the Chrome extension bridge socket exists, indicating the
+ * Claude-in-Chrome extension is available for browser automation.
+ * The bridge lives at /tmp/claude-mcp-browser-bridge-{username}/.
+ */
+function isChromeExtensionAvailable(): boolean {
+    try {
+        const username = userInfo().username;
+        const bridgeDir = `/tmp/claude-mcp-browser-bridge-${username}`;
+        if (!existsSync(bridgeDir)) return false;
+        // Check that there's at least one socket file inside
+        const entries = readdirSync(bridgeDir);
+        return entries.length > 0;
+    } catch {
+        return false;
+    }
+}
 
 // Environment variables safe to pass to agent subprocesses.
 // Everything else (ALGOCHAT_MNEMONIC, WALLET_ENCRYPTION_KEY, API_KEY, etc.) is excluded.
@@ -231,8 +251,14 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
         env: buildSafeEnv(project.envVars),
-        extraArgs: { chrome: null },
+        // Enable Chrome browser tools only when the extension bridge is detected.
+        // This avoids wasting prompt space with Chrome tool definitions when the
+        // extension isn't running, freeing room for other tools.
+        ...(isChromeExtensionAvailable() ? { extraArgs: { chrome: null } } : {}),
     };
+
+    const chromeEnabled = sdkOptions.extraArgs != null;
+    log.info(`Session ${session.id}: Chrome extension ${chromeEnabled ? 'enabled' : 'not detected, skipping'}`);
 
     if (agent?.model) {
         sdkOptions.model = agent.model;
