@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { assertSnowflake, assertInteractionToken, buildFooterText, extractMentionsFromEmbed } from '../discord/embeds';
+import { assertSnowflake, assertInteractionToken, buildFooterText, buildFooterWithStats, extractMentionsFromEmbed } from '../discord/embeds';
 
 describe('assertSnowflake', () => {
     test('accepts valid snowflake IDs', () => {
@@ -40,12 +40,7 @@ describe('assertInteractionToken', () => {
 });
 
 describe('buildFooterText', () => {
-    test('returns agent name only when no status', () => {
-        const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' });
-        expect(result).toBe('Corvid');
-    });
-
-    test('shows agent name and status only (ignores model, project, session)', () => {
+    test('includes all context segments', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
@@ -53,25 +48,30 @@ describe('buildFooterText', () => {
             sessionId: 'abcdef1234567890',
             status: 'running',
         });
-        expect(result).toBe('Corvid · running');
+        expect(result).toBe('Corvid · opus · my-project · sid:abcdef12 · running');
     });
 
-    test('ignores projectName without status', () => {
+    test('returns agent name and model when no other context', () => {
+        const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' });
+        expect(result).toBe('Corvid · opus');
+    });
+
+    test('includes projectName', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
             projectName: 'my-project',
         });
-        expect(result).toBe('Corvid');
+        expect(result).toBe('Corvid · opus · my-project');
     });
 
-    test('ignores sessionId', () => {
+    test('includes sessionId as truncated sid:', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
             sessionId: 'abcdef1234567890',
         });
-        expect(result).toBe('Corvid');
+        expect(result).toBe('Corvid · opus · sid:abcdef12');
     });
 
     test('includes status', () => {
@@ -80,7 +80,7 @@ describe('buildFooterText', () => {
             agentModel: 'opus',
             status: 'completed',
         });
-        expect(result).toBe('Corvid · completed');
+        expect(result).toBe('Corvid · opus · completed');
     });
 
     test('works without agentModel', () => {
@@ -89,6 +89,40 @@ describe('buildFooterText', () => {
             status: 'done',
         });
         expect(result).toBe('Corvid · done');
+    });
+});
+
+describe('buildFooterWithStats', () => {
+    test('appends stats after pipe separator', () => {
+        const result = buildFooterWithStats(
+            { agentName: 'Corvid', agentModel: 'opus', sessionId: 'abcdef1234567890', status: 'done' },
+            { filesChanged: 5, turns: 12, commits: 3 },
+        );
+        expect(result).toBe('Corvid · opus · sid:abcdef12 · done | 5 files · 12 turns · 3 commits');
+    });
+
+    test('omits zero stats', () => {
+        const result = buildFooterWithStats(
+            { agentName: 'Corvid', agentModel: 'opus', status: 'done' },
+            { filesChanged: 0, turns: 8, commits: 0 },
+        );
+        expect(result).toBe('Corvid · opus · done | 8 turns');
+    });
+
+    test('returns base footer when all stats are zero', () => {
+        const result = buildFooterWithStats(
+            { agentName: 'Corvid', agentModel: 'opus', status: 'done' },
+            { filesChanged: 0, turns: 0, commits: 0 },
+        );
+        expect(result).toBe('Corvid · opus · done');
+    });
+
+    test('includes tools stat', () => {
+        const result = buildFooterWithStats(
+            { agentName: 'Corvid', status: 'done' },
+            { turns: 3, tools: 15 },
+        );
+        expect(result).toBe('Corvid · done | 3 turns · 15 tools');
     });
 });
 

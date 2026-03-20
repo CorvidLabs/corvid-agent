@@ -70,16 +70,57 @@ export interface FooterContext {
     status?: string;
 }
 
+/** Stats that can be appended to the footer on completion embeds. */
+export interface FooterStats {
+    filesChanged?: number;
+    turns?: number;
+    tools?: number;
+    commits?: number;
+}
+
 /**
- * Build a clean footer string.
- * Format: `agentName` or `agentName · status` when a status is present.
+ * Build a detailed footer string with full session context.
+ * Format: `AgentName · model · project · sid:XXXXXX · status`
+ * Segments are omitted when their value is not provided.
  */
 export function buildFooterText(ctx: FooterContext): string {
     const parts: string[] = [ctx.agentName];
+    if (ctx.agentModel) {
+        parts.push(ctx.agentModel);
+    }
+    if (ctx.projectName) {
+        parts.push(ctx.projectName);
+    }
+    if (ctx.sessionId) {
+        parts.push(`sid:${ctx.sessionId.slice(0, 8)}`);
+    }
     if (ctx.status) {
         parts.push(ctx.status);
     }
     return parts.join(' · ');
+}
+
+/**
+ * Build a footer with session context AND run stats.
+ * Format: `AgentName · model · project · sid:XXXXXX · status | 5 files · 12 turns · 38 tools`
+ */
+export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): string {
+    const base = buildFooterText(ctx);
+    const statParts: string[] = [];
+    if (stats.filesChanged && stats.filesChanged > 0) {
+        statParts.push(`${stats.filesChanged} files`);
+    }
+    if (stats.turns && stats.turns > 0) {
+        statParts.push(`${stats.turns} turns`);
+    }
+    if (stats.tools && stats.tools > 0) {
+        statParts.push(`${stats.tools} tools`);
+    }
+    if (stats.commits && stats.commits > 0) {
+        statParts.push(`${stats.commits} commits`);
+    }
+    if (statParts.length === 0) return base;
+    return `${base} | ${statParts.join(' · ')}`;
 }
 
 export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
