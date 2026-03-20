@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - **Flock register idempotency** — make flock register idempotent for duplicate addresses (#1288)
 - **Legacy /chat handler** — remove legacy handler and add Angular wildcard route (#1274, #1275)
 - **Localnet auto-fund** — fix localnet auto-fund for development (#1281)
+- **Discord channel tracking** — persist `channel_id` in mention sessions for reliable reply routing (#1298)
 
 ### Docs
 - Sync API reference with code — add 29 undocumented endpoints and fix README stats (#1280)
