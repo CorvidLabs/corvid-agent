@@ -230,6 +230,7 @@ export function subscribeForResponseWithEmbed(
                 let statsTurns = 0;
                 let statsFiles = 0;
                 let statsCommits = 0;
+                let statsTools = 0;
                 try {
                     const row = db.query<{
                         total_turns: number;
@@ -238,6 +239,14 @@ export function subscribeForResponseWithEmbed(
                     }, [string]>(
                         'SELECT total_turns, work_dir, created_at FROM sessions WHERE id = ?',
                     ).get(sessionId);
+
+                    // Fetch tool call count from session_metrics
+                    const metricsRow = db.query<{ tool_call_count: number }, [string]>(
+                        'SELECT tool_call_count FROM session_metrics WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+                    ).get(sessionId);
+                    if (metricsRow) {
+                        statsTools = metricsRow.tool_call_count;
+                    }
 
                     if (row) {
                         // Duration — normalizeTimestamp appends Z so JS parses SQLite UTC correctly
@@ -250,6 +259,11 @@ export function subscribeForResponseWithEmbed(
                         statsTurns = row.total_turns;
                         if (row.total_turns > 0) {
                             fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+                        }
+
+                        // Tool calls
+                        if (statsTools > 0) {
+                            fields.push({ name: 'Tool Calls', value: String(statsTools), inline: true });
                         }
 
                         // Worktree branch + git stats
@@ -300,7 +314,7 @@ export function subscribeForResponseWithEmbed(
                 }
 
                 const footerCtx = { agentName, agentModel, sessionId, projectName, status: 'done' };
-                const footerStats = { filesChanged: statsFiles, turns: statsTurns, commits: statsCommits };
+                const footerStats = { filesChanged: statsFiles, turns: statsTurns, tools: statsTools, commits: statsCommits };
                 await sendEmbedWithButtons(delivery, botToken, threadId, {
                     description: 'Session complete. Send a message to continue the conversation.',
                     color: 0x57f287,
