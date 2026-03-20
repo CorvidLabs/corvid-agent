@@ -31,9 +31,10 @@ const TABS: NavTab[] = [
         key: 'chat',
         label: 'Chat',
         route: '/chat',
-        matchRoutes: ['/chat', '/sessions', '/work-tasks', '/councils', '/council-launches'],
+        matchRoutes: ['/chat', '/dashboard', '/sessions', '/work-tasks', '/councils', '/council-launches'],
         children: [
             { label: 'Home', route: '/chat' },
+            { label: 'Dashboard', route: '/dashboard' },
             { label: 'Conversations', route: '/sessions' },
             { label: 'Work Tasks', route: '/work-tasks' },
             { label: 'Councils', route: '/councils' },

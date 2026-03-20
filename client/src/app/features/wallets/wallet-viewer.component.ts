@@ -12,6 +12,7 @@ import { AllowlistService } from '../../core/services/allowlist.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { firstValueFrom } from 'rxjs';
 
 interface WalletSummary {
@@ -38,7 +39,7 @@ interface WalletMessage {
 @Component({
     selector: 'app-wallet-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe],
+    imports: [RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -62,7 +63,13 @@ interface WalletMessage {
             @if (loading()) {
                 <p class="loading">Loading wallets...</p>
             } @else if (filteredWallets().length === 0) {
-                <p class="empty">No external wallets have interacted via AlgoChat yet.</p>
+                <app-empty-state
+                    icon="  [===]\n  | $ |\n  [===]"
+                    title="No wallets detected."
+                    description="External wallets will appear here when they interact with your agents via AlgoChat."
+                    actionLabel="View Settings"
+                    actionRoute="/settings"
+                    actionAriaLabel="Check AlgoChat settings" />
             } @else {
                 <div class="wallet-list">
                     @for (wallet of filteredWallets(); track wallet.address) {
