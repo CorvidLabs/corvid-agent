@@ -24,34 +24,16 @@ interface Agent {
     name: string;
 }
 
-interface UsdcDeposit {
-    id: number;
-    walletAddress: string;
-    amount: number;
-    balanceAfter: number;
-    reference: string | null;
-    txid: string | null;
-    createdAt: string;
-}
-
-interface CreditBalance {
-    walletAddress: string;
-    credits: number;
-    reserved: number;
-    available: number;
-    totalPurchased: number;
-    totalConsumed: number;
-}
-
 interface CreditTransaction {
     id: number;
-    walletAddress: string;
+    wallet_address: string;
     type: string;
     amount: number;
-    balanceAfter: number;
+    balance_after: number;
     reference: string | null;
     txid: string | null;
-    createdAt: string;
+    session_id: string | null;
+    created_at: string;
 }
 
 @Component({
@@ -125,7 +107,8 @@ interface CreditTransaction {
                                 <label>Daily ALGO Limit</label>
                                 <input
                                     type="number"
-                                    [(ngModel)]="editAlgoLimit"
+                                    [ngModel]="editAlgoLimit()"
+                                    (ngModelChange)="editAlgoLimit.set($event)"
                                     min="0"
                                     step="0.1"
                                     class="input" />
@@ -139,67 +122,9 @@ interface CreditTransaction {
                     </div>
                 }
 
-                <!-- Credit Balance -->
-                <div class="spending__section">
-                    <h3>Credit Balance</h3>
-                    @if (creditBalance()) {
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <span class="info-label">Available Credits</span>
-                                <span class="info-value">{{ creditBalance()?.available | number }}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Reserved</span>
-                                <span class="info-value">{{ creditBalance()?.reserved | number }}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Total Purchased</span>
-                                <span class="info-value">{{ creditBalance()?.totalPurchased | number }}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Total Consumed</span>
-                                <span class="info-value">{{ creditBalance()?.totalConsumed | number }}</span>
-                            </div>
-                        </div>
-                    } @else {
-                        <p class="spending__empty">No credit balance data available.</p>
-                    }
-                </div>
-
-                <!-- USDC Deposit History -->
-                <div class="spending__section">
-                    <h3>USDC Deposit History</h3>
-                    @if (usdcDeposits().length > 0) {
-                        <div class="table-scroll">
-                        <table class="spending__table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Amount (USDC)</th>
-                                    <th>Credits Added</th>
-                                    <th>Transaction ID</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @for (deposit of usdcDeposits(); track deposit.id) {
-                                    <tr>
-                                        <td>{{ deposit.createdAt }}</td>
-                                        <td>{{ deposit.reference }}</td>
-                                        <td>{{ deposit.amount | number }}</td>
-                                        <td class="txid">{{ deposit.txid ? deposit.txid.slice(0, 12) + '...' : '-' }}</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                        </div>
-                    } @else {
-                        <p class="spending__empty">No USDC deposits yet.</p>
-                    }
-                </div>
-
                 <!-- Recent Credit Transactions -->
                 <div class="spending__section">
-                    <h3>Recent Credit Transactions</h3>
+                    <h3>Credit Transactions</h3>
                     @if (creditTransactions().length > 0) {
                         <div class="table-scroll">
                         <table class="spending__table">
@@ -215,10 +140,10 @@ interface CreditTransaction {
                             <tbody>
                                 @for (tx of creditTransactions(); track tx.id) {
                                     <tr>
-                                        <td>{{ tx.createdAt }}</td>
+                                        <td>{{ tx.created_at }}</td>
                                         <td><span class="badge" [class]="'badge--' + tx.type">{{ tx.type }}</span></td>
                                         <td>{{ tx.amount | number }}</td>
-                                        <td>{{ tx.balanceAfter | number }}</td>
+                                        <td>{{ tx.balance_after | number }}</td>
                                         <td>{{ tx.reference ?? '-' }}</td>
                                     </tr>
                                 }
@@ -285,11 +210,9 @@ export class SpendingComponent implements OnInit {
 
     readonly loading = signal(true);
     readonly agentSpending = signal<AgentSpendingInfo[]>([]);
-    readonly creditBalance = signal<CreditBalance | null>(null);
-    readonly usdcDeposits = signal<UsdcDeposit[]>([]);
     readonly creditTransactions = signal<CreditTransaction[]>([]);
     readonly editingAgent = signal<AgentSpendingInfo | null>(null);
-    editAlgoLimit = 5;
+    readonly editAlgoLimit = signal(5);
 
     async ngOnInit(): Promise<void> {
         await this.loadData();
@@ -319,6 +242,16 @@ export class SpendingComponent implements OnInit {
                 }
             }
             this.agentSpending.set(spendingInfos);
+
+            // Load credit transactions
+            try {
+                const txData = await firstValueFrom(
+                    this.api.get<{ transactions: CreditTransaction[] }>('/system-logs/credit-transactions')
+                );
+                this.creditTransactions.set(txData.transactions);
+            } catch {
+                // Credit transactions are optional — don't block the page
+            }
         } catch {
             this.notify.error('Failed to load spending data');
         } finally {
@@ -333,7 +266,7 @@ export class SpendingComponent implements OnInit {
 
     editCap(info: AgentSpendingInfo): void {
         this.editingAgent.set(info);
-        this.editAlgoLimit = info.cap.dailyLimitMicroalgos / 1_000_000;
+        this.editAlgoLimit.set(info.cap.dailyLimitMicroalgos / 1_000_000);
     }
 
     cancelEdit(): void {
@@ -347,7 +280,7 @@ export class SpendingComponent implements OnInit {
         try {
             await firstValueFrom(
                 this.api.put(`/agents/${agent.agentId}/spending-cap`, {
-                    dailyLimitMicroalgos: Math.round(this.editAlgoLimit * 1_000_000),
+                    dailyLimitMicroalgos: Math.round(this.editAlgoLimit() * 1_000_000),
                 })
             );
             this.notify.success(`Spending cap updated for ${agent.agentName}`);

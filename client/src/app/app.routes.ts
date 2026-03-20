@@ -9,8 +9,8 @@ export const routes: Routes = [
     },
     {
         path: 'dashboard',
-        redirectTo: 'chat',
-        pathMatch: 'full',
+        loadComponent: () =>
+            import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
     },
     {
         path: 'projects',
