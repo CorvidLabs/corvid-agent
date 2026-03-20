@@ -8,6 +8,7 @@ export interface ShortcutEntry {
 }
 
 const SHORTCUTS: ShortcutEntry[] = [
+    { keys: 'Cmd+K', description: 'Open command palette', category: 'General' },
     { keys: '?', description: 'Toggle shortcuts overlay', category: 'General' },
     { keys: 'Esc', description: 'Close modal / overlay', category: 'General' },
     { keys: 'n', description: 'New conversation', category: 'Navigation' },

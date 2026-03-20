@@ -8,6 +8,7 @@ import {
 import { RouterOutlet } from '@angular/router';
 import { TopNavComponent } from './shared/components/top-nav.component';
 import { ActivityRailComponent } from './shared/components/activity-rail.component';
+import { CommandPaletteComponent } from './shared/components/command-palette.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { WebSocketService } from './core/services/websocket.service';
@@ -17,7 +18,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
+    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
     template: `
         <div class="app-layout">
             <app-top-nav />
@@ -37,6 +38,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 <app-activity-rail />
             </div>
         </div>
+        <app-command-palette />
         <app-keyboard-shortcuts-overlay />
         <app-toast-container />
     `,

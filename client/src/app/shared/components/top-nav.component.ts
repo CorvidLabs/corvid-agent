@@ -15,6 +15,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
+import { CommandPaletteComponent } from './command-palette.component';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
@@ -146,6 +147,14 @@ const TABS: NavTab[] = [
                         aria-label="Switch to mainnet"
                     >MAIN</button>
                 </div>
+                <button
+                    class="topnav__search-btn"
+                    (click)="openCommandPalette()"
+                    title="Command palette (Cmd+K)"
+                    type="button">
+                    <span class="topnav__search-label">Search...</span>
+                    <kbd class="topnav__search-kbd">⌘K</kbd>
+                </button>
                 <div class="topnav__status">
                     <app-status-badge [status]="wsService.connectionStatus()" />
                 </div>
@@ -356,6 +365,38 @@ const TABS: NavTab[] = [
             color: var(--accent-cyan);
             border-color: var(--accent-cyan);
         }
+        .topnav__search-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.3rem 0.6rem;
+            background: var(--bg-input, #1a1a2e);
+            border: 1px solid var(--border, #333);
+            border-radius: var(--radius, 6px);
+            color: var(--text-tertiary);
+            font-family: inherit;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+            min-width: 160px;
+        }
+        .topnav__search-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--text-secondary);
+        }
+        .topnav__search-label {
+            flex: 1;
+            text-align: left;
+        }
+        .topnav__search-kbd {
+            padding: 0.08rem 0.3rem;
+            background: var(--bg-raised, #222);
+            border: 1px solid var(--border, #333);
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 0.55rem;
+            color: var(--text-tertiary);
+        }
 
         /* Mobile hamburger */
         .topnav__hamburger {
@@ -511,6 +552,11 @@ export class TopNavComponent implements OnInit, OnDestroy {
 
     protected closeDropdown(): void {
         this.openDropdown.set(null);
+    }
+
+    protected openCommandPalette(): void {
+        // Simulate Cmd+K to open the palette
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
     }
 
     protected openHelp(): void {
