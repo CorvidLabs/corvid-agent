@@ -57,24 +57,37 @@ export interface DiscordEmbed {
     fields?: Array<{ name: string; value: string; inline?: boolean }>;
     footer?: { text: string };
     timestamp?: string;
+    image?: { url: string };
+    thumbnail?: { url: string };
 }
 
 /** Metadata for building rich embed footers with session context. */
 export interface FooterContext {
     agentName: string;
-    agentModel: string;
+    agentModel?: string;
     sessionId?: string;
     projectName?: string;
     status?: string;
 }
 
+/** Stats that can be appended to the footer on completion embeds. */
+export interface FooterStats {
+    filesChanged?: number;
+    turns?: number;
+    tools?: number;
+    commits?: number;
+}
+
 /**
- * Build a standardized footer string with session metadata.
- * Format: `agentName · model | project | sid:abc12345 · status`
- * Shorter segments are omitted when not available.
+ * Build a detailed footer string with full session context.
+ * Format: `AgentName · model · project · sid:XXXXXX · status`
+ * Segments are omitted when their value is not provided.
  */
 export function buildFooterText(ctx: FooterContext): string {
-    const parts: string[] = [`${ctx.agentName} · ${ctx.agentModel}`];
+    const parts: string[] = [ctx.agentName];
+    if (ctx.agentModel) {
+        parts.push(ctx.agentModel);
+    }
     if (ctx.projectName) {
         parts.push(ctx.projectName);
     }
@@ -85,6 +98,29 @@ export function buildFooterText(ctx: FooterContext): string {
         parts.push(ctx.status);
     }
     return parts.join(' · ');
+}
+
+/**
+ * Build a footer with session context AND run stats.
+ * Format: `AgentName · model · project · sid:XXXXXX · status | 5 files · 12 turns · 38 tools`
+ */
+export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): string {
+    const base = buildFooterText(ctx);
+    const statParts: string[] = [];
+    if (stats.filesChanged && stats.filesChanged > 0) {
+        statParts.push(`${stats.filesChanged} files`);
+    }
+    if (stats.turns && stats.turns > 0) {
+        statParts.push(`${stats.turns} turns`);
+    }
+    if (stats.tools && stats.tools > 0) {
+        statParts.push(`${stats.tools} tools`);
+    }
+    if (stats.commits && stats.commits > 0) {
+        statParts.push(`${stats.commits} commits`);
+    }
+    if (statParts.length === 0) return base;
+    return `${base} | ${statParts.join(' · ')}`;
 }
 
 export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
@@ -512,6 +548,140 @@ export async function editEmbed(
         });
     } catch {
         // Error already logged by DeliveryTracker
+    }
+}
+
+// ── File attachment support ──────────────────────────────────────────
+
+/** A file to attach to an outbound Discord message. */
+export interface DiscordFileAttachment {
+    /** Filename shown in Discord (e.g. "chart.png"). */
+    name: string;
+    /** Raw file contents. */
+    data: Uint8Array | Buffer;
+    /** MIME type (defaults to "application/octet-stream"). */
+    contentType?: string;
+}
+
+/** Discord bot file size limit (25 MB). */
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Build a multipart/form-data body for Discord messages with file attachments.
+ * The `payload_json` part carries the normal message JSON; file parts use `files[n]`.
+ */
+function buildMultipartBody(
+    payload: Record<string, unknown>,
+    files: DiscordFileAttachment[],
+): FormData {
+    const form = new FormData();
+    form.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const blob = new Blob([new Uint8Array(f.data) as unknown as ArrayBuffer], { type: f.contentType ?? 'application/octet-stream' });
+        form.append(`files[${i}]`, blob, f.name);
+    }
+    return form;
+}
+
+/**
+ * Send an embed with file attachments.
+ * Files can be referenced in the embed via `attachment://filename.png` in image/thumbnail URLs.
+ */
+export async function sendEmbedWithFiles(
+    delivery: DeliveryTracker,
+    botToken: string,
+    channelId: string,
+    embed: DiscordEmbed,
+    files: DiscordFileAttachment[],
+): Promise<string | null> {
+    for (const f of files) {
+        if (f.data.byteLength > MAX_FILE_SIZE_BYTES) {
+            log.error('File too large for Discord upload', { name: f.name, size: f.data.byteLength });
+            return null;
+        }
+    }
+
+    try {
+        const { result } = await delivery.sendWithReceipt('discord', async () => {
+            const payload: Record<string, unknown> = {
+                embeds: [embed],
+                attachments: files.map((f, i) => ({ id: i, filename: f.name })),
+            };
+            const mentions = extractMentionsFromEmbed(embed);
+            if (mentions) payload.content = mentions;
+
+            const form = buildMultipartBody(payload, files);
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${channelId}/messages`,
+                {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${botToken}` },
+                    body: form,
+                },
+            );
+
+            if (!response.ok) {
+                const error = await response.text();
+                log.error('Failed to send Discord embed with files', { status: response.status, error: error.slice(0, 200) });
+                throw new Error(`Discord embed+files failed: ${response.status}`);
+            }
+
+            const data = await response.json() as { id: string };
+            return data.id;
+        });
+        return result;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Send a plain-text message with file attachments.
+ */
+export async function sendMessageWithFiles(
+    delivery: DeliveryTracker,
+    botToken: string,
+    channelId: string,
+    content: string,
+    files: DiscordFileAttachment[],
+): Promise<string | null> {
+    for (const f of files) {
+        if (f.data.byteLength > MAX_FILE_SIZE_BYTES) {
+            log.error('File too large for Discord upload', { name: f.name, size: f.data.byteLength });
+            return null;
+        }
+    }
+
+    try {
+        const { result } = await delivery.sendWithReceipt('discord', async () => {
+            const payload: Record<string, unknown> = {
+                content: content.slice(0, MAX_MESSAGE_LENGTH),
+                attachments: files.map((f, i) => ({ id: i, filename: f.name })),
+            };
+
+            const form = buildMultipartBody(payload, files);
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${channelId}/messages`,
+                {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bot ${botToken}` },
+                    body: form,
+                },
+            );
+
+            if (!response.ok) {
+                const error = await response.text();
+                log.error('Failed to send Discord message with files', { status: response.status, error: error.slice(0, 200) });
+                throw new Error(`Discord message+files failed: ${response.status}`);
+            }
+
+            const data = await response.json() as { id: string };
+            return data.id;
+        });
+        return result;
+    } catch {
+        return null;
     }
 }
 

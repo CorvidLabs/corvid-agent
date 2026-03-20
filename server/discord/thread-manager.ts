@@ -24,6 +24,7 @@ import {
     assertSnowflake,
     splitEmbedDescription,
     buildFooterText,
+    buildFooterWithStats,
 } from './embeds';
 
 const log = createLogger('DiscordThreadManager');
@@ -226,6 +227,10 @@ export function subscribeForResponseWithEmbed(
             // Gather stats and send completion embed (async, fire-and-forget)
             (async () => {
                 const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+                let statsTurns = 0;
+                let statsFiles = 0;
+                let statsCommits = 0;
+                let statsTools = 0;
                 try {
                     const row = db.query<{
                         total_turns: number;
@@ -235,6 +240,14 @@ export function subscribeForResponseWithEmbed(
                         'SELECT total_turns, work_dir, created_at FROM sessions WHERE id = ?',
                     ).get(sessionId);
 
+                    // Fetch tool call count from session_metrics
+                    const metricsRow = db.query<{ tool_call_count: number }, [string]>(
+                        'SELECT tool_call_count FROM session_metrics WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+                    ).get(sessionId);
+                    if (metricsRow) {
+                        statsTools = metricsRow.tool_call_count;
+                    }
+
                     if (row) {
                         // Duration — normalizeTimestamp appends Z so JS parses SQLite UTC correctly
                         const createdAt = normalizeTimestamp(row.created_at);
@@ -243,8 +256,14 @@ export function subscribeForResponseWithEmbed(
                         fields.push({ name: 'Duration', value: formatDuration(durationMs), inline: true });
 
                         // Turns
+                        statsTurns = row.total_turns;
                         if (row.total_turns > 0) {
                             fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+                        }
+
+                        // Tool calls
+                        if (statsTools > 0) {
+                            fields.push({ name: 'Tool Calls', value: String(statsTools), inline: true });
                         }
 
                         // Worktree branch + git stats
@@ -270,14 +289,14 @@ export function subscribeForResponseWithEmbed(
                                     })(),
                                 ]);
 
-                                const fileCount = filesOutput ? filesOutput.split('\n').length : 0;
-                                if (fileCount > 0) {
-                                    fields.push({ name: 'Files Changed', value: String(fileCount), inline: true });
+                                statsFiles = filesOutput ? filesOutput.split('\n').length : 0;
+                                if (statsFiles > 0) {
+                                    fields.push({ name: 'Files Changed', value: String(statsFiles), inline: true });
                                 }
 
-                                const commitCount = parseInt(commitsOutput, 10);
-                                if (commitCount > 0) {
-                                    fields.push({ name: 'Commits', value: String(commitCount), inline: true });
+                                statsCommits = parseInt(commitsOutput, 10) || 0;
+                                if (statsCommits > 0) {
+                                    fields.push({ name: 'Commits', value: String(statsCommits), inline: true });
                                 }
                             } catch (gitErr) {
                                 log.debug('Failed to gather git stats for completion embed', {
@@ -294,11 +313,13 @@ export function subscribeForResponseWithEmbed(
                     });
                 }
 
+                const footerCtx = { agentName, agentModel, sessionId, projectName, status: 'done' };
+                const footerStats = { filesChanged: statsFiles, turns: statsTurns, tools: statsTools, commits: statsCommits };
                 await sendEmbedWithButtons(delivery, botToken, threadId, {
                     description: 'Session complete. Send a message to continue the conversation.',
                     color: 0x57f287,
                     ...(fields.length > 0 ? { fields } : {}),
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+                    footer: { text: buildFooterWithStats(footerCtx, footerStats) },
                 }, [
                     buildActionRow(
                         { label: 'Continue', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '💬' },

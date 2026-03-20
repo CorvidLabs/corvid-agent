@@ -231,6 +231,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
         env: buildSafeEnv(project.envVars),
+        extraArgs: { chrome: null },
     };
 
     if (agent?.model) {

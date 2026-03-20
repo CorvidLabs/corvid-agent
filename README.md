@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-8208%20unit%20%7C%20360%20E2E-brightgreen" alt="8208 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-8213%20unit%20%7C%20360%20E2E-brightgreen" alt="8208 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -190,7 +190,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |--------|-------|
 | Unit tests | **8,208** across 341 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **161** with automated specsync validation (100% file coverage) |
+| Module specs | **162** with automated specsync validation (100% file coverage) |
 | Test:code ratio | **1.14×** — more test code than production code |
 | MCP tools | **47** corvid_* tool handlers |
 | API endpoints | **~380** across 47 route modules |
