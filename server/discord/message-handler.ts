@@ -12,7 +12,7 @@ import type { WorkTaskService } from '../work/service';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordAttachment } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { ButtonStyle } from './types';
-import { buildMultimodalContent } from './image-attachments';
+import { appendAttachmentUrls, buildMultimodalContent } from './image-attachments';
 import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
@@ -442,15 +442,10 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         workDir,
     });
 
-    // Start the process with the text prompt
-    ctx.processManager.startProcess(session, withAuthorContext(cleanText, authorId, authorUsername));
-
-    // If there are image attachments, send them as a follow-up multimodal message.
-    // The SDK query is already created by startProcess, so streamInput is ready.
-    const imageContent = buildMultimodalContent('', attachments);
-    if (typeof imageContent !== 'string') {
-        ctx.processManager.sendMessage(session.id, imageContent);
-    }
+    // Start the process with the text prompt (include attachment URLs so the agent
+    // sees image links even though startProcess only accepts strings).
+    const textWithUrls = appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername), attachments);
+    ctx.processManager.startProcess(session, textWithUrls);
 
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
@@ -494,8 +489,8 @@ async function handleMentionReplyResume(
     const contextualContent = buildMultimodalContent(withAuthorContext(cleanText, authorId, authorUsername), attachments);
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
-        // resumeProcess accepts string only — use text for resume prompt
-        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(cleanText, authorId, authorUsername);
+        // resumeProcess only accepts strings — include attachment URLs so images aren't lost
+        const resumeText = typeof contextualContent === 'string' ? contextualContent : appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername), attachments);
         ctx.processManager.resumeProcess(session, resumeText);
     }
 
@@ -569,14 +564,10 @@ async function resumeExpiredThreadSession(
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
-    // Start the process with the user's message
-    const contextualContent = buildMultimodalContent(withAuthorContext(text, authorId, authorUsername), attachments);
-    ctx.processManager.startProcess(newSession, typeof contextualContent === 'string' ? contextualContent : withAuthorContext(text, authorId, authorUsername));
-
-    // Send image attachments as a follow-up if multimodal
-    if (typeof contextualContent !== 'string') {
-        ctx.processManager.sendMessage(newSession.id, contextualContent);
-    }
+    // Start the process with the user's message (include attachment URLs in text so
+    // the agent sees them even though startProcess only accepts strings).
+    const textWithUrls = appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername), attachments);
+    ctx.processManager.startProcess(newSession, textWithUrls);
 
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
@@ -629,7 +620,8 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     const contextualContent = buildMultimodalContent(withAuthorContext(text, authorId, authorUsername), attachments);
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
-        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(text, authorId, authorUsername);
+        // resumeProcess only accepts strings — include attachment URLs in text so images aren't lost
+        const resumeText = typeof contextualContent === 'string' ? contextualContent : appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername), attachments);
         ctx.processManager.resumeProcess(session, resumeText);
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
