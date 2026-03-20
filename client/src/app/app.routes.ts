@@ -197,4 +197,5 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/brain-viewer/brain-viewer.component').then((m) => m.BrainViewerComponent),
     },
+    { path: '**', redirectTo: 'dashboard' },
 ];

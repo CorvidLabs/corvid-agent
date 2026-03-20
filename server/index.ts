@@ -374,19 +374,6 @@ const server = Bun.serve<WsData>({
                 return instrumentResponse(apiResponse, route);
             }
 
-            // Mobile chat client
-            if (url.pathname === '/chat') {
-                const chatPath = join(import.meta.dir, 'public', 'chat.html');
-                if (existsSync(chatPath)) {
-                    return instrumentResponse(
-                        new Response(Bun.file(chatPath), {
-                            headers: { 'Content-Type': 'text/html' },
-                        }),
-                        '/chat',
-                    );
-                }
-            }
-
             // Serve Angular static files
             if (existsSync(CLIENT_DIST)) {
                 const filePath = join(CLIENT_DIST, url.pathname);
