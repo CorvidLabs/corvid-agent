@@ -105,7 +105,18 @@ export interface SdkProcessOptions {
     personaPrompt?: string;
     /** Skill bundle prompt additions (from assigned skill_bundles) */
     skillPrompt?: string;
+    /** When true, disable ALL tools — pure conversation mode for untrusted users. */
+    conversationOnly?: boolean;
 }
+
+/** All built-in Claude Code tools that must be blocked in conversation-only mode. */
+const ALL_BUILTIN_TOOLS = [
+    'Read', 'Write', 'Edit', 'MultiEdit', 'Bash', 'Glob', 'Grep',
+    'WebFetch', 'WebSearch', 'TodoRead', 'TodoWrite', 'NotebookEdit',
+    'Agent', 'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree',
+    'TaskStart', 'TaskStatus', 'TaskOutput', 'TaskStop',
+    'AskFollowUpQuestion',
+];
 
 export interface SdkProcess {
     pid: number;
@@ -130,6 +141,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         externalMcpConfigs,
         personaPrompt,
         skillPrompt,
+        conversationOnly,
     } = options;
 
     const abortController = new AbortController();
@@ -288,10 +300,15 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.tools = agent.allowedTools.split(',').map((t) => t.trim());
     }
 
+    // Conversation-only mode: block ALL built-in tools. No file ops, no bash, no web, nothing.
+    // This is the security lockdown for untrusted public-facing sessions.
+    const systemDisallowed: string[] = [];
+    if (conversationOnly) {
+        systemDisallowed.push(...ALL_BUILTIN_TOOLS);
+    }
     // Plan mode tools (EnterPlanMode, ExitPlanMode) require an interactive user
     // to approve plans. They're incompatible with bypassPermissions mode and will
     // error at the SDK level. Disallow them to prevent confusing errors. (#71)
-    const systemDisallowed: string[] = [];
     if (needsBypass) {
         systemDisallowed.push('EnterPlanMode', 'ExitPlanMode');
     }

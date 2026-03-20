@@ -50,6 +50,7 @@ import { handleReaction as handleReactionImpl, type ReactionHandlerContext } fro
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
 import {
     subscribeForResponseWithEmbed as subscribeImpl,
+    subscribeForAdaptiveInlineResponse,
     recoverActiveThreadSubscriptions,
     archiveStaleThreads as archiveStaleThreadsImpl,
     createStandaloneThread as createStandaloneThreadImpl,
@@ -323,6 +324,9 @@ export class DiscordBridge {
                 this.sendTaskResult(cid, task, uid),
             muteUser: (uid) => this.muteUser(uid),
             unmuteUser: (uid) => this.unmuteUser(uid),
+            mentionSessions: this.mentionSessions,
+            subscribeForInlineResponse: (sid, cid, rid, an, am, onBot, pn, dc) =>
+                subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc),
         };
         await handleInteractionImpl(ctx, interaction);
     }
