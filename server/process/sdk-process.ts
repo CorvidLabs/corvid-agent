@@ -9,29 +9,8 @@ import type { McpServerConfig as DbMcpServerConfig } from '../../shared/types';
 import { getMessagingSafetyPrompt, getResponseRoutingPrompt, getWorktreeIsolationPrompt } from '../providers/ollama/tool-prompt-templates';
 import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
-import { existsSync, readFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
 
 const log = createLogger('SdkProcess');
-
-/**
- * Check if the Chrome extension bridge is configured and enabled.
- * Reads ~/.claude.json to check cachedChromeExtensionInstalled and
- * claudeInChromeDefaultEnabled — these are set by Claude Code when
- * the user completes Chrome extension onboarding.
- */
-function isChromeExtensionAvailable(): boolean {
-    try {
-        const configPath = join(homedir(), '.claude.json');
-        if (!existsSync(configPath)) return false;
-        const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-        return config.cachedChromeExtensionInstalled === true
-            && config.claudeInChromeDefaultEnabled === true;
-    } catch {
-        return false;
-    }
-}
 
 // Environment variables safe to pass to agent subprocesses.
 // Everything else (ALGOCHAT_MNEMONIC, WALLET_ENCRYPTION_KEY, API_KEY, etc.) is excluded.
@@ -252,14 +231,11 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
         env: buildSafeEnv(project.envVars),
-        // Enable Chrome browser tools only when the extension bridge is detected.
-        // This avoids wasting prompt space with Chrome tool definitions when the
-        // extension isn't running, freeing room for other tools.
-        ...(isChromeExtensionAvailable() ? { extraArgs: { chrome: null } } : {}),
+        // Chrome extension bridge does not work from SDK-spawned subprocesses.
+        // Browser automation is provided by corvid_browser (Playwright) instead.
+        // Do NOT pass extraArgs: { chrome: null } — it injects non-functional
+        // Chrome tool instructions that confuse agents.
     };
-
-    const chromeEnabled = sdkOptions.extraArgs != null;
-    log.info(`Session ${session.id}: Chrome extension ${chromeEnabled ? 'enabled' : 'not detected, skipping'}`);
 
     if (agent?.model) {
         sdkOptions.model = agent.model;
