@@ -109,7 +109,7 @@ const TEMPLATES: AgentTemplate[] = [
                             class="field__input"
                             id="agent-model"
                             formControlName="model">
-                            @for (p of providers(); track p.id) {
+                            @for (p of providers(); track p.name) {
                                 @for (m of p.models; track m) {
                                     <option [value]="m">{{ p.name }}: {{ m }}</option>
                                 }
