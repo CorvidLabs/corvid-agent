@@ -117,8 +117,32 @@ export class FlockDirectoryService {
         return this.onChainClient;
     }
 
-    /** Register a new agent in the directory. Returns the created agent. */
+    /** Register a new agent in the directory. Returns the created agent.
+     *  If the address is already registered, updates the existing record and
+     *  sends a heartbeat instead of failing with a UNIQUE constraint error.
+     */
     register(input: RegisterFlockAgentInput): FlockAgent {
+        // Check for existing registration by address (idempotent)
+        const existing = this.getByAddress(input.address);
+        if (existing) {
+            // Update name/description/capabilities if provided, reactivate if deregistered
+            const capabilities = JSON.stringify(input.capabilities ?? existing.capabilities);
+            const now = new Date().toISOString();
+            this.db.query(`
+                UPDATE flock_agents
+                SET name = ?, description = ?, instance_url = ?, capabilities = ?,
+                    status = 'active', last_heartbeat = ?, updated_at = ?
+                WHERE id = ?
+            `).run(
+                input.name ?? existing.name,
+                input.description ?? existing.description,
+                input.instanceUrl ?? existing.instanceUrl,
+                capabilities, now, now, existing.id,
+            );
+            log.info('Agent re-registered (existing address)', { id: existing.id, address: input.address });
+            return this.getById(existing.id)!;
+        }
+
         const id = crypto.randomUUID();
         const capabilities = JSON.stringify(input.capabilities ?? []);
         const now = new Date().toISOString();
