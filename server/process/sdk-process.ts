@@ -405,7 +405,18 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     })();
 
     function sendMessage(content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
-        if (inputDone || abortController.signal.aborted) return false;
+        if (inputDone || abortController.signal.aborted) {
+            log.info(`sendMessage rejected for session ${session.id}: inputDone=${inputDone}, aborted=${abortController.signal.aborted}`);
+            return false;
+        }
+
+        const isMultimodal = Array.isArray(content);
+        log.info(`sendMessage: streaming ${isMultimodal ? 'multimodal' : 'text'} content to session ${session.id}`, {
+            isMultimodal,
+            blockCount: isMultimodal ? content.length : 0,
+            blockTypes: isMultimodal ? content.map(b => b.type) : [],
+            contentPreview: isMultimodal ? JSON.stringify(content).slice(0, 300) : (content as string).slice(0, 200),
+        });
 
         // Stream input to the running query
         q.streamInput((async function* () {
@@ -418,6 +429,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         })()).catch((err) => {
             log.warn(`streamInput failed for session ${session.id}`, {
                 error: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined,
             });
         });
 
