@@ -489,6 +489,14 @@ async function handleMentionReplyResume(
 
     // Build multimodal content if images are attached
     const contextualContent = buildMultimodalContent(withAuthorContext(cleanText, authorId, authorUsername), attachments);
+    log.info('Mention-reply resume: sending content to session', {
+        sessionId,
+        hasAttachments: (attachments?.length ?? 0) > 0,
+        attachmentCount: attachments?.length ?? 0,
+        contentType: typeof contextualContent === 'string' ? 'string' : 'multimodal',
+        blockCount: Array.isArray(contextualContent) ? contextualContent.length : 0,
+        contentPreview: typeof contextualContent === 'string' ? contextualContent.slice(0, 200) : JSON.stringify(contextualContent).slice(0, 300),
+    });
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
         // resumeProcess only accepts strings — include attachment URLs so images aren't lost
