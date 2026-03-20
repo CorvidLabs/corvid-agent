@@ -65,9 +65,10 @@ Specs in `specs/` are the source of truth. Read the relevant spec before modifyi
 Always run before committing — see [verification skill](skills/verification/SKILL.md) for details:
 
 ```bash
-bun x tsc --noEmit --skipLibCheck
-bun test
-bun run spec:check
+bun run lint                          # Biome lint check
+bun x tsc --noEmit --skipLibCheck     # TypeScript type checking
+bun test                              # Test suite
+bun run spec:check                    # Spec invariant verification
 ```
 
 ## Coding Conventions

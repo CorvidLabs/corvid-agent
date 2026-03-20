@@ -15,8 +15,8 @@ import { NotFoundError } from '../lib/errors';
 const log = createLogger('AgentWallet');
 
 const DEFAULT_FUND_ALGO = 10;
-const REFILL_THRESHOLD_MICRO = 1_000_000; // 1 ALGO
-const REFILL_AMOUNT_MICRO = 5_000_000; // 5 ALGO
+const REFILL_BUFFER_MICRO = 2_000_000; // 2 ALGO above minimum balance
+const REFILL_AMOUNT_MICRO = 10_000_000; // 10 ALGO
 
 /** Default TTL for cached decrypted mnemonics: 5 minutes. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -374,7 +374,8 @@ export class AgentWalletService {
     }
 
     /**
-     * Check if agent balance is below threshold and auto-refill (localnet/testnet).
+     * Check if agent balance is below minimum balance + buffer and auto-refill.
+     * Accounts for ASA opt-ins (each adds 0.1 ALGO to minimum balance).
      */
     async checkAndRefill(agentId: string): Promise<void> {
         if (this.config.network === 'mainnet') return;
@@ -382,10 +383,28 @@ export class AgentWalletService {
         const agent = getAgent(this.db, agentId);
         if (!agent?.walletAddress) return;
 
-        const balance = await this.getBalance(agent.walletAddress);
-        if (balance < REFILL_THRESHOLD_MICRO) {
-            log.info(`Auto-refilling agent ${agent.name}`, { balance, threshold: REFILL_THRESHOLD_MICRO });
-            await this.fundAgent(agentId, REFILL_AMOUNT_MICRO);
+        try {
+            const info = await this.service.algodClient.accountInformation(agent.walletAddress).do();
+            const balance = Number(info.amount ?? 0);
+            const assetCount = Array.isArray(info.assets) ? info.assets.length : 0;
+            // Minimum balance: 0.1 ALGO base + 0.1 ALGO per ASA
+            const minBalance = (1 + assetCount) * 100_000;
+            const threshold = minBalance + REFILL_BUFFER_MICRO;
+
+            if (balance < threshold) {
+                log.info(`Auto-refilling agent ${agent.name}`, {
+                    balance,
+                    minBalance,
+                    assetCount,
+                    threshold,
+                });
+                await this.fundAgent(agentId, REFILL_AMOUNT_MICRO);
+            }
+        } catch (err) {
+            log.error('Failed to check balance for auto-refill', {
+                agentId,
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 

@@ -1,14 +1,30 @@
 ---
 name: discord
-description: Discord messaging — sending replies, bridge architecture, user identity, message formatting. Trigger keywords: discord, discord message, discord reply, discord user, discord bridge.
+description: Discord messaging — how to send and receive messages, bridge architecture, user identity, formatting. Trigger keywords: discord, discord message, discord reply, discord user, discord bridge, send discord.
 metadata:
   author: CorvidLabs
-  version: "1.0"
+  version: "2.0"
 ---
 
 # Discord — Messaging & Bridge
 
-How to handle Discord messages, respond to users, and understand the Discord bridge architecture.
+How to handle Discord messages — sending, receiving, and understanding the bridge.
+
+## How You Send Discord Messages
+
+**You send Discord messages by writing text directly.** When a Discord message arrives, your text response is automatically routed back through the Discord bridge. There is no MCP tool for Discord messaging — you ARE the Discord interface.
+
+### Sending a reply
+Just write your response as text. The bridge handles delivery.
+
+### Sending to a different channel
+Use `corvid_send_message` only when you need to proactively reach out to a DIFFERENT agent (not to reply to the current conversation).
+
+### What you CANNOT do
+- Send file attachments, reactions, or embeds
+- Post to specific Discord channels by ID
+- Manage Discord server settings, roles, or permissions
+- Join voice channels
 
 ## Bridge Architecture
 
@@ -20,7 +36,7 @@ The Discord bridge (`server/discord/bridge.ts`) uses a raw WebSocket gateway con
 - Subscribes to session responses and sends them back to Discord
 - Enabled when `DISCORD_TOKEN` is set in `.env`
 
-## Responding to Discord Messages
+## Receiving Discord Messages
 
 When a message arrives from Discord, it is tagged:
 
@@ -28,12 +44,7 @@ When a message arrives from Discord, it is tagged:
 [This message came from Discord. Reply directly in this conversation — do NOT use corvid_send_message or other cross-channel tools to respond.]
 ```
 
-### Rules
-
-1. **Reply directly as text** — your response is automatically routed back to Discord
-2. **Do NOT use `corvid_send_message`** to reply — that's for proactive outreach only
-3. **Maintain channel affinity** — if it came from Discord, reply goes to Discord
-4. **Never bridge replies** to a different channel than the conversation started on
+The message also includes the sender's username and Discord ID.
 
 ## User Identity
 
@@ -50,12 +61,6 @@ Discord supports a subset of Markdown:
 - `` `inline code` `` and ` ```code blocks``` `
 - `> blockquotes`
 - Links: `[text](url)` or bare URLs
-- No tables (use code blocks instead)
+- **No tables** — use code blocks instead
+- **2000 character limit** — messages over this are rejected by Discord API
 - Keep messages concise — Discord is conversational, not document-oriented
-
-## Limitations
-
-- Messages over 2000 characters are rejected by Discord API
-- No file attachments from agent responses (text only)
-- No reactions or embeds from agent responses
-- Voice channels are not supported through the bridge

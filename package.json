@@ -42,12 +42,18 @@
     "migrate:keys": "bun scripts/migrate-keys.ts",
     "purge:test-data": "bun scripts/purge-test-data.ts",
     "governance:check": "bun scripts/governance-check.ts",
-    "mcp": "bun server/mcp/stdio-server.ts"
+    "mcp": "bun server/mcp/stdio-server.ts",
+    "lint": "biome check .",
+    "lint:fix": "biome check --fix .",
+    "format": "biome format .",
+    "format:fix": "biome format --fix .",
+    "localnet:fund": "bun scripts/localnet-fund.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
     "@playwright/test": "^1.58.2",
     "@types/bun": "^1.3.10",
     "@types/node": "^25.3.3",

@@ -12,15 +12,25 @@ The verification pipeline that must pass before any commit.
 
 ## Commands
 
-Run all three in order:
+Run all four in order:
 
 ```bash
+bun run lint                          # Biome lint check
 bun x tsc --noEmit --skipLibCheck    # TypeScript type checking
 bun test                              # Test suite
 bun run spec:check                    # Spec invariant verification
 ```
 
-**All three must pass.** Do not commit with failures.
+**All four must pass.** Do not commit with failures.
+
+## Linting
+
+- Uses [Biome](https://biomejs.dev/) — config in `biome.json`
+- `bun run lint` — check for issues
+- `bun run lint:fix` — auto-fix what it can
+- `bun run format:fix` — auto-format files
+- Covers `server/`, `shared/`, `scripts/`, `packages/`
+- Client has its own Prettier config (separate)
 
 ## TypeScript Checking
 
