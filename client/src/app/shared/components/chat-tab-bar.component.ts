@@ -14,13 +14,15 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         @if (tabsService.tabs().length > 0) {
             <div class="tab-bar">
                 <div class="tab-bar__tabs">
-                    @for (tab of tabsService.tabs(); track tab.sessionId) {
+                    @for (tab of tabsService.tabs(); track tab.sessionId; let i = $index) {
                         <a
                             class="tab"
                             [class.tab--active]="tabsService.activeSessionId() === tab.sessionId"
                             [class.tab--running]="tab.status === 'running' || tab.status === 'thinking' || tab.status === 'tool_use'"
                             [class.tab--error]="tab.status === 'error'"
-                            [routerLink]="['/sessions', tab.sessionId]">
+                            [routerLink]="['/sessions', tab.sessionId]"
+                            [title]="(tab.agentName ? tab.agentName + ' — ' : '') + tab.label">
+                            <span class="tab__index">{{ i < 9 ? i + 1 : '' }}</span>
                             <span class="tab__status">
                                 @switch (tab.status) {
                                     @case ('running') { <span class="tab__pulse"></span> }
@@ -30,11 +32,14 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                                     @default { }
                                 }
                             </span>
+                            @if (tab.agentName) {
+                                <span class="tab__agent">{{ tab.agentName }}</span>
+                            }
                             <span class="tab__label">{{ tab.label }}</span>
                             <button
                                 class="tab__close"
                                 (click)="closeTab(tab.sessionId, $event)"
-                                title="Close tab"
+                                title="Close tab (Cmd+W)"
                                 type="button">&times;</button>
                         </a>
                     }
@@ -42,7 +47,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                 <button
                     class="tab-bar__new"
                     (click)="newChat()"
-                    title="New conversation"
+                    title="New conversation (Cmd+T)"
                     type="button">+</button>
             </div>
         }
@@ -96,6 +101,14 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         }
         .tab--running .tab__status { color: var(--accent-cyan, #0ef); }
         .tab--error .tab__status { color: var(--accent-red, #f33); }
+        .tab__index {
+            flex-shrink: 0;
+            font-size: 0.55rem;
+            color: var(--text-quaternary, #555);
+            min-width: 8px;
+            text-align: center;
+        }
+        .tab--active .tab__index { color: var(--text-tertiary, #888); }
         .tab__status {
             flex-shrink: 0;
             width: 10px;
@@ -104,6 +117,15 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             justify-content: center;
             font-size: 0.6rem;
             font-weight: 700;
+        }
+        .tab__agent {
+            flex-shrink: 0;
+            font-size: 0.6rem;
+            color: var(--accent-cyan, #0ef);
+            opacity: 0.7;
+            max-width: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .tab__pulse {
             width: 6px;
