@@ -65,6 +65,11 @@ Role-based access levels:
 - [Skill Bundles](#skill-bundles)
 - [Proposals](#proposals)
 - [Slack](#slack)
+- [Operational Mode](#operational-mode)
+- [Escalation Queue](#escalation-queue)
+- [Feed](#feed)
+- [AlgoChat](#algochat)
+- [Wallets](#wallets)
 
 ---
 
@@ -454,6 +459,10 @@ Agent reputation scoring, event tracking, identity verification, and on-chain at
 | GET | `/api/reputation/identities` | List all identity records | any |
 | GET | `/api/reputation/identity/{agentId}` | Get identity for agent | any |
 | PUT | `/api/reputation/identity/{agentId}` | Set identity verification tier | owner |
+| GET | `/api/reputation/explain/{agentId}` | Score explanation breakdown | any |
+| GET | `/api/reputation/stats/{agentId}` | Agent reputation statistics | any |
+| POST | `/api/reputation/feedback` | Submit feedback for agent | any |
+| GET | `/api/reputation/feedback/{agentId}` | Get feedback for agent | any |
 
 ### Get Agent Score
 
@@ -735,6 +744,7 @@ Interactive agent sessions with project context. Sessions run agent processes an
 | GET | `/api/sessions/{id}/messages` | Get session messages | any |
 | POST | `/api/sessions/{id}/stop` | Stop running session | operator |
 | POST | `/api/sessions/{id}/resume` | Resume session | operator |
+| POST | `/api/sessions/{id}/escalate` | Escalate session to work task | operator |
 
 ### Create Session
 
@@ -1011,6 +1021,10 @@ Capability-based permission management. Grant, revoke, and check agent permissio
 | POST | `/api/permissions/check` | Check tool permission | admin |
 | GET | `/api/permissions/actions` | List action taxonomy | admin |
 | GET | `/api/permissions/{agentId}` | List grants for agent | admin |
+| GET | `/api/permissions/roles` | List role templates | admin |
+| GET | `/api/permissions/roles/{name}` | Get role template | admin |
+| POST | `/api/permissions/roles/apply` | Apply role template to agent | admin |
+| POST | `/api/permissions/roles/revoke` | Revoke role template from agent | admin |
 
 ### Grant Permission
 
@@ -1332,6 +1346,7 @@ Cross-instance agent discovery registry with search, heartbeat, and CRUD operati
 | DELETE | `/api/flock-directory/agents/{id}` | Deregister agent | any |
 | POST | `/api/flock-directory/agents/{id}/heartbeat` | Send heartbeat | any |
 | GET | `/api/flock-directory/lookup/{address}` | Lookup by Algorand address | any |
+| POST | `/api/flock-directory/agents/{id}/reputation` | Compute agent reputation | any |
 
 ### Search Agents
 
@@ -2634,6 +2649,10 @@ Read-only dashboard endpoints for inspecting agent memory state across both tier
 | GET | `/api/dashboard/memories/stats` | Memory statistics (counts by status, category, agent) | dashboard |
 | GET | `/api/dashboard/memories/sync-status` | Sync status (pending/failed counts, recent failures) | dashboard |
 | GET | `/api/dashboard/memories/{id}` | Get memory detail with categories and decay score | dashboard |
+| GET | `/api/dashboard/memories/observations` | List observations | dashboard |
+| GET | `/api/dashboard/memories/observations/stats` | Observation statistics | dashboard |
+| POST | `/api/dashboard/memories/observations/{id}/graduate` | Force graduate observation | dashboard |
+| POST | `/api/dashboard/memories/observations/{id}/boost` | Boost observation score | dashboard |
 
 ---
 
@@ -2751,6 +2770,11 @@ Internal MCP tool endpoints exposed as REST. Used by agents to send messages, ma
 | POST | `/api/mcp/sync-on-chain-memories` | Sync on-chain memories to local store | any |
 | POST | `/api/mcp/delete-memory` | Delete a memory entry | any |
 | GET | `/api/mcp/list-agents` | List known agents | any |
+| POST | `/api/mcp/record-observation` | Record a new observation | any |
+| POST | `/api/mcp/list-observations` | List observations for agent | any |
+| POST | `/api/mcp/boost-observation` | Boost observation score | any |
+| POST | `/api/mcp/dismiss-observation` | Dismiss an observation | any |
+| POST | `/api/mcp/observation-stats` | Get observation statistics | any |
 
 ### Send Message
 
@@ -3311,6 +3335,79 @@ This endpoint handles two payload formats:
 - **Interactive (form-urlencoded):** Processes `block_actions` from button clicks on dispatched questions.
 
 Authentication uses Slack's HMAC-SHA256 signature verification (`SLACK_SIGNING_SECRET`). Signatures older than 5 minutes are rejected.
+
+---
+
+## Operational Mode
+
+Get or set the agent's operational mode (autonomous, supervised, paused).
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/operational-mode` | Get current operational mode | any |
+| POST | `/api/operational-mode` | Set operational mode | any |
+
+---
+
+## Escalation Queue
+
+View and resolve escalated items that require human attention.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/escalation-queue` | List escalation queue | any |
+| POST | `/api/escalation-queue/{id}/resolve` | Resolve escalation | any |
+
+---
+
+## Feed
+
+Aggregated activity feed combining agent messages and AlgoChat history.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/feed/history` | Get feed history | any |
+
+---
+
+## AlgoChat
+
+Algorand-based encrypted messaging status, network switching, and PSK (pre-shared key) contact management.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/algochat/status` | AlgoChat connection status | any |
+| POST | `/api/algochat/network` | Switch network (testnet/mainnet) | any |
+| POST | `/api/algochat/conversations` | List conversations | any |
+| GET | `/api/algochat/psk-exchange` | Get PSK exchange URI | any |
+| POST | `/api/algochat/psk-exchange` | Generate PSK exchange URI | any |
+| GET | `/api/algochat/psk-contacts` | List PSK contacts | any |
+| POST | `/api/algochat/psk-contacts` | Create PSK contact | any |
+| PATCH | `/api/algochat/psk-contacts/{id}` | Rename PSK contact | any |
+| DELETE | `/api/algochat/psk-contacts/{id}` | Cancel PSK contact | any |
+| GET | `/api/algochat/psk-contacts/{id}/qr` | Get QR URI for PSK contact | any |
+
+---
+
+## Wallets
+
+Wallet balance summaries, message history, and credit grants.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/wallets/summary` | Wallet summary | any |
+| GET | `/api/wallets/{address}/messages` | Wallet messages | any |
+| POST | `/api/wallets/{address}/credits` | Grant credits to wallet | any |
 
 ---
 
