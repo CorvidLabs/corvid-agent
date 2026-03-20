@@ -1,5 +1,6 @@
 import { Injectable, signal, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { ChatTabsService } from './chat-tabs.service';
 
 export interface ShortcutEntry {
     keys: string;
@@ -11,6 +12,9 @@ const SHORTCUTS: ShortcutEntry[] = [
     { keys: 'Cmd+K', description: 'Open command palette', category: 'General' },
     { keys: '?', description: 'Toggle shortcuts overlay', category: 'General' },
     { keys: 'Esc', description: 'Close modal / overlay', category: 'General' },
+    { keys: 'Cmd+T', description: 'New tab', category: 'Tabs' },
+    { keys: 'Cmd+W', description: 'Close active tab', category: 'Tabs' },
+    { keys: 'Cmd+1-9', description: 'Switch to tab 1-9', category: 'Tabs' },
     { keys: 'n', description: 'New conversation', category: 'Navigation' },
     { keys: 'g d', description: 'Go to Chat Home', category: 'Navigation' },
     { keys: 'g a', description: 'Go to Agents', category: 'Navigation' },
@@ -21,6 +25,7 @@ const SHORTCUTS: ShortcutEntry[] = [
 @Injectable({ providedIn: 'root' })
 export class KeyboardShortcutsService implements OnDestroy {
     private readonly router = inject(Router);
+    private readonly chatTabs = inject(ChatTabsService);
 
     readonly overlayOpen = signal(false);
     readonly shortcuts = SHORTCUTS;
@@ -52,8 +57,17 @@ export class KeyboardShortcutsService implements OnDestroy {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         if ((e.target as HTMLElement)?.isContentEditable) return;
 
-        // Don't intercept modified keys (Ctrl, Alt, Meta) except Escape
-        if ((e.ctrlKey || e.altKey || e.metaKey) && e.key !== 'Escape') return;
+        // Handle Cmd/Ctrl+key tab shortcuts before skipping modified keys
+        if (e.metaKey || e.ctrlKey) {
+            if (e.key === 'Escape') {
+                // fall through to Escape handler below
+            } else if (this.handleTabShortcut(e)) {
+                return;
+            } else {
+                return; // don't intercept other Cmd/Ctrl combos
+            }
+        }
+        if (e.altKey) return;
 
         const key = e.key;
 
@@ -101,6 +115,48 @@ export class KeyboardShortcutsService implements OnDestroy {
             this.router.navigate(['/sessions/new']);
             return;
         }
+    }
+
+    /** Handle Cmd/Ctrl+key tab shortcuts. Returns true if handled. */
+    private handleTabShortcut(e: KeyboardEvent): boolean {
+        const key = e.key.toLowerCase();
+
+        // Cmd+T — new tab
+        if (key === 't') {
+            e.preventDefault();
+            this.router.navigate(['/chat']);
+            return true;
+        }
+
+        // Cmd+W — close active tab
+        if (key === 'w') {
+            e.preventDefault();
+            const activeId = this.chatTabs.activeSessionId();
+            if (activeId) {
+                const nextId = this.chatTabs.closeTab(activeId);
+                if (nextId) {
+                    this.router.navigate(['/sessions', nextId]);
+                } else {
+                    this.router.navigate(['/chat']);
+                }
+            }
+            return true;
+        }
+
+        // Cmd+1-9 — switch to tab by index (9 = last tab)
+        const digit = parseInt(key, 10);
+        if (digit >= 1 && digit <= 9) {
+            e.preventDefault();
+            const sessionId = digit === 9
+                ? this.chatTabs.switchToLastTab()
+                : this.chatTabs.switchToTabByIndex(digit - 1);
+            if (sessionId) {
+                this.router.navigate(['/sessions', sessionId]);
+            }
+            return true;
+        }
+
+        return false;
     }
 
     private clearPrefix(): void {
