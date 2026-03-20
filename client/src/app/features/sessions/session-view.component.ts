@@ -12,12 +12,15 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Session, SessionMessage } from '../../core/models/session.model';
 import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '@shared/ws-protocol';
 import { NotificationService } from '../../core/services/notification.service';
+import { ChatTabsService } from '../../core/services/chat-tabs.service';
+import { ChatTabBarComponent } from '../../shared/components/chat-tab-bar.component';
 
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, ChatTabBarComponent, DecimalPipe, RelativeTimePipe],
     template: `
+        <app-chat-tab-bar />
         @if (session(); as s) {
             <div class="session-view">
                 <div class="session-view__header">
@@ -147,6 +150,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     private readonly agentService = inject(AgentService);
     private readonly wsService = inject(WebSocketService);
     private readonly notifications = inject(NotificationService);
+    private readonly chatTabs = inject(ChatTabsService);
 
     protected readonly session = signal<Session | null>(null);
     protected readonly agentName = signal('assistant');
@@ -178,6 +182,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
             }
             if (msg.type === 'session_status' && msg.sessionId === sid) {
                 this.session.update((cur) => cur ? { ...cur, status: msg.status as Session['status'] } : cur);
+                this.chatTabs.updateTabStatus(sid, msg.status as string);
             }
             if (msg.type === 'agent_notification' && msg.sessionId === sid) {
                 const level = msg.level as 'info' | 'warning' | 'success' | 'error';
@@ -206,9 +211,14 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         this.session.set(session);
         this.messages.set(messages);
 
+        // Register tab
+        const tabLabel = session.name || session.initialPrompt?.slice(0, 40) || session.id.slice(0, 8);
+        this.chatTabs.openTab(session.id, tabLabel, session.status);
+
         if (session.agentId) {
             this.agentService.getAgent(session.agentId).then((agent) => {
                 this.agentName.set(agent.name);
+                this.chatTabs.openTab(session.id, tabLabel, session.status, agent.name);
             }).catch(() => {});
         }
     }
