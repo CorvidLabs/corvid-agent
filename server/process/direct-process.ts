@@ -421,6 +421,8 @@ export interface DirectProcessOptions {
     externalMcpConfigs?: McpServerConfig[];
     /** If set, only these tool names are available (all others filtered out). */
     toolAllowList?: string[];
+    /** When true, disable ALL tools — pure conversation mode for untrusted users. */
+    conversationOnly?: boolean;
 }
 
 let nextPseudoPid = 800_000;
@@ -472,8 +474,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     // External MCP client manager for third-party MCP servers
     const externalMcpManager = new ExternalMcpClientManager();
 
-    // Build tools — skip for council deliberation sessions
-    let directTools = isDeliberationSession ? [] : buildDirectTools(mcpToolContext, codingCtx);
+    // Build tools — skip for council deliberation and conversation-only sessions
+    let directTools = (isDeliberationSession || options.conversationOnly) ? [] : buildDirectTools(mcpToolContext, codingCtx);
     // Filter to allowlist if specified (e.g. poll sessions only need run_command)
     if (options.toolAllowList && options.toolAllowList.length > 0) {
         const allowed = new Set(options.toolAllowList);

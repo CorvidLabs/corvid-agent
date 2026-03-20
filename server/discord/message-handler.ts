@@ -91,6 +91,8 @@ export interface MentionSessionInfo {
     projectName?: string;
     displayColor?: string | null;
     channelId?: string;
+    /** When true, this session uses pure conversation mode (no tools). */
+    conversationOnly?: boolean;
 }
 
 /** Context needed by the message handler to access bridge state. */
@@ -119,6 +121,7 @@ export interface MessageHandlerContext {
 /** Cooldown for permission-denial replies: only notify a user once per window. */
 const PERM_DENY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 const permDenyCooldowns = new Map<string, number>();
+
 
 export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMessageData): Promise<void> {
     // Ignore bot messages
@@ -408,6 +411,17 @@ export async function sendTaskResult(
 }
 
 async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
+    // Dedup: check if a session already exists for this Discord message ID.
+    // The in-memory dedup in handleMessage() covers most cases, but can miss
+    // duplicates during gateway reconnects or server restarts.
+    const existingSession = ctx.db.query<{ id: string }, [string]>(
+        `SELECT id FROM sessions WHERE name = ? AND source = 'discord' LIMIT 1`,
+    ).get(`Discord mention:${messageId}`);
+    if (existingSession) {
+        log.info('Skipping duplicate mention session', { messageId, existingSessionId: existingSession.id });
+        return;
+    }
+
     const agent = resolveDefaultAgent(ctx.db, ctx.config);
     if (!agent) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No agents configured. Create an agent first.');
@@ -494,7 +508,7 @@ async function handleMentionReplyResume(
     const hasAttachments = (attachments?.length ?? 0) > 0;
     if (!cleanText && !hasAttachments) return;
 
-    const { sessionId, agentName, agentModel, projectName, displayColor } = sessionInfo;
+    const { sessionId, agentName, agentModel, projectName, displayColor, conversationOnly } = sessionInfo;
     const session = getSession(ctx.db, sessionId);
 
     if (!session) {
@@ -524,7 +538,7 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor, channelId });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor, channelId, conversationOnly });
         },
         projectName, displayColor,
     );

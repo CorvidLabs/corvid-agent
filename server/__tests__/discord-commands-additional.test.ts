@@ -52,6 +52,8 @@ function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionCo
         sendTaskResult: mock(async () => {}),
         muteUser: mock(() => {}),
         unmuteUser: mock(() => {}),
+        mentionSessions: new Map(),
+        subscribeForInlineResponse: mock(() => {}),
     };
 }
 

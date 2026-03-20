@@ -21,9 +21,11 @@ import { respondToInteraction } from './embeds';
 import { resolvePermissionLevel } from './permissions';
 import { handleAdminCommand } from './admin-commands';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
+import type { MentionSessionInfo } from './message-handler';
 
 // Command handler imports
 import { handleSessionCommand, handleWorkCommand } from './command-handlers/session-commands';
+import { handleMessageCommand } from './command-handlers/message-commands';
 import {
     handleAgentsCommand,
     handleStatusCommand,
@@ -99,6 +101,26 @@ export async function registerSlashCommands(
                     type: 3,
                     required: false,
                     autocomplete: true,
+                },
+            ],
+        },
+        {
+            name: 'message',
+            description: 'Send a message to an agent (conversation only, no tools)',
+            type: 1,
+            options: [
+                {
+                    name: 'agent',
+                    description: 'Agent to talk to',
+                    type: 3,
+                    required: true,
+                    autocomplete: true,
+                },
+                {
+                    name: 'message',
+                    description: 'Your message',
+                    type: 3,
+                    required: true,
                 },
             ],
         },
@@ -295,6 +317,10 @@ export interface InteractionContext {
     sendTaskResult: (channelId: string, task: import('../../shared/types/work-tasks').WorkTask, mentionUserId?: string) => Promise<void>;
     muteUser: (userId: string) => void;
     unmuteUser: (userId: string) => void;
+    /** Mention session map for /message command inline replies. */
+    mentionSessions: Map<string, MentionSessionInfo>;
+    /** Subscribe for adaptive inline response (used by /message command). */
+    subscribeForInlineResponse: (sessionId: string, channelId: string, replyToMessageId: string, agentName: string, agentModel: string, onBotMessage?: (botMessageId: string) => void, projectName?: string, displayColor?: string | null) => void;
 }
 
 export async function handleInteraction(
@@ -335,6 +361,9 @@ export async function handleInteraction(
     switch (commandName) {
         case 'session':
             await handleSessionCommand(ctx, interaction, permLevel, getOption, userId);
+            break;
+        case 'message':
+            await handleMessageCommand(ctx, interaction, permLevel, getOption, userId);
             break;
         case 'work':
             await handleWorkCommand(ctx, interaction, permLevel, getOption, userId);

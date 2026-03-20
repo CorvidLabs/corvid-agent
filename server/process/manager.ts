@@ -166,7 +166,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -227,9 +227,9 @@ export class ProcessManager {
         const effectiveProject = baseProject;
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
         }
     }
 
@@ -243,7 +243,7 @@ export class ProcessManager {
         effectiveAgent: import('../../shared/types').Agent | null,
         resolvedPrompt: string,
         provider: import('../providers/types').LlmProvider | undefined,
-        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType },
+        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean },
     ): Promise<void> {
         const resolved = await resolveProjectDir(project);
 
@@ -264,30 +264,31 @@ export class ProcessManager {
         }
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
         }
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType, conversationOnly?: boolean): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
             : project;
 
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        const mcpServers = session.agentId
+        // Conversation-only sessions get NO tools — pure text conversation
+        const mcpServers = conversationOnly ? undefined : (session.agentId
             ? (() => {
                 const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
-            : undefined;
+            : undefined);
 
         // Fetch external MCP server configs (Figma, Slack, etc.) for SDK sessions
-        const externalMcpConfigs = session.agentId
+        const externalMcpConfigs = conversationOnly ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
-            : [];
+            : []);
 
         let sp: SdkProcess;
         try {
@@ -305,6 +306,7 @@ export class ProcessManager {
                 externalMcpConfigs,
                 personaPrompt: config.personaPrompt,
                 skillPrompt: config.skillPrompt,
+                conversationOnly,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -339,6 +341,7 @@ export class ProcessManager {
         depth?: number,
         schedulerMode?: boolean,
         schedulerActionType?: ScheduleActionType,
+        conversationOnly?: boolean,
     ): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -346,13 +349,14 @@ export class ProcessManager {
 
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        const mcpToolContext = session.agentId
+        // Conversation-only sessions get NO tool context
+        const mcpToolContext = conversationOnly ? null : (session.agentId
             ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType)
-            : null;
+            : null);
 
-        const externalMcpConfigs = session.agentId
+        const externalMcpConfigs = conversationOnly ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
-            : [];
+            : []);
 
         const councilModel = process.env.COUNCIL_MODEL;
         const modelOverride = (session.councilRole === 'chairman' && councilModel)
@@ -378,7 +382,8 @@ export class ProcessManager {
                 skillPrompt: config.skillPrompt,
                 modelOverride,
                 externalMcpConfigs,
-                toolAllowList: isPollSession ? ['run_command'] : undefined,
+                toolAllowList: conversationOnly ? [] : (isPollSession ? ['run_command'] : undefined),
+                conversationOnly,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -526,17 +531,20 @@ export class ProcessManager {
 
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
+        // Detect conversation-only sessions by name convention
+        const isConversationOnly = session.name.startsWith('Discord message:');
+
         // Load external MCP configs for resumed sessions (Figma, GitHub, etc.)
-        const resumeExternalMcpConfigs = session.agentId
+        const resumeExternalMcpConfigs = isConversationOnly ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
-            : [];
+            : []);
 
         let sp: SdkProcess;
         try {
             if (providerInstance && providerInstance.executionMode === 'direct') {
-                const mcpToolContext = session.agentId
+                const mcpToolContext = isConversationOnly ? null : (session.agentId
                     ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions)
-                    : null;
+                    : null);
                 const councilModelResume = process.env.COUNCIL_MODEL;
                 const modelOverrideResume = (session.councilRole === 'chairman' && councilModelResume)
                     ? councilModelResume
@@ -557,14 +565,16 @@ export class ProcessManager {
                     skillPrompt: resumeConfig.skillPrompt,
                     modelOverride: modelOverrideResume,
                     externalMcpConfigs: resumeExternalMcpConfigs,
+                    toolAllowList: isConversationOnly ? [] : undefined,
+                    conversationOnly: isConversationOnly,
                 });
             } else {
-                const mcpServers = session.agentId
+                const mcpServers = isConversationOnly ? undefined : (session.agentId
                     ? (() => {
                         const ctx = this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions);
                         return ctx ? [createCorvidMcpServer(ctx)] : undefined;
                     })()
-                    : undefined;
+                    : undefined);
                 sp = startSdkProcess({
                     session,
                     project: effectiveProject,
@@ -579,6 +589,7 @@ export class ProcessManager {
                     personaPrompt: resumeConfig.personaPrompt,
                     skillPrompt: resumeConfig.skillPrompt,
                     externalMcpConfigs: resumeExternalMcpConfigs,
+                    conversationOnly: isConversationOnly,
                 });
             }
         } catch (err) {
