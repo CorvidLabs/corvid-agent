@@ -15,7 +15,6 @@ import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
-import { CommandPaletteComponent } from './command-palette.component';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
