@@ -28,7 +28,7 @@ const SECTIONS: SidebarSection[] = [
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions', '/work-tasks', '/councils'] },
     { key: 'observe', label: 'Observe', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs', '/brain-viewer', '/reputation'] },
     { key: 'automate', label: 'Automate', collapsible: true, defaultCollapsed: true, routes: ['/schedules', '/workflows', '/webhooks', '/mention-polling', '/mcp-servers'] },
-    { key: 'config', label: 'Settings', collapsible: true, defaultCollapsed: true, routes: ['/settings', '/security', '/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/marketplace'] },
+    { key: 'config', label: 'Settings', collapsible: true, defaultCollapsed: false, routes: ['/settings', '/security', '/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/marketplace'] },
 ];
 
 const STORAGE_KEY = 'sidebar_sections_collapsed';
@@ -259,7 +259,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     </ul>
                 </li>
 
-                <!-- Settings (collapsible, collapsed by default) -->
+                }
+
+                <!-- Settings (collapsible, expanded by default for easy access) -->
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
                         class="sidebar__section-toggle"
@@ -328,7 +330,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
-                }
             </ul>
             <button
                 class="sidebar__help-btn"
