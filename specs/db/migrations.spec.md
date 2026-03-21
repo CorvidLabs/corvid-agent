@@ -23,6 +23,7 @@ files:
   - server/db/migrations/093_mention_session_project_name.ts
   - server/db/migrations/096_mention_session_channel_id.ts
   - server/db/migrations/097_mention_session_conversation_only.ts
+  - server/db/migrations/098_schedule_output_destinations.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -358,10 +359,22 @@ Adds `conversation_only` column to `discord_mention_sessions` for tracking wheth
 | `up` | `(db: Database)` | `void` | Adds `conversation_only` INTEGER DEFAULT 0 column to `discord_mention_sessions` (idempotent — checks column existence first) |
 | `down` | `(db: Database)` | `void` | Drops `conversation_only` column from `discord_mention_sessions` |
 
+### 098_schedule_output_destinations.ts
+
+Adds `output_destinations` column to `agent_schedules` for routing schedule execution results to Discord channels or AlgoChat addresses.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `output_destinations` TEXT column to `agent_schedules` (idempotent — checks column existence first) |
+| `down` | `(db: Database)` | `void` | Drops `output_destinations` column from `agent_schedules` |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
 | 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
 | 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |
 | 2026-03-15 | corvid-agent | Add migration 091 to spec coverage |
