@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     inject,
     signal,
+    computed,
     OnInit,
     OnDestroy,
     HostListener,
@@ -15,6 +16,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
+import { WidgetLayoutService } from '../../core/services/widget-layout.service';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
@@ -112,7 +114,7 @@ const TABS: NavTab[] = [
                     <span class="topnav__logo-text">CorvidAgent</span>
                 </a>
                 <div class="topnav__tabs">
-                    @for (tab of tabs; track tab.key) {
+                    @for (tab of tabs(); track tab.key) {
                         <div class="topnav__tab-wrapper">
                             <button
                                 class="topnav__tab"
@@ -196,7 +198,7 @@ const TABS: NavTab[] = [
         @if (mobileOpen()) {
             <div class="topnav-mobile-backdrop" (click)="mobileOpen.set(false)"></div>
             <div class="topnav-mobile">
-                @for (tab of tabs; track tab.key) {
+                @for (tab of tabs(); track tab.key) {
                     <div class="topnav-mobile__section">
                         <span class="topnav-mobile__section-label">{{ tab.label }}</span>
                         @for (child of tab.children; track child.route) {
@@ -525,9 +527,25 @@ export class TopNavComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
+    private readonly widgetLayout = inject(WidgetLayoutService);
     private readonly elRef = inject(ElementRef);
 
-    protected readonly tabs = TABS;
+    /** Simple mode: Chat + Agents only; Developer: all tabs */
+    private static readonly SIMPLE_TABS = new Set(['chat', 'agents']);
+    /** In simple mode, hide advanced children from Agents tab */
+    private static readonly SIMPLE_AGENT_CHILDREN = new Set(['All Agents']);
+
+    protected readonly tabs = computed<NavTab[]>(() => {
+        if (this.widgetLayout.viewMode() === 'developer') return TABS;
+        return TABS
+            .filter((t) => TopNavComponent.SIMPLE_TABS.has(t.key))
+            .map((t) => {
+                if (t.key === 'agents') {
+                    return { ...t, children: t.children.filter((c) => TopNavComponent.SIMPLE_AGENT_CHILDREN.has(c.label)) };
+                }
+                return t;
+            });
+    });
     protected readonly openDropdown = signal<string | null>(null);
     protected readonly mobileOpen = signal(false);
     protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
