@@ -285,6 +285,26 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                                     <span class="flock-metric__value">{{ fa.councilParticipations }}</span>
                                     <span class="flock-metric__label">Councils</span>
                                 </div>
+                                @if (lastTestScore() !== null) {
+                                    <div class="flock-metric">
+                                        <span class="flock-metric__value" [attr.data-level]="lastTestScore()! >= 70 ? 'high' : lastTestScore()! >= 30 ? 'mid' : 'low'">{{ lastTestScore() }}/100</span>
+                                        <span class="flock-metric__label">Test Score</span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="flock-profile__actions">
+                                <button class="btn btn--secondary btn--sm" [disabled]="sendingHeartbeat()" (click)="sendHeartbeat()">
+                                    {{ sendingHeartbeat() ? 'Sending...' : 'Send Heartbeat' }}
+                                </button>
+                                <button class="btn btn--secondary btn--sm" [disabled]="runningTest() || isTestOnCooldown()" (click)="runFlockTest()">
+                                    @if (runningTest()) {
+                                        Testing...
+                                    } @else if (isTestOnCooldown()) {
+                                        Test on Cooldown
+                                    } @else {
+                                        Run Test
+                                    }
+                                </button>
                             </div>
                             <div class="flock-profile__info">
                                 <dl>
@@ -506,12 +526,16 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
             padding: 0.75rem; display: flex; flex-direction: column; gap: 0.2rem;
         }
         .flock-metric__value { font-size: 1.3rem; font-weight: 700; color: var(--accent-cyan); }
+        .flock-metric__value[data-level="high"] { color: var(--accent-cyan); }
+        .flock-metric__value[data-level="mid"] { color: var(--accent-amber, #ffc107); }
+        .flock-metric__value[data-level="low"] { color: var(--accent-red); }
         .flock-metric__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
         .flock-metric__bar { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; margin-top: 0.25rem; }
         .flock-metric__fill { height: 100%; background: linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan)); border-radius: 2px; min-width: 1px; transition: width 0.3s; }
         .flock-profile__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .flock-profile__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .flock-profile__info dd { margin: 0; color: var(--text-primary); }
+        .flock-profile__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .flock-register { text-align: center; padding: 2rem 1rem; }
         .flock-register__text { color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.35rem; }
         .flock-register__hint { color: var(--text-tertiary); font-size: 0.75rem; margin: 0 0 1rem; line-height: 1.5; }
@@ -552,6 +576,10 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly creatingWork = signal(false);
     protected readonly flockAgent = signal<FlockAgent | null>(null);
     protected readonly registeringFlock = signal(false);
+    protected readonly sendingHeartbeat = signal(false);
+    protected readonly runningTest = signal(false);
+    protected readonly testCooldownUntil = signal<string | null>(null);
+    protected readonly lastTestScore = signal<number | null>(null);
     protected readonly activeTab = signal<Tab>('overview');
 
     protected invokeTargetId = '';
@@ -631,7 +659,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
                 .catch(() => {});
         }
 
-        this.loadFlockProfile(agent.name);
+        this.loadFlockProfile(agent.walletAddress ?? undefined, agent.name);
         this.personaService.loadPersona(id).then((p) => this.persona.set(p)).catch(() => this.persona.set(null));
         this.skillBundleService.getAgentBundles(id).then((ab) => this.agentBundles.set(ab)).catch(() => this.agentBundles.set([]));
         this.skillBundleService.loadBundles().catch(() => {});
@@ -675,16 +703,46 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         this.workTaskService.stopListening();
     }
 
-    private async loadFlockProfile(agentName: string): Promise<void> {
+    private async loadFlockProfile(walletAddress: string | undefined, agentName: string): Promise<void> {
         try {
+            // Prefer address-based lookup (deterministic) over name search (ambiguous with limit=1)
+            if (walletAddress) {
+                const agent = await firstValueFrom(
+                    this.apiService.get<FlockAgent>(`/flock-directory/lookup/${encodeURIComponent(walletAddress)}`),
+                ).catch(() => null);
+                if (agent) {
+                    this.flockAgent.set(agent);
+                    this.loadTestInfo(agent.id);
+                    return;
+                }
+            }
+            // Fallback: search by name
             const result = await firstValueFrom(
-                this.apiService.get<{ agents: FlockAgent[] }>(`/flock-directory/search?q=${encodeURIComponent(agentName)}&limit=1`),
+                this.apiService.get<{ agents: FlockAgent[] }>(`/flock-directory/search?q=${encodeURIComponent(agentName)}&limit=5`),
             );
             const match = result.agents.find((fa) => fa.name.toLowerCase() === agentName.toLowerCase());
             this.flockAgent.set(match ?? null);
+            if (match) this.loadTestInfo(match.id);
         } catch {
             this.flockAgent.set(null);
         }
+    }
+
+    private async loadTestInfo(flockAgentId: string): Promise<void> {
+        try {
+            const [score, cooldown] = await Promise.all([
+                firstValueFrom(
+                    this.apiService.get<{ effectiveScore: number; rawScore: number | null }>(`/flock-directory/testing/agents/${flockAgentId}/score`),
+                ).catch(() => null),
+                firstValueFrom(
+                    this.apiService.get<{ onCooldown: boolean; nextAvailableAt?: string }>(`/flock-directory/testing/agents/${flockAgentId}/cooldown`),
+                ).catch(() => null),
+            ]);
+            if (score?.rawScore != null) this.lastTestScore.set(score.rawScore);
+            if (cooldown?.onCooldown && cooldown.nextAvailableAt) {
+                this.testCooldownUntil.set(cooldown.nextAvailableAt);
+            }
+        } catch { /* non-critical */ }
     }
 
     async registerInFlock(): Promise<void> {
@@ -711,6 +769,55 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         } finally {
             this.registeringFlock.set(false);
         }
+    }
+
+    async sendHeartbeat(): Promise<void> {
+        const fa = this.flockAgent();
+        if (!fa) return;
+        this.sendingHeartbeat.set(true);
+        try {
+            await firstValueFrom(
+                this.apiService.post(`/flock-directory/agents/${fa.id}/heartbeat`, {}),
+            );
+            this.flockAgent.set({ ...fa, lastHeartbeat: new Date().toISOString(), status: 'active' });
+            this.notify.info('Heartbeat sent');
+        } catch {
+            this.notify.error('Failed to send heartbeat');
+        } finally {
+            this.sendingHeartbeat.set(false);
+        }
+    }
+
+    async runFlockTest(): Promise<void> {
+        const fa = this.flockAgent();
+        if (!fa) return;
+        this.runningTest.set(true);
+        try {
+            const res = await firstValueFrom(
+                this.apiService.post<{ result: { overallScore: number }; nextAvailableAt: string }>(
+                    `/flock-directory/testing/agents/${fa.id}/run`, {},
+                ),
+            );
+            this.lastTestScore.set(res.result.overallScore);
+            this.testCooldownUntil.set(res.nextAvailableAt);
+            this.notify.info(`Test complete — score: ${res.result.overallScore}/100`);
+        } catch (err: unknown) {
+            const httpErr = err as { status?: number; error?: { remainingMin?: number; nextAvailableAt?: string } };
+            if (httpErr.status === 429 && httpErr.error?.nextAvailableAt) {
+                this.testCooldownUntil.set(httpErr.error.nextAvailableAt);
+                this.notify.error(`Test on cooldown — try again in ${httpErr.error.remainingMin} minutes`);
+            } else {
+                this.notify.error('Failed to run test');
+            }
+        } finally {
+            this.runningTest.set(false);
+        }
+    }
+
+    protected isTestOnCooldown(): boolean {
+        const until = this.testCooldownUntil();
+        if (!until) return false;
+        return new Date(until).getTime() > Date.now();
     }
 
     async onDelete(): Promise<void> {

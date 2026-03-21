@@ -236,10 +236,12 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         });
 
         // ── Periodic heartbeat + stale sweep ────────────────────────────
-        // Heartbeat every 10 minutes to keep this agent active in the directory.
-        // Stale sweep every 15 minutes to mark unresponsive agents as inactive.
-        const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000;
-        const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
+        // Heartbeat every 12 hours to keep this agent active in the directory.
+        // Stale sweep every 6 hours to mark unresponsive agents as inactive (24h threshold).
+        // This gives ~2 heartbeats/day — enough to verify the directory is working
+        // without being excessive.
+        const HEARTBEAT_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
+        const SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
         const heartbeatTimer = setInterval(() => {
             flockDirectoryService.selfRegister({
