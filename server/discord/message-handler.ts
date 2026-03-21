@@ -11,7 +11,7 @@ import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordAttachment } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { ButtonStyle } from './types';
+import { ButtonStyle, PermissionLevel } from './types';
 import { appendAttachmentUrls, buildMultimodalContent } from './image-attachments';
 import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
@@ -195,6 +195,14 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, data.member?.roles);
     if (permLevel <= 0) {
         log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
+        recordAudit(
+            ctx.db,
+            'discord_access_denied',
+            userId,
+            'discord_message',
+            null,
+            JSON.stringify({ channel: 'discord', channelId, reason: 'blocked', username: data.author.username }),
+        );
         // Only send the denial once per cooldown window to avoid spamming
         const now = Date.now();
         const lastDenied = permDenyCooldowns.get(userId);
@@ -205,8 +213,46 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
         return;
     }
 
-    // Per-user rate limiting with tiered limits
-    if (!checkRateLimit(ctx.config, ctx.userMessageTimestamps, userId, ctx.rateLimitWindowMs, ctx.rateLimitMaxMessages, permLevel)) {
+    // BASIC tier in public mode: guide @mention users to /message instead of starting a full session.
+    // Only applies to channel messages (not threads, which use conversation-only sessions below).
+    if (
+        ctx.config.publicMode &&
+        permLevel === PermissionLevel.BASIC &&
+        isMonitored && !isOurThread &&
+        (isBotMentioned || isReplyToBot)
+    ) {
+        log.info('BASIC user @mention in public channel — redirecting to /message', { userId, channelId });
+        const now = Date.now();
+        const lastDenied = permDenyCooldowns.get(userId);
+        if (!lastDenied || now - lastDenied >= PERM_DENY_COOLDOWN_MS) {
+            permDenyCooldowns.set(userId, now);
+            await sendDiscordMessage(
+                ctx.delivery,
+                ctx.config.botToken,
+                channelId,
+                `Hey <@${userId}>! To chat with me, please use the \`/message\` command — it\'s designed for quick conversations. Type \`/message\` to get started!`,
+            );
+        }
+        return;
+    }
+
+    // Per-user rate limiting with tiered limits.
+    // BASIC users in public mode get a tighter default limit (5 per window).
+    const basicDefaultLimit = 5;
+    const effectiveMaxMessages =
+        ctx.config.publicMode && permLevel === PermissionLevel.BASIC && !ctx.config.rateLimitByLevel
+            ? basicDefaultLimit
+            : ctx.rateLimitMaxMessages;
+    if (!checkRateLimit(ctx.config, ctx.userMessageTimestamps, userId, ctx.rateLimitWindowMs, effectiveMaxMessages, permLevel)) {
+        log.warn('Rate limit hit', { userId, username: data.author.username, permLevel, channelId });
+        recordAudit(
+            ctx.db,
+            'discord_rate_limited',
+            userId,
+            'discord_message',
+            null,
+            JSON.stringify({ channel: 'discord', channelId, permLevel, username: data.author.username }),
+        );
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'Slow down! Please wait before sending more messages.');
         return;
     }
@@ -242,7 +288,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (isOurThread) {
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
-        await routeToThread(ctx, channelId, userId, text, data.author.id, data.author.username, data.attachments);
+        await routeToThread(ctx, channelId, userId, text, data.author.id, data.author.username, data.attachments, permLevel);
         return;
     }
 
@@ -634,7 +680,79 @@ async function resumeExpiredThreadSession(
     return true;
 }
 
-async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
+/**
+ * Handle a BASIC-tier user's message in a thread.
+ * Creates a short-lived conversation-only session so the user gets a response
+ * without inheriting the tool access of the thread's original session.
+ */
+async function handleBasicUserInThread(
+    ctx: MessageHandlerContext,
+    threadId: string,
+    userId: string,
+    text: string,
+    authorId?: string,
+    authorUsername?: string,
+    attachments?: DiscordAttachment[],
+    threadInfo?: ThreadSessionInfo,
+): Promise<void> {
+    // Find the agent associated with this thread (fall back to default)
+    const agents = listAgents(ctx.db);
+    const agent = (threadInfo ? agents.find(a => a.name === threadInfo.agentName) : null)
+        ?? resolveDefaultAgent(ctx.db, ctx.config);
+    if (!agent) {
+        await sendDiscordMessage(ctx.delivery, ctx.config.botToken, threadId,
+            `<@${userId}> No agents available to respond.`);
+        return;
+    }
+
+    const projects = listProjects(ctx.db);
+    const project = agent.defaultProjectId
+        ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
+        : projects[0];
+    if (!project) {
+        await sendDiscordMessage(ctx.delivery, ctx.config.botToken, threadId,
+            `<@${userId}> No projects configured.`);
+        return;
+    }
+
+    const cleanText = resolveMentions(text, undefined, ctx.botUserId);
+    if (!cleanText && !attachments?.length) return;
+
+    // Use session name convention that triggers conversation-only mode in process manager
+    const msgId = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const session = createSession(ctx.db, {
+        projectId: project.id,
+        agentId: agent.id,
+        name: `Discord message:${threadId}-${msgId}`,
+        initialPrompt: cleanText,
+        source: 'discord' as SessionSource,
+        // No workDir — conversation only
+    });
+
+    log.info('BASIC user in thread: starting conversation-only session', {
+        threadId, userId, sessionId: session.id, agentName: agent.name,
+    });
+    recordAudit(
+        ctx.db,
+        'discord_access_denied',
+        userId,
+        'discord_message',
+        null,
+        JSON.stringify({ channel: 'discord', threadId, reason: 'basic_tier_thread_downgrade', sessionId: session.id }),
+    );
+
+    const textWithContext = appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername), attachments);
+    ctx.processManager.startProcess(session, textWithContext, { conversationOnly: true });
+
+    const agentModel = agent.model || 'unknown';
+    subscribeForResponseWithEmbed(
+        ctx.processManager, ctx.delivery, ctx.config.botToken,
+        ctx.db, ctx.threadCallbacks, session.id, threadId,
+        agent.name, agentModel, project.name, agent.displayColor,
+    );
+}
+
+async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[], permLevel?: number): Promise<void> {
     ctx.threadLastActivity.set(threadId, Date.now());
 
     let threadInfo = ctx.threadSessions.get(threadId);
@@ -642,6 +760,14 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     if (!threadInfo) {
         threadInfo = tryRecoverThread(ctx.db, ctx.threadSessions, threadId) ?? undefined;
         if (!threadInfo) return;
+    }
+
+    // BASIC tier users cannot participate in full thread sessions.
+    // Route their message through a conversation-only session so they get a
+    // response without gaining access to tools the thread owner may have.
+    if (ctx.config.publicMode && permLevel === PermissionLevel.BASIC) {
+        await handleBasicUserInThread(ctx, threadId, _userId, text, authorId, authorUsername, attachments, threadInfo);
+        return;
     }
 
     const { sessionId, agentName, agentModel, projectName, displayColor } = threadInfo;

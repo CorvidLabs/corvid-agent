@@ -59,10 +59,16 @@ afterEach(() => {
 });
 
 describe('DiscordBridge public mode', () => {
-    test('public mode allows any user with default BASIC level', async () => {
+    test('BASIC user @mention in public mode receives /message guidance', async () => {
         const pm = createMockProcessManager();
         createAgent(db, { name: 'TestAgent' });
         createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const fetchBodies: unknown[] = [];
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
@@ -73,18 +79,25 @@ describe('DiscordBridge public mode', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        // Any user can @mention the bot
+        // BASIC user @mentions the bot
         await callHandleMessage(bridge, {
             id: '200000000000000001',
             channel_id: '100000000000000001',
-            author: { id: 'random-user-12345678', username: 'RandomUser' },
+            author: { id: 'basic-user-12345678', username: 'BasicUser' },
             content: '<@999000000000000001> hello',
             timestamp: new Date().toISOString(),
             mentions: [{ id: '999000000000000001', username: 'Bot' }],
             member: { roles: [] },
         });
 
-        expect(pm.startProcess).toHaveBeenCalled();
+        // Should NOT start a full session for BASIC @mention in public mode
+        expect(pm.startProcess).not.toHaveBeenCalled();
+        // Should send guidance message pointing to /message
+        const guidanceMsg = fetchBodies.find((b: unknown) =>
+            typeof (b as { content?: string }).content === 'string' &&
+            (b as { content: string }).content.includes('/message')
+        ) as { content: string } | undefined;
+        expect(guidanceMsg).toBeTruthy();
     });
 
     test('blocked permission level prevents interaction', async () => {
@@ -119,6 +132,35 @@ describe('DiscordBridge public mode', () => {
         expect(pm.startProcess).not.toHaveBeenCalled();
         const msg = fetchBodies.find((b: unknown) => (b as { content?: string }).content) as { content: string } | undefined;
         expect(msg?.content).toContain('permission');
+    });
+
+    test('STANDARD user @mention in public mode starts a full session', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            publicMode: true,
+            rolePermissions: { 'standard-role-001': PermissionLevel.STANDARD },
+            defaultPermissionLevel: PermissionLevel.BLOCKED,
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        await callHandleMessage(bridge, {
+            id: '200000000000000030',
+            channel_id: '100000000000000001',
+            author: { id: 'standard-user-1234', username: 'StdUser' },
+            content: '<@999000000000000001> hello',
+            timestamp: new Date().toISOString(),
+            mentions: [{ id: '999000000000000001', username: 'Bot' }],
+            member: { roles: ['standard-role-001'] },
+        });
+
+        expect(pm.startProcess).toHaveBeenCalled();
     });
 
     test('role-based permissions resolve highest matching role', async () => {
@@ -177,6 +219,100 @@ describe('DiscordBridge public mode', () => {
         expect(resolvePermissionLevel(config, mutedUsers, 'allowed-user-123456')).toBe(PermissionLevel.ADMIN);
         // Non-allowed user gets BLOCKED
         expect(resolvePermissionLevel(config, mutedUsers, 'unknown-user-654321')).toBe(PermissionLevel.BLOCKED);
+    });
+});
+
+describe('DiscordBridge thread access gating', () => {
+    test('BASIC user in a thread gets a conversation-only session (no tools)', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            publicMode: true,
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        // Simulate an existing thread session (created by a STANDARD user)
+        const threadId = '100000000000000050';
+        (bridge as unknown as {
+            threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }>
+        }).threadSessions.set(threadId, {
+            sessionId: 'thread-session-abc123',
+            agentName: 'TestAgent',
+            agentModel: 'claude-sonnet-4-6',
+            ownerUserId: 'standard-user-owner',
+        });
+
+        // BASIC user (no special roles, default BASIC in public mode) sends in the thread
+        await callHandleMessage(bridge, {
+            id: '200000000000000050',
+            channel_id: threadId,
+            author: { id: 'basic-user-9999', username: 'BasicInThread' },
+            content: 'hello from basic user',
+            timestamp: new Date().toISOString(),
+            member: { roles: [] },
+        });
+
+        // A new conversation-only session should be started (not sendMessage to the existing one)
+        expect(pm.startProcess).toHaveBeenCalled();
+        const startCall = (pm.startProcess as ReturnType<typeof mock>).mock.calls[0];
+        // Third argument should include conversationOnly: true
+        expect(startCall[2]).toEqual(expect.objectContaining({ conversationOnly: true }));
+        // The existing thread session should NOT receive the message
+        expect(pm.sendMessage).not.toHaveBeenCalledWith('thread-session-abc123', expect.anything());
+    });
+
+    test('STANDARD user in a thread does NOT get conversation-only restriction', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            publicMode: true,
+            rolePermissions: { 'std-role-000001': PermissionLevel.STANDARD },
+            defaultPermissionLevel: PermissionLevel.BLOCKED,
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const threadId = '100000000000000051';
+        (bridge as unknown as {
+            threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }>
+        }).threadSessions.set(threadId, {
+            sessionId: 'thread-session-def456',
+            agentName: 'TestAgent',
+            agentModel: 'claude-sonnet-4-6',
+            ownerUserId: 'standard-user-owner',
+        });
+
+        // STANDARD user sends in the thread
+        await callHandleMessage(bridge, {
+            id: '200000000000000051',
+            channel_id: threadId,
+            author: { id: 'standard-user-9876', username: 'StdInThread' },
+            content: 'hello from standard user',
+            timestamp: new Date().toISOString(),
+            member: { roles: ['std-role-000001'] },
+        });
+
+        // If startProcess was called, it must NOT have conversationOnly: true
+        // (thread session expired and was resumed without conversation-only restriction)
+        const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
+        if (startCalls.length > 0) {
+            const options = startCalls[0][2] as { conversationOnly?: boolean } | undefined;
+            expect(options?.conversationOnly).not.toBe(true);
+        } else {
+            // sendMessage was used instead — no restriction applies
+            expect(pm.sendMessage).toHaveBeenCalled();
+        }
     });
 });
 
@@ -271,6 +407,67 @@ describe('DiscordBridge tiered rate limiting', () => {
             expect(checkRateLimit(config, timestamps, 'default-user-1234567', 60_000, 10)).toBe(true);
         }
         expect(checkRateLimit(config, timestamps, 'default-user-1234567', 60_000, 10)).toBe(false);
+    });
+
+    test('BASIC users in public mode default to 5 messages per window', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        // Public mode with a thread so BASIC users can interact (not redirected)
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            publicMode: true,
+            // No rateLimitByLevel — should default BASIC to 5
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const threadId = '100000000000000060';
+        (bridge as unknown as {
+            threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }>
+        }).threadSessions.set(threadId, {
+            sessionId: 'session-rate-test-001',
+            agentName: 'TestAgent',
+            agentModel: 'claude-sonnet-4-6',
+            ownerUserId: 'owner-user',
+        });
+
+        const fetchBodies: unknown[] = [];
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
+            return new Response(JSON.stringify({ id: 'fake-msg-id' }), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        // Send 5 messages — all should be processed
+        for (let i = 0; i < 5; i++) {
+            await callHandleMessage(bridge, {
+                id: `rate-msg-${i}-00000000000000`,
+                channel_id: threadId,
+                author: { id: 'basic-rate-user-001', username: 'BasicRateUser' },
+                content: `message ${i}`,
+                timestamp: new Date().toISOString(),
+                member: { roles: [] },
+            });
+        }
+
+        // 6th message should be rate-limited
+        await callHandleMessage(bridge, {
+            id: 'rate-msg-5-000000000000000',
+            channel_id: threadId,
+            author: { id: 'basic-rate-user-001', username: 'BasicRateUser' },
+            content: 'message 5',
+            timestamp: new Date().toISOString(),
+            member: { roles: [] },
+        });
+
+        const rateLimitMsg = fetchBodies.find((b: unknown) =>
+            typeof (b as { content?: string }).content === 'string' &&
+            (b as { content: string }).content.toLowerCase().includes('slow down')
+        );
+        expect(rateLimitMsg).toBeTruthy();
     });
 });
 
