@@ -270,8 +270,8 @@ button:active:not(:disabled) {
 }
 
 @keyframes subtlePulse {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; }
-    50% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.08); }
+    0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
 }
 
 /* ── Glassmorphism utility ── */
