@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.42.0] - 2026-03-21
+
+### Added
+- **OpenRouter integration** — new LLM provider option for accessing additional models (#1338)
+- **Onboarding tour** — multi-page tour with progress dots for new users (#1249, #1341)
+- **Opt-in MCP tools** — tools are now opt-in per CLI session for better security (#1310)
+- **Route consolidation** — ~41 flat routes → ~10 nested groups for cleaner API (#1309)
+- **Flock Directory page** — browsing with search, filters, and agent profiles (#1306)
+- **View modes** — Simple/Developer toggle with progressive disclosure (#1307, #1308)
+- **Discord hardening** — ready for public channel deployment (#1336)
+- **Unified website** — docs load inline, consistent design across all pages
+- **Blockchain-first flock ordering** — enforce blockchain-first ordering in flock directory (#1339)
+- **AlgoChat /message command** — pure conversation mode with no tools (#1304, #1329)
+- **Ollama auto-escalation** — auto-escalate stalled Ollama sessions to task queue (#1314)
+
+### Fixed
+- **SSRF in ReputationVerifier** — validate wallet address format before URL interpolation (#1316)
+- **Work task recovery** — improve recovery after server restarts (#1333, #1337)
+- **Localnet memory sync** — prevent fallback to plain transactions (#1340)
+- **Skill bundles** — no longer drop default tools when base permissions are null (#1319)
+- **Dashboard layout** — status section overflow, view toggle shift, text truncation fixes
+- **Discord reply fallback** — fall back to non-reply embed when message reference fails (#1318)
+- **Discord silent errors** — show error embed when adaptive inline session errors or exits silently (#1317)
+
+### Docs
+- Slim README to intro + links, point to unified website
+- Add missing Discord Image and Memory Backfill API endpoints (#1326)
+
 ## [0.41.0] - 2026-03-20
 
 ### Added
