@@ -1,7 +1,7 @@
 import type { ClaudeStreamEvent, ContentBlock, AssistantEvent, ContentBlockStartEvent } from '../process/types';
 import { extractContentText } from '../process/types';
 
-// ── Heuristic patterns ───────────────────────────────────────────────────
+// ── Heuristic patterns ──────────────────────────────────────────────────
 
 /**
  * Patterns that indicate forward-commitment language: the agent is promising
