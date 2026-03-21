@@ -1,9 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed, ElementRef } from '@angular/core';
 import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SessionService } from '../../core/services/session.service';
+import { GuidedTourService } from '../../core/services/guided-tour.service';
 import { firstValueFrom } from 'rxjs';
 import QRCode from 'qrcode';
 
@@ -78,6 +80,26 @@ interface PSKContact {
                             <div class="info-item">
                                 <span class="info-label">Sessions</span>
                                 <span class="info-value">{{ settings()?.system?.sessionCount }}</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Help -->
+                <div class="settings__section">
+                    <h3 class="section-toggle" (click)="toggleSection('help')">
+                        <span class="section-chevron">{{ collapsedSections().has('help') ? '\u25B6' : '\u25BC' }}</span>
+                        Help
+                    </h3>
+                    @if (!collapsedSections().has('help')) {
+                        <div class="info-grid">
+                            <div class="info-item info-item--action">
+                                <span class="info-label">Guided Tour</span>
+                                <button class="save-btn save-btn--sm" (click)="replayTour()">Replay Tour</button>
+                            </div>
+                            <div class="info-item info-item--action">
+                                <span class="info-label">Keyboard Shortcuts</span>
+                                <span class="info-value">Press <kbd>?</kbd> to view</span>
                             </div>
                         </div>
                     }
@@ -789,6 +811,8 @@ export class SettingsComponent implements OnInit {
     private readonly api = inject(ApiService);
     private readonly notifications = inject(NotificationService);
     private readonly sessionService = inject(SessionService);
+    private readonly tourService = inject(GuidedTourService);
+    private readonly settingsRouter = inject(Router);
     private readonly elRef = inject(ElementRef);
 
     readonly loading = signal(true);
@@ -840,6 +864,13 @@ export class SettingsComponent implements OnInit {
     /** Helper for template input events. */
     asInputValue(event: Event): string {
         return (event.target as HTMLInputElement).value;
+    }
+
+    replayTour(): void {
+        this.tourService.reset();
+        this.settingsRouter.navigate(['/dashboard']).then(() => {
+            setTimeout(() => this.tourService.startTour(), 400);
+        });
     }
 
     toggleSection(section: string): void {

@@ -13,6 +13,7 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { GuidedTourService } from '../../core/services/guided-tour.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WidgetLayoutService, type WidgetId } from '../../core/services/widget-layout.service';
@@ -991,6 +992,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly notify = inject(NotificationService);
+    private readonly tourService = inject(GuidedTourService);
 
     protected readonly layoutService = inject(WidgetLayoutService);
 
@@ -1226,7 +1228,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     protected onWizardComplete(): void {
         this.wizardDismissed.set(true);
-        this.agentService.loadAgents().then(() => this.loadAgentSummaries());
+        this.agentService.loadAgents().then(() => {
+            this.loadAgentSummaries();
+            // Start guided tour after first agent is created (slight delay for DOM to render)
+            if (!this.tourService.isCompleted) {
+                setTimeout(() => this.tourService.startTour(), 600);
+            }
+        });
         this.loadOverview();
     }
 
