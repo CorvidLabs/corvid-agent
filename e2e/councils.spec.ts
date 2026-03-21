@@ -4,16 +4,17 @@ const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 test.describe('Councils', () => {
     test('navigate to councils page from sidebar', async ({ page }) => {
-        await gotoWithRetry(page, '/dashboard');
-        const link = page.locator('a.sidebar__link[href="/councils"]');
-        await expect(link).toBeVisible({ timeout: 10_000 });
-        await link.click();
-        await page.waitForURL('/councils');
+        await gotoWithRetry(page, '/sessions');
+        // Councils is a sub-tab under Sessions, not a sidebar link
+        const tab = page.locator('a.tab-shell__tab:has-text("Councils")');
+        await expect(tab).toBeVisible({ timeout: 10_000 });
+        await tab.click();
+        await page.waitForURL(/\/sessions\/councils/);
         await expect(page.locator('h2')).toBeVisible();
     });
 
     test('councils page loads successfully', async ({ page }) => {
-        await gotoWithRetry(page, '/councils');
+        await gotoWithRetry(page, '/sessions/councils');
         await expect(page.locator('h2')).toBeVisible({ timeout: 10_000 });
         // Wait for either council cards or empty state to render
         await expect(
@@ -26,7 +27,7 @@ test.describe('Councils', () => {
         await api.seedAgent('Council Agent A');
         await api.seedAgent('Council Agent B');
 
-        await gotoWithRetry(page, '/councils/new');
+        await gotoWithRetry(page, '/sessions/councils/new');
         await expect(page.locator('h2')).toHaveText('New Council');
 
         // Fill form
@@ -41,11 +42,11 @@ test.describe('Councils', () => {
         await page.locator('form button[type="submit"]').click();
 
         // Should redirect to council detail
-        await page.waitForURL(/\/councils\//);
+        await page.waitForURL(/\/sessions\/councils\//);
         await expect(page.locator('h2')).toHaveText('Integration Council');
 
         // Navigate to list and verify
-        await gotoWithRetry(page, '/councils');
+        await gotoWithRetry(page, '/sessions/councils');
         await expect(page.locator('text=Integration Council').first()).toBeVisible();
     });
 
@@ -54,7 +55,7 @@ test.describe('Councils', () => {
         const agent2 = await api.seedAgent('Detail Agent 2');
         const council = await api.seedCouncil([agent1.id, agent2.id], 'Detail Council', agent1.id);
 
-        await gotoWithRetry(page, `/councils/${council.id}`);
+        await gotoWithRetry(page, `/sessions/councils/${council.id}`);
 
         // Verify council info
         await expect(page.locator('h2')).toHaveText('Detail Council');
@@ -71,11 +72,11 @@ test.describe('Councils', () => {
         const agent1 = await api.seedAgent('Edit Agent 1');
         const council = await api.seedCouncil([agent1.id], 'Before Edit');
 
-        await gotoWithRetry(page, `/councils/${council.id}`);
+        await gotoWithRetry(page, `/sessions/councils/${council.id}`);
 
         // Click edit
         await page.locator('a:has-text("Edit")').click();
-        await page.waitForURL(/\/councils\/.*\/edit/);
+        await page.waitForURL(/\/sessions\/councils\/.*\/edit/);
 
         // Wait for form to load existing data (name input should have existing value)
         await expect(page.locator('#name')).toHaveValue('Before Edit');
@@ -88,7 +89,7 @@ test.describe('Councils', () => {
         await page.locator('form button[type="submit"]').click();
 
         // Should redirect back to detail
-        await page.waitForURL(/\/councils\/[^/]+$/);
+        await page.waitForURL(/\/sessions\/councils\/[^/]+$/);
         await expect(page.locator('h2')).toHaveText('After Edit');
     });
 
@@ -96,10 +97,10 @@ test.describe('Councils', () => {
         const agent1 = await api.seedAgent('Delete Agent');
         const council = await api.seedCouncil([agent1.id], 'To Be Deleted');
 
-        await gotoWithRetry(page, `/councils/${council.id}`);
+        await gotoWithRetry(page, `/sessions/councils/${council.id}`);
 
         await page.locator('button:has-text("Delete")').click();
-        await page.waitForURL('/councils');
+        await page.waitForURL(/\/sessions\/councils$/);
 
         // The deleted council should not appear
         await expect(page.locator('text=To Be Deleted')).not.toBeVisible();
@@ -111,9 +112,9 @@ test.describe('Councils', () => {
 
         await gotoWithRetry(page, '/dashboard');
 
-        // Dashboard uses .section containers, not .card — check for councils quick action or link
-        const councilLink = page.locator('a[href="/councils"]').first();
-        await expect(councilLink).toBeVisible({ timeout: 10_000 });
+        // Dashboard has a "Launch Council" quick-action button (not an <a> link)
+        const councilBtn = page.locator('button.action-btn:has-text("Launch Council")');
+        await expect(councilBtn).toBeVisible({ timeout: 10_000 });
     });
 
     test('council API CRUD works correctly', async ({ api }) => {
@@ -202,7 +203,7 @@ test.describe('Councils', () => {
         const launch = await launchRes.json();
 
         // Navigate to launch view
-        await gotoWithRetry(page, `/council-launches/${launch.launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launch.launchId}`);
 
         // Verify stage bar exists
         await expect(page.locator('.stage-bar')).toBeVisible();

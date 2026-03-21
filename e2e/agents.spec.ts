@@ -50,8 +50,15 @@ test.describe('Agents', () => {
 
         await gotoWithRetry(page, '/agents');
 
-        // Verify agent cards render in the grid
+        // Uncheck "Hide inactive" so newly seeded agents without sessions are visible
+        const hideInactiveCheckbox = page.locator('.toggle-input');
+        if (await hideInactiveCheckbox.isChecked()) {
+            await hideInactiveCheckbox.uncheck();
+        }
+
+        // Wait for agent cards to render (auto-retrying assertion)
         const cards = page.locator('.agent-card');
+        await expect(cards.first()).toBeVisible({ timeout: 10000 });
         expect(await cards.count()).toBeGreaterThanOrEqual(2);
 
         // Each card should have a name
@@ -122,14 +129,18 @@ test.describe('Agents', () => {
             await editBtn.click();
             await page.waitForURL(/\/agents\/.*\/edit/, { timeout: 10000 });
 
-            // Update name
+            // Update name — use fill which clears existing value first
             const nameInput = page.locator('#name');
-            await nameInput.clear();
+            await nameInput.fill('');
             await nameInput.fill(newName);
+
+            // Click Save button (the submit button text is "Save", not "Submit")
             await page.locator('form button[type="submit"]').click();
 
-            // Should redirect to detail
+            // Should redirect to detail page
             await page.waitForURL(/\/agents\/(?!.*edit)/, { timeout: 15000 });
+            // Re-navigate with auth (page.reload() loses the in-memory API key)
+            await gotoWithRetry(page, `/agents/${agent.id}`);
             await expect(page.locator(`text=${newName}`).first()).toBeVisible({ timeout: 10000 });
         }
     });

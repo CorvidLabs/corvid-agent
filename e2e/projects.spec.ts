@@ -60,8 +60,9 @@ test.describe('Projects', () => {
 
         await page.locator('button:text("Delete")').first().click();
 
-        // Should redirect to project list
-        await page.waitForURL('/projects', { timeout: 15000 });
+        // Should redirect to project list (app uses /agents/projects internally,
+        // /projects redirects to /agents/projects)
+        await page.waitForURL(/\/(?:agents\/)?projects(?:\?|$)/, { timeout: 15000 });
 
         // Verify name is gone
         await expect(page.locator('text=Delete Me Project')).toHaveCount(0, { timeout: 5000 });

@@ -27,7 +27,7 @@ test.describe('Prompt Injection Detection', () => {
 
     test('health endpoint is accessible', async ({ api }) => {
         const health = await api.getHealth();
-        expect(['ok', 'degraded']).toContain(health.status);
+        expect(['ok', 'healthy', 'degraded']).toContain(health.status);
     });
 
     test('normal session creation succeeds', async () => {

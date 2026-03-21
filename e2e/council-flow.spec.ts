@@ -27,12 +27,13 @@ test.describe.serial('Council Deliberation Flow', () => {
         networkInfo = await healthRes.json();
         console.log(`[council-flow] Network context: algochat=${networkInfo.algochat}`);
 
-        // Seed test data
+        // Seed test data — assert each response to surface failures early
         const projectRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Council Flow Project', workingDir: '/tmp' }),
         });
+        if (!projectRes.ok) throw new Error(`seedProject failed: ${projectRes.status} ${await projectRes.text()}`);
         const project = await projectRes.json();
         projectId = project.id;
 
@@ -41,6 +42,7 @@ test.describe.serial('Council Deliberation Flow', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Flow Agent Alpha', model: 'claude-sonnet-4-20250514' }),
         });
+        if (!agent1Res.ok) throw new Error(`seedAgent1 failed: ${agent1Res.status} ${await agent1Res.text()}`);
         const agent1 = await agent1Res.json();
         agent1Id = agent1.id;
 
@@ -49,6 +51,7 @@ test.describe.serial('Council Deliberation Flow', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Flow Agent Beta', model: 'claude-sonnet-4-20250514' }),
         });
+        if (!agent2Res.ok) throw new Error(`seedAgent2 failed: ${agent2Res.status} ${await agent2Res.text()}`);
         const agent2 = await agent2Res.json();
         agent2Id = agent2.id;
 
@@ -62,6 +65,7 @@ test.describe.serial('Council Deliberation Flow', () => {
                 chairmanAgentId: agent1Id,
             }),
         });
+        if (!councilRes.ok) throw new Error(`seedCouncil failed: ${councilRes.status} ${await councilRes.text()}`);
         const council = await councilRes.json();
         councilWithChairmanId = council.id;
 
@@ -74,6 +78,7 @@ test.describe.serial('Council Deliberation Flow', () => {
                 agentIds: [agent1Id, agent2Id],
             }),
         });
+        if (!noChairRes.ok) throw new Error(`seedCouncilNoChair failed: ${noChairRes.status} ${await noChairRes.text()}`);
         const noChair = await noChairRes.json();
         councilNoChairmanId = noChair.id;
 
@@ -82,6 +87,10 @@ test.describe.serial('Council Deliberation Flow', () => {
     });
 
     test('launch council and verify responding stage', async ({ page, api }) => {
+        // Guard: ensure beforeAll seeded data successfully
+        if (!councilWithChairmanId || !projectId) {
+            throw new Error(`beforeAll seeding incomplete: councilWithChairmanId=${councilWithChairmanId}, projectId=${projectId}`);
+        }
         const launch = await api.launchCouncil(
             councilWithChairmanId,
             projectId,
@@ -90,7 +99,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         launchId = launch.launchId;
         expect(launch.sessionIds).toHaveLength(2);
 
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         // Stage bar should exist
         await expect(page.locator('.stage-bar')).toBeVisible();
@@ -109,7 +118,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         expect(stages).toContain(launch.stage);
 
         // Navigate and verify stage bar advanced
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         // Review sessions should appear (if still in reviewing stage or later)
         if (launch.stage === 'reviewing') {
@@ -143,7 +152,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         expect(launch.synthesis!.length).toBeGreaterThan(0);
 
         // Navigate to launch view — give Angular time to fetch and render
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         // Wait for the synthesis section to appear (component may need a refresh cycle)
         await expect(page.locator('.synthesis')).toBeVisible({ timeout: 15_000 });
@@ -197,7 +206,7 @@ test.describe.serial('Council Deliberation Flow', () => {
 
     test('stage bar shows data-stage attributes', async ({ page }) => {
         // Navigate to the existing completed launch
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         const steps = page.locator('.stage-step');
         expect(await steps.count()).toBeGreaterThanOrEqual(4);
@@ -215,7 +224,7 @@ test.describe.serial('Council Deliberation Flow', () => {
     });
 
     test('feed entries expand and collapse', async ({ page }) => {
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         const entries = page.locator('.feed-entry');
         expect(await entries.count()).toBeGreaterThanOrEqual(1);
@@ -241,7 +250,7 @@ test.describe.serial('Council Deliberation Flow', () => {
     });
 
     test('log panel toggle', async ({ page }) => {
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         // Look for Show/Hide Logs button
         const logsBtn = page.locator('button:text("Logs"), button:text("Hide Logs")').first();
@@ -258,7 +267,7 @@ test.describe.serial('Council Deliberation Flow', () => {
     });
 
     test('synthesis section structure', async ({ page }) => {
-        await gotoWithRetry(page, `/council-launches/${launchId}`);
+        await gotoWithRetry(page, `/sessions/council-launches/${launchId}`);
 
         // Wait for synthesis to appear
         await expect(page.locator('.synthesis')).toBeVisible({ timeout: 15000 });
