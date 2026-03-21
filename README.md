@@ -194,7 +194,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 | Test:code ratio | **1.14×** — more test code than production code |
 | MCP tools | **48** corvid_* tool handlers |
 | API endpoints | **~380** across 47 route modules |
-| DB migrations | **19** (squashed baseline + incremental, 90+ tables) |
+| DB migrations | **20** (squashed baseline + incremental, 90+ tables) |
 
 ### Tech Stack
 
@@ -251,7 +251,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  19 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  20 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```

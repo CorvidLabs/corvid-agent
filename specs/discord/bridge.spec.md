@@ -11,6 +11,7 @@ files:
   - server/discord/command-handlers/moderation-commands.ts
   - server/discord/command-handlers/component-handlers.ts
   - server/discord/command-handlers/autocomplete-handler.ts
+  - server/discord/command-handlers/message-commands.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
   - server/discord/permissions.ts
