@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal, HostListener } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { ProjectService } from '../../core/services/project.service';
@@ -78,7 +78,13 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
         <div class="dashboard">
             <!-- Top bar: view mode + customize toggle -->
             <div class="dash-toolbar">
-                <span class="dash-toolbar__title">Dashboard</span>
+                <div class="dash-toolbar__left">
+                    <span class="dash-toolbar__title">Dashboard</span>
+                    <span class="connection-dot" [attr.data-status]="wsService.connected() ? 'ok' : 'down'" [title]="wsService.connected() ? 'Connected' : 'Disconnected'"></span>
+                    @if (lastRefresh()) {
+                        <span class="dash-toolbar__updated">Updated {{ lastRefresh() | relativeTime }}</span>
+                    }
+                </div>
                 <div class="dash-toolbar__right">
                     <div class="view-toggle">
                         <button class="view-toggle__btn"
@@ -137,6 +143,12 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                          (drop)="onWidgetDrop($event, i)"
                          (dragend)="widgetDragIndex.set(-1)"
                          [class.widget--drag-over]="widgetDragOver() === i && widgetDragIndex() !== i">
+
+                        @if (widgetRefreshing()[widget.id]) {
+                            <div class="widget-refreshing">
+                                <app-skeleton [variant]="widget.id === 'metrics' ? 'card' : 'line'" [count]="3" />
+                            </div>
+                        }
 
                         <!-- metrics -->
                         @if (widget.id === 'metrics') {
@@ -692,6 +704,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly hoveredBar = signal<{ date: string; dateShort: string; value: number; pct: number } | null>(null);
     protected readonly hoveredSegment = signal<{ status: string; count: number } | null>(null);
 
+    // Last refresh timestamp
+    protected readonly lastRefresh = signal<string | null>(null);
+
     // Drag state for customize panel
     protected readonly dragIndex = signal(-1);
     // Drag state for widget grid
@@ -855,6 +870,50 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return (value / max) * 100;
     }
 
+    @HostListener('document:keydown', ['$event'])
+    handleKeyboard(event: KeyboardEvent): void {
+        // Ignore if typing in an input/textarea
+        const tag = (event.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        switch (event.key.toLowerCase()) {
+            case 'r':
+                if (!event.ctrlKey && !event.metaKey) {
+                    event.preventDefault();
+                    this.refreshAll();
+                }
+                break;
+            case '1':
+                if (!event.ctrlKey && !event.metaKey) {
+                    this.layoutService.setViewMode('simple');
+                }
+                break;
+            case '2':
+                if (!event.ctrlKey && !event.metaKey) {
+                    this.layoutService.setViewMode('developer');
+                }
+                break;
+        }
+    }
+
+    protected async refreshAll(): Promise<void> {
+        this.notify.info('Refreshing dashboard...');
+        const loads = [
+            this.loadOverview(),
+            this.agentService.loadAgents().then(() => this.loadAgentSummaries()),
+            this.sessionService.loadSessions(),
+            this.sessionService.loadAlgoChatStatus(),
+            this.loadSpendingData(),
+            this.loadSessionStats(),
+            this.loadActiveCouncilLaunches(),
+            this.loadServerVersion(),
+            this.loadFlockDirectory(),
+            this.loadAgentMessages(),
+        ];
+        await Promise.allSettled(loads);
+        this.lastRefresh.set(new Date().toISOString());
+    }
+
     ngOnInit(): void {
         const loads = [
             this.projectService.loadProjects(),
@@ -872,7 +931,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.loadSpendingData(),
             this.loadSessionStats(),
         ];
-        Promise.allSettled(loads).then(() => this.loading.set(false));
+        Promise.allSettled(loads).then(() => {
+            this.loading.set(false);
+            this.lastRefresh.set(new Date().toISOString());
+        });
 
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'agent_balance') {
