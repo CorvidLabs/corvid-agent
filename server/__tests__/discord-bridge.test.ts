@@ -220,7 +220,7 @@ describe('DiscordBridge', () => {
             // Prompt should include author context prefix
             const startArgs = (pm.startProcess as ReturnType<typeof mock>).mock.calls[0];
             const prompt = startArgs[1] as string;
-            expect(prompt).toContain('[From Discord user: TestUser (Discord ID: user-1)]');
+            expect(prompt).toContain('[From Discord user: TestUser (Discord ID: user-1) in channel');
             expect(prompt).toContain('what time is it?');
             // Should subscribe for response
             expect(pm.subscribe).toHaveBeenCalled();
@@ -1155,6 +1155,18 @@ describe('withAuthorContext', () => {
 
     test('includes only username when Discord ID is missing', () => {
         expect(withAuthorContext('hello', undefined, 'Alice')).toBe('[From Discord user: Alice]\nhello');
+    });
+
+    test('includes channel ID when provided with full author info', () => {
+        expect(withAuthorContext('hello', '12345', 'Alice', '99999')).toBe('[From Discord user: Alice (Discord ID: 12345) in channel 99999]\nhello');
+    });
+
+    test('includes channel ID with only Discord ID', () => {
+        expect(withAuthorContext('hello', '12345', undefined, '99999')).toBe('[From Discord user ID: 12345 in channel 99999]\nhello');
+    });
+
+    test('includes channel ID with only username', () => {
+        expect(withAuthorContext('hello', undefined, 'Alice', '99999')).toBe('[From Discord user: Alice in channel 99999]\nhello');
     });
 });
 

@@ -90,7 +90,7 @@ export async function handleMessageCommand(
         // No workDir — conversation only, no coding
     });
 
-    const textWithContext = withAuthorContext(message, userId, username);
+    const textWithContext = withAuthorContext(message, userId, username, channelId);
 
     // Start the process in conversation-only mode (zero tools)
     ctx.processManager.startProcess(session, textWithContext, { conversationOnly: true });
