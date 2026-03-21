@@ -40,7 +40,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | Constant | Type | Description |
 |----------|------|-------------|
 | `REPO_MAP_MAX_LINES` | `number` (200) | Max lines in the generated repo map to keep it lightweight |
-| `PRIORITY_DIRS` | `string[]` | Directories prioritized in repo map ordering (`src/`, `server/`, `lib/`, `packages/`) |
+| `PRIORITY_DIRS` | `string[]` | Directories prioritized in repo map ordering (`src/`, `server/`, `lib/`) |
 | `STOP_WORDS` | `Set<string>` | Stop words excluded from keyword extraction for symbol search |
 
 ### Exported Functions (server/work/repo-map.ts)

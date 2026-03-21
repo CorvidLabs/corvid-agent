@@ -29,7 +29,7 @@ bun run spec:check                    # Spec invariant verification
 - `bun run lint` — check for issues
 - `bun run lint:fix` — auto-fix what it can
 - `bun run format:fix` — auto-format files
-- Covers `server/`, `shared/`, `scripts/`, `packages/`
+- Covers `server/`, `shared/`, `scripts/`
 - Client has its own Prettier config (separate)
 
 ## TypeScript Checking
