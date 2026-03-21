@@ -92,7 +92,7 @@ export class KeyboardShortcutsService implements OnDestroy {
                 case 'd': this.router.navigate(['/dashboard']); break;
                 case 'a': this.router.navigate(['/agents']); break;
                 case 's': this.router.navigate(['/sessions']); break;
-                case 'w': this.router.navigate(['/work-tasks']); break;
+                case 'w': this.router.navigate(['/sessions/work-tasks']); break;
             }
             return;
         }

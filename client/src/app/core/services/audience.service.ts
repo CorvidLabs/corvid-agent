@@ -13,9 +13,9 @@ const AUDIENCE_SECTIONS: Record<Audience, Set<string>> = {
 
 /** Which sidebar links within "core" each audience sees */
 const AUDIENCE_CORE_LINKS: Record<Audience, Set<string>> = {
-    normal: new Set(['/dashboard', '/agents', '/projects']),
-    developer: new Set(['/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles']),
-    enterprise: new Set(['/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles']),
+    normal: new Set(['/dashboard', '/agents', '/agents/projects']),
+    developer: new Set(['/dashboard', '/agents', '/agents/projects', '/agents/models', '/agents/personas', '/agents/skill-bundles']),
+    enterprise: new Set(['/dashboard', '/agents', '/agents/projects', '/agents/models', '/agents/personas', '/agents/skill-bundles']),
 };
 
 @Injectable({ providedIn: 'root' })

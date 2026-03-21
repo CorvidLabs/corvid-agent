@@ -202,7 +202,7 @@ export class CouncilFormComponent implements OnInit {
                     agentIds,
                     chairmanAgentId: chairmanAgentId ?? null,
                 });
-                this.router.navigate(['/councils', id]);
+                this.router.navigate(['/sessions/councils', id]);
             } else {
                 const council = await this.councilService.createCouncil({
                     name: value.name,
@@ -212,7 +212,7 @@ export class CouncilFormComponent implements OnInit {
                     agentIds,
                     chairmanAgentId,
                 });
-                this.router.navigate(['/councils', council.id]);
+                this.router.navigate(['/sessions/councils', council.id]);
             }
         } finally {
             this.saving.set(false);
@@ -220,6 +220,6 @@ export class CouncilFormComponent implements OnInit {
     }
 
     onCancel(): void {
-        this.router.navigate(['/councils']);
+        this.router.navigate(['/sessions/councils']);
     }
 }

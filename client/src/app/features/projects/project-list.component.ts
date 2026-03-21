@@ -14,7 +14,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         <div class="page">
             <div class="page__header">
                 <h2 class="page-title">Projects</h2>
-                <a class="btn btn--primary" routerLink="/projects/new">New Project</a>
+                <a class="btn btn--primary" routerLink="/agents/projects/new">New Project</a>
             </div>
 
             @if (projectService.loading()) {
@@ -25,7 +25,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
                     title="No projects yet."
                     description="Projects define working directories and CLAUDE.md configs for your agents."
                     actionLabel="+ Create a project"
-                    actionRoute="/projects/new"
+                    actionRoute="/agents/projects/new"
                     actionAriaLabel="Create your first project" />
             } @else {
                 <div class="list" role="list">
@@ -33,7 +33,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
                         <a
                             class="list__item"
                             role="listitem"
-                            [routerLink]="['/projects', project.id]">
+                            [routerLink]="['/agents/projects', project.id]">
                             <div class="list__item-main">
                                 <h3 class="list__item-title">{{ project.name }}</h3>
                                 <p class="list__item-desc">{{ project.description }}</p>

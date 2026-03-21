@@ -121,10 +121,10 @@ export class ProjectFormComponent implements OnInit {
 
             if (id) {
                 await this.projectService.updateProject(id, value);
-                this.router.navigate(['/projects', id]);
+                this.router.navigate(['/agents/projects', id]);
             } else {
                 const project = await this.projectService.createProject(value);
-                this.router.navigate(['/projects', project.id]);
+                this.router.navigate(['/agents/projects', project.id]);
             }
         } finally {
             this.saving.set(false);
@@ -137,6 +137,6 @@ export class ProjectFormComponent implements OnInit {
     }
 
     onCancel(): void {
-        this.router.navigate(['/projects']);
+        this.router.navigate(['/agents/projects']);
     }
 }

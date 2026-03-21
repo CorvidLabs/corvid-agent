@@ -39,7 +39,7 @@ interface CouncilCard {
                             {{ hideTestData() ? 'Show all' : 'Hide test data' }}
                         </button>
                     }
-                    <a class="btn btn--primary" routerLink="/councils/new">New Council</a>
+                    <a class="btn btn--primary" routerLink="/sessions/councils/new">New Council</a>
                 </div>
             </div>
 
@@ -51,7 +51,7 @@ interface CouncilCard {
                     title="No councils yet."
                     description="Councils run multi-agent deliberations — each member responds, discusses, and a chairman synthesizes the outcome."
                     actionLabel="+ Create a council"
-                    actionRoute="/councils/new"
+                    actionRoute="/sessions/councils/new"
                     actionAriaLabel="Create your first multi-agent council" />
             } @else {
                 <!-- Search & Filters -->
@@ -88,7 +88,7 @@ interface CouncilCard {
                 } @else {
                     <div class="council-grid">
                         @for (card of paginatedCards(); track card.council.id) {
-                            <a class="council-card" [routerLink]="['/councils', card.council.id]">
+                            <a class="council-card" [routerLink]="['/sessions/councils', card.council.id]">
                                 <div class="council-card__top">
                                     <h3 class="council-card__name">{{ card.council.name }}</h3>
                                     @if (card.lastLaunch) {

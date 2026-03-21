@@ -90,7 +90,7 @@ describe('KeyboardShortcutsService', () => {
             const spy = vi.spyOn(router, 'navigate');
             pressKey('g');
             pressKey('w');
-            expect(spy).toHaveBeenCalledWith(['/work-tasks']);
+            expect(spy).toHaveBeenCalledWith(['/sessions/work-tasks']);
         });
     });
 

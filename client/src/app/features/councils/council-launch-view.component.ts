@@ -24,7 +24,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
                         <h2>Council Launch</h2>
                         <p class="page__prompt">{{ l.prompt }}</p>
                     </div>
-                    <a class="btn btn--secondary" [routerLink]="['/councils', l.councilId]">Back to Council</a>
+                    <a class="btn btn--secondary" [routerLink]="['/sessions/councils', l.councilId]">Back to Council</a>
                 </div>
 
                 <div class="stage-bar">

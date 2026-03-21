@@ -166,7 +166,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <div class="metric-card">
                                     <span class="metric-card__label">Total Projects</span>
                                     <span class="metric-card__value">{{ projectService.projects().length }}</span>
-                                    <a class="metric-card__link" routerLink="/projects">View all</a>
+                                    <a class="metric-card__link" routerLink="/agents/projects">View all</a>
                                 </div>
                                 <div class="metric-card metric-card--highlight">
                                     <span class="metric-card__label">API Cost (Today)</span>
@@ -188,7 +188,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <div class="metric-card">
                                     <span class="metric-card__label">Work Tasks</span>
                                     <span class="metric-card__value metric-card__value--work">{{ activeWorkTaskCount() }}</span>
-                                    <a class="metric-card__link" routerLink="/work-tasks">View all</a>
+                                    <a class="metric-card__link" routerLink="/sessions/work-tasks">View all</a>
                                 </div>
                                 <div class="metric-card">
                                     <span class="metric-card__label">Total Sessions</span>
@@ -534,8 +534,8 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <h3>Quick Actions</h3>
                                 <div class="quick-actions">
                                     <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
-                                    <button class="action-btn" (click)="navigateTo('/councils')">Launch Council</button>
-                                    <button class="action-btn" (click)="navigateTo('/work-tasks')">Create Work Task</button>
+                                    <button class="action-btn" (click)="navigateTo('/sessions/councils')">Launch Council</button>
+                                    <button class="action-btn" (click)="navigateTo('/sessions/work-tasks')">Create Work Task</button>
                                     <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
                                         {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
                                     </button>
@@ -594,7 +594,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                         <h4>Active Councils ({{ activeCouncilLaunches().length }})</h4>
                                         @for (launch of activeCouncilLaunches().slice(0, 10); track launch.id) {
                                             <div class="running-item">
-                                                <a [routerLink]="['/council-launches', launch.id]">{{ launch.prompt.length > 50 ? launch.prompt.slice(0, 50) + '...' : launch.prompt }}</a>
+                                                <a [routerLink]="['/sessions/council-launches', launch.id]">{{ launch.prompt.length > 50 ? launch.prompt.slice(0, 50) + '...' : launch.prompt }}</a>
                                                 <span class="stage-badge" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
                                             </div>
                                         }
@@ -1040,7 +1040,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected startWorkTask(agentId: string, event: Event): void {
         event.preventDefault();
         event.stopPropagation();
-        this.router.navigate(['/work-tasks'], { queryParams: { agentId } });
+        this.router.navigate(['/sessions/work-tasks'], { queryParams: { agentId } });
     }
 
     protected async runSelfTest(): Promise<void> {
