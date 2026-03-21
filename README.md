@@ -188,7 +188,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **8,279** across 346 files |
+| Unit tests | **8,342** across 347 files (22,251 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **169** with automated specsync validation (100% file coverage) |
 | Test:code ratio | **1.14×** — more test code than production code |
