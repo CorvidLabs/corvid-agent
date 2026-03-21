@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 17
+version: 18
 status: active
 files:
   - server/discord/bridge.ts
@@ -21,6 +21,7 @@ files:
   - server/discord/reaction-handler.ts
   - server/discord/contact-linker.ts
   - server/discord/image-attachments.ts
+  - server/discord/command-handlers/message-commands.ts
 db_tables:
   - sessions
   - session_messages
@@ -89,6 +90,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleSessionCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/session` slash command — creates a threaded conversation with a selected agent |
 | `handleWorkCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/work` slash command — creates an autonomous work task |
+
+### Exported Functions (from command-handlers/message-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — pure conversation with no tools, for untrusted external users |
 
 ### Exported Functions (from command-handlers/info-commands.ts)
 
