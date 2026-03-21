@@ -1012,7 +1012,157 @@ select:focus {
     background: var(--bg-hover);
 }
 
-/* ── Phase 5 reduced-motion overrides ── */
+/* ── Phase 6: Form focus glow ── */
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan), inset 0 0 0 1px rgba(0, 229, 255, 0.08);
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-base);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    transition: border-color var(--transition-fast), box-shadow var(--transition-base);
+}
+
+/* ── Phase 6: Accordion / collapsible section ── */
+.section-collapse {
+    overflow: hidden;
+    animation: collapseReveal 0.25s ease-out;
+}
+
+@keyframes collapseReveal {
+    from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+    to { opacity: 1; max-height: 2000px; transform: translateY(0); }
+}
+
+/* Chevron rotation — use with .section-chevron on toggle headers */
+.section-chevron {
+    display: inline-block;
+    transition: transform var(--transition-base);
+}
+.section-chevron--open {
+    transform: rotate(90deg);
+}
+
+/* ── Phase 6: Filter bar polish ── */
+.filter-pill {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-family: inherit;
+    transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-base);
+}
+.filter-pill:hover {
+    border-color: var(--border-bright);
+    color: var(--text-primary);
+}
+.filter-pill--active {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.12);
+}
+
+/* ── Phase 6: Expand/collapse card sections ── */
+.expand-section {
+    animation: expandReveal 0.3s ease-out;
+    overflow: hidden;
+}
+
+@keyframes expandReveal {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Phase 6: Node chip polish ── */
+.node-chip-interactive {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    cursor: default;
+}
+.node-chip-interactive:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Phase 6: Flow arrow animation ── */
+@keyframes flowPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+.flow-arrow-animated {
+    animation: flowPulse 2s ease-in-out infinite;
+}
+
+/* ── Phase 6: Inline edit form entrance ── */
+.inline-form-enter {
+    animation: expandReveal 0.2s ease-out;
+}
+
+/* ── Phase 6: Save bar pulse ── */
+.save-bar-glow {
+    animation: saveBarPulse 2s ease-in-out infinite;
+}
+@keyframes saveBarPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(0, 229, 255, 0); }
+    50% { box-shadow: 0 0 12px rgba(0, 229, 255, 0.15); }
+}
+
+/* ── Phase 6: Run/exec row hover lift ── */
+.row-lift {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.row-lift:hover {
+    transform: translateX(2px);
+    box-shadow: -2px 0 0 var(--accent-cyan);
+    background: var(--bg-hover);
+}
+
+/* ── Phase 6: Card interactive border glow ── */
+.card-lift {
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.card-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-bright);
+}
+
+/* ── Phase 6: Health dot pulse for active status ── */
+@keyframes healthPulse {
+    0%, 100% { box-shadow: 0 0 6px currentColor; }
+    50% { box-shadow: 0 0 12px currentColor, 0 0 4px currentColor; }
+}
+.health-dot-pulse {
+    animation: healthPulse 2s ease-in-out infinite;
+}
+
+/* ── Phase 6: Contact card hover ── */
+.contact-interactive {
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.contact-interactive:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Phase 6: Dirty/unsaved badge pulse ── */
+@keyframes dirtyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+.dirty-badge-pulse {
+    animation: dirtyPulse 2s ease-in-out infinite;
+}
+
+/* ── Reduced-motion overrides (Phase 5 + 6) ── */
 @media (prefers-reduced-motion: reduce) {
     .modal-overlay { animation: none; }
     .modal { animation: none; }
@@ -1022,4 +1172,14 @@ select:focus {
     .progress-bar__fill--active { animation: none; }
     .stat-card:hover { transform: none; }
     [data-tooltip]::after { transition: none; }
+    .section-collapse { animation: none; }
+    .expand-section { animation: none; }
+    .inline-form-enter { animation: none; }
+    .save-bar-glow { animation: none; }
+    .health-dot-pulse { animation: none; }
+    .dirty-badge-pulse { animation: none; }
+    .flow-arrow-animated { animation: none; }
+    .card-lift:hover,
+    .row-lift:hover,
+    .node-chip-interactive:hover { transform: none; }
 }

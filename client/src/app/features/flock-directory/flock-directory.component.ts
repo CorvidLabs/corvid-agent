@@ -354,7 +354,7 @@ interface FlockStats {
             border-radius: 8px;
             transition: border-color 0.15s;
         }
-        .flock-search:focus-within { border-color: var(--accent-cyan, #0ef); }
+        .flock-search:focus-within { border-color: var(--accent-cyan, #0ef); box-shadow: var(--glow-cyan); }
         .flock-search__icon {
             color: var(--accent-cyan, #0ef);
             font-weight: 700;
@@ -388,8 +388,9 @@ interface FlockStats {
             font-size: 0.7rem;
             cursor: pointer;
             outline: none;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-base);
         }
-        .flock-filter:focus { border-color: var(--accent-cyan, #0ef); }
+        .flock-filter:focus { border-color: var(--accent-cyan, #0ef); box-shadow: var(--glow-cyan); }
         .flock-filter option { background: var(--bg-surface, #1a1a2e); }
 
         .flock-sort-toggle {

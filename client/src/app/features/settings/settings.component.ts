@@ -60,11 +60,11 @@ interface PSKContact {
                 <!-- System Info -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('system')">
-                        <span class="section-chevron">{{ collapsedSections().has('system') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('system')">&#9654;</span>
                         System Info
                     </h3>
                     @if (!collapsedSections().has('system')) {
-                        <div class="info-grid">
+                        <div class="info-grid section-collapse">
                             <div class="info-item">
                                 <span class="info-label">Schema Version</span>
                                 <span class="info-value">{{ settings()?.system?.schemaVersion }}</span>
@@ -88,11 +88,11 @@ interface PSKContact {
                 <!-- Help -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('help')">
-                        <span class="section-chevron">{{ collapsedSections().has('help') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('help')">&#9654;</span>
                         Help
                     </h3>
                     @if (!collapsedSections().has('help')) {
-                        <div class="info-grid">
+                        <div class="info-grid section-collapse">
                             <div class="info-item info-item--action">
                                 <span class="info-label">Guided Tour</span>
                                 <button class="save-btn save-btn--sm" (click)="replayTour()">Replay Tour</button>
@@ -108,18 +108,18 @@ interface PSKContact {
                 <!-- System Health -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('health')">
-                        <span class="section-chevron">{{ collapsedSections().has('health') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('health')">&#9654;</span>
                         System Health
                     </h3>
                     @if (!collapsedSections().has('health')) {
-                        <div class="health-grid">
+                        <div class="health-grid section-collapse">
                             <div class="health-item">
-                                <span class="health-dot" [attr.data-status]="algochatStatus() ? 'ok' : 'off'"></span>
+                                <span class="health-dot" [attr.data-status]="algochatStatus() ? 'ok' : 'off'" [class.health-dot-pulse]="algochatStatus()?.enabled"></span>
                                 <span class="health-name">AlgoChat</span>
                                 <span class="health-status">{{ algochatStatus()?.enabled ? 'Connected' : 'Disconnected' }}</span>
                             </div>
                             <div class="health-item">
-                                <span class="health-dot" [attr.data-status]="operationalMode() === 'normal' ? 'ok' : operationalMode() === 'paused' ? 'off' : 'warn'"></span>
+                                <span class="health-dot" [attr.data-status]="operationalMode() === 'normal' ? 'ok' : operationalMode() === 'paused' ? 'off' : 'warn'" [class.health-dot-pulse]="operationalMode() === 'normal'"></span>
                                 <span class="health-name">Operations</span>
                                 <span class="health-status">{{ operationalMode() | titlecase }}</span>
                             </div>
@@ -141,14 +141,14 @@ interface PSKContact {
                 @if (discordConfig()) {
                     <div class="settings__section">
                         <h3 class="section-toggle" (click)="toggleSection('discord')">
-                            <span class="section-chevron">{{ collapsedSections().has('discord') ? '\u25B6' : '\u25BC' }}</span>
+                            <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('discord')">&#9654;</span>
                             Discord
                             @if (discordDirty()) {
-                                <span class="dirty-badge">Unsaved changes</span>
+                                <span class="dirty-badge dirty-badge-pulse">Unsaved changes</span>
                             }
                         </h3>
                         @if (!collapsedSections().has('discord')) {
-                            <div class="discord-grid">
+                            <div class="discord-grid section-collapse">
                                 <div class="discord-field">
                                     <label class="discord-label" for="discord_mode">Bridge Mode</label>
                                     <select class="discord-select" id="discord_mode"
@@ -260,12 +260,12 @@ interface PSKContact {
                 <!-- AlgoChat Status -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('algochat')">
-                        <span class="section-chevron">{{ collapsedSections().has('algochat') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('algochat')">&#9654;</span>
                         AlgoChat
                     </h3>
                     @if (!collapsedSections().has('algochat')) {
                         @if (algochatStatus(); as status) {
-                            <div class="info-grid">
+                            <div class="info-grid section-collapse">
                                 <div class="info-item">
                                     <span class="info-label">Status</span>
                                     <span class="info-value" [class.info-value--active]="status.enabled" [class.info-value--inactive]="!status.enabled">
@@ -302,7 +302,7 @@ interface PSKContact {
                 <!-- Connect Mobile — Multi-Contact PSK -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('mobile')">
-                        <span class="section-chevron">{{ collapsedSections().has('mobile') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('mobile')">&#9654;</span>
                         Connect Mobile
                         @if (pskContacts().length > 0) {
                             <span class="section-badge">{{ pskContacts().length }}</span>
@@ -317,7 +317,7 @@ interface PSKContact {
                         @if (pskContacts().length > 0) {
                             <div class="contact-list">
                                 @for (contact of pskContacts(); track contact.id) {
-                                    <div class="contact-card">
+                                    <div class="contact-card contact-interactive">
                                         <div class="contact-header">
                                             @if (editingContactId() === contact.id) {
                                                 <input
@@ -387,12 +387,12 @@ interface PSKContact {
                 <!-- Operational Mode -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('mode')">
-                        <span class="section-chevron">{{ collapsedSections().has('mode') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('mode')">&#9654;</span>
                         Operational Mode
                         <span class="section-badge section-badge--mode" [attr.data-mode]="operationalMode()">{{ operationalMode() }}</span>
                     </h3>
                     @if (!collapsedSections().has('mode')) {
-                        <div class="mode-selector">
+                        <div class="mode-selector section-collapse">
                             @for (mode of modes; track mode) {
                                 <button
                                     class="mode-btn"
@@ -414,14 +414,14 @@ interface PSKContact {
                 <!-- OpenRouter Provider -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('openrouter')">
-                        <span class="section-chevron">{{ collapsedSections().has('openrouter') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('openrouter')">&#9654;</span>
                         OpenRouter
                         @if (openrouterStatus()?.status === 'available') {
                             <span class="status-badge status-badge--ok">Connected</span>
                         }
                     </h3>
                     @if (!collapsedSections().has('openrouter')) {
-                        <div class="info-grid">
+                        <div class="info-grid section-collapse">
                             <div class="info-item">
                                 <span class="info-label">Status</span>
                                 <span class="info-value">{{ openrouterStatus()?.status ?? 'Not configured' }}</span>
@@ -458,14 +458,14 @@ interface PSKContact {
                 <!-- Credit Configuration -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('credits')">
-                        <span class="section-chevron">{{ collapsedSections().has('credits') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('credits')">&#9654;</span>
                         Credit Configuration
                         @if (isDirty()) {
-                            <span class="dirty-badge">Unsaved changes</span>
+                            <span class="dirty-badge dirty-badge-pulse">Unsaved changes</span>
                         }
                     </h3>
                     @if (!collapsedSections().has('credits')) {
-                        <div class="credit-grid">
+                        <div class="credit-grid section-collapse">
                             @for (field of creditFields; track field.key) {
                                 <div class="credit-field">
                                     <label class="credit-label" [for]="'credit_' + field.key">{{ field.label }}</label>
@@ -497,7 +497,7 @@ interface PSKContact {
                 <!-- Database Backup -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('database')">
-                        <span class="section-chevron">{{ collapsedSections().has('database') ? '\u25B6' : '\u25BC' }}</span>
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('database')">&#9654;</span>
                         Database
                     </h3>
                     @if (!collapsedSections().has('database')) {
