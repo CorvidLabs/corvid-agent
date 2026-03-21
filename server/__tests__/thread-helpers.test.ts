@@ -5,9 +5,11 @@ import {
     formatDuration,
     tryRecoverThread,
     archiveThread,
+    archiveStaleThreads,
     createStandaloneThread,
     resolveDefaultAgent,
     type ThreadSessionInfo,
+    type ThreadCallbackInfo,
 } from '../discord/thread-helpers';
 import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
@@ -261,5 +263,116 @@ describe('resolveDefaultAgent', () => {
         const result = resolveDefaultAgent(db, config);
         // listAgents returns ORDER BY updated_at DESC, so the most recently created comes first
         expect(result).not.toBeNull();
+    });
+});
+
+// ── archiveStaleThreads ──
+
+describe('archiveStaleThreads', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    function setupFetchMock() {
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({ id: '1' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }) as any;
+    }
+
+    function makeMockProcessManager() {
+        return {
+            unsubscribe: mock(() => {}),
+        } as any;
+    }
+
+    function makeMockDelivery() {
+        return {
+            track: mock(async (_id: string, fn: () => Promise<any>) => fn()),
+        } as any;
+    }
+
+    test('archives stale threads and cleans up maps', async () => {
+        setupFetchMock();
+        const pm = makeMockProcessManager();
+        const delivery = makeMockDelivery();
+        const threadLastActivity = new Map<string, number>();
+        const threadSessions = new Map<string, ThreadSessionInfo>();
+        const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+
+        const staleId = '123456789012345678';
+        // Set activity to 2 hours ago
+        threadLastActivity.set(staleId, Date.now() - 2 * 60 * 60 * 1000);
+        threadSessions.set(staleId, {
+            sessionId: 'sess-1',
+            agentName: 'Test',
+            agentModel: 'opus',
+            ownerUserId: 'user-1',
+        });
+        const cb = mock(() => {}) as any;
+        threadCallbacks.set(staleId, { sessionId: 'sess-1', callback: cb });
+
+        // Threshold: 1 hour
+        await archiveStaleThreads(pm, delivery, 'bot-token', threadLastActivity, threadSessions, threadCallbacks, 60 * 60 * 1000);
+
+        expect(threadLastActivity.has(staleId)).toBe(false);
+        expect(threadSessions.has(staleId)).toBe(false);
+        expect(threadCallbacks.has(staleId)).toBe(false);
+        expect(pm.unsubscribe).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not archive threads within threshold', async () => {
+        setupFetchMock();
+        const pm = makeMockProcessManager();
+        const delivery = makeMockDelivery();
+        const threadLastActivity = new Map<string, number>();
+        const threadSessions = new Map<string, ThreadSessionInfo>();
+        const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+
+        const activeId = '123456789012345678';
+        // Set activity to 5 minutes ago (within 1 hour threshold)
+        threadLastActivity.set(activeId, Date.now() - 5 * 60 * 1000);
+
+        await archiveStaleThreads(pm, delivery, 'bot-token', threadLastActivity, threadSessions, threadCallbacks, 60 * 60 * 1000);
+
+        expect(threadLastActivity.has(activeId)).toBe(true);
+    });
+
+    test('handles archive errors gracefully', async () => {
+        globalThis.fetch = mock(async () => {
+            throw new Error('Network error');
+        }) as any;
+        const pm = makeMockProcessManager();
+        const delivery = makeMockDelivery();
+        const threadLastActivity = new Map<string, number>();
+        const threadSessions = new Map<string, ThreadSessionInfo>();
+        const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+
+        const staleId = '123456789012345678';
+        threadLastActivity.set(staleId, Date.now() - 2 * 60 * 60 * 1000);
+
+        // Should not throw
+        await archiveStaleThreads(pm, delivery, 'bot-token', threadLastActivity, threadSessions, threadCallbacks, 60 * 60 * 1000);
+    });
+
+    test('skips unsubscribe when no callback registered', async () => {
+        setupFetchMock();
+        const pm = makeMockProcessManager();
+        const delivery = makeMockDelivery();
+        const threadLastActivity = new Map<string, number>();
+        const threadSessions = new Map<string, ThreadSessionInfo>();
+        const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+
+        const staleId = '123456789012345678';
+        threadLastActivity.set(staleId, Date.now() - 2 * 60 * 60 * 1000);
+
+        await archiveStaleThreads(pm, delivery, 'bot-token', threadLastActivity, threadSessions, threadCallbacks, 60 * 60 * 1000);
+
+        expect(pm.unsubscribe).not.toHaveBeenCalled();
+        expect(threadLastActivity.has(staleId)).toBe(false);
     });
 });
