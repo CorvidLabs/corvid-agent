@@ -67,7 +67,10 @@ export type AuditAction =
     | 'link_add'
     | 'link_remove'
     | 'link_verify'
-    | 'session_ollama_complexity_warning';
+    | 'session_ollama_complexity_warning'
+    | 'public_channel_message'
+    | 'public_channel_rate_limited'
+    | 'public_channel_thread_gated';
 
 export interface AuditEntry {
     id: number;

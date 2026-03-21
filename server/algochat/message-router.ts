@@ -47,6 +47,7 @@ import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { createWorktree, generateChatBranchName } from '../lib/worktree';
+import { PublicChannelGuard, sanitizePublicChannelContent, buildPublicChannelGuidance } from './public-channel-guard';
 
 const log = createLogger('MessageRouter');
 
@@ -90,6 +91,9 @@ export class MessageRouter {
     // Group message reassembly buffer
     private pendingGroupChunks: Map<string, { chunks: unknown[]; firstSeen: number }> = new Map();
 
+    // Public channel per-sender rate limiter (created lazily when public channel mode is on)
+    private publicChannelGuard: PublicChannelGuard | null = null;
+
     constructor(
         db: Database,
         processManager: ProcessManager,
@@ -110,6 +114,13 @@ export class MessageRouter {
         this.subscriptionManager = subscriptionManager;
         this.discoveryService = discoveryService;
         this.contactManager = contactManager;
+
+        if (config.publicChannel) {
+            this.publicChannelGuard = new PublicChannelGuard({
+                rateLimitPerWindow: config.publicChannelRateLimit,
+            });
+            log.info('Public channel mode enabled', { rateLimit: config.publicChannelRateLimit });
+        }
     }
 
     // ── Dependency injection ──────────────────────────────────────────
@@ -544,6 +555,74 @@ export class MessageRouter {
             return;
         }
 
+        // ── Public channel hardening ──────────────────────────────────
+        if (this.config.publicChannel && this.publicChannelGuard && !isOwner) {
+            // 1. Input sanitization
+            messageContent = sanitizePublicChannelContent(messageContent);
+
+            // 2. Thread gating — non-admins may only continue existing conversations
+            const existingConv = getConversationByParticipant(this.db, participant);
+            if (!existingConv) {
+                log.info('Public channel thread gate: no existing conversation for non-owner', {
+                    address: participant.slice(0, 8) + '...',
+                });
+                recordAudit(
+                    this.db,
+                    'public_channel_thread_gated',
+                    participant,
+                    'algochat_message',
+                    null,
+                    JSON.stringify({ reason: 'no_existing_thread', channel: 'algochat' }),
+                );
+                this.responseFormatter.sendResponse(
+                    participant,
+                    '[This is a public channel. You may only reply to an existing conversation thread initiated by an admin.]',
+                );
+                return;
+            }
+
+            // 3. Per-sender rate limiting
+            const rateCheck = this.publicChannelGuard.checkRateLimit(participant);
+            if (!rateCheck.allowed) {
+                log.warn('Public channel rate limit exceeded', {
+                    address: participant.slice(0, 8) + '...',
+                    retryAfterMs: rateCheck.retryAfterMs,
+                });
+                recordAudit(
+                    this.db,
+                    'public_channel_rate_limited',
+                    participant,
+                    'algochat_message',
+                    null,
+                    JSON.stringify({
+                        channel: 'algochat',
+                        retryAfterMs: rateCheck.retryAfterMs,
+                    }),
+                );
+                const retryAfterSec = rateCheck.retryAfterMs ? Math.ceil(rateCheck.retryAfterMs / 1000) : 60;
+                this.responseFormatter.sendResponse(
+                    participant,
+                    `[Rate limit exceeded. Please wait ${retryAfterSec}s before sending another message.]`,
+                );
+                return;
+            }
+            this.publicChannelGuard.recordSend(participant);
+
+            // 4. Audit log every public channel message
+            recordAudit(
+                this.db,
+                'public_channel_message',
+                participant,
+                'algochat_message',
+                null,
+                JSON.stringify({
+                    channel: 'algochat',
+                    contentPreview: messageContent.slice(0, 200),
+                    confirmedRound,
+                }),
+            );
+        }
+
         // Emit feed event only for external (non-agent) messages
         this.responseFormatter.emitEvent(participant, messageContent, 'inbound', amount);
 
@@ -588,7 +667,11 @@ export class MessageRouter {
         }
 
         // Prepend device name for agent context
-        const agentContent = deviceName ? `[From: ${deviceName}] ${messageContent}` : messageContent;
+        // In public channel mode, prepend a BASIC guidance prompt to anchor safe behavior
+        const publicGuidance = this.config.publicChannel && !isOwner ? buildPublicChannelGuidance() + '\n\n' : '';
+        const agentContent = deviceName
+            ? `${publicGuidance}[From: ${deviceName}] ${messageContent}`
+            : `${publicGuidance}${messageContent}`;
 
         let conversation = getConversationByParticipant(this.db, participant);
 

@@ -27,6 +27,8 @@ function createDisabledConfig(): AlgoChatConfig {
         enabled: false,
         pskContact: null,
         ownerAddresses: new Set(),
+        publicChannel: false,
+        publicChannelRateLimit: 5,
     };
 }
 

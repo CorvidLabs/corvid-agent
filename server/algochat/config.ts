@@ -20,6 +20,19 @@ export interface AlgoChatConfig {
     pskContact: PSKContactConfig | null;
     /** Algorand addresses authorized to run privileged commands (/stop, /approve, /deny, /mode, /work). */
     ownerAddresses: Set<string>;
+    /**
+     * When true, the channel operates in public mode:
+     * - Thread gating (non-admins may only reply to existing threads)
+     * - Per-sender rate limiting
+     * - Full audit logging for every message
+     * - Input sanitization
+     * - Guidance system prompt injected into public sessions
+     *
+     * Enabled via ALGOCHAT_PUBLIC_CHANNEL=true.
+     */
+    publicChannel: boolean;
+    /** Max messages per sender per minute in public channel mode. Default: 5. */
+    publicChannelRateLimit: number;
 }
 
 let _cachedConfig: AlgoChatConfig | null = null;
@@ -37,6 +50,9 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     const syncInterval = parseInt(process.env.ALGOCHAT_SYNC_INTERVAL ?? '30000', 10);
     const defaultAgentId = process.env.ALGOCHAT_DEFAULT_AGENT_ID ?? null;
     const hasMnemonic = mnemonic !== null && mnemonic.trim().length > 0;
+    const publicChannel = (process.env.ALGOCHAT_PUBLIC_CHANNEL ?? '').toLowerCase() === 'true';
+    const rawRateLimit = parseInt(process.env.ALGOCHAT_PUBLIC_CHANNEL_RATE_LIMIT ?? '5', 10);
+    const publicChannelRateLimit = Number.isFinite(rawRateLimit) && rawRateLimit > 0 ? rawRateLimit : 5;
 
     // When no mnemonic and not explicitly on mainnet, default to localnet
     const network: AlgoChatNetwork = hasMnemonic ? rawNetwork : (rawNetwork === 'mainnet' ? 'mainnet' : 'localnet');
@@ -58,6 +74,8 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
         enabled: hasMnemonic || network === 'localnet' || network === 'testnet',
         pskContact,
         ownerAddresses,
+        publicChannel,
+        publicChannelRateLimit,
     };
     return _cachedConfig;
 }

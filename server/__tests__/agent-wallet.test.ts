@@ -18,6 +18,8 @@ function makeConfig(overrides: Partial<AlgoChatConfig> = {}): AlgoChatConfig {
         enabled: true,
         pskContact: null,
         ownerAddresses: new Set<string>(),
+        publicChannel: false,
+        publicChannelRateLimit: 5,
         ...overrides,
     };
 }
