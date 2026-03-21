@@ -126,6 +126,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleAutocomplete` | `(ctx, interaction)` | `Promise<void>` | Handle autocomplete interactions — provides live results for agent and project name fields |
 
+### Exported Functions (from command-handlers/message-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — pure conversation mode with no tools, for untrusted users at BASIC permission level |
+
 ### Exported Functions (from embeds.ts)
 
 | Function | Parameters | Returns | Description |
