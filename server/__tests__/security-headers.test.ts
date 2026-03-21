@@ -9,7 +9,7 @@ describe('security-headers', () => {
             expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'");
             expect(csp).toContain("style-src 'self' 'unsafe-inline'");
             expect(csp).toContain("connect-src 'self' ws: wss:");
-            expect(csp).toContain("img-src 'self' data:");
+            expect(csp).toContain("img-src 'self' data: https://avatars.githubusercontent.com");
             expect(csp).toContain("font-src 'self'");
             expect(csp).toContain("frame-ancestors 'none'");
             expect(csp).toContain("base-uri 'self'");
