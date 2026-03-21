@@ -12,6 +12,7 @@ import {
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
+import { WidgetLayoutService } from '../../core/services/widget-layout.service';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -79,35 +80,39 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
                     </a>
-                    <a class="sidebar__link" routerLink="/flock-directory" routerLinkActive="sidebar__link--active" title="Flock Directory">
-                        <span class="sidebar__label">Flock Directory</span>
-                        <span class="sidebar__abbr">FD</span>
-                    </a>
+                    @if (isDeveloperMode()) {
+                        <a class="sidebar__link" routerLink="/flock-directory" routerLinkActive="sidebar__link--active" title="Flock Directory">
+                            <span class="sidebar__label">Flock Directory</span>
+                            <span class="sidebar__abbr">FD</span>
+                        </a>
+                    }
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/projects" routerLinkActive="sidebar__link--active" title="Projects">
-                        <span class="sidebar__label">Projects</span>
-                        <span class="sidebar__abbr">P</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/models" routerLinkActive="sidebar__link--active" title="Models">
-                        <span class="sidebar__label">Models</span>
-                        <span class="sidebar__abbr">M</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/personas" routerLinkActive="sidebar__link--active" title="Personas">
-                        <span class="sidebar__label">Personas</span>
-                        <span class="sidebar__abbr">Ps</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/skill-bundles" routerLinkActive="sidebar__link--active" title="Skill Bundles">
-                        <span class="sidebar__label">Skill Bundles</span>
-                        <span class="sidebar__abbr">Sk</span>
-                    </a>
-                </li>
+                @if (isDeveloperMode()) {
+                    <li>
+                        <a class="sidebar__link" routerLink="/projects" routerLinkActive="sidebar__link--active" title="Projects">
+                            <span class="sidebar__label">Projects</span>
+                            <span class="sidebar__abbr">P</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar__link" routerLink="/models" routerLinkActive="sidebar__link--active" title="Models">
+                            <span class="sidebar__label">Models</span>
+                            <span class="sidebar__abbr">M</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar__link" routerLink="/personas" routerLinkActive="sidebar__link--active" title="Personas">
+                            <span class="sidebar__label">Personas</span>
+                            <span class="sidebar__abbr">Ps</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar__link" routerLink="/skill-bundles" routerLinkActive="sidebar__link--active" title="Skill Bundles">
+                            <span class="sidebar__label">Skill Bundles</span>
+                            <span class="sidebar__abbr">Sk</span>
+                        </a>
+                    </li>
+                }
 
                 <!-- Sessions (collapsible) -->
                 <li class="sidebar__section sidebar__section--collapsible">
@@ -150,6 +155,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 </li>
 
                 <!-- Observe (collapsible) -->
+                @if (isDeveloperMode()) {
                 <li class="sidebar__section sidebar__section--collapsible">
                     <button
                         class="sidebar__section-toggle"
@@ -322,6 +328,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         </li>
                     </ul>
                 </li>
+                }
             </ul>
             <button
                 class="sidebar__help-btn"
@@ -623,6 +630,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
+    private readonly widgetLayout = inject(WidgetLayoutService);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private readonly sidebarEl = viewChild<ElementRef<HTMLElement>>('sidebarEl');
     private routerSub: Subscription | null = null;
@@ -683,6 +691,10 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Check if a section is collapsed */
     isSectionCollapsed(sectionKey: string): boolean {
         return this.sectionStates()[sectionKey] ?? false;
+    }
+
+    isDeveloperMode(): boolean {
+        return this.widgetLayout.viewMode() === 'developer';
     }
 
     openHelp(): void {
