@@ -80,6 +80,7 @@ ${c.bold}Global Options:${c.reset}
   --agent <id>       Agent ID (or set default via config)
   --project <id>     Project ID (or set default via config)
   --model <model>    Model override
+  --tools <spec>     Opt-in to specific tools (none, github, code, etc.)
   --help, -h         Show this help
   --version, -v      Show version
 
@@ -178,15 +179,30 @@ ${c.bold}Usage:${c.reset}
   corvid-agent chat <prompt> [options]
 
 ${c.bold}Options:${c.reset}
-  --agent <id>     Agent ID (or picks interactively / uses default)
-  --project <id>   Project ID (or auto-detects from cwd)
-  --model <model>  Model override for this message
-  --help, -h       Show this help
+  --agent <id>       Agent ID (or picks interactively / uses default)
+  --project <id>     Project ID (or auto-detects from cwd)
+  --model <model>    Model override for this message
+  --tools <spec>     Opt-in to specific tools (default: all)
+  --help, -h         Show this help
+
+${c.bold}Tool Specifiers (--tools):${c.reset}
+  all                All tools (default)
+  none               No tools (conversation only)
+  github             GitHub tools (star, PR, issues, etc.)
+  code               File I/O + code analysis (read, write, edit, run)
+  memory             Memory tools (save, recall, delete)
+  messaging          Messaging tools (send_message, list_agents)
+  work               Work tasks, schedules, workflows
+  web                Web search + deep research
+  <tool_name>        Individual tool name
+  Combine with commas: --tools github,code,web
 
 ${c.bold}Examples:${c.reset}
   corvid-agent chat "What files are in this project?"
   corvid-agent chat "Fix the bug in auth.ts" --agent abc123
   corvid-agent chat "Summarize recent changes" --model claude-sonnet-4-20250514
+  corvid-agent chat "What is Algorand?" --tools none
+  corvid-agent chat "Review my PRs" --tools github
 `);
 }
 
@@ -314,7 +330,7 @@ async function main(): Promise<void> {
 
     // No command → interactive REPL
     if (!command || (command.startsWith('--') && command !== '--version' && command !== '-v')) {
-        await interactiveCommand({ agent: getFlag('agent') });
+        await interactiveCommand({ agent: getFlag('agent'), tools: getFlag('tools') });
         return;
     }
 
@@ -358,6 +374,7 @@ async function main(): Promise<void> {
                 agent: getFlag('agent'),
                 project: getFlag('project'),
                 model: getFlag('model'),
+                tools: getFlag('tools'),
             });
             break;
         }

@@ -166,7 +166,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[] }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -227,9 +227,9 @@ export class ProcessManager {
         const effectiveProject = baseProject;
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
         }
     }
 
@@ -243,7 +243,7 @@ export class ProcessManager {
         effectiveAgent: import('../../shared/types').Agent | null,
         resolvedPrompt: string,
         provider: import('../providers/types').LlmProvider | undefined,
-        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean },
+        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[] },
     ): Promise<void> {
         const resolved = await resolveProjectDir(project);
 
@@ -264,21 +264,22 @@ export class ProcessManager {
         }
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
         }
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType, conversationOnly?: boolean): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType, conversationOnly?: boolean, toolAllowList?: string[]): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
             : project;
 
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        // Conversation-only sessions get NO tools — pure text conversation
-        const mcpServers = conversationOnly ? undefined : (session.agentId
+        // Conversation-only sessions (or empty toolAllowList) get NO tools — pure text conversation
+        const isNoTools = conversationOnly || (toolAllowList && toolAllowList.length === 0);
+        const mcpServers = isNoTools ? undefined : (session.agentId
             ? (() => {
                 const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
@@ -286,7 +287,7 @@ export class ProcessManager {
             : undefined);
 
         // Fetch external MCP server configs (Figma, Slack, etc.) for SDK sessions
-        const externalMcpConfigs = conversationOnly ? [] : (session.agentId
+        const externalMcpConfigs = isNoTools ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : []);
 
@@ -306,7 +307,7 @@ export class ProcessManager {
                 externalMcpConfigs,
                 personaPrompt: config.personaPrompt,
                 skillPrompt: config.skillPrompt,
-                conversationOnly,
+                conversationOnly: isNoTools || conversationOnly,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -342,6 +343,7 @@ export class ProcessManager {
         schedulerMode?: boolean,
         schedulerActionType?: ScheduleActionType,
         conversationOnly?: boolean,
+        toolAllowList?: string[],
     ): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -382,7 +384,7 @@ export class ProcessManager {
                 skillPrompt: config.skillPrompt,
                 modelOverride,
                 externalMcpConfigs,
-                toolAllowList: conversationOnly ? [] : (isPollSession ? ['run_command'] : undefined),
+                toolAllowList: conversationOnly ? [] : (toolAllowList ?? (isPollSession ? ['run_command'] : undefined)),
                 conversationOnly,
             });
         } catch (err) {

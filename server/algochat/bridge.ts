@@ -290,7 +290,8 @@ export class AlgoChatBridge implements ChannelAdapter {
         sendFn: import('./subscription-manager').LocalChatSendFn,
         projectId?: string,
         eventFn?: import('./subscription-manager').LocalChatEventFn,
+        toolAllowList?: string[],
     ): Promise<void> {
-        return this.messageRouter.handleLocalMessage(agentId, content, sendFn, projectId, eventFn);
+        return this.messageRouter.handleLocalMessage(agentId, content, sendFn, projectId, eventFn, toolAllowList);
     }
 }

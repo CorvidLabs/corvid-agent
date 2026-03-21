@@ -5,11 +5,13 @@ import type { ServerMessage } from '../../shared/ws-protocol';
 import { printError, renderStreamChunk, renderToolUse, renderThinking, flushStreamBuffer, Spinner } from '../render';
 import { stripFirstChunkNewlines } from './interactive';
 import { resolveProjectFromCwd } from '../utils';
+import { resolveToolSpecifiers } from '../../shared/tool-categories';
 
 interface ChatOptions {
     agent?: string;
     project?: string;
     model?: string;
+    tools?: string;
 }
 
 export async function chatCommand(prompt: string, options: ChatOptions): Promise<void> {
@@ -54,12 +56,16 @@ export async function chatCommand(prompt: string, options: ChatOptions): Promise
 
     spinner.stop();
 
+    // Resolve tool specifiers (--tools flag)
+    const resolvedTools = options.tools ? resolveToolSpecifiers(options.tools) : undefined;
+
     // Send the chat message
     client.sendWs(ws, {
         type: 'chat_send',
         agentId,
         content: prompt,
         projectId: projectId ?? undefined,
+        tools: resolvedTools,
     });
 
     // Wait for completion via direct callback (no polling)

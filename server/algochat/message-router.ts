@@ -306,6 +306,7 @@ export class MessageRouter {
         sendFn: LocalChatSendFn,
         projectId?: string,
         eventFn?: LocalChatEventFn,
+        toolAllowList?: string[],
     ): Promise<void> {
         log.debug('handleLocalMessage', { agentId, content: content.slice(0, 50) });
         const agent = getAgent(this.db, agentId);
@@ -395,7 +396,7 @@ export class MessageRouter {
         }
         eventFn?.({ type: 'session_info', sessionId: session.id });
         this.subscriptionManager.subscribeForLocalResponse(session.id, sendFn);
-        this.processManager.startProcess(session, content);
+        this.processManager.startProcess(session, content, toolAllowList ? { toolAllowList } : undefined);
     }
 
     // ── Core incoming message handler ─────────────────────────────────
