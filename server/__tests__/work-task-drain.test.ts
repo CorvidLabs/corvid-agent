@@ -306,7 +306,7 @@ describe('recoverInterruptedTasks', () => {
         existsMock.mockRestore();
     });
 
-    test('skips tasks without worktreeDir set', async () => {
+    test('requeues tasks without worktreeDir that never started', async () => {
         const { agent, project } = createTestAgentAndProject();
 
         const taskId = insertTaskWithStatus(agent.id, project.id, 'running', {
@@ -316,10 +316,10 @@ describe('recoverInterruptedTasks', () => {
 
         await service.recoverInterruptedTasks();
 
-        // Task should remain failed
+        // Never-started tasks (no worktree, iteration 0) should be requeued
         const task = getWorkTask(db, taskId);
         expect(task).not.toBeNull();
-        expect(task!.status).toBe('failed');
+        expect(task!.status).toBe('pending');
     });
 
     test('does nothing when no active tasks exist', async () => {
