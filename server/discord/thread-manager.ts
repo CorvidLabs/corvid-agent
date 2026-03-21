@@ -511,18 +511,20 @@ export function subscribeForInlineResponse(
         const parts = splitEmbedDescription(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
+            const embedPayload = {
+                description: parts[i],
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            };
             if (i === 0) {
-                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
+                // Fall back to non-reply if the referenced message no longer exists
+                if (!sentId) {
+                    log.debug('Reply embed failed, falling back to non-reply send', { channelId, replyToMessageId });
+                    sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
+                }
             } else {
-                sentId = await sendEmbed(delivery, botToken, channelId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
             }
             if (sentId && onBotMessage) {
                 onBotMessage(sentId);
@@ -643,18 +645,20 @@ export function subscribeForAdaptiveInlineResponse(
         const parts = splitEmbedDescription(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
+            const embedPayload = {
+                description: parts[i],
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            };
             if (i === 0) {
-                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
+                // Fall back to non-reply if the referenced message no longer exists
+                if (!sentId) {
+                    log.debug('Reply embed failed, falling back to non-reply send', { channelId, replyToMessageId });
+                    sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
+                }
             } else {
-                sentId = await sendEmbed(delivery, botToken, channelId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
             }
             if (sentId && onBotMessage) {
                 onBotMessage(sentId);
@@ -916,18 +920,20 @@ export function subscribeForInlineProgressResponse(
         const parts = splitEmbedDescription(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
+            const embedPayload = {
+                description: parts[i],
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            };
             if (i === 0) {
-                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
+                // Fall back to non-reply if the referenced message no longer exists
+                if (!sentId) {
+                    log.debug('Reply embed failed, falling back to non-reply send', { channelId, replyToMessageId });
+                    sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
+                }
             } else {
-                sentId = await sendEmbed(delivery, botToken, channelId, {
-                    description: parts[i],
-                    color,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
-                });
+                sentId = await sendEmbed(delivery, botToken, channelId, embedPayload);
             }
             if (sentId && onBotMessage) {
                 onBotMessage(sentId);
