@@ -67,7 +67,9 @@ export type AuditAction =
     | 'link_add'
     | 'link_remove'
     | 'link_verify'
-    | 'session_ollama_complexity_warning';
+    | 'session_ollama_complexity_warning'
+    | 'discord_permission_denied'
+    | 'discord_rate_limited';
 
 export interface AuditEntry {
     id: number;

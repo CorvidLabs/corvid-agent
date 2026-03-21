@@ -11,7 +11,7 @@ import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordAttachment } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { ButtonStyle } from './types';
+import { ButtonStyle, PermissionLevel } from './types';
 import { appendAttachmentUrls, buildMultimodalContent } from './image-attachments';
 import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
@@ -195,6 +195,14 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, data.member?.roles);
     if (permLevel <= 0) {
         log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
+        recordAudit(
+            ctx.db,
+            'discord_permission_denied',
+            userId,
+            'discord_message',
+            null,
+            JSON.stringify({ channel: 'discord', channelId, reason: 'blocked', username: data.author.username }),
+        );
         // Only send the denial once per cooldown window to avoid spamming
         const now = Date.now();
         const lastDenied = permDenyCooldowns.get(userId);
@@ -207,6 +215,15 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
 
     // Per-user rate limiting with tiered limits
     if (!checkRateLimit(ctx.config, ctx.userMessageTimestamps, userId, ctx.rateLimitWindowMs, ctx.rateLimitMaxMessages, permLevel)) {
+        log.warn('Rate limit hit', { userId, username: data.author.username, permLevel, channelId });
+        recordAudit(
+            ctx.db,
+            'discord_rate_limited',
+            userId,
+            'discord_message',
+            null,
+            JSON.stringify({ channel: 'discord', channelId, permLevel, username: data.author.username }),
+        );
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'Slow down! Please wait before sending more messages.');
         return;
     }
@@ -242,7 +259,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (isOurThread) {
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
-        await routeToThread(ctx, channelId, userId, text, data.author.id, data.author.username, data.attachments);
+        await routeToThread(ctx, channelId, userId, text, permLevel, data.author.id, data.author.username, data.attachments);
         return;
     }
 
@@ -267,6 +284,19 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
             return;
         }
         // If we can't find the session in memory or DB, fall through to create new
+    }
+
+    // In public mode, BASIC-tier users who @mention the bot should use /message
+    // instead of starting a full tool-enabled session. Give friendly guidance.
+    if (ctx.config.publicMode && permLevel === PermissionLevel.BASIC && isBotMentioned) {
+        log.info('BASIC user @mentioned bot in public channel — redirecting to /message', { userId, username: data.author.username });
+        await sendDiscordMessage(
+            ctx.delivery,
+            ctx.config.botToken,
+            channelId,
+            `Hey <@${userId}>! Use \`/message\` to chat with me — it's the best way to get a quick reply. 👋`,
+        );
+        return;
     }
 
     const mode = ctx.config.mode ?? 'chat';
@@ -560,7 +590,7 @@ async function handleMentionReplyResume(
 async function resumeExpiredThreadSession(
     ctx: MessageHandlerContext,
     threadId: string,
-    previousInfo: { agentName: string; agentModel: string; ownerUserId: string; topic?: string; projectName?: string },
+    previousInfo: { agentName: string; agentModel: string; ownerUserId: string; topic?: string; projectName?: string; creatorPermLevel?: number },
     text: string,
     authorId?: string,
     authorUsername?: string,
@@ -609,6 +639,7 @@ async function resumeExpiredThreadSession(
         topic: previousInfo.topic,
         projectName: project.name,
         displayColor: agent.displayColor,
+        creatorPermLevel: previousInfo.creatorPermLevel,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
@@ -634,7 +665,7 @@ async function resumeExpiredThreadSession(
     return true;
 }
 
-async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
+async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, userPermLevel: number, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
     ctx.threadLastActivity.set(threadId, Date.now());
 
     let threadInfo = ctx.threadSessions.get(threadId);
@@ -642,6 +673,36 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     if (!threadInfo) {
         threadInfo = tryRecoverThread(ctx.db, ctx.threadSessions, threadId) ?? undefined;
         if (!threadInfo) return;
+    }
+
+    // Thread permission isolation: BASIC users cannot interact with threads
+    // created by STANDARD/ADMIN users, which may have tool access enabled.
+    if (
+        userPermLevel === PermissionLevel.BASIC &&
+        threadInfo.creatorPermLevel !== undefined &&
+        threadInfo.creatorPermLevel >= PermissionLevel.STANDARD
+    ) {
+        log.warn('BASIC user blocked from STANDARD/ADMIN thread', {
+            userId: _userId,
+            threadId,
+            userPermLevel,
+            creatorPermLevel: threadInfo.creatorPermLevel,
+        });
+        recordAudit(
+            ctx.db,
+            'discord_permission_denied',
+            _userId,
+            'discord_thread',
+            threadId,
+            JSON.stringify({ reason: 'tier_isolation', userPermLevel, creatorPermLevel: threadInfo.creatorPermLevel }),
+        );
+        await sendDiscordMessage(
+            ctx.delivery,
+            ctx.config.botToken,
+            threadId,
+            `Hey <@${_userId}>! This thread requires a higher access level. Use \`/message\` to chat with me instead. 👋`,
+        );
+        return;
     }
 
     const { sessionId, agentName, agentModel, projectName, displayColor } = threadInfo;

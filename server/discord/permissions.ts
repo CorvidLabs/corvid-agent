@@ -6,6 +6,9 @@
 
 import { PermissionLevel } from './types';
 import type { DiscordBridgeConfig } from './types';
+
+/** Default max messages per window for BASIC-tier users in public mode. */
+const PUBLIC_BASIC_RATE_LIMIT = 5;
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DiscordPermissions');
@@ -64,10 +67,16 @@ export function checkRateLimit(
     const timestamps = userMessageTimestamps.get(userId) ?? [];
     const recent = timestamps.filter(t => now - t < rateLimitWindowMs);
 
-    // Tiered rate limiting: higher permission levels get higher limits
+    // Tiered rate limiting: higher permission levels get higher limits.
+    // In public mode, BASIC users default to a tighter limit (5/window) unless
+    // explicitly overridden via rateLimitByLevel config.
     let maxMessages = rateLimitMaxMessages;
-    if (permLevel !== undefined && config.rateLimitByLevel) {
-        maxMessages = config.rateLimitByLevel[permLevel] ?? maxMessages;
+    if (permLevel !== undefined) {
+        if (config.rateLimitByLevel?.[permLevel] !== undefined) {
+            maxMessages = config.rateLimitByLevel[permLevel]!;
+        } else if (config.publicMode && permLevel === PermissionLevel.BASIC) {
+            maxMessages = PUBLIC_BASIC_RATE_LIMIT;
+        }
     }
 
     if (recent.length >= maxMessages) return false;
