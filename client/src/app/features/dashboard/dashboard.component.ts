@@ -974,6 +974,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         Promise.allSettled(loads).then(() => {
             this.loading.set(false);
             this.lastRefresh.set(new Date().toISOString());
+            // Auto-start guided tour on first visit when agents exist
+            if (!this.tourService.isCompleted && this.agentService.agents().length > 0 && !this.showWelcome()) {
+                setTimeout(() => this.tourService.startTour(), 800);
+            }
         });
 
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
