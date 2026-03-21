@@ -11,7 +11,7 @@ import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordAttachment } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { ButtonStyle } from './types';
+import { ButtonStyle, PermissionLevel } from './types';
 import { appendAttachmentUrls, buildMultimodalContent } from './image-attachments';
 import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
@@ -240,6 +240,16 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
 
     // If this message is in a thread we're tracking, route to that thread's session
     if (isOurThread) {
+        // Gate: BASIC users in public mode can only access threads they personally created.
+        // Prevents inheriting the STANDARD tool access of threads started by other users.
+        if (ctx.config.publicMode && permLevel < PermissionLevel.STANDARD) {
+            const threadInfo = ctx.threadSessions.get(channelId) ?? tryRecoverThread(ctx.db, ctx.threadSessions, channelId);
+            if (threadInfo && threadInfo.ownerUserId && threadInfo.ownerUserId !== userId) {
+                await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+                    'You can only interact with threads you created. Use `/message` for a conversation with the bot.');
+                return;
+            }
+        }
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
         await routeToThread(ctx, channelId, userId, text, data.author.id, data.author.username, data.attachments);
@@ -267,6 +277,14 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
             return;
         }
         // If we can't find the session in memory or DB, fall through to create new
+    }
+
+    // In public mode, BASIC users cannot create full tool-enabled mention sessions.
+    // Redirect them to the /message command, which runs in conversation-only mode.
+    if (ctx.config.publicMode && permLevel < PermissionLevel.STANDARD && isBotMentioned) {
+        await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+            `Hi <@${userId}>! Use the \`/message\` command to chat with the bot. @mentions in this channel create full tool-enabled sessions that require elevated access.`);
+        return;
     }
 
     const mode = ctx.config.mode ?? 'chat';

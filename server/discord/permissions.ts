@@ -8,6 +8,18 @@ import { PermissionLevel } from './types';
 import type { DiscordBridgeConfig } from './types';
 import { createLogger } from '../lib/logger';
 
+/**
+ * Default per-window message limits applied when publicMode is enabled and
+ * no explicit rateLimitByLevel override is configured for a given level.
+ * Keeps casual public users from overwhelming the bot while giving trusted
+ * users headroom.
+ */
+export const PUBLIC_MODE_RATE_LIMIT_DEFAULTS: Record<number, number> = {
+    [PermissionLevel.BASIC]: 5,
+    [PermissionLevel.STANDARD]: 20,
+    [PermissionLevel.ADMIN]: 50,
+};
+
 const log = createLogger('DiscordPermissions');
 
 /**
@@ -64,10 +76,19 @@ export function checkRateLimit(
     const timestamps = userMessageTimestamps.get(userId) ?? [];
     const recent = timestamps.filter(t => now - t < rateLimitWindowMs);
 
-    // Tiered rate limiting: higher permission levels get higher limits
+    // Tiered rate limiting: higher permission levels get higher limits.
+    // Priority order:
+    //   1. Explicit rateLimitByLevel override in config
+    //   2. Public mode defaults (BASIC=5, STANDARD=20, ADMIN=50)
+    //   3. Bridge-level default (rateLimitMaxMessages)
     let maxMessages = rateLimitMaxMessages;
-    if (permLevel !== undefined && config.rateLimitByLevel) {
-        maxMessages = config.rateLimitByLevel[permLevel] ?? maxMessages;
+    if (permLevel !== undefined) {
+        const explicitOverride = config.rateLimitByLevel?.[permLevel];
+        if (explicitOverride !== undefined) {
+            maxMessages = explicitOverride;
+        } else if (config.publicMode && PUBLIC_MODE_RATE_LIMIT_DEFAULTS[permLevel] !== undefined) {
+            maxMessages = PUBLIC_MODE_RATE_LIMIT_DEFAULTS[permLevel];
+        }
     }
 
     if (recent.length >= maxMessages) return false;
