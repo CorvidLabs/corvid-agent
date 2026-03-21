@@ -327,42 +327,42 @@ Creates the `discord_mention_sessions` table for persisting mention-reply sessio
 
 ### 093_mention_session_project_name.ts
 
-Adds `project_name` column to `discord_mention_sessions` for richer embed footers.
+Adds `project_name` column to `discord_mention_sessions` for persisting the project context in Discord footer metadata.
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `project_name` TEXT column to `discord_mention_sessions` |
-| `down` | `(db: Database)` | `void` | Drops `project_name` column |
+| `down` | `(db: Database)` | `void` | Drops `project_name` column from `discord_mention_sessions` |
 
 ### 096_mention_session_channel_id.ts
 
-Adds `channel_id` column to `discord_mention_sessions` so the agent knows which channel to send follow-up replies and images to.
+Adds `channel_id` column to `discord_mention_sessions` for tracking which Discord channel a mention session originated from.
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `channel_id` TEXT column to `discord_mention_sessions` |
-| `down` | `(db: Database)` | `void` | Drops `channel_id` column |
+| `down` | `(db: Database)` | `void` | Drops `channel_id` column from `discord_mention_sessions` |
 
 ### 097_mention_session_conversation_only.ts
 
-Adds `conversation_only` column to `discord_mention_sessions` to track sessions created via `/message` command (conversation-only mode with no tools).
+Adds `conversation_only` column to `discord_mention_sessions` for tracking whether a session was created via the /message command (conversation-only mode with no tools).
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `columnExists` | `(db: Database, table: string, column: string)` | `boolean` | Checks if a column exists in the given table via `PRAGMA table_info` |
-| `up` | `(db: Database)` | `void` | Adds `conversation_only` INTEGER column (default 0) to `discord_mention_sessions` with idempotency guard |
-| `down` | `(db: Database)` | `void` | Drops `conversation_only` column |
+| `up` | `(db: Database)` | `void` | Adds `conversation_only` INTEGER DEFAULT 0 column to `discord_mention_sessions` (idempotent — checks column existence first) |
+| `down` | `(db: Database)` | `void` | Drops `conversation_only` column from `discord_mention_sessions` |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
 | 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |
 | 2026-03-15 | corvid-agent | Add migration 091 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migrations 087-089 to spec coverage |

@@ -5,7 +5,6 @@ import {
     effect,
     signal,
     OnDestroy,
-    ElementRef,
 } from '@angular/core';
 import { GuidedTourService, type TourStep } from '../../core/services/guided-tour.service';
 

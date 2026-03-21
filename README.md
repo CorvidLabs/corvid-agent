@@ -251,7 +251,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  19 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  20 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -306,7 +306,7 @@ See [SECURITY.md](SECURITY.md) for the full security model and responsible discl
 ### Testing
 
 ```bash
-bun test              # ~8213 server tests
+bun test              # ~8261 server tests
 cd client && npx vitest run   # Angular component tests
 bun run test:e2e      # 360 Playwright tests
 bun run spec:check    # Module spec validation
