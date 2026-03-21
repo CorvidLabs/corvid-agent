@@ -97,20 +97,35 @@ export class MemorySyncService {
                         await this.walletService.checkAndRefill(memory.agentId);
                     }
 
-                    // On localnet: try ARC-69 ASA path first
+                    // On localnet: ARC-69 ASA path only — never fall back to plain transactions.
+                    // Plain transactions are immutable and can't be updated/deleted, so we'd rather
+                    // retry later than create a permanent, unmodifiable memory record.
                     if (isLocalnet && this.walletService) {
                         try {
-                            const synced = await this.syncViaArc69(memory);
-                            if (synced) continue;
+                            const arc69Synced = await this.syncViaArc69(memory);
+                            if (arc69Synced) {
+                                synced++;
+                                continue;
+                            }
+                            // syncViaArc69 returned false — ARC-69 infra unavailable (no indexer, no chat account)
+                            log.warn('ARC-69 unavailable on localnet, memory stays pending', {
+                                key: memory.key,
+                                agentId: memory.agentId,
+                            });
+                            skipped++;
+                            continue;
                         } catch (err) {
-                            log.debug('ARC-69 sync failed, falling back to plain txn', {
+                            log.warn('ARC-69 sync failed on localnet, marking failed for retry', {
                                 key: memory.key,
                                 error: err instanceof Error ? err.message : String(err),
                             });
+                            updateMemoryStatus(this.db, memory.id, 'failed');
+                            failed++;
+                            continue;
                         }
                     }
 
-                    // Fallback: plain transaction path
+                    // Non-localnet: plain transaction path (fire-and-forget, immutable)
                     const encrypted = await encryptMemoryContent(
                         memory.content,
                         this.serverMnemonic,
