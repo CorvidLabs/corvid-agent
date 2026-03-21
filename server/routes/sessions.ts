@@ -144,6 +144,8 @@ async function handleCreate(
                 if (warning) {
                     complexityWarning = warning;
                     log.warn('Ollama complexity advisory', { sessionId: session.id, model: agent.model, warning });
+                    const ip = getClientIp(req);
+                    recordAudit(db, 'session_ollama_complexity_warning', ip, 'session', session.id, JSON.stringify({ model: agent.model, provider: agent.provider }), null, ip);
                 }
             }
         }

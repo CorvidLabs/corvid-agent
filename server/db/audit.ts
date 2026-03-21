@@ -66,7 +66,8 @@ export type AuditAction =
     | 'contact_delete'
     | 'link_add'
     | 'link_remove'
-    | 'link_verify';
+    | 'link_verify'
+    | 'session_ollama_complexity_warning';
 
 export interface AuditEntry {
     id: number;

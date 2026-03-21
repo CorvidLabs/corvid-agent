@@ -19,6 +19,7 @@ import { listProjects } from '../db/projects';
 import { scanForInjection } from '../lib/prompt-injection';
 import { createWorktree, generateChatBranchName } from '../lib/worktree';
 import { recordAudit } from '../db/audit';
+import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 import { updateDiscordConfig } from '../db/discord-config';
 import { createLogger } from '../lib/logger';
 import {
@@ -472,6 +473,13 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         source: 'discord' as SessionSource,
         workDir,
     });
+
+    // Advisory: warn in-channel when Ollama is used for a complex task.
+    const complexityWarning = buildOllamaComplexityWarning(cleanText, agent.model, agent.provider);
+    if (complexityWarning) {
+        await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+            `⚠️ ${complexityWarning}`);
+    }
 
     // Start the process with the text prompt (include attachment URLs so the agent
     // sees image links even though startProcess only accepts strings).
