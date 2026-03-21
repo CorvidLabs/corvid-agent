@@ -552,8 +552,8 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 </div>
                                 @if (activeCouncilLaunches().length > 0) {
                                     <div class="councils-sub">
-                                        <h4>Active Councils</h4>
-                                        @for (launch of activeCouncilLaunches(); track launch.id) {
+                                        <h4>Active Councils ({{ activeCouncilLaunches().length }})</h4>
+                                        @for (launch of activeCouncilLaunches().slice(0, 10); track launch.id) {
                                             <div class="running-item">
                                                 <a [routerLink]="['/council-launches', launch.id]">{{ launch.prompt.length > 50 ? launch.prompt.slice(0, 50) + '...' : launch.prompt }}</a>
                                                 <span class="stage-badge" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
