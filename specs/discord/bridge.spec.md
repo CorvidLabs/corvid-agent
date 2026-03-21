@@ -120,6 +120,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleComponentInteraction` | `(ctx, interaction)` | `Promise<void>` | Handle button/component interactions (resume_thread, new_session, archive_thread, stop_session) |
 
+### Exported Functions (from command-handlers/message-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — sends a message to another agent via AlgoChat |
+
 ### Exported Functions (from command-handlers/autocomplete-handler.ts)
 
 | Function | Parameters | Returns | Description |
