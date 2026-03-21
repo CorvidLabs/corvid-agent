@@ -8,13 +8,14 @@ export const tables: string[] = [
     )`,
 
     `CREATE TABLE IF NOT EXISTS discord_mention_sessions (
-        bot_message_id  TEXT PRIMARY KEY,
-        session_id      TEXT NOT NULL,
-        agent_name      TEXT NOT NULL,
-        agent_model     TEXT NOT NULL,
-        project_name    TEXT,
-        channel_id      TEXT,
-        created_at      TEXT DEFAULT (datetime('now'))
+        bot_message_id    TEXT PRIMARY KEY,
+        session_id        TEXT NOT NULL,
+        agent_name        TEXT NOT NULL,
+        agent_model       TEXT NOT NULL,
+        project_name      TEXT,
+        channel_id        TEXT,
+        conversation_only INTEGER DEFAULT 0,
+        created_at        TEXT DEFAULT (datetime('now'))
     )`,
 ];
 
