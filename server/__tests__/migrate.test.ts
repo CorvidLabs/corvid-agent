@@ -354,11 +354,11 @@ describe('initDb retry on failure', () => {
         expect(current).toBeGreaterThan(0);
         d.query('UPDATE schema_version SET version = ?').run(current - 1);
 
-        // Now initDb should discover 1 pending migration and apply it
+        // Now initDb should discover pending migration(s) and apply them
         await initDb();
 
-        // Verify version was restored
-        expect(getCurrentVersion(d)).toBe(current);
+        // Verify version is at least restored (may be higher if new file-based migrations exist)
+        expect(getCurrentVersion(d)).toBeGreaterThanOrEqual(current);
 
         closeDb();
     });

@@ -10,6 +10,7 @@ import { PerformanceCollector } from './performance/collector';
 import { ProcessManager } from './process/manager';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { SessionCheerleadingDetector } from './process/session-cheerleading-detector';
+import { OllamaStallEscalator } from './process/ollama-stall-escalator';
 import { MemorySyncService } from './db/memory-sync';
 import { MemoryGraduationService } from './memory/graduation-service';
 import { loadAlgoChatConfig } from './algochat/config';
@@ -89,6 +90,7 @@ export interface ServiceContainer {
     processManager: ProcessManager;
     sessionLifecycle: SessionLifecycleManager;
     cheerleadingDetector: SessionCheerleadingDetector;
+    ollamaStallEscalator: OllamaStallEscalator;
 
     // AlgoChat (mutable — set by initAlgoChat after server starts)
     algochatConfig: ReturnType<typeof loadAlgoChatConfig>;
@@ -258,6 +260,16 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const notificationService = new NotificationService(db);
     const questionDispatcher = new QuestionDispatcher(db);
     const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
+
+    // ── Ollama stall escalation ───────────────────────────────────────────
+    // Instantiated after notificationService so it can issue notifications on
+    // escalation. The escalator attaches to processManager as a global event
+    // subscriber and is otherwise self-contained.
+    const ollamaStallEscalator = new OllamaStallEscalator({
+        eventSource: processManager,
+        db,
+        notificationService,
+    });
 
     // ── Optional subsystems ──────────────────────────────────────────────
     const sandboxEnabled = process.env.SANDBOX_ENABLED === 'true';
@@ -444,6 +456,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         processManager,
         sessionLifecycle,
         cheerleadingDetector,
+        ollamaStallEscalator,
         algochatConfig,
         algochatState,
         memorySyncService,
