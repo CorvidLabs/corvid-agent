@@ -132,10 +132,10 @@ export class WidgetLayoutService {
     }
 
     private loadViewMode(): ViewMode {
-        if (typeof localStorage === 'undefined') return 'simple';
+        if (typeof localStorage === 'undefined') return 'developer';
         const stored = localStorage.getItem(VIEW_MODE_KEY);
         if (stored === 'simple' || stored === 'developer') return stored;
-        return 'simple';
+        return 'developer';
     }
 
     private saveViewMode(mode: ViewMode): void {
