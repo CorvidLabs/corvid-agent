@@ -40,6 +40,8 @@ import { RouterLink } from '@angular/router';
             padding: 4rem 2rem;
             min-height: 280px;
             position: relative;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius-lg);
             background:
                 repeating-linear-gradient(
                     0deg,
@@ -48,6 +50,10 @@ import { RouterLink } from '@angular/router';
                     rgba(30, 32, 53, 0.15) 3px,
                     rgba(30, 32, 53, 0.15) 4px
                 );
+            transition: border-color 0.3s ease;
+        }
+        .empty-state:hover {
+            border-color: var(--border-bright);
         }
         .empty-state__icon {
             margin: 0 0 1.25rem;

@@ -206,6 +206,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+            animation: sidebarActiveGlow 0.3s ease-out;
+        }
+        @keyframes sidebarActiveGlow {
+            from { background: transparent; border-left-color: transparent; }
         }
         .sidebar__link--active::before {
             display: none;

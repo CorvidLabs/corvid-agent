@@ -63,7 +63,7 @@ interface SessionStats {
                 <p class="loading">Loading analytics data...</p>
             } @else if (overview()) {
                 <!-- Overview Cards -->
-                <div class="analytics__cards">
+                <div class="analytics__cards stagger-scale">
                     <div class="stat-card">
                         <span class="stat-card__label">Total Sessions</span>
                         <span class="stat-card__value">{{ overview()!.totalSessions }}</span>

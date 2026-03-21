@@ -53,7 +53,7 @@ interface CreditTransaction {
                     <p class="spending__desc">Configure daily spending limits for each agent. Agents without a custom cap use the global default.</p>
 
                     <div class="table-scroll">
-                    <table class="spending__table">
+                    <table class="spending__table table-striped">
                         <thead>
                             <tr>
                                 <th>Agent</th>
@@ -63,7 +63,7 @@ interface CreditTransaction {
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="stagger-rows">
                             @for (info of agentSpending(); track info.agentId) {
                                 <tr>
                                     <td>
@@ -127,7 +127,7 @@ interface CreditTransaction {
                     <h3>Credit Transactions</h3>
                     @if (creditTransactions().length > 0) {
                         <div class="table-scroll">
-                        <table class="spending__table">
+                        <table class="spending__table table-striped">
                             <thead>
                                 <tr>
                                     <th>Date</th>
@@ -137,7 +137,7 @@ interface CreditTransaction {
                                     <th>Reference</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody class="stagger-rows">
                                 @for (tx of creditTransactions(); track tx.id) {
                                     <tr>
                                         <td>{{ tx.created_at }}</td>
@@ -184,10 +184,10 @@ interface CreditTransaction {
         .txid { font-family: monospace; font-size: 0.8rem; }
         .btn--sm { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
         .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border); }
-        .modal h3 { margin-bottom: 1rem; }
-        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 229, 255, 0.1); }
+        .modal h3 { margin-bottom: 1rem; color: var(--text-primary); }
+        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
         .form-group small { color: var(--text-secondary); font-size: 0.75rem; }

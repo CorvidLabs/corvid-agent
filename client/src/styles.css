@@ -812,3 +812,214 @@ select:focus {
     .card-lift:hover { transform: none; }
     .app-layout__content { scroll-behavior: auto; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   Phase 5 — Modals, progress animations, charts, tables
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Modal / dialog system ── */
+@keyframes modalBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-overlay {
+    animation: modalBackdropIn 0.2s ease-out;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.modal {
+    animation: modalSlideIn 0.25s ease-out;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 229, 255, 0.04);
+}
+
+/* ── Error banner utility ── */
+.error-banner {
+    background: var(--accent-red-dim);
+    border: 1px solid var(--accent-red);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+.error-banner::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent-red);
+}
+.error-banner p {
+    margin: 0;
+    color: var(--accent-red);
+    font-size: 0.85rem;
+}
+
+/* ── Warning banner ── */
+.warning-banner {
+    background: var(--accent-amber-dim);
+    border: 1px solid var(--accent-amber);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+.warning-banner::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent-amber);
+}
+
+/* ── Animated progress bar fill ── */
+@keyframes progressFill {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+.progress-bar__fill,
+.comp-bar__fill,
+.detail-bar__fill {
+    transform-origin: left;
+    animation: progressFill 0.6s ease-out;
+}
+
+/* ── Animated progress bar shimmer ── */
+@keyframes progressShimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+}
+
+.progress-bar__fill--active {
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.12) 50%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: progressShimmer 2s linear infinite;
+}
+
+/* ── Chart row hover ── */
+.chart-row {
+    transition: background var(--transition-fast);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+}
+.chart-row:hover {
+    background: var(--bg-hover);
+}
+.chart-row:hover .chart-row__bar {
+    filter: brightness(1.2);
+}
+.chart-row:hover .chart-row__value {
+    color: var(--text-primary);
+}
+
+/* ── Table striping utility ── */
+.table-striped tbody tr:nth-child(even) {
+    background: rgba(22, 24, 34, 0.5);
+}
+.table-striped tbody tr {
+    transition: background var(--transition-fast);
+}
+.table-striped tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Stat card hover ── */
+.stat-card {
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-bright);
+}
+
+/* ── CSS tooltip utility ── */
+[data-tooltip] {
+    position: relative;
+}
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 3px 8px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.65rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 100;
+}
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ── Score ring draw animation ── */
+@keyframes ringDraw {
+    from { stroke-dashoffset: 326.73; }
+}
+
+/* ── KV row hover ── */
+.kv-row {
+    transition: background var(--transition-fast);
+    padding-left: 4px;
+    padding-right: 4px;
+    border-radius: var(--radius-sm);
+}
+.kv-row:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Event / table row hover ── */
+.event-row {
+    transition: background var(--transition-fast);
+    border-radius: var(--radius-sm);
+    padding-left: 4px;
+    padding-right: 4px;
+}
+.event-row:hover {
+    background: var(--bg-hover);
+}
+
+.agent-table__row {
+    transition: background var(--transition-fast);
+    border-radius: var(--radius-sm);
+}
+.agent-table__row:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Phase 5 reduced-motion overrides ── */
+@media (prefers-reduced-motion: reduce) {
+    .modal-overlay { animation: none; }
+    .modal { animation: none; }
+    .progress-bar__fill,
+    .comp-bar__fill,
+    .detail-bar__fill { animation: none; }
+    .progress-bar__fill--active { animation: none; }
+    .stat-card:hover { transform: none; }
+    [data-tooltip]::after { transition: none; }
+}
