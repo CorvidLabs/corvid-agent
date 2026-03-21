@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 96;
+const SCHEMA_VERSION = 97;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -109,6 +109,10 @@ const MIGRATIONS: Record<number, string[]> = {
     96: [
         // Add channel_id to mention sessions for channel tracking
         `ALTER TABLE discord_mention_sessions ADD COLUMN channel_id TEXT`,
+    ],
+    97: [
+        // Add conversation_only flag to mention sessions for /message command
+        `ALTER TABLE discord_mention_sessions ADD COLUMN conversation_only INTEGER DEFAULT 0`,
     ],
 };
 

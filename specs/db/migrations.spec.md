@@ -22,6 +22,7 @@ files:
   - server/db/migrations/092_discord_mention_sessions.ts
   - server/db/migrations/093_mention_session_project_name.ts
   - server/db/migrations/096_mention_session_channel_id.ts
+  - server/db/migrations/097_mention_session_conversation_only.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -323,6 +324,39 @@ Creates the `discord_mention_sessions` table for persisting mention-reply sessio
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Creates `discord_mention_sessions` table with `bot_message_id` as primary key, plus index on `session_id` |
 | `down` | `(db: Database)` | `void` | Drops the `discord_mention_sessions` table |
+
+### 093_mention_session_project_name.ts
+
+Adds `project_name` column to `discord_mention_sessions` for embed footer context.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `project_name` TEXT column to `discord_mention_sessions` |
+| `down` | `(db: Database)` | `void` | Drops the `project_name` column |
+
+### 096_mention_session_channel_id.ts
+
+Adds `channel_id` column to `discord_mention_sessions` for tracking which channel the mention originated in.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `channel_id` TEXT column to `discord_mention_sessions` |
+| `down` | `(db: Database)` | `void` | Drops the `channel_id` column |
+
+### 097_mention_session_conversation_only.ts
+
+Adds `conversation_only` column to `discord_mention_sessions` to track whether a session was created via `/message` command (conversation-only mode with no tools), so the flag persists across server restarts.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `conversation_only` INTEGER column (default 0) to `discord_mention_sessions` with idempotent guard |
+| `down` | `(db: Database)` | `void` | Drops the `conversation_only` column |
 
 ## Change Log
 
