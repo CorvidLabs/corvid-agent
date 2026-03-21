@@ -271,6 +271,45 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             }
                         }
 
+                        <!-- active-sessions -->
+                        @if (widget.id === 'active-sessions') {
+                            <div class="section">
+                                <div class="section__header">
+                                    <h3>Active Sessions</h3>
+                                    <div class="section__header-actions">
+                                        <a class="section__link" routerLink="/sessions">View all sessions</a>
+                                        <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['active-sessions']" (click)="refreshWidget('active-sessions')" title="Refresh">&#x21bb;</button>
+                                    </div>
+                                </div>
+                                @if (runningSessions().length === 0) {
+                                    <div class="empty-state">
+                                        <p class="empty-state__title">No active sessions</p>
+                                        <p class="empty-state__hint">Start a conversation or work task to see live sessions here.</p>
+                                        <div class="empty-state__actions">
+                                            <a class="empty-state__link" routerLink="/sessions/new">New conversation</a>
+                                            <a class="empty-state__link" routerLink="/work-tasks">Create work task</a>
+                                        </div>
+                                    </div>
+                                } @else {
+                                    <div class="session-list">
+                                        @for (session of runningSessions().slice(0, 8); track session.id) {
+                                            <a class="session-item" [routerLink]="['/sessions', session.id]">
+                                                <span class="session-item__dot"></span>
+                                                <div class="session-item__body">
+                                                    <span class="session-item__label">{{ session.name || session.initialPrompt?.slice(0, 60) || 'Session' }}{{ !session.name && (session.initialPrompt?.length ?? 0) > 60 ? '...' : '' }}</span>
+                                                    <span class="session-item__detail">{{ getAgentName(session.agentId) }} &middot; {{ session.source }}</span>
+                                                </div>
+                                                <span class="session-item__time" [title]="session.createdAt | absoluteTime">{{ session.createdAt | relativeTime }}</span>
+                                            </a>
+                                        }
+                                        @if (runningSessions().length > 8) {
+                                            <a class="session-list__more" routerLink="/sessions">+ {{ runningSessions().length - 8 }} more</a>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+
                         <!-- spending-chart -->
                         @if (widget.id === 'spending-chart') {
                             @if (widgetErrors()['spending-chart']) {
@@ -854,7 +893,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     /** Which widgets should span full width */
     protected isFullWidth(id: WidgetId): boolean {
-        return id === 'metrics' || id === 'agents' || id === 'flock' || id === 'comparison';
+        return id === 'metrics' || id === 'agents' || id === 'active-sessions' || id === 'flock' || id === 'comparison';
     }
 
     protected sourceBarPct(count: number): number {
@@ -972,6 +1011,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.loadOverview();
     }
 
+    protected getAgentName(agentId: string | null): string {
+        if (!agentId) return 'Agent';
+        const agent = this.agentService.agents().find((a) => a.id === agentId);
+        return agent?.name ?? 'Agent';
+    }
+
     protected navigateTo(path: string): void {
         this.router.navigate([path]);
     }
@@ -1071,6 +1116,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             switch (widgetId) {
                 case 'metrics': await this.loadOverview(); break;
                 case 'agents': await this.agentService.loadAgents().then(() => this.loadAgentSummaries()); break;
+                case 'active-sessions': await this.sessionService.loadSessions(); break;
                 case 'spending-chart': await this.loadSpendingData(); break;
                 case 'session-chart': case 'agent-usage-chart': await this.loadSessionStats(); break;
                 case 'activity': await Promise.all([this.sessionService.loadSessions(), this.workTaskService.loadTasks(), this.loadAgentMessages()]); break;

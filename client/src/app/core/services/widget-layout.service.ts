@@ -3,6 +3,7 @@ import { Injectable, signal, computed } from '@angular/core';
 export type WidgetId =
     | 'metrics'
     | 'agents'
+    | 'active-sessions'
     | 'spending-chart'
     | 'session-chart'
     | 'agent-usage-chart'
@@ -26,6 +27,7 @@ const VIEW_MODE_KEY = 'corvid_view_mode';
 /** Widgets visible in simple mode — focused on what non-technical users need */
 const SIMPLE_WIDGETS: Set<WidgetId> = new Set([
     'agents',
+    'active-sessions',
     'activity',
     'quick-actions',
 ]);
@@ -33,6 +35,7 @@ const SIMPLE_WIDGETS: Set<WidgetId> = new Set([
 const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'metrics', label: 'Metrics', visible: true },
     { id: 'agents', label: 'Agent Activity', visible: true },
+    { id: 'active-sessions', label: 'Active Sessions', visible: true },
     { id: 'spending-chart', label: 'Spending Trend', visible: true },
     { id: 'session-chart', label: 'Sessions Breakdown', visible: true },
     { id: 'agent-usage-chart', label: 'Agent Usage', visible: true },
@@ -129,10 +132,10 @@ export class WidgetLayoutService {
     }
 
     private loadViewMode(): ViewMode {
-        if (typeof localStorage === 'undefined') return 'developer';
+        if (typeof localStorage === 'undefined') return 'simple';
         const stored = localStorage.getItem(VIEW_MODE_KEY);
         if (stored === 'simple' || stored === 'developer') return stored;
-        return 'developer';
+        return 'simple';
     }
 
     private saveViewMode(mode: ViewMode): void {
