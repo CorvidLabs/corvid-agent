@@ -18,11 +18,17 @@ HTTP API routes for viewing Flock Directory agent test results and statistics. R
 
 ## Public API
 
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `FlockTestingDeps` | Optional dependencies for test triggering (`flockDirectory`, `agentMessenger`) |
+
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleFlockTestingRoutes` | `(req, url, db, testRunner?, context?)` | `Response \| null` | Route handler for `/api/flock-directory/testing/*` |
+| `handleFlockTestingRoutes` | `(req, url, db, testRunner?, context?, deps?)` | `Response \| Promise<Response> \| null` | Route handler for `/api/flock-directory/testing/*` |
 
 ## Endpoints
 
