@@ -184,6 +184,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `muteUser` | `(mutedUsers, userId)` | `void` | Mute a user from bot interactions |
 | `unmuteUser` | `(mutedUsers, userId)` | `void` | Unmute a user |
 
+### Exported Constants (from permissions.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `PUBLIC_MODE_RATE_LIMIT_DEFAULTS` | `Record<number, number>` | Default per-window message limits by permission level when publicMode is enabled |
+
 ### Exported Functions (from thread-manager.ts)
 
 | Function | Parameters | Returns | Description |
