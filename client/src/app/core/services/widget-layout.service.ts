@@ -30,6 +30,7 @@ const SIMPLE_WIDGETS: Set<WidgetId> = new Set([
     'active-sessions',
     'activity',
     'quick-actions',
+    'system-status',
 ]);
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
@@ -71,6 +72,7 @@ export class WidgetLayoutService {
     setViewMode(mode: ViewMode): void {
         this.viewMode.set(mode);
         this.saveViewMode(mode);
+        if (mode === 'simple') this.customizing.set(false);
     }
 
     /** Toggle between modes */
@@ -132,10 +134,10 @@ export class WidgetLayoutService {
     }
 
     private loadViewMode(): ViewMode {
-        if (typeof localStorage === 'undefined') return 'developer';
+        if (typeof localStorage === 'undefined') return 'simple';
         const stored = localStorage.getItem(VIEW_MODE_KEY);
         if (stored === 'simple' || stored === 'developer') return stored;
-        return 'developer';
+        return 'simple';
     }
 
     private saveViewMode(mode: ViewMode): void {

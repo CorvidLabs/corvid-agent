@@ -161,6 +161,36 @@
 }
 .simple-hero__btn:hover { background: rgba(0,229,255,.14); box-shadow: 0 0 16px rgba(0,229,255,.15); }
 
+/* Simple mode prompt — top-level hero for first-time/simple users */
+.simple-prompt {
+    text-align: center; padding: 2.5rem 1.5rem;
+    background: linear-gradient(135deg, rgba(0,229,255,.04) 0%, rgba(0,229,255,.01) 100%);
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+}
+.simple-prompt__title {
+    margin: 0 0 .5rem; font-size: 1.4rem; font-weight: 700;
+    color: var(--text-primary);
+}
+.simple-prompt__desc {
+    margin: 0 0 1.5rem; font-size: .85rem; color: var(--text-secondary);
+    max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.5;
+}
+.simple-prompt__actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+.simple-prompt__btn {
+    padding: .65rem 1.5rem; border-radius: var(--radius); font-size: .8rem; font-weight: 600;
+    font-family: inherit; border: 1px solid var(--border); color: var(--text-secondary);
+    background: var(--bg-surface); cursor: pointer; transition: all .15s;
+}
+.simple-prompt__btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.simple-prompt__btn--primary {
+    border-color: var(--accent-cyan); color: var(--accent-cyan);
+    background: rgba(0,229,255,.08);
+}
+.simple-prompt__btn--primary:hover {
+    background: rgba(0,229,255,.16); box-shadow: 0 0 20px rgba(0,229,255,.12);
+}
+
 /* Agent grid */
 .agent-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: .75rem; }
 .agent-card {
