@@ -1,6 +1,9 @@
 import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { ReputationVerifier } from '../reputation/verifier';
 
+// Valid-format 58-char base32 Algorand address for tests
+const VALID_ADDR = 'A'.repeat(58);
+
 function makeIndexerResponse(transactions: Array<{ id: string; note?: string; 'confirmed-round'?: number; 'round-time'?: number }>) {
     return new Response(JSON.stringify({ transactions }), {
         status: 200,
@@ -42,7 +45,7 @@ describe('scanAttestations', () => {
         ]))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(2);
         expect(attestations[0].txid).toBe('txn-1');
@@ -59,7 +62,7 @@ describe('scanAttestations', () => {
         ]))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(1);
     });
@@ -73,7 +76,7 @@ describe('scanAttestations', () => {
         ]))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(0);
     });
@@ -82,7 +85,7 @@ describe('scanAttestations', () => {
         global.fetch = mock(() => Promise.resolve(new Response('Not Found', { status: 404 }))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(0);
     });
@@ -91,7 +94,7 @@ describe('scanAttestations', () => {
         global.fetch = mock(() => Promise.reject(new Error('Network error'))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(0);
     });
@@ -100,7 +103,7 @@ describe('scanAttestations', () => {
         global.fetch = mock(() => Promise.resolve(makeIndexerResponse([]))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(0);
     });
@@ -115,7 +118,7 @@ describe('scanAttestations', () => {
         ]))) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const attestations = await verifier.scanAttestations('WALLETADDR');
+        const attestations = await verifier.scanAttestations(VALID_ADDR);
 
         expect(attestations).toHaveLength(1);
         expect(attestations[0].timestamp).toBe('');
@@ -139,7 +142,7 @@ describe('checkRemoteTrust', () => {
     test('untrusted with 0 attestations', async () => {
         mockAttestations(0);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
         expect(result.trustLevel).toBe('untrusted');
         expect(result.attestationCount).toBe(0);
@@ -149,7 +152,7 @@ describe('checkRemoteTrust', () => {
     test('low trust with 1 attestation', async () => {
         mockAttestations(1);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
         expect(result.trustLevel).toBe('low');
         expect(result.meetsMinimum).toBe(true);
@@ -158,7 +161,7 @@ describe('checkRemoteTrust', () => {
     test('medium trust with 3 attestations', async () => {
         mockAttestations(3);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
         expect(result.trustLevel).toBe('medium');
     });
@@ -166,7 +169,7 @@ describe('checkRemoteTrust', () => {
     test('high trust with 6 attestations', async () => {
         mockAttestations(6);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
         expect(result.trustLevel).toBe('high');
     });
@@ -174,7 +177,7 @@ describe('checkRemoteTrust', () => {
     test('verified trust with 10+ attestations', async () => {
         mockAttestations(12);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
         expect(result.trustLevel).toBe('verified');
         expect(result.attestationCount).toBe(12);
@@ -183,7 +186,7 @@ describe('checkRemoteTrust', () => {
     test('meetsMinimum is false when trust is below threshold', async () => {
         mockAttestations(1);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET', 'high');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR, 'high');
 
         expect(result.trustLevel).toBe('low');
         expect(result.meetsMinimum).toBe(false);
@@ -192,7 +195,7 @@ describe('checkRemoteTrust', () => {
     test('meetsMinimum is true when trust equals threshold', async () => {
         mockAttestations(6);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('WALLET', 'high');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR, 'high');
 
         expect(result.meetsMinimum).toBe(true);
     });
@@ -200,9 +203,23 @@ describe('checkRemoteTrust', () => {
     test('includes wallet address in result', async () => {
         mockAttestations(0);
         const verifier = new ReputationVerifier('https://mock-indexer');
-        const result = await verifier.checkRemoteTrust('MY_WALLET_ADDR');
+        const result = await verifier.checkRemoteTrust(VALID_ADDR);
 
-        expect(result.walletAddress).toBe('MY_WALLET_ADDR');
+        expect(result.walletAddress).toBe(VALID_ADDR);
+    });
+});
+
+// ─── address validation ─────────────────────────────────────────────────────
+
+describe('address validation', () => {
+    test('rejects invalid address format', async () => {
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        await expect(verifier.scanAttestations('../../evil-path')).rejects.toThrow('Invalid Algorand address format');
+    });
+
+    test('rejects URL injection attempts', async () => {
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        await expect(verifier.scanAttestations('WALLET?injected=true&')).rejects.toThrow('Invalid Algorand address format');
     });
 });
 
@@ -217,7 +234,7 @@ describe('constructor', () => {
         }) as unknown as typeof global.fetch;
 
         const verifier = new ReputationVerifier('https://custom-indexer.example.com');
-        await verifier.scanAttestations('WALLET');
+        await verifier.scanAttestations(VALID_ADDR);
 
         expect(calledUrl).toContain('custom-indexer.example.com');
     });
