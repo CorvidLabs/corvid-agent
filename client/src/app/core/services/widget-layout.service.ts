@@ -12,6 +12,8 @@ export type WidgetId =
     | 'flock'
     | 'comparison';
 
+export type ViewMode = 'simple' | 'developer';
+
 export interface WidgetConfig {
     id: WidgetId;
     label: string;
@@ -19,6 +21,14 @@ export interface WidgetConfig {
 }
 
 const STORAGE_KEY = 'corvid_widget_layout';
+const VIEW_MODE_KEY = 'corvid_view_mode';
+
+/** Widgets visible in simple mode — focused on what non-technical users need */
+const SIMPLE_WIDGETS: Set<WidgetId> = new Set([
+    'agents',
+    'activity',
+    'quick-actions',
+]);
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'metrics', label: 'Metrics', visible: true },
@@ -35,16 +45,35 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
 
 @Injectable({ providedIn: 'root' })
 export class WidgetLayoutService {
+    /** Current view mode */
+    readonly viewMode = signal<ViewMode>(this.loadViewMode());
+
     /** Current widget layout — order + visibility */
     readonly widgets = signal<WidgetConfig[]>(this.load());
 
-    /** Only visible widgets, in order */
-    readonly visibleWidgets = computed(() =>
-        this.widgets().filter((w) => w.visible),
-    );
+    /** Only visible widgets, in order (respects view mode) */
+    readonly visibleWidgets = computed(() => {
+        const mode = this.viewMode();
+        return this.widgets().filter((w) => {
+            if (!w.visible) return false;
+            if (mode === 'simple') return SIMPLE_WIDGETS.has(w.id);
+            return true;
+        });
+    });
 
     /** Whether the customize panel is open */
     readonly customizing = signal(false);
+
+    /** Switch between simple and developer modes */
+    setViewMode(mode: ViewMode): void {
+        this.viewMode.set(mode);
+        this.saveViewMode(mode);
+    }
+
+    /** Toggle between modes */
+    toggleViewMode(): void {
+        this.setViewMode(this.viewMode() === 'simple' ? 'developer' : 'simple');
+    }
 
     /** Move a widget from one index to another */
     moveWidget(fromIndex: number, toIndex: number): void {
@@ -69,6 +98,7 @@ export class WidgetLayoutService {
         const defaults = DEFAULT_WIDGETS.map((w) => ({ ...w }));
         this.widgets.set(defaults);
         this.save(defaults);
+        this.setViewMode('developer');
     }
 
     private load(): WidgetConfig[] {
@@ -96,5 +126,17 @@ export class WidgetLayoutService {
     private save(widgets: WidgetConfig[]): void {
         if (typeof localStorage === 'undefined') return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+    }
+
+    private loadViewMode(): ViewMode {
+        if (typeof localStorage === 'undefined') return 'developer';
+        const stored = localStorage.getItem(VIEW_MODE_KEY);
+        if (stored === 'simple' || stored === 'developer') return stored;
+        return 'developer';
+    }
+
+    private saveViewMode(mode: ViewMode): void {
+        if (typeof localStorage === 'undefined') return;
+        localStorage.setItem(VIEW_MODE_KEY, mode);
     }
 }
