@@ -61,6 +61,12 @@ export interface ThreadSessionInfo {
     topic?: string;
     projectName?: string;
     displayColor?: string | null;
+    /**
+     * Permission level of the user who created this thread.
+     * Used to enforce per-tier access: BASIC users cannot interact with
+     * threads created by STANDARD/ADMIN users (which may have tool access).
+     */
+    creatorPermLevel?: number;
 }
 
 export interface ThreadCallbackInfo {

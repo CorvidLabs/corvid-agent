@@ -129,6 +129,7 @@ export async function handleSessionCommand(
         topic,
         projectName: project.name,
         displayColor: agent.displayColor,
+        creatorPermLevel: permLevel,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
