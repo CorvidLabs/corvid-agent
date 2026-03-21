@@ -55,6 +55,7 @@ import { createLogger } from './lib/logger';
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
+import { OpenRouterProvider } from './providers/openrouter/provider';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
 import { FlockDirectoryService } from './flock-directory/service';
@@ -182,6 +183,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── LLM providers ────────────────────────────────────────────────────
     const providerRegistry = LlmProviderRegistry.getInstance();
     providerRegistry.register(new AnthropicProvider());
+    providerRegistry.register(new OpenRouterProvider());
     const ollamaProvider = new OllamaProvider();
     providerRegistry.register(ollamaProvider);
 

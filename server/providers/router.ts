@@ -38,7 +38,7 @@ export function _resetClaudeCliCache(value?: boolean | null): void {
  * should route everything through local Ollama models.
  */
 export function isLocalOnly(): boolean {
-    return !hasClaudeAccess() && !process.env.OPENAI_API_KEY;
+    return !hasClaudeAccess() && !process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY;
 }
 
 export type ComplexityLevel = 'simple' | 'moderate' | 'complex' | 'expert';

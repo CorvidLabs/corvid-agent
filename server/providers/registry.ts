@@ -41,7 +41,7 @@ export class LlmProviderRegistry {
         let enabled: string[] | null = null;
         if (enabledRaw) {
             enabled = enabledRaw.split(',').map((s) => s.trim().toLowerCase());
-        } else if (!hasClaudeAccess() && !process.env.OPENAI_API_KEY) {
+        } else if (!hasClaudeAccess() && !process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
             enabled = ['ollama'];
             if (!this.loggedLocalOnly) {
                 log.info('Running in local-only mode (Ollama) — no cloud API keys detected');

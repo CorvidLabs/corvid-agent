@@ -140,6 +140,9 @@ interface LibraryResponse {
                 <button class="tab" [class.tab--active]="activeTab() === 'library'" (click)="switchToLibrary()">
                     Library
                 </button>
+                <button class="tab" [class.tab--active]="activeTab() === 'openrouter'" (click)="switchToOpenRouter()">
+                    OpenRouter ({{ openrouterModels().length }})
+                </button>
             </div>
 
             <!-- Installed Models Tab -->
@@ -241,6 +244,34 @@ interface LibraryResponse {
                                         </button>
                                     }
                                 </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            <!-- OpenRouter Models Tab -->
+            @if (activeTab() === 'openrouter') {
+                @if (loadingOpenRouter()) {
+                    <p class="hint">Loading OpenRouter models...</p>
+                } @else if (openrouterModels().length === 0) {
+                    <p class="hint">
+                        No OpenRouter models available. Set <code>OPENROUTER_API_KEY</code> to enable.
+                    </p>
+                } @else {
+                    <div class="model-grid">
+                        @for (model of openrouterModels(); track model.id) {
+                            <div class="model-card">
+                                <div class="model-card__header">
+                                    <span class="model-card__name">{{ model.name }}</span>
+                                </div>
+                                <div class="model-card__details">
+                                    <span class="detail">Context: {{ model.contextLength | number }} tokens</span>
+                                    <span class="detail">
+                                        Price: ${{ model.pricing.promptPerMillion | number:'1.2-2' }}/${{ model.pricing.completionPerMillion | number:'1.2-2' }} /M
+                                    </span>
+                                </div>
+                                <div class="model-card__id">{{ model.id }}</div>
                             </div>
                         }
                     </div>
@@ -414,7 +445,7 @@ export class ModelsComponent implements OnInit, OnDestroy {
     readonly deletingModel = signal<string | null>(null);
 
     // Tabs
-    readonly activeTab = signal<'installed' | 'library'>('installed');
+    readonly activeTab = signal<'installed' | 'library' | 'openrouter'>('installed');
 
     // Library
     readonly loadingLibrary = signal(false);
@@ -425,6 +456,10 @@ export class ModelsComponent implements OnInit, OnDestroy {
 
     // Computed: set of models being pulled (for library "Downloading..." label)
     readonly pullingSet = computed(() => new Set(this.activePulls().filter(p => p.status === 'pulling').map(p => p.model)));
+
+    // OpenRouter
+    readonly loadingOpenRouter = signal(false);
+    readonly openrouterModels = signal<Array<{ id: string; name: string; contextLength: number; pricing: { promptPerMillion: number; completionPerMillion: number } }>>([]);
 
     private wsUnsub: (() => void) | null = null;
     private searchDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -509,6 +544,25 @@ export class ModelsComponent implements OnInit, OnDestroy {
         this.activeTab.set('library');
         if (this.libraryModels().length === 0) {
             this.loadLibrary();
+        }
+    }
+
+    switchToOpenRouter(): void {
+        this.activeTab.set('openrouter');
+        if (this.openrouterModels().length === 0) {
+            this.loadOpenRouterModels();
+        }
+    }
+
+    async loadOpenRouterModels(): Promise<void> {
+        this.loadingOpenRouter.set(true);
+        try {
+            const resp = await firstValueFrom(this.api.get<{ models: Array<{ id: string; name: string; contextLength: number; pricing: { promptPerMillion: number; completionPerMillion: number } }>; total: number }>('/openrouter/models'));
+            this.openrouterModels.set(resp.models ?? []);
+        } catch {
+            // OpenRouter not available — not an error
+        } finally {
+            this.loadingOpenRouter.set(false);
         }
     }
 
