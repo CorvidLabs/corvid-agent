@@ -40,7 +40,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                 </div>
             }
 
-            <div class="tasks__filter-row">
+            <div class="tasks__filter-row sticky-toolbar">
                 <div class="tasks__filters">
                     <button
                         class="filter-btn"
@@ -80,7 +80,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
                 </div>
             } @else {
-                <div class="task-list">
+                <div class="task-list stagger-rows">
                     @for (task of filteredTasks(); track task.id) {
                         <div class="task-card" [attr.data-status]="getDisplayStatus(task)">
                             <div class="task-card__header">
@@ -189,12 +189,13 @@ import { WorkTask } from '../../core/models/work-task.model';
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
+        .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; animation: expandReveal 0.25s ease-out; }
         .create-form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
         .form-select, .form-textarea { padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
         .form-select { min-width: 150px; }
         .form-textarea { flex: 1; resize: vertical; min-height: 2.5em; line-height: 1.5; }
-        .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); outline: none; }
+        .form-select, .form-textarea { transition: border-color var(--transition-fast), box-shadow var(--transition-base); }
+        .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .btn { padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -232,7 +233,7 @@ import { WorkTask } from '../../core/models/work-task.model';
             transition: border-color 0.15s, color 0.15s;
         }
         .filter-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+        .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px rgba(0, 229, 255, 0.12); }
 
         .empty {
             text-align: center;
@@ -251,9 +252,9 @@ import { WorkTask } from '../../core/models/work-task.model';
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             padding: 1rem;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, transform 0.2s ease, box-shadow 0.25s ease;
         }
-        .task-card:hover { border-color: var(--border-bright); }
+        .task-card:hover { border-color: var(--border-bright); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); }
         .task-card[data-status="running"],
         .task-card[data-status="branching"],
         .task-card[data-status="validating"] {

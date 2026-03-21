@@ -31,6 +31,12 @@ import type { NotificationType } from '../../core/models/notification.model';
                         type="button">
                         &times;
                     </button>
+                    @if (n.duration && n.duration > 0) {
+                        <div
+                            class="toast__progress"
+                            [style.animation-duration.ms]="n.duration">
+                        </div>
+                    }
                 </div>
             }
         </div>
@@ -58,9 +64,16 @@ import type { NotificationType } from '../../core/models/notification.model';
             border: 1px solid;
             font-size: 0.8rem;
             pointer-events: auto;
-            animation: toast-in 0.25s ease-out;
+            animation: toast-in 0.3s ease-out;
             backdrop-filter: blur(8px);
+            position: relative;
+            overflow: hidden;
         }
+
+        /* Stagger toasts */
+        .toast:nth-child(1) { animation-delay: 0ms; }
+        .toast:nth-child(2) { animation-delay: 60ms; }
+        .toast:nth-child(3) { animation-delay: 120ms; }
 
         @keyframes toast-in {
             from {
@@ -146,6 +159,24 @@ import type { NotificationType } from '../../core/models/notification.model';
             outline: 2px solid currentColor;
             outline-offset: 2px;
             border-radius: 2px;
+        }
+
+        /* Progress bar countdown */
+        .toast__progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: currentColor;
+            opacity: 0.4;
+            transform-origin: left;
+            animation: toastProgress linear forwards;
+        }
+
+        @keyframes toastProgress {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
         }
 
         /* Mobile: full-width bottom positioning */

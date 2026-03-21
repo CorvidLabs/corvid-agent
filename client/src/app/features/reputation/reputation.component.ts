@@ -39,10 +39,10 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     actionRoute="/agents"
                     actionAriaLabel="View agents to start building reputation" />
             } @else {
-                <div class="card-grid">
+                <div class="card-grid stagger-children">
                     @for (score of reputationService.scores(); track score.agentId) {
                         <div
-                            class="agent-card"
+                            class="agent-card card-lift"
                             [class.agent-card--selected]="selectedAgentId() === score.agentId"
                             (click)="selectAgent(score.agentId)">
                             <div class="agent-card__header">
@@ -172,7 +172,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
 
                             @if (stats()) {
                                 <h4>Activity Breakdown</h4>
-                                <div class="stats-grid">
+                                <div class="stats-grid stagger-scale">
                                     @if (stats()!.feedbackTotal.total > 0) {
                                         <div class="stat-card">
                                             <div class="stat-card__icon" data-type="positive">&#128077;</div>
@@ -313,6 +313,10 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .score-ring__fill {
             fill: none; stroke-width: 8; stroke-linecap: round;
             transition: stroke-dashoffset 0.5s ease;
+            animation: ringDraw 0.8s ease-out;
+        }
+        @keyframes ringDraw {
+            from { stroke-dashoffset: 326.73; }
         }
         .score-ring__fill[data-level="verified"], .score-ring__fill[data-level="high"] { stroke: var(--accent-green); }
         .score-ring__fill[data-level="medium"] { stroke: var(--accent-cyan); }

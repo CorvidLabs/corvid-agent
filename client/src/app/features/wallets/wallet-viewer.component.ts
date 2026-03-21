@@ -120,7 +120,7 @@ interface WalletMessage {
                                         (click)="openGrant($event, wallet.address)">
                                         Grant
                                     </button>
-                                    <span class="expand-icon">{{ expandedWallet() === wallet.address ? '&#x25B2;' : '&#x25BC;' }}</span>
+                                    <span class="expand-icon section-chevron" [class.section-chevron--open]="expandedWallet() === wallet.address">&#9654;</span>
                                 </div>
                             </div>
 
@@ -209,7 +209,9 @@ interface WalletMessage {
         .input {
             width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-base);
         }
+        .input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .input::placeholder { color: var(--text-tertiary); }
 
         .loading { color: var(--text-secondary); }
@@ -220,10 +222,10 @@ interface WalletMessage {
         .wallet-card {
             background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg); overflow: hidden;
-            transition: border-color 0.15s;
+            transition: border-color var(--transition-fast), transform var(--transition-base), box-shadow var(--transition-base);
         }
-        .wallet-card:hover { border-color: var(--border-bright); }
-        .wallet-card--expanded { border-color: var(--accent-cyan); }
+        .wallet-card:hover { border-color: var(--border-bright); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+        .wallet-card--expanded { border-color: var(--accent-cyan); transform: none; box-shadow: 0 0 0 1px var(--accent-cyan), 0 4px 20px rgba(0, 229, 255, 0.08); }
 
         .wallet-card__header {
             display: flex; align-items: center; justify-content: space-between;
@@ -284,6 +286,7 @@ interface WalletMessage {
         .wallet-card__messages {
             border-top: 1px solid var(--border); padding: 1rem;
             background: var(--bg-deep);
+            animation: expandReveal 0.3s ease-out;
         }
 
         .full-address {
@@ -297,7 +300,9 @@ interface WalletMessage {
         .message {
             padding: 0.6rem 0.75rem; border-radius: var(--radius);
             border: 1px solid var(--border);
+            transition: background var(--transition-fast), transform var(--transition-fast);
         }
+        .message:hover { transform: translateX(2px); }
         .message--in { border-left: 3px solid var(--accent-cyan); background: rgba(0, 229, 255, 0.03); }
         .message--out { border-left: 3px solid var(--accent-magenta); background: rgba(255, 0, 170, 0.03); }
         .message--status { border-left: 3px solid var(--accent-amber, #ffaa00); background: rgba(255, 170, 0, 0.03); }
@@ -323,14 +328,17 @@ interface WalletMessage {
 
         .modal-overlay {
             position: fixed; inset: 0; z-index: 1000;
-            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
+            animation: fadeIn var(--transition-base) ease-out;
         }
         .modal {
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
             border-radius: var(--radius-lg); padding: 1.5rem; width: 360px; max-width: 90vw;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.1);
+            animation: modalSlideIn 0.2s ease-out;
         }
+        @keyframes modalSlideIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .modal__title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; }
         .modal__address {
             font-family: monospace; font-size: 0.75rem; color: var(--accent-cyan);

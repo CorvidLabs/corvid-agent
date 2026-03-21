@@ -42,7 +42,8 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                 <a class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
             </div>
 
-            <!-- Search Bar -->
+            <!-- Search + Filters (sticky) -->
+            <div class="sticky-toolbar">
             <div class="search-bar">
                 <input
                     class="search-input"
@@ -94,6 +95,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                     </select>
                 </div>
             </div>
+            </div><!-- /sticky-toolbar -->
 
             @if (agentService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -109,7 +111,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             } @else if (filteredAgents().length === 0) {
                 <p class="empty">No agents match your filters.</p>
             } @else {
-                <div class="agent-grid">
+                <div class="agent-grid stagger-children">
                     @for (card of filteredAgents(); track card.agent.id) {
                         <a class="agent-card" [routerLink]="['/agents', card.agent.id]"
                            [style.--agent-accent]="card.agent.displayColor || ''">
@@ -218,11 +220,21 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .toggle-input { accent-color: var(--accent-cyan); cursor: pointer; }
         .toggle-text { font-size: 0.7rem; color: var(--text-secondary); }
 
-        /* Agent Grid */
+        /* Agent Grid — fluid + container-query aware */
+        :host { container-type: inline-size; }
         .agent-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
             gap: 0.85rem;
+        }
+        @container (max-width: 640px) {
+            .agent-grid { grid-template-columns: 1fr; }
+        }
+        @container (min-width: 641px) and (max-width: 960px) {
+            .agent-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @container (min-width: 1400px) {
+            .agent-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
         }
         .agent-card {
             display: block;

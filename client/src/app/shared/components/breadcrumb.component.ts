@@ -85,11 +85,26 @@ const ROUTE_LABELS: Record<string, string> = {
             text-decoration: none;
             font-size: 0.7rem;
             letter-spacing: 0.03em;
-            transition: color 0.1s ease;
+            transition: color 0.15s ease;
+            position: relative;
+        }
+        .breadcrumb__link::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--text-primary);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.2s ease;
         }
         .breadcrumb__link:hover {
             color: var(--text-primary);
-            text-decoration: underline;
+        }
+        .breadcrumb__link:hover::after {
+            transform: scaleX(1);
         }
         .breadcrumb__sep {
             color: var(--text-tertiary);

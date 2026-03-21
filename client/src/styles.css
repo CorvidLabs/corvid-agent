@@ -236,13 +236,23 @@ select:focus-visible {
     transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 .card-hover:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-bright);
     border-color: var(--border-bright);
 }
 
 button:active:not(:disabled) {
     transform: scale(0.97);
+}
+
+/* Interactive card with glow on hover */
+.card-glow {
+    transition: transform var(--transition-base), box-shadow var(--transition-slow), border-color var(--transition-base);
+}
+.card-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 229, 255, 0.06);
+    border-color: rgba(0, 229, 255, 0.15);
 }
 
 @keyframes fadeIn {
@@ -251,6 +261,11 @@ button:active:not(:disabled) {
 }
 .page-enter {
     animation: fadeIn var(--transition-slow) ease-out;
+}
+
+/* Auto-apply entrance animation to .page containers */
+.page {
+    animation: slideUp 0.3s ease-out;
 }
 
 @keyframes shimmer {
@@ -272,6 +287,110 @@ button:active:not(:disabled) {
 @keyframes subtlePulse {
     0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
     50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+}
+
+/* ── Staggered entrance animation ── */
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes rowReveal {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stagger utility: apply to grid/list children via --stagger-index */
+.stagger-children > * {
+    opacity: 0;
+    animation: slideUp 0.35s ease-out forwards;
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(11) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(12) { animation-delay: 440ms; }
+.stagger-children > *:nth-child(n+13) { animation-delay: 480ms; }
+
+/* Row stagger: for table-like lists */
+.stagger-rows > * {
+    opacity: 0;
+    animation: rowReveal 0.25s ease-out forwards;
+}
+.stagger-rows > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-rows > *:nth-child(2)  { animation-delay: 30ms; }
+.stagger-rows > *:nth-child(3)  { animation-delay: 60ms; }
+.stagger-rows > *:nth-child(4)  { animation-delay: 90ms; }
+.stagger-rows > *:nth-child(5)  { animation-delay: 120ms; }
+.stagger-rows > *:nth-child(6)  { animation-delay: 150ms; }
+.stagger-rows > *:nth-child(7)  { animation-delay: 180ms; }
+.stagger-rows > *:nth-child(8)  { animation-delay: 210ms; }
+.stagger-rows > *:nth-child(9)  { animation-delay: 240ms; }
+.stagger-rows > *:nth-child(10) { animation-delay: 270ms; }
+.stagger-rows > *:nth-child(n+11) { animation-delay: 300ms; }
+
+/* Scale-in stagger: for metric cards */
+.stagger-scale > * {
+    opacity: 0;
+    animation: scaleIn 0.3s ease-out forwards;
+}
+.stagger-scale > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-scale > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-scale > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-scale > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-scale > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-scale > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-scale > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-scale > *:nth-child(8) { animation-delay: 420ms; }
+.stagger-scale > *:nth-child(n+9) { animation-delay: 480ms; }
+
+/* ── Container query support ── */
+.cq-container {
+    container-type: inline-size;
+}
+
+/* ── Fluid grid utility ── */
+.fluid-grid {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(auto-fill, minmax(var(--fluid-min, 280px), 1fr));
+}
+
+@container (max-width: 600px) {
+    .fluid-grid { grid-template-columns: 1fr; }
+}
+@container (min-width: 601px) and (max-width: 900px) {
+    .fluid-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Interactive card with lift + glow ── */
+.card-interactive {
+    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+.card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 24px rgba(0, 229, 255, 0.08);
+}
+.card-interactive:active {
+    transform: translateY(-1px);
+    transition-duration: 0.1s;
 }
 
 /* ── Glassmorphism utility ── */
@@ -325,6 +444,32 @@ button:active:not(:disabled) {
 @media (max-width: 480px) {
     .page-title { font-size: var(--text-xl); }
     .section-header { font-size: var(--text-lg); }
+}
+
+/* ── Modern panel transitions ── */
+.panel-resize {
+    transition: width var(--transition-slow), min-width var(--transition-slow);
+}
+
+/* ── Subtle surface shimmer on focus-within ── */
+.surface-focus:focus-within {
+    box-shadow: inset 0 0 0 1px rgba(0, 229, 255, 0.1);
+}
+
+/* ── Smooth scrollbar fade ── */
+.scroll-fade {
+    position: relative;
+}
+.scroll-fade::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: linear-gradient(to bottom, transparent, var(--bg-deep));
+    pointer-events: none;
+    display: block;
 }
 
 /* ── WCAG AAA: Reduced motion ── */
@@ -383,4 +528,658 @@ button:active:not(:disabled) {
 }
 .table-scroll:not(:has(:last-child:is(:last-child))) .table-scroll::after {
     opacity: 1;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Phase 3 — Micro-interactions, form polish, enhanced UX
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Enhanced form inputs ── */
+.form__input,
+.form__textarea,
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
+textarea,
+select {
+    transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
+}
+
+.form__input:focus,
+.form__textarea:focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):focus,
+textarea:focus,
+select:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan), inset 0 0 0 1px rgba(0, 229, 255, 0.05);
+    background: rgba(0, 229, 255, 0.02);
+}
+
+/* Label transition when sibling input is focused */
+.form__field:focus-within .form__label {
+    color: var(--accent-cyan);
+    transition: color 0.2s ease;
+}
+
+/* ── Button micro-interactions ── */
+.btn,
+button[type="submit"],
+.empty-state__action {
+    position: relative;
+    overflow: hidden;
+    transition: background 0.15s ease, box-shadow 0.2s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Press feedback */
+.btn:active:not(:disabled),
+button[type="submit"]:active:not(:disabled) {
+    transform: scale(0.96);
+    transition-duration: 0.05s;
+}
+
+/* Ripple effect on click */
+@keyframes btnRipple {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0.4; }
+    100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+
+.btn::after,
+button[type="submit"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(0, 229, 255, 0.2) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.btn:hover::after,
+button[type="submit"]:hover::after {
+    opacity: 1;
+}
+
+/* ── Enhanced skeleton wave ── */
+@keyframes skeletonWave {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton__item {
+    background: linear-gradient(
+        90deg,
+        var(--bg-raised) 0%,
+        var(--bg-raised) 25%,
+        rgba(0, 229, 255, 0.04) 50%,
+        var(--bg-raised) 75%,
+        var(--bg-raised) 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: skeletonWave 2s ease-in-out infinite !important;
+}
+
+/* ── Toast progress bar ── */
+@keyframes toastProgress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+
+/* ── Status badge transitions ── */
+.status-badge {
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Enhanced pulse for active states */
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+    50% { opacity: 0.7; box-shadow: 0 0 8px 2px currentColor; }
+}
+
+/* ── Empty state floating icon ── */
+@keyframes gentleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+/* ── Link underline animation ── */
+@keyframes underlineGrow {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Phase 4 — Custom selects, sticky toolbars, scroll polish
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Custom select styling ── */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7d98'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 6px;
+    padding-right: 24px !important;
+    cursor: pointer;
+}
+select:hover {
+    border-color: var(--border-bright);
+    color: var(--text-primary);
+}
+select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300e5ff'/%3E%3C/svg%3E");
+}
+
+/* ── Sticky toolbar utility ── */
+.sticky-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-deep);
+    padding-bottom: 0.75rem;
+}
+.sticky-toolbar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+/* ── Enhanced row hover with highlight line ── */
+.row-highlight {
+    position: relative;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.row-highlight::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 2px;
+    background: var(--accent-cyan);
+    border-radius: 1px;
+    transform: scaleY(0);
+    transition: transform 0.15s ease;
+}
+.row-highlight:hover::before {
+    transform: scaleY(1);
+}
+
+/* ── Card unified hover ── */
+.card-lift {
+    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(0, 229, 255, 0.06);
+    border-color: rgba(0, 229, 255, 0.12);
+}
+.card-lift:active {
+    transform: translateY(-1px);
+    transition-duration: 0.08s;
+}
+
+/* ── Scroll-to-top button ── */
+.scroll-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-bright);
+    color: var(--accent-cyan);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    pointer-events: none;
+    z-index: 50;
+}
+.scroll-to-top--visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.scroll-to-top:hover {
+    box-shadow: var(--glow-cyan);
+    border-color: var(--accent-cyan);
+}
+
+/* ── Page skeleton loading ── */
+@keyframes skeletonFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.skeleton-page {
+    padding: 1.5rem;
+    animation: skeletonFadeIn 0.2s ease-out;
+}
+.skeleton-page__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+.skeleton-page__title {
+    width: 180px;
+    height: 1.8rem;
+}
+.skeleton-page__action {
+    width: 120px;
+    height: 2rem;
+    border-radius: var(--radius);
+}
+.skeleton-page__toolbar {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+.skeleton-page__chip {
+    width: 70px;
+    height: 1.5rem;
+    border-radius: var(--radius-sm);
+}
+
+/* ── Smooth content transitions ── */
+@keyframes viewEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.view-enter {
+    animation: viewEnter 0.25s ease-out;
+}
+
+/* ── Smooth scroll ── */
+.app-layout__content {
+    scroll-behavior: smooth;
+}
+
+/* ── Phase 4 reduced-motion overrides ── */
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top { transition: none; }
+    .row-highlight::before { transition: none; }
+    .card-lift:hover { transform: none; }
+    .app-layout__content { scroll-behavior: auto; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Phase 5 — Modals, progress animations, charts, tables
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Modal / dialog system ── */
+@keyframes modalBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-overlay {
+    animation: modalBackdropIn 0.2s ease-out;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.modal {
+    animation: modalSlideIn 0.25s ease-out;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 229, 255, 0.04);
+}
+
+/* ── Error banner utility ── */
+.error-banner {
+    background: var(--accent-red-dim);
+    border: 1px solid var(--accent-red);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+.error-banner::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent-red);
+}
+.error-banner p {
+    margin: 0;
+    color: var(--accent-red);
+    font-size: 0.85rem;
+}
+
+/* ── Warning banner ── */
+.warning-banner {
+    background: var(--accent-amber-dim);
+    border: 1px solid var(--accent-amber);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+.warning-banner::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent-amber);
+}
+
+/* ── Animated progress bar fill ── */
+@keyframes progressFill {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+.progress-bar__fill,
+.comp-bar__fill,
+.detail-bar__fill {
+    transform-origin: left;
+    animation: progressFill 0.6s ease-out;
+}
+
+/* ── Animated progress bar shimmer ── */
+@keyframes progressShimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+}
+
+.progress-bar__fill--active {
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.12) 50%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: progressShimmer 2s linear infinite;
+}
+
+/* ── Chart row hover ── */
+.chart-row {
+    transition: background var(--transition-fast);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+}
+.chart-row:hover {
+    background: var(--bg-hover);
+}
+.chart-row:hover .chart-row__bar {
+    filter: brightness(1.2);
+}
+.chart-row:hover .chart-row__value {
+    color: var(--text-primary);
+}
+
+/* ── Table striping utility ── */
+.table-striped tbody tr:nth-child(even) {
+    background: rgba(22, 24, 34, 0.5);
+}
+.table-striped tbody tr {
+    transition: background var(--transition-fast);
+}
+.table-striped tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Stat card hover ── */
+.stat-card {
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-bright);
+}
+
+/* ── CSS tooltip utility ── */
+[data-tooltip] {
+    position: relative;
+}
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 3px 8px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.65rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 100;
+}
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ── Score ring draw animation ── */
+@keyframes ringDraw {
+    from { stroke-dashoffset: 326.73; }
+}
+
+/* ── KV row hover ── */
+.kv-row {
+    transition: background var(--transition-fast);
+    padding-left: 4px;
+    padding-right: 4px;
+    border-radius: var(--radius-sm);
+}
+.kv-row:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Event / table row hover ── */
+.event-row {
+    transition: background var(--transition-fast);
+    border-radius: var(--radius-sm);
+    padding-left: 4px;
+    padding-right: 4px;
+}
+.event-row:hover {
+    background: var(--bg-hover);
+}
+
+.agent-table__row {
+    transition: background var(--transition-fast);
+    border-radius: var(--radius-sm);
+}
+.agent-table__row:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Phase 6: Form focus glow ── */
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan), inset 0 0 0 1px rgba(0, 229, 255, 0.08);
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-base);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    transition: border-color var(--transition-fast), box-shadow var(--transition-base);
+}
+
+/* ── Phase 6: Accordion / collapsible section ── */
+.section-collapse {
+    overflow: hidden;
+    animation: collapseReveal 0.25s ease-out;
+}
+
+@keyframes collapseReveal {
+    from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+    to { opacity: 1; max-height: 2000px; transform: translateY(0); }
+}
+
+/* Chevron rotation — use with .section-chevron on toggle headers */
+.section-chevron {
+    display: inline-block;
+    transition: transform var(--transition-base);
+}
+.section-chevron--open {
+    transform: rotate(90deg);
+}
+
+/* ── Phase 6: Filter bar polish ── */
+.filter-pill {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-family: inherit;
+    transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-base);
+}
+.filter-pill:hover {
+    border-color: var(--border-bright);
+    color: var(--text-primary);
+}
+.filter-pill--active {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.12);
+}
+
+/* ── Phase 6: Expand/collapse card sections ── */
+.expand-section {
+    animation: expandReveal 0.3s ease-out;
+    overflow: hidden;
+}
+
+@keyframes expandReveal {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Phase 6: Node chip polish ── */
+.node-chip-interactive {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    cursor: default;
+}
+.node-chip-interactive:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Phase 6: Flow arrow animation ── */
+@keyframes flowPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+.flow-arrow-animated {
+    animation: flowPulse 2s ease-in-out infinite;
+}
+
+/* ── Phase 6: Inline edit form entrance ── */
+.inline-form-enter {
+    animation: expandReveal 0.2s ease-out;
+}
+
+/* ── Phase 6: Save bar pulse ── */
+.save-bar-glow {
+    animation: saveBarPulse 2s ease-in-out infinite;
+}
+@keyframes saveBarPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(0, 229, 255, 0); }
+    50% { box-shadow: 0 0 12px rgba(0, 229, 255, 0.15); }
+}
+
+/* ── Phase 6: Run/exec row hover lift ── */
+.row-lift {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.row-lift:hover {
+    transform: translateX(2px);
+    box-shadow: -2px 0 0 var(--accent-cyan);
+    background: var(--bg-hover);
+}
+
+/* ── Phase 6: Card interactive border glow ── */
+.card-lift {
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.card-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-bright);
+}
+
+/* ── Phase 6: Health dot pulse for active status ── */
+@keyframes healthPulse {
+    0%, 100% { box-shadow: 0 0 6px currentColor; }
+    50% { box-shadow: 0 0 12px currentColor, 0 0 4px currentColor; }
+}
+.health-dot-pulse {
+    animation: healthPulse 2s ease-in-out infinite;
+}
+
+/* ── Phase 6: Contact card hover ── */
+.contact-interactive {
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.contact-interactive:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Phase 6: Dirty/unsaved badge pulse ── */
+@keyframes dirtyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+.dirty-badge-pulse {
+    animation: dirtyPulse 2s ease-in-out infinite;
+}
+
+/* ── Reduced-motion overrides (Phase 5 + 6) ── */
+@media (prefers-reduced-motion: reduce) {
+    .modal-overlay { animation: none; }
+    .modal { animation: none; }
+    .progress-bar__fill,
+    .comp-bar__fill,
+    .detail-bar__fill { animation: none; }
+    .progress-bar__fill--active { animation: none; }
+    .stat-card:hover { transform: none; }
+    [data-tooltip]::after { transition: none; }
+    .section-collapse { animation: none; }
+    .expand-section { animation: none; }
+    .inline-form-enter { animation: none; }
+    .save-bar-glow { animation: none; }
+    .health-dot-pulse { animation: none; }
+    .dirty-badge-pulse { animation: none; }
+    .flow-arrow-animated { animation: none; }
+    .card-lift:hover,
+    .row-lift:hover,
+    .node-chip-interactive:hover { transform: none; }
 }

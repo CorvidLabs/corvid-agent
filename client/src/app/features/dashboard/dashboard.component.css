@@ -1,4 +1,8 @@
-.dashboard { padding: 1.25rem; overflow-y: auto; height: 100%; }
+.dashboard { padding: 1.25rem; overflow-y: auto; height: 100%; animation: slideUp 0.3s ease-out; }
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 /* Toolbar */
 .dash-toolbar {
@@ -97,21 +101,33 @@
     background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-tertiary);
 }
 
-/* Widget grid */
+/* Widget grid — fluid with container queries */
 .widget-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; align-content: start; }
 .widget--full { grid-column: 1 / -1; }
-.widget { transition: outline .15s; border-radius: var(--radius-lg); }
+.widget { transition: outline .15s, transform 0.2s ease, box-shadow 0.25s ease; border-radius: var(--radius-lg); }
 .widget--drag-over { outline: 2px dashed var(--accent-cyan); outline-offset: 4px; }
 .widget[draggable="true"] { cursor: grab; }
 .widget[draggable="true"]:active { cursor: grabbing; }
+@container (max-width: 700px) {
+    .widget-grid { grid-template-columns: 1fr; }
+}
+@container (min-width: 1400px) {
+    .widget-grid { grid-template-columns: 1fr 1fr 1fr; }
+    .widget--full { grid-column: 1 / -1; }
+}
 
 /* Metrics */
 .metrics-row { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: .75rem; }
 .metric-card {
-    padding: .75rem 1rem; display: flex; flex-direction: column; gap: .2rem; transition: border-color .15s;
+    padding: .75rem 1rem; display: flex; flex-direction: column; gap: .2rem;
+    transition: border-color .2s, box-shadow .25s, transform .2s;
     background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
 }
-.metric-card:hover { border-color: var(--border-bright); }
+.metric-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 12px rgba(0, 229, 255, 0.04);
+}
 .metric-card--highlight { border-color: var(--accent-amber,#ffc107); border-style: dashed; }
 .metric-card__label { font-size: .6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
 .metric-card__value { font-size: 1.5rem; font-weight: 700; color: var(--accent-cyan); }

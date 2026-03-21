@@ -8,11 +8,13 @@ import {
     AfterViewInit,
     OnDestroy,
     signal,
+    computed,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
 import { WidgetLayoutService } from '../../core/services/widget-layout.service';
+import { ResizeHandleComponent } from './resize-handle.component';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -36,7 +38,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
 @Component({
     selector: 'app-sidebar',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RouterLinkActive],
+    imports: [RouterLink, RouterLinkActive, ResizeHandleComponent],
     template: `
         @if (sidebarOpen()) {
             <div
@@ -49,6 +51,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             class="sidebar"
             [class.sidebar--open]="sidebarOpen()"
             [class.sidebar--collapsed]="collapsed()"
+            [style.width.px]="effectiveWidth()"
             role="navigation"
             aria-label="Main navigation"
             #sidebarEl>
@@ -136,21 +139,28 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 {{ collapsed() ? '\u00BB' : '\u00AB' }}
             </button>
         </nav>
+        @if (!collapsed()) {
+            <app-resize-handle position="right" (resized)="onResize($event)" (resizeEnd)="onResizeEnd()" />
+        }
     `,
     styles: `
+        :host {
+            display: flex;
+            flex-shrink: 0;
+        }
+
         /* Desktop (default) */
         .sidebar-backdrop {
             display: none;
         }
         .sidebar {
-            width: 200px;
+            width: 100%;
             background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
             min-height: 100%;
             padding: 1rem 0;
             border-right: 1px solid rgba(255, 255, 255, 0.04);
             display: flex;
             flex-direction: column;
-            transition: width 0.2s ease;
             overflow-y: auto;
         }
         .sidebar__list {
@@ -165,13 +175,30 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             text-decoration: none;
             font-size: 0.85rem;
             letter-spacing: 0.03em;
-            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
             border-left: 3px solid transparent;
+            position: relative;
+        }
+        /* Hover glow line indicator */
+        .sidebar__link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 25%;
+            bottom: 25%;
+            width: 3px;
+            background: var(--accent-cyan);
+            transform: scaleY(0);
+            transition: transform 0.2s ease;
+            border-radius: 0 2px 2px 0;
         }
         @media (hover: hover) {
             .sidebar__link:hover {
                 background: var(--bg-hover);
                 color: var(--accent-cyan);
+            }
+            .sidebar__link:hover::before {
+                transform: scaleY(1);
             }
         }
         .sidebar__link--active {
@@ -179,6 +206,13 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+            animation: sidebarActiveGlow 0.3s ease-out;
+        }
+        @keyframes sidebarActiveGlow {
+            from { background: transparent; border-left-color: transparent; }
+        }
+        .sidebar__link--active::before {
+            display: none;
         }
         .sidebar__divider {
             height: 1px;
@@ -312,7 +346,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
 
         /* Collapsed state (desktop) */
         .sidebar--collapsed {
-            width: 48px;
+            width: 48px !important;
         }
         .sidebar--collapsed .sidebar__label {
             display: none;
@@ -414,6 +448,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Collapsed state — persisted in localStorage; auto-collapse for normal audience */
     readonly collapsed = signal(this.loadCollapsed());
 
+    /** Custom width — persisted in localStorage */
+    readonly customWidth = signal(this.loadWidth());
+
+    /** Effective width considering collapsed state */
+    readonly effectiveWidth = computed(() => this.collapsed() ? 48 : this.customWidth());
+
     /** Section collapsed states — persisted in localStorage */
     readonly sectionStates = signal<Record<string, boolean>>(this.loadSectionStates());
 
@@ -486,6 +526,18 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         return this.widgetLayout.viewMode() === 'developer';
     }
 
+    onResize(delta: number): void {
+        const current = this.customWidth();
+        const next = Math.max(140, Math.min(400, current + delta));
+        this.customWidth.set(next);
+    }
+
+    onResizeEnd(): void {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('sidebar_width', String(this.customWidth()));
+        }
+    }
+
     openHelp(): void {
         this.closeSidebar();
         this.shortcutsService.overlayOpen.set(true);
@@ -520,6 +572,17 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
             event.preventDefault();
             first.focus();
         }
+    }
+
+    private loadWidth(): number {
+        if (typeof localStorage !== 'undefined') {
+            const stored = localStorage.getItem('sidebar_width');
+            if (stored) {
+                const val = parseInt(stored, 10);
+                if (!isNaN(val) && val >= 140 && val <= 400) return val;
+            }
+        }
+        return 200;
     }
 
     private loadCollapsed(): boolean {

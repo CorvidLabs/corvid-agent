@@ -4,6 +4,10 @@ import {
     inject,
     OnInit,
     OnDestroy,
+    signal,
+    viewChild,
+    ElementRef,
+    AfterViewInit,
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TopNavComponent } from './shared/components/top-nav.component';
@@ -33,12 +37,18 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 </div>
             }
             <div class="app-layout__body">
-                <main class="app-layout__content" role="main">
+                <main class="app-layout__content" role="main" #mainContent (scroll)="onScroll($event)">
                     <router-outlet />
                 </main>
                 <app-activity-rail />
             </div>
         </div>
+        <button
+            class="scroll-to-top"
+            [class.scroll-to-top--visible]="showScrollTop()"
+            (click)="scrollToTop()"
+            aria-label="Scroll to top"
+            title="Scroll to top">&#x25B2;</button>
         <app-command-palette />
         <app-keyboard-shortcuts-overlay />
         <app-guided-tour />
@@ -64,6 +74,8 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             position: relative;
             background: var(--bg-deep);
             overflow-y: auto;
+            scroll-behavior: smooth;
+            container-type: inline-size;
         }
         .app-layout__banner {
             padding: 0.375rem 1rem;
@@ -87,6 +99,9 @@ export class App implements OnInit, OnDestroy {
     private readonly sessionService = inject(SessionService);
     private readonly _shortcuts = inject(KeyboardShortcutsService);
 
+    protected readonly showScrollTop = signal(false);
+    private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
+
     ngOnInit(): void {
         this.wsService.connect();
         this.sessionService.init();
@@ -95,5 +110,14 @@ export class App implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.sessionService.destroy();
         this.wsService.disconnect();
+    }
+
+    protected onScroll(event: Event): void {
+        const el = event.target as HTMLElement;
+        this.showScrollTop.set(el.scrollTop > 300);
+    }
+
+    protected scrollToTop(): void {
+        this.mainContent()?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
