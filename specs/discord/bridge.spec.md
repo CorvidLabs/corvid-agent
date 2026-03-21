@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 18
+version: 19
 status: active
 files:
   - server/discord/bridge.ts
@@ -15,6 +15,7 @@ files:
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
   - server/discord/permissions.ts
+  - server/discord/thread-helpers.ts
   - server/discord/thread-manager.ts
   - server/discord/types.ts
   - server/discord/message-formatter.ts
@@ -285,9 +286,9 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `FooterStats` | `embeds.ts` | Optional run statistics for embed footers (filesChanged?, turns?, tools?, commits?) |
 | `DiscordFileAttachment` | `embeds.ts` | File attachment for Discord uploads (name, data, contentType?) |
 | `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
-| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?) |
+| `ThreadSessionInfo` | `thread-helpers.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?) |
 | `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?) |
-| `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
+| `ThreadCallbackInfo` | `thread-helpers.ts` | Active subscription info per thread (sessionId, callback) |
 | `ReactionHandlerContext` | `reaction-handler.ts` | Context object for reaction handler (db, botUserId, scorer, mentionSessions, threadSessions) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
 
