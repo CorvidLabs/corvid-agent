@@ -50,7 +50,7 @@
     "localnet:fund": "bun scripts/localnet-fund.ts"
   },
   "optionalDependencies": {
-    "@corvidlabs/ts-algochat": "^0.3.0"
+    "@corvidlabs/ts-algochat": "^0.4.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",
@@ -79,9 +79,7 @@
     "web-tree-sitter": "0.25.10",
     "zod": "^4.3.6"
   },
-  "patchedDependencies": {
-    "@corvidlabs/ts-algochat@0.3.0": "patches/@corvidlabs%2Fts-algochat@0.3.0.patch"
-  },
+  "patchedDependencies": {},
   "overrides": {
     "minimatch": ">=9.0.7",
     "ajv": ">=8.18.0",

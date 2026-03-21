@@ -60,8 +60,8 @@ function recordToAgent(row: FlockAgentRecord): FlockAgent {
 
 // ─── Service ────────────────────────────────────────────────────────────────
 
-/** Stale threshold: agents without heartbeat for 30 minutes are marked inactive. */
-const HEARTBEAT_STALE_MINUTES = 30;
+/** Stale threshold: agents without heartbeat for 24 hours are marked inactive. */
+const HEARTBEAT_STALE_MINUTES = 24 * 60; // 1440 minutes = 24 hours
 
 /** Map sort field names to SQL columns. */
 const SORT_COLUMN_MAP: Record<FlockSortField, string> = {
@@ -117,11 +117,27 @@ export class FlockDirectoryService {
         return this.onChainClient;
     }
 
-    /** Register a new agent in the directory. Returns the created agent.
-     *  If the address is already registered, updates the existing record and
-     *  sends a heartbeat instead of failing with a UNIQUE constraint error.
+    /**
+     * Register a new agent in the directory. Returns the created agent.
+     *
+     * **Blockchain-first**: If on-chain client is available, the on-chain
+     * registration must succeed before the off-chain record is created.
+     * This ensures 1:1 parity between chain and SQLite.
+     *
+     * If the address is already registered, updates the existing record and
+     * sends a heartbeat instead of creating a duplicate.
      */
-    register(input: RegisterFlockAgentInput): FlockAgent {
+    async register(input: RegisterFlockAgentInput): Promise<FlockAgent> {
+        // ── On-chain first ──────────────────────────────────────────────
+        if (this.onChainClient && this.signerConfig) {
+            await this.registerOnChain(input);
+        } else {
+            log.warn('No on-chain client — registering off-chain only (dev mode)', {
+                address: input.address,
+            });
+        }
+
+        // ── Then persist to SQLite ──────────────────────────────────────
         // Check for existing registration by address (idempotent)
         const existing = this.getByAddress(input.address);
         if (existing) {
@@ -153,17 +169,6 @@ export class FlockDirectoryService {
         `).run(id, input.address, input.name, input.description ?? '', input.instanceUrl ?? null, capabilities, now, now, now);
 
         log.info('Agent registered', { id, address: input.address, name: input.name });
-
-        // Fire-and-forget on-chain registration
-        if (this.onChainClient && this.signerConfig) {
-            this.registerOnChain(input).catch(err => {
-                log.warn('On-chain registration failed (off-chain record is intact)', {
-                    address: input.address,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            });
-        }
-
         return this.getById(id)!;
     }
 
@@ -188,41 +193,63 @@ export class FlockDirectoryService {
         log.info('Agent registered on-chain', { address: input.address, name: input.name });
     }
 
-    /** Deregister an agent (soft delete — sets status to 'deregistered'). */
-    deregister(id: string): boolean {
+    /**
+     * Deregister an agent (soft delete — sets status to 'deregistered').
+     *
+     * **Blockchain-first**: On-chain deregistration must succeed before
+     * the off-chain record is updated. This ensures 1:1 parity.
+     */
+    async deregister(id: string): Promise<boolean> {
+        const agent = this.getById(id);
+        if (!agent || agent.status === 'deregistered') return false;
+
+        // ── On-chain first ──────────────────────────────────────────────
+        if (this.onChainClient && this.signerConfig) {
+            await this.onChainClient.deregister(
+                this.signerConfig.senderAddress,
+                this.signerConfig.sk,
+            );
+        } else {
+            log.warn('No on-chain client — deregistering off-chain only (dev mode)', { id });
+        }
+
+        // ── Then update SQLite ──────────────────────────────────────────
         const result = this.db.query(`
             UPDATE flock_agents SET status = 'deregistered', updated_at = datetime('now')
             WHERE id = ? AND status != 'deregistered'
         `).run(id);
+
         if (result.changes > 0) {
             log.info('Agent deregistered', { id });
-
-            // Fire-and-forget on-chain deregistration
-            if (this.onChainClient && this.signerConfig) {
-                this.onChainClient.deregister(this.signerConfig.senderAddress, this.signerConfig.sk).catch(err => {
-                    log.warn('On-chain deregistration failed', { error: err instanceof Error ? err.message : String(err) });
-                });
-            }
-
             return true;
         }
         return false;
     }
 
-    /** Record a heartbeat for the given agent, marking it active. */
-    heartbeat(id: string): boolean {
+    /**
+     * Record a heartbeat for the given agent, marking it active.
+     *
+     * **Blockchain-first**: On-chain heartbeat must succeed before
+     * the off-chain record is updated. This ensures 1:1 parity.
+     */
+    async heartbeat(id: string): Promise<boolean> {
+        const agent = this.getById(id);
+        if (!agent || agent.status === 'deregistered') return false;
+
+        // ── On-chain first ──────────────────────────────────────────────
+        if (this.onChainClient && this.signerConfig) {
+            await this.onChainClient.heartbeat(
+                this.signerConfig.senderAddress,
+                this.signerConfig.sk,
+            );
+        }
+
+        // ── Then update SQLite ──────────────────────────────────────────
         const now = new Date().toISOString();
         const result = this.db.query(`
             UPDATE flock_agents SET last_heartbeat = ?, status = 'active', updated_at = ?
             WHERE id = ? AND status != 'deregistered'
         `).run(now, now, id);
-
-        if (result.changes > 0 && this.onChainClient && this.signerConfig) {
-            // Fire-and-forget on-chain heartbeat
-            this.onChainClient.heartbeat(this.signerConfig.senderAddress, this.signerConfig.sk).catch(err => {
-                log.debug('On-chain heartbeat failed', { error: err instanceof Error ? err.message : String(err) });
-            });
-        }
 
         return result.changes > 0;
     }
@@ -410,7 +437,7 @@ export class FlockDirectoryService {
 
     /**
      * Self-register this corvid-agent instance in the Flock Directory.
-     * Ensures both off-chain and on-chain records exist.
+     * Blockchain-first: on-chain registration must succeed before SQLite.
      * Idempotent — skips if already registered at the given address.
      */
     async selfRegister(opts: {
@@ -425,12 +452,12 @@ export class FlockDirectoryService {
         if (existing && existing.status !== 'deregistered') {
             log.info('Self-registration: already registered', { id: existing.id, address: opts.address });
             // Send heartbeat to keep it active
-            this.heartbeat(existing.id);
+            await this.heartbeat(existing.id);
             return existing;
         }
 
-        // Register off-chain (this also fires on-chain registration)
-        const agent = this.register({
+        // Register (blockchain-first, then SQLite)
+        const agent = await this.register({
             address: opts.address,
             name: opts.name,
             description: opts.description,

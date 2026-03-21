@@ -85,6 +85,7 @@ function freshRegistry(): LlmProviderRegistry {
 describe('ProviderRegistry', () => {
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const savedOpenaiKey = process.env.OPENAI_API_KEY;
+    const savedOpenrouterKey = process.env.OPENROUTER_API_KEY;
     const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
     const savedOllamaFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
     let registry: LlmProviderRegistry;
@@ -96,6 +97,7 @@ describe('ProviderRegistry', () => {
         // Enable Ollama for tests that explicitly register it
         process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
         delete process.env.ENABLED_PROVIDERS;
+        delete process.env.OPENROUTER_API_KEY;
         // Reset cached claude CLI detection so hasClaudeAccess() re-evaluates
         _resetClaudeCliCache(null);
         registry = freshRegistry();
@@ -108,6 +110,8 @@ describe('ProviderRegistry', () => {
         else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
         if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
         else process.env.OPENAI_API_KEY = savedOpenaiKey;
+        if (savedOpenrouterKey === undefined) delete process.env.OPENROUTER_API_KEY;
+        else process.env.OPENROUTER_API_KEY = savedOpenrouterKey;
         if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
         else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
         if (savedOllamaFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;

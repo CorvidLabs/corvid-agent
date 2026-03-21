@@ -9,7 +9,7 @@ const log = createLogger('repo-map');
 export const REPO_MAP_MAX_LINES = 200;
 
 /** Directories prioritized in repo map ordering (appear first). */
-export const PRIORITY_DIRS = ['src/', 'server/', 'lib/', 'packages/'];
+export const PRIORITY_DIRS = ['src/', 'server/', 'lib/'];
 
 /** Stop words excluded from keyword extraction for symbol search. */
 export const STOP_WORDS = new Set([

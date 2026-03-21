@@ -263,7 +263,6 @@ server/          Bun HTTP + WebSocket server (47 modules)
 client/          Angular 21 SPA (standalone components, signals)
 cli/             CLI entry point and commands
 shared/          TypeScript types shared between server and client
-packages/        Published packages (MCP server, env loader, result monad)
 skills/          Agent skill definitions
 deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm, K8s
 e2e/             Playwright end-to-end tests (31 spec files, 360 tests)

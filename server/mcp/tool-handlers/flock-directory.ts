@@ -39,7 +39,7 @@ export async function handleFlockDirectory(
                     return errorResult('register requires address and name');
                 }
                 const caps = args.capabilities ? args.capabilities.split(',').map(s => s.trim()).filter(Boolean) : [];
-                const agent = svc.register({
+                const agent = await svc.register({
                     address: args.address,
                     name: args.name,
                     description: args.description,
@@ -51,7 +51,7 @@ export async function handleFlockDirectory(
 
             case 'deregister': {
                 if (!args.agent_id) return errorResult('deregister requires agent_id');
-                const ok = svc.deregister(args.agent_id);
+                const ok = await svc.deregister(args.agent_id);
                 return ok
                     ? textResult(`Agent ${args.agent_id} deregistered.`)
                     : errorResult(`Agent ${args.agent_id} not found or already deregistered.`);
@@ -59,7 +59,7 @@ export async function handleFlockDirectory(
 
             case 'heartbeat': {
                 if (!args.agent_id) return errorResult('heartbeat requires agent_id');
-                const ok = svc.heartbeat(args.agent_id);
+                const ok = await svc.heartbeat(args.agent_id);
                 return ok
                     ? textResult(`Heartbeat recorded for agent ${args.agent_id}.`)
                     : errorResult(`Agent ${args.agent_id} not found.`);

@@ -126,7 +126,6 @@ client/           Angular 21 SPA (standalone components, signals)
 shared/           TypeScript types shared between server and client
 e2e/              Playwright end-to-end tests (31 spec files)
 deploy/           Docker, docker-compose, systemd, launchd, nginx, caddy
-packages/         Workspace packages (env, result utilities)
 scripts/          Developer tooling and automation scripts
 specs/            Module specification documents (38 specs)
 ```

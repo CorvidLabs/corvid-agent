@@ -45,7 +45,6 @@
       "server/**",
       "shared/**",
       "scripts/**",
-      "packages/**",
       "src/**"
     ]
   }
