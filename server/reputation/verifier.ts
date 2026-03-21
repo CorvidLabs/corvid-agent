@@ -7,6 +7,7 @@
 
 import type { TrustLevel } from './types';
 import { createLogger } from '../lib/logger';
+import { isAlgorandAddressFormat } from '../lib/validation';
 
 const log = createLogger('ReputationVerifier');
 
@@ -56,6 +57,10 @@ export class ReputationVerifier {
      * whose note prefix matches `corvid-reputation:`.
      */
     async scanAttestations(walletAddress: string): Promise<AttestationInfo[]> {
+        if (!isAlgorandAddressFormat(walletAddress)) {
+            throw new Error(`Invalid Algorand address format: ${walletAddress.slice(0, 10)}...`);
+        }
+
         const notePrefix = Buffer.from('corvid-reputation:').toString('base64');
         const url = `${this.indexerBaseUrl}/v2/accounts/${walletAddress}/transactions?note-prefix=${notePrefix}&limit=50`;
 
