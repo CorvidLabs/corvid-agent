@@ -411,6 +411,50 @@ interface PSKContact {
                     }
                 </div>
 
+                <!-- OpenRouter Provider -->
+                <div class="settings__section">
+                    <h3 class="section-toggle" (click)="toggleSection('openrouter')">
+                        <span class="section-chevron">{{ collapsedSections().has('openrouter') ? '\u25B6' : '\u25BC' }}</span>
+                        OpenRouter
+                        @if (openrouterStatus()?.status === 'available') {
+                            <span class="status-badge status-badge--ok">Connected</span>
+                        }
+                    </h3>
+                    @if (!collapsedSections().has('openrouter')) {
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Status</span>
+                                <span class="info-value">{{ openrouterStatus()?.status ?? 'Not configured' }}</span>
+                            </div>
+                            @if (openrouterStatus()?.configuredModels) {
+                                <div class="info-item">
+                                    <span class="info-label">Configured Models</span>
+                                    <span class="info-value">{{ openrouterStatus()?.configuredModels }}</span>
+                                </div>
+                            }
+                        </div>
+                        <p class="muted" style="margin-top: 0.5rem;">
+                            Set <code>OPENROUTER_API_KEY</code> in your environment to enable.
+                            Models are routed via <code>https://openrouter.ai</code>.
+                        </p>
+                        @if (openrouterModels().length > 0) {
+                            <div class="openrouter-models">
+                                <h4>Available Models</h4>
+                                <div class="model-list">
+                                    @for (model of openrouterModels(); track model.model) {
+                                        <div class="model-item">
+                                            <span class="model-name">{{ model.displayName }}</span>
+                                            <span class="model-price">
+                                                \${{ model.inputPricePerMillion }}/\${{ model.outputPricePerMillion }} per M tokens
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
                 <!-- Credit Configuration -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('credits')">
@@ -838,6 +882,10 @@ export class SettingsComponent implements OnInit {
     readonly editingContactId = signal<string | null>(null);
     readonly editingNickname = signal('');
 
+    // OpenRouter state
+    readonly openrouterStatus = signal<{ status: string; configuredModels?: number } | null>(null);
+    readonly openrouterModels = signal<Array<{ model: string; displayName: string; inputPricePerMillion: number; outputPricePerMillion: number }>>([]);
+
     // Collapsible sections
     readonly collapsedSections = signal<Set<string>>(new Set());
 
@@ -1144,15 +1192,30 @@ export class SettingsComponent implements OnInit {
             this.operationalMode.set(mode.mode);
             this.sessionService.loadAlgoChatStatus();
 
-            // Load PSK contacts and Discord config in parallel
+            // Load PSK contacts, Discord config, and OpenRouter status in parallel
             await Promise.all([
                 this.loadPSKContacts(),
                 this.loadDiscordConfig(),
+                this.loadOpenRouterStatus(),
             ]);
         } catch {
             // Non-critical
         } finally {
             this.loading.set(false);
+        }
+    }
+
+    private async loadOpenRouterStatus(): Promise<void> {
+        try {
+            const status = await firstValueFrom(this.api.get<{ status: string; configuredModels?: number }>('/openrouter/status'));
+            this.openrouterStatus.set(status);
+
+            if (status.status === 'available') {
+                const configured = await firstValueFrom(this.api.get<{ models: Array<{ model: string; displayName: string; inputPricePerMillion: number; outputPricePerMillion: number }> }>('/openrouter/models/configured'));
+                this.openrouterModels.set(configured.models ?? []);
+            }
+        } catch {
+            this.openrouterStatus.set({ status: 'unavailable' });
         }
     }
 }

@@ -47,6 +47,8 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
             { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'openai', model: 'o3' },
+            { provider: 'openrouter', model: 'google/gemini-2.5-pro' },
+            { provider: 'openrouter', model: 'openai/gpt-4.1' },
         ],
     },
     /** Balanced chain: work tasks, code generation, specialist agents. */
@@ -56,6 +58,8 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
             { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'openai', model: 'gpt-4.1-mini' },
+            { provider: 'openrouter', model: 'deepseek/deepseek-chat-v3' },
+            { provider: 'openrouter', model: 'mistralai/mistral-large' },
         ],
     },
     /** Cost-optimized chain: routing, triage, lightweight classification. */
@@ -64,6 +68,8 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
             { provider: 'openai', model: 'gpt-4.1-nano' },
             { provider: 'openai', model: 'gpt-4o-mini' },
+            { provider: 'openrouter', model: 'google/gemini-2.5-flash' },
+            { provider: 'openrouter', model: 'qwen/qwen-2.5-coder-32b-instruct' },
         ],
     },
     /**

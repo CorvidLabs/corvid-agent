@@ -1,4 +1,4 @@
-export type LlmProviderType = 'anthropic' | 'openai' | 'ollama';
+export type LlmProviderType = 'anthropic' | 'openai' | 'openrouter' | 'ollama';
 export type ExecutionMode = 'managed' | 'direct';
 
 /**
