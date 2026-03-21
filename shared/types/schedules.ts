@@ -43,6 +43,15 @@ export interface ScheduleAction {
     focusArea?: string;
 }
 
+export type ScheduleOutputDestinationType = 'discord_channel' | 'algochat_agent' | 'algochat_address';
+export type ScheduleOutputFormat = 'summary' | 'full' | 'on_error_only';
+
+export interface ScheduleOutputDestination {
+    type: ScheduleOutputDestinationType;
+    target: string;
+    format?: ScheduleOutputFormat;
+}
+
 export interface AgentSchedule {
     id: string;
     agentId: string;
@@ -58,6 +67,7 @@ export interface AgentSchedule {
     maxBudgetPerRun: number | null;
     notifyAddress: string | null;
     triggerEvents: ScheduleTriggerEvent[] | null;
+    outputDestinations: ScheduleOutputDestination[] | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
@@ -94,6 +104,7 @@ export interface CreateScheduleInput {
     maxBudgetPerRun?: number;
     notifyAddress?: string;
     triggerEvents?: ScheduleTriggerEvent[];
+    outputDestinations?: ScheduleOutputDestination[];
 }
 
 export interface UpdateScheduleInput {
@@ -108,4 +119,5 @@ export interface UpdateScheduleInput {
     maxBudgetPerRun?: number;
     notifyAddress?: string | null;
     triggerEvents?: ScheduleTriggerEvent[] | null;
+    outputDestinations?: ScheduleOutputDestination[] | null;
 }

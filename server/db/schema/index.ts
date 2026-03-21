@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 97;
+const SCHEMA_VERSION = 98;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -113,6 +113,10 @@ const MIGRATIONS: Record<number, string[]> = {
     97: [
         // Add conversation_only to mention sessions for /message command tracking
         `ALTER TABLE discord_mention_sessions ADD COLUMN conversation_only INTEGER DEFAULT 0`,
+    ],
+    98: [
+        // Add output_destinations to schedules for routing results to Discord/AlgoChat
+        `ALTER TABLE agent_schedules ADD COLUMN output_destinations TEXT DEFAULT NULL`,
     ],
 };
 

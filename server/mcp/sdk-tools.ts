@@ -248,6 +248,11 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
                 max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),
                 schedule_id: z.string().optional().describe('Schedule ID (for update/pause/resume/history)'),
+                output_destinations: z.array(z.object({
+                    type: z.string().describe('Destination type: discord_channel, algochat_agent, or algochat_address'),
+                    target: z.string().describe('Target: Discord channel ID, agent ID, or Algorand address'),
+                    format: z.string().optional().describe('Output format: summary (truncated), full (complete), or on_error_only (only on failure)'),
+                })).optional().describe('Where to deliver results after execution (for create/update)'),
             },
             async (args) => handleManageSchedule(ctx, args),
         ),

@@ -388,6 +388,19 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve (for create/update)' },
                 max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
                 schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
+                output_destinations: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            type: { type: 'string', description: 'discord_channel, algochat_agent, or algochat_address' },
+                            target: { type: 'string', description: 'Discord channel ID, agent ID, or Algorand address' },
+                            format: { type: 'string', description: 'summary, full, or on_error_only' },
+                        },
+                        required: ['type', 'target'],
+                    },
+                    description: 'Where to deliver results after execution (for create/update)',
+                },
             },
             required: ['action'],
         },
