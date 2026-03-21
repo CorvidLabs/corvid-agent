@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.43.0] - 2026-03-21
+
+### Added
+- **Schedule output destinations** — deliver schedule results to Discord channels, webhooks, or other agents (#1347)
+- **Simple mode default** — new users now start in simple mode for a cleaner first experience (#1349)
+- **Dashboard polish** — animations, theming improvements, and responsive layout refinements (#1348)
+
+### Fixed
+- **CSP for GitHub avatars** — allow GitHub avatar URLs in Content-Security-Policy and unblock score/cooldown endpoints (#1346)
+
 ## [0.42.1] - 2026-03-21
 
 ### Fixed
