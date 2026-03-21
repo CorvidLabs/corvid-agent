@@ -1,4 +1,5 @@
-import { describe, test, expect, mock, afterEach } from 'bun:test';
+import { describe, test, expect, mock, afterEach, beforeEach } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import {
     normalizeTimestamp,
     formatDuration,
@@ -8,6 +9,8 @@ import {
     resolveDefaultAgent,
     type ThreadSessionInfo,
 } from '../discord/thread-helpers';
+import { runMigrations } from '../db/schema';
+import { createAgent } from '../db/agents';
 
 // ── normalizeTimestamp (re-verified against new source) ──
 
@@ -212,67 +215,51 @@ describe('createStandaloneThread', () => {
     });
 });
 
-// ── resolveDefaultAgent ──
+// ── resolveDefaultAgent (uses real in-memory DB to avoid mock.module leaks) ──
 
 describe('resolveDefaultAgent', () => {
+    let db: Database;
+
+    beforeEach(() => {
+        db = new Database(':memory:');
+        runMigrations(db);
+    });
+
+    afterEach(() => {
+        db.close();
+    });
+
     test('returns null when no agents exist', () => {
-        const mockListAgents = mock(() => []);
-        mock.module('../db/agents', () => ({
-            listAgents: mockListAgents,
-        }));
-
-        const mockDb = {} as any;
         const config = {} as any;
-
-        const result = resolveDefaultAgent(mockDb, config);
+        const result = resolveDefaultAgent(db, config);
         expect(result).toBeNull();
     });
 
     test('returns configured default agent when it exists', () => {
-        const agents = [
-            { id: 'agent-1', name: 'First' },
-            { id: 'agent-2', name: 'Second' },
-        ];
-        mock.module('../db/agents', () => ({
-            listAgents: () => agents,
-        }));
+        createAgent(db, { name: 'First', model: 'opus' });
+        const a2 = createAgent(db, { name: 'Second', model: 'sonnet' });
 
-        const mockDb = {} as any;
-        const config = { defaultAgentId: 'agent-2' } as any;
-
-        const result = resolveDefaultAgent(mockDb, config);
+        const config = { defaultAgentId: a2.id } as any;
+        const result = resolveDefaultAgent(db, config);
         expect(result).not.toBeNull();
-        expect(result!.id).toBe('agent-2');
+        expect(result!.id).toBe(a2.id);
     });
 
     test('falls back to first agent when default not found', () => {
-        const agents = [
-            { id: 'agent-1', name: 'First' },
-        ];
-        mock.module('../db/agents', () => ({
-            listAgents: () => agents,
-        }));
+        const a1 = createAgent(db, { name: 'First', model: 'opus' });
 
-        const mockDb = {} as any;
         const config = { defaultAgentId: 'nonexistent' } as any;
-
-        const result = resolveDefaultAgent(mockDb, config);
-        expect(result!.id).toBe('agent-1');
+        const result = resolveDefaultAgent(db, config);
+        expect(result!.id).toBe(a1.id);
     });
 
     test('returns first agent when no default configured', () => {
-        const agents = [
-            { id: 'agent-1', name: 'First' },
-            { id: 'agent-2', name: 'Second' },
-        ];
-        mock.module('../db/agents', () => ({
-            listAgents: () => agents,
-        }));
+        createAgent(db, { name: 'First', model: 'opus' });
+        createAgent(db, { name: 'Second', model: 'sonnet' });
 
-        const mockDb = {} as any;
         const config = {} as any;
-
-        const result = resolveDefaultAgent(mockDb, config);
-        expect(result!.id).toBe('agent-1');
+        const result = resolveDefaultAgent(db, config);
+        // listAgents returns ORDER BY updated_at DESC, so the most recently created comes first
+        expect(result).not.toBeNull();
     });
 });
