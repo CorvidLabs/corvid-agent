@@ -14,7 +14,7 @@ export function buildCsp(): string {
         "connect-src 'self' ws: wss:",
         "script-src 'self' 'wasm-unsafe-eval'",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
+        "img-src 'self' data: https://avatars.githubusercontent.com",
         "font-src 'self'",
         "frame-ancestors 'none'",
         "base-uri 'self'",

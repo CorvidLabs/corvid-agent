@@ -108,7 +108,42 @@ export function handleFlockTestingRoutes(
         })();
     }
 
-    // All other endpoints require a test runner
+    // ─── Agent effective score (with decay) ─────────────────────────────────
+    // Works without testRunner by returning nulls gracefully.
+
+    const scoreMatch = path.match(/^\/api\/flock-directory\/testing\/agents\/([^/]+)\/score$/);
+    if (scoreMatch && method === 'GET') {
+        const agentId = scoreMatch[1];
+        const effectiveScore = testRunner?.getEffectiveScore(agentId) ?? null;
+        const latest = testRunner?.getLatestResult(agentId) ?? null;
+        return json({
+            agentId,
+            effectiveScore,
+            rawScore: latest?.overallScore ?? null,
+            lastTestedAt: latest?.completedAt ?? null,
+        });
+    }
+
+    // ─── Test cooldown status ────────────────────────────────────────────────
+    // Uses module-level map — no testRunner needed.
+
+    const cooldownMatch = path.match(/^\/api\/flock-directory\/testing\/agents\/([^/]+)\/cooldown$/);
+    if (cooldownMatch && method === 'GET') {
+        const agentId = cooldownMatch[1];
+        const lastRun = testCooldowns.get(agentId);
+        if (!lastRun || Date.now() - lastRun >= TEST_COOLDOWN_MS) {
+            return json({ onCooldown: false });
+        }
+        const remainingMs = TEST_COOLDOWN_MS - (Date.now() - lastRun);
+        return json({
+            onCooldown: true,
+            remainingMs,
+            remainingMin: Math.ceil(remainingMs / 60_000),
+            nextAvailableAt: new Date(lastRun + TEST_COOLDOWN_MS).toISOString(),
+        });
+    }
+
+    // All remaining endpoints require a test runner
     if (!testRunner) {
         return json({ error: 'Flock testing not available' }, 503);
     }
@@ -138,39 +173,6 @@ export function handleFlockTestingRoutes(
         const result = testRunner.getLatestResult(agentId);
         if (!result) return notFound('No test results for this agent');
         return json(result);
-    }
-
-    // ─── Agent effective score (with decay) ─────────────────────────────────
-
-    const scoreMatch = path.match(/^\/api\/flock-directory\/testing\/agents\/([^/]+)\/score$/);
-    if (scoreMatch && method === 'GET') {
-        const agentId = scoreMatch[1];
-        const effectiveScore = testRunner.getEffectiveScore(agentId);
-        const latest = testRunner.getLatestResult(agentId);
-        return json({
-            agentId,
-            effectiveScore,
-            rawScore: latest?.overallScore ?? null,
-            lastTestedAt: latest?.completedAt ?? null,
-        });
-    }
-
-    // ─── Test cooldown status ────────────────────────────────────────────────
-
-    const cooldownMatch = path.match(/^\/api\/flock-directory\/testing\/agents\/([^/]+)\/cooldown$/);
-    if (cooldownMatch && method === 'GET') {
-        const agentId = cooldownMatch[1];
-        const lastRun = testCooldowns.get(agentId);
-        if (!lastRun || Date.now() - lastRun >= TEST_COOLDOWN_MS) {
-            return json({ onCooldown: false });
-        }
-        const remainingMs = TEST_COOLDOWN_MS - (Date.now() - lastRun);
-        return json({
-            onCooldown: true,
-            remainingMs,
-            remainingMin: Math.ceil(remainingMs / 60_000),
-            nextAvailableAt: new Date(lastRun + TEST_COOLDOWN_MS).toISOString(),
-        });
     }
 
     return null;
