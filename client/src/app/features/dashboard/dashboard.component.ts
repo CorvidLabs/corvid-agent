@@ -75,12 +75,22 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             </div>
         } @else {
         <div class="dashboard">
-            <!-- Top bar: customize toggle -->
+            <!-- Top bar: view mode + customize toggle -->
             <div class="dash-toolbar">
                 <span class="dash-toolbar__title">Dashboard</span>
-                <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
-                    {{ layoutService.customizing() ? 'Done' : 'Customize' }}
-                </button>
+                <div class="dash-toolbar__right">
+                    <div class="view-toggle">
+                        <button class="view-toggle__btn"
+                                [class.view-toggle__btn--active]="layoutService.viewMode() === 'simple'"
+                                (click)="layoutService.setViewMode('simple')">Simple</button>
+                        <button class="view-toggle__btn"
+                                [class.view-toggle__btn--active]="layoutService.viewMode() === 'developer'"
+                                (click)="layoutService.setViewMode('developer')">Developer</button>
+                    </div>
+                    <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
+                        {{ layoutService.customizing() ? 'Done' : 'Customize' }}
+                    </button>
+                </div>
             </div>
 
             <!-- Customize panel (slide-down) -->
@@ -554,6 +564,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
         /* Toolbar */
         .dash-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: .5rem; flex-wrap: wrap; }
         .dash-toolbar__title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+        .dash-toolbar__right { display: flex; gap: .5rem; align-items: center; }
         .view-toggle {
             display: flex; gap: .25rem;
             background: var(--bg-surface); border: 1px solid var(--border);
@@ -565,11 +576,11 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             background: transparent; color: var(--text-tertiary); cursor: pointer;
             text-transform: uppercase; letter-spacing: .06em; transition: all .15s;
         }
-        .view-toggle__btn[data-active="true"] {
+        .view-toggle__btn--active {
             background: rgba(0,229,255,.1); color: var(--accent-cyan);
             border: 1px solid rgba(0,229,255,.2);
         }
-        .view-toggle__btn:hover:not([data-active="true"]) { color: var(--text-secondary); }
+        .view-toggle__btn:hover:not(.view-toggle__btn--active) { color: var(--text-secondary); }
 
         .customize-btn {
             padding: .35rem .85rem; border-radius: var(--radius); font-size: .7rem;
