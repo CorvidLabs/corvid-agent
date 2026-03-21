@@ -191,7 +191,10 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <div class="section">
                                     <div class="section__header">
                                         <h3>Agent Activity</h3>
-                                        <a class="section__link" routerLink="/agents">View all agents</a>
+                                        <div class="section__header-right">
+                                            <a class="section__link" routerLink="/agents">View all agents</a>
+                                            <button class="refresh-btn" [class.refresh-btn--spinning]="widgetRefreshing()['agents']" (click)="refreshWidget('agents')" title="Refresh">&#x21bb;</button>
+                                        </div>
                                     </div>
                                     <div class="agent-grid">
                                         @for (summary of agentSummaries(); track summary.agent.id) {
@@ -258,20 +261,36 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
 
                         <!-- spending-chart -->
                         @if (widget.id === 'spending-chart') {
+                            @if (widgetErrors()['spending-chart']) {
+                                <div class="widget-error">
+                                    <span class="widget-error__icon">!</span>
+                                    <span class="widget-error__msg">{{ widgetErrors()['spending-chart'] }}</span>
+                                    <button class="widget-error__retry" (click)="refreshWidget('spending-chart')">Retry</button>
+                                </div>
+                            } @else {
                             <div class="section">
                                 <div class="section__header">
                                     <h3>Spending Trend</h3>
-                                    <div class="chart-controls">
-                                        <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 7" (click)="loadSpending(7)">7d</button>
-                                        <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 14" (click)="loadSpending(14)">14d</button>
-                                        <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 30" (click)="loadSpending(30)">30d</button>
+                                    <div class="section__header-actions">
+                                        <div class="chart-controls">
+                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 7" (click)="loadSpending(7)">7d</button>
+                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 14" (click)="loadSpending(14)">14d</button>
+                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 30" (click)="loadSpending(30)">30d</button>
+                                        </div>
+                                        <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['spending-chart']" (click)="refreshWidget('spending-chart')" title="Refresh">&#x21bb;</button>
                                     </div>
                                 </div>
                                 @if (spendingBars().length > 0) {
                                     <div class="bar-chart">
                                         <div class="bar-chart__bars">
                                             @for (bar of spendingBars(); track bar.date) {
-                                                <div class="bar-chart__col" [title]="bar.date + ': $' + bar.value.toFixed(4)">
+                                                <div class="bar-chart__col bar-chart__col--hoverable"
+                                                     (mouseenter)="hoveredBar.set(bar)"
+                                                     (mouseleave)="hoveredBar.set(null)">
+                                                    <div class="bar-chart__tooltip" [class.bar-chart__tooltip--visible]="hoveredBar() === bar">
+                                                        <span class="bar-chart__tooltip-date">{{ bar.date }}</span>
+                                                        <span class="bar-chart__tooltip-val">\${{ bar.value.toFixed(4) }}</span>
+                                                    </div>
                                                     <div class="bar-chart__bar bar-chart__bar--spending" [style.height.%]="bar.pct"></div>
                                                     <span class="bar-chart__label">{{ bar.dateShort }}</span>
                                                 </div>
@@ -279,16 +298,29 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                         </div>
                                     </div>
                                 } @else {
-                                    <p class="empty-chart">No spending data</p>
+                                    <div class="empty-state">
+                                        <p class="empty-state__title">No spending data yet</p>
+                                        <p class="empty-state__hint">Spending will appear here once your agents start running sessions.</p>
+                                        <a class="empty-state__link" routerLink="/sessions/new">Start a conversation</a>
+                                    </div>
                                 }
                             </div>
+                            }
                         }
 
                         <!-- session-chart -->
                         @if (widget.id === 'session-chart') {
+                            @if (widgetErrors()['session-chart']) {
+                                <div class="widget-error">
+                                    <span class="widget-error__icon">!</span>
+                                    <span class="widget-error__msg">{{ widgetErrors()['session-chart'] }}</span>
+                                    <button class="widget-error__retry" (click)="refreshWidget('session-chart')">Retry</button>
+                                </div>
+                            } @else {
                             <div class="section">
                                 <div class="section__header">
                                     <h3>Sessions Breakdown</h3>
+                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['session-chart']" (click)="refreshWidget('session-chart')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (sessionStats()) {
                                     <div class="chart-duo">
@@ -304,10 +336,16 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                                             stroke-width="3"
                                                             [attr.stroke-dasharray]="seg.dashArray"
                                                             [attr.stroke-dashoffset]="seg.dashOffset"
+                                                            (mouseenter)="hoveredSegment.set(seg)"
+                                                            (mouseleave)="hoveredSegment.set(null)"
                                                         />
                                                     }
                                                 </svg>
-                                                <span class="ring-chart__center">{{ totalSessionCount() }}</span>
+                                                @if (hoveredSegment()) {
+                                                    <span class="ring-chart__tooltip">{{ hoveredSegment()!.status }}: {{ hoveredSegment()!.count }}</span>
+                                                } @else {
+                                                    <span class="ring-chart__center">{{ totalSessionCount() }}</span>
+                                                }
                                             </div>
                                             <div class="ring-chart__legend">
                                                 @for (seg of statusSegments(); track seg.status) {
@@ -334,16 +372,29 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                         </div>
                                     </div>
                                 } @else {
-                                    <p class="empty-chart">Loading session data...</p>
+                                    <div class="empty-state">
+                                        <p class="empty-state__title">No session data yet</p>
+                                        <p class="empty-state__hint">Session breakdowns will appear after your first conversation.</p>
+                                        <a class="empty-state__link" routerLink="/sessions/new">Start a conversation</a>
+                                    </div>
                                 }
                             </div>
+                            }
                         }
 
                         <!-- agent-usage-chart -->
                         @if (widget.id === 'agent-usage-chart') {
+                            @if (widgetErrors()['agent-usage-chart']) {
+                                <div class="widget-error">
+                                    <span class="widget-error__icon">!</span>
+                                    <span class="widget-error__msg">{{ widgetErrors()['agent-usage-chart'] }}</span>
+                                    <button class="widget-error__retry" (click)="refreshWidget('agent-usage-chart')">Retry</button>
+                                </div>
+                            } @else {
                             <div class="section">
                                 <div class="section__header">
                                     <h3>Agent Usage</h3>
+                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['agent-usage-chart']" (click)="refreshWidget('agent-usage-chart')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (sessionStats() && sessionStats()!.byAgent.length > 0) {
                                     <div class="usage-chart">
@@ -366,21 +417,38 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                         </div>
                                     </div>
                                 } @else {
-                                    <p class="empty-chart">No agent usage data yet</p>
+                                    <div class="empty-state">
+                                        <p class="empty-state__title">No agent usage data yet</p>
+                                        <p class="empty-state__hint">Usage breakdown by agent will appear after sessions run.</p>
+                                        <a class="empty-state__link" routerLink="/agents">View agents</a>
+                                    </div>
                                 }
                             </div>
+                            }
                         }
 
                         <!-- activity -->
                         @if (widget.id === 'activity') {
+                            @if (widgetErrors()['activity']) {
+                                <div class="widget-error">
+                                    <span class="widget-error__icon">!</span>
+                                    <span class="widget-error__msg">{{ widgetErrors()['activity'] }}</span>
+                                    <button class="widget-error__retry" (click)="refreshWidget('activity')">Retry</button>
+                                </div>
+                            } @else {
                             <div class="section section--feed">
                                 <div class="section__header">
                                     <h3>Recent Activity</h3>
+                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['activity']" (click)="refreshWidget('activity')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (activityFeed().length === 0) {
-                                    <div class="empty-activity">
-                                        <p class="empty-activity__title">No recent activity</p>
-                                        <p class="empty-activity__hint">Start a conversation, create a work task, or launch a council to see activity here.</p>
+                                    <div class="empty-state">
+                                        <p class="empty-state__title">No recent activity</p>
+                                        <p class="empty-state__hint">Start a conversation, create a work task, or launch a council to see activity here.</p>
+                                        <div class="empty-state__actions">
+                                            <a class="empty-state__link" routerLink="/sessions/new">New conversation</a>
+                                            <a class="empty-state__link" routerLink="/work-tasks">Create work task</a>
+                                        </div>
                                     </div>
                                 } @else {
                                     <div class="activity-feed">
@@ -406,6 +474,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                     </div>
                                 }
                             </div>
+                            }
                         }
 
                         <!-- quick-actions -->
@@ -426,7 +495,10 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                         <!-- system-status -->
                         @if (widget.id === 'system-status') {
                             <div class="section section--status">
-                                <h3>System Status</h3>
+                                <div class="section__header">
+                                    <h3>System Status</h3>
+                                    <button class="refresh-btn" [class.refresh-btn--spinning]="widgetRefreshing()['system-status']" (click)="refreshWidget('system-status')" title="Refresh">&#x21bb;</button>
+                                </div>
                                 <div class="status-list">
                                     <div class="status-row">
                                         <span class="status-row__label">WebSocket</span>
@@ -479,9 +551,12 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <div class="section">
                                     <div class="section__header">
                                         <h3>Flock Directory</h3>
-                                        @if (flockStats(); as stats) {
-                                            <span class="flock-stats">{{ stats.active }} active agents</span>
-                                        }
+                                        <div class="section__header-right">
+                                            @if (flockStats(); as stats) {
+                                                <span class="flock-stats">{{ stats.active }} active agents</span>
+                                            }
+                                            <button class="refresh-btn" [class.refresh-btn--spinning]="widgetRefreshing()['flock']" (click)="refreshWidget('flock')" title="Refresh">&#x21bb;</button>
+                                        </div>
                                     </div>
                                     <div class="flock-grid">
                                         @for (agent of flockAgents(); track agent.id) {
@@ -959,6 +1034,53 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
         .comparison-table__balance { color: var(--accent-green); font-family: var(--font-mono,monospace); font-size: .8rem; }
         .comparison-table__status { text-align: center; }
 
+        /* Section header right group */
+        .section__header-right { display: flex; align-items: center; gap: .5rem; }
+
+        /* Per-widget refresh button */
+        .refresh-btn {
+            width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border);
+            background: var(--bg-raised); color: var(--text-tertiary); font-size: .8rem;
+            cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center;
+            padding: 0; line-height: 1; flex-shrink: 0;
+        }
+        .refresh-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,229,255,.06); }
+        .refresh-btn--spinning { animation: spin .8s linear infinite; pointer-events: none; opacity: .5; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Widget error boundary */
+        .widget-error {
+            text-align: center; padding: 1.5rem 1rem;
+            border: 1px dashed var(--accent-red); border-radius: var(--radius);
+            background: rgba(255,0,0,.03);
+        }
+        .widget-error__msg { display: block; font-size: .8rem; color: var(--accent-red); margin-bottom: .5rem; }
+        .widget-error__retry {
+            padding: .3rem .75rem; font-size: .7rem; font-weight: 600; font-family: inherit;
+            border: 1px solid var(--accent-red); border-radius: var(--radius-sm);
+            background: transparent; color: var(--accent-red); cursor: pointer;
+            text-transform: uppercase; letter-spacing: .05em; transition: all .15s;
+        }
+        .widget-error__retry:hover { background: rgba(255,0,0,.08); }
+
+        /* Chart hover tooltip */
+        .chart-tooltip {
+            position: absolute; transform: translate(-50%, -100%);
+            background: var(--bg-raised); border: 1px solid var(--accent-green);
+            border-radius: var(--radius-sm); padding: .3rem .5rem;
+            pointer-events: none; z-index: 10; white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,.3);
+        }
+        .chart-tooltip__date { display: block; font-size: .6rem; color: var(--text-tertiary); }
+        .chart-tooltip__val { display: block; font-size: .75rem; font-weight: 700; color: var(--accent-green); }
+
+        /* Rich empty states */
+        .empty-state { text-align: center; padding: 1.5rem 1rem; }
+        .empty-state__title { color: var(--text-secondary); font-size: .85rem; font-weight: 600; margin: 0 0 .35rem; }
+        .empty-state__hint { color: var(--text-tertiary); font-size: .75rem; margin: 0; line-height: 1.5; }
+        .empty-state__hint a { color: var(--accent-cyan); text-decoration: none; }
+        .empty-state__hint a:hover { text-decoration: underline; }
+
         /* Responsive */
         @media (max-width:768px) {
             .dashboard { padding: 1rem; }
@@ -1019,6 +1141,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly spendingData = signal<SpendingData | null>(null);
     protected readonly sessionStats = signal<SessionStats | null>(null);
     protected readonly spendingDays = signal(14);
+
+    // Per-widget error + refresh state
+    protected readonly widgetErrors = signal<Record<string, string>>({});
+    protected readonly widgetRefreshing = signal<Record<string, boolean>>({});
+
+    // Chart hover tooltips
+    protected readonly hoveredBar = signal<{ date: string; dateShort: string; value: number; pct: number } | null>(null);
+    protected readonly hoveredSegment = signal<{ status: string; count: number } | null>(null);
 
     // Drag state for customize panel
     protected readonly dragIndex = signal(-1);
@@ -1327,6 +1457,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
         this.widgetDragIndex.set(-1);
         this.widgetDragOver.set(-1);
+    }
+
+    // Per-widget refresh
+    protected async refreshWidget(widgetId: WidgetId): Promise<void> {
+        this.widgetRefreshing.update((r) => ({ ...r, [widgetId]: true }));
+        this.widgetErrors.update((e) => { const copy = { ...e }; delete copy[widgetId]; return copy; });
+        try {
+            switch (widgetId) {
+                case 'metrics': await this.loadOverview(); break;
+                case 'agents': await this.agentService.loadAgents().then(() => this.loadAgentSummaries()); break;
+                case 'spending-chart': await this.loadSpendingData(); break;
+                case 'session-chart': case 'agent-usage-chart': await this.loadSessionStats(); break;
+                case 'activity': await Promise.all([this.sessionService.loadSessions(), this.workTaskService.loadTasks(), this.loadAgentMessages()]); break;
+                case 'system-status': await Promise.all([this.loadServerVersion(), this.loadActiveCouncilLaunches()]); break;
+                case 'flock': await this.loadFlockDirectory(); break;
+                case 'comparison': await this.agentService.loadAgents().then(() => this.loadAgentSummaries()); break;
+            }
+        } catch (err) {
+            this.widgetErrors.update((e) => ({ ...e, [widgetId]: 'Failed to load data' }));
+        } finally {
+            this.widgetRefreshing.update((r) => ({ ...r, [widgetId]: false }));
+        }
+    }
+
+    // Spending bar hover tooltip
+    protected onBarHover(bar: { date: string; value: number }, event: MouseEvent): void {
+        const rect = (event.target as HTMLElement).getBoundingClientRect();
+        const parent = (event.target as HTMLElement).closest('.bar-chart')!.getBoundingClientRect();
+        this.hoveredBar.set({ date: bar.date, value: bar.value, x: rect.left - parent.left + rect.width / 2, y: rect.top - parent.top - 8 });
+    }
+
+    protected onBarLeave(): void {
+        this.hoveredBar.set(null);
     }
 
     // Spending chart day range switcher
