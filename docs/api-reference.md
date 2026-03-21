@@ -2513,6 +2513,103 @@ curl -X POST http://localhost:3000/api/backup \
 
 ---
 
+## Discord Image
+
+Send an image to a Discord channel. Accepts JSON or multipart form data.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/discord/send-image` | Send image to Discord channel | any |
+
+### Send Image (JSON)
+
+```bash
+curl -X POST http://localhost:3000/api/discord/send-image \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channelId": "123456789",
+    "imageBase64": "<base64-encoded-image>",
+    "filename": "screenshot.png",
+    "contentType": "image/png",
+    "message": "Here is the image",
+    "replyToMessageId": "987654321"
+  }'
+```
+
+### Send Image (Multipart)
+
+```bash
+curl -X POST http://localhost:3000/api/discord/send-image \
+  -H "Authorization: Bearer $API_KEY" \
+  -F "channelId=123456789" \
+  -F "image=@screenshot.png" \
+  -F "message=Here is the image"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "messageId": "1234567890"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `channelId` | string | **Required.** Discord channel ID |
+| `imageBase64` | string | Base64-encoded image (JSON mode) |
+| `imagePath` | string | Local file path (JSON mode, alternative to base64) |
+| `filename` | string | Attachment filename (default: `image.png`) |
+| `contentType` | string | MIME type (default: `image/png`) |
+| `message` | string | Optional text message |
+| `replyToMessageId` | string | Message ID to reply to |
+
+---
+
+## Memory Backfill
+
+Re-send memories with missing on-chain transaction IDs. Retries all memories in `pending` or `failed` status.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/memories/backfill` | Backfill pending memories on-chain | any |
+
+### Backfill Memories
+
+```bash
+curl -X POST http://localhost:3000/api/memories/backfill \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "backfilled": 3,
+  "total": 5,
+  "results": [
+    { "id": "mem-1", "key": "user-leif", "agentId": "abc-123", "txid": "TXID..." },
+    { "id": "mem-2", "key": "feedback-x", "agentId": "abc-123", "txid": null, "error": "Failed to publish memory" }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ok` | boolean | Always `true` on success |
+| `backfilled` | number | Number of memories successfully published |
+| `total` | number | Total memories attempted |
+| `results` | array | Per-memory results with txid or error |
+
+---
+
 ## Self-Test
 
 Trigger the self-test suite to run unit tests, end-to-end tests, or both.
