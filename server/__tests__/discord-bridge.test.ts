@@ -229,6 +229,47 @@ describe('DiscordBridge', () => {
         }
     });
 
+    test('@mention with Ollama agent and complex prompt sends complexity warning', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'OllamaTestAgent', model: 'llama3.3', provider: 'ollama' });
+        createProject(db, { name: 'OllamaProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const fetchCalls: { url: string; body: string }[] = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+            const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+            fetchCalls.push({ url: urlStr, body: init?.body as string ?? '' });
+            return new Response(JSON.stringify({ id: '300000000000000001' }), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000002',
+                channel_id: '100000000000000001',
+                author: { id: 'user-2', username: 'TestUser2' },
+                content: '<@999000000000000001> Refactor the authentication system, migrate to JWT tokens, and optimize all database queries for performance and security.',
+                timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+            });
+
+            // Should start a process
+            expect(pm.startProcess).toHaveBeenCalled();
+            // Should have sent a complexity warning message to Discord
+            const warningCall = fetchCalls.find(c => c.body.includes('Advisory'));
+            expect(warningCall).toBeDefined();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
     test('sendMessage splits long messages', async () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
