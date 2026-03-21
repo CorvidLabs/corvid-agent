@@ -20,6 +20,9 @@ const SHORTCUTS: ShortcutEntry[] = [
     { keys: 'g a', description: 'Go to Agents', category: 'Navigation' },
     { keys: 'g s', description: 'Go to Sessions', category: 'Navigation' },
     { keys: 'g w', description: 'Go to Work Tasks', category: 'Navigation' },
+    { keys: '1', description: 'Switch to Simple view (dashboard)', category: 'Dashboard' },
+    { keys: '2', description: 'Switch to Developer view (dashboard)', category: 'Dashboard' },
+    { keys: 'r', description: 'Refresh all widgets (dashboard)', category: 'Dashboard' },
 ];
 
 @Injectable({ providedIn: 'root' })

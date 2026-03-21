@@ -302,7 +302,10 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                         <div class="flock-register">
                             <p class="flock-register__text">This agent is not registered in the Flock Directory.</p>
                             <p class="flock-register__hint">Register to enable discovery, reputation tracking, and cross-agent collaboration.</p>
-                            <button class="btn btn--primary" [disabled]="registeringFlock()" (click)="registerInFlock()">
+                            @if (!a.walletAddress) {
+                                <p class="flock-register__hint" style="color: var(--color-warning)">This agent needs a wallet before it can register.</p>
+                            }
+                            <button class="btn btn--primary" [disabled]="registeringFlock() || !a.walletAddress" (click)="registerInFlock()">
                                 {{ registeringFlock() ? 'Registering...' : 'Register in Flock' }}
                             </button>
                         </div>
@@ -675,7 +678,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     private async loadFlockProfile(agentName: string): Promise<void> {
         try {
             const result = await firstValueFrom(
-                this.apiService.get<{ agents: FlockAgent[] }>(`/flock-directory/search?name=${encodeURIComponent(agentName)}&limit=1`),
+                this.apiService.get<{ agents: FlockAgent[] }>(`/flock-directory/search?q=${encodeURIComponent(agentName)}&limit=1`),
             );
             const match = result.agents.find((fa) => fa.name.toLowerCase() === agentName.toLowerCase());
             this.flockAgent.set(match ?? null);
@@ -687,13 +690,17 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     async registerInFlock(): Promise<void> {
         const a = this.agent();
         if (!a) return;
+        if (!a.walletAddress) {
+            this.notify.error('Agent needs a wallet before registering in Flock. Create one in the agent settings.');
+            return;
+        }
         this.registeringFlock.set(true);
         try {
             const fa = await firstValueFrom(
                 this.apiService.post<FlockAgent>('/flock-directory/agents', {
                     name: a.name,
                     description: a.description,
-                    address: a.walletAddress ?? '',
+                    address: a.walletAddress,
                     capabilities: [],
                 }),
             );
