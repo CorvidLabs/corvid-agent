@@ -283,6 +283,7 @@ export class CommandPaletteComponent implements AfterViewInit, OnDestroy {
             // Navigation
             { id: 'nav-chat', label: 'Go to Chat', category: 'Navigation', icon: '💬', action: () => this.nav('/chat'), keywords: 'home' },
             { id: 'nav-agents', label: 'Go to Agents', category: 'Navigation', icon: '🤖', action: () => this.nav('/agents'), keywords: 'bots' },
+            { id: 'nav-flock', label: 'Go to Flock Directory', category: 'Navigation', icon: '🌐', action: () => this.nav('/flock-directory'), keywords: 'directory discover network registry' },
             { id: 'nav-sessions', label: 'Go to Sessions', category: 'Navigation', icon: '📋', action: () => this.nav('/sessions'), keywords: 'conversations history' },
             { id: 'nav-work-tasks', label: 'Go to Work Tasks', category: 'Navigation', icon: '📝', action: () => this.nav('/work-tasks') },
             { id: 'nav-projects', label: 'Go to Projects', category: 'Navigation', icon: '📁', action: () => this.nav('/projects') },

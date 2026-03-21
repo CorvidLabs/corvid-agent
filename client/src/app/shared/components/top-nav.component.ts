@@ -44,9 +44,10 @@ const TABS: NavTab[] = [
         key: 'agents',
         label: 'Agents',
         route: '/agents',
-        matchRoutes: ['/agents', '/projects', '/models', '/personas', '/skill-bundles'],
+        matchRoutes: ['/agents', '/projects', '/models', '/personas', '/skill-bundles', '/flock-directory'],
         children: [
             { label: 'All Agents', route: '/agents' },
+            { label: 'Flock Directory', route: '/flock-directory' },
             { label: 'Projects', route: '/projects' },
             { label: 'Models', route: '/models' },
             { label: 'Personas', route: '/personas' },

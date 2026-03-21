@@ -23,7 +23,7 @@ interface SidebarSection {
 }
 
 const SECTIONS: SidebarSection[] = [
-    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles'] },
+    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents', '/flock-directory', '/projects', '/models', '/personas', '/skill-bundles'] },
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions', '/work-tasks', '/councils'] },
     { key: 'observe', label: 'Observe', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs', '/brain-viewer', '/reputation'] },
     { key: 'automate', label: 'Automate', collapsible: true, defaultCollapsed: true, routes: ['/schedules', '/workflows', '/webhooks', '/mention-polling', '/mcp-servers'] },
@@ -78,6 +78,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
+                    </a>
+                    <a class="sidebar__link" routerLink="/flock-directory" routerLinkActive="sidebar__link--active" title="Flock Directory">
+                        <span class="sidebar__label">Flock Directory</span>
+                        <span class="sidebar__abbr">FD</span>
                     </a>
                 </li>
                 <li>
