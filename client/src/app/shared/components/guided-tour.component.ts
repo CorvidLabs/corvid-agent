@@ -68,11 +68,23 @@ interface TooltipPos {
                         </div>
                         <h3 class="tour-tooltip__title">{{ step.title }}</h3>
                         <p class="tour-tooltip__content">{{ step.content }}</p>
+
+                        <!-- Progress dots -->
+                        <div class="tour-dots">
+                            @for (s of tourService.steps(); track s.id; let i = $index) {
+                                <span
+                                    class="tour-dot"
+                                    [class.tour-dot--active]="i === tourService.currentStepIndex()"
+                                    [class.tour-dot--done]="i < tourService.currentStepIndex()">
+                                </span>
+                            }
+                        </div>
+
                         <div class="tour-tooltip__actions">
                             @if (tourService.currentStepIndex() > 0) {
-                                <button class="tour-btn tour-btn--ghost" (click)="tourService.prev()">Back</button>
+                                <button class="tour-btn tour-btn--ghost" (click)="onPrev()">Back</button>
                             }
-                            <button class="tour-btn tour-btn--primary" (click)="tourService.next()">
+                            <button class="tour-btn tour-btn--primary" (click)="onNext()">
                                 {{ tourService.currentStepIndex() === tourService.steps().length - 1 ? 'Done' : 'Next' }}
                             </button>
                         </div>
@@ -161,11 +173,35 @@ interface TooltipPos {
         }
 
         .tour-tooltip__content {
-            margin: 0 0 1rem;
+            margin: 0 0 0.75rem;
             font-size: 0.8rem;
             line-height: 1.5;
             color: var(--text-secondary, #aaa);
             white-space: pre-line;
+        }
+
+        .tour-dots {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .tour-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--border, #333);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .tour-dot--active {
+            background: var(--accent-cyan, #00e5ff);
+            box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+        }
+
+        .tour-dot--done {
+            background: var(--accent-green, #00e676);
         }
 
         .tour-tooltip__actions {
@@ -219,8 +255,8 @@ export class GuidedTourComponent implements OnDestroy {
             const step = this.tourService.currentStep();
             const active = this.tourService.active();
             if (active && step) {
-                // Small delay to let DOM settle after navigation
-                requestAnimationFrame(() => this.positionForStep(step));
+                // Delay to let DOM settle after navigation
+                setTimeout(() => this.positionForStep(step), 150);
             }
         });
     }
@@ -234,6 +270,14 @@ export class GuidedTourComponent implements OnDestroy {
         const target = event.target as HTMLElement;
         if (target.closest('.tour-tooltip')) return;
         this.tourService.next();
+    }
+
+    protected onNext(): void {
+        this.tourService.next();
+    }
+
+    protected onPrev(): void {
+        this.tourService.prev();
     }
 
     private positionForStep(step: TourStep): void {
