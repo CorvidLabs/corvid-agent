@@ -81,6 +81,53 @@ describe('handleFlockTestingRoutes', () => {
             expect(res).toBeInstanceOf(Response);
             expect((res as Response).status).toBe(503);
         });
+
+        it('returns stats from testRunner', async () => {
+            const mockRunner = {
+                getTestStats: () => ({ totalTests: 5, testedAgents: 2, avgScore: 85 }),
+            } as any;
+            const { req, url } = makeReq('GET', '/api/flock-directory/testing/stats');
+            const res = handleFlockTestingRoutes(req, url, db, mockRunner);
+            expect(res).toBeInstanceOf(Response);
+            const data = await (res as Response).json();
+            expect(data.totalTests).toBe(5);
+            expect(data.testedAgents).toBe(2);
+            expect(data.avgScore).toBe(85);
+        });
+
+        it('returns results from testRunner', async () => {
+            const mockRunner = {
+                getResults: (id: string, limit?: number) => [{ agentId: id, overallScore: 90 }],
+            } as any;
+            const { req, url } = makeReq('GET', '/api/flock-directory/testing/agents/agent-1/results');
+            const res = handleFlockTestingRoutes(req, url, db, mockRunner);
+            expect(res).toBeInstanceOf(Response);
+            const data = await (res as Response).json();
+            expect(data.agentId).toBe('agent-1');
+            expect(data.results).toHaveLength(1);
+            expect(data.results[0].overallScore).toBe(90);
+        });
+
+        it('returns latest result from testRunner', async () => {
+            const mockRunner = {
+                getLatestResult: (id: string) => ({ agentId: id, overallScore: 88, completedAt: '2026-01-01T00:00:00Z' }),
+            } as any;
+            const { req, url } = makeReq('GET', '/api/flock-directory/testing/agents/agent-1/latest');
+            const res = handleFlockTestingRoutes(req, url, db, mockRunner);
+            expect(res).toBeInstanceOf(Response);
+            const data = await (res as Response).json();
+            expect(data.overallScore).toBe(88);
+        });
+
+        it('returns 404 for latest when no results exist', async () => {
+            const mockRunner = {
+                getLatestResult: () => null,
+            } as any;
+            const { req, url } = makeReq('GET', '/api/flock-directory/testing/agents/agent-1/latest');
+            const res = handleFlockTestingRoutes(req, url, db, mockRunner);
+            expect(res).toBeInstanceOf(Response);
+            expect((res as Response).status).toBe(404);
+        });
     });
 
     describe('run endpoint', () => {
