@@ -160,6 +160,17 @@ export const COMMAND_DEFS: CommandDef[] = [
         examples: ['/schedule', '/schedule pause abc123', '/schedule history abc123', '/schedule run abc123'],
     },
     {
+        name: '/message',
+        description: 'Send a message to an agent in no-tools conversation mode',
+        usage: '/message [@agent] <text>',
+        params: [
+            { name: '@agent', description: 'Agent to message (optional, defaults to active agent)', required: false, agentMention: true },
+            { name: 'text', description: 'Message text', required: true, rest: true },
+        ],
+        privileged: false,
+        examples: ['/message hello there', '/message @CorvidAgent what is the weather?'],
+    },
+    {
         name: '/help',
         description: 'Show available commands and usage',
         usage: '/help [command]',

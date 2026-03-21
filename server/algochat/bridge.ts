@@ -104,6 +104,9 @@ export class AlgoChatBridge implements ChannelAdapter {
             },
         });
 
+        // Wire subscription manager into command handler for /message support
+        this.commandHandler.setSubscriptionManager(this.subscriptionManager);
+
         this.contactManager = new PSKContactManager(db, config, service);
         this.discoveryPoller = new PSKDiscoveryPoller(db, config, service, this.contactManager);
         this.messageRouter = new MessageRouter(

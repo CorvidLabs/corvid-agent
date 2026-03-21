@@ -16,7 +16,6 @@ import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
-import { WidgetLayoutService } from '../../core/services/widget-layout.service';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
@@ -527,25 +526,10 @@ export class TopNavComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
-    private readonly widgetLayout = inject(WidgetLayoutService);
     private readonly elRef = inject(ElementRef);
 
-    /** Simple mode: Chat + Agents only; Developer: all tabs */
-    private static readonly SIMPLE_TABS = new Set(['chat', 'agents']);
-    /** In simple mode, hide advanced children from Agents tab */
-    private static readonly SIMPLE_AGENT_CHILDREN = new Set(['All Agents']);
-
-    protected readonly tabs = computed<NavTab[]>(() => {
-        if (this.widgetLayout.viewMode() === 'developer') return TABS;
-        return TABS
-            .filter((t) => TopNavComponent.SIMPLE_TABS.has(t.key))
-            .map((t) => {
-                if (t.key === 'agents') {
-                    return { ...t, children: t.children.filter((c) => TopNavComponent.SIMPLE_AGENT_CHILDREN.has(c.label)) };
-                }
-                return t;
-            });
-    });
+    /** All tabs are always visible regardless of view mode — simple mode only affects dashboard widgets */
+    protected readonly tabs = computed<NavTab[]>(() => TABS);
     protected readonly openDropdown = signal<string | null>(null);
     protected readonly mobileOpen = signal(false);
     protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
