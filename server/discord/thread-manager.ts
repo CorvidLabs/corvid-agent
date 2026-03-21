@@ -759,8 +759,69 @@ export function subscribeForAdaptiveInlineResponse(
             processManager.unsubscribe(sessionId, adaptiveCallback);
         }
 
-        if (event.type === 'session_error' || event.type === 'session_exited') {
+        if (event.type === 'session_error') {
             clearTyping();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            // Flush any buffered content before showing the error
+            flush().catch(() => {});
+
+            const errEvent = event as { error?: { message?: string; errorType?: string } };
+            const errorType = errEvent.error?.errorType || 'unknown';
+
+            let title: string;
+            let description: string;
+            let errColor: number;
+            switch (errorType) {
+                case 'context_exhausted':
+                    title = 'Context Limit Reached';
+                    description = 'The conversation ran out of context space. Send a message to start a new session.';
+                    errColor = 0xf0b232;
+                    break;
+                case 'credits_exhausted':
+                    title = 'Credits Exhausted';
+                    description = 'Session paused — credits have been used up. Add credits to resume.';
+                    errColor = 0xf0b232;
+                    break;
+                case 'spawn_error':
+                    title = 'Failed to Start';
+                    description = 'The agent session could not be started. This may be a configuration issue.';
+                    errColor = 0xff3355;
+                    break;
+                default:
+                    title = 'Session Error';
+                    description = (errEvent.error?.message || 'An unexpected error occurred.').slice(0, 4096);
+                    errColor = 0xff3355;
+                    break;
+            }
+
+            // If we have a progress embed, update it with the error; otherwise send a new one
+            if (progressMode && progressMessageId) {
+                editEmbed(delivery, botToken, channelId, progressMessageId, {
+                    title,
+                    description,
+                    color: errColor,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+                }).catch((err) => {
+                    log.debug('Error embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            } else {
+                sendEmbed(delivery, botToken, channelId, {
+                    title,
+                    description,
+                    color: errColor,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+                }).catch((err) => {
+                    log.debug('Error embed send failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+
+            processManager.unsubscribe(sessionId, adaptiveCallback);
+        }
+
+        if (event.type === 'session_exited') {
+            clearTyping();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            flush().catch(() => {});
             processManager.unsubscribe(sessionId, adaptiveCallback);
         }
     };
