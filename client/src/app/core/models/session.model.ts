@@ -19,6 +19,8 @@ export interface Session {
     councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
     createdAt: string;
     updatedAt: string;
+    /** Advisory warning emitted when an Ollama model is used for a complex task. */
+    complexityWarning?: string;
 }
 
 export interface SessionMessage {

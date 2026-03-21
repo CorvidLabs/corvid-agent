@@ -39,6 +39,7 @@ import {
 } from './thread-manager';
 import { resolveDiscordContact } from './contact-linker';
 import { saveMentionSession, getMentionSession } from '../db/discord-mention-sessions';
+import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 
 const log = createLogger('DiscordMessageHandler');
 
@@ -472,6 +473,14 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         source: 'discord' as SessionSource,
         workDir,
     });
+
+    // Advisory: warn when Ollama model is used for a complex task (non-blocking).
+    const complexityWarning = buildOllamaComplexityWarning(cleanText, agent.model, agent.provider);
+    if (complexityWarning) {
+        log.warn('Ollama complexity advisory (Discord)', { sessionId: session.id, model: agent.model });
+        void sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+            `⚠️ This task may exceed Ollama's capabilities. Consider using Claude for reliable results.\n-# Model: \`${agent.model}\` • Task will proceed regardless.`);
+    }
 
     // Start the process with the text prompt (include attachment URLs so the agent
     // sees image links even though startProcess only accepts strings).

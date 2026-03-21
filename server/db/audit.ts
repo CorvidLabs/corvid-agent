@@ -38,6 +38,7 @@ export type AuditAction =
     | 'api_key_rotation'
     | 'session_create'
     | 'session_kill'
+    | 'session_ollama_complexity_warning'
     | 'agent_create'
     | 'agent_update'
     | 'agent_delete'

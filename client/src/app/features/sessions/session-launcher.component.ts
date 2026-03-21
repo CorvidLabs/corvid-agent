@@ -123,7 +123,11 @@ export class SessionLauncherComponent implements OnInit {
                 name: value.name || undefined,
                 initialPrompt: value.initialPrompt || undefined,
             });
-            this.notify.success('Session started');
+            if (session.complexityWarning) {
+                this.notify.warning('⚠️ Ollama model selected for complex task', session.complexityWarning);
+            } else {
+                this.notify.success('Session started');
+            }
             this.router.navigate(['/sessions', session.id]);
         } catch (e) {
             this.notify.error('Failed to start session', String(e));
