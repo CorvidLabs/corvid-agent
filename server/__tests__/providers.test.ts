@@ -1048,7 +1048,7 @@ describe('FallbackManager', () => {
         test('each chain entry has valid provider and model', () => {
             for (const [, chain] of Object.entries(DEFAULT_FALLBACK_CHAINS)) {
                 for (const entry of chain.chain) {
-                    expect(['anthropic', 'openai', 'ollama']).toContain(entry.provider);
+                    expect(['anthropic', 'openai', 'openrouter', 'ollama']).toContain(entry.provider);
                     expect(entry.model).toBeTruthy();
                 }
             }
