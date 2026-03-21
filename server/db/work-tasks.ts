@@ -212,7 +212,13 @@ export function updateWorkTaskStatus(
         fields.push('iteration_count = ?');
         values.push(extra.iterationCount);
     }
-    if (status === 'completed' || status === 'failed') {
+    if (status === 'completed') {
+        fields.push("completed_at = datetime('now')");
+        // Clear any stale error from a previous failed attempt
+        if (extra?.error === undefined) {
+            fields.push('error = NULL');
+        }
+    } else if (status === 'failed') {
         fields.push("completed_at = datetime('now')");
     }
 

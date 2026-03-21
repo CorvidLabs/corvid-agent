@@ -259,6 +259,18 @@ export class WorkTaskService {
             try {
                 const worktreeExists = task.worktreeDir ? existsSync(task.worktreeDir) : false;
                 const canRetry = (task.iterationCount ?? 0) < WORK_MAX_ITERATIONS;
+                const neverStarted = !task.worktreeDir && (task.iterationCount ?? 0) === 0;
+
+                // Tasks that never actually started (no worktree, iteration 0) should
+                // always be requeued — they were just in 'branching' when the restart hit.
+                if (neverStarted && canRetry) {
+                    resetWorkTaskForRetry(this.db, task.id);
+                    log.info('Requeuing task that never started', {
+                        taskId: task.id,
+                        description: task.description.slice(0, 80),
+                    });
+                    continue;
+                }
 
                 if (!worktreeExists || !canRetry) {
                     log.info('Skipping recovery for task (worktree missing or max iterations reached)', {
