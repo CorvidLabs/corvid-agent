@@ -13,9 +13,11 @@ import type { ProcessManager } from '../process/manager';
 import type { AgentMessenger } from './agent-messenger';
 import type { WorkCommandRouter } from './work-command-router';
 import type { ResponseFormatter } from './response-formatter';
+import type { SubscriptionManager } from './subscription-manager';
 import {
     listConversations,
     getConversationByParticipant,
+    createSession,
 } from '../db/sessions';
 import { getAlgochatEnabledAgents } from '../db/agents';
 import {
@@ -63,6 +65,7 @@ export class CommandHandler {
     private workCommandRouter: WorkCommandRouter | null = null;
     private agentMessengerRef: AgentMessenger | null = null;
     private schedulerServiceRef: SchedulerService | null = null;
+    private subscriptionManagerRef: SubscriptionManager | null = null;
 
     constructor(
         db: Database,
@@ -91,6 +94,11 @@ export class CommandHandler {
     /** Inject the optional scheduler service reference. */
     setSchedulerService(service: SchedulerService): void {
         this.schedulerServiceRef = service;
+    }
+
+    /** Inject the subscription manager (required for /message command). */
+    setSubscriptionManager(manager: SubscriptionManager): void {
+        this.subscriptionManagerRef = manager;
     }
 
     /**
@@ -348,9 +356,114 @@ export class CommandHandler {
                 return true;
             }
 
+            case '/message': {
+                this.handleMessageCommand(participant, parts, respond);
+                return true;
+            }
+
             default:
                 return false;
         }
+    }
+
+    /**
+     * Handle the `/message [@agent] <text>` command from AlgoChat.
+     *
+     * Starts a conversation-only (no-tools) session with the specified agent.
+     * Available to all users (including basic-tier, non-owner addresses).
+     * Approved agents are identified by the algochat_enabled flag.
+     */
+    private handleMessageCommand(participant: string, parts: string[], respond: (text: string) => void): void {
+        const rest = parts.slice(1).join(' ').trim();
+        if (!rest) {
+            respond('Usage: /message [@agent] <message text>');
+            return;
+        }
+
+        if (!this.subscriptionManagerRef) {
+            respond('/message is not available — subscription service unavailable.');
+            return;
+        }
+
+        // Parse optional @AgentName prefix
+        let agentName: string | undefined;
+        let messageText: string = rest;
+        const mentionMatch = rest.match(/^@(\S+)\s+([\s\S]*)$/);
+        if (mentionMatch) {
+            agentName = mentionMatch[1];
+            messageText = mentionMatch[2].trim();
+        }
+
+        if (!messageText) {
+            respond('Usage: /message [@agent] <message text>');
+            return;
+        }
+
+        // Resolve agent — restricted to algochat-enabled (approved) agents
+        const agents = getAlgochatEnabledAgents(this.db);
+        let agent: (typeof agents)[0] | undefined;
+
+        if (agentName) {
+            const target = agentName.toLowerCase();
+            agent = agents.find(
+                (a) =>
+                    a.name.toLowerCase() === target ||
+                    a.name.toLowerCase().replace(/\s+/g, '') === target.replace(/\s+/g, ''),
+            );
+            if (!agent) {
+                const names = agents.map((a) => a.name).join(', ');
+                respond(`Agent not found: "@${agentName}". Available: ${names || 'none'}`);
+                return;
+            }
+        } else {
+            // Fall back to the default agent for new conversations
+            const defaultId = this.context.findAgentForNewConversation();
+            if (defaultId) {
+                agent = agents.find((a) => a.id === defaultId);
+            }
+            if (!agent && agents.length > 0) {
+                agent = agents[0];
+            }
+            if (!agent) {
+                respond('No agent available for /message.');
+                return;
+            }
+        }
+
+        // Resolve project
+        const projectId = agent.defaultProjectId ?? this.context.getDefaultProjectId();
+
+        // Create session in conversation-only mode (no tools, no worktree needed)
+        const session = createSession(this.db, {
+            projectId,
+            agentId: agent.id,
+            name: `AlgoChat message: ${participant.slice(0, 8)}...`,
+            initialPrompt: messageText,
+            source: 'algochat',
+            // No workDir — conversation only, no code execution
+        });
+
+        // Subscribe for the response before starting the process
+        this.subscriptionManagerRef.subscribeForResponse(session.id, participant);
+
+        // Start in no-tools mode — gracefully handles absence of tools
+        try {
+            this.processManager.startProcess(session, messageText, { conversationOnly: true });
+        } catch (err) {
+            log.error('Failed to start /message process', {
+                sessionId: session.id,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            respond('[Error: Failed to start agent session]');
+            return;
+        }
+
+        log.info('/message session started', {
+            sessionId: session.id,
+            agentName: agent.name,
+            participant: participant.slice(0, 8) + '...',
+            conversationOnly: true,
+        });
     }
 
     /**
