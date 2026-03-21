@@ -178,6 +178,11 @@ export const routes: Routes = [
             import('./features/skill-bundles/skill-bundle-list.component').then((m) => m.SkillBundleListComponent),
     },
     {
+        path: 'flock-directory',
+        loadComponent: () =>
+            import('./features/flock-directory/flock-directory.component').then((m) => m.FlockDirectoryComponent),
+    },
+    {
         path: 'reputation',
         loadComponent: () =>
             import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
