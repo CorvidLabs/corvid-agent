@@ -14,6 +14,7 @@ export const tables: string[] = [
         agent_model     TEXT NOT NULL,
         project_name    TEXT,
         channel_id      TEXT,
+        conversation_only INTEGER DEFAULT 0,
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 ];

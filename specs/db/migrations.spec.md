@@ -362,6 +362,7 @@ Adds `conversation_only` column to `discord_mention_sessions` for tracking wheth
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
 | 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |
 | 2026-03-15 | corvid-agent | Add migration 091 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migrations 087-089 to spec coverage |
