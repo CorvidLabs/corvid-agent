@@ -22,13 +22,14 @@ test.describe('Models', () => {
         await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         const tabs = page.locator('.tab');
-        expect(await tabs.count()).toBe(2);
+        // There are 3 tabs: Installed, Library, and OpenRouter
+        expect(await tabs.count()).toBe(3);
 
-        // Installed tab active by default
+        // Installed tab active by default (text includes model count, e.g. "Installed (0)")
         await expect(page.locator('.tab--active')).toContainText('Installed');
 
-        // Click Library tab
-        const libraryTab = page.locator('.tab:text("Library")');
+        // Click Library tab and verify it becomes active
+        const libraryTab = page.locator('.tab', { hasText: 'Library' });
         await libraryTab.click();
         await expect(libraryTab).toHaveClass(/tab--active/);
     });

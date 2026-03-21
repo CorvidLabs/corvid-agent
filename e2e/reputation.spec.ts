@@ -91,10 +91,13 @@ test.describe('Reputation', () => {
         await expect(card).toBeVisible({ timeout: 5000 });
         await card.click();
 
-        // Detail panel should open with heading and expanded bars
+        // Detail panel should open with heading
         await expect(page.locator('.detail-panel')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('.detail-panel h3')).toBeVisible();
-        await expect(page.locator('.detail-bar').first()).toBeVisible();
+        // Component details may render as explain-cards (with explanation) or detail-bars (without)
+        const hasExplainCards = await page.locator('.explain-card').count() > 0;
+        const hasDetailBars = await page.locator('.detail-bar').count() > 0;
+        expect(hasExplainCards || hasDetailBars).toBe(true);
     });
 
     test('Compute All button triggers recomputation', async ({ page, api }) => {
@@ -199,13 +202,20 @@ test.describe('Reputation', () => {
 
         await expect(page.locator('.detail-panel')).toBeVisible({ timeout: 5000 });
 
-        // Detail panel should have expanded bars
-        const detailBars = page.locator('.detail-bar');
-        expect(await detailBars.count()).toBe(5);
+        // Detail panel renders explain-cards when an explanation is available, or detail-bars otherwise
+        const hasExplainCards = await page.locator('.explain-card').count() > 0;
+        const hasDetailBars = await page.locator('.detail-bar').count() > 0;
+        expect(hasExplainCards || hasDetailBars).toBe(true);
 
-        // Each bar should have label, weight, and value
-        await expect(page.locator('.detail-bar__label').first()).toBeVisible();
-        await expect(page.locator('.detail-bar__value').first()).toBeVisible();
+        if (hasExplainCards) {
+            expect(await page.locator('.explain-card').count()).toBe(5);
+            await expect(page.locator('.explain-card__name').first()).toBeVisible();
+            await expect(page.locator('.explain-card__score').first()).toBeVisible();
+        } else {
+            expect(await page.locator('.detail-bar').count()).toBe(5);
+            await expect(page.locator('.detail-bar__label').first()).toBeVisible();
+            await expect(page.locator('.detail-bar__value').first()).toBeVisible();
+        }
     });
 
     test('event impact shows positive/negative coloring', async ({ page, api }) => {
@@ -249,8 +259,10 @@ test.describe('Reputation', () => {
         if (await attestation.count() > 0) {
             await expect(attestation).toBeVisible();
         }
-        // Regardless, the detail panel should show the expanded component bars
-        await expect(page.locator('.detail-bar').first()).toBeVisible();
+        // Regardless, the detail panel should show component details (explain-cards or detail-bars)
+        const hasExplainCards = await page.locator('.explain-card').count() > 0;
+        const hasDetailBars = await page.locator('.detail-bar').count() > 0;
+        expect(hasExplainCards || hasDetailBars).toBe(true);
     });
 
     test('API endpoints for reputation', async ({ api }) => {

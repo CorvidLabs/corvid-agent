@@ -116,6 +116,7 @@ const TABLES = [
         next_run_at        TEXT DEFAULT NULL,
         notify_address     TEXT DEFAULT NULL,
         trigger_events     TEXT DEFAULT NULL,
+        output_destinations TEXT DEFAULT NULL,
         tenant_id          TEXT NOT NULL DEFAULT 'default',
         created_at         TEXT DEFAULT (datetime('now')),
         updated_at         TEXT DEFAULT (datetime('now'))

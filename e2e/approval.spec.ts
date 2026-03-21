@@ -139,8 +139,14 @@ test.describe.serial('Approval Dialog Critical Path', () => {
                     },
                 });
 
-                // Dispatch a native MessageEvent on the socket
-                ws.dispatchEvent(new MessageEvent('message', { data: msg }));
+                // The Angular WebSocketService uses ws.onmessage = ... (not addEventListener),
+                // so dispatchEvent won't trigger it. Call onmessage directly.
+                const event = new MessageEvent('message', { data: msg });
+                if (typeof ws.onmessage === 'function') {
+                    ws.onmessage(event);
+                } else {
+                    ws.dispatchEvent(event);
+                }
             },
             {
                 req: {

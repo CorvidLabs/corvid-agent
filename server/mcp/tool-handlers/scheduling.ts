@@ -19,6 +19,7 @@ export async function handleManageSchedule(
         approval_policy?: string;
         max_executions?: number;
         schedule_id?: string;
+        output_destinations?: Array<{ type: string; target: string; format?: string }>;
     },
 ): Promise<CallToolResult> {
     try {
@@ -53,6 +54,12 @@ export async function handleManageSchedule(
                     prompt: a.prompt,
                 }));
 
+                const outputDestinations = args.output_destinations?.map((d) => ({
+                    type: d.type as import('../../../shared/types').ScheduleOutputDestinationType,
+                    target: d.target,
+                    format: d.format as import('../../../shared/types').ScheduleOutputFormat | undefined,
+                }));
+
                 const schedule = createSchedule(ctx.db, {
                     agentId: ctx.agentId,
                     name: args.name,
@@ -61,6 +68,7 @@ export async function handleManageSchedule(
                     intervalMs: intervalMs,
                     actions,
                     approvalPolicy: (args.approval_policy as 'auto' | 'owner_approve' | 'council_approve') ?? 'owner_approve',
+                    outputDestinations,
                 });
 
                 return textResult(
@@ -104,6 +112,14 @@ export async function handleManageSchedule(
                 if (args.max_executions !== undefined) {
                     updateInput.maxExecutions = args.max_executions;
                     changedFields.push('max_executions');
+                }
+                if (args.output_destinations !== undefined) {
+                    updateInput.outputDestinations = args.output_destinations.map((d) => ({
+                        type: d.type as import('../../../shared/types').ScheduleOutputDestinationType,
+                        target: d.target,
+                        format: d.format as import('../../../shared/types').ScheduleOutputFormat | undefined,
+                    }));
+                    changedFields.push('output_destinations');
                 }
 
                 if (changedFields.length === 0) {

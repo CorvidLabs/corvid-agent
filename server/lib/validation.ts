@@ -496,6 +496,12 @@ const ScheduleTriggerEventSchema = z.object({
     repo: z.string().optional(),
 });
 
+const ScheduleOutputDestinationSchema = z.object({
+    type: z.enum(['discord_channel', 'algochat_agent', 'algochat_address']),
+    target: z.string().min(1),
+    format: z.enum(['summary', 'full', 'on_error_only']).optional(),
+});
+
 export const CreateScheduleSchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
     name: z.string().min(1, 'name is required'),
@@ -508,6 +514,7 @@ export const CreateScheduleSchema = z.object({
     maxBudgetPerRun: z.number().min(0).optional(),
     notifyAddress: z.string().min(1).optional(),
     triggerEvents: z.array(ScheduleTriggerEventSchema).optional(),
+    outputDestinations: z.array(ScheduleOutputDestinationSchema).optional(),
 }).refine(
     (d) => d.cronExpression || d.intervalMs || (d.triggerEvents && d.triggerEvents.length > 0),
     { message: 'Either cronExpression, intervalMs, or triggerEvents must be provided' },
@@ -525,6 +532,7 @@ export const UpdateScheduleSchema = z.object({
     maxBudgetPerRun: z.number().min(0).optional(),
     notifyAddress: z.string().min(1).nullable().optional(),
     triggerEvents: z.array(ScheduleTriggerEventSchema).nullable().optional(),
+    outputDestinations: z.array(ScheduleOutputDestinationSchema).nullable().optional(),
 });
 
 export const ScheduleApprovalSchema = z.object({

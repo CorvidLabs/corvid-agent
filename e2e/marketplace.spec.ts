@@ -59,7 +59,7 @@ test.describe('Marketplace', () => {
         await page.locator('input[placeholder*="typescript"]').fill('test, e2e');
 
         // Submit
-        await page.locator('button:text("Create Listing")').click();
+        await page.locator('button.btn--primary:text("Create Listing")').click();
         await expect(page.locator('text=Listing created').first()).toBeVisible({ timeout: 10000 });
         await expect(page.locator('text=E2E Marketplace Listing').first()).toBeVisible();
     });
@@ -88,13 +88,17 @@ test.describe('Marketplace', () => {
 
         await gotoMarketplace(page);
 
-        // Click any visible listing card to open detail panel
+        // Click the specific seeded listing card to open detail panel
         await expect(page.locator('.listing-card').first()).toBeVisible({ timeout: 10000 });
-        await page.locator('.listing-card').first().click();
+        const targetCard = page.locator('.listing-card:has-text("Delete Target Listing")').first();
+        // Fall back to first card if the specific one isn't visible (search/filter timing)
+        const card = (await targetCard.count()) > 0 ? targetCard : page.locator('.listing-card').first();
+        await card.click();
         await expect(page.locator('.detail-panel')).toBeVisible({ timeout: 5000 });
 
-        // Delete button should be visible in detail panel
-        const deleteBtn = page.locator('.detail-panel button:text("Delete")').first();
+        // Delete button should be visible in detail panel — matches both
+        // `btn--danger` styled buttons and plain text buttons
+        const deleteBtn = page.locator('.detail-panel button').filter({ hasText: 'Delete' }).first();
         await expect(deleteBtn).toBeVisible({ timeout: 5000 });
         await deleteBtn.click();
         await expect(page.locator('text=Listing deleted').first()).toBeVisible({ timeout: 5000 });

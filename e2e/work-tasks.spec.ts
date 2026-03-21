@@ -18,6 +18,8 @@ test.describe('Work Tasks', () => {
         await api.seedWorkTask(agent.id, desc);
 
         await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
+        // The component may auto-select a non-"All" filter via setSmartDefaultFilter — click "All" to ensure all tasks are visible
+        await page.locator('.filter-btn').first().click();
         await expect(page.locator(`text=${desc}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -27,8 +29,10 @@ test.describe('Work Tasks', () => {
 
         await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
-        // Click "All" filter — should be active by default
+        // The component uses setSmartDefaultFilter() on init, so "All" may not be active by default.
+        // Click "All" explicitly to set it active, then verify.
         const allBtn = page.locator('.filter-btn').first();
+        await allBtn.click();
         await expect(allBtn).toHaveClass(/filter-btn--active/);
 
         // Click a different filter and verify active class toggles

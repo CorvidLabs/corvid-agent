@@ -8,6 +8,7 @@ import type {
     ScheduleAction,
     ScheduleActionType,
     ScheduleExecution,
+    ScheduleOutputDestination,
 } from '../../shared/types';
 import {
     updateExecutionStatus,
@@ -129,6 +130,7 @@ export async function runAction(
                     `Schedule "${schedule.name}" FAILED (${action.type}): ${resultSnippet}`);
             }
 
+            deliverToOutputDestinations(deps, schedule, updated);
             trackConsecutiveFailures(deps, schedule, updated);
         }
     }
@@ -185,4 +187,155 @@ function notifyScheduleEvent(
             error: err instanceof Error ? err.message : String(err),
         });
     });
+}
+
+// ─── Output Destination Delivery ────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, number> = {
+    completed: 0x2ecc71,  // green
+    failed: 0xe74c3c,     // red
+};
+
+async function sendToDiscordChannel(
+    channelId: string,
+    scheduleName: string,
+    actionType: string,
+    status: string,
+    result: string,
+): Promise<void> {
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!botToken) {
+        log.debug('No DISCORD_BOT_TOKEN — skipping Discord output destination');
+        return;
+    }
+
+    const embed = {
+        title: `Schedule: ${scheduleName}`,
+        description: result.slice(0, 4000),
+        color: STATUS_COLORS[status] ?? 0x3498db,
+        fields: [
+            { name: 'Action', value: actionType, inline: true },
+            { name: 'Status', value: status, inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+        footer: { text: 'Schedule Output' },
+    };
+
+    const response = await fetch(
+        `https://discord.com/api/v10/channels/${channelId}/messages`,
+        {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bot ${botToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ embeds: [embed] }),
+            signal: AbortSignal.timeout(10_000),
+        },
+    );
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        log.warn('Discord output destination delivery failed', {
+            channelId, status: response.status, error: text.slice(0, 200),
+        });
+    }
+}
+
+async function sendToAlgoChatAgent(
+    agentMessenger: AgentMessenger,
+    fromAgentId: string,
+    toAgentId: string,
+    scheduleName: string,
+    actionType: string,
+    result: string,
+): Promise<void> {
+    const msg = `[SCHEDULE:${actionType}] ${scheduleName}: ${result.slice(0, 200)}`;
+    await agentMessenger.sendOnChainToSelf(fromAgentId, msg);
+    // Note: direct agent-to-agent messaging would require agent lookup for address.
+    // For now, we broadcast on-chain where the target agent can observe it.
+    log.debug('AlgoChat agent output destination delivered', { fromAgentId, toAgentId });
+}
+
+async function sendToAlgoChatAddress(
+    agentMessenger: AgentMessenger,
+    fromAgentId: string,
+    toAddress: string,
+    scheduleName: string,
+    actionType: string,
+    result: string,
+): Promise<void> {
+    const msg = `[SCHEDULE:${actionType}] ${scheduleName}: ${result.slice(0, 200)}`;
+    await agentMessenger.sendNotificationToAddress(fromAgentId, toAddress, msg);
+}
+
+/** @internal exported for testing */
+export function shouldDeliver(
+    dest: ScheduleOutputDestination,
+    status: string,
+): boolean {
+    if (dest.format === 'on_error_only') return status === 'failed';
+    return true;
+}
+
+/** @internal exported for testing */
+export function formatResult(
+    dest: ScheduleOutputDestination,
+    result: string,
+): string {
+    if (dest.format === 'summary') return result.slice(0, 200);
+    return result;
+}
+
+/** @internal exported for testing */
+export function deliverToOutputDestinations(
+    deps: RunActionDeps,
+    schedule: AgentSchedule,
+    execution: ScheduleExecution,
+): void {
+    if (!schedule.outputDestinations?.length) return;
+
+    const result = execution.result ?? '';
+    const status = execution.status;
+
+    for (const dest of schedule.outputDestinations) {
+        if (!shouldDeliver(dest, status)) continue;
+
+        const formatted = formatResult(dest, result);
+
+        const promise = (async () => {
+            switch (dest.type) {
+                case 'discord_channel':
+                    await sendToDiscordChannel(
+                        dest.target, schedule.name, execution.actionType, status, formatted,
+                    );
+                    break;
+                case 'algochat_agent':
+                    if (deps.agentMessenger) {
+                        await sendToAlgoChatAgent(
+                            deps.agentMessenger, schedule.agentId, dest.target,
+                            schedule.name, execution.actionType, formatted,
+                        );
+                    }
+                    break;
+                case 'algochat_address':
+                    if (deps.agentMessenger) {
+                        await sendToAlgoChatAddress(
+                            deps.agentMessenger, schedule.agentId, dest.target,
+                            schedule.name, execution.actionType, formatted,
+                        );
+                    }
+                    break;
+            }
+        })();
+
+        promise.catch((err) => {
+            log.warn('Output destination delivery failed', {
+                scheduleId: schedule.id,
+                destType: dest.type,
+                target: dest.target,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
+    }
 }

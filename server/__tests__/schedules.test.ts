@@ -608,3 +608,88 @@ describe('findSchedulesForEvent', () => {
         expect(found!.triggerEvents![1].source).toBe('github_poll');
     });
 });
+
+// ─── Output Destinations ─────────────────────────────────────────────────────
+
+describe('Output Destinations', () => {
+    test('create schedule with output destinations', () => {
+        const destinations = [
+            { type: 'discord_channel' as const, target: '123456789', format: 'summary' as const },
+            { type: 'algochat_address' as const, target: 'ALGO_ADDR_123' },
+        ];
+
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'With Output Destinations',
+            actions: [{ type: 'daily_review' }],
+            outputDestinations: destinations,
+        });
+
+        expect(schedule.outputDestinations).toHaveLength(2);
+        expect(schedule.outputDestinations![0].type).toBe('discord_channel');
+        expect(schedule.outputDestinations![0].target).toBe('123456789');
+        expect(schedule.outputDestinations![0].format).toBe('summary');
+        expect(schedule.outputDestinations![1].type).toBe('algochat_address');
+        expect(schedule.outputDestinations![1].target).toBe('ALGO_ADDR_123');
+        expect(schedule.outputDestinations![1].format).toBeUndefined();
+    });
+
+    test('create schedule without output destinations defaults to null', () => {
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'No Destinations',
+            actions: [{ type: 'star_repo' }],
+        });
+
+        expect(schedule.outputDestinations).toBeNull();
+    });
+
+    test('update schedule output destinations', () => {
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'Update Dest Test',
+            actions: [{ type: 'work_task' }],
+        });
+
+        const updated = updateSchedule(db, schedule.id, {
+            outputDestinations: [
+                { type: 'discord_channel', target: '999888777', format: 'on_error_only' },
+            ],
+        });
+
+        expect(updated!.outputDestinations).toHaveLength(1);
+        expect(updated!.outputDestinations![0].type).toBe('discord_channel');
+        expect(updated!.outputDestinations![0].format).toBe('on_error_only');
+    });
+
+    test('clear output destinations by setting to null', () => {
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'Clear Dest Test',
+            actions: [{ type: 'work_task' }],
+            outputDestinations: [{ type: 'algochat_agent', target: 'agent-1' }],
+        });
+
+        expect(schedule.outputDestinations).toHaveLength(1);
+
+        const updated = updateSchedule(db, schedule.id, { outputDestinations: null });
+        expect(updated!.outputDestinations).toBeNull();
+    });
+
+    test('output destinations persist through get', () => {
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'Persist Test',
+            actions: [{ type: 'custom' }],
+            outputDestinations: [
+                { type: 'algochat_agent', target: 'agent-abc' },
+                { type: 'discord_channel', target: '111222333', format: 'full' },
+            ],
+        });
+
+        const found = getSchedule(db, schedule.id);
+        expect(found!.outputDestinations).toHaveLength(2);
+        expect(found!.outputDestinations![0].type).toBe('algochat_agent');
+        expect(found!.outputDestinations![1].format).toBe('full');
+    });
+});

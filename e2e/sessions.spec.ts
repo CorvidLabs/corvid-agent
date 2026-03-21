@@ -54,8 +54,8 @@ test.describe('Sessions', () => {
 
         await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
-        // Verify session table structure
-        await expect(page.locator('.session-table')).toBeVisible({ timeout: 10000 });
+        // Verify session table structure (use .first() since sessions are grouped by date — multiple .session-table elements may exist)
+        await expect(page.locator('.session-table').first()).toBeVisible({ timeout: 10000 });
 
         const rows = page.locator('.session-table__row');
         expect(await rows.count()).toBeGreaterThanOrEqual(1);
@@ -104,7 +104,7 @@ test.describe('Sessions', () => {
 
         await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
-        await expect(page.locator('.session-table')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.session-table').first()).toBeVisible({ timeout: 10000 });
 
         const badge = page.locator('.status-badge').first();
         if (await badge.count() > 0) {

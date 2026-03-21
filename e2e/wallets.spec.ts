@@ -12,8 +12,11 @@ test.describe('Wallets', () => {
     test('wallet list shows cards or empty', async ({ page }) => {
         await gotoWithRetry(page, '/wallets', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
+        // Wait for loading to finish
+        await page.locator('.loading').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+
         const hasCards = await page.locator('.wallet-card').count() > 0;
-        const hasEmpty = await page.locator('.empty').count() > 0;
+        const hasEmpty = await page.locator('.empty-state').count() > 0;
         expect(hasCards || hasEmpty).toBe(true);
 
         if (hasCards) {

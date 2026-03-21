@@ -44,6 +44,7 @@ function createMockSchedule(overrides: Partial<AgentSchedule> = {}): AgentSchedu
         maxBudgetPerRun: null,
         notifyAddress: null,
         triggerEvents: null,
+        outputDestinations: null,
         lastRunAt: null,
         nextRunAt: null,
         createdAt: new Date().toISOString(),

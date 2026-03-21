@@ -39,8 +39,11 @@ test.describe('System Logs', () => {
         await creditTab.click();
         await expect(creditTab).toHaveClass(/tab-btn--active/);
 
+        // Wait for loading to finish
+        await page.locator('.loading').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+
         const hasTable = await page.locator('.credit-table').count() > 0;
-        const hasEmpty = await page.locator('.empty').count() > 0;
+        const hasEmpty = await page.locator('.empty-state').count() > 0;
         expect(hasTable || hasEmpty).toBe(true);
 
         if (hasTable) {
