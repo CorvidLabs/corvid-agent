@@ -10,6 +10,7 @@ import {
     getProjectBundles, assignProjectBundle, unassignProjectBundle,
     resolveProjectPromptAdditions, resolveProjectTools,
 } from '../db/skill-bundles';
+import { DEFAULT_CORE_TOOLS } from '../mcp/default-tools';
 
 let db: Database;
 
@@ -270,13 +271,18 @@ describe('Tool and Prompt Resolution', () => {
         expect(result).toContain('corvid_deep_research');
     });
 
-    test('resolveAgentTools with null base returns bundle tools', () => {
+    test('resolveAgentTools with null base returns defaults + bundle tools', () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const bundle = createBundle(db, { name: 'Test', tools: ['corvid_web_search'] });
         assignBundle(db, agent.id, bundle.id);
 
         const result = resolveAgentTools(db, agent.id, null);
-        expect(result).toEqual(['corvid_web_search']);
+        // Should include all defaults AND the bundle tool
+        expect(result).toContain('corvid_web_search');
+        expect(result).toContain('corvid_save_memory');
+        expect(result).toContain('corvid_recall_memory');
+        expect(result).toContain('corvid_send_message');
+        expect(result!.length).toBeGreaterThanOrEqual(DEFAULT_CORE_TOOLS.length);
     });
 
     test('resolveAgentTools deduplicates overlapping tools', () => {
@@ -332,14 +338,17 @@ describe('Project Tool and Prompt Resolution', () => {
         expect(result).toContain('run_command');
     });
 
-    test('resolveProjectTools with null base returns bundle tools', () => {
+    test('resolveProjectTools with null base returns defaults + bundle tools', () => {
         const project = createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
         assignProjectBundle(db, project.id, 'preset-coder');
 
         const result = resolveProjectTools(db, project.id, null);
+        // Should include all defaults AND the bundle tools
         expect(result).toContain('read_file');
         expect(result).toContain('write_file');
-        expect(result!.length).toBe(6); // Coder has exactly 6 tools
+        expect(result).toContain('corvid_save_memory');
+        expect(result).toContain('corvid_recall_memory');
+        expect(result!.length).toBeGreaterThanOrEqual(DEFAULT_CORE_TOOLS.length);
     });
 
     test('resolveProjectPromptAdditions with no bundles returns empty', () => {
@@ -367,10 +376,12 @@ describe('Project Tool and Prompt Resolution', () => {
         // Project has Coder skills
         assignProjectBundle(db, project.id, 'preset-coder');
 
-        // Resolve agent tools first
+        // Resolve agent tools first — null base means defaults + GitHub Ops bundle
         const agentTools = resolveAgentTools(db, agent.id, null);
         expect(agentTools).toContain('corvid_github_list_prs');
-        expect(agentTools).not.toContain('read_file');
+        expect(agentTools).toContain('corvid_save_memory'); // defaults preserved
+        // read_file is in DEFAULT_CORE_TOOLS, so it IS present from defaults
+        expect(agentTools).toContain('read_file');
 
         // Then merge project tools on top
         const merged = resolveProjectTools(db, project.id, agentTools);

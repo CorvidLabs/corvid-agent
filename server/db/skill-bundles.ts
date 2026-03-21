@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { SkillBundle, CreateSkillBundleInput, UpdateSkillBundleInput } from '../../shared/types';
+import { DEFAULT_CORE_TOOLS } from '../mcp/default-tools';
 
 interface BundleRow {
     id: string;
@@ -142,8 +143,12 @@ export function resolveAgentTools(db: Database, agentId: string, basePermissions
     if (bundleTools.size === 0) return basePermissions;
 
     if (basePermissions === null) {
-        // No base permissions means "all default tools" — add bundle tools
-        return [...bundleTools];
+        // No base permissions means "all default tools" — merge defaults WITH bundle tools
+        const merged = new Set<string>(DEFAULT_CORE_TOOLS);
+        for (const tool of bundleTools) {
+            merged.add(tool);
+        }
+        return [...merged];
     }
 
     // Merge: base + bundle tools
@@ -215,7 +220,12 @@ export function resolveProjectTools(db: Database, projectId: string, basePermiss
     if (bundleTools.size === 0) return basePermissions;
 
     if (basePermissions === null) {
-        return [...bundleTools];
+        // No base permissions means "all default tools" — merge defaults WITH bundle tools
+        const merged = new Set<string>(DEFAULT_CORE_TOOLS);
+        for (const tool of bundleTools) {
+            merged.add(tool);
+        }
+        return [...merged];
     }
 
     const merged = new Set(basePermissions);

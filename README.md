@@ -190,7 +190,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |--------|-------|
 | Unit tests | **8,261** across 345 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **163** with automated specsync validation (100% file coverage) |
+| Module specs | **164** with automated specsync validation (100% file coverage) |
 | Test:code ratio | **1.14×** — more test code than production code |
 | MCP tools | **48** corvid_* tool handlers |
 | API endpoints | **~380** across 47 route modules |
