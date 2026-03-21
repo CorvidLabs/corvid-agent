@@ -269,7 +269,8 @@ async function sendToAlgoChatAddress(
     await agentMessenger.sendNotificationToAddress(fromAgentId, toAddress, msg);
 }
 
-function shouldDeliver(
+/** @internal exported for testing */
+export function shouldDeliver(
     dest: ScheduleOutputDestination,
     status: string,
 ): boolean {
@@ -277,7 +278,8 @@ function shouldDeliver(
     return true;
 }
 
-function formatResult(
+/** @internal exported for testing */
+export function formatResult(
     dest: ScheduleOutputDestination,
     result: string,
 ): string {
@@ -285,7 +287,8 @@ function formatResult(
     return result;
 }
 
-function deliverToOutputDestinations(
+/** @internal exported for testing */
+export function deliverToOutputDestinations(
     deps: RunActionDeps,
     schedule: AgentSchedule,
     execution: ScheduleExecution,
