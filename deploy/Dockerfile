@@ -19,7 +19,6 @@ WORKDIR /app
 
 # Install server dependencies only
 COPY package.json bun.lock* ./
-COPY patches/ patches/
 RUN bun install --frozen-lockfile --production
 
 # Copy server source
