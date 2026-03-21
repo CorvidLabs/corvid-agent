@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-8261%20unit%20%7C%20360%20E2E-brightgreen" alt="8261 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-8279%20unit%20%7C%20360%20E2E-brightgreen" alt="8279 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -188,7 +188,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **8,261** across 345 files |
+| Unit tests | **8,279** across 346 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **164** with automated specsync validation (100% file coverage) |
 | Test:code ratio | **1.14×** — more test code than production code |

@@ -746,6 +746,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Last refresh timestamp
     protected readonly lastRefresh = signal<string | null>(null);
 
+
     // Drag state for customize panel
     protected readonly dragIndex = signal(-1);
     // Drag state for widget grid

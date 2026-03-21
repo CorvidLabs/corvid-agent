@@ -461,6 +461,7 @@
     100% { transform: translateX(100%); }
 }
 
+
 /* Widget error boundary */
 .widget-error {
     background: var(--bg-surface); border: 1px solid var(--accent-red);

@@ -22,12 +22,14 @@ Heuristic detection of "cheerleading" responses — agent turns that acknowledge
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `isCheerleadingResponse` | `events: ClaudeStreamEvent[]` | `boolean` | Returns `true` if the turn contains no tool calls, is short, lacks substantive markers, and matches forward-commitment or enthusiasm patterns. |
+| `isStallTurn` | `events: ClaudeStreamEvent[]` | `boolean` | Returns `true` if the turn is cheerleading or has no tool calls and text shorter than `MIN_SUBSTANTIVE_LENGTH`. Used by OllamaStallEscalator. |
 
 ### Exported Constants
 
 | Constant | Type | Description |
 |----------|------|-------------|
 | `CHEERLEADING_WARNING_THRESHOLD` | `number` | Number of consecutive cheerleading turns (2) that should trigger an owner warning. |
+| `MIN_SUBSTANTIVE_LENGTH` | `number` | Minimum response length (in characters, default 100) below which a no-tool-call turn is considered a stall. |
 
 ## Invariants
 

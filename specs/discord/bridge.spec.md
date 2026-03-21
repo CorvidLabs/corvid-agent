@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 17
+version: 18
 status: active
 files:
   - server/discord/bridge.ts
@@ -22,6 +22,7 @@ files:
   - server/discord/reaction-handler.ts
   - server/discord/contact-linker.ts
   - server/discord/image-attachments.ts
+  - server/discord/command-handlers/message-commands.ts
 db_tables:
   - sessions
   - session_messages
