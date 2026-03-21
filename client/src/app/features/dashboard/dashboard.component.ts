@@ -89,18 +89,22 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                     <div class="view-toggle">
                         <button class="view-toggle__btn"
                                 [class.view-toggle__btn--active]="layoutService.viewMode() === 'simple'"
-                                (click)="layoutService.setViewMode('simple')">Simple</button>
+                                (click)="layoutService.setViewMode('simple')"
+                                title="Simplified view for everyday use">Simple</button>
                         <button class="view-toggle__btn"
                                 [class.view-toggle__btn--active]="layoutService.viewMode() === 'developer'"
-                                (click)="layoutService.setViewMode('developer')">Developer</button>
+                                (click)="layoutService.setViewMode('developer')"
+                                title="Full dashboard with metrics, charts, and developer tools">Developer</button>
                     </div>
-                    <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
-                        {{ layoutService.customizing() ? 'Done' : 'Customize' }}
-                    </button>
+                    @if (layoutService.viewMode() === 'developer') {
+                        <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
+                            {{ layoutService.customizing() ? 'Done' : 'Customize' }}
+                        </button>
+                    }
                 </div>
             </div>
 
-            <!-- Customize panel (slide-down) -->
+            <!-- Customize panel (developer mode only) -->
             @if (layoutService.customizing()) {
                 <div class="customize-panel">
                     <div class="customize-panel__header">
@@ -127,6 +131,18 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 </button>
                             </div>
                         }
+                    </div>
+                </div>
+            }
+
+            <!-- Simple mode hero prompt -->
+            @if (layoutService.viewMode() === 'simple') {
+                <div class="simple-prompt">
+                    <h2 class="simple-prompt__title">What would you like to build?</h2>
+                    <p class="simple-prompt__desc">Start a conversation with your agent to build something new, or check on active sessions below.</p>
+                    <div class="simple-prompt__actions">
+                        <button class="simple-prompt__btn simple-prompt__btn--primary" (click)="navigateTo('/sessions/new')">Start a Conversation</button>
+                        <button class="simple-prompt__btn" (click)="navigateTo('/chat')">Open Chat</button>
                     </div>
                 </div>
             }
