@@ -15,8 +15,14 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import type { ClaudeStreamEvent, AssistantEvent, ResultEvent, SessionExitedEvent } from '../process/types';
 import type { EventCallback } from '../process/interfaces';
+import {
+    OllamaStallEscalator,
+    type IEventSubscribable,
+    OLLAMA_STALL_THRESHOLD,
+    OLLAMA_STALL_ESCALATION_ENABLED,
+} from '../process/ollama-stall-escalator';
 
-// ── Module mocks (must precede import of the module under test) ──────────
+// ── Mock functions (injected via constructor DI, no mock.module) ─────────
 
 const mockGetSession = mock((_db: unknown, _id: string) => ({
     id: _id,
@@ -92,19 +98,6 @@ const mockCreateWorkTask = mock((_db: unknown, _params: unknown) => ({
     completedAt: null,
 }));
 
-mock.module('../db/sessions', () => ({ getSession: mockGetSession }));
-mock.module('../db/agents', () => ({ getAgent: mockGetAgent }));
-mock.module('../db/work-tasks', () => ({ createWorkTask: mockCreateWorkTask }));
-
-// ── Import AFTER mock.module calls ───────────────────────────────────────
-
-import {
-    OllamaStallEscalator,
-    type IEventSubscribable,
-    OLLAMA_STALL_THRESHOLD,
-    OLLAMA_STALL_ESCALATION_ENABLED,
-} from '../process/ollama-stall-escalator';
-
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function createMockEventSource() {
@@ -123,6 +116,13 @@ function createMockEventSource() {
 }
 
 const dummyDb = {} as import('bun:sqlite').Database;
+
+/** Shared DI overrides so we don't need mock.module. */
+const diOverrides = {
+    getSession: mockGetSession as any,
+    getAgent: mockGetAgent as any,
+    createWorkTask: mockCreateWorkTask as any,
+};
 
 function createMockNotifier() {
     return {
@@ -193,7 +193,7 @@ describe('OllamaStallEscalator — stall detection', () => {
     });
 
     test('counts consecutive cheerleading turns as stalled', () => {
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-cheer';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
@@ -202,14 +202,14 @@ describe('OllamaStallEscalator — stall detection', () => {
     });
 
     test('counts short no-tool turns as stalled', () => {
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-short';
         ms.emit(sid, shortNoToolEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
     });
 
     test('resets counter on substantive turn', () => {
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-reset';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
@@ -218,7 +218,7 @@ describe('OllamaStallEscalator — stall detection', () => {
     });
 
     test('resets counter when turn has tool calls', () => {
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-toolcall';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
@@ -241,7 +241,7 @@ describe('OllamaStallEscalator — escalation trigger', () => {
     });
 
     test('triggers escalation after threshold stalled turns', async () => {
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 3 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 3 });
         const sid = 'sid-esc1';
         for (let i = 0; i < 3; i++) { ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent()); }
         await Promise.resolve();
@@ -250,7 +250,7 @@ describe('OllamaStallEscalator — escalation trigger', () => {
     });
 
     test('creates work task with escalated_from_session_id in requesterInfo', async () => {
-        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1 });
+        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
         const sid = 'sid-esc-task';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -261,7 +261,7 @@ describe('OllamaStallEscalator — escalation trigger', () => {
     });
 
     test('notification contains session id and warning level', async () => {
-        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1 });
+        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
         const sid = 'sid-esc2';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -272,7 +272,7 @@ describe('OllamaStallEscalator — escalation trigger', () => {
     });
 
     test('does not double-escalate the same session', async () => {
-        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1 });
+        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
         const sid = 'sid-esc3';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -293,7 +293,7 @@ describe('OllamaStallEscalator — config flags', () => {
     test('does nothing when enabled=false', async () => {
         const ms = createMockEventSource();
         const notifier = createMockNotifier();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1, enabled: false });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1, enabled: false });
         const sid = 'sid-dis';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -304,7 +304,7 @@ describe('OllamaStallEscalator — config flags', () => {
     test('uses custom threshold', async () => {
         const ms = createMockEventSource();
         const notifier = createMockNotifier();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 2 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 2 });
         const sid = 'sid-thresh';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -332,7 +332,7 @@ describe('OllamaStallEscalator — non-Ollama sessions', () => {
         const notifier = createMockNotifier();
         mockGetAgent.mockImplementation((_db, id) => ({ ...ollamaAgentStub(id as string), provider: 'anthropic', model: 'claude-sonnet-4-6' }));
 
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
         const sid = 'sid-claude';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();
@@ -351,7 +351,7 @@ describe('OllamaStallEscalator — lifecycle', () => {
 
     test('cleans up state on session_exited event', () => {
         const ms = createMockEventSource();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-lc1';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
@@ -361,7 +361,7 @@ describe('OllamaStallEscalator — lifecycle', () => {
 
     test('cleans up state on session_stopped event', () => {
         const ms = createMockEventSource();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, ...diOverrides, threshold: 5 });
         const sid = 'sid-lc2';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         expect(e.getConsecutiveStalledTurns(sid)).toBe(1);
@@ -371,7 +371,7 @@ describe('OllamaStallEscalator — lifecycle', () => {
 
     test('destroy() unsubscribes from event source', () => {
         const ms = createMockEventSource();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, ...diOverrides, threshold: 5 });
         expect(ms.callbacks.length).toBe(1);
         e.destroy(ms.source);
         expect(ms.callbacks.length).toBe(0);
@@ -379,7 +379,7 @@ describe('OllamaStallEscalator — lifecycle', () => {
 
     test('tracks multiple sessions independently', () => {
         const ms = createMockEventSource();
-        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, threshold: 5 });
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: createMockNotifier() as never, ...diOverrides, threshold: 5 });
         const sid1 = 'sid-multi-a';
         const sid2 = 'sid-multi-b';
         ms.emit(sid1, cheerleadingEvent()); ms.emit(sid1, resultEvent());
@@ -397,7 +397,7 @@ describe('OllamaStallEscalator — work task metadata', () => {
         const notifier = createMockNotifier();
         mockGetAgent.mockImplementation((_db, id) => ollamaAgentStub(id as string));
 
-        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, threshold: 1 });
+        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
         const sid = 'sid-meta';
         ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
         await Promise.resolve();

@@ -95,6 +95,9 @@ export class OllamaStallEscalator {
     private readonly notificationService: NotificationService;
     private readonly threshold: number;
     private readonly enabled: boolean;
+    private readonly _getSession: typeof getSession;
+    private readonly _getAgent: typeof getAgent;
+    private readonly _createWorkTask: typeof createWorkTask;
 
     constructor(opts: {
         eventSource: IEventSubscribable;
@@ -104,11 +107,20 @@ export class OllamaStallEscalator {
         threshold?: number;
         /** Override enabled flag (used in tests). Defaults to OLLAMA_STALL_ESCALATION_ENABLED. */
         enabled?: boolean;
+        /** Override for testing — avoids mock.module leaks. */
+        getSession?: typeof getSession;
+        /** Override for testing — avoids mock.module leaks. */
+        getAgent?: typeof getAgent;
+        /** Override for testing — avoids mock.module leaks. */
+        createWorkTask?: typeof createWorkTask;
     }) {
         this.db = opts.db;
         this.notificationService = opts.notificationService;
         this.threshold = opts.threshold ?? OLLAMA_STALL_THRESHOLD;
         this.enabled = opts.enabled ?? OLLAMA_STALL_ESCALATION_ENABLED;
+        this._getSession = opts.getSession ?? getSession;
+        this._getAgent = opts.getAgent ?? getAgent;
+        this._createWorkTask = opts.createWorkTask ?? createWorkTask;
 
         this.boundCallback = (sessionId, event) => this.handleEvent(sessionId, event);
         opts.eventSource.subscribeAll(this.boundCallback);
@@ -168,14 +180,14 @@ export class OllamaStallEscalator {
         }
 
         try {
-            const session = getSession(this.db, sessionId);
+            const session = this._getSession(this.db, sessionId);
             if (!session?.agentId) {
                 state.providerType = '';
                 state.isOllamaSession = false;
                 return false;
             }
 
-            const agent = getAgent(this.db, session.agentId);
+            const agent = this._getAgent(this.db, session.agentId);
             state.providerType = agent?.provider ?? '';
             state.isOllamaSession = state.providerType === 'ollama';
         } catch (err) {
@@ -245,14 +257,14 @@ export class OllamaStallEscalator {
         });
 
         try {
-            const session = getSession(this.db, sessionId);
+            const session = this._getSession(this.db, sessionId);
             if (!session) {
                 log.warn('Escalation aborted — session not found', { sessionId });
                 return;
             }
 
             // Create a new work task for the same goal
-            const task = createWorkTask(this.db, {
+            const task = this._createWorkTask(this.db, {
                 agentId: session.agentId ?? '',
                 projectId: session.projectId ?? '',
                 description: session.initialPrompt ?? '(no prompt)',
