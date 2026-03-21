@@ -40,7 +40,7 @@ jobs:
 
       - name: Spec validation (strict + 100% coverage)
         # https://github.com/marketplace/actions/spec-sync
-        uses: CorvidLabs/spec-sync@v1
+        uses: CorvidLabs/spec-sync@6d9a8970b6f7534c33424fe13239b6c824fda336
         with:
           strict: 'true'
           require-coverage: '100'
