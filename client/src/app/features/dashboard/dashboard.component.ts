@@ -132,7 +132,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             }
 
             <!-- Widget grid: render visible widgets in order -->
-            <div class="widget-grid">
+            <div class="widget-grid stagger-children">
                 @for (widget of layoutService.visibleWidgets(); track widget.id; let i = $index) {
                     <div class="widget"
                          [attr.data-widget]="widget.id"
@@ -152,7 +152,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
 
                         <!-- metrics -->
                         @if (widget.id === 'metrics') {
-                            <div class="metrics-row">
+                            <div class="metrics-row stagger-scale">
                                 <div class="metric-card">
                                     <span class="metric-card__label">Total Agents</span>
                                     <span class="metric-card__value">{{ agentService.agents().length }}</span>

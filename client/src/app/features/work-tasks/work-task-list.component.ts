@@ -80,7 +80,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
                 </div>
             } @else {
-                <div class="task-list">
+                <div class="task-list stagger-rows">
                     @for (task of filteredTasks(); track task.id) {
                         <div class="task-card" [attr.data-status]="getDisplayStatus(task)">
                             <div class="task-card__header">

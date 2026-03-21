@@ -131,7 +131,7 @@ interface FlockStats {
                         </p>
                     </div>
                 } @else {
-                    <div class="flock-grid">
+                    <div class="flock-grid stagger-children">
                         @for (agent of agents(); track agent.id) {
                             <button class="flock-card" (click)="selectAgent(agent)" [class.flock-card--selected]="selectedAgent()?.id === agent.id" type="button">
                                 <div class="flock-card__header">
@@ -283,6 +283,11 @@ interface FlockStats {
             padding: 1.5rem;
             max-width: 1200px;
             margin: 0 auto;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Header */
@@ -454,28 +459,61 @@ interface FlockStats {
             margin: 0;
         }
 
-        /* Agent Grid */
+        /* Agent Grid — fluid with container queries */
+        :host { container-type: inline-size; }
         .flock-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 0.85rem;
+        }
+        @container (max-width: 580px) {
+            .flock-grid { grid-template-columns: 1fr; }
+        }
+        @container (min-width: 581px) and (max-width: 900px) {
+            .flock-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @container (min-width: 1200px) {
+            .flock-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
         }
 
-        /* Agent Card */
+        /* Agent Card — glassmorphic with lift */
         .flock-card {
             display: flex;
             flex-direction: column;
             padding: 1rem;
-            background: var(--bg-surface, #1a1a2e);
-            border: 1px solid var(--border, #2a2a3e);
-            border-radius: 10px;
+            background: rgba(15, 16, 24, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-xl, 16px);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s, background 0.25s;
             text-align: left;
             color: inherit;
             font-family: inherit;
+            position: relative;
         }
-        .flock-card:hover { border-color: var(--accent-cyan, #0ef); transform: translateY(-1px); }
+        .flock-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(255, 0, 170, 0.15), rgba(0, 255, 136, 0.1));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .flock-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 229, 255, 0.06);
+            background: rgba(15, 16, 24, 0.75);
+        }
+        .flock-card:hover::before { opacity: 1; }
+        .flock-card:active { transform: translateY(-1px); transition-duration: 0.1s; }
         .flock-card--selected { border-color: var(--accent-magenta, #f08); }
 
         .flock-card__header {
@@ -598,26 +636,35 @@ interface FlockStats {
             inset: 0;
             z-index: 9998;
             background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             display: flex;
             justify-content: center;
             padding-top: 8vh;
-            animation: fadeIn 0.1s ease;
+            animation: fadeIn 0.15s ease-out;
         }
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        @keyframes panelSlideUp {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
 
         .flock-detail {
             width: 520px;
             max-height: 80vh;
-            background: var(--bg-surface, #1a1a2e);
-            border: 1px solid var(--border-bright, #444);
-            border-radius: 12px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            background: rgba(15, 16, 24, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-xl, 16px);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 32px rgba(0, 229, 255, 0.04);
             overflow-y: auto;
             align-self: flex-start;
             padding: 1.5rem;
+            animation: panelSlideUp 0.25s ease-out;
         }
 
         .flock-detail__header {

@@ -203,7 +203,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                 <span class="status-group__count">{{ group.schedules.length }}</span>
                             </button>
                             @if (!collapsedGroups()[group.status]) {
-                                <div class="schedule-list">
+                                <div class="schedule-list stagger-rows">
                                     @for (schedule of group.schedules; track schedule.id) {
                                         <div class="schedule-card" [attr.data-status]="schedule.status" [class.schedule-card--expanded]="expandedScheduleId() === schedule.id" (click)="toggleSchedule(schedule.id)">
                                             <div class="schedule-card__header">

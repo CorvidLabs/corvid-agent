@@ -95,7 +95,7 @@ interface SessionGroup {
                 @for (group of groupedSessions(); track group.label) {
                     <div class="session-group">
                         <div class="session-group__label">{{ group.label }} ({{ group.total }})</div>
-                        <div class="session-table">
+                        <div class="session-table stagger-rows">
                             <div class="session-table__header">
                                 <span>Name</span>
                                 <span>Agent</span>

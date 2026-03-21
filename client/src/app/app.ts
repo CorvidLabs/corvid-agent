@@ -64,6 +64,8 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             position: relative;
             background: var(--bg-deep);
             overflow-y: auto;
+            scroll-behavior: smooth;
+            container-type: inline-size;
         }
         .app-layout__banner {
             padding: 0.375rem 1rem;

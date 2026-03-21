@@ -263,6 +263,11 @@ button:active:not(:disabled) {
     animation: fadeIn var(--transition-slow) ease-out;
 }
 
+/* Auto-apply entrance animation to .page containers */
+.page {
+    animation: slideUp 0.3s ease-out;
+}
+
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
@@ -282,6 +287,110 @@ button:active:not(:disabled) {
 @keyframes subtlePulse {
     0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
     50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+}
+
+/* ── Staggered entrance animation ── */
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes rowReveal {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stagger utility: apply to grid/list children via --stagger-index */
+.stagger-children > * {
+    opacity: 0;
+    animation: slideUp 0.35s ease-out forwards;
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(11) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(12) { animation-delay: 440ms; }
+.stagger-children > *:nth-child(n+13) { animation-delay: 480ms; }
+
+/* Row stagger: for table-like lists */
+.stagger-rows > * {
+    opacity: 0;
+    animation: rowReveal 0.25s ease-out forwards;
+}
+.stagger-rows > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-rows > *:nth-child(2)  { animation-delay: 30ms; }
+.stagger-rows > *:nth-child(3)  { animation-delay: 60ms; }
+.stagger-rows > *:nth-child(4)  { animation-delay: 90ms; }
+.stagger-rows > *:nth-child(5)  { animation-delay: 120ms; }
+.stagger-rows > *:nth-child(6)  { animation-delay: 150ms; }
+.stagger-rows > *:nth-child(7)  { animation-delay: 180ms; }
+.stagger-rows > *:nth-child(8)  { animation-delay: 210ms; }
+.stagger-rows > *:nth-child(9)  { animation-delay: 240ms; }
+.stagger-rows > *:nth-child(10) { animation-delay: 270ms; }
+.stagger-rows > *:nth-child(n+11) { animation-delay: 300ms; }
+
+/* Scale-in stagger: for metric cards */
+.stagger-scale > * {
+    opacity: 0;
+    animation: scaleIn 0.3s ease-out forwards;
+}
+.stagger-scale > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-scale > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-scale > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-scale > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-scale > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-scale > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-scale > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-scale > *:nth-child(8) { animation-delay: 420ms; }
+.stagger-scale > *:nth-child(n+9) { animation-delay: 480ms; }
+
+/* ── Container query support ── */
+.cq-container {
+    container-type: inline-size;
+}
+
+/* ── Fluid grid utility ── */
+.fluid-grid {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(auto-fill, minmax(var(--fluid-min, 280px), 1fr));
+}
+
+@container (max-width: 600px) {
+    .fluid-grid { grid-template-columns: 1fr; }
+}
+@container (min-width: 601px) and (max-width: 900px) {
+    .fluid-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Interactive card with lift + glow ── */
+.card-interactive {
+    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+.card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 24px rgba(0, 229, 255, 0.08);
+}
+.card-interactive:active {
+    transform: translateY(-1px);
+    transition-duration: 0.1s;
 }
 
 /* ── Glassmorphism utility ── */
