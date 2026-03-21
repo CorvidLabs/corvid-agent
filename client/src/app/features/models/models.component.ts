@@ -268,7 +268,7 @@ interface LibraryResponse {
                                 <div class="model-card__details">
                                     <span class="detail">Context: {{ model.contextLength | number }} tokens</span>
                                     <span class="detail">
-                                        Price: ${{ model.pricing.promptPerMillion | number:'1.2-2' }}/${{ model.pricing.completionPerMillion | number:'1.2-2' }} /M
+                                        Price: <span>$</span>{{ model.pricing.promptPerMillion | number:'1.2-2' }}/<span>$</span>{{ model.pricing.completionPerMillion | number:'1.2-2' }} /M
                                     </span>
                                 </div>
                                 <div class="model-card__id">{{ model.id }}</div>
