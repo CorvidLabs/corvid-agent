@@ -420,4 +420,51 @@ describe('Session Routes', () => {
             expect(data.error).toContain('Escalation failed');
         });
     });
+
+    // ─── Ollama complexity warning ──────────────────────────────────────────
+
+    describe('Ollama complexity warning on session create', () => {
+        it('returns complexityWarning when Ollama agent receives complex prompt', async () => {
+            const pm = createMockPM();
+            const ollamaAgentId = crypto.randomUUID();
+            db.query(
+                "INSERT INTO agents (id, name, system_prompt, model, provider) VALUES (?, 'OllamaAgent', 'test', 'llama3.3', 'ollama')",
+            ).run(ollamaAgentId);
+
+            const complexPrompt =
+                'Refactor the authentication system, migrate to JWT tokens, and optimize all database queries for performance and security.';
+            const { req, url } = fakeReq('POST', '/api/sessions', {
+                projectId,
+                name: 'Ollama Complex Session',
+                agentId: ollamaAgentId,
+                initialPrompt: complexPrompt,
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(201);
+            const data = await res!.json();
+            expect(data.complexityWarning).toBeDefined();
+            expect(typeof data.complexityWarning).toBe('string');
+            expect(data.complexityWarning).toContain('llama3.3');
+        });
+
+        it('does not return complexityWarning for non-Ollama agent', async () => {
+            const pm = createMockPM();
+            const claudeAgentId = crypto.randomUUID();
+            db.query(
+                "INSERT INTO agents (id, name, system_prompt, model, provider) VALUES (?, 'ClaudeAgent', 'test', 'claude-sonnet-4-6', 'anthropic')",
+            ).run(claudeAgentId);
+
+            const { req, url } = fakeReq('POST', '/api/sessions', {
+                projectId,
+                name: 'Claude Complex Session',
+                agentId: claudeAgentId,
+                initialPrompt:
+                    'Refactor the authentication system, migrate to JWT tokens, and optimize all database queries.',
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(201);
+            const data = await res!.json();
+            expect(data.complexityWarning).toBeUndefined();
+        });
+    });
 });
