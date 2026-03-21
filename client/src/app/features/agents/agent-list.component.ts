@@ -42,7 +42,8 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                 <a class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
             </div>
 
-            <!-- Search Bar -->
+            <!-- Search + Filters (sticky) -->
+            <div class="sticky-toolbar">
             <div class="search-bar">
                 <input
                     class="search-input"
@@ -94,6 +95,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                     </select>
                 </div>
             </div>
+            </div><!-- /sticky-toolbar -->
 
             @if (agentService.loading()) {
                 <app-skeleton variant="table" [count]="5" />

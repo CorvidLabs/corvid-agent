@@ -28,7 +28,8 @@ interface SessionGroup {
                 <a class="btn btn--primary" routerLink="/sessions/new">+ New Conversation</a>
             </div>
 
-            <!-- Search -->
+            <!-- Search + Filters (sticky) -->
+            <div class="sticky-toolbar">
             <div class="search-bar">
                 <input
                     class="search-input"
@@ -58,6 +59,8 @@ interface SessionGroup {
                     <option value="algochat">AlgoChat</option>
                 </select>
             </div>
+
+            </div><!-- /sticky-toolbar -->
 
             <!-- Bulk Actions -->
             @if (runningCount() > 0 || completedCount() > 0) {
@@ -105,7 +108,7 @@ interface SessionGroup {
                                 <span>Time</span>
                             </div>
                             @for (session of group.sessions; track session.id) {
-                                <a class="session-table__row" [routerLink]="['/sessions', session.id]"
+                                <a class="session-table__row row-highlight" [routerLink]="['/sessions', session.id]"
                                    [class.session-table__row--running]="session.status === 'running' || session.status === 'loading'">
                                     <span class="session-table__name" [title]="sessionDisplayName(session)">{{ sessionDisplayName(session) }}</span>
                                     <span class="session-table__agent" [title]="getAgentName(session.agentId)">{{ getAgentName(session.agentId) }}</span>
@@ -194,6 +197,8 @@ interface SessionGroup {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
             padding: 0.5rem 1rem; background: var(--bg-raised); font-size: 0.7rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);
+            position: sticky; top: 0; z-index: 5;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
         .session-table__row {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;

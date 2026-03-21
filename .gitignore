@@ -19,6 +19,8 @@ corvid-screenshots/
 playwright-report/
 coverage/
 blob-report/
+e2e/screenshots/
+client/e2e/
 backups/
 git-focus/
 

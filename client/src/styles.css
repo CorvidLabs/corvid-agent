@@ -644,3 +644,171 @@ button[type="submit"]:hover::after {
     from { transform: scaleX(0); }
     to { transform: scaleX(1); }
 }
+
+/* ══════════════════════════════════════════════════════════
+   Phase 4 — Custom selects, sticky toolbars, scroll polish
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Custom select styling ── */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7d98'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 6px;
+    padding-right: 24px !important;
+    cursor: pointer;
+}
+select:hover {
+    border-color: var(--border-bright);
+    color: var(--text-primary);
+}
+select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300e5ff'/%3E%3C/svg%3E");
+}
+
+/* ── Sticky toolbar utility ── */
+.sticky-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-deep);
+    padding-bottom: 0.75rem;
+}
+.sticky-toolbar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+/* ── Enhanced row hover with highlight line ── */
+.row-highlight {
+    position: relative;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.row-highlight::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 2px;
+    background: var(--accent-cyan);
+    border-radius: 1px;
+    transform: scaleY(0);
+    transition: transform 0.15s ease;
+}
+.row-highlight:hover::before {
+    transform: scaleY(1);
+}
+
+/* ── Card unified hover ── */
+.card-lift {
+    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(0, 229, 255, 0.06);
+    border-color: rgba(0, 229, 255, 0.12);
+}
+.card-lift:active {
+    transform: translateY(-1px);
+    transition-duration: 0.08s;
+}
+
+/* ── Scroll-to-top button ── */
+.scroll-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-bright);
+    color: var(--accent-cyan);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    pointer-events: none;
+    z-index: 50;
+}
+.scroll-to-top--visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.scroll-to-top:hover {
+    box-shadow: var(--glow-cyan);
+    border-color: var(--accent-cyan);
+}
+
+/* ── Page skeleton loading ── */
+@keyframes skeletonFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.skeleton-page {
+    padding: 1.5rem;
+    animation: skeletonFadeIn 0.2s ease-out;
+}
+.skeleton-page__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+.skeleton-page__title {
+    width: 180px;
+    height: 1.8rem;
+}
+.skeleton-page__action {
+    width: 120px;
+    height: 2rem;
+    border-radius: var(--radius);
+}
+.skeleton-page__toolbar {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+.skeleton-page__chip {
+    width: 70px;
+    height: 1.5rem;
+    border-radius: var(--radius-sm);
+}
+
+/* ── Smooth content transitions ── */
+@keyframes viewEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.view-enter {
+    animation: viewEnter 0.25s ease-out;
+}
+
+/* ── Smooth scroll ── */
+.app-layout__content {
+    scroll-behavior: smooth;
+}
+
+/* ── Phase 4 reduced-motion overrides ── */
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top { transition: none; }
+    .row-highlight::before { transition: none; }
+    .card-lift:hover { transform: none; }
+    .app-layout__content { scroll-behavior: auto; }
+}

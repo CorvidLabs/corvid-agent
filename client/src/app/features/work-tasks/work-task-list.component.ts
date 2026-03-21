@@ -40,7 +40,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                 </div>
             }
 
-            <div class="tasks__filter-row">
+            <div class="tasks__filter-row sticky-toolbar">
                 <div class="tasks__filters">
                     <button
                         class="filter-btn"
@@ -251,9 +251,9 @@ import { WorkTask } from '../../core/models/work-task.model';
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             padding: 1rem;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, transform 0.2s ease, box-shadow 0.25s ease;
         }
-        .task-card:hover { border-color: var(--border-bright); }
+        .task-card:hover { border-color: var(--border-bright); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); }
         .task-card[data-status="running"],
         .task-card[data-status="branching"],
         .task-card[data-status="validating"] {
