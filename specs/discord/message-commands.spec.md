@@ -30,7 +30,8 @@ Handles the Discord `/message` slash command — a pure conversation mode with n
 3. Agent name matching is case-insensitive and strips model suffixes like ` (claude-opus-4-6)`.
 4. Sessions are created with `conversationOnly: true` — no coding tools are available.
 5. Session name follows the pattern `Discord message:<channelId>`.
-6. The mention session is persisted both in-memory (`ctx.mentionSessions`) and in the database for server restart recovery.
+6. No worktree is created (no coding tools means no git isolation needed).
+7. The mention session is persisted both in-memory (`ctx.mentionSessions`) and in the database for server restart recovery.
 
 ## Behavioral Examples
 
