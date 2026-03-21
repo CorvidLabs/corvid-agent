@@ -52,7 +52,7 @@ None — this module has no imports.
 
 | Module | What is used |
 |--------|-------------|
-| `server/mcp/skill-bundles.ts` | `DEFAULT_CORE_TOOLS` for merging bundle tools with defaults |
+| `server/db/skill-bundles.ts` | `DEFAULT_CORE_TOOLS` for merging bundle tools with defaults |
 
 ## Change Log
 
