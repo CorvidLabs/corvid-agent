@@ -27,8 +27,8 @@ describe('filePathPriority', () => {
         expect(filePathPriority('lib/utils.ts')).toBe(1);
     });
 
-    test('returns 1 for packages/ prefixed files', () => {
-        expect(filePathPriority('packages/core/index.ts')).toBe(1);
+    test('returns 2 for packages/ prefixed files (not prioritized)', () => {
+        expect(filePathPriority('packages/core/index.ts')).toBe(2);
     });
 
     test('returns 3 for __tests__ files', () => {
@@ -133,7 +133,6 @@ describe('PRIORITY_DIRS', () => {
         expect(PRIORITY_DIRS).toContain('src/');
         expect(PRIORITY_DIRS).toContain('server/');
         expect(PRIORITY_DIRS).toContain('lib/');
-        expect(PRIORITY_DIRS).toContain('packages/');
     });
 });
 

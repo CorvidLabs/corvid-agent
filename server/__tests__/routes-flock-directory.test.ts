@@ -33,7 +33,7 @@ function createMockService(overrides?: Partial<FlockDirectoryService>): FlockDir
         search: mock(() => ({ agents: [], total: 0, limit: 50, offset: 0 })),
         getStats: mock(() => ({ total: 5, active: 3, inactive: 2 })),
         listActive: mock(() => []),
-        register: mock(() => ({
+        register: mock(() => Promise.resolve({
             id: 'new-id',
             address: VALID_ADDR1,
             name: 'TestAgent',
@@ -52,8 +52,8 @@ function createMockService(overrides?: Partial<FlockDirectoryService>): FlockDir
         getById: mock(() => null),
         getByAddress: mock(() => null),
         update: mock(() => null),
-        deregister: mock(() => false),
-        heartbeat: mock(() => false),
+        deregister: mock(() => Promise.resolve(false)),
+        heartbeat: mock(() => Promise.resolve(false)),
         ...overrides,
     } as unknown as FlockDirectoryService;
 }
@@ -326,7 +326,7 @@ describe('Flock Directory Routes', () => {
     // ─── DELETE by ID ────────────────────────────────────────────────────────
 
     it('DELETE /api/flock-directory/agents/:id deregisters agent', async () => {
-        const svc = createMockService({ deregister: mock(() => true) });
+        const svc = createMockService({ deregister: mock(() => Promise.resolve(true)) });
         const { req, url } = fakeReq('DELETE', '/api/flock-directory/agents/agent-1');
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();
@@ -369,7 +369,7 @@ describe('Flock Directory Routes', () => {
     // ─── Heartbeat ───────────────────────────────────────────────────────────
 
     it('POST /api/flock-directory/agents/:id/heartbeat succeeds', async () => {
-        const svc = createMockService({ heartbeat: mock(() => true) });
+        const svc = createMockService({ heartbeat: mock(() => Promise.resolve(true)) });
         const { req, url } = fakeReq('POST', '/api/flock-directory/agents/agent-1/heartbeat');
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();

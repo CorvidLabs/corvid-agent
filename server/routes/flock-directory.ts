@@ -90,7 +90,7 @@ export function handleFlockDirectoryRoutes(
         return (async () => {
             try {
                 const body = await parseBodyOrThrow(req, RegisterAgentSchema);
-                const agent = flockDirectory.register(body);
+                const agent = await flockDirectory.register(body);
                 return json(agent, 201);
             } catch (err) {
                 if (err instanceof ValidationError) return badRequest(err.message);
@@ -126,9 +126,15 @@ export function handleFlockDirectoryRoutes(
         }
 
         if (method === 'DELETE') {
-            const ok = flockDirectory.deregister(agentId);
-            if (!ok) return notFound('Agent not found or already deregistered');
-            return json({ ok: true });
+            return (async () => {
+                try {
+                    const ok = await flockDirectory.deregister(agentId);
+                    if (!ok) return notFound('Agent not found or already deregistered');
+                    return json({ ok: true });
+                } catch (err) {
+                    return handleRouteError(err);
+                }
+            })();
         }
     }
 
@@ -145,9 +151,15 @@ export function handleFlockDirectoryRoutes(
 
     const heartbeatMatch = path.match(/^\/api\/flock-directory\/agents\/([^/]+)\/heartbeat$/);
     if (heartbeatMatch && method === 'POST') {
-        const ok = flockDirectory.heartbeat(heartbeatMatch[1]);
-        if (!ok) return notFound('Agent not found');
-        return json({ ok: true });
+        return (async () => {
+            try {
+                const ok = await flockDirectory.heartbeat(heartbeatMatch[1]);
+                if (!ok) return notFound('Agent not found');
+                return json({ ok: true });
+            } catch (err) {
+                return handleRouteError(err);
+            }
+        })();
     }
 
     // ─── Lookup by address ──────────────────────────────────────────────────

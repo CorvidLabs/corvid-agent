@@ -46,7 +46,7 @@ describe('heartbeat via selfRegister', () => {
 
     test('explicit heartbeat keeps agent active', async () => {
         const agent = await svc.selfRegister(SELF_OPTS);
-        const result = svc.heartbeat(agent.id);
+        const result = await svc.heartbeat(agent.id);
         expect(result).toBe(true);
 
         const refreshed = svc.getById(agent.id)!;
@@ -60,9 +60,9 @@ describe('sweepStaleAgents', () => {
     test('marks agents inactive after heartbeat timeout', async () => {
         const agent = await svc.selfRegister(SELF_OPTS);
 
-        // Backdate the heartbeat to 45 minutes ago (beyond 30-min threshold)
+        // Backdate the heartbeat to 25 hours ago (beyond 24-hour threshold)
         db.query(
-            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-45 minutes') WHERE id = ?`,
+            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-25 hours') WHERE id = ?`,
         ).run(agent.id);
 
         const swept = svc.sweepStaleAgents();
@@ -81,11 +81,11 @@ describe('sweepStaleAgents', () => {
 
     test('does not sweep deregistered agents', async () => {
         const agent = await svc.selfRegister(SELF_OPTS);
-        svc.deregister(agent.id);
+        await svc.deregister(agent.id);
 
         // Backdate heartbeat
         db.query(
-            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-45 minutes') WHERE id = ?`,
+            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-25 hours') WHERE id = ?`,
         ).run(agent.id);
 
         const swept = svc.sweepStaleAgents();
@@ -93,13 +93,13 @@ describe('sweepStaleAgents', () => {
     });
 
     test('sweeps multiple stale agents at once', async () => {
-        const a1 = svc.register({ address: 'STALE_1', name: 'Agent1' });
-        const a2 = svc.register({ address: 'STALE_2', name: 'Agent2' });
-        svc.register({ address: 'FRESH', name: 'Agent3' }); // stays fresh
+        const a1 = await svc.register({ address: 'STALE_1', name: 'Agent1' });
+        const a2 = await svc.register({ address: 'STALE_2', name: 'Agent2' });
+        await svc.register({ address: 'FRESH', name: 'Agent3' }); // stays fresh
 
         // Backdate two agents
         db.query(
-            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-60 minutes') WHERE id IN (?, ?)`,
+            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-25 hours') WHERE id IN (?, ?)`,
         ).run(a1.id, a2.id);
 
         const swept = svc.sweepStaleAgents();
@@ -119,12 +119,12 @@ describe('full lifecycle', () => {
         expect(agent.status).toBe('active');
 
         // 2. Heartbeat
-        svc.heartbeat(agent.id);
+        await svc.heartbeat(agent.id);
         expect(svc.getById(agent.id)!.status).toBe('active');
 
         // 3. Go stale (backdate heartbeat)
         db.query(
-            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-45 minutes') WHERE id = ?`,
+            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-25 hours') WHERE id = ?`,
         ).run(agent.id);
 
         // 4. Sweep
@@ -140,11 +140,11 @@ describe('full lifecycle', () => {
     });
 
     test('stats reflect active/inactive counts after sweep', async () => {
-        svc.register({ address: 'S_ACTIVE', name: 'Active' });
-        const staleAgent = svc.register({ address: 'S_STALE', name: 'Stale' });
+        await svc.register({ address: 'S_ACTIVE', name: 'Active' });
+        const staleAgent = await svc.register({ address: 'S_STALE', name: 'Stale' });
 
         db.query(
-            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-60 minutes') WHERE id = ?`,
+            `UPDATE flock_agents SET last_heartbeat = datetime('now', '-25 hours') WHERE id = ?`,
         ).run(staleAgent.id);
 
         svc.sweepStaleAgents();

@@ -147,6 +147,7 @@ describe('isLocalOnly()', () => {
         const env = withEnv({
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
+            OPENROUTER_API_KEY: undefined,
         });
         env.setup();
         _resetClaudeCliCache(false);
@@ -162,6 +163,7 @@ describe('isLocalOnly()', () => {
         const env = withEnv({
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
+            OPENROUTER_API_KEY: undefined,
         });
         env.setup();
         _resetClaudeCliCache(true);
@@ -232,6 +234,7 @@ describe('Provider registry auto-restrict', () => {
         const env = withEnv({
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
+            OPENROUTER_API_KEY: undefined,
             ENABLED_PROVIDERS: undefined,
             OLLAMA_LOCAL_EXPERIMENTAL: 'true',
         });

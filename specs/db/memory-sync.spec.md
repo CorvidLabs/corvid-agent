@@ -48,6 +48,7 @@ Background service that periodically syncs pending agent memories to **long-term
 3. **Batch size**: Each tick processes at most 10 pending memories (`BATCH_SIZE = 10`)
 4. **Failed backoff**: Memories with status `failed` are skipped if their `updatedAt` is less than 5 minutes ago (`FAILED_BACKOFF_MS`)
 5. **Wallet refill before send**: If a `walletService` is set, `checkAndRefill()` is called before each on-chain send to ensure the agent wallet has sufficient balance
+6. **Localnet ARC-69 only**: On localnet, memories are **never** synced via plain transactions. If ARC-69 is unavailable (no indexer/chat account), the memory stays `pending`. If ARC-69 throws, the memory is marked `failed` for retry after backoff. This prevents creating immutable, unmodifiable memory records on localnet
 6. **Null txid handling**: If `sendOnChainToSelf` returns null (no wallet configured), the memory stays pending (not marked failed)
 7. **Error isolation**: A failure on one memory does not abort the batch; it marks that memory as `failed` and continues
 8. **Idempotent start**: Calling `start()` when already running logs a warning and does nothing
@@ -55,11 +56,29 @@ Background service that periodically syncs pending agent memories to **long-term
 
 ## Behavioral Examples
 
-### Scenario: Successful memory sync
+### Scenario: Successful memory sync (non-localnet)
 
-- **Given** 3 memories with status `pending` in the database and `agentMessenger` is configured
+- **Given** 3 memories with status `pending` in the database, `agentMessenger` is configured, and network is `testnet`
 - **When** `tick()` runs
 - **Then** each memory is encrypted via `encryptMemoryContent`, sent on-chain via `sendOnChainToSelf`, and its txid is stored via `updateMemoryTxid`
+
+### Scenario: Successful memory sync (localnet)
+
+- **Given** a pending memory, network is `localnet`, and `walletService` is configured with indexer and chat account available
+- **When** `tick()` runs
+- **Then** the memory is synced via `syncViaArc69()` (creating or updating an ASA), and its txid and asaId are stored
+
+### Scenario: ARC-69 unavailable on localnet
+
+- **Given** a pending memory, network is `localnet`, and `walletService` is configured but indexer is unavailable
+- **When** `tick()` runs
+- **Then** `syncViaArc69()` returns false, the memory stays `pending` (not sent as a plain transaction), and it is retried on the next tick
+
+### Scenario: ARC-69 error on localnet
+
+- **Given** a pending memory, network is `localnet`, and `syncViaArc69()` throws an error
+- **When** `tick()` runs
+- **Then** the memory is marked `failed` (retried after 5-minute backoff) and is **not** sent as a plain transaction
 
 ### Scenario: Failed memory with backoff
 
@@ -95,6 +114,8 @@ Background service that periodically syncs pending agent memories to **long-term
 | `walletService.checkAndRefill` throws | Memory status is set to `failed`; error is logged |
 | `start()` called when already running | Logs a warning and returns without creating a second timer |
 | `tick()` called while already syncing | Returns immediately (reentrancy guard) |
+| `syncViaArc69` returns false on localnet | Memory stays `pending`, skipped for this tick (ARC-69 infra unavailable) |
+| `syncViaArc69` throws on localnet | Memory marked `failed` with 5-minute backoff; **never** falls back to plain transaction |
 
 ## Dependencies
 

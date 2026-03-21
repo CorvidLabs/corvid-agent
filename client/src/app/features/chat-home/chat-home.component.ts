@@ -48,19 +48,35 @@ import { OnboardingComponent } from './onboarding.component';
                             aria-label="Chat prompt"
                         ></textarea>
                         <div class="chat-home__actions">
-                            <div class="chat-home__agent-picker">
-                                <label for="agentSelect" class="chat-home__picker-label">Agent</label>
-                                <select
-                                    id="agentSelect"
-                                    class="chat-home__select"
-                                    [value]="selectedAgentId()"
-                                    (change)="onAgentChange($event)"
-                                >
-                                    <option value="">Default</option>
-                                    @for (agent of agents(); track agent.id) {
-                                        <option [value]="agent.id">{{ agent.name }}</option>
-                                    }
-                                </select>
+                            <div class="chat-home__pickers">
+                                <div class="chat-home__agent-picker">
+                                    <label for="agentSelect" class="chat-home__picker-label">Agent</label>
+                                    <select
+                                        id="agentSelect"
+                                        class="chat-home__select"
+                                        [value]="selectedAgentId()"
+                                        (change)="onAgentChange($event)"
+                                    >
+                                        <option value="">Default</option>
+                                        @for (agent of agents(); track agent.id) {
+                                            <option [value]="agent.id">{{ agent.name }}</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="chat-home__agent-picker">
+                                    <label for="projectSelect" class="chat-home__picker-label">Project</label>
+                                    <select
+                                        id="projectSelect"
+                                        class="chat-home__select"
+                                        [value]="selectedProjectId()"
+                                        (change)="onProjectChange($event)"
+                                    >
+                                        <option value="">Sandbox</option>
+                                        @for (project of projects(); track project.id) {
+                                            <option [value]="project.id">{{ project.name }}</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
                             <button
                                 class="chat-home__send"
@@ -141,13 +157,15 @@ import { OnboardingComponent } from './onboarding.component';
             transform: translateX(-50%);
             width: 600px;
             height: 600px;
+            border-radius: 50%;
             background: radial-gradient(
                 circle,
-                rgba(0, 229, 255, 0.06) 0%,
-                rgba(255, 0, 170, 0.03) 40%,
-                transparent 70%
+                rgba(0, 229, 255, 0.08) 0%,
+                rgba(255, 0, 170, 0.04) 35%,
+                transparent 65%
             );
             pointer-events: none;
+            filter: blur(40px);
             animation: subtlePulse 8s ease-in-out infinite;
         }
         .chat-home__scroll {
@@ -239,6 +257,11 @@ import { OnboardingComponent } from './onboarding.component';
             justify-content: space-between;
             padding: 0.5rem 1.25rem 0.85rem;
             gap: 0.75rem;
+        }
+        .chat-home__pickers {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         .chat-home__agent-picker {
             display: flex;
@@ -463,6 +486,7 @@ import { OnboardingComponent } from './onboarding.component';
             .chat-home__title { font-size: 1.5rem; }
             .chat-home__logo-mark { width: 44px; height: 44px; font-size: 1.2rem; }
             .chat-home__actions { flex-direction: column; align-items: stretch; }
+            .chat-home__pickers { flex-wrap: wrap; }
             .chat-home__agent-picker { justify-content: space-between; }
             .chat-home__bg-glow { width: 300px; height: 300px; }
             .chat-home__templates { grid-template-columns: 1fr; }
@@ -485,8 +509,10 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     );
 
     readonly agents = signal<Agent[]>([]);
+    readonly projects = this.projectService.projects;
     readonly prompt = signal('');
     readonly selectedAgentId = signal('');
+    readonly selectedProjectId = signal('');
     readonly launching = signal(false);
     readonly recentSessions = signal<Session[]>([]);
 
@@ -536,6 +562,10 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
 
     onAgentChange(event: Event): void {
         this.selectedAgentId.set((event.target as HTMLSelectElement).value);
+    }
+
+    onProjectChange(event: Event): void {
+        this.selectedProjectId.set((event.target as HTMLSelectElement).value);
     }
 
     onKeydown(event: KeyboardEvent): void {
@@ -588,13 +618,13 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         this.launching.set(true);
 
         try {
-            // Ensure we have a project — use first available or create a default
-            let projectId = this.projectService.projects()[0]?.id;
+            // Use selected project, or create a sandboxed temp project
+            let projectId = this.selectedProjectId() || undefined;
             if (!projectId) {
                 const project = await this.projectService.createProject({
-                    name: 'Default',
-                    description: 'Auto-created project',
-                    workingDir: '.',
+                    name: 'Sandbox',
+                    description: 'Temporary sandbox workspace',
+                    workingDir: '/tmp/corvid-sandbox',
                 });
                 projectId = project.id;
             }

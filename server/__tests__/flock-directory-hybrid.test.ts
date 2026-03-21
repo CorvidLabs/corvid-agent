@@ -1,11 +1,13 @@
 /**
- * Tests for the hybrid FlockDirectoryService — off-chain + on-chain integration.
+ * Tests for the hybrid FlockDirectoryService — blockchain-first + off-chain sync.
  *
  * Tests verify:
  * - setOnChainClient wiring and hasOnChain flag
+ * - Blockchain-first: on-chain calls happen BEFORE SQLite writes
+ * - On-chain failure prevents off-chain record creation (1:1 parity)
+ * - Off-chain-only mode works when no on-chain client is attached (dev mode)
  * - selfRegister idempotency
  * - getStats includes on-chain app ID
- * - On-chain fire-and-forget calls are triggered (via mock)
  */
 import { test, expect, describe, beforeEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -70,69 +72,94 @@ describe('setOnChainClient', () => {
     });
 });
 
-// ─── Hybrid Register ─────────────────────────────────────────────────────────
+// ─── Blockchain-First Register ──────────────────────────────────────────────
 
-describe('hybrid register', () => {
-    test('register triggers on-chain registration when client is wired', async () => {
+describe('blockchain-first register', () => {
+    test('register calls on-chain BEFORE writing to SQLite', async () => {
         const client = createMockOnChainClient();
         svc.setOnChainClient(client, MOCK_SIGNER);
 
-        svc.register({ address: 'ALGO_HYBRID', name: 'HybridAgent', capabilities: ['test'] });
+        const agent = await svc.register({ address: 'ALGO_HYBRID', name: 'HybridAgent', capabilities: ['test'] });
 
-        // Allow fire-and-forget promise to resolve
-        await new Promise(r => setTimeout(r, 10));
-
+        // On-chain was called (awaited, not fire-and-forget)
         expect(client.registerAgent).toHaveBeenCalledTimes(1);
+        // SQLite record exists
+        expect(agent.status).toBe('active');
+        expect(svc.getById(agent.id)).not.toBeNull();
     });
 
-    test('register succeeds even when on-chain call fails', async () => {
+    test('register fails when on-chain call fails (no orphaned off-chain record)', async () => {
         const client = createMockOnChainClient();
         (client as any).registerAgent = mock(() => Promise.reject(new Error('network down')));
         svc.setOnChainClient(client, MOCK_SIGNER);
 
-        const agent = svc.register({ address: 'ALGO_FAIL', name: 'FailAgent' });
-        expect(agent.status).toBe('active'); // off-chain still works
+        await expect(
+            svc.register({ address: 'ALGO_FAIL', name: 'FailAgent' }),
+        ).rejects.toThrow('network down');
 
-        await new Promise(r => setTimeout(r, 10));
+        // No off-chain record should exist
+        expect(svc.getByAddress('ALGO_FAIL')).toBeNull();
     });
 
-    test('register without on-chain client does not throw', () => {
-        const agent = svc.register({ address: 'ALGO_NOCHAIN', name: 'NoChain' });
+    test('register without on-chain client works in dev mode', async () => {
+        const agent = await svc.register({ address: 'ALGO_NOCHAIN', name: 'NoChain' });
         expect(agent.status).toBe('active');
     });
 });
 
-// ─── Hybrid Heartbeat ────────────────────────────────────────────────────────
+// ─── Blockchain-First Heartbeat ─────────────────────────────────────────────
 
-describe('hybrid heartbeat', () => {
-    test('heartbeat triggers on-chain heartbeat when client is wired', async () => {
+describe('blockchain-first heartbeat', () => {
+    test('heartbeat calls on-chain BEFORE updating SQLite', async () => {
         const client = createMockOnChainClient();
         svc.setOnChainClient(client, MOCK_SIGNER);
 
-        const agent = svc.register({ address: 'ALGO_HB_H', name: 'HBAgent' });
-        await new Promise(r => setTimeout(r, 10)); // let register fire
-
-        svc.heartbeat(agent.id);
-        await new Promise(r => setTimeout(r, 10));
+        const agent = await svc.register({ address: 'ALGO_HB_H', name: 'HBAgent' });
+        await svc.heartbeat(agent.id);
 
         expect(client.heartbeat).toHaveBeenCalledTimes(1);
     });
-});
 
-// ─── Hybrid Deregister ───────────────────────────────────────────────────────
-
-describe('hybrid deregister', () => {
-    test('deregister triggers on-chain deregistration when client is wired', async () => {
+    test('heartbeat fails when on-chain call fails', async () => {
         const client = createMockOnChainClient();
         svc.setOnChainClient(client, MOCK_SIGNER);
 
-        const agent = svc.register({ address: 'ALGO_DEREG_H', name: 'DeregAgent' });
-        await new Promise(r => setTimeout(r, 10));
+        const agent = await svc.register({ address: 'ALGO_HB_FAIL', name: 'HBFail' });
 
-        svc.deregister(agent.id);
-        await new Promise(r => setTimeout(r, 10));
+        // Make heartbeat fail on-chain
+        (client as any).heartbeat = mock(() => Promise.reject(new Error('chain error')));
+
+        await expect(svc.heartbeat(agent.id)).rejects.toThrow('chain error');
+    });
+});
+
+// ─── Blockchain-First Deregister ────────────────────────────────────────────
+
+describe('blockchain-first deregister', () => {
+    test('deregister calls on-chain BEFORE updating SQLite', async () => {
+        const client = createMockOnChainClient();
+        svc.setOnChainClient(client, MOCK_SIGNER);
+
+        const agent = await svc.register({ address: 'ALGO_DEREG_H', name: 'DeregAgent' });
+        await svc.deregister(agent.id);
 
         expect(client.deregister).toHaveBeenCalledTimes(1);
+        expect(svc.getById(agent.id)!.status).toBe('deregistered');
+    });
+
+    test('deregister fails when on-chain call fails (agent stays active)', async () => {
+        const client = createMockOnChainClient();
+        svc.setOnChainClient(client, MOCK_SIGNER);
+
+        const agent = await svc.register({ address: 'ALGO_DEREG_FAIL', name: 'DeregFail' });
+
+        // Make deregister fail on-chain
+        (client as any).deregister = mock(() => Promise.reject(new Error('chain error')));
+
+        await expect(svc.deregister(agent.id)).rejects.toThrow('chain error');
+
+        // Agent should still be active in SQLite (no orphaned state)
+        expect(svc.getById(agent.id)!.status).toBe('active');
     });
 });
 
@@ -182,7 +209,7 @@ describe('selfRegister', () => {
             instanceUrl: 'http://localhost:3000',
             capabilities: [],
         });
-        svc.deregister(first.id);
+        await svc.deregister(first.id);
 
         // Need a different address since the old one is still in DB (deregistered)
         // The self-register should detect deregistered status and create new
@@ -201,11 +228,11 @@ describe('selfRegister', () => {
 // ─── Stats with On-Chain ─────────────────────────────────────────────────────
 
 describe('getStats with on-chain', () => {
-    test('includes onChainAppId when client is wired', () => {
+    test('includes onChainAppId when client is wired', async () => {
         const client = createMockOnChainClient();
         svc.setOnChainClient(client, MOCK_SIGNER);
 
-        svc.register({ address: 'ALGO_STAT_H', name: 'StatAgent' });
+        await svc.register({ address: 'ALGO_STAT_H', name: 'StatAgent' });
         const stats = svc.getStats();
 
         expect(stats.onChainAppId).toBe(42);

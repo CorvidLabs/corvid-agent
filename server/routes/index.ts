@@ -40,6 +40,7 @@ import { handleSecurityOverviewRoutes } from './security-overview';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import { handleDiscordImageRoutes } from './discord-image';
 import { handleFlockDirectoryRoutes } from './flock-directory';
+import { handleFlockTestingRoutes } from './flock-testing';
 import { handleContactRoutes } from './contacts';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
@@ -416,6 +417,13 @@ async function handleRoutes(
     // Flock Directory routes
     const flockDirResponse = handleFlockDirectoryRoutes(req, url, db, flockDirectory, context);
     if (flockDirResponse) return flockDirResponse;
+
+    // Flock Testing routes (test results, stats, on-demand test trigger)
+    const flockTestResponse = await handleFlockTestingRoutes(req, url, db, null, context, {
+        flockDirectory,
+        agentMessenger,
+    });
+    if (flockTestResponse) return flockTestResponse;
 
     // Billing routes
     const billingResponse = await handleBillingRoutes(req, url, db, billing, usageMeter, context);
