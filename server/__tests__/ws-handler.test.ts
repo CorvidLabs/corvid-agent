@@ -111,6 +111,14 @@ describe('isClientMessage', () => {
         expect(isClientMessage({ type: 'chat_send', agentId: 'a1' })).toBe(false);
     });
 
+    it('validates chat_send with tools field', () => {
+        expect(isClientMessage({ type: 'chat_send', agentId: 'a1', content: 'hi', tools: ['read_file'] })).toBe(true);
+        expect(isClientMessage({ type: 'chat_send', agentId: 'a1', content: 'hi', tools: [] })).toBe(true);
+        expect(isClientMessage({ type: 'chat_send', agentId: 'a1', content: 'hi', tools: undefined })).toBe(true);
+        expect(isClientMessage({ type: 'chat_send', agentId: 'a1', content: 'hi', tools: 'invalid' })).toBe(false);
+        expect(isClientMessage({ type: 'chat_send', agentId: 'a1', content: 'hi', tools: 42 })).toBe(false);
+    });
+
     it('validates agent_reward', () => {
         expect(isClientMessage({ type: 'agent_reward', agentId: 'a1', microAlgos: 1000 })).toBe(true);
         expect(isClientMessage({ type: 'agent_reward', agentId: 'a1' })).toBe(false);

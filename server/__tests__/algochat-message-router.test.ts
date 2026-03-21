@@ -892,6 +892,23 @@ describe('handleLocalMessage', () => {
 
         expect((sm.updateLocalSendFn as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(1);
     });
+
+    test('passes toolAllowList to startProcess when provided', async () => {
+        const toolAllowList = ['read_file', 'write_file'];
+        await router.handleLocalMessage(AGENT_ID, 'Hello', sendFn, undefined, eventFn, toolAllowList);
+
+        const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
+        expect(startCalls.length).toBe(1);
+        expect(startCalls[0][2]).toEqual({ toolAllowList });
+    });
+
+    test('does not pass toolAllowList option when not provided', async () => {
+        await router.handleLocalMessage(AGENT_ID, 'Hello', sendFn, undefined, eventFn);
+
+        const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
+        expect(startCalls.length).toBe(1);
+        expect(startCalls[0][2]).toBeUndefined();
+    });
 });
 
 // ── setupMessageHandler ────────────────────────────────────────────────────
