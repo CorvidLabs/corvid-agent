@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { ProjectService } from '../../core/services/project.service';
+import { GuidedTourService } from '../../core/services/guided-tour.service';
 
 interface CommandItem {
     id: string;
@@ -231,6 +232,7 @@ export class CommandPaletteComponent implements AfterViewInit, OnDestroy {
     private readonly agentService = inject(AgentService);
     private readonly sessionService = inject(SessionService);
     private readonly projectService = inject(ProjectService);
+    private readonly tourService = inject(GuidedTourService);
 
     @ViewChild('searchInput') searchInputRef?: ElementRef<HTMLInputElement>;
 
@@ -310,6 +312,7 @@ export class CommandPaletteComponent implements AfterViewInit, OnDestroy {
             { id: 'act-new-agent', label: 'Create New Agent', category: 'Actions', icon: '➕', action: () => this.nav('/agents/new'), keywords: 'add bot' },
             { id: 'act-new-project', label: 'Create New Project', category: 'Actions', icon: '📁', action: () => this.nav('/projects/new'), keywords: 'add' },
             { id: 'act-new-council', label: 'Create New Council', category: 'Actions', icon: '👥', action: () => this.nav('/councils/new'), keywords: 'add multi-agent' },
+            { id: 'act-replay-tour', label: 'Replay Guided Tour', category: 'Actions', icon: '?', action: () => this.replayTour(), keywords: 'onboarding help walkthrough' },
         ];
 
         // Dynamic: agents
@@ -405,5 +408,12 @@ export class CommandPaletteComponent implements AfterViewInit, OnDestroy {
 
     private nav(path: string): void {
         this.router.navigate([path]);
+    }
+
+    private replayTour(): void {
+        this.tourService.reset();
+        this.router.navigate(['/dashboard']).then(() => {
+            setTimeout(() => this.tourService.startTour(), 400);
+        });
     }
 }

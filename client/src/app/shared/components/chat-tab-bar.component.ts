@@ -126,6 +126,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             max-width: 60px;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .tab__pulse {
             width: 6px;
@@ -141,6 +142,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .tab__label {
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .tab__close {
             flex-shrink: 0;

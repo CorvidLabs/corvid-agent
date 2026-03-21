@@ -11,6 +11,7 @@ files:
   - server/discord/command-handlers/moderation-commands.ts
   - server/discord/command-handlers/component-handlers.ts
   - server/discord/command-handlers/autocomplete-handler.ts
+  - server/discord/command-handlers/message-commands.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
   - server/discord/permissions.ts
@@ -90,6 +91,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `handleSessionCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/session` slash command — creates a threaded conversation with a selected agent |
 | `handleWorkCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/work` slash command — creates an autonomous work task |
 
+### Exported Functions (from command-handlers/message-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — starts a pure conversation session (no tools, no code execution) with a selected agent. Available at BASIC permission level for untrusted users. Persists the mention session to both the in-memory map and the database for follow-up replies. |
+
 ### Exported Functions (from command-handlers/info-commands.ts)
 
 | Function | Parameters | Returns | Description |
@@ -124,6 +131,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleAutocomplete` | `(ctx, interaction)` | `Promise<void>` | Handle autocomplete interactions — provides live results for agent and project name fields |
+
+### Exported Functions (from command-handlers/message-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — pure conversation mode with no tools, for untrusted users at BASIC permission level |
 
 ### Exported Functions (from embeds.ts)
 

@@ -6,6 +6,7 @@ import type { ServerMessage } from '../../shared/ws-protocol';
 import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, flushStreamBuffer, Spinner } from '../render';
 import { formatUptime, resolveProjectFromCwd } from '../utils';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
+import { resolveToolSpecifiers, CATEGORY_NAMES } from '../../shared/tool-categories';
 
 const VERSION = require('../../package.json').version as string;
 const MAX_HISTORY_CHARS = 12_000; // Trim oldest turns when history exceeds this
@@ -23,6 +24,7 @@ export function stripFirstChunkNewlines(chunk: string, isFirstChunk: boolean): s
 
 interface InteractiveOptions {
     agent?: string;
+    tools?: string;
 }
 
 export interface Turn {
@@ -92,7 +94,10 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
         ? `${agent.name} ${c.gray(`(${agent.model})`)}`
         : agentId.slice(0, 8);
 
-    // 5. Show banner
+    // 5. Resolve tool config
+    let resolvedTools = options?.tools ? resolveToolSpecifiers(options.tools) : undefined;
+
+    // 6. Show banner
     console.log(`\n${c.bold}corvid${c.reset} v${VERSION} — agent: ${agentLabel}`);
     if (projectId) {
         try {
@@ -100,9 +105,13 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
             console.log(c.gray(`project: ${proj.name} (${proj.workingDir})`));
         } catch { /* ignore */ }
     }
+    if (resolvedTools !== undefined) {
+        const label = resolvedTools.length === 0 ? 'none' : resolvedTools.join(', ');
+        console.log(c.gray(`tools: ${label}`));
+    }
     console.log(c.gray('Type /help for commands, /quit to exit\n'));
 
-    // 6. Open WebSocket + conversation state
+    // 7. Open WebSocket + conversation state
     const history: Turn[] = [];
     let responding = false;
     let hasStreamContent = false;
@@ -178,7 +187,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
 
             // Slash commands
             if (line.startsWith('/')) {
-                await handleSlashCommand(line, rl, client, history, (newId) => { agentId = newId; });
+                await handleSlashCommand(line, rl, client, history, (newId) => { agentId = newId; }, (tools) => { resolvedTools = tools; }, resolvedTools);
                 promptUser();
                 return;
             }
@@ -203,6 +212,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
                 agentId,
                 content: prompt,
                 projectId: projectId ?? undefined,
+                tools: resolvedTools,
             });
 
             // Wait for response to complete
@@ -289,6 +299,8 @@ async function handleSlashCommand(
     client: CorvidClient,
     history: Turn[],
     setAgentId: (id: string) => void,
+    setTools: (tools: string[] | undefined) => void,
+    currentTools: string[] | undefined,
 ): Promise<void> {
     const parts = line.split(/\s+/);
     const cmd = parts[0].toLowerCase();
@@ -312,6 +324,42 @@ async function handleSlashCommand(
             const agent = await fetchAgent(client, newId);
             if (agent) {
                 console.log(`Switched to: ${c.bold}${agent.name}${c.reset} ${c.gray(`(${agent.model})`)}`);
+            }
+            break;
+        }
+
+        case '/tools': {
+            const action = parts[1]?.toLowerCase();
+            if (!action) {
+                // Show current tool config
+                if (!currentTools) {
+                    console.log(`  Tools: ${c.green('all')} (default — all tools available)`);
+                } else if (currentTools.length === 0) {
+                    console.log(`  Tools: ${c.yellow('none')} (conversation only)`);
+                } else {
+                    console.log(`  Tools: ${c.cyan(currentTools.join(', '))}`);
+                }
+                console.log(c.gray(`  Categories: ${CATEGORY_NAMES.join(', ')}`));
+                console.log(c.gray('  Usage: /tools <specifier>  e.g. /tools github,code'));
+                console.log(c.gray('         /tools all | /tools none | /tools off'));
+                break;
+            }
+            if (action === 'off' || action === 'none') {
+                setTools([]);
+                console.log(c.yellow('Tools disabled (conversation only).'));
+            } else if (action === 'on' || action === 'all') {
+                setTools(undefined);
+                console.log(c.green('All tools enabled.'));
+            } else {
+                const resolved = resolveToolSpecifiers(action);
+                setTools(resolved);
+                if (!resolved) {
+                    console.log(c.green('All tools enabled.'));
+                } else if (resolved.length === 0) {
+                    console.log(c.yellow('Tools disabled (conversation only).'));
+                } else {
+                    console.log(`Tools set: ${c.cyan(resolved.join(', '))}`);
+                }
             }
             break;
         }
@@ -344,9 +392,17 @@ async function handleSlashCommand(
 ${c.bold}Commands:${c.reset}
   ${c.cyan('/help')}     Show this help
   ${c.cyan('/agent')}    Switch to a different agent
+  ${c.cyan('/tools')}    Show or change tool availability
   ${c.cyan('/clear')}    Clear conversation history
   ${c.cyan('/status')}   Show server status
   ${c.cyan('/quit')}     Exit the REPL
+
+${c.bold}Tool Control:${c.reset}
+  ${c.cyan('/tools')}              Show current tools
+  ${c.cyan('/tools all')}          Enable all tools (default)
+  ${c.cyan('/tools none')}         Disable all tools (conversation only)
+  ${c.cyan('/tools github,code')}  Enable specific categories
+  Categories: ${c.gray(CATEGORY_NAMES.join(', '))}
 
 ${c.bold}Shell:${c.reset}
   ${c.cyan('!<cmd>')}    Run a shell command (e.g. ${c.gray('!ls -la')})

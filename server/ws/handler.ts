@@ -342,7 +342,7 @@ function handleClientMessage(
                 if (serverMsg) {
                     ws.send(JSON.stringify(serverMsg));
                 }
-            }).catch((err) => {
+            }, msg.tools).catch((err) => {
                 log.error('Chat error', { error: err instanceof Error ? err.message : String(err) });
                 sendError(ws, 'Chat request failed', undefined, 'CHAT_ERROR');
             });

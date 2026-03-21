@@ -13,7 +13,7 @@ export type ClientMessage =
     | { type: 'subscribe'; sessionId: string }
     | { type: 'unsubscribe'; sessionId: string }
     | { type: 'send_message'; sessionId: string; content: string }
-    | { type: 'chat_send'; agentId: string; content: string; projectId?: string }
+    | { type: 'chat_send'; agentId: string; content: string; projectId?: string; tools?: string[] }
     | { type: 'agent_reward'; agentId: string; microAlgos: number }
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
     | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
@@ -231,7 +231,8 @@ export function isClientMessage(data: unknown): data is ClientMessage {
             return typeof msg['sessionId'] === 'string' && typeof msg['content'] === 'string';
         case 'chat_send':
             return typeof msg['agentId'] === 'string' && typeof msg['content'] === 'string'
-                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string');
+                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string')
+                && (msg['tools'] === undefined || Array.isArray(msg['tools']));
         case 'agent_reward':
             return typeof msg['agentId'] === 'string' && typeof msg['microAlgos'] === 'number';
         case 'agent_invoke':

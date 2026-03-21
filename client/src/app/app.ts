@@ -11,6 +11,7 @@ import { ActivityRailComponent } from './shared/components/activity-rail.compone
 import { CommandPaletteComponent } from './shared/components/command-palette.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
+import { GuidedTourComponent } from './shared/components/guided-tour.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
 import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.service';
@@ -18,7 +19,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
+    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent],
     template: `
         <div class="app-layout">
             <app-top-nav />
@@ -40,6 +41,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         </div>
         <app-command-palette />
         <app-keyboard-shortcuts-overlay />
+        <app-guided-tour />
         <app-toast-container />
     `,
     styles: `
