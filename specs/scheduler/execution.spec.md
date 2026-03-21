@@ -37,6 +37,9 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `runAction` | `(deps: RunActionDeps, hctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Executes an action with full lifecycle: dispatch to handler, error handling, lock cleanup, failure tracking, notifications, and AlgoChat broadcasting |
+| `shouldDeliver` | `(dest: ScheduleOutputDestination, status: string)` | `boolean` | Returns true if the destination should receive output; `on_error_only` destinations only deliver when status is `failed` |
+| `formatResult` | `(dest: ScheduleOutputDestination, result: string)` | `string` | Formats execution result for a destination; `summary` format truncates to 200 chars |
+| `deliverToOutputDestinations` | `(deps: RunActionDeps, schedule: AgentSchedule, execution: ScheduleExecution)` | `void` | Delivers execution results to all configured output destinations (Discord channels, AlgoChat agents/addresses); no-op if destinations is null or empty |
 
 #### orchestration.ts
 

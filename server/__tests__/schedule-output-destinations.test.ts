@@ -87,7 +87,7 @@ function makeSchedule(outputDestinations: ScheduleOutputDestination[] | null): A
         id: 'sched-1',
         agentId: 'agent-1',
         name: 'Test Schedule',
-        description: null,
+        description: '',
         status: 'active',
         cronExpression: '0 * * * *',
         intervalMs: null,
@@ -103,7 +103,6 @@ function makeSchedule(outputDestinations: ScheduleOutputDestination[] | null): A
         nextRunAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tenantId: 'default',
     };
 }
 
@@ -111,18 +110,20 @@ function makeExecution(status: string, result: string | null): ScheduleExecution
     return {
         id: 'exec-1',
         scheduleId: 'sched-1',
+        agentId: 'agent-1',
         actionType: 'daily_review',
+        actionInput: {},
         status,
         result,
+        sessionId: null,
+        workTaskId: null,
+        costUsd: 0,
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
-        metadata: null,
     } as ScheduleExecution;
 }
 
 describe('deliverToOutputDestinations', () => {
-    const originalEnv = process.env.DISCORD_BOT_TOKEN;
-
     beforeEach(() => {
         delete process.env.DISCORD_BOT_TOKEN;
     });
