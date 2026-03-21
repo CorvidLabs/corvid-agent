@@ -236,13 +236,23 @@ select:focus-visible {
     transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 .card-hover:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-bright);
     border-color: var(--border-bright);
 }
 
 button:active:not(:disabled) {
     transform: scale(0.97);
+}
+
+/* Interactive card with glow on hover */
+.card-glow {
+    transition: transform var(--transition-base), box-shadow var(--transition-slow), border-color var(--transition-base);
+}
+.card-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 229, 255, 0.06);
+    border-color: rgba(0, 229, 255, 0.15);
 }
 
 @keyframes fadeIn {
@@ -325,6 +335,32 @@ button:active:not(:disabled) {
 @media (max-width: 480px) {
     .page-title { font-size: var(--text-xl); }
     .section-header { font-size: var(--text-lg); }
+}
+
+/* ── Modern panel transitions ── */
+.panel-resize {
+    transition: width var(--transition-slow), min-width var(--transition-slow);
+}
+
+/* ── Subtle surface shimmer on focus-within ── */
+.surface-focus:focus-within {
+    box-shadow: inset 0 0 0 1px rgba(0, 229, 255, 0.1);
+}
+
+/* ── Smooth scrollbar fade ── */
+.scroll-fade {
+    position: relative;
+}
+.scroll-fade::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: linear-gradient(to bottom, transparent, var(--bg-deep));
+    pointer-events: none;
+    display: block;
 }
 
 /* ── WCAG AAA: Reduced motion ── */

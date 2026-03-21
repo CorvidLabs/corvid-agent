@@ -12,16 +12,22 @@ import { RouterLink } from '@angular/router';
 import { SessionService } from '../../core/services/session.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from './status-badge.component';
+import { ResizeHandleComponent } from './resize-handle.component';
 import type { Session } from '../../core/models/session.model';
 
 @Component({
     selector: 'app-activity-rail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, StatusBadgeComponent],
+    imports: [RouterLink, StatusBadgeComponent, ResizeHandleComponent],
     template: `
+        @if (open()) {
+            <app-resize-handle position="left" (resized)="onResize($event)" (resizeEnd)="onResizeEnd()" />
+        }
         <aside
             class="rail"
             [class.rail--open]="open()"
+            [style.width.px]="effectiveWidth()"
+            [style.min-width.px]="effectiveWidth()"
             role="complementary"
             aria-label="Activity panel">
             <button
@@ -66,9 +72,13 @@ import type { Session } from '../../core/models/session.model';
         </aside>
     `,
     styles: `
+        :host {
+            display: flex;
+            flex-shrink: 0;
+        }
         .rail {
-            width: 36px;
-            min-width: 36px;
+            width: 100%;
+            min-width: 0;
             background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
             border-left: 1px solid rgba(255, 255, 255, 0.04);
             display: flex;
@@ -77,8 +87,7 @@ import type { Session } from '../../core/models/session.model';
             overflow: hidden;
         }
         .rail--open {
-            width: 260px;
-            min-width: 260px;
+            /* width controlled by [style.width.px] binding */
         }
         .rail__toggle {
             width: 100%;
@@ -177,6 +186,12 @@ export class ActivityRailComponent implements OnInit, OnDestroy {
         typeof localStorage !== 'undefined' && localStorage.getItem('activity_rail_open') !== 'false',
     );
 
+    /** Custom width for open state — persisted */
+    protected readonly customWidth = signal(this.loadWidth());
+
+    /** Effective width considering open/closed state */
+    protected readonly effectiveWidth = computed(() => this.open() ? this.customWidth() : 36);
+
     private interval: ReturnType<typeof setInterval> | null = null;
 
     protected readonly activeSessions = computed(() => {
@@ -213,5 +228,28 @@ export class ActivityRailComponent implements OnInit, OnDestroy {
 
     protected toggle(): void {
         this.open.set(!this.open());
+    }
+
+    protected onResize(delta: number): void {
+        const current = this.customWidth();
+        const next = Math.max(180, Math.min(500, current + delta));
+        this.customWidth.set(next);
+    }
+
+    protected onResizeEnd(): void {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('activity_rail_width', String(this.customWidth()));
+        }
+    }
+
+    private loadWidth(): number {
+        if (typeof localStorage !== 'undefined') {
+            const stored = localStorage.getItem('activity_rail_width');
+            if (stored) {
+                const val = parseInt(stored, 10);
+                if (!isNaN(val) && val >= 180 && val <= 500) return val;
+            }
+        }
+        return 260;
     }
 }
