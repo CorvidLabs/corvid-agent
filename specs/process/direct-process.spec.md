@@ -8,6 +8,7 @@ db_tables: []
 depends_on:
   - specs/providers/ollama-provider.spec.md
   - specs/providers/tool-prompt-templates.spec.md
+  - specs/process/context-management.spec.md
 ---
 
 # Direct Process
@@ -38,11 +39,11 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
 | `buildResultEvent` | `(base: {...}, escalationInput: BuildEscalationInput)` | `ClaudeStreamEvent` | Build a result event with optional escalation metadata attached. Used for both success and error result events |
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
-| `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state. |
-| `determineWarningLevel` | `usagePercent: number` | `{level, message} \| null` | Determine warning level and message for a given usage percent. Returns null below 50%. |
-| `compressToolResults` | `(messages: ConversationMessage[], maxAge: number, maxChars: number)` | `number` | Compress tool result messages in-place by truncating content older than `maxAge` positions to at most `maxChars`. Returns count of compressed messages |
-| `summarizeConversation` | `(messages: Array<{role, content}>)` | `string` | Generate a brief plain-text summary of the key points in a conversation. Used for Tier 4 compression and context reset |
-| `truncateOldToolResults` | `(messages: ConversationMessage[], ageThreshold: number, maxChars: number)` | `number` | Post-trim pass that truncates tool results older than `ageThreshold` positions to at most `maxChars`. Returns count of truncated messages |
+| `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Re-exported from `context-management.ts` |
+| `determineWarningLevel` | `usagePercent: number` | `{level, message} \| null` | Re-exported from `context-management.ts` |
+| `compressToolResults` | `(messages: ConversationMessage[], maxAge: number, maxChars: number)` | `number` | Re-exported from `context-management.ts` |
+| `summarizeConversation` | `(messages: Array<{role, content}>)` | `string` | Re-exported from `context-management.ts` |
+| `truncateOldToolResults` | `(messages: ConversationMessage[], ageThreshold: number, maxChars: number)` | `number` | Re-exported from `context-management.ts` |
 
 ## Invariants
 
