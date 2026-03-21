@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.42.1] - 2026-03-21
+
+### Fixed
+- **Docker build** — remove `COPY patches/` from Dockerfile; directory does not exist (#1344)
+
 ## [0.42.0] - 2026-03-21
 
 ### Added
