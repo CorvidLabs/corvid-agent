@@ -97,7 +97,7 @@ describe('handleFlockTestingRoutes', () => {
 
         it('returns results from testRunner', async () => {
             const mockRunner = {
-                getResults: (id: string, limit?: number) => [{ agentId: id, overallScore: 90 }],
+                getResults: (id: string, _limit?: number) => [{ agentId: id, overallScore: 90 }],
             } as any;
             const { req, url } = makeReq('GET', '/api/flock-directory/testing/agents/agent-1/results');
             const res = handleFlockTestingRoutes(req, url, db, mockRunner);
