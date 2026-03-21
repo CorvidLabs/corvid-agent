@@ -329,16 +329,16 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                                 <p class="persona-info__text"><strong>Background:</strong> {{ p.background }}</p>
                             }
                         </div>
-                        <button class="btn btn--secondary btn--sm" routerLink="/personas">Edit Persona</button>
+                        <button class="btn btn--secondary btn--sm" routerLink="/agents/personas">Edit Persona</button>
                     } @else {
-                        <p class="detail__empty">No persona configured. <a routerLink="/personas">Configure one</a></p>
+                        <p class="detail__empty">No persona configured. <a routerLink="/agents/personas">Configure one</a></p>
                     }
                 }
 
                 <!-- Skills Tab -->
                 @if (activeTab() === 'skills') {
                     @if (agentBundles().length === 0) {
-                        <p class="detail__empty">No skill bundles assigned. <a routerLink="/skill-bundles">Manage bundles</a></p>
+                        <p class="detail__empty">No skill bundles assigned. <a routerLink="/agents/skill-bundles">Manage bundles</a></p>
                     } @else {
                         <div class="skills-list">
                             @for (ab of agentBundles(); track ab.bundleId) {

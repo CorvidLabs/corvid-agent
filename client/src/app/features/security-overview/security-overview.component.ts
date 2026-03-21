@@ -154,11 +154,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                 <section class="card">
                     <h3 class="card__title">Related Pages</h3>
                     <div class="link-grid">
-                        <a class="link-card" routerLink="/github-allowlist">
+                        <a class="link-card" routerLink="/settings/github-allowlist">
                             <span class="link-card__label">GitHub Allowlist</span>
                             <span class="link-card__count">{{ d.allowlistCount }} entries</span>
                         </a>
-                        <a class="link-card" routerLink="/repo-blocklist">
+                        <a class="link-card" routerLink="/settings/repo-blocklist">
                             <span class="link-card__label">Repo Blocklist</span>
                             <span class="link-card__count">{{ d.blocklistCount }} entries</span>
                         </a>

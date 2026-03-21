@@ -22,7 +22,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         <p class="page__desc">{{ c.description }}</p>
                     </div>
                     <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/councils', c.id, 'edit']">Edit</a>
+                        <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
                         <button class="btn btn--danger" (click)="onDelete()">Delete</button>
                     </div>
                 </div>
@@ -86,7 +86,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                     } @else {
                         <div class="launches-list">
                             @for (launch of launches(); track launch.id) {
-                                <a class="launch-card" [routerLink]="['/council-launches', launch.id]">
+                                <a class="launch-card" [routerLink]="['/sessions/council-launches', launch.id]">
                                     <div class="launch-card__header">
                                         <span class="launch-card__stage" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
                                         <span class="launch-card__meta">{{ launch.sessionIds.length }} sessions · round {{ launch.currentDiscussionRound }}/{{ launch.totalDiscussionRounds }}</span>
@@ -218,7 +218,7 @@ export class CouncilDetailComponent implements OnInit {
         const c = this.council();
         if (!c) return;
         await this.councilService.deleteCouncil(c.id);
-        this.router.navigate(['/councils']);
+        this.router.navigate(['/sessions/councils']);
     }
 
     async onLaunch(): Promise<void> {
@@ -228,7 +228,7 @@ export class CouncilDetailComponent implements OnInit {
         this.launching.set(true);
         try {
             const result = await this.councilService.launchCouncil(c.id, this.selectedProjectId, this.launchPrompt);
-            this.router.navigate(['/council-launches', result.launchId]);
+            this.router.navigate(['/sessions/council-launches', result.launchId]);
         } finally {
             this.launching.set(false);
         }

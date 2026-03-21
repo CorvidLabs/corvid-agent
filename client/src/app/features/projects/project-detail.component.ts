@@ -21,7 +21,7 @@ import type { Session } from '../../core/models/session.model';
                         <p class="page__desc">{{ p.description }}</p>
                     </div>
                     <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/projects', p.id, 'edit']">Edit</a>
+                        <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
                         <button class="btn btn--danger" (click)="onDelete()">Delete</button>
                     </div>
                 </div>
@@ -129,6 +129,6 @@ export class ProjectDetailComponent implements OnInit {
         const p = this.project();
         if (!p) return;
         await this.projectService.deleteProject(p.id);
-        this.router.navigate(['/projects']);
+        this.router.navigate(['/agents/projects']);
     }
 }
