@@ -126,3 +126,32 @@ export function isCheerleadingResponse(events: ClaudeStreamEvent[]): boolean {
  * Exposed as a constant so callers and tests share the same threshold.
  */
 export const CHEERLEADING_WARNING_THRESHOLD = 2;
+
+// ── Stall detection ───────────────────────────────────────────────────────
+
+/**
+ * Minimum response length (in characters) below which a no-tool-call turn
+ * is considered a stall, even without cheerleading language patterns.
+ */
+export const MIN_SUBSTANTIVE_LENGTH = 100;
+
+/**
+ * Returns true if a completed response turn is "stalled" — i.e. it made no
+ * tool calls and produced no substantive output.
+ *
+ * A turn is stalled when:
+ *   - It matches `isCheerleadingResponse()` (forward-commit without action), OR
+ *   - It has no tool calls AND the response text is below {@link MIN_SUBSTANTIVE_LENGTH}
+ *
+ * Used by OllamaStallEscalator to detect consecutive stalled turns in Ollama
+ * sessions and trigger escalation to the task queue.
+ *
+ * @param events - All stream events emitted during a single response turn.
+ * @returns `true` if the turn looks like a stall.
+ */
+export function isStallTurn(events: ClaudeStreamEvent[]): boolean {
+    if (isCheerleadingResponse(events)) return true;
+    if (hasToolUseInTurn(events)) return false;
+    const text = extractTurnText(events);
+    return text.length < MIN_SUBSTANTIVE_LENGTH;
+}
