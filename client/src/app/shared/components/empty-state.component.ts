@@ -56,6 +56,11 @@ import { RouterLink } from '@angular/router';
             line-height: 1.4;
             color: var(--text-secondary);
             user-select: none;
+            animation: gentleFloat 3s ease-in-out infinite;
+        }
+        @keyframes gentleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
         }
         .empty-state__title {
             margin: 0 0 0.5rem;
@@ -89,7 +94,11 @@ import { RouterLink } from '@angular/router';
         .empty-state__action:hover {
             background: var(--accent-cyan);
             color: var(--bg-deep);
-            box-shadow: var(--glow-cyan);
+            box-shadow: var(--glow-cyan), 0 0 20px rgba(0, 229, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        .empty-state__action:active {
+            transform: translateY(0) scale(0.97);
         }
         .empty-state__action:focus-visible {
             outline: 2px solid var(--accent-cyan);
@@ -100,6 +109,11 @@ import { RouterLink } from '@angular/router';
             margin: 1rem 0 0;
             font-size: 0.65rem;
             color: var(--text-tertiary);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .empty-state__icon { animation: none; }
+            .empty-state__action:hover { transform: none; }
+            .empty-state__action:active { transform: none; }
         }
         @media (max-width: 768px) {
             .empty-state {

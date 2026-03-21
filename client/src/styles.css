@@ -529,3 +529,118 @@ button:active:not(:disabled) {
 .table-scroll:not(:has(:last-child:is(:last-child))) .table-scroll::after {
     opacity: 1;
 }
+
+/* ══════════════════════════════════════════════════════════
+   Phase 3 — Micro-interactions, form polish, enhanced UX
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Enhanced form inputs ── */
+.form__input,
+.form__textarea,
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
+textarea,
+select {
+    transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
+}
+
+.form__input:focus,
+.form__textarea:focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):focus,
+textarea:focus,
+select:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan), inset 0 0 0 1px rgba(0, 229, 255, 0.05);
+    background: rgba(0, 229, 255, 0.02);
+}
+
+/* Label transition when sibling input is focused */
+.form__field:focus-within .form__label {
+    color: var(--accent-cyan);
+    transition: color 0.2s ease;
+}
+
+/* ── Button micro-interactions ── */
+.btn,
+button[type="submit"],
+.empty-state__action {
+    position: relative;
+    overflow: hidden;
+    transition: background 0.15s ease, box-shadow 0.2s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Press feedback */
+.btn:active:not(:disabled),
+button[type="submit"]:active:not(:disabled) {
+    transform: scale(0.96);
+    transition-duration: 0.05s;
+}
+
+/* Ripple effect on click */
+@keyframes btnRipple {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0.4; }
+    100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+
+.btn::after,
+button[type="submit"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(0, 229, 255, 0.2) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.btn:hover::after,
+button[type="submit"]:hover::after {
+    opacity: 1;
+}
+
+/* ── Enhanced skeleton wave ── */
+@keyframes skeletonWave {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton__item {
+    background: linear-gradient(
+        90deg,
+        var(--bg-raised) 0%,
+        var(--bg-raised) 25%,
+        rgba(0, 229, 255, 0.04) 50%,
+        var(--bg-raised) 75%,
+        var(--bg-raised) 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: skeletonWave 2s ease-in-out infinite !important;
+}
+
+/* ── Toast progress bar ── */
+@keyframes toastProgress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+
+/* ── Status badge transitions ── */
+.status-badge {
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Enhanced pulse for active states */
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+    50% { opacity: 0.7; box-shadow: 0 0 8px 2px currentColor; }
+}
+
+/* ── Empty state floating icon ── */
+@keyframes gentleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+/* ── Link underline animation ── */
+@keyframes underlineGrow {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}

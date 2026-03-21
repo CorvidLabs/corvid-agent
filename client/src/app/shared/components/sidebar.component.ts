@@ -175,13 +175,30 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             text-decoration: none;
             font-size: 0.85rem;
             letter-spacing: 0.03em;
-            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
             border-left: 3px solid transparent;
+            position: relative;
+        }
+        /* Hover glow line indicator */
+        .sidebar__link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 25%;
+            bottom: 25%;
+            width: 3px;
+            background: var(--accent-cyan);
+            transform: scaleY(0);
+            transition: transform 0.2s ease;
+            border-radius: 0 2px 2px 0;
         }
         @media (hover: hover) {
             .sidebar__link:hover {
                 background: var(--bg-hover);
                 color: var(--accent-cyan);
+            }
+            .sidebar__link:hover::before {
+                transform: scaleY(1);
             }
         }
         .sidebar__link--active {
@@ -189,6 +206,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+        }
+        .sidebar__link--active::before {
+            display: none;
         }
         .sidebar__divider {
             height: 1px;
