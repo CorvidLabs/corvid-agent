@@ -49,6 +49,7 @@ files:
   - server/routes/security-overview.ts
   - server/routes/contacts.ts
   - server/routes/discord-image.ts
+  - server/routes/variants.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -131,6 +132,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
 | `handleContactRoutes` | contacts.ts | Contact identity CRUD and cross-platform lookup |
 | `handleDiscordImageRoutes` | discord-image.ts | Send images to Discord channels via `POST /api/discord/send-image` (base64, file path, or multipart) |
+| `handleVariantRoutes` | variants.ts | Agent variant profile CRUD and agent-variant assignment/removal |
 
 ### Exported Functions (projects.ts)
 
@@ -617,6 +619,19 @@ Every request passes through these stages in order:
 | POST | `/api/contacts/:id/links` | contacts.ts | Add a platform link to a contact |
 | DELETE | `/api/contacts/:id/links/:linkId` | contacts.ts | Remove a platform link |
 | PUT | `/api/contacts/:id/links/:linkId/verify` | contacts.ts | Mark a platform link as verified |
+
+### Variants
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/variants` | variants.ts | List all variant profiles |
+| POST | `/api/variants` | variants.ts | Create a variant profile |
+| GET | `/api/variants/:id` | variants.ts | Get a variant by ID |
+| PUT | `/api/variants/:id` | variants.ts | Update a variant |
+| DELETE | `/api/variants/:id` | variants.ts | Delete a variant |
+| GET | `/api/agents/:id/variant` | variants.ts | Get the variant applied to an agent |
+| POST | `/api/agents/:id/variant` | variants.ts | Apply a variant to an agent |
+| DELETE | `/api/agents/:id/variant` | variants.ts | Remove variant from an agent |
 
 ### Inline Routes (index.ts)
 

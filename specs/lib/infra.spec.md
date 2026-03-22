@@ -160,6 +160,9 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `CreateSkillBundleSchema` | Skill Bundles | Validates skill bundle creation: `name` (required), optional `description`, `tools` (max 50), `promptAdditions`. |
 | `UpdateSkillBundleSchema` | Skill Bundles | Validates skill bundle update. All fields optional. |
 | `AssignSkillBundleSchema` | Skill Bundles | Validates skill bundle assignment: `bundleId` (required), optional `sortOrder`. |
+| `CreateVariantSchema` | Variants | Validates variant creation: `name` (required), optional `description`, `skillBundleIds` (max 20), `personaIds` (max 10), `preset`. |
+| `UpdateVariantSchema` | Variants | Validates variant update. All fields optional. |
+| `ApplyVariantSchema` | Variants | Validates variant application: `variantId` (required). |
 | `AddRepoBlocklistSchema` | Repo Blocklist | Validates repo blocklist add: `repo` (required, `owner/name` format). |
 | `CreateMcpServerConfigSchema` | MCP Server Configs | Validates MCP server config creation: `name`, `command` (required), optional `agentId`, `args`, `envVars`, `cwd`, `enabled`. |
 | `UpdateMcpServerConfigSchema` | MCP Server Configs | Validates MCP server config update. All fields optional. |

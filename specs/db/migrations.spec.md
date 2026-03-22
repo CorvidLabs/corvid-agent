@@ -25,7 +25,7 @@ files:
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
   - server/db/migrations/099_composable_personas.ts
-  - server/db/migrations/100_agent_blocklist.ts
+  - server/db/migrations/100_agent_variants.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -372,22 +372,22 @@ Adds `output_destinations` column to `agent_schedules` for routing schedule exec
 | `up` | `(db: Database)` | `void` | Adds `output_destinations` TEXT column to `agent_schedules` (idempotent — checks column existence first) |
 | `down` | `(db: Database)` | `void` | Drops `output_destinations` column from `agent_schedules` |
 
-### 100_agent_blocklist.ts
+### 100_agent_variants.ts
 
-Creates the `agent_blocklist` table for the agent kill switch. Tracks blacklisted agents to prevent them from sending or receiving messages.
+Creates `agent_variants` and `agent_variant_assignments` tables for preset skill + persona combinations.
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Creates `agent_blocklist` table with `agent_id` as primary key, plus index on `reason` |
-| `down` | `(db: Database)` | `void` | Drops the `agent_blocklist` table |
+| `up` | `(db: Database)` | `void` | Creates `agent_variants` table (name UNIQUE, JSON skill_bundle_ids/persona_ids) and `agent_variant_assignments` junction table (agent_id PRIMARY KEY) |
+| `down` | `(db: Database)` | `void` | Drops both tables |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |
+| 2026-03-22 | corvid-agent | Add migration 100 (agent_variants) to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
 | 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
 | 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |

@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 99;
+const SCHEMA_VERSION = 100;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -126,9 +126,9 @@ const MIGRATIONS: Record<number, string[]> = {
         ...agents.indexes.filter((s) => s.includes('agent_persona_assignments')),
     ],
     100: [
-        // Agent blocklist: kill switch for malicious agents
-        ...reputation.tables.filter((s) => s.includes('agent_blocklist')),
-        ...reputation.indexes.filter((s) => s.includes('agent_blocklist')),
+        // Agent variant profiles: preset skill + persona combinations
+        ...agents.tables.filter((s) => s.includes('agent_variants') || s.includes('agent_variant_assignments')),
+        ...agents.indexes.filter((s) => s.includes('agent_variant_assignments')),
     ],
 };
 

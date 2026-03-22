@@ -96,6 +96,23 @@ export const tables: string[] = [
         PRIMARY KEY (agent_id, bundle_id)
     )`,
 
+    `CREATE TABLE IF NOT EXISTS agent_variants (
+        id               TEXT PRIMARY KEY,
+        name             TEXT UNIQUE NOT NULL,
+        description      TEXT DEFAULT '',
+        skill_bundle_ids TEXT NOT NULL DEFAULT '[]',
+        persona_ids      TEXT NOT NULL DEFAULT '[]',
+        preset           INTEGER NOT NULL DEFAULT 0,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_variant_assignments (
+        agent_id   TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+        variant_id TEXT NOT NULL REFERENCES agent_variants(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+
     `CREATE TABLE IF NOT EXISTS agent_spending_caps (
         agent_id               TEXT PRIMARY KEY,
         daily_limit_microalgos INTEGER NOT NULL DEFAULT 5000000,
@@ -126,6 +143,7 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_persona_assignments_agent ON agent_persona_assignments(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_variant_assignments_variant ON agent_variant_assignments(variant_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
     `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
