@@ -145,6 +145,29 @@ function checkAdminAuth(req: Request): boolean {
     return timingSafeEqual(token, adminKey);
 }
 
+// ─── Port recovery: kill stale processes before binding ─────────────────────
+// Prevents EADDRINUSE crash loops when the previous server didn't exit cleanly.
+try {
+    const probe = Bun.listen({ hostname: BIND_HOST, port: PORT, socket: { data() {}, open() {}, close() {}, error() {} } });
+    probe.stop(true);
+} catch {
+    log.warn(`Port ${PORT} is in use — attempting recovery`);
+    try {
+        const lsof = Bun.spawnSync(['lsof', '-ti', `:${PORT}`]);
+        const pids = lsof.stdout.toString().trim().split('\n').filter(Boolean);
+        const myPid = process.pid.toString();
+        for (const pid of pids) {
+            if (pid === myPid) continue;
+            log.warn(`Killing stale process ${pid} on port ${PORT}`);
+            try { process.kill(Number(pid), 'SIGTERM'); } catch { /* already dead */ }
+        }
+        // Wait for port to free up
+        Bun.sleepSync(1500);
+    } catch (err) {
+        log.error('Port recovery failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
 // Start server
 const server = Bun.serve<WsData>({
     port: PORT,
