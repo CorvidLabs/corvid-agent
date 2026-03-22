@@ -208,6 +208,133 @@ curl -X POST http://localhost:3000/api/workflow-runs/run-xyz789/action \
 
 Actions: `pause`, `resume`, `cancel`.
 
+### List Workflows
+
+```bash
+curl http://localhost:3000/api/workflows \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "wf-abc123",
+    "agentId": "agent-1",
+    "name": "Code Review Pipeline",
+    "status": "draft",
+    "createdAt": "2026-03-08T12:00:00Z"
+  }
+]
+```
+
+### Get Workflow
+
+```bash
+curl http://localhost:3000/api/workflows/wf-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full workflow object including nodes and edges.
+
+### Update Workflow
+
+```bash
+curl -X PUT http://localhost:3000/api/workflows/wf-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "description": "Updated pipeline description", "maxConcurrency": 4 }'
+```
+
+**Response (200):** Returns the updated workflow object.
+
+### Delete Workflow
+
+```bash
+curl -X DELETE http://localhost:3000/api/workflows/wf-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List Runs for Workflow
+
+```bash
+curl http://localhost:3000/api/workflows/wf-abc123/runs \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "run-xyz789",
+    "workflowId": "wf-abc123",
+    "status": "completed",
+    "startedAt": "2026-03-08T12:05:00Z",
+    "completedAt": "2026-03-08T12:10:00Z"
+  }
+]
+```
+
+### List All Workflow Runs
+
+```bash
+curl http://localhost:3000/api/workflow-runs \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns all workflow runs across all workflows (same shape as above).
+
+### Get Workflow Run
+
+```bash
+curl http://localhost:3000/api/workflow-runs/run-xyz789 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full run object with status and timing.
+
+### Get Node Runs
+
+```bash
+curl http://localhost:3000/api/workflow-runs/run-xyz789/nodes \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "nodeId": "lint",
+    "status": "completed",
+    "startedAt": "2026-03-08T12:05:01Z",
+    "completedAt": "2026-03-08T12:06:30Z",
+    "output": { "passed": true }
+  }
+]
+```
+
+### Workflow Health
+
+```bash
+curl http://localhost:3000/api/workflows/health \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "healthy",
+  "activeRuns": 1,
+  "queuedRuns": 0
+}
+```
+
 ---
 
 ## Councils
@@ -329,6 +456,172 @@ curl -X POST http://localhost:3000/api/council-launches/launch-xyz/vote \
 }
 ```
 
+### List Councils
+
+```bash
+curl http://localhost:3000/api/councils \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of council objects.
+
+### Get Council
+
+```bash
+curl http://localhost:3000/api/councils/council-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full council object.
+
+### Update Council
+
+```bash
+curl -X PUT http://localhost:3000/api/councils/council-abc \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "discussionRounds": 3 }'
+```
+
+**Response (200):** Returns the updated council object.
+
+### Delete Council
+
+```bash
+curl -X DELETE http://localhost:3000/api/councils/council-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List Launches for Council
+
+```bash
+curl http://localhost:3000/api/councils/council-abc/launches \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of launch objects for the council.
+
+### List All Council Launches
+
+```bash
+curl http://localhost:3000/api/council-launches \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns all council launches across all councils.
+
+### Get Council Launch
+
+```bash
+curl http://localhost:3000/api/council-launches/launch-xyz \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full launch object with status, agents, and timing.
+
+### Get Launch Logs
+
+```bash
+curl http://localhost:3000/api/council-launches/launch-xyz/logs \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "level": "info", "message": "Discussion round 1 started", "createdAt": "2026-03-08T10:01:00Z" }
+]
+```
+
+### Get Discussion Messages
+
+```bash
+curl http://localhost:3000/api/council-launches/launch-xyz/discussion-messages \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "agentId": "agent-backend",
+    "round": 1,
+    "content": "The migration plan looks solid...",
+    "createdAt": "2026-03-08T10:02:00Z"
+  }
+]
+```
+
+### Abort Launch
+
+```bash
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/abort \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Trigger Review
+
+```bash
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/review \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Trigger Synthesis
+
+```bash
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/synthesize \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Continue Chat
+
+```bash
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/chat \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "prompt": "Can we revisit the rollback strategy?" }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get Vote Status
+
+```bash
+curl http://localhost:3000/api/council-launches/launch-xyz/vote \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "voting",
+  "votes": [
+    { "agentId": "agent-security", "vote": "approve", "reason": "Safe and reversible" }
+  ],
+  "quorumMet": false
+}
+```
+
+### Human Approval Override
+
+```bash
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/vote/approve \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ---
 
 ## Marketplace
@@ -426,6 +719,73 @@ curl -X POST http://localhost:3000/api/marketplace/listings \
 }
 ```
 
+### List All Listings
+
+```bash
+curl http://localhost:3000/api/marketplace/listings \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of listing objects.
+
+### Get Listing
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full listing object.
+
+### Update Listing
+
+```bash
+curl -X PUT http://localhost:3000/api/marketplace/listings/listing-abc \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "published", "description": "Updated description" }'
+```
+
+**Response (200):** Returns the updated listing object.
+
+### Delete Listing
+
+```bash
+curl -X DELETE http://localhost:3000/api/marketplace/listings/listing-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Record Listing Use
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/use \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true, "totalUses": 43 }`
+
+### Get Reviews
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/reviews \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "review-1",
+    "rating": 5,
+    "comment": "Excellent coverage",
+    "createdAt": "2026-03-10T12:00:00Z"
+  }
+]
+```
+
 ### Create Review
 
 ```bash
@@ -436,6 +796,181 @@ curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/reviews 
     "rating": 5,
     "comment": "Excellent coverage — found three real vulnerabilities"
   }'
+```
+
+**Response (201):** Returns the created review object.
+
+### Delete Review
+
+```bash
+curl -X DELETE http://localhost:3000/api/marketplace/reviews/review-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List Federation Instances
+
+```bash
+curl http://localhost:3000/api/marketplace/federation/instances \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "url": "https://other-instance.example.com", "status": "active", "lastSyncAt": "2026-03-20T10:00:00Z" }
+]
+```
+
+### Register Federation Instance
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/federation/instances \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://other-instance.example.com" }'
+```
+
+**Response (201):** `{ "ok": true }`
+
+### Remove Federation Instance
+
+```bash
+curl -X DELETE "http://localhost:3000/api/marketplace/federation/instances/https%3A%2F%2Fother-instance.example.com" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Sync Federation
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/federation/sync \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true, "synced": 3 }`
+
+### Get Federated Listings
+
+```bash
+curl http://localhost:3000/api/marketplace/federated \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns aggregated listings from all federation instances.
+
+### Subscribe to Listing
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/subscribe \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "sub-1",
+  "listingId": "listing-abc",
+  "status": "active",
+  "startedAt": "2026-03-20T10:00:00Z"
+}
+```
+
+### Cancel Subscription
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/subscriptions/sub-1/cancel \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get Subscriptions
+
+```bash
+curl http://localhost:3000/api/marketplace/subscriptions \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of subscription objects.
+
+### Get Listing Subscribers
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/subscribers \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of subscriber records.
+
+### Get Listing Badges
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/badges \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "badge": "top-rated", "awardedAt": "2026-03-15T10:00:00Z" }
+]
+```
+
+### Check Quality Gates
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/quality-gates \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "gates": [
+    { "name": "min-reviews", "passed": true, "required": 3, "current": 5 },
+    { "name": "min-rating", "passed": true, "required": 3.5, "current": 4.8 }
+  ]
+}
+```
+
+### Get Listing Analytics
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/analytics \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalUses": 150,
+  "uniqueUsers": 42,
+  "averageRating": 4.8,
+  "revenueCredits": 7500
+}
+```
+
+### Get Buyer Usage
+
+```bash
+curl http://localhost:3000/api/marketplace/usage \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "listingId": "listing-abc", "uses": 12, "lastUsedAt": "2026-03-20T14:00:00Z" }
+]
 ```
 
 ---
@@ -510,6 +1045,176 @@ curl -X PUT http://localhost:3000/api/reputation/identity/agent-1 \
 
 **Tiers:** `UNVERIFIED`, `GITHUB_VERIFIED`, `OWNER_VOUCHED`, `ESTABLISHED`
 
+### Get All Scores
+
+```bash
+curl http://localhost:3000/api/reputation/scores \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of score objects for all agents.
+
+### Force Recompute All
+
+```bash
+curl -X POST http://localhost:3000/api/reputation/scores \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true, "recomputed": 5 }`
+
+### Force Recompute for Agent
+
+```bash
+curl -X POST http://localhost:3000/api/reputation/scores/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the recomputed score object.
+
+### Get Events for Agent
+
+```bash
+curl http://localhost:3000/api/reputation/events/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "eventType": "task_completed",
+    "scoreImpact": 2.5,
+    "metadata": { "taskId": "task-xyz" },
+    "createdAt": "2026-03-20T10:00:00Z"
+  }
+]
+```
+
+### Get Attestation
+
+```bash
+curl http://localhost:3000/api/reputation/attestation/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "score": 87.5,
+  "txid": "ALGO_TX_ID",
+  "attestedAt": "2026-03-18T10:00:00Z"
+}
+```
+
+### Create Attestation
+
+```bash
+curl -X POST http://localhost:3000/api/reputation/attestation/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (201):** Returns the attestation with on-chain transaction ID.
+
+### List Identity Records
+
+```bash
+curl http://localhost:3000/api/reputation/identities \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of identity records for all agents.
+
+### Get Identity
+
+```bash
+curl http://localhost:3000/api/reputation/identity/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "tier": "GITHUB_VERIFIED",
+  "dataHash": "abc123...",
+  "verifiedAt": "2026-03-10T08:00:00Z"
+}
+```
+
+### Score Explanation
+
+```bash
+curl http://localhost:3000/api/reputation/explain/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "overallScore": 87.5,
+  "breakdown": {
+    "taskCompletion": { "weight": 0.4, "score": 94, "events": 120 },
+    "reliability": { "weight": 0.3, "score": 85, "events": 36 },
+    "community": { "weight": 0.3, "score": 80, "events": 20 }
+  }
+}
+```
+
+### Agent Statistics
+
+```bash
+curl http://localhost:3000/api/reputation/stats/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalEvents": 156,
+  "taskCompletionRate": 0.94,
+  "averageSessionDuration": 45000,
+  "totalCreditsEarned": 2500
+}
+```
+
+### Submit Feedback
+
+```bash
+curl -X POST http://localhost:3000/api/reputation/feedback \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "rating": 5,
+    "comment": "Very thorough code review"
+  }'
+```
+
+**Response (201):** `{ "ok": true }`
+
+### Get Feedback
+
+```bash
+curl http://localhost:3000/api/reputation/feedback/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "rating": 5, "comment": "Very thorough code review", "createdAt": "2026-03-20T10:00:00Z" }
+]
+```
+
 ---
 
 ## Billing
@@ -578,6 +1283,59 @@ curl "http://localhost:3000/api/billing/usage/tenant-1" \
     "averageMonthly": 1500
   }
 }
+```
+
+### Get Subscription
+
+```bash
+curl http://localhost:3000/api/billing/subscription/tenant-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the subscription object.
+
+### Cancel Subscription
+
+```bash
+curl -X POST http://localhost:3000/api/billing/subscription/tenant-1/cancel \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Stripe Webhook
+
+Stripe sends billing events to this endpoint. Authentication uses Stripe's webhook signature verification.
+
+```bash
+curl -X POST http://localhost:3000/webhooks/stripe \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=1616000000,v1=abc123..." \
+  -d '{ "type": "invoice.paid", "data": { "object": { "subscription": "sub_abc123" } } }'
+```
+
+**Response (200):** `{ "received": true }`
+
+### Get Invoices
+
+```bash
+curl http://localhost:3000/api/billing/invoices/tenant-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "inv-1",
+    "tenantId": "tenant-1",
+    "amountCents": 2500,
+    "status": "paid",
+    "periodStart": "2026-02-01T00:00:00Z",
+    "periodEnd": "2026-03-01T00:00:00Z"
+  }
+]
 ```
 
 ### Calculate Cost
@@ -714,6 +1472,89 @@ curl http://localhost:3000/api/agents/agent-1/balance \
 }
 ```
 
+### List Agents
+
+```bash
+curl http://localhost:3000/api/agents \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of agent objects.
+
+### Get Agent
+
+```bash
+curl http://localhost:3000/api/agents/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full agent object.
+
+### Update Agent
+
+```bash
+curl -X PUT http://localhost:3000/api/agents/agent-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "description": "Updated agent description", "model": "claude-opus-4-20250514" }'
+```
+
+**Response (200):** Returns the updated agent object.
+
+### Delete Agent
+
+```bash
+curl -X DELETE http://localhost:3000/api/agents/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Fund Wallet (localnet only)
+
+```bash
+curl -X POST http://localhost:3000/api/agents/agent-1/fund \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 10000000 }'
+```
+
+**Response (200):** `{ "ok": true, "txid": "ALGO_TX_ID" }`
+
+### List AlgoChat Messages
+
+```bash
+curl "http://localhost:3000/api/agents/agent-1/messages?limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "messages": [
+    { "from": "ALGO...", "content": "Review this PR", "createdAt": "2026-03-20T10:00:00Z" }
+  ],
+  "total": 50
+}
+```
+
+### Get Spending
+
+```bash
+curl http://localhost:3000/api/agents/agent-1/spending \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "dailySpent": { "microalgos": 5000000, "usdc": 2000000 },
+  "dailyCap": { "microalgos": 10000000, "usdc": 5000000 }
+}
+```
+
 ### Set Spending Cap
 
 ```bash
@@ -724,6 +1565,36 @@ curl -X PUT http://localhost:3000/api/agents/agent-1/spending-cap \
     "dailyLimitMicroalgos": 10000000,
     "dailyLimitUsdc": 5000000
   }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Remove Spending Cap
+
+```bash
+curl -X DELETE http://localhost:3000/api/agents/agent-1/spending-cap \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get A2A Agent Card
+
+```bash
+curl http://localhost:3000/api/agents/agent-1/agent-card \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "name": "code-reviewer",
+  "description": "Automated code review agent",
+  "skills": ["code-review", "testing"],
+  "provider": { "organization": "CorvidLabs" },
+  "url": "http://localhost:3000/api/a2a"
+}
 ```
 
 ---
@@ -793,6 +1664,68 @@ curl -X POST http://localhost:3000/api/sessions/session-abc123/resume \
   -d '{ "prompt": "Now add unit tests for the fix" }'
 ```
 
+### List Sessions
+
+```bash
+curl "http://localhost:3000/api/sessions?agentId=agent-1&status=running" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of session objects.
+
+### Get Session
+
+```bash
+curl http://localhost:3000/api/sessions/session-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full session object.
+
+### Update Session
+
+```bash
+curl -X PUT http://localhost:3000/api/sessions/session-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Fix login bug - updated" }'
+```
+
+**Response (200):** Returns the updated session object.
+
+### Delete Session
+
+```bash
+curl -X DELETE http://localhost:3000/api/sessions/session-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get Session Messages
+
+```bash
+curl http://localhost:3000/api/sessions/session-abc123/messages \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "role": "user",
+    "content": "Fix the authentication timeout issue in auth.ts",
+    "timestamp": "2026-03-08T10:00:00Z"
+  },
+  {
+    "role": "assistant",
+    "content": "I'll investigate the auth timeout...",
+    "timestamp": "2026-03-08T10:00:05Z"
+  }
+]
+```
+
 ### Stop Session
 
 ```bash
@@ -801,6 +1734,24 @@ curl -X POST http://localhost:3000/api/sessions/session-abc123/stop \
 ```
 
 **Response:** `{ "ok": true }`
+
+### Escalate to Work Task
+
+```bash
+curl -X POST http://localhost:3000/api/sessions/session-abc123/escalate \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "Session needs a dedicated branch and PR" }'
+```
+
+**Response (201):**
+
+```json
+{
+  "taskId": "task-new123",
+  "sessionId": "session-abc123"
+}
+```
 
 ---
 
@@ -906,6 +1857,96 @@ curl -X POST http://localhost:3000/api/schedules/bulk \
 }
 ```
 
+### List Schedules
+
+```bash
+curl http://localhost:3000/api/schedules \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of schedule objects.
+
+### Get Schedule
+
+```bash
+curl http://localhost:3000/api/schedules/sched-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full schedule object.
+
+### Update Schedule
+
+```bash
+curl -X PUT http://localhost:3000/api/schedules/sched-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "cronExpression": "0 3 * * *", "name": "Nightly Review (3am)" }'
+```
+
+**Response (200):** Returns the updated schedule object.
+
+### Delete Schedule
+
+```bash
+curl -X DELETE http://localhost:3000/api/schedules/sched-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Trigger Immediately
+
+```bash
+curl -X POST http://localhost:3000/api/schedules/sched-abc123/trigger \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (201):**
+
+```json
+{
+  "executionId": "exec-123",
+  "status": "running"
+}
+```
+
+### List Executions for Schedule
+
+```bash
+curl http://localhost:3000/api/schedules/sched-abc123/executions \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of execution objects for the schedule.
+
+### List All Executions
+
+```bash
+curl http://localhost:3000/api/schedule-executions \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns all executions across all schedules.
+
+### Get Execution
+
+```bash
+curl http://localhost:3000/api/schedule-executions/exec-123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full execution object with status and timing.
+
+### Cancel Execution
+
+```bash
+curl -X POST http://localhost:3000/api/schedule-executions/exec-123/cancel \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ### Approve/Deny Execution
 
 ```bash
@@ -914,6 +1955,8 @@ curl -X POST http://localhost:3000/api/schedule-executions/exec-123/resolve \
   -H "Content-Type: application/json" \
   -d '{ "approved": true }'
 ```
+
+**Response (200):** `{ "ok": true }`
 
 ### Scheduler Health
 
@@ -932,6 +1975,40 @@ curl http://localhost:3000/api/scheduler/health \
   "runningExecutions": 2,
   "maxConcurrent": 5,
   "recentFailures": 0
+}
+```
+
+### System State
+
+```bash
+curl http://localhost:3000/api/scheduler/system-state \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "schedules": 12,
+  "activeExecutions": 2,
+  "queuedExecutions": 1,
+  "uptime": 86400
+}
+```
+
+### GitHub Integration Status
+
+```bash
+curl http://localhost:3000/api/github/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "configured": true,
+  "rateLimit": { "remaining": 4500, "limit": 5000, "resetsAt": "2026-03-20T16:00:00Z" }
 }
 ```
 
@@ -991,6 +2068,42 @@ curl -X POST http://localhost:3000/api/work-tasks \
 | `sourceId` | string | no | Source reference ID |
 | `requesterInfo` | object | no | Metadata about requester |
 
+### Queue Status
+
+```bash
+curl http://localhost:3000/api/work-tasks/queue-status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "pending": 3,
+  "running": 1,
+  "completed": 120,
+  "failed": 5
+}
+```
+
+### List Work Tasks
+
+```bash
+curl "http://localhost:3000/api/work-tasks?status=pending" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of work task objects.
+
+### Get Work Task
+
+```bash
+curl http://localhost:3000/api/work-tasks/task-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full work task object.
+
 ### Cancel Work Task
 
 ```bash
@@ -998,12 +2111,16 @@ curl -X POST http://localhost:3000/api/work-tasks/task-abc123/cancel \
   -H "Authorization: Bearer $API_KEY"
 ```
 
+**Response (200):** `{ "ok": true }`
+
 ### Retry Failed Task
 
 ```bash
 curl -X POST http://localhost:3000/api/work-tasks/task-abc123/retry \
   -H "Authorization: Bearer $API_KEY"
 ```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -1081,6 +2198,114 @@ curl -X POST http://localhost:3000/api/permissions/check \
   }'
 ```
 
+**Response (200):**
+
+```json
+{
+  "allowed": true,
+  "grant": { "action": "tool:bash", "granted_by": "owner" }
+}
+```
+
+### Revoke Permission
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/revoke \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agent-1",
+    "action": "file:write",
+    "reason": "No longer needed"
+  }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List Action Taxonomy
+
+```bash
+curl http://localhost:3000/api/permissions/actions \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "action": "file:read", "description": "Read files" },
+  { "action": "file:write", "description": "Write files" },
+  { "action": "tool:bash", "description": "Execute bash commands" }
+]
+```
+
+### List Grants for Agent
+
+```bash
+curl http://localhost:3000/api/permissions/agent-1 \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "grant-abc",
+    "action": "file:write",
+    "granted_by": "owner",
+    "reason": "Needs write access",
+    "created_at": "2026-03-08T10:00:00Z"
+  }
+]
+```
+
+### List Role Templates
+
+```bash
+curl http://localhost:3000/api/permissions/roles \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "name": "code-reviewer", "description": "Read-only code access", "actions": ["file:read", "tool:grep"] }
+]
+```
+
+### Get Role Template
+
+```bash
+curl http://localhost:3000/api/permissions/roles/code-reviewer \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+**Response (200):** Returns the full role template object.
+
+### Apply Role Template
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/roles/apply \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agent_id": "agent-1", "role": "code-reviewer" }'
+```
+
+**Response (200):** `{ "ok": true, "grantsCreated": 2 }`
+
+### Revoke Role Template
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/roles/revoke \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agent_id": "agent-1", "role": "code-reviewer" }'
+```
+
+**Response (200):** `{ "ok": true, "grantsRevoked": 2 }`
+
 ---
 
 ## Sandbox
@@ -1134,6 +2359,72 @@ curl -X POST http://localhost:3000/api/sandbox/assign \
 
 **Response (201):** `{ "containerId": "container-xyz" }`
 
+### Get Pool Statistics
+
+```bash
+curl http://localhost:3000/api/sandbox/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalContainers": 10,
+  "activeContainers": 3,
+  "availableContainers": 7,
+  "poolSize": 10
+}
+```
+
+### List Policies
+
+```bash
+curl http://localhost:3000/api/sandbox/policies \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "agentId": "agent-1",
+    "cpuLimit": 2,
+    "memoryLimitMb": 1024,
+    "networkPolicy": "restricted",
+    "timeoutSeconds": 3600
+  }
+]
+```
+
+### Get Policy for Agent
+
+```bash
+curl http://localhost:3000/api/sandbox/policies/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the policy object for the specified agent.
+
+### Delete Policy
+
+```bash
+curl -X DELETE http://localhost:3000/api/sandbox/policies/agent-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Release Container
+
+```bash
+curl -X POST http://localhost:3000/api/sandbox/release/session-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ---
 
 ## Ollama
@@ -1151,6 +2442,53 @@ Local LLM management via Ollama. Check status, browse models, pull/delete, and m
 | DELETE | `/api/ollama/models` | Delete a model | any |
 | GET | `/api/ollama/models/pull/status` | Get pull progress | any |
 | GET | `/api/ollama/library` | Browse model library | any |
+
+### Get Status
+
+```bash
+curl http://localhost:3000/api/ollama/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "running": true,
+  "version": "0.1.34",
+  "activePulls": []
+}
+```
+
+### List Installed Models
+
+```bash
+curl http://localhost:3000/api/ollama/models \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "name": "llama3:8b", "size": "4.7 GB", "modifiedAt": "2026-03-15T10:00:00Z" }
+]
+```
+
+### List Running Models
+
+```bash
+curl http://localhost:3000/api/ollama/models/running \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "name": "llama3:8b", "size": "4.7 GB", "vramUsage": "5.2 GB" }
+]
+```
 
 ### Pull a Model
 
@@ -1179,6 +2517,34 @@ curl "http://localhost:3000/api/ollama/library?category=coding" \
 
 **Query params:** `q` (search), `category` (`all`, `cloud`, `recommended`, `coding`, `small`, `large`, `vision`)
 
+### Delete a Model
+
+```bash
+curl -X DELETE http://localhost:3000/api/ollama/models \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "llama3:8b" }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get Pull Progress
+
+```bash
+curl http://localhost:3000/api/ollama/models/pull/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "model": "llama3:8b",
+  "status": "pulling",
+  "progress": 45
+}
+```
+
 ---
 
 ## Webhooks
@@ -1197,6 +2563,20 @@ GitHub webhook registration and delivery tracking. Incoming webhooks are authent
 | DELETE | `/api/webhooks/{id}` | Delete registration | operator |
 | GET | `/api/webhooks/deliveries` | List all deliveries | any |
 | GET | `/api/webhooks/{id}/deliveries` | List deliveries for registration | any |
+
+### Receive GitHub Webhook
+
+GitHub sends events to this endpoint. Authentication uses HMAC-SHA256 signature verification via `X-Hub-Signature-256` header.
+
+```bash
+curl -X POST http://localhost:3000/webhooks/github \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: issue_comment" \
+  -H "X-Hub-Signature-256: sha256=abc123..." \
+  -d '{ "action": "created", "comment": { "body": "@corvid-agent review this" } }'
+```
+
+**Response (200):** `{ "ok": true }`
 
 ### Create Registration
 
@@ -1226,6 +2606,89 @@ curl -X POST http://localhost:3000/api/webhooks \
 ```
 
 **Event types:** `issue_comment`, `issues`, `pull_request_review_comment`, `issue_comment_pr`
+
+### List Registrations
+
+```bash
+curl http://localhost:3000/api/webhooks \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "wh-abc123",
+    "agentId": "agent-1",
+    "repo": "CorvidLabs/corvid-agent",
+    "events": ["issue_comment", "issues"],
+    "status": "active"
+  }
+]
+```
+
+### Get Registration
+
+```bash
+curl http://localhost:3000/api/webhooks/wh-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the webhook registration object.
+
+### Update Registration
+
+```bash
+curl -X PUT http://localhost:3000/api/webhooks/wh-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": ["issue_comment", "issues", "pull_request_review_comment"]
+  }'
+```
+
+**Response (200):** Returns the updated registration object.
+
+### Delete Registration
+
+```bash
+curl -X DELETE http://localhost:3000/api/webhooks/wh-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List All Deliveries
+
+```bash
+curl "http://localhost:3000/api/webhooks/deliveries?limit=10" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "del-1",
+    "webhookId": "wh-abc123",
+    "event": "issue_comment",
+    "repo": "CorvidLabs/corvid-agent",
+    "status": "delivered",
+    "createdAt": "2026-03-20T15:00:00Z"
+  }
+]
+```
+
+### List Deliveries for Registration
+
+```bash
+curl http://localhost:3000/api/webhooks/wh-abc123/deliveries \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns deliveries filtered to the specified registration (same shape as above).
 
 ---
 
@@ -1271,6 +2734,94 @@ curl -X POST http://localhost:3000/api/mention-polling \
   "intervalSeconds": 120,
   "status": "active"
 }
+```
+
+### List Configs
+
+```bash
+curl http://localhost:3000/api/mention-polling \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "poll-abc123",
+    "agentId": "agent-1",
+    "repo": "CorvidLabs/corvid-agent",
+    "mentionUsername": "corvid-agent",
+    "intervalSeconds": 120,
+    "status": "active"
+  }
+]
+```
+
+### Polling Stats
+
+```bash
+curl http://localhost:3000/api/mention-polling/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "activeConfigs": 2,
+  "totalPolls": 500,
+  "mentionsFound": 35,
+  "sessionsTriggered": 30
+}
+```
+
+### Get Config
+
+```bash
+curl http://localhost:3000/api/mention-polling/poll-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the polling config object.
+
+### Update Config
+
+```bash
+curl -X PUT http://localhost:3000/api/mention-polling/poll-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "intervalSeconds": 60 }'
+```
+
+**Response (200):** Returns the updated config object.
+
+### Delete Config
+
+```bash
+curl -X DELETE http://localhost:3000/api/mention-polling/poll-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Recent Activity
+
+```bash
+curl http://localhost:3000/api/mention-polling/poll-abc123/activity \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "sessionId": "sess-1",
+    "mentionUrl": "https://github.com/CorvidLabs/corvid-agent/issues/42#issuecomment-1",
+    "triggeredAt": "2026-03-20T14:30:00Z"
+  }
+]
 ```
 
 ---
@@ -1326,6 +2877,28 @@ curl -X POST http://localhost:3000/api/auth/device/token \
   "email": "user@example.com"
 }
 ```
+
+### Authorize Device Code
+
+```bash
+curl -X POST http://localhost:3000/api/auth/device/authorize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userCode": "ABCD1234",
+    "approved": true,
+    "email": "user@example.com"
+  }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Verify Page
+
+```bash
+curl "http://localhost:3000/api/auth/verify?code=ABCD1234"
+```
+
+**Response (200):** Returns an HTML verification page where the user can approve or deny the device code.
 
 ---
 
@@ -1496,6 +3069,41 @@ curl http://localhost:3000/api/flock-directory/lookup/ALGO_ADDRESS_58_CHARS... \
 
 **Response (200):** Returns the agent object matching the given Algorand address.
 
+### List Active Agents
+
+```bash
+curl http://localhost:3000/api/flock-directory/agents \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of active agent objects.
+
+### Get Agent by ID
+
+```bash
+curl http://localhost:3000/api/flock-directory/agents/fd-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full agent object.
+
+### Compute Reputation
+
+```bash
+curl -X POST http://localhost:3000/api/flock-directory/agents/fd-abc123/reputation \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "fd-abc123",
+  "reputationScore": 85.5,
+  "computedAt": "2026-03-20T10:00:00Z"
+}
+```
+
 ---
 
 ## Marketplace Tiers
@@ -1515,6 +3123,24 @@ Pricing tier management for marketplace listings. Tiers allow listings to offer 
 | POST | `/api/marketplace/listings/{id}/tier-subscribe` | Subscribe via tier | operator |
 | POST | `/api/marketplace/listings/{id}/trial` | Start free trial | any |
 | GET | `/api/marketplace/listings/{id}/trial` | Get trial status | any |
+
+### List Tiers
+
+```bash
+curl http://localhost:3000/api/marketplace/listings/listing-abc/tiers \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns an array of tier objects for the listing.
+
+### Get Tier
+
+```bash
+curl http://localhost:3000/api/marketplace/tiers/tier-xyz \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the tier object.
 
 ### Create Tier
 
@@ -2732,6 +4358,144 @@ Manage cross-platform contact identities with linked platform accounts (Discord,
 | DELETE | `/api/contacts/{id}/links/{linkId}` | Remove platform link | any |
 | PUT | `/api/contacts/{id}/links/{linkId}/verify` | Mark platform link as verified | any |
 
+### List Contacts
+
+```bash
+curl "http://localhost:3000/api/contacts?search=alice&limit=10&offset=0" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "contacts": [
+    {
+      "id": "contact-abc123",
+      "displayName": "Alice",
+      "notes": "Core contributor",
+      "links": [
+        { "id": "link-1", "platform": "github", "platformId": "alice-dev", "verified": true }
+      ],
+      "createdAt": "2026-03-10T08:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Create Contact
+
+```bash
+curl -X POST http://localhost:3000/api/contacts \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Bob Smith",
+    "notes": "External collaborator"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "contact-def456",
+  "displayName": "Bob Smith",
+  "notes": "External collaborator",
+  "links": [],
+  "createdAt": "2026-03-15T10:00:00Z"
+}
+```
+
+### Lookup Contact
+
+```bash
+# By name
+curl "http://localhost:3000/api/contacts/lookup?name=Alice" \
+  -H "Authorization: Bearer $API_KEY"
+
+# By platform identity
+curl "http://localhost:3000/api/contacts/lookup?platform=discord&platform_id=123456789" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the matching contact object (same shape as Create Contact response).
+
+### Get Contact by ID
+
+```bash
+curl http://localhost:3000/api/contacts/contact-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the contact object with all linked platforms.
+
+### Update Contact
+
+```bash
+curl -X PUT http://localhost:3000/api/contacts/contact-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Alice Updated",
+    "notes": "Now a maintainer"
+  }'
+```
+
+**Response (200):** Returns the updated contact object.
+
+### Delete Contact
+
+```bash
+curl -X DELETE http://localhost:3000/api/contacts/contact-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Add Platform Link
+
+```bash
+curl -X POST http://localhost:3000/api/contacts/contact-abc123/links \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "discord",
+    "platformId": "123456789012345678"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "link-xyz",
+  "contactId": "contact-abc123",
+  "platform": "discord",
+  "platformId": "123456789012345678",
+  "verified": false
+}
+```
+
+### Remove Platform Link
+
+```bash
+curl -X DELETE http://localhost:3000/api/contacts/contact-abc123/links/link-xyz \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Verify Platform Link
+
+```bash
+curl -X PUT http://localhost:3000/api/contacts/contact-abc123/links/link-xyz/verify \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ---
 
 ## Brain Viewer
@@ -2751,6 +4515,147 @@ Read-only dashboard endpoints for inspecting agent memory state across both tier
 | POST | `/api/dashboard/memories/observations/{id}/graduate` | Force graduate observation | dashboard |
 | POST | `/api/dashboard/memories/observations/{id}/boost` | Boost observation score | dashboard |
 
+### List Memories
+
+```bash
+curl "http://localhost:3000/api/dashboard/memories?agentId=agent-1&tier=longterm&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "memories": [
+    {
+      "id": "mem-abc",
+      "agentId": "agent-1",
+      "key": "user-alice",
+      "content": "Alice is a backend engineer...",
+      "tier": "longterm",
+      "storageType": "arc69",
+      "status": "confirmed",
+      "txid": "TXID...",
+      "asaId": 12345,
+      "categories": [{ "category": "people", "confidence": 0.95 }],
+      "decayMultiplier": 0.98,
+      "createdAt": "2026-03-01T12:00:00Z",
+      "updatedAt": "2026-03-15T08:00:00Z"
+    }
+  ],
+  "total": 42
+}
+```
+
+### Memory Statistics
+
+```bash
+curl http://localhost:3000/api/dashboard/memories/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "total": 150,
+  "byStatus": { "confirmed": 120, "pending": 25, "failed": 5 },
+  "byCategory": { "people": 40, "feedback": 30, "project": 50, "reference": 30 },
+  "byAgent": [
+    { "agentId": "agent-1", "total": 100, "longterm": 80, "shortterm": 20 }
+  ]
+}
+```
+
+### Sync Status
+
+```bash
+curl http://localhost:3000/api/dashboard/memories/sync-status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "pendingCount": 5,
+  "failedCount": 2,
+  "recentFailures": [
+    { "id": "mem-xyz", "key": "some-key", "updatedAt": "2026-03-20T10:00:00Z" }
+  ]
+}
+```
+
+### Get Memory Detail
+
+```bash
+curl http://localhost:3000/api/dashboard/memories/mem-abc \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the full memory object including categories and decay score.
+
+### List Observations
+
+```bash
+curl "http://localhost:3000/api/dashboard/memories/observations?agentId=agent-1&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "observations": [
+    {
+      "id": "obs-1",
+      "agentId": "agent-1",
+      "content": "User prefers concise responses",
+      "score": 3.5,
+      "status": "active",
+      "createdAt": "2026-03-18T09:00:00Z"
+    }
+  ],
+  "total": 15
+}
+```
+
+### Observation Statistics
+
+```bash
+curl http://localhost:3000/api/dashboard/memories/observations/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "total": 45,
+  "active": 38,
+  "graduated": 5,
+  "dismissed": 2
+}
+```
+
+### Force Graduate Observation
+
+```bash
+curl -X POST http://localhost:3000/api/dashboard/memories/observations/obs-1/graduate \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Boost Observation
+
+```bash
+curl -X POST http://localhost:3000/api/dashboard/memories/observations/obs-1/boost \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ---
 
 ## Flock Testing
@@ -2765,6 +4670,75 @@ Test result tracking for Flock Directory agents with score decay.
 | GET | `/api/flock-directory/testing/agents/{agentId}/results` | Agent test results (with limit) | any |
 | GET | `/api/flock-directory/testing/agents/{agentId}/latest` | Latest test result for agent | any |
 | GET | `/api/flock-directory/testing/agents/{agentId}/score` | Effective score with decay multiplier | any |
+
+### Test Statistics
+
+```bash
+curl http://localhost:3000/api/flock-directory/testing/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalTests": 120,
+  "totalAgents": 8,
+  "averageScore": 0.82,
+  "lastRunAt": "2026-03-20T14:00:00Z"
+}
+```
+
+### Agent Test Results
+
+```bash
+curl "http://localhost:3000/api/flock-directory/testing/agents/agent-1/results?limit=5" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "results": [
+    {
+      "id": "test-1",
+      "agentId": "agent-1",
+      "overallScore": 0.85,
+      "categories": { "responsiveness": 0.9, "accuracy": 0.8 },
+      "completedAt": "2026-03-20T14:00:00Z"
+    }
+  ]
+}
+```
+
+### Latest Test Result
+
+```bash
+curl http://localhost:3000/api/flock-directory/testing/agents/agent-1/latest \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the most recent test result object (same shape as individual results above).
+
+### Effective Score
+
+```bash
+curl http://localhost:3000/api/flock-directory/testing/agents/agent-1/score \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "effectiveScore": 0.83,
+  "rawScore": 0.85,
+  "lastTestedAt": "2026-03-20T14:00:00Z"
+}
+```
 
 ---
 
@@ -2808,11 +4782,98 @@ curl http://localhost:3000/api/analytics/overview \
 }
 ```
 
+### Get Spending
+
+```bash
+curl "http://localhost:3000/api/analytics/spending?days=7" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "days": [
+    { "date": "2026-03-20", "algoMicro": 5000000, "apiCostUsd": 2.10 },
+    { "date": "2026-03-19", "algoMicro": 3200000, "apiCostUsd": 1.50 }
+  ]
+}
+```
+
 ### Query Parameters: Spending
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `days` | number | 30 | Number of days to include (1-365) |
+
+### Get Session Distribution
+
+```bash
+curl http://localhost:3000/api/analytics/sessions \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "byAgent": [{ "agentId": "agent-1", "count": 500 }],
+  "bySource": [{ "source": "api", "count": 800 }, { "source": "webhook", "count": 450 }],
+  "byStatus": [{ "status": "completed", "count": 1100 }, { "status": "failed", "count": 50 }]
+}
+```
+
+### Get Session Metrics
+
+```bash
+curl "http://localhost:3000/api/analytics/session-metrics?agentId=agent-1&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "aggregate": {
+    "avgDurationMs": 45000,
+    "avgTurns": 6,
+    "avgCostUsd": 0.035,
+    "totalSessions": 500
+  },
+  "recent": [
+    {
+      "sessionId": "sess-1",
+      "agentId": "agent-1",
+      "durationMs": 32000,
+      "turns": 4,
+      "costUsd": 0.02,
+      "completedAt": "2026-03-20T15:00:00Z"
+    }
+  ]
+}
+```
+
+### Get Single Session Metrics
+
+```bash
+curl http://localhost:3000/api/analytics/session-metrics/sess-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "metrics": {
+    "sessionId": "sess-1",
+    "agentId": "agent-1",
+    "durationMs": 32000,
+    "turns": 4,
+    "costUsd": 0.02,
+    "completedAt": "2026-03-20T15:00:00Z"
+  }
+}
+```
 
 ---
 
@@ -2843,12 +4904,112 @@ curl -X POST http://localhost:3000/api/exam/run \
   }'
 ```
 
+**Response (200):**
+
+```json
+{
+  "scorecard": {
+    "id": "exam-run-1",
+    "model": "claude-sonnet-4-20250514",
+    "categories": ["coding", "tools"],
+    "overallScore": 0.92,
+    "categoryScores": { "coding": 0.95, "tools": 0.89 },
+    "startedAt": "2026-03-20T10:00:00Z",
+    "completedAt": "2026-03-20T10:02:30Z"
+  }
+}
+```
+
 ### Request Body: Run Exam
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `model` | string | yes | Model identifier to evaluate |
 | `categories` | string[] | no | Subset of categories (coding, context, tools, algochat, council, instruction) |
+
+### List Exam Categories
+
+```bash
+curl http://localhost:3000/api/exam/categories \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "categories": ["coding", "context", "tools", "algochat", "council", "instruction"]
+}
+```
+
+### List Exam Runs
+
+```bash
+curl http://localhost:3000/api/exam/runs \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "runs": [
+    {
+      "id": "exam-run-1",
+      "model": "claude-sonnet-4-20250514",
+      "overallScore": 0.92,
+      "completedAt": "2026-03-20T10:02:30Z"
+    }
+  ]
+}
+```
+
+### List Models with Results
+
+```bash
+curl http://localhost:3000/api/exam/models \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "runs": [
+    { "model": "claude-sonnet-4-20250514", "runCount": 5, "bestScore": 0.95 }
+  ]
+}
+```
+
+### Get Exam Run
+
+```bash
+curl http://localhost:3000/api/exam/runs/exam-run-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "run": {
+    "id": "exam-run-1",
+    "model": "claude-sonnet-4-20250514",
+    "overallScore": 0.92,
+    "categoryScores": { "coding": 0.95, "tools": 0.89 },
+    "completedAt": "2026-03-20T10:02:30Z"
+  }
+}
+```
+
+### Delete Exam Run
+
+```bash
+curl -X DELETE http://localhost:3000/api/exam/runs/exam-run-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "deleted": true }`
 
 ---
 
@@ -2911,6 +5072,49 @@ curl -X POST http://localhost:3000/api/mcp/send-message \
 | `key` | string | yes | Memory key |
 | `content` | string | yes | Memory content |
 
+### Save Memory
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/save-memory \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "key": "project-notes",
+    "content": "The migration to v2 is scheduled for next week"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "Memory saved successfully",
+  "isError": false
+}
+```
+
+### Recall Memory
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/recall-memory \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "key": "project-notes"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "The migration to v2 is scheduled for next week",
+  "isError": false
+}
+```
+
 ### Request Body: Recall Memory
 
 | Field | Type | Required | Description |
@@ -2918,6 +5122,165 @@ curl -X POST http://localhost:3000/api/mcp/send-message \
 | `agentId` | string | yes | Agent ID |
 | `key` | string | no | Exact memory key |
 | `query` | string | no | Semantic search query |
+
+### Read On-Chain Memories
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/read-on-chain-memories \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agentId": "agent-1" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "[{\"key\":\"user-alice\",\"content\":\"Alice is a backend engineer\",\"asaId\":12345}]",
+  "isError": false
+}
+```
+
+### Sync On-Chain Memories
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/sync-on-chain-memories \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agentId": "agent-1" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "Synced 5 memories from chain",
+  "isError": false
+}
+```
+
+### Delete Memory
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/delete-memory \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "key": "old-notes"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "Memory deleted",
+  "isError": false
+}
+```
+
+### List Known Agents
+
+```bash
+curl http://localhost:3000/api/mcp/list-agents \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "[{\"id\":\"agent-1\",\"name\":\"corvid-agent\",\"address\":\"ALGO...\"}]",
+  "isError": false
+}
+```
+
+### Record Observation
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/record-observation \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "content": "User prefers detailed commit messages"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "Observation recorded",
+  "isError": false
+}
+```
+
+### List Observations
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/list-observations \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agentId": "agent-1" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "[{\"id\":\"obs-1\",\"content\":\"User prefers detailed commit messages\",\"score\":1.0}]",
+  "isError": false
+}
+```
+
+### Boost Observation
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/boost-observation \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "observationId": "obs-1",
+    "amount": 0.5
+  }'
+```
+
+**Response (200):** `{ "response": "Observation boosted", "isError": false }`
+
+### Dismiss Observation
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/dismiss-observation \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "observationId": "obs-1"
+  }'
+```
+
+**Response (200):** `{ "response": "Observation dismissed", "isError": false }`
+
+### Observation Statistics
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/observation-stats \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agentId": "agent-1" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "{\"total\":15,\"active\":12,\"graduated\":2,\"dismissed\":1}",
+  "isError": false
+}
+```
 
 ---
 
@@ -2934,6 +5297,66 @@ Manage external MCP server configurations for agent tool access.
 | PUT | `/api/mcp-servers/{id}` | Update MCP server config | operator |
 | DELETE | `/api/mcp-servers/{id}` | Remove MCP server config | operator |
 | POST | `/api/mcp-servers/{id}/test` | Test connection and list tools | operator |
+
+### List MCP Servers
+
+```bash
+curl http://localhost:3000/api/mcp-servers \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "mcp-1",
+    "name": "Web Tools",
+    "command": "npx",
+    "args": ["-y", "@anthropic/web-tools"],
+    "status": "connected",
+    "toolCount": 2
+  }
+]
+```
+
+### Add MCP Server
+
+```bash
+curl -X POST http://localhost:3000/api/mcp-servers \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Web Tools",
+    "command": "npx",
+    "args": ["-y", "@anthropic/web-tools"]
+  }'
+```
+
+**Response (201):** Returns the created server config object.
+
+### Update MCP Server
+
+```bash
+curl -X PUT http://localhost:3000/api/mcp-servers/mcp-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Web Tools v2",
+    "args": ["-y", "@anthropic/web-tools@2"]
+  }'
+```
+
+**Response (200):** Returns the updated server config object.
+
+### Delete MCP Server
+
+```bash
+curl -X DELETE http://localhost:3000/api/mcp-servers/mcp-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ### Test MCP Server
 
@@ -2982,12 +5405,72 @@ curl -X POST http://localhost:3000/api/plugins/load \
   }'
 ```
 
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "message": "Plugin loaded from corvid-plugin-analytics"
+}
+```
+
 ### Request Body: Load Plugin
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `packageName` | string | yes | Plugin package name |
 | `autoGrant` | boolean | no | Automatically grant requested capabilities |
+
+### List Plugins
+
+```bash
+curl http://localhost:3000/api/plugins \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "loaded": [
+    { "name": "corvid-plugin-analytics", "capabilities": ["read:sessions"], "status": "active" }
+  ],
+  "all": [
+    { "name": "corvid-plugin-analytics", "description": "Session analytics plugin" }
+  ]
+}
+```
+
+### Unload Plugin
+
+```bash
+curl -X POST http://localhost:3000/api/plugins/corvid-plugin-analytics/unload \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true, "message": "Plugin corvid-plugin-analytics unloaded" }`
+
+### Grant Capability
+
+```bash
+curl -X POST http://localhost:3000/api/plugins/corvid-plugin-analytics/grant \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "capability": "write:sessions" }'
+```
+
+**Response (200):** `{ "ok": true, "message": "write:sessions granted to corvid-plugin-analytics" }`
+
+### Revoke Capability
+
+```bash
+curl -X POST http://localhost:3000/api/plugins/corvid-plugin-analytics/revoke \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "capability": "write:sessions" }'
+```
+
+**Response (200):** `{ "ok": true, "message": "write:sessions revoked from corvid-plugin-analytics" }`
 
 ---
 
@@ -3016,12 +5499,49 @@ curl -X POST http://localhost:3000/api/allowlist \
   }'
 ```
 
+**Response (201):** `{ "ok": true }`
+
 ### Request Body: Add Address
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `address` | string | yes | Algorand address |
 | `label` | string | no | Human-readable label |
+
+### List Allowlist
+
+```bash
+curl http://localhost:3000/api/allowlist \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "address": "ALGO...", "label": "Trusted partner", "addedAt": "2026-03-10T08:00:00Z" }
+]
+```
+
+### Update Allowlist Entry
+
+```bash
+curl -X PUT http://localhost:3000/api/allowlist/ALGO... \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "label": "Primary partner" }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Remove from Allowlist
+
+```bash
+curl -X DELETE http://localhost:3000/api/allowlist/ALGO... \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3050,6 +5570,8 @@ curl -X POST http://localhost:3000/api/repo-blocklist \
   }'
 ```
 
+**Response (201):** `{ "ok": true }`
+
 ### Request Body: Add Repo
 
 | Field | Type | Required | Description |
@@ -3058,6 +5580,36 @@ curl -X POST http://localhost:3000/api/repo-blocklist \
 | `reason` | string | no | Reason for blocking |
 | `source` | string | no | How the block was added (manual, automated) |
 | `prUrl` | string | no | Related PR URL |
+
+### List Blocked Repos
+
+```bash
+curl http://localhost:3000/api/repo-blocklist \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "repo": "org/dangerous-repo",
+    "reason": "Contains untrusted code",
+    "source": "manual",
+    "prUrl": null,
+    "addedAt": "2026-03-15T10:00:00Z"
+  }
+]
+```
+
+### Remove from Blocklist
+
+```bash
+curl -X DELETE "http://localhost:3000/api/repo-blocklist/org%2Fdangerous-repo" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3086,12 +5638,49 @@ curl -X POST http://localhost:3000/api/github-allowlist \
   }'
 ```
 
+**Response (201):** `{ "ok": true }`
+
 ### Request Body: Add GitHub User
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `username` | string | yes | GitHub username |
 | `label` | string | no | Human-readable label |
+
+### List GitHub Allowlist
+
+```bash
+curl http://localhost:3000/api/github-allowlist \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "username": "octocat", "label": "Core contributor", "addedAt": "2026-03-10T08:00:00Z" }
+]
+```
+
+### Update GitHub Allowlist Entry
+
+```bash
+curl -X PUT http://localhost:3000/api/github-allowlist/octocat \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "label": "Maintainer" }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Remove from GitHub Allowlist
+
+```bash
+curl -X DELETE http://localhost:3000/api/github-allowlist/octocat \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3109,6 +5698,71 @@ Manage projects — working directories that agents operate within.
 | PUT | `/api/projects/{id}` | Update project | operator |
 | DELETE | `/api/projects/{id}` | Delete project | operator |
 | GET | `/api/browse-dirs` | Browse allowed directories | any |
+
+### List Projects
+
+```bash
+curl http://localhost:3000/api/projects \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "proj-1",
+    "name": "corvid-agent",
+    "path": "/home/user/repos/corvid-agent",
+    "description": "Main agent project",
+    "createdAt": "2026-02-01T10:00:00Z"
+  }
+]
+```
+
+### Create Project
+
+```bash
+curl -X POST http://localhost:3000/api/projects \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "new-project",
+    "path": "/home/user/repos/new-project",
+    "description": "A new project"
+  }'
+```
+
+**Response (201):** Returns the created project object.
+
+### Get Project
+
+```bash
+curl http://localhost:3000/api/projects/proj-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the project object.
+
+### Update Project
+
+```bash
+curl -X PUT http://localhost:3000/api/projects/proj-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "description": "Updated description" }'
+```
+
+**Response (200):** Returns the updated project object.
+
+### Delete Project
+
+```bash
+curl -X DELETE http://localhost:3000/api/projects/proj-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ### Browse Directories
 
@@ -3198,12 +5852,58 @@ curl -X POST http://localhost:3000/api/tenants/me/members \
   }'
 ```
 
+**Response (201):** `{ "ok": true }`
+
 ### Request Body: Add Member
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `keyHash` | string | yes | SHA-256 hash of the member's API key |
 | `role` | string | no | Role: viewer, operator, owner (default: viewer) |
+
+### Get Current Tenant
+
+```bash
+curl http://localhost:3000/api/tenants/me \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "id": "tenant-abc123",
+  "name": "Acme Corp",
+  "slug": "acme-corp",
+  "plan": "starter",
+  "createdAt": "2026-01-15T10:00:00Z"
+}
+```
+
+### List Members
+
+```bash
+curl http://localhost:3000/api/tenants/me/members \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "keyHash": "sha256-of-api-key", "role": "owner", "addedAt": "2026-01-15T10:00:00Z" },
+  { "keyHash": "sha256-of-other-key", "role": "operator", "addedAt": "2026-02-01T12:00:00Z" }
+]
+```
+
+### Remove Member
+
+```bash
+curl -X DELETE http://localhost:3000/api/tenants/me/members/sha256-of-other-key \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3223,6 +5923,38 @@ Credit configuration, API key rotation, Discord config, and test data management
 | PUT | `/api/settings/discord` | Update Discord config | owner |
 | DELETE | `/api/settings/discord/{key}` | Delete a Discord config key | owner |
 | POST | `/api/settings/purge-test-data` | Purge test data (dry-run by default) | any |
+
+### Get Settings
+
+```bash
+curl http://localhost:3000/api/settings \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "credits": { "enabled": true, "costPerTurn": 1, "monthlyBudget": 1000 },
+  "discord": { "configured": true },
+  "apiKeyStatus": "active"
+}
+```
+
+### Update Credit Configuration
+
+```bash
+curl -X PUT http://localhost:3000/api/settings/credits \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": true,
+    "costPerTurn": 2,
+    "monthlyBudget": 5000
+  }'
+```
+
+**Response (200):** `{ "ok": true }`
 
 ### Rotate API Key
 
@@ -3263,6 +5995,64 @@ curl -X POST http://localhost:3000/api/settings/purge-test-data \
 |-------|------|----------|-------------|
 | `force` | boolean | no | Set `true` to actually delete; omit for dry-run |
 
+### API Key Status
+
+```bash
+curl http://localhost:3000/api/settings/api-key/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "active",
+  "expiresAt": "2026-06-18T00:00:00Z",
+  "gracePeriodExpiry": null
+}
+```
+
+### Get Discord Config
+
+```bash
+curl http://localhost:3000/api/settings/discord \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "botToken": "****",
+  "guildId": "123456789",
+  "channelId": "987654321"
+}
+```
+
+### Update Discord Config
+
+```bash
+curl -X PUT http://localhost:3000/api/settings/discord \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "botToken": "new-token",
+    "guildId": "123456789",
+    "channelId": "987654321"
+  }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Delete Discord Config Key
+
+```bash
+curl -X DELETE http://localhost:3000/api/settings/discord/channelId \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ---
 
 ## System Logs
@@ -3286,6 +6076,55 @@ Aggregated system logs from councils, escalations, and work tasks. Also exposes 
 | `level` | string | — | Filter by log level: info, warn, error |
 | `search` | string | — | Full-text search across log messages |
 
+### List System Logs
+
+```bash
+curl "http://localhost:3000/api/system-logs?type=council&level=warn&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "logs": [
+    {
+      "type": "council",
+      "id": 42,
+      "message": "Council discussion timeout",
+      "detail": "Launch cl-1 exceeded max duration",
+      "level": "warn",
+      "timestamp": "2026-03-20T14:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### List Credit Transactions
+
+```bash
+curl "http://localhost:3000/api/system-logs/credit-transactions?limit=10" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "transactions": [
+    {
+      "id": 1,
+      "address": "ALGO...",
+      "amount": 100,
+      "reference": "Session sess-1",
+      "createdAt": "2026-03-20T12:00:00Z"
+    }
+  ],
+  "total": 50
+}
+```
+
 ### Query Parameters: Credit Transactions
 
 | Param | Type | Default | Description |
@@ -3307,6 +6146,24 @@ Agent persona configuration — archetype, traits, and voice customization.
 | PUT | `/api/agents/{id}/persona` | Create or update agent persona | operator |
 | DELETE | `/api/agents/{id}/persona` | Delete agent persona | operator |
 
+### Get Agent Persona
+
+```bash
+curl http://localhost:3000/api/agents/agent-1/persona \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agentId": "agent-1",
+  "archetype": "engineer",
+  "traits": ["precise", "thorough"],
+  "voice": "Professional and concise"
+}
+```
+
 ### Set Agent Persona
 
 ```bash
@@ -3319,6 +6176,17 @@ curl -X PUT http://localhost:3000/api/agents/agent-1/persona \
     "voice": "Professional and concise"
   }'
 ```
+
+**Response (200):** Returns the updated persona object.
+
+### Delete Agent Persona
+
+```bash
+curl -X DELETE http://localhost:3000/api/agents/agent-1/persona \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3342,6 +6210,71 @@ Reusable skill packages that can be assigned to agents and projects. Includes pr
 | POST | `/api/projects/{id}/skills` | Assign skill bundle to project | operator |
 | DELETE | `/api/projects/{id}/skills/{bundleId}` | Unassign skill from project | operator |
 
+### List Skill Bundles
+
+```bash
+curl http://localhost:3000/api/skill-bundles \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "bundle-code-review",
+    "name": "Code Review",
+    "description": "Automated code review skills",
+    "skills": ["lint", "test", "review"],
+    "preset": true
+  }
+]
+```
+
+### Create Skill Bundle
+
+```bash
+curl -X POST http://localhost:3000/api/skill-bundles \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "DevOps Bundle",
+    "description": "CI/CD and deployment skills",
+    "skills": ["deploy", "monitor", "rollback"]
+  }'
+```
+
+**Response (201):** Returns the created skill bundle object.
+
+### Get Skill Bundle
+
+```bash
+curl http://localhost:3000/api/skill-bundles/bundle-code-review \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the skill bundle object.
+
+### Update Skill Bundle
+
+```bash
+curl -X PUT http://localhost:3000/api/skill-bundles/bundle-devops \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "description": "Updated CI/CD skills" }'
+```
+
+**Response (200):** Returns the updated skill bundle object.
+
+### Delete Skill Bundle
+
+```bash
+curl -X DELETE http://localhost:3000/api/skill-bundles/bundle-devops \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
 ### Assign Skill to Agent
 
 ```bash
@@ -3354,12 +6287,73 @@ curl -X POST http://localhost:3000/api/agents/agent-1/skills \
   }'
 ```
 
+**Response (201):** `{ "ok": true }`
+
 ### Request Body: Assign Skill Bundle
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `bundleId` | string | yes | Skill bundle ID to assign |
 | `sortOrder` | number | no | Display/priority order (default: 0) |
+
+### List Agent Skills
+
+```bash
+curl http://localhost:3000/api/agents/agent-1/skills \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "bundleId": "bundle-code-review", "sortOrder": 1 }
+]
+```
+
+### Unassign Skill from Agent
+
+```bash
+curl -X DELETE http://localhost:3000/api/agents/agent-1/skills/bundle-code-review \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### List Project Skills
+
+```bash
+curl http://localhost:3000/api/projects/proj-1/skills \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  { "bundleId": "bundle-code-review", "sortOrder": 0 }
+]
+```
+
+### Assign Skill to Project
+
+```bash
+curl -X POST http://localhost:3000/api/projects/proj-1/skills \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "bundleId": "bundle-code-review" }'
+```
+
+**Response (201):** `{ "ok": true }`
+
+### Unassign Skill from Project
+
+```bash
+curl -X DELETE http://localhost:3000/api/projects/proj-1/skills/bundle-code-review \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
 
 ---
 
@@ -3379,6 +6373,29 @@ Governance proposals with lifecycle management and vote evaluation.
 | POST | `/api/proposals/{id}/transition` | Transition proposal status | operator |
 | GET | `/api/proposals/{id}/evaluate` | Evaluate votes and compute decision | any |
 
+### List Proposals
+
+```bash
+curl "http://localhost:3000/api/proposals?councilId=council-1&status=open" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "prop-1",
+    "councilId": "council-1",
+    "title": "Adopt new logging standard",
+    "description": "Proposal to switch to structured JSON logging",
+    "proposedBy": "agent-1",
+    "status": "open",
+    "createdAt": "2026-03-18T10:00:00Z"
+  }
+]
+```
+
 ### Create Proposal
 
 ```bash
@@ -3393,6 +6410,37 @@ curl -X POST http://localhost:3000/api/proposals \
   }'
 ```
 
+**Response (201):** Returns the created proposal object.
+
+### Get Proposal
+
+```bash
+curl http://localhost:3000/api/proposals/prop-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the proposal object.
+
+### Update Proposal
+
+```bash
+curl -X PUT http://localhost:3000/api/proposals/prop-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "description": "Updated description for the logging proposal" }'
+```
+
+**Response (200):** Returns the updated proposal (only editable in `draft` or `open` status).
+
+### Delete Proposal
+
+```bash
+curl -X DELETE http://localhost:3000/api/proposals/prop-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }` (only deletable in `draft` status)
+
 ### Transition Proposal
 
 ```bash
@@ -3405,6 +6453,8 @@ curl -X POST http://localhost:3000/api/proposals/prop-1/transition \
   }'
 ```
 
+**Response (200):** Returns the updated proposal object.
+
 Lifecycle: `draft` → `open` → `voting` → `closed` (with decision: approved/rejected/tabled).
 
 ### Request Body: Transition
@@ -3413,6 +6463,25 @@ Lifecycle: `draft` → `open` → `voting` → `closed` (with decision: approved
 |-------|------|----------|-------------|
 | `status` | string | yes | Target status |
 | `decision` | string | no | Decision when closing (approved, rejected, tabled) |
+
+### Evaluate Votes
+
+```bash
+curl http://localhost:3000/api/proposals/prop-1/evaluate \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "proposalId": "prop-1",
+  "quorumMet": true,
+  "result": "approved",
+  "votes": { "approve": 3, "reject": 1, "abstain": 0 },
+  "threshold": 0.5
+}
+```
 
 ---
 
@@ -3433,11 +6502,27 @@ This endpoint handles two payload formats:
 
 Authentication uses Slack's HMAC-SHA256 signature verification (`SLACK_SIGNING_SECRET`). Signatures older than 5 minutes are rejected.
 
+### Slack Events Webhook
+
+```bash
+# URL verification challenge (sent by Slack during setup)
+curl -X POST http://localhost:3000/slack/events \
+  -H "Content-Type: application/json" \
+  -H "X-Slack-Request-Timestamp: 1616000000" \
+  -H "X-Slack-Signature: v0=abc123..." \
+  -d '{
+    "type": "url_verification",
+    "challenge": "abc123challenge"
+  }'
+```
+
+**Response (200):** `{ "challenge": "abc123challenge" }`
+
 ---
 
 ## Operational Mode
 
-Get or set the agent's operational mode (autonomous, supervised, paused).
+Get or set the agent's operational mode (normal, queued, paused).
 
 ### Endpoints
 
@@ -3445,6 +6530,34 @@ Get or set the agent's operational mode (autonomous, supervised, paused).
 |--------|------|---------|------|
 | GET | `/api/operational-mode` | Get current operational mode | any |
 | POST | `/api/operational-mode` | Set operational mode | any |
+
+### Get Operational Mode
+
+```bash
+curl http://localhost:3000/api/operational-mode \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "mode": "normal"
+}
+```
+
+### Set Operational Mode
+
+```bash
+curl -X POST http://localhost:3000/api/operational-mode \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "mode": "paused" }'
+```
+
+**Response (200):** `{ "ok": true, "mode": "paused" }`
+
+Modes: `normal`, `queued`, `paused`.
 
 ---
 
@@ -3459,6 +6572,40 @@ View and resolve escalated items that require human attention.
 | GET | `/api/escalation-queue` | List escalation queue | any |
 | POST | `/api/escalation-queue/{id}/resolve` | Resolve escalation | any |
 
+### List Escalation Queue
+
+```bash
+curl http://localhost:3000/api/escalation-queue \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "requests": [
+    {
+      "id": 1,
+      "sessionId": "sess-abc",
+      "toolName": "execute_command",
+      "status": "pending",
+      "createdAt": "2026-03-20T15:00:00Z"
+    }
+  ]
+}
+```
+
+### Resolve Escalation
+
+```bash
+curl -X POST http://localhost:3000/api/escalation-queue/1/resolve \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "approved": true }'
+```
+
+**Response (200):** `{ "ok": true, "message": "Escalation #1 approved" }`
+
 ---
 
 ## Feed
@@ -3470,6 +6617,50 @@ Aggregated activity feed combining agent messages and AlgoChat history.
 | Method | Path | Summary | Auth |
 |--------|------|---------|------|
 | GET | `/api/feed/history` | Get feed history | any |
+
+### Get Feed History
+
+```bash
+curl "http://localhost:3000/api/feed/history?limit=20&agentId=agent-1" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "messages": [
+    {
+      "id": "msg-1",
+      "agentId": "agent-1",
+      "content": "Completed code review for PR #42",
+      "createdAt": "2026-03-20T15:30:00Z"
+    }
+  ],
+  "algochatMessages": [
+    {
+      "id": "ac-1",
+      "from": "ALGO...",
+      "content": "Hello from AlgoChat",
+      "createdAt": "2026-03-20T15:00:00Z"
+    }
+  ],
+  "total": 150,
+  "algochatTotal": 80,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | number | 50 | Results per page |
+| `offset` | number | 0 | Pagination offset |
+| `search` | string | — | Full-text search |
+| `agentId` | string | — | Filter by agent |
+| `threadId` | string | — | Filter by thread |
 
 ---
 
@@ -3492,6 +6683,150 @@ Algorand-based encrypted messaging status, network switching, and PSK (pre-share
 | DELETE | `/api/algochat/psk-contacts/{id}` | Cancel PSK contact | any |
 | GET | `/api/algochat/psk-contacts/{id}/qr` | Get QR URI for PSK contact | any |
 
+### Get AlgoChat Status
+
+```bash
+curl http://localhost:3000/api/algochat/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "enabled": true,
+  "address": "ALGO...",
+  "network": "testnet",
+  "syncInterval": 30000,
+  "activeConversations": 5,
+  "balance": 1500000
+}
+```
+
+### Switch Network
+
+```bash
+curl -X POST http://localhost:3000/api/algochat/network \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "network": "mainnet" }'
+```
+
+**Response (200):** `{ "ok": true, "network": "mainnet" }`
+
+### List Conversations
+
+```bash
+curl -X POST http://localhost:3000/api/algochat/conversations \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "address": "ALGO...",
+    "lastMessage": "Thanks for the review",
+    "messageCount": 12,
+    "lastMessageAt": "2026-03-20T14:00:00Z"
+  }
+]
+```
+
+### Get PSK Exchange URI
+
+```bash
+curl http://localhost:3000/api/algochat/psk-exchange \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "uri": "algochat://psk-exchange?key=abc123...",
+  "expiresAt": "2026-03-20T16:00:00Z"
+}
+```
+
+### Generate PSK Exchange URI
+
+```bash
+curl -X POST http://localhost:3000/api/algochat/psk-exchange \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns a new PSK exchange URI (same shape as GET).
+
+### List PSK Contacts
+
+```bash
+curl http://localhost:3000/api/algochat/psk-contacts \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "contacts": [
+    {
+      "id": "psk-1",
+      "nickname": "Alice Mobile",
+      "status": "active",
+      "createdAt": "2026-03-18T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Create PSK Contact
+
+```bash
+curl -X POST http://localhost:3000/api/algochat/psk-contacts \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "nickname": "Bob Phone" }'
+```
+
+**Response (201):** Returns the created PSK contact with QR URI.
+
+### Rename PSK Contact
+
+```bash
+curl -X PATCH http://localhost:3000/api/algochat/psk-contacts/psk-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "nickname": "Alice Tablet" }'
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Cancel PSK Contact
+
+```bash
+curl -X DELETE http://localhost:3000/api/algochat/psk-contacts/psk-1 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Get PSK Contact QR URI
+
+```bash
+curl http://localhost:3000/api/algochat/psk-contacts/psk-1/qr \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "uri": "algochat://psk?id=psk-1&key=abc123..."
+}
+```
+
 ---
 
 ## Wallets
@@ -3505,6 +6840,72 @@ Wallet balance summaries, message history, and credit grants.
 | GET | `/api/wallets/summary` | Wallet summary | any |
 | GET | `/api/wallets/{address}/messages` | Wallet messages | any |
 | POST | `/api/wallets/{address}/credits` | Grant credits to wallet | any |
+
+### Wallet Summary
+
+```bash
+curl "http://localhost:3000/api/wallets/summary?search=ALGO" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "wallets": [
+    {
+      "address": "ALGO...",
+      "messageCount": 25,
+      "creditBalance": 500,
+      "lastMessageAt": "2026-03-20T14:00:00Z"
+    }
+  ]
+}
+```
+
+### Wallet Messages
+
+```bash
+curl "http://localhost:3000/api/wallets/ALGO.../messages?limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "messages": [
+    {
+      "id": "msg-1",
+      "from": "ALGO...",
+      "content": "Hello agent",
+      "createdAt": "2026-03-20T14:00:00Z"
+    }
+  ],
+  "total": 25
+}
+```
+
+### Grant Credits
+
+```bash
+curl -X POST http://localhost:3000/api/wallets/ALGO.../credits \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 100,
+    "reference": "Welcome bonus"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "balance": 600
+}
+```
 
 ---
 
