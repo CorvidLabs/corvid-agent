@@ -7,6 +7,7 @@
  */
 import type { AgentSchedule } from '../../../shared/types';
 import { updateExecutionStatus } from '../../db/schedules';
+import { getAgentByWalletAddress } from '../../db/agents';
 import { FlockDirectoryService } from '../../flock-directory/service';
 import { FlockTestRunner, type TestTransport, type TestRunConfig } from '../../flock-directory/testing/runner';
 import { createLogger } from '../../lib/logger';
@@ -23,11 +24,18 @@ function createAlgoChatTransport(ctx: HandlerContext, senderAgentId: string): Te
         async sendAndWait(agentAddress: string, message: string, timeoutMs: number): Promise<string | null> {
             if (!ctx.agentMessenger) return null;
 
+            // agentAddress is an Algorand wallet address — resolve to agent UUID
+            const targetAgent = getAgentByWalletAddress(ctx.db, agentAddress);
+            if (!targetAgent) {
+                log.warn('No agent found for wallet address', { agentAddress });
+                return null;
+            }
+
             try {
                 const result = await ctx.agentMessenger.invokeAndWait(
                     {
                         fromAgentId: senderAgentId,
-                        toAgentId: agentAddress,
+                        toAgentId: targetAgent.id,
                         content: `[FLOCK-TEST] ${message}`,
                     },
                     timeoutMs,
@@ -82,8 +90,9 @@ export async function execFlockTesting(
         const results: { agentId: string; name: string; score: number; responded: number; total: number }[] = [];
 
         for (const agent of activeAgents) {
-            // Skip self-testing
-            if (agent.address === schedule.agentId) {
+            // Skip self-testing — resolve wallet address to agent UUID for comparison
+            const resolvedAgent = getAgentByWalletAddress(ctx.db, agent.address);
+            if (resolvedAgent && resolvedAgent.id === schedule.agentId) {
                 log.debug('Skipping self-test', { agentId: agent.id });
                 continue;
             }

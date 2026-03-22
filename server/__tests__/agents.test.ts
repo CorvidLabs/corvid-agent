@@ -11,6 +11,7 @@ import {
     getAgentWalletMnemonic,
     addAgentFunding,
     getAlgochatEnabledAgents,
+    getAgentByWalletAddress,
 } from '../db/agents';
 
 let db: Database;
@@ -316,6 +317,28 @@ describe('wallet operations', () => {
         addAgentFunding(db, agent.id, 500);
         const updated = getAgent(db, agent.id)!;
         expect(updated.walletFundedAlgo).toBe(1500);
+    });
+});
+
+// ── getAgentByWalletAddress ──────────────────────────────────────────
+
+describe('getAgentByWalletAddress', () => {
+    test('returns agent when wallet address matches', () => {
+        const agent = makeAgent();
+        setAgentWallet(db, agent.id, 'ALGO_WALLET_ABC', 'enc-mnemonic');
+        const found = getAgentByWalletAddress(db, 'ALGO_WALLET_ABC');
+        expect(found).not.toBeNull();
+        expect(found!.id).toBe(agent.id);
+        expect(found!.walletAddress).toBe('ALGO_WALLET_ABC');
+    });
+
+    test('returns null when no agent has that wallet address', () => {
+        makeAgent();
+        expect(getAgentByWalletAddress(db, 'NONEXISTENT_ADDR')).toBeNull();
+    });
+
+    test('returns null for empty string', () => {
+        expect(getAgentByWalletAddress(db, '')).toBeNull();
     });
 });
 
