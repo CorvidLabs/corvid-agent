@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { AgentService } from '../../core/services/agent.service';
