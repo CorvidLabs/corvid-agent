@@ -23,6 +23,7 @@ import { json, handleRouteError } from '../lib/response';
 import { getDeliveryTracker } from '../lib/delivery-tracker';
 import { sendMessageWithFiles, sendEmbedWithFiles, type DiscordFileAttachment } from '../discord/embeds';
 import { createLogger } from '../lib/logger';
+import type { RequestContext } from '../middleware/guards';
 
 /** Allowed roots for imagePath — restrict filesystem reads to safe directories. */
 const ALLOWED_IMAGE_ROOTS = [
@@ -35,6 +36,7 @@ const log = createLogger('DiscordImageRoute');
 export function handleDiscordImageRoutes(
     req: Request,
     url: URL,
+    _context: RequestContext,
 ): Response | Promise<Response> | null {
     if (url.pathname !== '/api/discord/send-image') return null;
     if (req.method !== 'POST') return null;

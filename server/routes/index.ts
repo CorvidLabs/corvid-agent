@@ -43,6 +43,7 @@ import { handleDiscordImageRoutes } from './discord-image';
 import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleFlockTestingRoutes } from './flock-testing';
 import { handleContactRoutes } from './contacts';
+import { handleOpenRouterRoutes } from './openrouter';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -346,7 +347,7 @@ async function handleRoutes(
     const bridgeDeliveryResponse = handleBridgeDeliveryRoutes(req, url);
     if (bridgeDeliveryResponse) return bridgeDeliveryResponse;
 
-    const discordImageResponse = handleDiscordImageRoutes(req, url);
+    const discordImageResponse = handleDiscordImageRoutes(req, url, context);
     if (discordImageResponse) return discordImageResponse instanceof Promise ? await discordImageResponse : discordImageResponse;
 
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
@@ -357,6 +358,9 @@ async function handleRoutes(
 
     const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
     if (analyticsResponse) return analyticsResponse;
+
+    const openRouterResponse = handleOpenRouterRoutes(req, url, context);
+    if (openRouterResponse) return openRouterResponse instanceof Promise ? await openRouterResponse : openRouterResponse;
 
     const performanceResponse = handlePerformanceRoutes(req, url, db, performanceCollector ?? null);
     if (performanceResponse) return performanceResponse;
