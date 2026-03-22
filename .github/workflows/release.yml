@@ -100,7 +100,7 @@ jobs:
           cp -r server/    "$STAGING/server"
           cp -r shared/    "$STAGING/shared"
           cp -r client/    "$STAGING/client"
-          cp -r patches/   "$STAGING/patches"
+          [ -d patches ] && cp -r patches/ "$STAGING/patches"
           cp package.json  "$STAGING/package.json"
           cp bun.lock      "$STAGING/bun.lock"
           cp .env.example  "$STAGING/.env.example"
