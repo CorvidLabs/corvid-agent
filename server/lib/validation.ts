@@ -726,12 +726,30 @@ export const CreateSubscriptionSchema = z.object({
 
 const PersonaArchetypeSchema = z.enum(['custom', 'professional', 'friendly', 'technical', 'creative', 'formal']);
 
-export const UpsertPersonaSchema = z.object({
+export const CreatePersonaSchema = z.object({
+    name: z.string().min(1, 'name is required').max(100, 'name must be 100 chars or less'),
     archetype: PersonaArchetypeSchema.optional(),
     traits: z.array(z.string().max(100, 'each trait must be 100 chars or less')).max(20, 'maximum 20 traits').optional(),
     voiceGuidelines: z.string().max(2000, 'voiceGuidelines must be 2000 chars or less').optional(),
     background: z.string().max(4000, 'background must be 4000 chars or less').optional(),
     exampleMessages: z.array(z.string().max(500, 'each example must be 500 chars or less')).max(10, 'maximum 10 examples').optional(),
+});
+
+export const UpdatePersonaSchema = z.object({
+    name: z.string().min(1).max(100, 'name must be 100 chars or less').optional(),
+    archetype: PersonaArchetypeSchema.optional(),
+    traits: z.array(z.string().max(100, 'each trait must be 100 chars or less')).max(20, 'maximum 20 traits').optional(),
+    voiceGuidelines: z.string().max(2000, 'voiceGuidelines must be 2000 chars or less').optional(),
+    background: z.string().max(4000, 'background must be 4000 chars or less').optional(),
+    exampleMessages: z.array(z.string().max(500, 'each example must be 500 chars or less')).max(10, 'maximum 10 examples').optional(),
+});
+
+/** @deprecated Use CreatePersonaSchema or UpdatePersonaSchema instead */
+export const UpsertPersonaSchema = UpdatePersonaSchema;
+
+export const AssignPersonaSchema = z.object({
+    personaId: z.string().min(1, 'personaId is required'),
+    sortOrder: z.number().int().min(0).optional(),
 });
 
 // ─── Skill Bundles ──────────────────────────────────────────────────────────

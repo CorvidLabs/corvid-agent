@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
-import { upsertPersona } from '../db/personas';
+import { createPersona, assignPersona } from '../db/personas';
 import { createBundle, assignBundle } from '../db/skill-bundles';
 import { resolveSessionPrompts, resolveToolPermissions, resolveSessionConfig } from '../process/session-config-resolver';
 
@@ -36,12 +36,14 @@ describe('session-config-resolver', () => {
 
         it('returns persona prompt when agent has a persona', () => {
             const agent = createAgent(db, { name: 'TestAgent' });
-            upsertPersona(db, agent.id, {
+            const persona = createPersona(db, {
+                name: 'Professional',
                 archetype: 'professional',
                 traits: ['analytical'],
                 voiceGuidelines: 'Be precise.',
                 background: 'Expert engineer.',
             });
+            assignPersona(db, agent.id, persona.id);
 
             const result = resolveSessionPrompts(db, agent, null);
             expect(result.personaPrompt).toBeDefined();
@@ -124,10 +126,12 @@ describe('session-config-resolver', () => {
     describe('resolveSessionConfig', () => {
         it('returns all three config values', () => {
             const agent = createAgent(db, { name: 'FullConfig' });
-            upsertPersona(db, agent.id, {
+            const persona = createPersona(db, {
+                name: 'Technical',
                 archetype: 'technical',
                 traits: ['precise'],
             });
+            assignPersona(db, agent.id, persona.id);
             const bundle = createBundle(db, {
                 name: 'full-config-bundle',
                 tools: ['corvid_send_message'],

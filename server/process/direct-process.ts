@@ -67,7 +67,7 @@ export interface DirectProcessOptions {
     mcpToolContext: McpToolContext | null;
     /** Called to reset the session timeout when the agent is still active. */
     extendTimeout?: (additionalMs: number) => void;
-    /** Persona system prompt section (from agent_personas table) */
+    /** Persona system prompt section (from personas + agent_persona_assignments tables) */
     personaPrompt?: string;
     /** Skill bundle prompt additions (from assigned skill_bundles) */
     skillPrompt?: string;

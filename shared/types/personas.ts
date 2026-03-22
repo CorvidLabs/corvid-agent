@@ -1,7 +1,8 @@
 export type PersonaArchetype = 'custom' | 'professional' | 'friendly' | 'technical' | 'creative' | 'formal';
 
-export interface AgentPersona {
-    agentId: string;
+export interface Persona {
+    id: string;
+    name: string;
     archetype: PersonaArchetype;
     traits: string[];
     voiceGuidelines: string;
@@ -11,10 +12,31 @@ export interface AgentPersona {
     updatedAt: string;
 }
 
-export interface UpsertPersonaInput {
+export interface CreatePersonaInput {
+    name: string;
     archetype?: PersonaArchetype;
     traits?: string[];
     voiceGuidelines?: string;
     background?: string;
     exampleMessages?: string[];
 }
+
+export interface UpdatePersonaInput {
+    name?: string;
+    archetype?: PersonaArchetype;
+    traits?: string[];
+    voiceGuidelines?: string;
+    background?: string;
+    exampleMessages?: string[];
+}
+
+export interface AssignPersonaInput {
+    personaId: string;
+    sortOrder?: number;
+}
+
+/** @deprecated Use Persona instead — kept for backward compatibility */
+export type AgentPersona = Persona;
+
+/** @deprecated Use CreatePersonaInput instead */
+export type UpsertPersonaInput = UpdatePersonaInput;

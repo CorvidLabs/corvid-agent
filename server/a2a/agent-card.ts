@@ -14,7 +14,7 @@ import type {
     A2AProtocolExtension,
     Agent,
 } from '../../shared/types';
-import { getPersona } from '../db/personas';
+import { getAgentPersonas } from '../db/personas';
 import { getAgentBundles } from '../db/skill-bundles';
 
 // Package version is read once at module load time
@@ -249,9 +249,10 @@ export function buildAgentCardForAgent(
     // Enrich description with persona and skills if db is provided
     let enrichedDescription = agent.description || 'CorvidAgent instance';
     if (db) {
-        const persona = getPersona(db, agent.id);
-        if (persona && persona.archetype !== 'custom') {
-            enrichedDescription += ` | Archetype: ${persona.archetype}`;
+        const personas = getAgentPersonas(db, agent.id);
+        const firstPersona = personas.find(p => p.archetype !== 'custom');
+        if (firstPersona) {
+            enrichedDescription += ` | Archetype: ${firstPersona.archetype}`;
         }
         const bundles = getAgentBundles(db, agent.id);
         if (bundles.length > 0) {
