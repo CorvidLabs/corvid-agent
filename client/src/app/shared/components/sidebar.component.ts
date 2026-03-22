@@ -140,12 +140,17 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             border-right: 1px solid rgba(255, 255, 255, 0.04);
             display: flex;
             flex-direction: column;
-            overflow-y: auto;
+            overflow: hidden;
         }
         .sidebar__list {
             list-style: none;
             margin: 0;
             padding: 0;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-bright) transparent;
         }
         .sidebar__link {
             display: block;

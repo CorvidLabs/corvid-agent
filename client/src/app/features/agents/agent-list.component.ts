@@ -117,6 +117,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                            [style.--agent-accent]="card.agent.displayColor || ''">
                             <div class="agent-card__top">
                                 <div class="agent-card__title-row">
+                                    <span class="agent-card__health-dot" [attr.data-health]="getHealthLevel(card)" aria-hidden="true"></span>
                                     @if (card.agent.avatarUrl) {
                                         <img class="agent-card__avatar" [src]="card.agent.avatarUrl"
                                              [alt]="card.agent.name + ' avatar'" (error)="onAvatarError($event)" />
@@ -274,6 +275,12 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
         .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; }
+        .agent-card__health-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .agent-card__health-dot[data-health="green"] { background: var(--accent-green); box-shadow: 0 0 6px rgba(0,255,136,.4); }
+        .agent-card__health-dot[data-health="yellow"] { background: var(--accent-amber); box-shadow: 0 0 6px rgba(255,170,0,.4); }
+        .agent-card__health-dot[data-health="red"] { background: var(--accent-red); box-shadow: 0 0 6px rgba(255,51,85,.3); opacity: .6; }
         .agent-card__name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
         .status-indicator { display: flex; align-items: center; gap: 0.25rem; }
         .status-indicator__label { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -395,6 +402,15 @@ export class AgentListComponent implements OnInit {
 
     protected onAvatarError(event: Event): void {
         (event.target as HTMLImageElement).style.display = 'none';
+    }
+
+    /** Health level based on activity recency */
+    protected getHealthLevel(card: AgentCard): string {
+        if (card.runningSessions > 0) return 'green';
+        if (!card.lastActive) return 'red';
+        const hoursAgo = (Date.now() - new Date(card.lastActive).getTime()) / (1000 * 60 * 60);
+        if (hoursAgo < 24) return 'yellow';
+        return 'red';
     }
 
     protected startSession(agentId: string, event: Event): void {

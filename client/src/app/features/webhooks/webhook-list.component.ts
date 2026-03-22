@@ -8,12 +8,13 @@ import { ProjectService } from '../../core/services/project.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookRegistrationStatus } from '../../core/models/webhook.model';
 
 @Component({
     selector: 'app-webhook-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="webhooks">
             <div class="webhooks__header">
@@ -120,7 +121,7 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
             </div>
 
             @if (webhookService.loading()) {
-                <p class="loading">Loading webhooks...</p>
+                <app-skeleton variant="table" [count]="4" />
             } @else if (filteredRegistrations().length === 0) {
                 <app-empty-state
                     icon="  {->}\n  |  |\n  {<-}"

@@ -229,7 +229,10 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                             <a class="agent-card" [routerLink]="['/agents', summary.agent.id]">
                                                 <div class="agent-card__top">
                                                     <div class="agent-card__info">
-                                                        <span class="agent-card__name">{{ summary.agent.name }}</span>
+                                                        <div class="agent-card__name-row">
+                                                            <span class="agent-card__health-dot" [attr.data-health]="getAgentHealth(summary)"></span>
+                                                            <span class="agent-card__name">{{ summary.agent.name }}</span>
+                                                        </div>
                                                         <span class="agent-card__provider-badge" [attr.data-provider]="summary.agent.provider || 'anthropic'">
                                                             {{ summary.agent.provider || 'anthropic' }}{{ summary.agent.model ? ' / ' + summary.agent.model : '' }}
                                                         </span>
@@ -911,6 +914,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
     /** Which widgets should span full width */
     protected isFullWidth(id: WidgetId): boolean {
         return id === 'metrics' || id === 'agents' || id === 'active-sessions' || id === 'flock' || id === 'comparison';
+    }
+
+    /** Returns 'green' (active now), 'yellow' (active within 24h), 'red' (inactive >24h) */
+    protected getAgentHealth(summary: AgentSummary): string {
+        if (summary.runningSessions > 0) return 'green';
+        if (!summary.lastActive) return 'red';
+        const hoursAgo = (Date.now() - new Date(summary.lastActive).getTime()) / (1000 * 60 * 60);
+        if (hoursAgo < 24) return 'yellow';
+        return 'red';
     }
 
     protected sourceBarPct(count: number): number {

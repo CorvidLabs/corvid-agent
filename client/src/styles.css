@@ -34,6 +34,7 @@
 :root {
     /* Backgrounds */
     --bg-deep: #0a0a12;
+    --bg-base: #0a0a12;
     --bg-surface: #0f1018;
     --bg-raised: #161822;
     --bg-input: #0c0d14;

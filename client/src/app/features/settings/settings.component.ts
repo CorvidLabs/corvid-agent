@@ -3,6 +3,7 @@ import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { NotificationService } from '../../core/services/notification.service';
 import { SessionService } from '../../core/services/session.service';
 import { GuidedTourService } from '../../core/services/guided-tour.service';
@@ -49,13 +50,13 @@ interface PSKContact {
 @Component({
     selector: 'app-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, TitleCasePipe],
+    imports: [FormsModule, DecimalPipe, TitleCasePipe, SkeletonComponent],
     template: `
         <div class="settings">
             <h2>Settings</h2>
 
             @if (loading()) {
-                <p class="loading">Loading settings...</p>
+                <app-skeleton variant="line" [count]="6" />
             } @else {
                 <!-- System Info -->
                 <div class="settings__section">

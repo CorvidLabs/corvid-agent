@@ -440,6 +440,19 @@ import { WorkTask } from '../../core/models/work-task.model';
             max-height: 120px;
             overflow-y: auto;
         }
+
+        @media (max-width: 768px) {
+            .tasks { padding: 1rem; }
+            .tasks__header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .create-form__row { flex-direction: column; }
+            .form-select { min-width: 100%; }
+            .task-card__header { flex-wrap: wrap; gap: 0.35rem; }
+            .task-meta { flex-direction: column; gap: 0.25rem; }
+            .tasks__filters { flex-wrap: wrap; }
+        }
+        @media (max-width: 480px) {
+            .tasks { padding: 0.75rem; }
+        }
     `,
 })
 export class WorkTaskListComponent implements OnInit, OnDestroy {

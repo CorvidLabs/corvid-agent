@@ -13,6 +13,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { firstValueFrom } from 'rxjs';
 
 interface WalletSummary {
@@ -39,7 +40,7 @@ interface WalletMessage {
 @Component({
     selector: 'app-wallet-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, EmptyStateComponent],
+    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -61,7 +62,7 @@ interface WalletMessage {
             </div>
 
             @if (loading()) {
-                <p class="loading">Loading wallets...</p>
+                <app-skeleton variant="card" [count]="3" />
             } @else if (filteredWallets().length === 0) {
                 <app-empty-state
                     icon="  [===]\n  | $ |\n  [===]"
@@ -127,7 +128,7 @@ interface WalletMessage {
                             @if (expandedWallet() === wallet.address) {
                                 <div class="wallet-card__messages">
                                     @if (messagesLoading()) {
-                                        <p class="loading">Loading messages...</p>
+                                        <app-skeleton variant="line" [count]="3" />
                                     } @else if (messages().length === 0) {
                                         <p class="empty">No messages found.</p>
                                     } @else {

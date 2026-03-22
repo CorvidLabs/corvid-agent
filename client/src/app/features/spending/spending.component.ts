@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 interface AgentSpendingInfo {
     agentId: string;
@@ -39,13 +40,13 @@ interface CreditTransaction {
 @Component({
     selector: 'app-spending',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe],
+    imports: [FormsModule, DecimalPipe, SkeletonComponent],
     template: `
         <div class="spending">
             <h2>Spending Controls</h2>
 
             @if (loading()) {
-                <p class="loading">Loading spending data...</p>
+                <app-skeleton variant="card" [count]="4" />
             } @else {
                 <!-- Per-Agent Spending Caps -->
                 <div class="spending__section">

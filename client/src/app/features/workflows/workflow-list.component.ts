@@ -6,12 +6,13 @@ import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '../../core/models/workflow.model';
 
 @Component({
     selector: 'app-workflow-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent],
+    imports: [FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page-header">
@@ -52,7 +53,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             }
 
             @if (workflowService.loading()) {
-                <div class="loading">Loading workflows...</div>
+                <app-skeleton variant="table" [count]="4" />
             }
 
             <div class="filter-bar">
