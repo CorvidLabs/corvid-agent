@@ -9,7 +9,6 @@ import { createLogger } from './lib/logger';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
 import { applySecurityHeaders } from './lib/security-headers';
 import { handleOllamaRoutes } from './routes/ollama';
-import { handleOpenRouterRoutes } from './routes/openrouter';
 import { handleOpenApiRoutes } from './openapi/index';
 import {
     renderMetrics,
@@ -385,10 +384,6 @@ const server = Bun.serve<WsData>({
             // OpenAPI spec & Swagger UI (public, no auth required)
             const openApiResponse = handleOpenApiRoutes(req, url);
             if (openApiResponse) return instrumentResponse(openApiResponse, url.pathname);
-
-            // OpenRouter model discovery routes
-            const openRouterResponse = await handleOpenRouterRoutes(req, url);
-            if (openRouterResponse) return instrumentResponse(openRouterResponse, '/api/openrouter');
 
             // Ollama model management routes
             const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {

@@ -9,6 +9,7 @@ import { OpenRouterProvider } from '../providers/openrouter/provider';
 import { LlmProviderRegistry } from '../providers/registry';
 import { getModelsForProvider } from '../providers/cost-table';
 import { json } from '../lib/response';
+import type { RequestContext } from '../middleware/guards';
 
 /** Get the OpenRouterProvider instance from the registry, or null. */
 function getOpenRouterProvider(): OpenRouterProvider | null {
@@ -25,6 +26,7 @@ function getOpenRouterProvider(): OpenRouterProvider | null {
 export function handleOpenRouterRoutes(
     req: Request,
     url: URL,
+    _context: RequestContext,
 ): Response | Promise<Response> | null {
     if (!url.pathname.startsWith('/api/openrouter')) return null;
 
