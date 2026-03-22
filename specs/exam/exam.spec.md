@@ -40,7 +40,7 @@ Provides a model competency examination framework that runs standardized test ca
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `parseModelSizeB` | `input: string` | `number \| null` | Parses parameter count in billions from a model name (e.g., ":8b" returns 8, "14.8B" returns 14.8) |
-| `isCloudModel` | `model: string` | `boolean` | Returns true if the model name contains "-cloud" |
+| `isCloudModel` | `model: string` | `boolean` | Returns true if the model name contains ":cloud" or ends with "-cloud" (re-exported from `lib/agent-tiers`) |
 | `stripThinkBlocks` | `text: string` | `string` | Strips `<think>...</think>` blocks from text and trims whitespace |
 | `isApiError` | `text: string` | `string \| undefined` | Detects API error messages in assistant content; returns formatted error or undefined |
 | `extractSdkToolCalls` | `content: unknown[]` | `Array<{ name, arguments }>` | Extracts tool_use blocks from SDK assistant message content arrays |

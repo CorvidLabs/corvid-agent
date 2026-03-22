@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { parseModelSizeB, isCloudModel, stripThinkBlocks, isApiError, buildConversationPrompt, extractSdkToolCalls, detectProvider } from '../exam/runner';
+import { parseModelSizeB, stripThinkBlocks, isApiError, buildConversationPrompt, extractSdkToolCalls, detectProvider } from '../exam/runner';
+import { isCloudModel } from '../lib/agent-tiers';
 
 describe('parseModelSizeB', () => {
     test('parses colon-prefixed sizes like ":8b"', () => {
@@ -36,9 +37,14 @@ describe('parseModelSizeB', () => {
 });
 
 describe('isCloudModel', () => {
-    test('returns true for cloud models', () => {
+    test('returns true for -cloud suffix models', () => {
         expect(isCloudModel('qwen3-cloud')).toBe(true);
         expect(isCloudModel('deepseek-r1-cloud')).toBe(true);
+    });
+
+    test('returns true for :cloud tag models', () => {
+        expect(isCloudModel('qwen3:cloud')).toBe(true);
+        expect(isCloudModel('deepseek-v3.1:671b-cloud')).toBe(true);
     });
 
     test('returns false for non-cloud models', () => {

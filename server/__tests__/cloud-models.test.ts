@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { parseModelSizeB, isCloudModel } from '../exam/runner';
+import { parseModelSizeB } from '../exam/runner';
+import { isCloudModel } from '../lib/agent-tiers';
 
 // ── parseModelSizeB ─────────────────────────────────────────────────────────
 
@@ -56,12 +57,16 @@ describe('isCloudModel', () => {
         expect(isCloudModel('deepseek-v3.1:671b-cloud')).toBe(true);
     });
 
+    it('detects :cloud tag pattern', () => {
+        expect(isCloudModel('qwen3:cloud')).toBe(true);
+    });
+
     it('returns false for local models', () => {
         expect(isCloudModel('qwen3:8b')).toBe(false);
     });
 
     it('returns false for model with "cloud" in name but no hyphen prefix', () => {
-        // isCloudModel checks for '-cloud', not just 'cloud'
+        // isCloudModel checks for ':cloud' or '-cloud', not just 'cloud'
         expect(isCloudModel('cloudbert:7b')).toBe(false);
     });
 });
