@@ -69,7 +69,6 @@ const VISION_PATTERNS = [
     /llama.*vision/i,
 ];
 
-const CAPABILITY_CACHE = new Map<string, ModelCapabilities>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 interface OllamaShowResponse {
@@ -89,6 +88,7 @@ interface OllamaShowResponse {
 
 export class ModelCapabilityDetector {
     private host: string;
+    private readonly cache = new Map<string, ModelCapabilities>();
 
     constructor(host?: string) {
         this.host = host || process.env.OLLAMA_HOST || 'http://localhost:11434';
@@ -98,7 +98,7 @@ export class ModelCapabilityDetector {
      * Get capabilities for a model. Returns cached result if available.
      */
     async getCapabilities(modelName: string): Promise<ModelCapabilities> {
-        const cached = CAPABILITY_CACHE.get(modelName);
+        const cached = this.cache.get(modelName);
         if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
             return cached;
         }
@@ -118,7 +118,7 @@ export class ModelCapabilityDetector {
 
             const data = (await response.json()) as OllamaShowResponse;
             const capabilities = this.parseCapabilities(modelName, data);
-            CAPABILITY_CACHE.set(modelName, capabilities);
+            this.cache.set(modelName, capabilities);
             log.info(`Detected capabilities for ${modelName}`, {
                 tools: capabilities.supportsTools,
                 vision: capabilities.supportsVision,
@@ -172,7 +172,7 @@ export class ModelCapabilityDetector {
 
     /** Clear the capability cache (e.g., after pulling new models). */
     clearCache(): void {
-        CAPABILITY_CACHE.clear();
+        this.cache.clear();
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ export class ModelCapabilityDetector {
             cachedAt: Date.now(),
         };
 
-        CAPABILITY_CACHE.set(name, caps);
+        this.cache.set(name, caps);
         return caps;
     }
 }

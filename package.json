@@ -50,7 +50,7 @@
     "localnet:fund": "bun scripts/localnet-fund.ts"
   },
   "optionalDependencies": {
-    "@corvidlabs/ts-algochat": "^0.4.1"
+    "@corvidlabs/ts-algochat": "^0.4.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",

@@ -3,7 +3,7 @@
  * Validates message formatting, API call structure, and error handling
  * without hitting real external APIs.
  */
-import { test, expect, describe } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import { sendWhatsApp } from '../notifications/channels/whatsapp';
 import { sendSignal } from '../notifications/channels/signal';
 import { sendWhatsAppQuestion } from '../notifications/channels/whatsapp-question';
@@ -20,9 +20,29 @@ const TEST_PAYLOAD: NotificationPayload = {
     timestamp: '2026-02-16T12:00:00Z',
 };
 
+// Mock fetch to simulate API failures deterministically, regardless of other tests'
+// global fetch state. WhatsApp returns 401+error JSON; Signal returns a non-ok status.
+const mockWhatsAppFetch = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = async () =>
+        new Response(JSON.stringify({ error: { message: 'Invalid access token', code: 190 } }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+        });
+};
+const mockSignalFetch = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = async () =>
+        new Response('Unauthorized', { status: 401 });
+};
+
 // ─── WhatsApp Notification ───────────────────────────────────────────────────
 
 describe('sendWhatsApp', () => {
+    const originalFetch = globalThis.fetch;
+    beforeEach(() => mockWhatsAppFetch());
+    afterEach(() => { globalThis.fetch = originalFetch; });
+
     test('returns success: false with error for invalid API', async () => {
         const result = await sendWhatsApp(
             'invalid-phone-id',
@@ -43,6 +63,9 @@ describe('sendWhatsApp', () => {
 // ─── WhatsApp Question ───────────────────────────────────────────────────────
 
 describe('sendWhatsAppQuestion', () => {
+    const originalFetch = globalThis.fetch;
+    beforeEach(() => mockWhatsAppFetch());
+    afterEach(() => { globalThis.fetch = originalFetch; });
     test('returns success: false with error for invalid API', async () => {
         const result = await sendWhatsAppQuestion(
             'invalid-phone-id',
@@ -92,6 +115,9 @@ describe('sendWhatsAppQuestion', () => {
 // ─── Signal Notification ─────────────────────────────────────────────────────
 
 describe('sendSignal', () => {
+    const originalFetch = globalThis.fetch;
+    beforeEach(() => mockSignalFetch());
+    afterEach(() => { globalThis.fetch = originalFetch; });
     test('returns success: false with error for invalid API URL', async () => {
         const result = await sendSignal(
             'https://not-a-real-signal-api.invalid',
@@ -112,6 +138,9 @@ describe('sendSignal', () => {
 // ─── Signal Question ─────────────────────────────────────────────────────────
 
 describe('sendSignalQuestion', () => {
+    const originalFetch = globalThis.fetch;
+    beforeEach(() => mockSignalFetch());
+    afterEach(() => { globalThis.fetch = originalFetch; });
     test('returns success: false with error for invalid API URL', async () => {
         const result = await sendSignalQuestion(
             'https://not-a-real-signal-api.invalid',

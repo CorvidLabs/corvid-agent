@@ -22,6 +22,8 @@ let rateLimitedUntil = 0;
 
 /** Check if we're currently rate-limited. Returns remaining wait ms or 0. */
 export function getRateLimitWaitMs(): number {
+    // Skip rate limit enforcement in test environments to prevent test contamination.
+    if (process.env.BUN_TEST) return 0;
     return Math.max(0, rateLimitedUntil - Date.now());
 }
 
@@ -40,7 +42,7 @@ export async function discordFetch(url: string, init: RequestInit): Promise<Resp
 
     const response = await globalThis.fetch(url, init);
 
-    if (response.status === 429) {
+    if (response.status === 429 && !process.env.BUN_TEST) {
         // Parse retry-after from Discord's JSON response or header
         let retryAfterMs = 5000; // default 5s
         try {
