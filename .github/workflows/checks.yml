@@ -36,6 +36,7 @@ jobs:
         run: bun run governance:check
         env:
           GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Spec validation (strict + 100% coverage)
