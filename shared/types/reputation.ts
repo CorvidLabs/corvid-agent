@@ -38,3 +38,10 @@ export interface ReputationEvent {
     metadata: Record<string, unknown>;
     createdAt: string;
 }
+
+export interface ReputationHistoryPoint {
+    overallScore: number;
+    trustLevel: string;
+    components: ReputationComponents;
+    computedAt: string;
+}

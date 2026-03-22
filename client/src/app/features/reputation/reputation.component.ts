@@ -7,7 +7,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats } from '../../core/models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
@@ -95,6 +95,51 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                         </div>
                     }
                 </div>
+
+                @if (reputationService.scores().length > 1) {
+                    <div class="compare-section">
+                        <h4>
+                            <button class="btn btn--sm" [class.btn--primary]="compareMode()" (click)="compareMode.set(!compareMode())">
+                                {{ compareMode() ? 'Exit Compare' : 'Compare Agents' }}
+                            </button>
+                        </h4>
+                        @if (compareMode()) {
+                            <div class="compare-grid">
+                                <div class="compare-chart">
+                                    <svg [attr.viewBox]="'0 0 ' + compareWidth + ' ' + compareBarHeight" class="compare-chart__svg">
+                                        @for (agent of comparisonData(); track agent.agentId; let i = $index) {
+                                            <g [attr.transform]="'translate(0,' + (i * 28) + ')'">
+                                                <text x="0" y="16" class="compare-chart__name">{{ agent.name }}</text>
+                                                <rect x="100" y="4" [attr.width]="agent.barWidth" height="16" rx="3"
+                                                      class="compare-chart__bar" [attr.data-level]="agent.trustLevel" />
+                                                <text [attr.x]="104 + agent.barWidth" y="16" class="compare-chart__score">{{ agent.score }}</text>
+                                            </g>
+                                        }
+                                    </svg>
+                                </div>
+                                <div class="compare-components">
+                                    @for (meta of componentMeta; track meta.key) {
+                                        <div class="compare-component-row">
+                                            <span class="compare-component-label">{{ meta.label }}</span>
+                                            <div class="compare-component-bars">
+                                                @for (agent of comparisonData(); track agent.agentId) {
+                                                    <div class="compare-mini-bar">
+                                                        <span class="compare-mini-name">{{ agent.name }}</span>
+                                                        <div class="compare-mini-track">
+                                                            <div class="compare-mini-fill" [attr.data-color]="meta.color"
+                                                                 [style.width.%]="agent.components[meta.key]"></div>
+                                                        </div>
+                                                        <span class="compare-mini-val">{{ agent.components[meta.key] }}</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
 
                 @if (selectedAgentId()) {
                     <div class="detail-panel">
@@ -248,6 +293,56 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                             } @else {
                                 <button class="btn btn--primary btn--sm" (click)="onCreateAttestation(s.agentId)">Create Attestation</button>
                             }
+                        }
+
+                        @if (history().length > 1) {
+                            <h4>Score Trend</h4>
+                            <div class="history-chart">
+                                <div class="history-chart__legend">
+                                    <label class="history-chart__toggle">
+                                        <input type="checkbox" [checked]="showComponents()" (change)="showComponents.set(!showComponents())">
+                                        Show components
+                                    </label>
+                                    @for (meta of componentMeta; track meta.key) {
+                                        @if (showComponents()) {
+                                            <span class="history-chart__legend-item" [attr.data-color]="meta.color">{{ meta.label }}</span>
+                                        }
+                                    }
+                                </div>
+                                <svg [attr.viewBox]="'0 0 ' + historyWidth + ' ' + historyHeight" class="history-chart__svg" preserveAspectRatio="none">
+                                    <!-- Y-axis grid lines -->
+                                    @for (y of historyYGrid; track y.value) {
+                                        <line x1="0" [attr.y1]="y.y" [attr.x2]="historyWidth" [attr.y2]="y.y" class="history-chart__grid" />
+                                        <text x="2" [attr.y]="y.y - 2" class="history-chart__axis-label">{{ y.value }}</text>
+                                    }
+                                    <!-- Component lines (behind main) -->
+                                    @if (showComponents()) {
+                                        @for (line of historyComponentLines(); track line.key) {
+                                            <path [attr.d]="line.path" class="history-chart__component-line" [attr.data-color]="line.color" />
+                                        }
+                                    }
+                                    <!-- Main score area + line -->
+                                    @if (historyAreaPath()) {
+                                        <path [attr.d]="historyAreaPath()" class="history-chart__area" />
+                                    }
+                                    @if (historyLinePath()) {
+                                        <path [attr.d]="historyLinePath()" class="history-chart__main-line" />
+                                    }
+                                    <!-- Score dots -->
+                                    @for (point of historyPoints(); track $index) {
+                                        <circle [attr.cx]="point.x" [attr.cy]="point.y" r="3"
+                                                class="history-chart__dot"
+                                                [attr.data-level]="point.trustLevel">
+                                            <title>{{ point.date }}: Score {{ point.score }}</title>
+                                        </circle>
+                                    }
+                                </svg>
+                                <div class="history-chart__x-labels">
+                                    @for (label of historyXLabels(); track label.text) {
+                                        <span [style.left.%]="label.pct">{{ label.text }}</span>
+                                    }
+                                </div>
+                            </div>
                         }
 
                         @if (reputationService.events().length > 1) {
@@ -530,10 +625,93 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .trend-chart__label--positive { color: var(--accent-green); }
         .trend-chart__label--negative { color: var(--accent-red); }
 
+        /* History trend chart */
+        .history-chart {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem; margin-bottom: 1rem;
+        }
+        .history-chart__legend {
+            display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;
+        }
+        .history-chart__toggle {
+            font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;
+        }
+        .history-chart__toggle input { cursor: pointer; }
+        .history-chart__legend-item {
+            font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .history-chart__legend-item[data-color="green"] { color: var(--accent-green); }
+        .history-chart__legend-item[data-color="yellow"] { color: var(--accent-yellow, #ffc107); }
+        .history-chart__legend-item[data-color="cyan"] { color: var(--accent-cyan); }
+        .history-chart__legend-item[data-color="purple"] { color: var(--accent-purple, #b388ff); }
+        .history-chart__legend-item[data-color="orange"] { color: var(--accent-orange, #ff9100); }
+        .history-chart__svg { width: 100%; height: 120px; display: block; }
+        .history-chart__grid { stroke: var(--border); stroke-width: 0.5; opacity: 0.5; }
+        .history-chart__axis-label { fill: var(--text-tertiary); font-size: 7px; }
+        .history-chart__main-line {
+            fill: none; stroke: var(--accent-cyan); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+        }
+        .history-chart__area { fill: var(--accent-cyan); opacity: 0.08; }
+        .history-chart__component-line {
+            fill: none; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; opacity: 0.6;
+        }
+        .history-chart__component-line[data-color="green"] { stroke: var(--accent-green); }
+        .history-chart__component-line[data-color="yellow"] { stroke: var(--accent-yellow, #ffc107); }
+        .history-chart__component-line[data-color="cyan"] { stroke: var(--accent-cyan); stroke-dasharray: 4 2; }
+        .history-chart__component-line[data-color="purple"] { stroke: var(--accent-purple, #b388ff); }
+        .history-chart__component-line[data-color="orange"] { stroke: var(--accent-orange, #ff9100); }
+        .history-chart__dot { transition: r 0.15s; cursor: default; }
+        .history-chart__dot:hover { r: 5; }
+        .history-chart__dot[data-level="verified"], .history-chart__dot[data-level="high"] { fill: var(--accent-green); }
+        .history-chart__dot[data-level="medium"] { fill: var(--accent-cyan); }
+        .history-chart__dot[data-level="low"] { fill: var(--accent-yellow, #ffc107); }
+        .history-chart__dot[data-level="untrusted"] { fill: var(--accent-red); }
+        .history-chart__x-labels {
+            position: relative; height: 1rem; margin-top: 0.25rem;
+        }
+        .history-chart__x-labels span {
+            position: absolute; font-size: 0.55rem; color: var(--text-tertiary); transform: translateX(-50%);
+        }
+
+        /* Compare section */
+        .compare-section {
+            margin-top: 1.5rem;
+        }
+        .compare-section h4 { margin: 0 0 0.75rem; }
+        .compare-grid {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 1rem;
+        }
+        .compare-chart__svg { width: 100%; display: block; }
+        .compare-chart__name { fill: var(--text-secondary); font-size: 10px; font-weight: 600; }
+        .compare-chart__bar { opacity: 0.8; }
+        .compare-chart__bar[data-level="verified"], .compare-chart__bar[data-level="high"] { fill: var(--accent-green); }
+        .compare-chart__bar[data-level="medium"] { fill: var(--accent-cyan); }
+        .compare-chart__bar[data-level="low"] { fill: var(--accent-yellow, #ffc107); }
+        .compare-chart__bar[data-level="untrusted"] { fill: var(--accent-red); }
+        .compare-chart__score { fill: var(--text-primary); font-size: 10px; font-weight: 700; }
+        .compare-components { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .compare-component-row {}
+        .compare-component-label {
+            font-size: 0.75rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.3rem;
+        }
+        .compare-component-bars { display: flex; flex-direction: column; gap: 0.2rem; }
+        .compare-mini-bar { display: grid; grid-template-columns: 80px 1fr 30px; align-items: center; gap: 0.4rem; }
+        .compare-mini-name { font-size: 0.65rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .compare-mini-track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; }
+        .compare-mini-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .compare-mini-fill[data-color="green"] { background: var(--accent-green); }
+        .compare-mini-fill[data-color="yellow"] { background: var(--accent-yellow, #ffc107); }
+        .compare-mini-fill[data-color="cyan"] { background: var(--accent-cyan); }
+        .compare-mini-fill[data-color="purple"] { background: var(--accent-purple, #b388ff); }
+        .compare-mini-fill[data-color="orange"] { background: var(--accent-orange, #ff9100); }
+        .compare-mini-val { font-size: 0.7rem; color: var(--text-primary); text-align: right; }
+
         @media (max-width: 768px) {
             .card-grid { grid-template-columns: 1fr; }
             .agent-card__body { flex-direction: column; align-items: center; }
             .component-bars { width: 100%; }
+            .compare-mini-bar { grid-template-columns: 60px 1fr 24px; }
         }
     `,
 })
@@ -548,9 +726,109 @@ export class ReputationComponent implements OnInit {
     protected readonly stats = signal<AgentReputationStats | null>(null);
     protected readonly computing = signal(false);
     protected readonly loadError = signal(false);
+    protected readonly history = signal<ReputationHistoryPoint[]>([]);
+    protected readonly showComponents = signal(false);
+    protected readonly compareMode = signal(false);
 
     protected readonly trendWidth = 400;
     protected readonly trendHeight = 80;
+
+    // History chart dimensions
+    protected readonly historyWidth = 500;
+    protected readonly historyHeight = 120;
+    protected readonly historyPad = 12;
+
+    protected readonly historyYGrid = [
+        { value: 100, y: 12 },
+        { value: 50, y: 60 },
+        { value: 0, y: 108 },
+    ];
+
+    protected readonly historyPoints = computed(() => {
+        const h = this.history();
+        if (h.length < 2) return [];
+        const pad = this.historyPad;
+        const w = this.historyWidth;
+        const ht = this.historyHeight;
+        return h.map((p, i) => ({
+            x: pad + (i / (h.length - 1)) * (w - pad * 2),
+            y: pad + ((100 - p.overallScore) / 100) * (ht - pad * 2),
+            score: p.overallScore,
+            trustLevel: p.trustLevel,
+            date: new Date(p.computedAt).toLocaleDateString(),
+        }));
+    });
+
+    protected readonly historyLinePath = computed(() => {
+        const pts = this.historyPoints();
+        if (pts.length < 2) return '';
+        return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ');
+    });
+
+    protected readonly historyAreaPath = computed(() => {
+        const pts = this.historyPoints();
+        if (pts.length < 2) return '';
+        const bottom = this.historyHeight - this.historyPad;
+        return `M ${pts[0].x},${bottom} ` +
+            pts.map(p => `L ${p.x},${p.y}`).join(' ') +
+            ` L ${pts[pts.length - 1].x},${bottom} Z`;
+    });
+
+    protected readonly historyComponentLines = computed(() => {
+        const h = this.history();
+        if (h.length < 2) return [];
+        const pad = this.historyPad;
+        const w = this.historyWidth;
+        const ht = this.historyHeight;
+
+        return this.componentMeta.map(meta => {
+            const pts = h.map((p, i) => {
+                const x = pad + (i / (h.length - 1)) * (w - pad * 2);
+                const y = pad + ((100 - p.components[meta.key]) / 100) * (ht - pad * 2);
+                return `${x},${y}`;
+            });
+            return {
+                key: meta.key,
+                color: meta.color,
+                path: 'M ' + pts.join(' L '),
+            };
+        });
+    });
+
+    protected readonly historyXLabels = computed(() => {
+        const h = this.history();
+        if (h.length < 2) return [];
+        const count = Math.min(h.length, 5);
+        const labels: { text: string; pct: number }[] = [];
+        for (let i = 0; i < count; i++) {
+            const idx = Math.round((i / (count - 1)) * (h.length - 1));
+            const d = new Date(h[idx].computedAt);
+            labels.push({
+                text: `${d.getMonth() + 1}/${d.getDate()}`,
+                pct: (idx / (h.length - 1)) * 100,
+            });
+        }
+        return labels;
+    });
+
+    // Comparison data
+    protected readonly compareWidth = 400;
+    protected readonly compareBarHeight = computed(() => this.reputationService.scores().length * 28);
+
+    protected readonly comparisonData = computed(() => {
+        const maxBarWidth = this.compareWidth - 140; // leave room for name + score text
+        return this.reputationService.scores()
+            .filter(s => s.hasActivity)
+            .sort((a, b) => b.overallScore - a.overallScore)
+            .map(s => ({
+                agentId: s.agentId,
+                name: this.getAgentName(s.agentId),
+                score: s.overallScore,
+                trustLevel: s.trustLevel,
+                components: s.components,
+                barWidth: (s.overallScore / 100) * maxBarWidth,
+            }));
+    });
 
     protected readonly trendPoints = computed(() => {
         const events = this.reputationService.events();
@@ -681,6 +959,7 @@ export class ReputationComponent implements OnInit {
         this.selectedAgentId.set(agentId);
         this.explanation.set(null);
         this.stats.set(null);
+        this.history.set([]);
         try {
             const score = await this.reputationService.getScore(agentId);
             this.selectedScore.set(score);
@@ -688,6 +967,7 @@ export class ReputationComponent implements OnInit {
                 this.reputationService.getEvents(agentId, 0),
                 this.reputationService.getExplanation(agentId).then(ex => this.explanation.set(ex)),
                 this.reputationService.getStats(agentId).then(s => this.stats.set(s)).catch(() => {}),
+                this.reputationService.getHistory(agentId).then(h => this.history.set(h)).catch(() => {}),
             ]);
         } catch {
             this.selectedScore.set(null);

@@ -63,6 +63,15 @@ export function handleReputationRoutes(
         }
     }
 
+    // ─── History ──────────────────────────────────────────────────────────────
+
+    const historyMatch = path.match(/^\/api\/reputation\/history\/([^/]+)$/);
+    if (historyMatch && method === 'GET') {
+        const agentId = historyMatch[1];
+        const days = safeNumParam(url.searchParams.get('days'), 90);
+        return json(scorer.getHistory(agentId, days || 90));
+    }
+
     // ─── Explanation ──────────────────────────────────────────────────────────
 
     const explainMatch = path.match(/^\/api\/reputation\/explain\/([^/]+)$/);

@@ -75,3 +75,10 @@ export interface AgentReputationStats {
     feedback: Record<string, { positive: number; negative: number }>;
     feedbackTotal: { positive: number; negative: number; total: number };
 }
+
+export interface ReputationHistoryPoint {
+    overallScore: number;
+    trustLevel: string;
+    components: ReputationComponents;
+    computedAt: string;
+}

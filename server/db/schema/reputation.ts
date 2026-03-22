@@ -53,6 +53,19 @@ export const tables: string[] = [
         blocked_by  TEXT DEFAULT 'system',
         created_at  TEXT DEFAULT (datetime('now'))
     )`,
+
+    `CREATE TABLE IF NOT EXISTS reputation_history (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id            TEXT NOT NULL,
+        overall_score       INTEGER NOT NULL,
+        trust_level         TEXT NOT NULL,
+        task_completion     INTEGER NOT NULL DEFAULT 0,
+        peer_rating         INTEGER NOT NULL DEFAULT 0,
+        credit_pattern      INTEGER NOT NULL DEFAULT 0,
+        security_compliance INTEGER NOT NULL DEFAULT 0,
+        activity_level      INTEGER NOT NULL DEFAULT 0,
+        computed_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
 ];
 
 export const indexes: string[] = [
@@ -62,4 +75,7 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_response_feedback_agent ON response_feedback(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_response_feedback_created ON response_feedback(created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_blocklist_reason ON agent_blocklist(reason)`,
+    `CREATE INDEX IF NOT EXISTS idx_reputation_history_agent ON reputation_history(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_reputation_history_computed ON reputation_history(computed_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_reputation_history_agent_time ON reputation_history(agent_id, computed_at)`,
 ];
