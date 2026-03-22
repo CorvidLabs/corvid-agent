@@ -24,6 +24,7 @@ files:
   - server/db/migrations/096_mention_session_channel_id.ts
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
+  - server/db/migrations/099_composable_personas.ts
   - server/db/migrations/100_agent_blocklist.ts
 db_tables:
   - schema_version
