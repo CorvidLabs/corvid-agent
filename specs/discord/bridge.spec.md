@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 18
+version: 19
 status: active
 files:
   - server/discord/bridge.ts
@@ -167,6 +167,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field notifications |
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
 | `sendMessageWithFiles` | `(delivery, botToken, channelId, content, files)` | `Promise<string \| null>` | Send a text message with file attachments via multipart/form-data |
+| `getRateLimitWaitMs` | `()` | `number` | Check if globally rate-limited; returns remaining wait ms or 0 |
+| `discordFetch` | `(url: string, init: RequestInit)` | `Promise<Response>` | Wrapper for Discord API fetch that handles 429 rate limits globally, preventing Cloudflare IP bans |
 
 ### Exported Functions (from message-handler.ts)
 
