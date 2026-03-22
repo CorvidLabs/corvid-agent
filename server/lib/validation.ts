@@ -788,6 +788,28 @@ export const AssignSkillBundleSchema = z.object({
     sortOrder: z.number().int().min(0).optional(),
 });
 
+// ─── Agent Variants ─────────────────────────────────────────────────────────
+
+export const CreateVariantSchema = z.object({
+    name: z.string().min(1, 'name is required').max(100, 'name must be 100 chars or less'),
+    description: z.string().max(1000, 'description must be 1000 chars or less').optional(),
+    skillBundleIds: z.array(z.string().min(1)).max(20, 'maximum 20 skill bundles per variant').optional(),
+    personaIds: z.array(z.string().min(1)).max(10, 'maximum 10 personas per variant').optional(),
+    preset: z.boolean().optional(),
+});
+
+export const UpdateVariantSchema = z.object({
+    name: z.string().min(1).max(100, 'name must be 100 chars or less').optional(),
+    description: z.string().max(1000, 'description must be 1000 chars or less').optional(),
+    skillBundleIds: z.array(z.string().min(1)).max(20, 'maximum 20 skill bundles per variant').optional(),
+    personaIds: z.array(z.string().min(1)).max(10, 'maximum 10 personas per variant').optional(),
+    preset: z.boolean().optional(),
+});
+
+export const ApplyVariantSchema = z.object({
+    variantId: z.string().min(1, 'variantId is required'),
+});
+
 // ─── External MCP Server Configs ────────────────────────────────────────────
 
 export const CreateMcpServerConfigSchema = z.object({

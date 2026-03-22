@@ -27,6 +27,7 @@ import { handleAuthFlowRoutes } from './auth-flow';
 import { handleA2ARoutes } from './a2a';
 import { handlePluginRoutes } from './plugins';
 import { handlePersonaRoutes } from './personas';
+import { handleVariantRoutes } from './variants';
 import { handleSkillBundleRoutes } from './skill-bundles';
 import { handleMcpServerRoutes } from './mcp-servers';
 import { handleExamRoutes } from './exam';
@@ -313,6 +314,10 @@ async function handleRoutes(
     // Persona routes (agent identity/personality)
     const personaResponse = handlePersonaRoutes(req, url, db, context);
     if (personaResponse) return personaResponse;
+
+    // Variant routes (preset skill + persona combinations)
+    const variantResponse = handleVariantRoutes(req, url, db, context);
+    if (variantResponse) return variantResponse;
 
     // Skill bundle routes (composable tool + prompt packages)
     const skillBundleResponse = handleSkillBundleRoutes(req, url, db, context);
