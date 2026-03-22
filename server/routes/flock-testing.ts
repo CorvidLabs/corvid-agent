@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import { FlockTestRunner, type TestTransport } from '../flock-directory/testing/runner';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import { getAgentByWalletAddress } from '../db/agents';
 import type { RequestContext } from '../middleware/guards';
 import { json, notFound, safeNumParam, handleRouteError } from '../lib/response';
 
@@ -74,11 +75,15 @@ export function handleFlockTestingRoutes(
             try {
                 const transport: TestTransport = {
                     async sendAndWait(agentAddress: string, message: string, timeoutMs: number): Promise<string | null> {
+                        // agentAddress is an Algorand wallet address — resolve to agent UUID
+                        const targetAgent = getAgentByWalletAddress(db, agentAddress);
+                        if (!targetAgent) return null;
+
                         try {
                             const result = await agentMessenger.invokeAndWait(
                                 {
                                     fromAgentId: 'flock-tester',
-                                    toAgentId: agentAddress,
+                                    toAgentId: targetAgent.id,
                                     content: `[FLOCK-TEST] ${message}`,
                                 },
                                 timeoutMs,

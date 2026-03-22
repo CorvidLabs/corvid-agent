@@ -85,6 +85,11 @@ export function getAgent(db: Database, id: string, tenantId: string = DEFAULT_TE
     return row ? rowToAgent(row) : null;
 }
 
+export function getAgentByWalletAddress(db: Database, walletAddress: string): Agent | null {
+    const row = db.query('SELECT * FROM agents WHERE wallet_address = ? LIMIT 1').get(walletAddress) as AgentRow | null;
+    return row ? rowToAgent(row) : null;
+}
+
 export function createAgent(db: Database, input: CreateAgentInput, tenantId: string = DEFAULT_TENANT_ID): Agent {
     const id = crypto.randomUUID();
     const customFlags = JSON.stringify(input.customFlags ?? {});
