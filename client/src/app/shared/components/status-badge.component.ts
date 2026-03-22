@@ -33,6 +33,13 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
         .status-badge--stopped { background: var(--bg-raised); color: var(--text-tertiary); border-color: var(--border); }
         .status-badge--error { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
         .status-badge--queued { background: rgba(251, 191, 36, 0.1); color: var(--accent-yellow, #fbbf24); border-color: rgba(251, 191, 36, 0.3); }
+        .status-badge--completed { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
+        .status-badge--failed { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
+        .status-badge--pending { background: var(--accent-amber-dim); color: var(--accent-amber); border-color: rgba(255, 170, 0, 0.3); }
+        .status-badge--branching,
+        .status-badge--validating { background: var(--accent-cyan-dim, rgba(0, 200, 255, 0.1)); color: var(--accent-cyan, #00c8ff); border-color: rgba(0, 200, 255, 0.3); animation: statusPulse 1.5s ease-in-out infinite; }
+        .status-badge--cancelled { background: var(--bg-raised); color: var(--text-tertiary); border-color: var(--border); }
+        .status-badge--active { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
         .status-badge--connected { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
         .status-badge--disconnected { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
     `,

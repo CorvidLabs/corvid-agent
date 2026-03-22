@@ -201,6 +201,13 @@
 .agent-card:hover { border-color: var(--accent-cyan); box-shadow: 0 0 12px rgba(0,229,255,.08); }
 .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .5rem; }
 .agent-card__info, .agent-card__stat { display: flex; flex-direction: column; gap: .1rem; }
+.agent-card__name-row { display: flex; align-items: center; gap: .35rem; }
+.agent-card__health-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.agent-card__health-dot[data-health="green"] { background: var(--accent-green); box-shadow: 0 0 6px rgba(0,255,136,.4); }
+.agent-card__health-dot[data-health="yellow"] { background: var(--accent-amber); box-shadow: 0 0 6px rgba(255,170,0,.4); }
+.agent-card__health-dot[data-health="red"] { background: var(--accent-red); box-shadow: 0 0 6px rgba(255,51,85,.3); opacity: .6; }
 .agent-card__name { font-weight: 700; font-size: .85rem; color: var(--text-primary); }
 .agent-card__provider-badge {
     font-size: .55rem; font-family: var(--font-mono,monospace); font-weight: 600;

@@ -6,12 +6,13 @@ import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -25,7 +26,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
             </div>
 
             @if (reputationService.loading()) {
-                <p class="loading">Loading reputation scores...</p>
+                <app-skeleton variant="table" [count]="4" />
             } @else if (loadError()) {
                 <div class="error-banner">
                     <p>Reputation service unavailable (503). Scores may not be computed yet.</p>

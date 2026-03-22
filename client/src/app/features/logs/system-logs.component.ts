@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { firstValueFrom } from 'rxjs';
 
 interface LogEntry {
@@ -30,7 +31,7 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="logs">
             <h2>System Logs</h2>
@@ -87,7 +88,7 @@ interface CreditTransaction {
                 </div>
 
                 @if (loadingLogs()) {
-                    <p class="loading">Loading logs...</p>
+                    <app-skeleton variant="table" [count]="5" />
                 } @else if (logs().length === 0) {
                     <app-empty-state
                         icon="  [___]\n  |   |\n  |...|"
@@ -117,7 +118,7 @@ interface CreditTransaction {
 
             @if (activeTab() === 'credits') {
                 @if (loadingCredits()) {
-                    <p class="loading">Loading credit transactions...</p>
+                    <app-skeleton variant="table" [count]="4" />
                 } @else if (creditTxns().length === 0) {
                     <app-empty-state
                         icon="  [___]\n  | 0 |\n  |...|"

@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } 
 import { DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 interface OverviewData {
     totalSessions: number;
@@ -54,13 +55,13 @@ interface SessionStats {
 @Component({
     selector: 'app-analytics',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe],
+    imports: [DecimalPipe, SkeletonComponent],
     template: `
         <div class="analytics">
             <h2>Analytics</h2>
 
             @if (loading()) {
-                <p class="loading">Loading analytics data...</p>
+                <app-skeleton variant="card" [count]="6" />
             } @else if (overview()) {
                 <!-- Overview Cards -->
                 <div class="analytics__cards stagger-scale">

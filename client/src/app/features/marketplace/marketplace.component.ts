@@ -7,13 +7,14 @@ import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
 import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -101,7 +102,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
             }
 
             @if (marketplaceService.loading()) {
-                <p class="loading">Loading listings...</p>
+                <app-skeleton variant="card" [count]="4" />
             } @else if (loadError()) {
                 <div class="error-banner">
                     <p>Marketplace service unavailable (503). The service may not be initialized yet.</p>

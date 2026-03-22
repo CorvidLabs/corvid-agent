@@ -5,11 +5,12 @@ import { PersonaService } from '../../core/services/persona.service';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.model';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 @Component({
     selector: 'app-persona-manager',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -17,7 +18,7 @@ import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.m
             </div>
 
             @if (agentService.loading()) {
-                <p class="loading">Loading agents...</p>
+                <app-skeleton variant="line" [count]="4" />
             } @else if (agentService.agents().length === 0) {
                 <p class="empty">No agents found. Create an agent first.</p>
             } @else {
@@ -41,7 +42,7 @@ import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.m
                             <p>Select an agent above to configure its persona</p>
                         </div>
                     } @else if (personaService.loading()) {
-                        <p class="loading">Loading persona...</p>
+                        <app-skeleton variant="line" [count]="4" />
                     } @else {
                         <div class="detail-header">
                             <h3>{{ selectedAgentName() }}</h3>

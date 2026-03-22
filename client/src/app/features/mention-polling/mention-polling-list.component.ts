@@ -7,12 +7,13 @@ import { ProjectService } from '../../core/services/project.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from '../../core/models/mention-polling.model';
 
 @Component({
     selector: 'app-mention-polling-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="polling">
             <div class="polling__header">
@@ -147,7 +148,7 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
             </div>
 
             @if (pollingService.loading()) {
-                <p class="loading">Loading polling configs...</p>
+                <app-skeleton variant="table" [count]="4" />
             } @else if (filteredConfigs().length === 0) {
                 <app-empty-state
                     icon="  [@_@]\n   /|\\\n   / \\"

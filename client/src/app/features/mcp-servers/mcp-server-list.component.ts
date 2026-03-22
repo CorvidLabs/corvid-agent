@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { McpServerService } from '../../core/services/mcp-server.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { McpServerConfig, CreateMcpServerConfigInput } from '../../core/models/mcp-server.model';
 
 interface OfficialMcpServer {
@@ -132,7 +133,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
 @Component({
     selector: 'app-mcp-server-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -248,7 +249,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
 
             <!-- Configured Servers -->
             @if (mcpService.loading()) {
-                <p class="loading">Loading servers...</p>
+                <app-skeleton variant="table" [count]="4" />
             } @else if (mcpService.servers().length === 0) {
                 <p class="empty">No custom MCP servers configured.</p>
             } @else {

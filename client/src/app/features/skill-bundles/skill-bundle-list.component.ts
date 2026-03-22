@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { SkillBundle } from '../../core/models/skill-bundle.model';
 
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, EmptyStateComponent],
+    imports: [FormsModule, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -81,7 +82,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
             }
 
             @if (bundleService.loading()) {
-                <p class="loading">Loading bundles...</p>
+                <app-skeleton variant="card" [count]="3" />
             } @else if (filteredBundles().length === 0) {
                 <app-empty-state
                     icon="  [###]\n  [###]\n  [###]"
