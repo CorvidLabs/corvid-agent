@@ -28,6 +28,7 @@ files:
   - server/db/migrations/100_agent_blocklist.ts
   - server/db/migrations/100_agent_variants.ts
   - server/db/migrations/100_pipeline_schedules.ts
+  - server/db/migrations/101_reputation_history.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -418,10 +419,22 @@ Adds pipeline execution support to `agent_schedules` with `execution_mode` and `
 | `up` | `(db: Database)` | `void` | Adds `execution_mode` (TEXT, default `'independent'`) and `pipeline_steps` (TEXT, nullable) columns to `agent_schedules` (idempotent — checks column existence first) |
 | `down` | `(db: Database)` | `void` | Drops `execution_mode` and `pipeline_steps` columns from `agent_schedules` |
 
+### 101_reputation_history.ts
+
+Creates the `reputation_history` table for storing periodic reputation score snapshots, enabling trend charts and historical analysis in the dashboard. Snapshots are throttled to at most one per hour per agent by the scorer.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `reputation_history` table with 3 indexes (agent_id, computed_at, compound agent+time) |
+| `down` | `(db: Database)` | `void` | Drops the `reputation_history` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-22 | corvid-agent | Add migration 101 (reputation_history) to spec coverage |
 | 2026-03-22 | corvid-agent | Add migrations 099, 100 (variants, pipeline_schedules) to spec coverage |
 | 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
