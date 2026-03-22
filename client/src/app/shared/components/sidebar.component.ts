@@ -28,8 +28,6 @@ interface SidebarSection {
 const SECTIONS: SidebarSection[] = [
     { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents'] },
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions'] },
-    { key: 'observe', label: 'Observe', collapsible: true, defaultCollapsed: false, routes: ['/observe'] },
-    { key: 'automate', label: 'Automate', collapsible: true, defaultCollapsed: true, routes: ['/automate'] },
     { key: 'config', label: 'Settings', collapsible: true, defaultCollapsed: false, routes: ['/settings'] },
 ];
 
@@ -91,25 +89,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         <span class="sidebar__abbr">A</span>
                     </a>
                 </li>
-
-                @if (isDeveloperMode()) {
-                <!-- Observe -->
-                <li class="sidebar__section">
-                    <span class="sidebar__section-label">Developer</span>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/observe" routerLinkActive="sidebar__link--active" title="Observe">
-                        <span class="sidebar__label">Observe</span>
-                        <span class="sidebar__abbr">O</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/automate" routerLinkActive="sidebar__link--active" title="Automate">
-                        <span class="sidebar__label">Automate</span>
-                        <span class="sidebar__abbr">Au</span>
-                    </a>
-                </li>
-                }
 
                 <!-- Settings -->
                 <li class="sidebar__section">

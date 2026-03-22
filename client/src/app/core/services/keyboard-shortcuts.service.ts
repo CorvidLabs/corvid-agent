@@ -16,13 +16,11 @@ const SHORTCUTS: ShortcutEntry[] = [
     { keys: 'Cmd+W', description: 'Close active tab', category: 'Tabs' },
     { keys: 'Cmd+1-9', description: 'Switch to tab 1-9', category: 'Tabs' },
     { keys: 'n', description: 'New conversation', category: 'Navigation' },
-    { keys: 'g d', description: 'Go to Dashboard', category: 'Navigation' },
+    { keys: 'g h', description: 'Go to Chat Home', category: 'Navigation' },
     { keys: 'g a', description: 'Go to Agents', category: 'Navigation' },
     { keys: 'g s', description: 'Go to Sessions', category: 'Navigation' },
     { keys: 'g w', description: 'Go to Work Tasks', category: 'Navigation' },
-    { keys: '1', description: 'Switch to Simple view (dashboard)', category: 'Dashboard' },
-    { keys: '2', description: 'Switch to Developer view (dashboard)', category: 'Dashboard' },
-    { keys: 'r', description: 'Refresh all widgets (dashboard)', category: 'Dashboard' },
+    { keys: 'g e', description: 'Go to Settings', category: 'Navigation' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -89,10 +87,11 @@ export class KeyboardShortcutsService implements OnDestroy {
             e.preventDefault();
             this.clearPrefix();
             switch (key) {
-                case 'd': this.router.navigate(['/dashboard']); break;
+                case 'h': this.router.navigate(['/chat']); break;
                 case 'a': this.router.navigate(['/agents']); break;
                 case 's': this.router.navigate(['/sessions']); break;
                 case 'w': this.router.navigate(['/sessions/work-tasks']); break;
+                case 'e': this.router.navigate(['/settings']); break;
             }
             return;
         }

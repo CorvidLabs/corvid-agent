@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TopNavComponent } from './shared/components/top-nav.component';
+import { ChatTabBarComponent } from './shared/components/chat-tab-bar.component';
 import { ActivityRailComponent } from './shared/components/activity-rail.component';
 import { CommandPaletteComponent } from './shared/components/command-palette.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
@@ -18,15 +19,19 @@ import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-
 import { GuidedTourComponent } from './shared/components/guided-tour.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
+import { ChatTabsService } from './core/services/chat-tabs.service';
 import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.service';
 
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, TopNavComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent],
+    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent],
     template: `
         <div class="app-layout">
             <app-top-nav />
+            @if (chatTabs.tabs().length > 0) {
+                <app-chat-tab-bar />
+            }
             @if (wsService.serverRestarting()) {
                 <div class="app-layout__banner app-layout__banner--restart" role="alert">
                     Server is restarting — reconnecting automatically...
@@ -96,6 +101,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 })
 export class App implements OnInit, OnDestroy {
     protected readonly wsService = inject(WebSocketService);
+    protected readonly chatTabs = inject(ChatTabsService);
     private readonly sessionService = inject(SessionService);
     private readonly _shortcuts = inject(KeyboardShortcutsService);
 
