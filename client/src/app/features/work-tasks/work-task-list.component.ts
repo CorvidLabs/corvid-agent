@@ -63,6 +63,21 @@ import { WorkTask } from '../../core/models/work-task.model';
                         (click)="setFilter('failed')"
                     >Failed ({{ failedTasks().length }})</button>
                 </div>
+                <div class="tasks__search-row">
+                    <input class="search-input" type="text" placeholder="Search tasks..."
+                           [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+                    @if (agentOptions().length > 1) {
+                        <select class="agent-filter-select" [value]="agentFilter()" (change)="agentFilter.set($any($event.target).value)">
+                            <option value="">All agents</option>
+                            @for (opt of agentOptions(); track opt.id) {
+                                <option [value]="opt.id">{{ opt.name }}</option>
+                            }
+                        </select>
+                    }
+                    @if (searchQuery() || agentFilter()) {
+                        <button class="clear-filters-btn" (click)="searchQuery.set(''); agentFilter.set('')">Clear</button>
+                    }
+                </div>
             </div>
 
             @if (taskService.loading()) {
@@ -273,6 +288,33 @@ import { WorkTask } from '../../core/models/work-task.model';
         }
         .filter-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
         .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px rgba(0, 229, 255, 0.12); }
+
+        .tasks__search-row {
+            display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
+        }
+        .search-input {
+            flex: 1; padding: 0.4rem 0.65rem; font-size: 0.75rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            transition: border-color 0.15s, box-shadow 0.15s; min-width: 0;
+        }
+        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+        .search-input::placeholder { color: var(--text-tertiary); }
+        .agent-filter-select {
+            padding: 0.4rem 0.5rem; font-size: 0.7rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            cursor: pointer; min-width: 120px;
+        }
+        .agent-filter-select:focus { border-color: var(--accent-cyan); outline: none; }
+        .clear-filters-btn {
+            padding: 0.35rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            background: transparent; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text-tertiary);
+            cursor: pointer; white-space: nowrap; transition: all 0.15s;
+        }
+        .clear-filters-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
         .empty {
             text-align: center;
@@ -488,6 +530,8 @@ import { WorkTask } from '../../core/models/work-task.model';
             .task-card__header { flex-wrap: wrap; gap: 0.35rem; }
             .task-meta { flex-direction: column; gap: 0.25rem; }
             .tasks__filters { flex-wrap: wrap; }
+            .tasks__search-row { flex-wrap: wrap; }
+            .agent-filter-select { min-width: 100%; }
             .pipeline-stage__label { font-size: 0.45rem; }
             .pipeline-stage__dot { width: 8px; height: 8px; }
         }
@@ -503,6 +547,8 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
     private readonly notify = inject(NotificationService);
 
     readonly activeFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
+    readonly searchQuery = signal('');
+    readonly agentFilter = signal('');
     readonly showCreateForm = signal(false);
     readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
@@ -538,13 +584,32 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
         this.taskService.tasks().filter((t) => t.status === 'failed'),
     );
 
-    readonly filteredTasks = computed(() => {
-        switch (this.activeFilter()) {
-            case 'active': return this.activeTasks();
-            case 'completed': return this.completedTasks();
-            case 'failed': return this.failedTasks();
-            default: return this.allTasks();
+    readonly agentOptions = computed(() => {
+        const seen = new Map<string, string>();
+        for (const t of this.taskService.tasks()) {
+            if (!seen.has(t.agentId)) seen.set(t.agentId, this.getAgentName(t.agentId));
         }
+        return Array.from(seen.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    readonly filteredTasks = computed(() => {
+        let tasks: WorkTask[];
+        switch (this.activeFilter()) {
+            case 'active': tasks = this.activeTasks(); break;
+            case 'completed': tasks = this.completedTasks(); break;
+            case 'failed': tasks = this.failedTasks(); break;
+            default: tasks = this.allTasks();
+        }
+        const agent = this.agentFilter();
+        if (agent) tasks = tasks.filter((t) => t.agentId === agent);
+        const query = this.searchQuery().toLowerCase().trim();
+        if (query) tasks = tasks.filter((t) =>
+            t.description.toLowerCase().includes(query) ||
+            (t.branchName?.toLowerCase().includes(query) ?? false) ||
+            (t.error?.toLowerCase().includes(query) ?? false) ||
+            (t.summary?.toLowerCase().includes(query) ?? false)
+        );
+        return tasks;
     });
 
     async ngOnInit(): Promise<void> {

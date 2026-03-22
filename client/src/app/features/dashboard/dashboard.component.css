@@ -16,23 +16,42 @@
 .dash-toolbar__title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 .dash-toolbar__updated { font-size: .6rem; color: var(--text-tertiary); }
 
-/* Connection status dot */
-.connection-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+/* Connection status badge */
+.connection-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 10px; font-size: .6rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+    border: 1px solid transparent; transition: all .2s;
 }
-.connection-dot[data-status="ok"] {
-    background: var(--accent-green);
-    box-shadow: 0 0 6px rgba(0,255,136,.4);
-    animation: pulse-dot 2s infinite;
+.connection-badge__dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
 }
-.connection-dot[data-status="down"] {
-    background: var(--accent-red);
-    box-shadow: 0 0 6px rgba(255,69,58,.4);
+.connection-badge[data-status="connected"] {
+    color: var(--accent-green); background: rgba(0,255,136,.08);
+    border-color: rgba(0,255,136,.2);
+}
+.connection-badge[data-status="connected"] .connection-badge__dot {
+    background: var(--accent-green); box-shadow: 0 0 4px rgba(0,255,136,.5);
+}
+.connection-badge[data-status="disconnected"] {
+    color: var(--accent-red); background: rgba(255,69,58,.08);
+    border-color: rgba(255,69,58,.2);
+}
+.connection-badge[data-status="disconnected"] .connection-badge__dot {
+    background: var(--accent-red); box-shadow: 0 0 4px rgba(255,69,58,.5);
     animation: pulse-dot 1s infinite;
+}
+.connection-badge[data-status="reconnecting"] {
+    color: var(--accent-amber, #ffc107); background: rgba(255,193,7,.08);
+    border-color: rgba(255,193,7,.2);
+}
+.connection-badge[data-status="reconnecting"] .connection-badge__dot {
+    background: var(--accent-amber, #ffc107); box-shadow: 0 0 4px rgba(255,193,7,.5);
+    animation: pulse-dot .6s infinite;
 }
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
-    50% { opacity: .5; }
+    50% { opacity: .3; }
 }
 .dash-toolbar__right { display: flex; gap: .5rem; align-items: center; }
 .view-toggle {
@@ -550,6 +569,17 @@
 .bar-chart__tooltip--visible { opacity: 1; }
 .bar-chart__tooltip-date { font-size: .55rem; color: var(--text-tertiary); }
 .bar-chart__tooltip-val { font-size: .7rem; font-weight: 700; color: var(--accent-green); }
+.bar-chart__tooltip-cum { font-size: .5rem; color: var(--text-tertiary); border-top: 1px solid var(--border); padding-top: 2px; margin-top: 1px; }
+
+/* Spending summary strip */
+.spending-summary {
+    display: flex; align-items: baseline; gap: .5rem; margin-bottom: .5rem;
+    padding: .35rem .6rem; background: var(--bg-raised);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.spending-summary__total { font-size: 1rem; font-weight: 700; color: var(--accent-green); font-family: var(--font-mono, monospace); }
+.spending-summary__label { font-size: .6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .04em; }
+.spending-summary__avg { font-size: .65rem; color: var(--text-secondary); margin-left: auto; font-family: var(--font-mono, monospace); }
 
 /* Ring chart tooltip */
 .ring-chart__tooltip {
