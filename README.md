@@ -15,15 +15,33 @@ No coding experience required. You describe what you want in plain English, and 
 
 ---
 
-## Get started
+## Quick start
 
 ```bash
+# One-line install
 curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+
+# Or clone and init manually
+git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
+corvid-agent init          # auto-detects your AI provider, creates .env, installs deps
+bun run dev                # starts server + dashboard at http://localhost:3000
 ```
 
-The installer handles everything — prerequisites, setup, and opens the dashboard in your browser.
+Add corvid-agent tools to your AI editor (Claude Code, Cursor, Copilot):
 
-**[Full setup guide →](docs/quickstart.md)**
+```bash
+corvid-agent init --mcp    # configures MCP server + copies Agent Skills
+```
+
+**[Full setup guide →](docs/quickstart.md)** | **[MCP setup →](docs/mcp-setup.md)** | **[VibeKit integration →](docs/vibekit-integration.md)**
+
+---
+
+## What is corvid-agent?
+
+An open-source AI agent platform that writes code, opens pull requests, and ships software. It combines LLM-powered coding with on-chain identity (Algorand/AlgoChat), multi-agent orchestration, and integrations with Discord, Telegram, Slack, and GitHub.
+
+You describe what you want in plain English. Your agent designs, codes, tests, and deploys it.
 
 ---
 
@@ -58,6 +76,38 @@ Every app above was designed, coded, tested, and deployed by corvid-agent — ze
 | **Terminal** | `corvid-agent` (interactive CLI) |
 | **Discord / Telegram / Slack** | Add a bot token to `.env` |
 | **Your AI editor** | `corvid-agent init --mcp` (Claude Code, Cursor, Copilot, etc.) |
+
+---
+
+## Extend with VibeKit (Algorand smart contracts)
+
+corvid-agent handles dev orchestration. [VibeKit](https://getvibekit.ai) handles blockchain operations. Together they give you a complete Algorand development stack:
+
+```bash
+corvid-agent init --mcp    # add corvid-agent MCP tools
+vibekit init               # add blockchain MCP tools (deploy, assets, indexer)
+```
+
+Your AI editor gets 48 corvid-agent tools (code, GitHub, scheduling, agents) plus 42 VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
+
+**[VibeKit integration guide →](docs/vibekit-integration.md)**
+
+---
+
+## Agent Skills (skills-as-markdown)
+
+Skills are markdown files in `.skills/` or `skills/` that teach AI assistants how to use corvid-agent. Each skill has a short description for discovery and a full body loaded on demand:
+
+```
+skills/
+  coding/SKILL.md          # File operations, shell commands
+  github/SKILL.md          # PRs, issues, reviews
+  smart-contracts/SKILL.md # VibeKit + Algorand contract tools
+  scheduling/SKILL.md      # Cron-based task automation
+  ...30 skills total
+```
+
+`corvid-agent init --mcp` copies skills to your editor automatically. **[Skill list →](skills/README.md)**
 
 ---
 
