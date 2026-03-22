@@ -73,7 +73,7 @@ Dashboard API endpoint that proxies GitHub PR diff requests. Fetches a unified d
 
 | Module | What is used |
 |--------|-------------|
-| `server/server.ts` | `handleGitHubPRDiffRoutes` (route registration) |
+| `server/routes/index.ts` | `handleGitHubPRDiffRoutes` (route registration) |
 
 ## Change Log
 
