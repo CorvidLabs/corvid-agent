@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch, e2eName } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -31,7 +31,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const projectRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Council Flow Project', workingDir: '/tmp' }),
+            body: JSON.stringify({ name: e2eName('Council Flow Project'), workingDir: '/tmp' }),
         });
         if (!projectRes.ok) throw new Error(`seedProject failed: ${projectRes.status} ${await projectRes.text()}`);
         const project = await projectRes.json();
@@ -40,7 +40,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const agent1Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Flow Agent Alpha', model: 'claude-sonnet-4-20250514' }),
+            body: JSON.stringify({ name: e2eName('Flow Agent Alpha'), model: 'claude-sonnet-4-20250514' }),
         });
         if (!agent1Res.ok) throw new Error(`seedAgent1 failed: ${agent1Res.status} ${await agent1Res.text()}`);
         const agent1 = await agent1Res.json();
@@ -49,7 +49,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const agent2Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Flow Agent Beta', model: 'claude-sonnet-4-20250514' }),
+            body: JSON.stringify({ name: e2eName('Flow Agent Beta'), model: 'claude-sonnet-4-20250514' }),
         });
         if (!agent2Res.ok) throw new Error(`seedAgent2 failed: ${agent2Res.status} ${await agent2Res.text()}`);
         const agent2 = await agent2Res.json();
@@ -60,7 +60,7 @@ test.describe.serial('Council Deliberation Flow', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: 'Flow Council With Chairman',
+                name: e2eName('Flow Council With Chairman'),
                 agentIds: [agent1Id, agent2Id],
                 chairmanAgentId: agent1Id,
             }),
@@ -74,7 +74,7 @@ test.describe.serial('Council Deliberation Flow', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: 'Flow Council No Chairman',
+                name: e2eName('Flow Council No Chairman'),
                 agentIds: [agent1Id, agent2Id],
             }),
         });
@@ -84,6 +84,21 @@ test.describe.serial('Council Deliberation Flow', () => {
 
         await page.close();
         await ctx.close();
+    });
+
+    test.afterAll(async () => {
+        // Clean up all data created in beforeAll (reverse dependency order)
+        const del = (path: string) =>
+            fetch(`${BASE_URL}${path}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${process.env.API_KEY || 'e2e-test-key'}` },
+            }).catch(() => {});
+
+        if (councilWithChairmanId) await del(`/api/councils/${councilWithChairmanId}`);
+        if (councilNoChairmanId) await del(`/api/councils/${councilNoChairmanId}`);
+        if (agent1Id) await del(`/api/agents/${agent1Id}`);
+        if (agent2Id) await del(`/api/agents/${agent2Id}`);
+        if (projectId) await del(`/api/projects/${projectId}`);
     });
 
     test('launch council and verify responding stage', async ({ page, api }) => {

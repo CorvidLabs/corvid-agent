@@ -37,14 +37,14 @@ test.describe('Prompt Injection Detection', () => {
             body: JSON.stringify({
                 projectId,
                 agentId,
-                name: 'Normal Session',
+                name: 'E2E_Normal Session',
                 initialPrompt: 'Hello, can you help me with a coding question?',
             }),
         });
         expect(res.ok).toBe(true);
         const session = await res.json();
         expect(session.id).toBeDefined();
-        expect(session.name).toBe('Normal Session');
+        expect(session.name).toBe('E2E_Normal Session');
     });
 
     test('session creation with legitimate technical content succeeds', async () => {
@@ -54,7 +54,7 @@ test.describe('Prompt Injection Detection', () => {
             body: JSON.stringify({
                 projectId,
                 agentId,
-                name: 'Technical Session',
+                name: 'E2E_Technical Session',
                 initialPrompt: 'How do I write a SELECT query to join two tables in PostgreSQL?',
             }),
         });
@@ -68,7 +68,7 @@ test.describe('Prompt Injection Detection', () => {
             body: JSON.stringify({
                 projectId,
                 agentId,
-                name: 'Security Discussion',
+                name: 'E2E_Security Discussion',
                 initialPrompt: 'What are best practices for preventing prompt injection attacks?',
             }),
         });

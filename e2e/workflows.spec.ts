@@ -34,7 +34,7 @@ test.describe('Workflows', () => {
     test('edit name via API, verify update', async ({ page, api }) => {
         const agent = await api.seedAgent('EditName Agent');
         const workflow = await api.seedWorkflow(agent.id);
-        const newName = `Updated Workflow ${Date.now()}`;
+        const newName = `E2E_Updated Workflow ${Date.now()}`;
 
         // Update via API
         const res = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
@@ -124,7 +124,7 @@ test.describe('Workflows', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated' }),
+            body: JSON.stringify({ name: 'E2E_Updated' }),
         });
         expect(updateRes.ok).toBe(true);
 

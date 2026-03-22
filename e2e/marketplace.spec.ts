@@ -54,14 +54,14 @@ test.describe('Marketplace', () => {
 
         // Fill form — use .form-select to avoid matching the filter-select
         await page.locator('.form-select').first().selectOption(agent.id);
-        await page.locator('input[placeholder="Listing name"]').fill('E2E Marketplace Listing');
+        await page.locator('input[placeholder="Listing name"]').fill('E2E_Marketplace Listing');
         await page.locator('textarea[placeholder*="description"]').fill('Test listing description');
         await page.locator('input[placeholder*="typescript"]').fill('test, e2e');
 
         // Submit
         await page.locator('button.btn--primary:text("Create Listing")').click();
         await expect(page.locator('text=Listing created').first()).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('text=E2E Marketplace Listing').first()).toBeVisible();
+        await expect(page.locator('text=E2E_Marketplace Listing').first()).toBeVisible();
     });
 
     test('leave review and verify it appears', async ({ page, api }) => {
@@ -414,7 +414,7 @@ test.describe('Marketplace', () => {
         const registerRes = await authedFetch(`${BASE_URL}/api/marketplace/federation/instances`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: 'https://e2e-test-instance.example.com', name: 'E2E Test Instance' }),
+            body: JSON.stringify({ url: 'https://e2e-test-instance.example.com', name: 'E2E_Test Instance' }),
         });
         expect([201, 503]).toContain(registerRes.status);
 

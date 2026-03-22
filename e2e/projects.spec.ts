@@ -11,7 +11,7 @@ test.describe('Projects', () => {
     });
 
     test('create project via form', async ({ page }) => {
-        const projectName = `PW Project ${Date.now()}`;
+        const projectName = `E2E_PW Project ${Date.now()}`;
         await gotoWithRetry(page, '/projects/new', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
 
         await page.locator('#name').fill(projectName);
@@ -39,7 +39,7 @@ test.describe('Projects', () => {
 
     test('edit project updates name', async ({ page, api }) => {
         const project = await api.seedProject('Edit Me Project');
-        const newName = `Edited Project ${Date.now()}`;
+        const newName = `E2E_Edited Project ${Date.now()}`;
 
         await gotoWithRetry(page, `/projects/${project.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
         await page.locator('a:text("Edit"), button:text("Edit")').first().click();
@@ -73,7 +73,7 @@ test.describe('Projects', () => {
         const createRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: `API CRUD ${Date.now()}`, workingDir: '/tmp' }),
+            body: JSON.stringify({ name: `E2E_API CRUD ${Date.now()}`, workingDir: '/tmp' }),
         });
         expect(createRes.status).toBe(201);
         const project = await createRes.json();
@@ -89,7 +89,7 @@ test.describe('Projects', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated Name' }),
+            body: JSON.stringify({ name: 'E2E_Updated Name' }),
         });
         expect(updateRes.ok).toBe(true);
 
@@ -120,7 +120,7 @@ test.describe('Projects', () => {
         const res1 = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'No Dir' }),
+            body: JSON.stringify({ name: 'E2E_No Dir' }),
         });
         expect(res1.status).toBe(400);
 

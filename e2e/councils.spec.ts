@@ -31,7 +31,7 @@ test.describe('Councils', () => {
         await expect(page.locator('h2')).toHaveText('New Council');
 
         // Fill form
-        await page.locator('#name').fill('Integration Council');
+        await page.locator('#name').fill('E2E_E2E_Integration Council');
         await page.locator('#description').fill('A council for testing');
 
         // Select agents via checkboxes
@@ -43,11 +43,11 @@ test.describe('Councils', () => {
 
         // Should redirect to council detail
         await page.waitForURL(/\/sessions\/councils\//);
-        await expect(page.locator('h2')).toHaveText('Integration Council');
+        await expect(page.locator('h2')).toHaveText('E2E_Integration Council');
 
         // Navigate to list and verify
         await gotoWithRetry(page, '/sessions/councils');
-        await expect(page.locator('text=Integration Council').first()).toBeVisible();
+        await expect(page.locator('text=E2E_Integration Council').first()).toBeVisible();
     });
 
     test('council detail shows members and launch form', async ({ page, api }) => {
@@ -58,7 +58,7 @@ test.describe('Councils', () => {
         await gotoWithRetry(page, `/sessions/councils/${council.id}`);
 
         // Verify council info
-        await expect(page.locator('h2')).toHaveText('Detail Council');
+        await expect(page.locator('h2')).toHaveText('E2E_Detail Council');
         await expect(page.locator('text=2 agents')).toBeVisible();
         await expect(page.locator('text=Detail Agent 1').first()).toBeVisible();
 
@@ -79,18 +79,18 @@ test.describe('Councils', () => {
         await page.waitForURL(/\/sessions\/councils\/.*\/edit/);
 
         // Wait for form to load existing data (name input should have existing value)
-        await expect(page.locator('#name')).toHaveValue('Before Edit');
+        await expect(page.locator('#name')).toHaveValue('E2E_Before Edit');
 
         // Wait for agent checkboxes to appear and be checked
         await expect(page.locator('input[type="checkbox"]:checked')).toHaveCount(1);
 
         // Change name
-        await page.locator('#name').fill('After Edit');
+        await page.locator('#name').fill('E2E_After Edit');
         await page.locator('form button[type="submit"]').click();
 
         // Should redirect back to detail
         await page.waitForURL(/\/sessions\/councils\/[^/]+$/);
-        await expect(page.locator('h2')).toHaveText('After Edit');
+        await expect(page.locator('h2')).toHaveText('E2E_After Edit');
     });
 
     test('delete council removes it from list', async ({ page, api }) => {
@@ -123,7 +123,7 @@ test.describe('Councils', () => {
 
         // Create
         const council = await api.seedCouncil([agent1.id, agent2.id], 'API Council', agent1.id);
-        expect(council.name).toBe('API Council');
+        expect(council.name).toBe('E2E_API Council');
         expect(council.agentIds).toHaveLength(2);
         expect(council.chairmanAgentId).toBe(agent1.id);
 
@@ -131,17 +131,17 @@ test.describe('Councils', () => {
         const getRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`);
         expect(getRes.ok).toBe(true);
         const fetched = await getRes.json();
-        expect(fetched.name).toBe('API Council');
+        expect(fetched.name).toBe('E2E_API Council');
 
         // Update
         const updateRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated Council', agentIds: [agent1.id] }),
+            body: JSON.stringify({ name: 'E2E_Updated Council', agentIds: [agent1.id] }),
         });
         expect(updateRes.ok).toBe(true);
         const updated = await updateRes.json();
-        expect(updated.name).toBe('Updated Council');
+        expect(updated.name).toBe('E2E_Updated Council');
         expect(updated.agentIds).toHaveLength(1);
 
         // Delete
@@ -221,7 +221,7 @@ test.describe('Councils', () => {
         const res = await authedFetch(`${BASE_URL}/api/councils`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Bad Council', agentIds: [] }),
+            body: JSON.stringify({ name: 'E2E_Bad Council', agentIds: [] }),
         });
         expect(res.status).toBe(400);
         const data = await res.json();

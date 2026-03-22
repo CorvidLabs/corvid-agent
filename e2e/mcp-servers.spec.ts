@@ -16,14 +16,14 @@ test.describe('MCP Servers', () => {
         await expect(page.locator('h3:text("Add MCP Server")')).toBeVisible();
 
         // Fill form
-        await page.locator('input[placeholder*="GitHub MCP"]').fill('E2E Test Server');
+        await page.locator('input[placeholder*="GitHub MCP"]').fill('E2E_Test Server');
         await page.locator('input[placeholder*="npx"]').fill('echo');
         await page.locator('textarea[placeholder*="--port"]').fill('hello\nworld');
 
         // Submit
         await page.locator('button:text("Create Server")').click();
         await expect(page.locator('text=MCP server created').first()).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('text=E2E Test Server').first()).toBeVisible();
+        await expect(page.locator('text=E2E_Test Server').first()).toBeVisible();
     });
 
     test('test connection and verify error handling', async ({ page, api }) => {
@@ -93,7 +93,7 @@ test.describe('MCP Servers', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: `API MCP ${Date.now()}`,
+                name: `E2E_API MCP ${Date.now()}`,
                 command: 'echo',
                 args: ['test'],
                 enabled: true,
@@ -110,7 +110,7 @@ test.describe('MCP Servers', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/mcp-servers/${server.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated MCP Server' }),
+            body: JSON.stringify({ name: 'E2E_Updated MCP Server' }),
         });
         expect(updateRes.ok).toBe(true);
 

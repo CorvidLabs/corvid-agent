@@ -5,6 +5,9 @@ import { randomBytes } from 'node:crypto';
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 const E2E_API_KEY = process.env.API_KEY || 'e2e-test-key';
 
+/** Prefix all test entity names so they're easily identifiable and cleanable. */
+const e2eName = (name: string) => name.startsWith('E2E_') ? name : `E2E_${name}`;
+
 /**
  * Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load.
  * Pass an optional `isRendered` callback to customise the content check;
@@ -101,13 +104,14 @@ export const test = base.extend<{ api: ApiHelpers }>({
         const createdSkillBundleIds: string[] = [];
         const createdMcpServerIds: string[] = [];
         const createdListingIds: string[] = [];
+        const createdPersonaIds: string[] = [];
 
         const helpers: ApiHelpers = {
-            async seedProject(name = 'E2E Test Project') {
+            async seedProject(name = 'Test Project') {
                 const res = await fetchWithRetry(`${BASE_URL}/api/projects`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, workingDir: '/tmp' }),
+                    body: JSON.stringify({ name: e2eName(name), workingDir: '/tmp' }),
                 });
                 if (!res.ok) {
                     const body = await res.text().catch(() => '');
@@ -118,12 +122,12 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return project;
             },
 
-            async seedAgent(name = 'E2E Test Agent') {
+            async seedAgent(name = 'Test Agent') {
                 const res = await fetchWithRetry(`${BASE_URL}/api/agents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name,
+                        name: e2eName(name),
                         model: 'claude-sonnet-4-20250514',
                         algochatEnabled: true,
                     }),
@@ -137,11 +141,11 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return agent;
             },
 
-            async seedCouncil(agentIds: string[], name = 'E2E Test Council', chairmanAgentId?: string) {
+            async seedCouncil(agentIds: string[], name = 'Test Council', chairmanAgentId?: string) {
                 const res = await fetchWithRetry(`${BASE_URL}/api/councils`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, agentIds, chairmanAgentId }),
+                    body: JSON.stringify({ name: e2eName(name), agentIds, chairmanAgentId }),
                 });
                 if (!res.ok) {
                     const body = await res.text().catch(() => '');
@@ -152,13 +156,14 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return council;
             },
 
-            async seedPersona(agentId: string, data: Record<string, unknown> = {}) {
+            async seedPersona(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 // Create a standalone persona
                 const createRes = await fetchWithRetry(`${BASE_URL}/api/personas`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: `e2e-persona-${Date.now()}`,
+                        name: e2eName(`persona-${Date.now()}`),
                         archetype: 'professional',
                         traits: ['helpful', 'concise'],
                         voiceGuidelines: 'Be direct and clear.',
@@ -172,6 +177,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     throw new Error(`seedPersona create failed: ${createRes.status} ${createRes.statusText} — ${body}`);
                 }
                 const persona = await createRes.json();
+                createdPersonaIds.push(persona.id);
 
                 // Assign it to the agent
                 const assignRes = await fetchWithRetry(`${BASE_URL}/api/agents/${agentId}/personas`, {
@@ -187,15 +193,16 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async seedSkillBundle(data: Record<string, unknown> = {}) {
+                const prefixed = data.name ? { ...data, name: e2eName(data.name as string) } : data;
                 const res = await fetchWithRetry(`${BASE_URL}/api/skill-bundles`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: `E2E Test Bundle ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        name: e2eName(`Test Bundle ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`),
                         description: 'Bundle for e2e testing',
                         tools: ['Read', 'Write'],
                         promptAdditions: 'Test prompt addition',
-                        ...data,
+                        ...prefixed,
                     }),
                 });
                 if (!res.ok) {
@@ -207,7 +214,8 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return bundle;
             },
 
-            async seedMarketplaceListing(agentId: string, data: Record<string, unknown> = {}) {
+            async seedMarketplaceListing(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 // Ensure the agent meets the verification gate for publishing
                 await fetchWithRetry(`${BASE_URL}/api/reputation/identity/${agentId}`, {
                     method: 'PUT',
@@ -220,7 +228,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: 'E2E Test Listing Agent',
+                        name: e2eName('Test Listing Agent'),
                         description: 'Test marketplace listing for E2E',
                         category: 'general',
                         pricingModel: 'free',
@@ -250,12 +258,13 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return published;
             },
 
-            async seedMcpServer(data: Record<string, unknown> = {}) {
+            async seedMcpServer(_data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 const res = await fetchWithRetry(`${BASE_URL}/api/mcp-servers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: 'E2E Test MCP Server',
+                        name: e2eName('Test MCP Server'),
                         command: 'echo',
                         args: ['hello'],
                         enabled: true,
@@ -291,7 +300,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: `WT Project ${Date.now()}`, workingDir: '/tmp' }),
+                        body: JSON.stringify({ name: e2eName(`WT Project ${Date.now()}`), workingDir: '/tmp' }),
                     });
                     if (projRes.ok) {
                         const proj = await projRes.json();
@@ -311,13 +320,14 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return res.json();
             },
 
-            async seedSchedule(agentId: string, data: Record<string, unknown> = {}) {
+            async seedSchedule(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 const res = await fetchWithRetry(`${BASE_URL}/api/schedules`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: `E2E Schedule ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        name: e2eName(`Schedule ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`),
                         intervalMs: 3600000,
                         actions: [{ type: 'review_prs', repos: ['test/repo'] }],
                         approvalPolicy: 'auto',
@@ -333,13 +343,14 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return schedule;
             },
 
-            async seedWorkflow(agentId: string, data: Record<string, unknown> = {}) {
+            async seedWorkflow(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 const res = await fetchWithRetry(`${BASE_URL}/api/workflows`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: `E2E Workflow ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        name: e2eName(`Workflow ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`),
                         nodes: [
                             { id: 'start', type: 'start', label: 'Start' },
                             { id: 'agent', type: 'agent_session', label: 'Agent Session', config: { prompt: 'test' } },
@@ -362,14 +373,15 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return workflow;
             },
 
-            async seedWebhook(agentId: string, data: Record<string, unknown> = {}) {
+            async seedWebhook(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 // Webhook registrations require a projectId
                 let projectId = data.projectId as string | undefined;
                 if (!projectId) {
                     const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: `WH Project ${Date.now()}`, workingDir: '/tmp' }),
+                        body: JSON.stringify({ name: e2eName(`WH Project ${Date.now()}`), workingDir: '/tmp' }),
                     });
                     if (projRes.ok) {
                         const proj = await projRes.json();
@@ -382,8 +394,8 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        repo: `e2e-org/repo-${Date.now()}`,
-                        mentionUsername: `e2e-bot-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        repo: `E2E_org/repo-${Date.now()}`,
+                        mentionUsername: `E2E_bot-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         events: ['issue_comment', 'pull_request_review_comment'],
                         projectId,
                         ...data,
@@ -398,14 +410,15 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return webhook;
             },
 
-            async seedMentionPolling(agentId: string, data: Record<string, unknown> = {}) {
+            async seedMentionPolling(agentId: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 // Mention polling requires a projectId
                 let projectId = data.projectId as string | undefined;
                 if (!projectId) {
                     const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: `MP Project ${Date.now()}`, workingDir: '/tmp' }),
+                        body: JSON.stringify({ name: e2eName(`MP Project ${Date.now()}`), workingDir: '/tmp' }),
                     });
                     if (projRes.ok) {
                         const proj = await projRes.json();
@@ -419,8 +432,8 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     body: JSON.stringify({
                         agentId,
                         projectId,
-                        repo: `e2e-org/poll-${Date.now()}`,
-                        mentionUsername: `e2e-poll-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        repo: `E2E_org/poll-${Date.now()}`,
+                        mentionUsername: `E2E_poll-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         intervalSeconds: 300,
                         eventFilter: ['issue_comment', 'pull_request_review_comment'],
                         ...data,
@@ -435,14 +448,15 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 return polling;
             },
 
-            async seedSession(projectId: string, agentId?: string, data: Record<string, unknown> = {}) {
+            async seedSession(projectId: string, agentId?: string, _data: Record<string, unknown> = {}) {
+                const data = _data.name ? { ..._data, name: e2eName(_data.name as string) } : _data;
                 const res = await fetchWithRetry(`${BASE_URL}/api/sessions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         projectId,
                         agentId,
-                        name: `E2E Session ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
+                        name: e2eName(`Session ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`),
                         ...data,
                     }),
                 });
@@ -550,6 +564,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
         for (const id of createdSkillBundleIds) await del(`/api/skill-bundles/${id}`);
         for (const id of createdMcpServerIds) await del(`/api/mcp-servers/${id}`);
         for (const id of createdListingIds) await del(`/api/marketplace/listings/${id}`);
+        for (const id of createdPersonaIds) await del(`/api/personas/${id}`);
         for (const id of createdAgentIds) await del(`/api/agents/${id}`);
         for (const id of createdProjectIds) await del(`/api/projects/${id}`);
     },
@@ -568,3 +583,6 @@ export function authedFetch(url: string, init: RequestInit = {}): Promise<Respon
 
 /** The API key used for E2E auth, for tests that need to construct URLs. */
 export { E2E_API_KEY };
+
+/** Re-export the E2E name prefix helper for spec files that create data outside seed functions. */
+export { e2eName };
