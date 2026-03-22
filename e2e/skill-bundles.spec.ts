@@ -151,7 +151,7 @@ test.describe('Skill Bundles', () => {
 
     test('API CRUD for skill bundles', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
-        const name = `API Bundle ${Date.now()}`;
+        const name = `E2E_API Bundle ${Date.now()}`;
 
         // Create
         const createRes = await authedFetch(`${BASE_URL}/api/skill-bundles`, {

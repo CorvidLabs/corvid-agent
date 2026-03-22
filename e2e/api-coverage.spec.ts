@@ -52,7 +52,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const project = await api.seedProject('Update Session Project');
         const agent = await api.seedAgent('Update Session Agent');
         const session = await api.seedSession(project.id, agent.id);
-        const newName = `Updated ${Date.now()}`;
+        const newName = `E2E_Updated ${Date.now()}`;
 
         const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, {
             method: 'PUT',

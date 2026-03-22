@@ -81,7 +81,7 @@ test.describe('Session Launcher', () => {
         const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'No Project' }),
+            body: JSON.stringify({ name: 'E2E_No Project' }),
         });
         expect(res.status).toBe(400);
     });

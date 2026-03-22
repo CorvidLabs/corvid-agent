@@ -50,8 +50,8 @@ test.describe('Optimistic Updates & Render Performance', () => {
 
     test.describe('Agent optimistic updates', () => {
         test('create agent via API and verify it appears in list without reload', async ({ page }) => {
-            const uniqueName = `Opt Agent ${Date.now()}`;
-            const renamedName = `Renamed ${Date.now()}`;
+            const uniqueName = `E2E_Opt Agent ${Date.now()}`;
+            const renamedName = `E2E_Renamed ${Date.now()}`;
 
             await gotoWithRetry(page, '/agents');
 

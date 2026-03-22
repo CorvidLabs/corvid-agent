@@ -115,8 +115,8 @@ test.describe('Webhooks', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 agentId: agent.id,
-                repo: `crud-org/repo-${Date.now()}`,
-                mentionUsername: 'crud-bot',
+                repo: `E2E_crud-org/repo-${Date.now()}`,
+                mentionUsername: 'E2E_crud-bot',
                 events: ['issue_comment'],
                 projectId: project.id,
             }),

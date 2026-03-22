@@ -133,7 +133,7 @@ test.describe('Sessions', () => {
             body: JSON.stringify({
                 projectId: project.id,
                 agentId: agent.id,
-                name: `CRUD Session ${Date.now()}`,
+                name: `E2E_CRUD Session ${Date.now()}`,
             }),
         });
         expect(createRes.status).toBe(201);
@@ -151,7 +151,7 @@ test.describe('Sessions', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated Session' }),
+            body: JSON.stringify({ name: 'E2E_Updated Session' }),
         });
         expect(updateRes.ok).toBe(true);
 

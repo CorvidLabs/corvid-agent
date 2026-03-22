@@ -28,7 +28,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         const projectRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Approval E2E Project', workingDir: '/tmp' }),
+            body: JSON.stringify({ name: 'E2E_Approval Project', workingDir: '/tmp' }),
         });
         expect(projectRes.ok).toBe(true);
         const project = await projectRes.json();
@@ -38,7 +38,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: 'Approval E2E Agent',
+                name: 'E2E_Approval Agent',
                 model: 'claude-sonnet-4-20250514',
             }),
         });
@@ -52,13 +52,26 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             body: JSON.stringify({
                 projectId,
                 agentId,
-                name: 'Approval E2E Session',
+                name: 'E2E_Approval Session',
                 initialPrompt: 'Test prompt for approval flow',
             }),
         });
         expect(sessionRes.ok).toBe(true);
         const session = await sessionRes.json();
         sessionId = session.id;
+    });
+
+    test.afterAll(async () => {
+        // Clean up all data created in beforeAll (reverse dependency order)
+        const del = (path: string) =>
+            fetch(`${BASE_URL}${path}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${process.env.API_KEY || 'e2e-test-key'}` },
+            }).catch(() => {});
+
+        if (sessionId) await del(`/api/sessions/${sessionId}`);
+        if (agentId) await del(`/api/agents/${agentId}`);
+        if (projectId) await del(`/api/projects/${projectId}`);
     });
 
     /**

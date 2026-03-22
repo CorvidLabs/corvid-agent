@@ -171,7 +171,7 @@ test.describe('Agents', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: `CRUD Agent ${Date.now()}`,
+                name: `E2E_CRUD Agent ${Date.now()}`,
                 model: 'claude-sonnet-4-20250514',
             }),
         });
@@ -186,7 +186,7 @@ test.describe('Agents', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated CRUD Agent' }),
+            body: JSON.stringify({ name: 'E2E_Updated CRUD Agent' }),
         });
         expect(updateRes.ok).toBe(true);
 

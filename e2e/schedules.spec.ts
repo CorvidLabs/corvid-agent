@@ -108,7 +108,7 @@ test.describe('Schedules', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 agentId: agent.id,
-                name: `CRUD Schedule ${Date.now()}`,
+                name: `E2E_CRUD Schedule ${Date.now()}`,
                 intervalMs: 3600000,
                 actions: [{ type: 'review_prs', repos: ['test/repo'] }],
                 approvalPolicy: 'auto',
@@ -125,7 +125,7 @@ test.describe('Schedules', () => {
         const updateRes = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Updated Schedule' }),
+            body: JSON.stringify({ name: 'E2E_Updated Schedule' }),
         });
         expect(updateRes.ok).toBe(true);
 
