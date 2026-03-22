@@ -24,7 +24,10 @@ files:
   - server/db/migrations/096_mention_session_channel_id.ts
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
+  - server/db/migrations/099_composable_personas.ts
   - server/db/migrations/100_agent_blocklist.ts
+  - server/db/migrations/100_agent_variants.ts
+  - server/db/migrations/100_pipeline_schedules.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -371,6 +374,17 @@ Adds `output_destinations` column to `agent_schedules` for routing schedule exec
 | `up` | `(db: Database)` | `void` | Adds `output_destinations` TEXT column to `agent_schedules` (idempotent — checks column existence first) |
 | `down` | `(db: Database)` | `void` | Drops `output_destinations` column from `agent_schedules` |
 
+### 099_composable_personas.ts
+
+Migrates agent personas to a composable many-to-many model. Creates a standalone `personas` table and an `agent_persona_assignments` junction table, migrates existing data from the old `agent_personas` table, then drops it.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `personas` and `agent_persona_assignments` tables, migrates data from `agent_personas`, drops old table |
+| `down` | `(db: Database)` | `void` | Recreates `agent_personas` from `personas` + `agent_persona_assignments`, drops new tables |
+
 ### 100_agent_blocklist.ts
 
 Creates the `agent_blocklist` table for the agent kill switch. Tracks blacklisted agents to prevent them from sending or receiving messages.
@@ -382,10 +396,33 @@ Creates the `agent_blocklist` table for the agent kill switch. Tracks blackliste
 | `up` | `(db: Database)` | `void` | Creates `agent_blocklist` table with `agent_id` as primary key, plus index on `reason` |
 | `down` | `(db: Database)` | `void` | Drops the `agent_blocklist` table |
 
+### 100_agent_variants.ts
+
+Creates `agent_variants` and `agent_variant_assignments` tables for preset skill + persona combination profiles. Depends on migration 099 (composable personas).
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `agent_variants` table (with unique name constraint) and `agent_variant_assignments` table (1:1 agent → variant), plus index on variant_id |
+| `down` | `(db: Database)` | `void` | Drops `agent_variant_assignments` and `agent_variants` tables |
+
+### 100_pipeline_schedules.ts
+
+Adds pipeline execution support to `agent_schedules` with `execution_mode` and `pipeline_steps` columns for composable multi-action pipelines.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `execution_mode` (TEXT, default `'independent'`) and `pipeline_steps` (TEXT, nullable) columns to `agent_schedules` (idempotent — checks column existence first) |
+| `down` | `(db: Database)` | `void` | Drops `execution_mode` and `pipeline_steps` columns from `agent_schedules` |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-22 | corvid-agent | Add migrations 099, 100 (variants, pipeline_schedules) to spec coverage |
 | 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
 | 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
