@@ -256,7 +256,8 @@ export async function registerSlashCommands(
         ? `https://discord.com/api/v10/applications/${appId}/guilds/${config.guildId}/commands`
         : `https://discord.com/api/v10/applications/${appId}/commands`;
 
-    const response = await fetch(url, {
+    const { discordFetch } = await import('./embeds');
+    const response = await discordFetch(url, {
         method: 'PUT',
         headers: {
             'Authorization': `Bot ${config.botToken}`,
@@ -276,7 +277,7 @@ export async function registerSlashCommands(
         // When using guild commands, clear any stale global commands so they don't shadow guild ones
         if (config.guildId) {
             const globalUrl = `https://discord.com/api/v10/applications/${appId}/commands`;
-            const globalRes = await fetch(globalUrl, {
+            const globalRes = await discordFetch(globalUrl, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bot ${config.botToken}`,

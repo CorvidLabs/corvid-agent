@@ -397,9 +397,12 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
             workTaskService,
         );
         discordBridge.setReputationScorer(reputationScorer);
-        discordBridge.start();
+        // NOTE: discordBridge.start() is NOT called here — it's deferred until
+        // after the HTTP server successfully binds its port. This prevents wasted
+        // Discord gateway connections during crash loops (e.g., EADDRINUSE).
+        // See server/index.ts for the deferred start call.
         shutdownCoordinator.registerService('DiscordBridge', discordBridge, 20);
-        log.info('Discord bridge initialized');
+        log.info('Discord bridge initialized (connection deferred until server binds)');
     }
 
     let slackBridge: SlackBridge | null = null;

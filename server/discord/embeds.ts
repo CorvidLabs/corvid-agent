@@ -15,6 +15,55 @@ const log = createLogger('DiscordEmbeds');
 
 const MAX_MESSAGE_LENGTH = 2000;
 
+// ─── Rate limit tracking ──────────────────────────────────────────────────
+// When Discord returns 429, we pause ALL API calls for the retry-after
+// duration to avoid hammering and triggering Cloudflare IP bans.
+let rateLimitedUntil = 0;
+
+/** Check if we're currently rate-limited. Returns remaining wait ms or 0. */
+export function getRateLimitWaitMs(): number {
+    return Math.max(0, rateLimitedUntil - Date.now());
+}
+
+/**
+ * Wrapper for Discord API fetch that handles 429 rate limits globally.
+ * When rate-limited, queues the request until the limit expires.
+ * Prevents Cloudflare IP bans from rapid 429 retries.
+ */
+export async function discordFetch(url: string, init: RequestInit): Promise<Response> {
+    // Wait if we're globally rate-limited
+    const waitMs = getRateLimitWaitMs();
+    if (waitMs > 0) {
+        log.debug(`Discord rate-limited, waiting ${waitMs}ms before request`);
+        await new Promise(r => setTimeout(r, waitMs));
+    }
+
+    const response = await globalThis.fetch(url, init);
+
+    if (response.status === 429) {
+        // Parse retry-after from Discord's JSON response or header
+        let retryAfterMs = 5000; // default 5s
+        try {
+            const retryHeader = response.headers.get('retry-after');
+            if (retryHeader) {
+                retryAfterMs = Math.ceil(parseFloat(retryHeader) * 1000);
+            } else {
+                const body = await response.clone().json().catch(() => null);
+                if (body?.retry_after) {
+                    retryAfterMs = Math.ceil(body.retry_after * 1000);
+                }
+            }
+        } catch { /* use default */ }
+
+        // Cap at 5 minutes, minimum 1 second
+        retryAfterMs = Math.max(1000, Math.min(retryAfterMs, 300_000));
+        rateLimitedUntil = Date.now() + retryAfterMs;
+        log.warn(`Discord 429 rate limited — pausing all API calls for ${retryAfterMs}ms`);
+    }
+
+    return response;
+}
+
 /** Discord mention pattern: <@123456789> or <@!123456789> */
 const MENTION_RE = /<@!?\d{17,20}>/g;
 
@@ -126,7 +175,7 @@ export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): st
 export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await fetch(
+    const response = await discordFetch(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
             method: 'POST',
@@ -154,7 +203,7 @@ export async function respondToInteractionEmbed(
 ): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await fetch(
+    const response = await discordFetch(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
             method: 'POST',
@@ -185,7 +234,7 @@ export async function respondToInteractionEmbeds(
 ): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await fetch(
+    const response = await discordFetch(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
             method: 'POST',
@@ -212,7 +261,7 @@ export async function respondToInteractionEmbeds(
 export async function acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await fetch(
+    const response = await discordFetch(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
             method: 'POST',
@@ -238,7 +287,7 @@ export async function sendEmbed(
 ): Promise<string | null> {
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
                     method: 'POST',
@@ -281,7 +330,7 @@ export async function sendMessageWithEmbed(
             const body: Record<string, unknown> = { embeds: [embed] };
             if (content) body.content = content;
 
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
                     method: 'POST',
@@ -313,7 +362,7 @@ export async function sendEmbedWithButtons(
 ): Promise<void> {
     try {
         await delivery.sendWithReceipt('discord', async () => {
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
                     method: 'POST',
@@ -347,7 +396,7 @@ export async function sendReplyEmbed(
     assertSnowflake(replyToMessageId, 'message ID');
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
                 {
                     method: 'POST',
@@ -404,7 +453,7 @@ export async function sendDiscordMessage(
     for (const chunk of chunks) {
         try {
             await delivery.sendWithReceipt('discord', async () => {
-                const response = await fetch(
+                const response = await discordFetch(
                     `https://discord.com/api/v10/channels/${channelId}/messages`,
                     {
                         method: 'POST',
@@ -430,7 +479,7 @@ export async function sendDiscordMessage(
 
 export async function sendTypingIndicator(botToken: string, channelId: string): Promise<void> {
     try {
-        const response = await fetch(
+        const response = await discordFetch(
             `https://discord.com/api/v10/channels/${channelId}/typing`,
             {
                 method: 'POST',
@@ -451,7 +500,7 @@ export async function addReaction(botToken: string, channelId: string, messageId
     try {
         assertSnowflake(channelId, 'channel ID');
         assertSnowflake(messageId, 'message ID');
-        const response = await fetch(
+        const response = await discordFetch(
             `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
             {
                 method: 'PUT',
@@ -472,7 +521,7 @@ export async function removeReaction(botToken: string, channelId: string, messag
     try {
         assertSnowflake(channelId, 'channel ID');
         assertSnowflake(messageId, 'message ID');
-        const response = await fetch(
+        const response = await discordFetch(
             `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
             {
                 method: 'DELETE',
@@ -537,7 +586,7 @@ export async function editEmbed(
     assertSnowflake(messageId, 'message ID');
     try {
         await delivery.sendWithReceipt('discord', async () => {
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
                 {
                     method: 'PATCH',
@@ -624,7 +673,7 @@ export async function sendEmbedWithFiles(
             if (mentions) payload.content = mentions;
 
             const form = buildMultipartBody(payload, files);
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
                     method: 'POST',
@@ -673,7 +722,7 @@ export async function sendMessageWithFiles(
             };
 
             const form = buildMultipartBody(payload, files);
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
                     method: 'POST',
