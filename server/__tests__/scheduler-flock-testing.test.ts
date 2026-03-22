@@ -102,7 +102,12 @@ describe('execFlockTesting', () => {
     });
 
     test('tests active agents and reports results', async () => {
-        // Register an agent in the flock directory
+        // Register an agent in the agents table (for wallet address resolution)
+        db.query(`
+            INSERT INTO agents (id, name, wallet_address, tenant_id, created_at, updated_at)
+            VALUES ('agent-target-uuid', 'TestAgent', 'ALGO_TARGET_ADDR', 'default', datetime('now'), datetime('now'))
+        `).run();
+        // Register the same agent in the flock directory
         db.query(`
             INSERT INTO flock_agents (id, address, name, description, instance_url, capabilities, status, reputation_score, attestation_count, council_participations, uptime_pct, registered_at, updated_at)
             VALUES ('agent-target', 'ALGO_TARGET_ADDR', 'TestAgent', 'A test agent', 'http://test', '[]', 'active', 50, 0, 0, 100, datetime('now'), datetime('now'))
@@ -150,7 +155,12 @@ describe('execFlockTesting', () => {
     });
 
     test('handles agent test failure gracefully', async () => {
-        // Register an agent
+        // Register an agent in the agents table (for wallet address resolution)
+        db.query(`
+            INSERT INTO agents (id, name, wallet_address, tenant_id, created_at, updated_at)
+            VALUES ('agent-fail-uuid', 'FailAgent', 'ALGO_FAIL_ADDR', 'default', datetime('now'), datetime('now'))
+        `).run();
+        // Register the same agent in the flock directory
         db.query(`
             INSERT INTO flock_agents (id, address, name, description, instance_url, capabilities, status, reputation_score, attestation_count, council_participations, uptime_pct, registered_at, updated_at)
             VALUES ('agent-fail', 'ALGO_FAIL_ADDR', 'FailAgent', 'Agent that fails', 'http://fail', '[]', 'active', 50, 0, 0, 100, datetime('now'), datetime('now'))
