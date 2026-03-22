@@ -15,6 +15,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
+import { IconComponent } from './icon.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
@@ -22,56 +23,60 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
 interface NavTab {
     key: string;
     label: string;
+    icon: string;
     route: string;
     matchRoutes: string[];
-    children: { label: string; route: string }[];
+    children: { label: string; icon: string; route: string }[];
 }
 
 const TABS: NavTab[] = [
     {
         key: 'chat',
         label: 'Chat',
+        icon: 'chat',
         route: '/chat',
         matchRoutes: ['/chat', '/dashboard', '/sessions'],
         children: [
-            { label: 'Home', route: '/chat' },
-            { label: 'Dashboard', route: '/dashboard' },
-            { label: 'Conversations', route: '/sessions' },
-            { label: 'Work Tasks', route: '/sessions/work-tasks' },
-            { label: 'Councils', route: '/sessions/councils' },
-            { label: 'Live Feed', route: '/sessions/feed' },
-            { label: 'Analytics', route: '/sessions/analytics' },
-            { label: 'Logs', route: '/sessions/logs' },
+            { label: 'Home', icon: 'chat', route: '/chat' },
+            { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+            { label: 'Conversations', icon: 'sessions', route: '/sessions' },
+            { label: 'Work Tasks', icon: 'list', route: '/sessions/work-tasks' },
+            { label: 'Councils', icon: 'users', route: '/sessions/councils' },
+            { label: 'Live Feed', icon: 'activity', route: '/sessions/feed' },
+            { label: 'Analytics', icon: 'bar-chart', route: '/sessions/analytics' },
+            { label: 'Logs', icon: 'terminal', route: '/sessions/logs' },
         ],
     },
     {
         key: 'agents',
         label: 'Agents',
+        icon: 'agents',
         route: '/agents',
         matchRoutes: ['/agents'],
         children: [
-            { label: 'All Agents', route: '/agents' },
-            { label: 'Flock Directory', route: '/agents/flock-directory' },
-            { label: 'Projects', route: '/agents/projects' },
-            { label: 'Models', route: '/agents/models' },
-            { label: 'Personas', route: '/agents/personas' },
-            { label: 'Skill Bundles', route: '/agents/skill-bundles' },
+            { label: 'All Agents', icon: 'agents', route: '/agents' },
+            { label: 'Flock Directory', icon: 'globe', route: '/agents/flock-directory' },
+            { label: 'Projects', icon: 'code', route: '/agents/projects' },
+            { label: 'Models', icon: 'zap', route: '/agents/models' },
+            { label: 'Personas', icon: 'users', route: '/agents/personas' },
+            { label: 'Skill Bundles', icon: 'server', route: '/agents/skill-bundles' },
         ],
     },
     {
         key: 'settings',
         label: 'Settings',
+        icon: 'settings',
         route: '/settings',
         matchRoutes: ['/settings'],
         children: [
-            { label: 'General', route: '/settings' },
-            { label: 'Security', route: '/settings/security' },
-            { label: 'Wallets', route: '/settings/wallets' },
-            { label: 'Spending', route: '/settings/spending' },
-            { label: 'Schedules', route: '/settings/schedules' },
-            { label: 'Workflows', route: '/settings/workflows' },
-            { label: 'MCP Servers', route: '/settings/mcp-servers' },
-            { label: 'Marketplace', route: '/settings/marketplace' },
+            { label: 'General', icon: 'settings', route: '/settings' },
+            { label: 'Security', icon: 'shield', route: '/settings/security' },
+            { label: 'Wallets', icon: 'wallet', route: '/settings/wallets' },
+            { label: 'Spending', icon: 'bar-chart', route: '/settings/spending' },
+            { label: 'Schedules', icon: 'clock', route: '/settings/schedules' },
+            { label: 'Workflows', icon: 'activity', route: '/settings/workflows' },
+            { label: 'MCP Servers', icon: 'server', route: '/settings/mcp-servers' },
+            { label: 'Marketplace', icon: 'star', route: '/settings/marketplace' },
         ],
     },
 ];
@@ -79,7 +84,7 @@ const TABS: NavTab[] = [
 @Component({
     selector: 'app-top-nav',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RouterLinkActive, StatusBadgeComponent],
+    imports: [RouterLink, RouterLinkActive, StatusBadgeComponent, IconComponent],
     template: `
         <nav class="topnav" role="navigation" aria-label="Main navigation">
             <div class="topnav__left">
@@ -94,6 +99,7 @@ const TABS: NavTab[] = [
                                 [class.topnav__tab--active]="isTabActive(tab)"
                                 (click)="onTabClick(tab, $event)"
                                 type="button">
+                                <app-icon [name]="tab.icon" [size]="14" />
                                 {{ tab.label }}
                                 @if (tab.children.length > 1) {
                                     <span class="topnav__tab-chevron" [class.topnav__tab-chevron--open]="openDropdown() === tab.key">&#x25BE;</span>
@@ -108,6 +114,7 @@ const TABS: NavTab[] = [
                                             routerLinkActive="topnav__dropdown-item--active"
                                             [routerLinkActiveOptions]="{ exact: child.route === '/chat' }"
                                             (click)="closeDropdown()">
+                                            <app-icon [name]="child.icon" [size]="12" />
                                             {{ child.label }}
                                         </a>
                                     }
@@ -141,6 +148,7 @@ const TABS: NavTab[] = [
                     (click)="openCommandPalette()"
                     title="Command palette (Cmd+K)"
                     type="button">
+                    <app-icon name="search" [size]="12" />
                     <span class="topnav__search-label">Search...</span>
                     <kbd class="topnav__search-kbd">⌘K</kbd>
                 </button>
@@ -151,7 +159,9 @@ const TABS: NavTab[] = [
                     class="topnav__help"
                     (click)="openHelp()"
                     title="Keyboard shortcuts (?)"
-                    type="button">?</button>
+                    type="button">
+                    <app-icon name="help" [size]="14" />
+                </button>
             </div>
 
             <!-- Mobile hamburger -->
@@ -180,6 +190,7 @@ const TABS: NavTab[] = [
                                 [routerLink]="child.route"
                                 routerLinkActive="topnav-mobile__link--active"
                                 (click)="mobileOpen.set(false)">
+                                <app-icon [name]="child.icon" [size]="14" />
                                 {{ child.label }}
                             </a>
                         }
@@ -289,7 +300,9 @@ const TABS: NavTab[] = [
             to { opacity: 1; transform: translateY(0); }
         }
         .topnav__dropdown-item {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             padding: 0.5rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
@@ -476,7 +489,9 @@ const TABS: NavTab[] = [
                 font-weight: 700;
             }
             .topnav-mobile__link {
-                display: block;
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
                 padding: 0.75rem 1.5rem;
                 color: var(--text-secondary);
                 text-decoration: none;

@@ -42,7 +42,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 </div>
             }
             <div class="app-layout__body">
-                <main class="app-layout__content" role="main" #mainContent (scroll)="onScroll($event)">
+                <main class="app-layout__content" role="main" id="main-content" #mainContent (scroll)="onScroll($event)">
                     <router-outlet />
                 </main>
                 <app-activity-rail />

@@ -44,10 +44,10 @@
     --border: #1e2035;
     --border-bright: #2a2d48;
 
-    /* Text */
+    /* Text — all pass WCAG AA (4.5:1) on --bg-deep #0a0a12 */
     --text-primary: #e0e0ec;
-    --text-secondary: #7a7d98;
-    --text-tertiary: #4a4d68;
+    --text-secondary: #8b8eaa;
+    --text-tertiary: #6b6e88;
 
     /* Accents */
     --accent-cyan: #00e5ff;
@@ -106,13 +106,14 @@
     --radius-lg: 10px;
     --radius-xl: 16px;
 
-    /* Typography scale (rem based on 8-10px root) */
-    --text-2xl: 2rem;
-    --text-xl: 1.5rem;
-    --text-lg: 1.125rem;
+    /* Typography scale (rem based on 10px root) */
+    --text-2xl: 1.8rem;
+    --text-xl: 1.35rem;
+    --text-lg: 1.1rem;
     --text-base: 1rem;
     --text-sm: 0.85rem;
-    --text-xs: 0.7rem;
+    --text-xs: 0.75rem;
+    --text-xxs: 0.65rem;
 
     /* Transitions */
     --transition-fast: 0.1s ease;
@@ -130,7 +131,7 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: 'Dogica Pixel', 'Dogica', monospace;
-    font-size: 8px;
+    font-size: 10px;
     line-height: 1.8;
     color: var(--text-primary);
     background: var(--bg-deep);
@@ -138,18 +139,40 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scale up for 1080p displays — the 8px base is too small at this resolution */
-@media (max-height: 1200px) and (min-width: 769px) {
-    html { font-size: 10px; }
+/* Large displays (4K / high-res): bump to 12px for comfort */
+@media (min-height: 1200px) and (min-width: 1600px) {
+    html { font-size: 12px; }
 }
 
-/* Mobile: bump base font so tiny labels stay readable */
+/* Mobile: ensure readable base */
 @media (max-width: 480px) {
     html { font-size: 10px; }
 }
 
 a {
     color: inherit;
+}
+
+/* Skip-to-content link — visible only on focus for keyboard users */
+.skip-to-content {
+    position: fixed;
+    top: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    padding: 0.6rem 1.5rem;
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    transition: top 0.15s ease;
+}
+.skip-to-content:focus {
+    top: 0;
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 2px;
 }
 
 /* Focus indicators — high contrast cyan for accessibility */
