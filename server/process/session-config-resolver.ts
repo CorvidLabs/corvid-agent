@@ -9,7 +9,7 @@
  */
 import type { Database } from 'bun:sqlite';
 import type { Agent } from '../../shared/types';
-import { getPersona, composePersonaPrompt } from '../db/personas';
+import { getAgentPersonas, composePersonaPrompt } from '../db/personas';
 import { resolveAgentPromptAdditions, resolveProjectPromptAdditions, resolveAgentTools, resolveProjectTools } from '../db/skill-bundles';
 import { getAgent } from '../db/agents';
 
@@ -33,8 +33,8 @@ export function resolveSessionPrompts(db: Database, agent: Agent | null, project
     let skillPrompt: string | undefined;
 
     if (agent) {
-        const persona = getPersona(db, agent.id);
-        const pp = composePersonaPrompt(persona);
+        const personas = getAgentPersonas(db, agent.id);
+        const pp = composePersonaPrompt(personas);
         if (pp) personaPrompt = pp;
 
         const sp = resolveAgentPromptAdditions(db, agent.id);

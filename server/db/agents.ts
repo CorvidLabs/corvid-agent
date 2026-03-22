@@ -265,7 +265,7 @@ export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT
         //   agent_memories, council_members, council_discussion_messages,
         //   agent_schedules, schedule_executions, webhook_registrations,
         //   mention_polling_configs, workflows, workflow_runs,
-        //   agent_personas, agent_skills, mcp_server_configs
+        //   agent_persona_assignments, agent_skills, mcp_server_configs
 
         // Finally delete the agent
         db.query('DELETE FROM agents WHERE id = ?').run(id);

@@ -153,10 +153,12 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async seedPersona(agentId: string, data: Record<string, unknown> = {}) {
-                const res = await fetchWithRetry(`${BASE_URL}/api/agents/${agentId}/persona`, {
-                    method: 'PUT',
+                // Create a standalone persona
+                const createRes = await fetchWithRetry(`${BASE_URL}/api/personas`, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        name: `e2e-persona-${Date.now()}`,
                         archetype: 'professional',
                         traits: ['helpful', 'concise'],
                         voiceGuidelines: 'Be direct and clear.',
@@ -165,11 +167,23 @@ export const test = base.extend<{ api: ApiHelpers }>({
                         ...data,
                     }),
                 });
-                if (!res.ok) {
-                    const body = await res.text().catch(() => '');
-                    throw new Error(`seedPersona failed: ${res.status} ${res.statusText} — ${body}`);
+                if (!createRes.ok) {
+                    const body = await createRes.text().catch(() => '');
+                    throw new Error(`seedPersona create failed: ${createRes.status} ${createRes.statusText} — ${body}`);
                 }
-                return res.json();
+                const persona = await createRes.json();
+
+                // Assign it to the agent
+                const assignRes = await fetchWithRetry(`${BASE_URL}/api/agents/${agentId}/personas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ personaId: persona.id }),
+                });
+                if (!assignRes.ok) {
+                    const body = await assignRes.text().catch(() => '');
+                    throw new Error(`seedPersona assign failed: ${assignRes.status} ${assignRes.statusText} — ${body}`);
+                }
+                return persona;
             },
 
             async seedSkillBundle(data: Record<string, unknown> = {}) {

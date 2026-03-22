@@ -101,7 +101,7 @@ export interface SdkProcessOptions {
     mcpServers?: McpSdkServerConfigWithInstance[];
     /** External MCP server configs from the database (stdio servers like Figma, Slack, etc.) */
     externalMcpConfigs?: DbMcpServerConfig[];
-    /** Persona system prompt section (from agent_personas table) */
+    /** Persona system prompt section (from personas + agent_persona_assignments tables) */
     personaPrompt?: string;
     /** Skill bundle prompt additions (from assigned skill_bundles) */
     skillPrompt?: string;

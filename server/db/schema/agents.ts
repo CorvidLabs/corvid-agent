@@ -70,8 +70,9 @@ export const tables: string[] = [
         completed_at     TEXT DEFAULT NULL
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_personas (
-        agent_id         TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+    `CREATE TABLE IF NOT EXISTS personas (
+        id               TEXT PRIMARY KEY,
+        name             TEXT NOT NULL,
         archetype        TEXT DEFAULT 'custom',
         traits           TEXT NOT NULL DEFAULT '[]',
         voice_guidelines TEXT DEFAULT '',
@@ -79,6 +80,13 @@ export const tables: string[] = [
         example_messages TEXT DEFAULT '[]',
         created_at       TEXT DEFAULT (datetime('now')),
         updated_at       TEXT DEFAULT (datetime('now'))
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_persona_assignments (
+        agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        persona_id TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+        sort_order INTEGER DEFAULT 0,
+        PRIMARY KEY (agent_id, persona_id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS agent_skills (
@@ -116,6 +124,7 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_persona_assignments_agent ON agent_persona_assignments(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
