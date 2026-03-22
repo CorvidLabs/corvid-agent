@@ -154,9 +154,9 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `SubmitFeedbackSchema` | Reputation | Validates feedback submission: `agentId` (required), `sessionId` (optional), `source` (enum: `api`/`discord`/`algochat`, default `api`), `sentiment` (enum: `positive`/`negative`, required), `category` (optional), `comment` (max 500, optional), `submittedBy` (optional). |
 | `CreateSubscriptionSchema` | Billing | Validates subscription creation: `tenantId`, `stripeSubscriptionId`, `plan`, `periodStart`, `periodEnd` (required). |
 | `UpsertPersonaSchema` | Personas | Validates persona upsert: optional `archetype`, `traits` (max 20), `voiceGuidelines`, `background`, `exampleMessages` (max 10). |
-| `CreatePersonaSchema` | Personas | Validates persona creation: `name` (required, max 100), optional `archetype`, `traits` (max 20), `voiceGuidelines` (max 2000), `background` (max 4000), `exampleMessages` (max 10). |
-| `UpdatePersonaSchema` | Personas | Validates persona update. All fields optional. Same shape as `CreatePersonaSchema` with optional `name`. |
-| `AssignPersonaSchema` | Personas | Validates persona assignment: `personaId` (required), optional `sortOrder` (int >= 0). |
+| `CreatePersonaSchema` | Personas | Validates persona creation: `name` (required), optional `archetype`, `traits` (max 20), `voiceGuidelines`, `background`, `exampleMessages` (max 10). |
+| `UpdatePersonaSchema` | Personas | Validates persona update. All fields optional. |
+| `AssignPersonaSchema` | Personas | Validates persona assignment: `personaId` (required), optional `sortOrder`. |
 | `CreateSkillBundleSchema` | Skill Bundles | Validates skill bundle creation: `name` (required), optional `description`, `tools` (max 50), `promptAdditions`. |
 | `UpdateSkillBundleSchema` | Skill Bundles | Validates skill bundle update. All fields optional. |
 | `AssignSkillBundleSchema` | Skill Bundles | Validates skill bundle assignment: `bundleId` (required), optional `sortOrder`. |
