@@ -11,6 +11,7 @@ describe('MessagingGuard', () => {
             successThreshold: 2,
             rateLimitPerWindow: 5,
             rateLimitWindowMs: 500, // Short window for tests
+            driftDetectionEnabled: false, // Disable drift detection for unit tests
         });
     });
 
@@ -276,10 +277,96 @@ describe('MessagingGuard config', () => {
     });
 
     it('accepts partial config overrides', () => {
-        const guard = new MessagingGuard({ failureThreshold: 1 });
+        const guard = new MessagingGuard({ failureThreshold: 1, driftDetectionEnabled: false });
         guard.check('sender', 'target');
         guard.recordFailure('target');
         expect(guard.getCircuitState('target')).toBe('OPEN');
+        guard.stop();
+    });
+});
+
+describe('MessagingGuard behavioral drift', () => {
+    it('allows messages below drift threshold', () => {
+        const guard = new MessagingGuard({
+            driftDetectionEnabled: true,
+            driftMinMessages: 5,
+            driftTargetSpikeThreshold: 3,
+            driftWindowMs: 60_000,
+            rateLimitPerWindow: 100, // High to avoid rate limit interference
+        });
+
+        // Send 4 messages to same target — should all pass
+        for (let i = 0; i < 4; i++) {
+            const result = guard.check('sender-1', 'target-1');
+            expect(result.allowed).toBe(true);
+        }
+
+        guard.stop();
+    });
+
+    it('detects target spreading', () => {
+        const guard = new MessagingGuard({
+            driftDetectionEnabled: true,
+            driftMinMessages: 3,
+            driftTargetSpikeThreshold: 3,
+            driftWindowMs: 60_000,
+            rateLimitPerWindow: 100,
+        });
+
+        // Send to 3 different targets — triggers at message 3
+        guard.check('sender-1', 'target-1');
+        guard.check('sender-1', 'target-2');
+        const result = guard.check('sender-1', 'target-3');
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toBe('BEHAVIORAL_DRIFT');
+
+        guard.stop();
+    });
+
+    it('resets drift profile after window expires', async () => {
+        const guard = new MessagingGuard({
+            driftDetectionEnabled: true,
+            driftMinMessages: 3,
+            driftTargetSpikeThreshold: 3,
+            driftWindowMs: 100, // Short window for testing
+            rateLimitPerWindow: 100,
+        });
+
+        // Send to 2 different targets
+        guard.check('sender-1', 'target-1');
+        guard.check('sender-1', 'target-2');
+
+        // Wait for window to expire
+        await new Promise((r) => setTimeout(r, 150));
+
+        // New window — should allow again
+        const result = guard.check('sender-1', 'target-3');
+        expect(result.allowed).toBe(true);
+
+        guard.stop();
+    });
+
+    it('provides behavior profile for monitoring', () => {
+        const guard = new MessagingGuard({
+            driftDetectionEnabled: true,
+            driftMinMessages: 10,
+            driftTargetSpikeThreshold: 10,
+            driftWindowMs: 60_000,
+            rateLimitPerWindow: 100,
+        });
+
+        guard.check('sender-1', 'target-1');
+        guard.check('sender-1', 'target-2');
+        guard.check('sender-1', 'target-3');
+
+        const profile = guard.getBehaviorProfile('sender-1');
+        expect(profile).not.toBeNull();
+        expect(profile!.messageCount).toBe(3);
+        expect(profile!.uniqueTargets).toBe(3);
+
+        // Unknown agent returns null
+        expect(guard.getBehaviorProfile('unknown')).toBeNull();
+
         guard.stop();
     });
 });

@@ -68,6 +68,7 @@ export class AgentMessenger {
         this.transactor = transactor;
         this.processManager = processManager;
         this.guard = new MessagingGuard(guardConfig);
+        this.guard.setDb(db);
     }
 
     setWorkCommandRouter(router: WorkCommandRouter): void {
@@ -166,13 +167,17 @@ export class AgentMessenger {
             });
         }
 
-        // Circuit breaker + per-agent rate limit check
-        const guardResult = this.guard.check(fromAgentId, toAgentId);
+        // Circuit breaker + per-agent rate limit + blocklist + drift check
+        const guardResult = this.guard.check(fromAgentId, toAgentId, content.length);
         if (!guardResult.allowed) {
-            const errorCode = guardResult.reason === 'CIRCUIT_OPEN' ? 'CIRCUIT_OPEN' as const : 'RATE_LIMITED' as const;
-            const errorMsg = guardResult.reason === 'CIRCUIT_OPEN'
-                ? `Circuit breaker open for agent ${toAgent.name} — calls temporarily blocked`
-                : `Rate limit exceeded: ${fromAgent.name} is sending too many messages (retry after ${Math.ceil((guardResult.retryAfterMs ?? 0) / 1000)}s)`;
+            const errorCode = (guardResult.reason ?? 'RATE_LIMITED') as 'CIRCUIT_OPEN' | 'RATE_LIMITED' | 'AGENT_BLOCKED' | 'BEHAVIORAL_DRIFT';
+            const errorMessages: Record<string, string> = {
+                CIRCUIT_OPEN: `Circuit breaker open for agent ${toAgent.name} — calls temporarily blocked`,
+                RATE_LIMITED: `Rate limit exceeded: ${fromAgent.name} is sending too many messages (retry after ${Math.ceil((guardResult.retryAfterMs ?? 0) / 1000)}s)`,
+                AGENT_BLOCKED: `Agent ${fromAgent.name} is blacklisted and cannot send messages`,
+                BEHAVIORAL_DRIFT: `Behavioral anomaly detected for ${fromAgent.name} — messaging pattern flagged for review`,
+            };
+            const errorMsg = errorMessages[errorCode] ?? 'Message rejected by guard';
 
             // Create the message row in failed state so it's visible in history
             const failedMessage = createAgentMessage(this.db, {

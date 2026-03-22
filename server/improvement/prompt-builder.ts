@@ -45,6 +45,7 @@ function formatPastAttempts(memories: ScoredMemory[]): string {
 
 function trustLevelDescription(level: TrustLevel): string {
     switch (level) {
+        case 'blacklisted': return 'BLACKLISTED — all actions blocked';
         case 'untrusted': return 'UNTRUSTED — actions severely restricted';
         case 'low': return 'LOW — limited to simple, safe fixes only';
         case 'medium': return 'MEDIUM — moderate complexity tasks allowed';

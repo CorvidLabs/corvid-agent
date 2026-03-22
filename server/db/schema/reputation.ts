@@ -45,6 +45,14 @@ export const tables: string[] = [
         submitted_by    TEXT DEFAULT NULL,
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_blocklist (
+        agent_id    TEXT PRIMARY KEY,
+        reason      TEXT NOT NULL DEFAULT 'manual',
+        detail      TEXT DEFAULT '',
+        blocked_by  TEXT DEFAULT 'system',
+        created_at  TEXT DEFAULT (datetime('now'))
+    )`,
 ];
 
 export const indexes: string[] = [
@@ -53,4 +61,5 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_reputation_events_type ON reputation_events(event_type)`,
     `CREATE INDEX IF NOT EXISTS idx_response_feedback_agent ON response_feedback(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_response_feedback_created ON response_feedback(created_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_blocklist_reason ON agent_blocklist(reason)`,
 ];
