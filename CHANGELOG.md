@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.44.0] - 2026-03-22
+
+### Added
+- **Flock Directory smart contract** — on-chain agent registry with chain-sync service (#895, #1366)
+- **Composable personas** — many-to-many agent↔persona relationships (#1351)
+- **Agent variant profiles** — preset skill + persona combinations (#1362)
+- **VibeKit MCP bridge** — skills-as-markdown loader and improved onboarding (#1369)
+- **Chat-first dashboard layout** — 3-tab nav with consolidated routes (#1266, #1368)
+- **Composable pipeline scheduler** — pipeline execution with shared context (#1156, #1364)
+- **Tool guardrails** — prevent emergent agent-to-agent networking (#1054, #1365)
+- **Agent blocklist & kill switch** — behavioral drift detection for security (#1360)
+- **Dashboard polish** — UI refinements for public readiness (#1014, #1363)
+
+### Fixed
+- **Security: path traversal** — protect Discord image route from path traversal (#1359)
+- **Discord Cloudflare IP bans** — prevent crash-loop reconnections from triggering bans (#1373)
+- **Port recovery on startup** — prevent EADDRINUSE crash loops (#1354)
+- **Wallet→UUID resolution** — resolve wallet addresses to agent UUIDs in flock testing (#1355)
+- **76 test regressions** — resolve failures introduced between v0.40.0 and v0.43.0 (#1374)
+- **Test rate-limit bypass** — skip rate-limit delays during tests to prevent timeouts (#1376)
+- **E2E test isolation** — add E2E_ prefix to all test data and clean up afterAll hooks (#1377)
+
+### Docs
+- Add request/response examples for all API endpoints (#1361, #1367)
+- Document `getRateLimitWaitMs` and `discordFetch` exports in bridge spec (#1375)
+
+### Chore
+- Update Anthropic SDK dependencies per security audit (#1356)
+- Update drifted stats in deep-dive.md (#1358)
+
 ## [0.43.0] - 2026-03-21
 
 ### Added
