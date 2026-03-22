@@ -18,10 +18,17 @@
  *   - replyToMessageId (optional form field)
  */
 
+import { resolve, sep } from 'node:path';
 import { json, handleRouteError } from '../lib/response';
 import { getDeliveryTracker } from '../lib/delivery-tracker';
 import { sendMessageWithFiles, sendEmbedWithFiles, type DiscordFileAttachment } from '../discord/embeds';
 import { createLogger } from '../lib/logger';
+
+/** Allowed roots for imagePath — restrict filesystem reads to safe directories. */
+const ALLOWED_IMAGE_ROOTS = [
+    resolve(process.cwd()),  // project directory
+    '/tmp',
+];
 
 const log = createLogger('DiscordImageRoute');
 
@@ -87,10 +94,22 @@ async function handleSendImage(req: Request): Promise<Response> {
             if (body.imageBase64) {
                 imageData = Buffer.from(body.imageBase64, 'base64');
             } else if (body.imagePath) {
-                // Read from local filesystem
-                const file = Bun.file(body.imagePath);
+                // Resolve and validate path to prevent path traversal (CWE-22)
+                const resolvedPath = resolve(body.imagePath);
+                const isAllowed = ALLOWED_IMAGE_ROOTS.some(root => {
+                    const normalizedRoot = resolve(root);
+                    if (resolvedPath === normalizedRoot) return true;
+                    const rootWithSep = normalizedRoot.endsWith(sep) ? normalizedRoot : normalizedRoot + sep;
+                    return resolvedPath.startsWith(rootWithSep);
+                });
+                if (!isAllowed) {
+                    log.warn('Blocked path traversal attempt', { imagePath: body.imagePath });
+                    return json({ error: 'imagePath is outside allowed directories' }, 403);
+                }
+
+                const file = Bun.file(resolvedPath);
                 if (!await file.exists()) {
-                    return json({ error: `File not found: ${body.imagePath}` }, 400);
+                    return json({ error: 'File not found' }, 400);
                 }
                 imageData = new Uint8Array(await file.arrayBuffer());
                 // Infer content type from extension if not specified
