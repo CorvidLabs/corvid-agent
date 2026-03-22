@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ReputationService } from '../../core/services/reputation.service';
@@ -250,6 +250,40 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                             }
                         }
 
+                        @if (reputationService.events().length > 1) {
+                            <h4>Score Impact Timeline</h4>
+                            <div class="trend-chart">
+                                <svg [attr.viewBox]="'0 0 ' + trendWidth + ' ' + trendHeight" class="trend-chart__svg" preserveAspectRatio="none">
+                                    <!-- Zero line -->
+                                    <line x1="0" [attr.y1]="trendHeight / 2" [attr.x1]="trendWidth" [attr.y2]="trendHeight / 2"
+                                          class="trend-chart__zero" />
+                                    <!-- Area fills -->
+                                    @if (trendPathPositive()) {
+                                        <path [attr.d]="trendPathPositive()" class="trend-chart__area trend-chart__area--positive" />
+                                    }
+                                    @if (trendPathNegative()) {
+                                        <path [attr.d]="trendPathNegative()" class="trend-chart__area trend-chart__area--negative" />
+                                    }
+                                    <!-- Line -->
+                                    @if (trendLinePath()) {
+                                        <path [attr.d]="trendLinePath()" class="trend-chart__line" />
+                                    }
+                                    <!-- Dots -->
+                                    @for (point of trendPoints(); track $index) {
+                                        <circle [attr.cx]="point.x" [attr.cy]="point.y" r="2.5"
+                                                class="trend-chart__dot"
+                                                [attr.data-impact]="point.impact >= 0 ? 'positive' : 'negative'">
+                                            <title>{{ point.label }}: {{ point.impact >= 0 ? '+' : '' }}{{ point.impact }}</title>
+                                        </circle>
+                                    }
+                                </svg>
+                                <div class="trend-chart__labels">
+                                    <span class="trend-chart__label trend-chart__label--positive">+ positive</span>
+                                    <span class="trend-chart__label trend-chart__label--negative">- negative</span>
+                                </div>
+                            </div>
+                        }
+
                         <h4>All Events</h4>
                         @if (reputationService.events().length === 0) {
                             <p class="empty">No events recorded.</p>
@@ -476,6 +510,26 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        /* Trend chart */
+        .trend-chart {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem; margin-bottom: 1rem;
+        }
+        .trend-chart__svg { width: 100%; height: 80px; display: block; }
+        .trend-chart__zero { stroke: var(--border); stroke-width: 0.5; stroke-dasharray: 4 2; }
+        .trend-chart__line { fill: none; stroke: var(--accent-cyan); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+        .trend-chart__area { opacity: 0.15; }
+        .trend-chart__area--positive { fill: var(--accent-green); }
+        .trend-chart__area--negative { fill: var(--accent-red); }
+        .trend-chart__dot { transition: r 0.15s; }
+        .trend-chart__dot:hover { r: 4; }
+        .trend-chart__dot[data-impact="positive"] { fill: var(--accent-green); }
+        .trend-chart__dot[data-impact="negative"] { fill: var(--accent-red); }
+        .trend-chart__labels { display: flex; justify-content: space-between; margin-top: 0.35rem; }
+        .trend-chart__label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .trend-chart__label--positive { color: var(--accent-green); }
+        .trend-chart__label--negative { color: var(--accent-red); }
+
         @media (max-width: 768px) {
             .card-grid { grid-template-columns: 1fr; }
             .agent-card__body { flex-direction: column; align-items: center; }
@@ -494,6 +548,46 @@ export class ReputationComponent implements OnInit {
     protected readonly stats = signal<AgentReputationStats | null>(null);
     protected readonly computing = signal(false);
     protected readonly loadError = signal(false);
+
+    protected readonly trendWidth = 400;
+    protected readonly trendHeight = 80;
+
+    protected readonly trendPoints = computed(() => {
+        const events = this.reputationService.events();
+        if (events.length < 2) return [];
+        const sorted = [...events].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const maxAbs = Math.max(...sorted.map(e => Math.abs(e.scoreImpact)), 1);
+        const mid = this.trendHeight / 2;
+        const pad = 8;
+        return sorted.map((e, i) => ({
+            x: pad + (i / (sorted.length - 1)) * (this.trendWidth - pad * 2),
+            y: mid - (e.scoreImpact / maxAbs) * (mid - pad),
+            impact: e.scoreImpact,
+            label: this.eventLabels[e.eventType] ?? e.eventType,
+        }));
+    });
+
+    protected readonly trendLinePath = computed(() => {
+        const pts = this.trendPoints();
+        if (pts.length < 2) return '';
+        return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ');
+    });
+
+    protected readonly trendPathPositive = computed(() => {
+        const pts = this.trendPoints();
+        if (pts.length < 2) return '';
+        const mid = this.trendHeight / 2;
+        const clipped = pts.map(p => ({ x: p.x, y: Math.min(p.y, mid) }));
+        return `M ${clipped[0].x},${mid} ` + clipped.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${clipped[clipped.length - 1].x},${mid} Z`;
+    });
+
+    protected readonly trendPathNegative = computed(() => {
+        const pts = this.trendPoints();
+        if (pts.length < 2) return '';
+        const mid = this.trendHeight / 2;
+        const clipped = pts.map(p => ({ x: p.x, y: Math.max(p.y, mid) }));
+        return `M ${clipped[0].x},${mid} ` + clipped.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${clipped[clipped.length - 1].x},${mid} Z`;
+    });
 
     protected readonly ringCircumference = 2 * Math.PI * 52; // ~326.7
 

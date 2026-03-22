@@ -80,7 +80,10 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             <div class="dash-toolbar">
                 <div class="dash-toolbar__left">
                     <span class="dash-toolbar__title">Dashboard</span>
-                    <span class="connection-dot" [attr.data-status]="wsService.connected() ? 'ok' : 'down'" [title]="wsService.connected() ? 'Connected' : 'Disconnected'"></span>
+                    <span class="connection-badge" [attr.data-status]="connectionState()">
+                        <span class="connection-badge__dot"></span>
+                        <span class="connection-badge__label">{{ connectionLabel() }}</span>
+                    </span>
                     @if (lastRefresh()) {
                         <span class="dash-toolbar__updated">Updated {{ lastRefresh() | relativeTime }}</span>
                     }
@@ -351,6 +354,11 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                     </div>
                                 </div>
                                 @if (spendingBars().length > 0) {
+                                    <div class="spending-summary">
+                                        <span class="spending-summary__total">\${{ spendingTotal().toFixed(2) }}</span>
+                                        <span class="spending-summary__label">total over {{ spendingDays() }}d</span>
+                                        <span class="spending-summary__avg">\${{ spendingDailyAvg().toFixed(4) }}/day avg</span>
+                                    </div>
                                     <div class="bar-chart">
                                         <div class="bar-chart__bars">
                                             @for (bar of spendingBars(); track bar.date) {
@@ -360,6 +368,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                                     <div class="bar-chart__tooltip" [class.bar-chart__tooltip--visible]="hoveredBar() === bar">
                                                         <span class="bar-chart__tooltip-date">{{ bar.date }}</span>
                                                         <span class="bar-chart__tooltip-val">\${{ bar.value.toFixed(4) }}</span>
+                                                        <span class="bar-chart__tooltip-cum">cumulative: \${{ bar.cumulative.toFixed(2) }}</span>
                                                     </div>
                                                     <div class="bar-chart__bar bar-chart__bar--spending" [style.height.%]="bar.pct"></div>
                                                     <span class="bar-chart__label">{{ bar.dateShort }}</span>
@@ -759,7 +768,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly widgetRefreshing = signal<Record<string, boolean>>({});
 
     // Chart hover tooltips
-    protected readonly hoveredBar = signal<{ date: string; dateShort: string; value: number; pct: number } | null>(null);
+    protected readonly hoveredBar = signal<{ date: string; dateShort: string; value: number; pct: number; cumulative: number } | null>(null);
     protected readonly hoveredSegment = signal<{ status: string; count: number } | null>(null);
 
     // Last refresh timestamp
@@ -779,6 +788,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
         'Set up a CI/CD pipeline',
     ];
 
+    // Connection state for the toolbar badge
+    protected readonly connectionState = computed(() => {
+        if (this.wsService.serverRestarting()) return 'reconnecting';
+        return this.wsService.connected() ? 'connected' : 'disconnected';
+    });
+    protected readonly connectionLabel = computed(() => {
+        switch (this.connectionState()) {
+            case 'connected': return 'Live';
+            case 'reconnecting': return 'Reconnecting…';
+            case 'disconnected': return 'Offline';
+        }
+    });
+
     protected readonly activeWorkTaskCount = computed(() => {
         const tasks = this.overview()?.workTasks;
         if (!tasks) return 0;
@@ -789,7 +811,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.scheduleService.schedules().filter((s) => s.status === 'active').length,
     );
 
-    // Spending chart bars (vertical)
+    // Spending chart bars (vertical) with cumulative totals
     protected readonly spendingBars = computed(() => {
         const data = this.spendingData();
         if (!data) return [];
@@ -798,12 +820,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
         for (const d of data.sessionCosts) dateMap.set(d.date, (dateMap.get(d.date) ?? 0) + d.cost_usd);
         const entries = Array.from(dateMap.entries()).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
         const max = Math.max(...entries.map((e) => e.value), 0.001);
-        return entries.map((e) => ({
-            date: e.date,
-            dateShort: e.date.slice(5),
-            value: e.value,
-            pct: (e.value / max) * 100,
-        }));
+        let cumulative = 0;
+        return entries.map((e) => {
+            cumulative += e.value;
+            return {
+                date: e.date,
+                dateShort: e.date.slice(5),
+                value: e.value,
+                pct: (e.value / max) * 100,
+                cumulative,
+            };
+        });
+    });
+
+    protected readonly spendingTotal = computed(() =>
+        this.spendingBars().reduce((sum, b) => sum + b.value, 0),
+    );
+
+    protected readonly spendingDailyAvg = computed(() => {
+        const bars = this.spendingBars();
+        return bars.length > 0 ? this.spendingTotal() / bars.length : 0;
     });
 
     // Session status ring chart segments

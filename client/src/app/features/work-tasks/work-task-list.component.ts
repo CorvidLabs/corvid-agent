@@ -63,6 +63,21 @@ import { WorkTask } from '../../core/models/work-task.model';
                         (click)="setFilter('failed')"
                     >Failed ({{ failedTasks().length }})</button>
                 </div>
+                <div class="tasks__search-row">
+                    <input class="search-input" type="text" placeholder="Search tasks..."
+                           [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+                    @if (agentOptions().length > 1) {
+                        <select class="agent-filter-select" [value]="agentFilter()" (change)="agentFilter.set($any($event.target).value)">
+                            <option value="">All agents</option>
+                            @for (opt of agentOptions(); track opt.id) {
+                                <option [value]="opt.id">{{ opt.name }}</option>
+                            }
+                        </select>
+                    }
+                    @if (searchQuery() || agentFilter()) {
+                        <button class="clear-filters-btn" (click)="searchQuery.set(''); agentFilter.set('')">Clear</button>
+                    }
+                </div>
             </div>
 
             @if (taskService.loading()) {
@@ -104,11 +119,19 @@ import { WorkTask } from '../../core/models/work-task.model';
                                 <span class="task-time">{{ task.createdAt | relativeTime }}</span>
                             </div>
                             <p class="task-desc">{{ task.description }}</p>
-                            @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
-                                <div class="task-progress">
-                                    <div class="task-progress__bar">
-                                        <div class="task-progress__fill" [attr.data-status]="task.status"></div>
-                                    </div>
+                            @if (isActiveStatus(task.status) || task.status === 'completed' || task.status === 'failed') {
+                                <div class="pipeline-stages">
+                                    @for (stage of pipelineStages; track stage.key) {
+                                        <div class="pipeline-stage"
+                                             [attr.data-state]="getStageState(task, stage.key)"
+                                             [title]="stage.label">
+                                            <div class="pipeline-stage__dot"></div>
+                                            <span class="pipeline-stage__label">{{ stage.label }}</span>
+                                        </div>
+                                        @if (!$last) {
+                                            <div class="pipeline-connector" [attr.data-state]="getConnectorState(task, stage.key)"></div>
+                                        }
+                                    }
                                 </div>
                             }
                             <div class="task-meta">
@@ -202,13 +225,44 @@ import { WorkTask } from '../../core/models/work-task.model';
         .tasks__filter-row { margin-bottom: 1rem; }
         .loading { color: var(--text-secondary); }
         .task-agent { font-size: 0.65rem; color: var(--accent-cyan); font-weight: 600; }
-        .task-progress { margin: 0.35rem 0; }
-        .task-progress__bar { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; }
-        .task-progress__fill { height: 100%; border-radius: 2px; animation: progress-pulse 1.5s ease-in-out infinite; }
-        .task-progress__fill[data-status="branching"] { width: 30%; background: var(--accent-cyan); }
-        .task-progress__fill[data-status="running"] { width: 60%; background: var(--accent-cyan); }
-        .task-progress__fill[data-status="validating"] { width: 85%; background: var(--accent-green); }
-        @keyframes progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        /* Pipeline stage indicator */
+        .pipeline-stages {
+            display: flex; align-items: center; margin: 0.5rem 0; gap: 0;
+        }
+        .pipeline-stage {
+            display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0;
+        }
+        .pipeline-stage__dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            border: 2px solid var(--border); background: var(--bg-raised);
+            transition: all 0.3s ease;
+        }
+        .pipeline-stage__label {
+            font-size: 0.5rem; color: var(--text-tertiary); text-transform: uppercase;
+            letter-spacing: 0.04em; white-space: nowrap;
+        }
+        .pipeline-stage[data-state="done"] .pipeline-stage__dot {
+            border-color: var(--accent-green); background: var(--accent-green);
+        }
+        .pipeline-stage[data-state="done"] .pipeline-stage__label { color: var(--accent-green); }
+        .pipeline-stage[data-state="active"] .pipeline-stage__dot {
+            border-color: var(--accent-cyan); background: var(--accent-cyan);
+            animation: stage-pulse 1.5s ease-in-out infinite;
+        }
+        .pipeline-stage[data-state="active"] .pipeline-stage__label { color: var(--accent-cyan); font-weight: 600; }
+        .pipeline-stage[data-state="failed"] .pipeline-stage__dot {
+            border-color: var(--accent-red); background: var(--accent-red);
+        }
+        .pipeline-stage[data-state="failed"] .pipeline-stage__label { color: var(--accent-red); }
+        .pipeline-connector {
+            flex: 1; height: 2px; background: var(--border); min-width: 8px;
+            margin: 0 2px; margin-bottom: 12px; transition: background 0.3s ease;
+        }
+        .pipeline-connector[data-state="done"] { background: var(--accent-green); }
+        .pipeline-connector[data-state="active"] {
+            background: linear-gradient(90deg, var(--accent-cyan), var(--border));
+        }
+        @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px rgba(0, 229, 255, 0.2); } }
         .task-actions { margin-top: 0.5rem; }
         .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
@@ -234,6 +288,33 @@ import { WorkTask } from '../../core/models/work-task.model';
         }
         .filter-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
         .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px rgba(0, 229, 255, 0.12); }
+
+        .tasks__search-row {
+            display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
+        }
+        .search-input {
+            flex: 1; padding: 0.4rem 0.65rem; font-size: 0.75rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            transition: border-color 0.15s, box-shadow 0.15s; min-width: 0;
+        }
+        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+        .search-input::placeholder { color: var(--text-tertiary); }
+        .agent-filter-select {
+            padding: 0.4rem 0.5rem; font-size: 0.7rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            cursor: pointer; min-width: 120px;
+        }
+        .agent-filter-select:focus { border-color: var(--accent-cyan); outline: none; }
+        .clear-filters-btn {
+            padding: 0.35rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            background: transparent; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text-tertiary);
+            cursor: pointer; white-space: nowrap; transition: all 0.15s;
+        }
+        .clear-filters-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
         .empty {
             text-align: center;
@@ -449,9 +530,14 @@ import { WorkTask } from '../../core/models/work-task.model';
             .task-card__header { flex-wrap: wrap; gap: 0.35rem; }
             .task-meta { flex-direction: column; gap: 0.25rem; }
             .tasks__filters { flex-wrap: wrap; }
+            .tasks__search-row { flex-wrap: wrap; }
+            .agent-filter-select { min-width: 100%; }
+            .pipeline-stage__label { font-size: 0.45rem; }
+            .pipeline-stage__dot { width: 8px; height: 8px; }
         }
         @media (max-width: 480px) {
             .tasks { padding: 0.75rem; }
+            .pipeline-stage__label { display: none; }
         }
     `,
 })
@@ -461,12 +547,23 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
     private readonly notify = inject(NotificationService);
 
     readonly activeFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
+    readonly searchQuery = signal('');
+    readonly agentFilter = signal('');
     readonly showCreateForm = signal(false);
     readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
     readonly retrying = signal<Set<string>>(new Set());
     protected createAgentId = '';
     protected createDescription = '';
+
+    protected readonly pipelineStages = [
+        { key: 'branching', label: 'Branch' },
+        { key: 'running', label: 'Implement' },
+        { key: 'validating', label: 'Validate' },
+        { key: 'completed', label: 'Done' },
+    ] as const;
+
+    private readonly stageOrder = ['pending', 'queued', 'branching', 'running', 'validating', 'completed'];
 
     private agentNameCache: Record<string, string> = {};
     private expandedErrors = new Set<string>();
@@ -487,13 +584,32 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
         this.taskService.tasks().filter((t) => t.status === 'failed'),
     );
 
-    readonly filteredTasks = computed(() => {
-        switch (this.activeFilter()) {
-            case 'active': return this.activeTasks();
-            case 'completed': return this.completedTasks();
-            case 'failed': return this.failedTasks();
-            default: return this.allTasks();
+    readonly agentOptions = computed(() => {
+        const seen = new Map<string, string>();
+        for (const t of this.taskService.tasks()) {
+            if (!seen.has(t.agentId)) seen.set(t.agentId, this.getAgentName(t.agentId));
         }
+        return Array.from(seen.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    readonly filteredTasks = computed(() => {
+        let tasks: WorkTask[];
+        switch (this.activeFilter()) {
+            case 'active': tasks = this.activeTasks(); break;
+            case 'completed': tasks = this.completedTasks(); break;
+            case 'failed': tasks = this.failedTasks(); break;
+            default: tasks = this.allTasks();
+        }
+        const agent = this.agentFilter();
+        if (agent) tasks = tasks.filter((t) => t.agentId === agent);
+        const query = this.searchQuery().toLowerCase().trim();
+        if (query) tasks = tasks.filter((t) =>
+            t.description.toLowerCase().includes(query) ||
+            (t.branchName?.toLowerCase().includes(query) ?? false) ||
+            (t.error?.toLowerCase().includes(query) ?? false) ||
+            (t.summary?.toLowerCase().includes(query) ?? false)
+        );
+        return tasks;
     });
 
     async ngOnInit(): Promise<void> {
@@ -530,6 +646,36 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     protected getDisplayStatus(task: WorkTask): string {
         return this.isInterrupted(task) ? 'interrupted' : task.status;
+    }
+
+    protected getStageState(task: WorkTask, stageKey: string): 'pending' | 'active' | 'done' | 'failed' {
+        const taskIdx = this.stageOrder.indexOf(task.status);
+        const stageIdx = this.stageOrder.indexOf(stageKey);
+
+        if (task.status === 'failed') {
+            // Find which stage it failed at — show stages before as done, current as failed
+            const failedAt = Math.max(taskIdx, this.stageOrder.indexOf('branching'));
+            if (stageIdx < failedAt) return 'done';
+            if (stageKey === 'completed') return 'pending';
+            // The stage it was on when it failed
+            if (stageIdx === failedAt || (task.iterationCount > 0 && stageKey === 'validating')) return 'failed';
+            return 'pending';
+        }
+
+        if (stageIdx < taskIdx) return 'done';
+        if (stageKey === task.status) return task.status === 'completed' ? 'done' : 'active';
+        return 'pending';
+    }
+
+    protected getConnectorState(task: WorkTask, fromStageKey: string): 'pending' | 'active' | 'done' {
+        const taskIdx = this.stageOrder.indexOf(task.status);
+        const fromIdx = this.stageOrder.indexOf(fromStageKey);
+
+        if (task.status === 'completed') return fromIdx < this.stageOrder.indexOf('completed') ? 'done' : 'pending';
+        if (task.status === 'failed') return fromIdx < taskIdx ? 'done' : 'pending';
+        if (fromIdx === taskIdx - 1) return 'active';
+        if (fromIdx < taskIdx) return 'done';
+        return 'pending';
     }
 
     protected truncateBranch(name: string): string {
