@@ -24,6 +24,7 @@ files:
   - server/db/migrations/096_mention_session_channel_id.ts
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
+  - server/db/migrations/099_composable_personas.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -370,10 +371,22 @@ Adds `output_destinations` column to `agent_schedules` for routing schedule exec
 | `up` | `(db: Database)` | `void` | Adds `output_destinations` TEXT column to `agent_schedules` (idempotent — checks column existence first) |
 | `down` | `(db: Database)` | `void` | Drops `output_destinations` column from `agent_schedules` |
 
+### 099_composable_personas.ts
+
+Converts agent personas from a one-to-one model (`agent_personas` keyed by `agent_id`) to a many-to-many model with a standalone `personas` table and an `agent_persona_assignments` junction table. Migrates existing data and drops the old table.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `personas` and `agent_persona_assignments` tables, migrates data from `agent_personas`, drops old table (idempotent — checks table existence) |
+| `down` | `(db: Database)` | `void` | Recreates `agent_personas`, migrates first assigned persona per agent back, drops new tables |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-22 | corvid-agent | Add migration 099 to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
 | 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
 | 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |
