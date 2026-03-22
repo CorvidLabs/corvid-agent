@@ -9,11 +9,12 @@ import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WorkTask } from '../../core/models/work-task.model';
+import { WorkTaskDetailComponent } from './work-task-detail.component';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent, WorkTaskDetailComponent],
     template: `
         <div class="tasks">
             <div class="tasks__header">
@@ -190,6 +191,14 @@ import { WorkTask } from '../../core/models/work-task.model';
                                     </button>
                                 </div>
                             }
+                            @if (task.sessionId || task.prUrl) {
+                                <button class="detail-toggle" (click)="toggleDetail(task.id); $event.stopPropagation()">
+                                    {{ isDetailExpanded(task.id) ? 'Hide Logs & Diff' : 'View Logs & Diff' }}
+                                </button>
+                            }
+                            @if (isDetailExpanded(task.id)) {
+                                <app-work-task-detail [task]="task" />
+                            }
                         </div>
                     }
                 </div>
@@ -270,6 +279,14 @@ import { WorkTask } from '../../core/models/work-task.model';
         .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
         .action-btn--retry:hover { background: var(--accent-cyan-dim); }
         .action-btn--retry:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .detail-toggle {
+            display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.6rem;
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text-tertiary); font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
+        }
+        .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
         .tasks__filters {
             display: flex;
@@ -567,6 +584,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     private agentNameCache: Record<string, string> = {};
     private expandedErrors = new Set<string>();
+    private expandedDetails = new Set<string>();
 
     readonly allTasks = computed(() => this.taskService.tasks());
 
@@ -721,6 +739,18 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
             this.expandedErrors.delete(taskId);
         } else {
             this.expandedErrors.add(taskId);
+        }
+    }
+
+    protected isDetailExpanded(taskId: string): boolean {
+        return this.expandedDetails.has(taskId);
+    }
+
+    protected toggleDetail(taskId: string): void {
+        if (this.expandedDetails.has(taskId)) {
+            this.expandedDetails.delete(taskId);
+        } else {
+            this.expandedDetails.add(taskId);
         }
     }
 

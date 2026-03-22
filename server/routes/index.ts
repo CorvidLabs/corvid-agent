@@ -44,6 +44,7 @@ import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleFlockTestingRoutes } from './flock-testing';
 import { handleContactRoutes } from './contacts';
 import { handleOpenRouterRoutes } from './openrouter';
+import { handleGitHubPRDiffRoutes } from './github-pr-diff';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -333,6 +334,9 @@ async function handleRoutes(
 
     const githubAllowlistResponse = handleGitHubAllowlistRoutes(req, url, db);
     if (githubAllowlistResponse) return githubAllowlistResponse;
+
+    const githubPRDiffResponse = handleGitHubPRDiffRoutes(req, url, context);
+    if (githubPRDiffResponse) return githubPRDiffResponse instanceof Promise ? await githubPRDiffResponse : githubPRDiffResponse;
 
     const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db, context);
     if (repoBlocklistResponse) return repoBlocklistResponse;
