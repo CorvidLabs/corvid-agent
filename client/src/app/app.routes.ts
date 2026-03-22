@@ -13,18 +13,7 @@ const SETTINGS_TABS: SubTab[] = [
     { label: 'GH Allowlist', path: 'github-allowlist' },
     { label: 'Repo Blocklist', path: 'repo-blocklist' },
     { label: 'Marketplace', path: 'marketplace' },
-];
-
-const OBSERVE_TABS: SubTab[] = [
-    { label: 'Live Feed', path: './', exact: true },
-    { label: 'Analytics', path: 'analytics' },
-    { label: 'Logs', path: 'logs' },
-    { label: 'Brain Viewer', path: 'brain-viewer' },
-    { label: 'Reputation', path: 'reputation' },
-];
-
-const AUTOMATE_TABS: SubTab[] = [
-    { label: 'Schedules', path: './', exact: true },
+    { label: 'Schedules', path: 'schedules' },
     { label: 'Workflows', path: 'workflows' },
     { label: 'Webhooks', path: 'webhooks' },
     { label: 'Polling', path: 'mention-polling' },
@@ -44,6 +33,11 @@ const SESSIONS_TABS: SubTab[] = [
     { label: 'Conversations', path: './', exact: true },
     { label: 'Work Tasks', path: 'work-tasks' },
     { label: 'Councils', path: 'councils' },
+    { label: 'Live Feed', path: 'feed' },
+    { label: 'Analytics', path: 'analytics' },
+    { label: 'Logs', path: 'logs' },
+    { label: 'Brain Viewer', path: 'brain-viewer' },
+    { label: 'Reputation', path: 'reputation' },
 ];
 
 // ── Route definitions ───────────────────────────────────────────────────
@@ -130,7 +124,7 @@ export const routes: Routes = [
         ],
     },
 
-    // ── Sessions (consolidated) ─────────────────────────────────────────
+    // ── Sessions (consolidated — now includes Observe views) ─────────────
     {
         path: 'sessions',
         component: SubTabShellComponent,
@@ -176,22 +170,9 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/councils/council-launch-view.component').then((m) => m.CouncilLaunchViewComponent),
             },
+            // Observe views (moved from /observe/* to /sessions/*)
             {
-                path: ':id',
-                loadComponent: () =>
-                    import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
-            },
-        ],
-    },
-
-    // ── Observe (consolidated) ──────────────────────────────────────────
-    {
-        path: 'observe',
-        component: SubTabShellComponent,
-        data: { tabs: OBSERVE_TABS, groupLabel: 'Observe' },
-        children: [
-            {
-                path: '',
+                path: 'feed',
                 loadComponent: () =>
                     import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
             },
@@ -215,44 +196,15 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
             },
-        ],
-    },
-
-    // ── Automate (consolidated) ─────────────────────────────────────────
-    {
-        path: 'automate',
-        component: SubTabShellComponent,
-        data: { tabs: AUTOMATE_TABS, groupLabel: 'Automate' },
-        children: [
             {
-                path: '',
+                path: ':id',
                 loadComponent: () =>
-                    import('./features/schedules/schedule-list.component').then((m) => m.ScheduleListComponent),
-            },
-            {
-                path: 'workflows',
-                loadComponent: () =>
-                    import('./features/workflows/workflow-list.component').then((m) => m.WorkflowListComponent),
-            },
-            {
-                path: 'webhooks',
-                loadComponent: () =>
-                    import('./features/webhooks/webhook-list.component').then((m) => m.WebhookListComponent),
-            },
-            {
-                path: 'mention-polling',
-                loadComponent: () =>
-                    import('./features/mention-polling/mention-polling-list.component').then((m) => m.MentionPollingListComponent),
-            },
-            {
-                path: 'mcp-servers',
-                loadComponent: () =>
-                    import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
+                    import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
             },
         ],
     },
 
-    // ── Settings (consolidated) ─────────────────────────────────────────
+    // ── Settings (consolidated — now includes Automate views) ────────────
     {
         path: 'settings',
         component: SubTabShellComponent,
@@ -298,11 +250,37 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/marketplace/marketplace.component').then((m) => m.MarketplaceComponent),
             },
+            // Automate views (moved from /automate/* to /settings/*)
+            {
+                path: 'schedules',
+                loadComponent: () =>
+                    import('./features/schedules/schedule-list.component').then((m) => m.ScheduleListComponent),
+            },
+            {
+                path: 'workflows',
+                loadComponent: () =>
+                    import('./features/workflows/workflow-list.component').then((m) => m.WorkflowListComponent),
+            },
+            {
+                path: 'webhooks',
+                loadComponent: () =>
+                    import('./features/webhooks/webhook-list.component').then((m) => m.WebhookListComponent),
+            },
+            {
+                path: 'mention-polling',
+                loadComponent: () =>
+                    import('./features/mention-polling/mention-polling-list.component').then((m) => m.MentionPollingListComponent),
+            },
+            {
+                path: 'mcp-servers',
+                loadComponent: () =>
+                    import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
+            },
         ],
     },
 
     // ── Backwards-compatibility redirects ────────────────────────────────
-    // Old flat paths → new nested paths
+    // Old flat paths -> nested paths
     { path: 'projects', redirectTo: 'agents/projects', pathMatch: 'full' },
     { path: 'projects/new', redirectTo: 'agents/projects/new', pathMatch: 'full' },
     { path: 'projects/:id', redirectTo: 'agents/projects/:id' },
@@ -313,16 +291,32 @@ export const routes: Routes = [
     { path: 'work-tasks', redirectTo: 'sessions/work-tasks', pathMatch: 'full' },
     { path: 'councils', redirectTo: 'sessions/councils', pathMatch: 'full' },
     { path: 'council-launches/:id', redirectTo: 'sessions/council-launches/:id' },
-    { path: 'feed', redirectTo: 'observe', pathMatch: 'full' },
-    { path: 'analytics', redirectTo: 'observe/analytics', pathMatch: 'full' },
-    { path: 'logs', redirectTo: 'observe/logs', pathMatch: 'full' },
-    { path: 'brain-viewer', redirectTo: 'observe/brain-viewer', pathMatch: 'full' },
-    { path: 'reputation', redirectTo: 'observe/reputation', pathMatch: 'full' },
-    { path: 'schedules', redirectTo: 'automate', pathMatch: 'full' },
-    { path: 'workflows', redirectTo: 'automate/workflows', pathMatch: 'full' },
-    { path: 'webhooks', redirectTo: 'automate/webhooks', pathMatch: 'full' },
-    { path: 'mention-polling', redirectTo: 'automate/mention-polling', pathMatch: 'full' },
-    { path: 'mcp-servers', redirectTo: 'automate/mcp-servers', pathMatch: 'full' },
+
+    // Old observe paths -> sessions/*
+    { path: 'observe', redirectTo: 'sessions/feed', pathMatch: 'full' },
+    { path: 'observe/analytics', redirectTo: 'sessions/analytics', pathMatch: 'full' },
+    { path: 'observe/logs', redirectTo: 'sessions/logs', pathMatch: 'full' },
+    { path: 'observe/brain-viewer', redirectTo: 'sessions/brain-viewer', pathMatch: 'full' },
+    { path: 'observe/reputation', redirectTo: 'sessions/reputation', pathMatch: 'full' },
+    { path: 'feed', redirectTo: 'sessions/feed', pathMatch: 'full' },
+    { path: 'analytics', redirectTo: 'sessions/analytics', pathMatch: 'full' },
+    { path: 'logs', redirectTo: 'sessions/logs', pathMatch: 'full' },
+    { path: 'brain-viewer', redirectTo: 'sessions/brain-viewer', pathMatch: 'full' },
+    { path: 'reputation', redirectTo: 'sessions/reputation', pathMatch: 'full' },
+
+    // Old automate paths -> settings/*
+    { path: 'automate', redirectTo: 'settings/schedules', pathMatch: 'full' },
+    { path: 'automate/workflows', redirectTo: 'settings/workflows', pathMatch: 'full' },
+    { path: 'automate/webhooks', redirectTo: 'settings/webhooks', pathMatch: 'full' },
+    { path: 'automate/mention-polling', redirectTo: 'settings/mention-polling', pathMatch: 'full' },
+    { path: 'automate/mcp-servers', redirectTo: 'settings/mcp-servers', pathMatch: 'full' },
+    { path: 'schedules', redirectTo: 'settings/schedules', pathMatch: 'full' },
+    { path: 'workflows', redirectTo: 'settings/workflows', pathMatch: 'full' },
+    { path: 'webhooks', redirectTo: 'settings/webhooks', pathMatch: 'full' },
+    { path: 'mention-polling', redirectTo: 'settings/mention-polling', pathMatch: 'full' },
+    { path: 'mcp-servers', redirectTo: 'settings/mcp-servers', pathMatch: 'full' },
+
+    // Old flat settings paths
     { path: 'security', redirectTo: 'settings/security', pathMatch: 'full' },
     { path: 'wallets', redirectTo: 'settings/wallets', pathMatch: 'full' },
     { path: 'spending', redirectTo: 'settings/spending', pathMatch: 'full' },

@@ -18,24 +18,15 @@ const ONBOARDING_TOUR: TourStep[] = [
         id: 'welcome',
         title: 'Welcome to CorvidAgent',
         content:
-            'This quick tour shows you around the platform. You can replay it anytime from Settings or the command palette (Cmd+K).',
+            'This is a 60-second tour of the platform. Three tabs: Chat, Agents, Settings — that is all you need. You can replay this anytime via the command palette (Cmd+K).',
         selector: '.topnav__logo',
         placement: 'bottom',
-    },
-    {
-        id: 'agent-card',
-        title: 'Meet your agent',
-        content:
-            'This is your AI developer. It can write code, review PRs, research topics, and more. Click it to see details, manage skills, or change its model.',
-        selector: '.agent-card',
-        placement: 'bottom',
-        route: '/dashboard',
     },
     {
         id: 'chat-home',
         title: 'Start a conversation',
         content:
-            'Type what you want built, fixed, or researched. Pick an agent and project, then hit send. Your agent takes it from there.',
+            'Chat is your home screen. Type what you want built, fixed, or researched. Pick an agent and project, then hit send. Your agent takes it from there.',
         selector: '.chat-home__input-card',
         placement: 'bottom',
         route: '/chat',
@@ -50,10 +41,18 @@ const ONBOARDING_TOUR: TourStep[] = [
         route: '/chat',
     },
     {
+        id: 'agents-tab',
+        title: 'Manage your agents',
+        content:
+            'The Agents tab is where you create, configure, and manage your AI developers. Each agent has a model, skills, and persona.',
+        selector: '.topnav__tabs',
+        placement: 'bottom',
+    },
+    {
         id: 'sessions',
         title: 'Find your results',
         content:
-            'Every conversation lives here. See real-time output, file changes, and tool calls. Completed work shows up with PRs linked.',
+            'Every conversation, work task, and council lives under Chat. See real-time output, file changes, and tool calls. Completed work shows up with PRs linked.',
         selector: '.tab-shell__tabs',
         placement: 'bottom',
         route: '/sessions',
@@ -62,15 +61,15 @@ const ONBOARDING_TOUR: TourStep[] = [
         id: 'activity-rail',
         title: 'Live activity',
         content:
-            'The sidebar shows active sessions and system status at a glance. It updates in real time via WebSocket.',
+            'The right panel shows active sessions and system status at a glance. It updates in real time via WebSocket.',
         selector: '.rail',
         placement: 'left',
     },
     {
         id: 'command-palette',
-        title: 'Quick actions',
+        title: 'Navigate with Cmd+K',
         content:
-            'Press Cmd+K (or Ctrl+K) to open the command palette. Jump to any page, start sessions, or search — all from the keyboard.',
+            'Press Cmd+K (or Ctrl+K) to open the command palette. Jump to any page, start sessions, or search — all from the keyboard. You can also use Cmd+T for new tabs and Cmd+1-9 to switch between them.',
         selector: '.topnav__search-btn',
         placement: 'bottom',
     },
