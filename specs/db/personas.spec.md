@@ -1,11 +1,12 @@
 ---
 module: personas-db
-version: 1
+version: 2
 status: draft
 files:
   - server/db/personas.ts
 db_tables:
-  - agent_personas
+  - personas
+  - agent_persona_assignments
 depends_on: []
 ---
 
@@ -13,7 +14,7 @@ depends_on: []
 
 ## Purpose
 
-Data-access and prompt-composition layer for agent personas. Provides CRUD operations on the `agent_personas` table and a function to compile persona fields into a system prompt section that shapes the agent's communication style and personality.
+Data-access and prompt-composition layer for composable agent personas. Provides CRUD operations on the standalone `personas` table, many-to-many assignment via `agent_persona_assignments`, and a function to compile multiple persona fields into a merged system prompt section.
 
 ## Public API
 
@@ -21,69 +22,65 @@ Data-access and prompt-composition layer for agent personas. Provides CRUD opera
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `getPersona` | `(db: Database, agentId: string)` | `AgentPersona \| null` | Fetch the persona for an agent. Returns null if no persona is configured |
-| `upsertPersona` | `(db: Database, agentId: string, input: UpsertPersonaInput)` | `AgentPersona` | Insert or update a persona. On update, only provided fields are changed. On insert, missing fields get defaults |
-| `deletePersona` | `(db: Database, agentId: string)` | `boolean` | Delete an agent's persona. Returns true if a row was deleted |
-| `composePersonaPrompt` | `(persona: AgentPersona \| null)` | `string` | Compose a system prompt section from persona fields. Returns empty string if persona is null |
+| `listPersonas` | `(db: Database)` | `Persona[]` | List all personas ordered by name |
+| `getPersona` | `(db: Database, personaId: string)` | `Persona \| null` | Fetch a persona by its own ID. Returns null if not found |
+| `createPersona` | `(db: Database, input: CreatePersonaInput)` | `Persona` | Create a standalone persona with a generated UUID |
+| `updatePersona` | `(db: Database, personaId: string, input: UpdatePersonaInput)` | `Persona \| null` | Update a persona. Only provided fields are changed. Returns null if not found |
+| `deletePersona` | `(db: Database, personaId: string)` | `boolean` | Delete a persona. Returns true if a row was deleted |
+| `getAgentPersonas` | `(db: Database, agentId: string)` | `Persona[]` | Get all personas assigned to an agent, ordered by sort_order |
+| `assignPersona` | `(db: Database, agentId: string, personaId: string, sortOrder?: number)` | `boolean` | Assign a persona to an agent. Returns false if persona not found |
+| `unassignPersona` | `(db: Database, agentId: string, personaId: string)` | `boolean` | Remove a persona assignment. Returns true if assignment was removed |
+| `composePersonaPrompt` | `(personas: Persona[])` | `string` | Compose a merged system prompt from multiple personas. Returns empty string for empty array |
 
 ### Exported Types
 
 | Type | Description |
 |------|-------------|
-| (none) | No types exported from this module. Types `AgentPersona`, `UpsertPersonaInput`, and `PersonaArchetype` are imported from `shared/types` |
+| (none) | Types `Persona`, `CreatePersonaInput`, `UpdatePersonaInput`, and `PersonaArchetype` are imported from `shared/types` |
 
 ## Invariants
 
-1. **One persona per agent**: The `agent_id` column is the primary key; each agent has at most one persona
-2. **Partial update**: `upsertPersona` only modifies fields present in the input; omitted fields retain their current values
-3. **Insert defaults**: When inserting a new persona, missing fields default to: archetype `'custom'`, traits `[]`, voiceGuidelines `''`, background `''`, exampleMessages `[]`
+1. **Standalone personas**: Personas exist independently of agents and can be shared (many-to-many)
+2. **Partial update**: `updatePersona` only modifies fields present in the input; omitted fields retain their current values
+3. **Insert defaults**: When creating a persona, missing fields default to: archetype `'custom'`, traits `[]`, voiceGuidelines `''`, background `''`, exampleMessages `[]`
 4. **JSON serialization**: `traits` and `exampleMessages` are stored as JSON arrays and parsed on read
 5. **Timestamp auto-update**: Every update sets `updated_at = datetime('now')`
-6. **Prompt composition order**: The composed prompt includes sections in order: archetype (if not custom), traits, background, voice guidelines, example messages
-7. **Empty prompt for null persona**: `composePersonaPrompt(null)` returns `''`
-8. **Custom archetype suppression**: If archetype is `'custom'`, the archetype line is omitted from the composed prompt
-9. **Cascade deletion**: The foreign key `REFERENCES agents(id) ON DELETE CASCADE` ensures persona is deleted when the agent is deleted
+6. **Prompt merge order**: When composing from multiple personas: traits are unioned (deduplicated), voice guidelines concatenated, backgrounds concatenated, example messages concatenated
+7. **Archetype selection**: Uses the first non-custom archetype found (by sort_order)
+8. **Empty prompt for empty array**: `composePersonaPrompt([])` returns `''`
+9. **Custom archetype suppression**: If all personas have archetype `'custom'`, the archetype line is omitted
+10. **Cascade deletion**: Foreign keys ensure assignments are deleted when either agent or persona is deleted
 
 ## Behavioral Examples
 
-### Scenario: Create a new persona
+### Scenario: Create and assign a persona
 
-- **Given** agent `agent-1` has no persona
-- **When** `upsertPersona(db, 'agent-1', { archetype: 'friendly', traits: ['helpful', 'witty'] })` is called
-- **Then** a new row is inserted with archetype `friendly`, traits `["helpful","witty"]`, and defaults for other fields
+- **Given** a persona `p1` with archetype `friendly` and traits `['helpful']`
+- **When** `assignPersona(db, agentId, p1.id)` is called
+- **Then** the agent has one assigned persona accessible via `getAgentPersonas`
 
-### Scenario: Partial update of existing persona
+### Scenario: Merge multiple personas
 
-- **Given** agent `agent-1` has a persona with archetype `friendly` and background `''`
-- **When** `upsertPersona(db, 'agent-1', { background: 'Expert in distributed systems' })` is called
-- **Then** only `background` and `updated_at` are updated; archetype remains `friendly`
-
-### Scenario: Compose prompt with full persona
-
-- **Given** a persona with archetype `technical`, traits `['precise', 'thorough']`, background `'Senior engineer'`, voiceGuidelines `'Use clear language'`, exampleMessages `['Let me analyze that.']`
-- **When** `composePersonaPrompt(persona)` is called
-- **Then** returns a multi-line string with sections: `## Persona`, `Archetype: technical`, `Personality traits: precise, thorough`, `Background: Senior engineer`, `Communication style: Use clear language`, `Example messages...`
-
-### Scenario: Compose prompt for custom archetype
-
-- **Given** a persona with archetype `custom` and traits `['calm']`
-- **When** `composePersonaPrompt(persona)` is called
-- **Then** the archetype line is omitted; output includes `## Persona` and `Personality traits: calm`
+- **Given** agent has personas P1 (archetype: custom, traits: [precise]) and P2 (archetype: technical, traits: [precise, creative])
+- **When** `composePersonaPrompt([p1, p2])` is called
+- **Then** traits are `precise, creative` (deduplicated), archetype is `technical` (first non-custom)
 
 ### Scenario: Delete a persona
 
-- **Given** agent `agent-1` has a persona
-- **When** `deletePersona(db, 'agent-1')` is called
-- **Then** the persona row is deleted and `true` is returned
+- **Given** persona `p1` is assigned to agents A1 and A2
+- **When** `deletePersona(db, p1.id)` is called
+- **Then** persona is deleted and assignments cascade-delete from both agents
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| `getPersona` with no persona set | Returns `null` |
-| `deletePersona` with no persona set | Returns `false` |
-| `upsertPersona` with empty input on existing persona | No fields updated (no-op except `updated_at` is not changed since `fields.length` is 0) |
-| `composePersonaPrompt(null)` | Returns `''` |
+| `getPersona` with non-existent ID | Returns `null` |
+| `updatePersona` with non-existent ID | Returns `null` |
+| `deletePersona` with non-existent ID | Returns `false` |
+| `assignPersona` with non-existent persona | Returns `false` |
+| `unassignPersona` with no matching assignment | Returns `false` |
+| `composePersonaPrompt([])` | Returns `''` |
 
 ## Dependencies
 
@@ -92,23 +89,24 @@ Data-access and prompt-composition layer for agent personas. Provides CRUD opera
 | Module | What is used |
 |--------|-------------|
 | `bun:sqlite` | `Database` type |
-| `shared/types` | `AgentPersona`, `UpsertPersonaInput`, `PersonaArchetype` |
+| `shared/types` | `Persona`, `CreatePersonaInput`, `UpdatePersonaInput`, `PersonaArchetype` |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `server/routes/personas.ts` | `getPersona`, `upsertPersona`, `deletePersona` |
-| `server/process/manager.ts` | `getPersona`, `composePersonaPrompt` (for system prompt injection) |
-| `server/a2a/agent-card.ts` | `getPersona` (for agent card metadata) |
+| `server/routes/personas.ts` | `listPersonas`, `getPersona`, `createPersona`, `updatePersona`, `deletePersona`, `getAgentPersonas`, `assignPersona`, `unassignPersona` |
+| `server/process/session-config-resolver.ts` | `getAgentPersonas`, `composePersonaPrompt` (for system prompt injection) |
+| `server/a2a/agent-card.ts` | `getAgentPersonas` (for agent card metadata) |
 
 ## Database Tables
 
-### agent_personas
+### personas
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| agent_id | TEXT | PRIMARY KEY, FK agents(id) ON DELETE CASCADE | Owning agent (one persona per agent) |
+| id | TEXT | PRIMARY KEY | Unique persona identifier (UUID) |
+| name | TEXT | NOT NULL | Human-readable persona name |
 | archetype | TEXT | DEFAULT 'custom' | Persona archetype: custom, professional, friendly, technical, creative, formal |
 | traits | TEXT | NOT NULL DEFAULT '[]' | JSON array of personality trait strings |
 | voice_guidelines | TEXT | DEFAULT '' | Free-text guidelines for communication style |
@@ -117,8 +115,18 @@ Data-access and prompt-composition layer for agent personas. Provides CRUD opera
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
 
+### agent_persona_assignments
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| agent_id | TEXT | NOT NULL, FK agents(id) ON DELETE CASCADE | Owning agent |
+| persona_id | TEXT | NOT NULL, FK personas(id) ON DELETE CASCADE | Assigned persona |
+| sort_order | INTEGER | DEFAULT 0 | Order for persona stacking (lower = higher priority) |
+| | | PRIMARY KEY (agent_id, persona_id) | Composite primary key |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-22 | corvid-agent | v2: Composable personas (many-to-many, stackable) — #987 |

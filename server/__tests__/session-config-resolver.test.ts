@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
-import { upsertPersona } from '../db/personas';
+import { createPersona, assignPersona } from '../db/personas';
 import { createBundle, assignBundle } from '../db/skill-bundles';
 import { resolveSessionPrompts, resolveToolPermissions, resolveSessionConfig } from '../process/session-config-resolver';
 
@@ -23,6 +23,19 @@ afterEach(() => {
     db.close();
 });
 
+/** Helper: create a persona and assign it to an agent. */
+function seedPersona(agentId: string, input: { archetype?: string; traits?: string[]; voiceGuidelines?: string; background?: string } = {}) {
+    const persona = createPersona(db, {
+        name: input.archetype ? `${input.archetype} persona` : 'Test Persona',
+        archetype: input.archetype as any ?? 'custom',
+        traits: input.traits,
+        voiceGuidelines: input.voiceGuidelines,
+        background: input.background,
+    });
+    assignPersona(db, agentId, persona.id);
+    return persona;
+}
+
 describe('session-config-resolver', () => {
 
     // ── resolveSessionPrompts ──────────────────────────────────────────
@@ -36,7 +49,7 @@ describe('session-config-resolver', () => {
 
         it('returns persona prompt when agent has a persona', () => {
             const agent = createAgent(db, { name: 'TestAgent' });
-            upsertPersona(db, agent.id, {
+            seedPersona(agent.id, {
                 archetype: 'professional',
                 traits: ['analytical'],
                 voiceGuidelines: 'Be precise.',
@@ -124,7 +137,7 @@ describe('session-config-resolver', () => {
     describe('resolveSessionConfig', () => {
         it('returns all three config values', () => {
             const agent = createAgent(db, { name: 'FullConfig' });
-            upsertPersona(db, agent.id, {
+            seedPersona(agent.id, {
                 archetype: 'technical',
                 traits: ['precise'],
             });

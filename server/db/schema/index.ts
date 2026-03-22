@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 98;
+const SCHEMA_VERSION = 99;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -117,6 +117,11 @@ const MIGRATIONS: Record<number, string[]> = {
     98: [
         // Add output_destinations to schedules for routing results to Discord/AlgoChat
         `ALTER TABLE agent_schedules ADD COLUMN output_destinations TEXT DEFAULT NULL`,
+    ],
+    99: [
+        // Composable personas: standalone personas table + many-to-many junction
+        ...agents.tables.filter((s) => s.includes('personas') && !s.includes('agent_skills')),
+        ...agents.indexes.filter((s) => s.includes('persona')),
     ],
 };
 
