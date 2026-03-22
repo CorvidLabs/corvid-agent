@@ -35,7 +35,9 @@ export type MessageErrorCode =
     | 'RESPONSE_SEND_FAILED'  // On-chain response delivery failed
     | 'WORK_TASK_ERROR'       // Work task creation failed
     | 'CIRCUIT_OPEN'          // Circuit breaker open for target agent
-    | 'RATE_LIMITED';         // Per-agent rate limit exceeded
+    | 'RATE_LIMITED'          // Per-agent rate limit exceeded
+    | 'AGENT_BLOCKED'        // Agent is blacklisted
+    | 'BEHAVIORAL_DRIFT';    // Behavioral anomaly detected
 
 /** Current message protocol version for forward compatibility. */
 export const MESSAGE_PROTOCOL_VERSION = 1;

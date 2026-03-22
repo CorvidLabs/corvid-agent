@@ -1,6 +1,6 @@
 // ─── Trust Levels ───────────────────────────────────────────────────────────
 
-export type TrustLevel = 'untrusted' | 'low' | 'medium' | 'high' | 'verified';
+export type TrustLevel = 'untrusted' | 'low' | 'medium' | 'high' | 'verified' | 'blacklisted';
 
 // ─── Reputation Score ───────────────────────────────────────────────────────
 
@@ -46,7 +46,9 @@ export type ReputationEventType =
     | 'attestation_published'
     | 'improvement_loop_completed'
     | 'improvement_loop_failed'
-    | 'feedback_received';
+    | 'feedback_received'
+    | 'agent_blacklisted'
+    | 'agent_unblacklisted';
 
 export interface ReputationEvent {
     id: string;

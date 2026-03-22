@@ -48,7 +48,7 @@ Combined circuit breaker and per-agent rate limiter for agent-to-agent messaging
 |------|-------------|
 | `MessagingGuardConfig` | `{ failureThreshold, resetTimeoutMs, successThreshold, rateLimitPerWindow, rateLimitWindowMs }` |
 | `GuardResult` | `{ allowed: boolean; reason?: GuardRejectionReason; retryAfterMs?: number }` |
-| `GuardRejectionReason` | `'CIRCUIT_OPEN' \| 'RATE_LIMITED'` |
+| `GuardRejectionReason` | `'CIRCUIT_OPEN' \| 'RATE_LIMITED' \| 'AGENT_BLOCKED' \| 'BEHAVIORAL_DRIFT'` |
 
 ### Exported Functions
 

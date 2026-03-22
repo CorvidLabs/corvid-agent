@@ -36,6 +36,15 @@ function isAutomatedActor(actor: string | undefined): boolean {
     return AUTOMATED_ACTORS.has(actor) || actor.endsWith('[bot]');
 }
 
+// ─── Branch prefix detection (same logic as governance-check.ts) ────────────
+
+const AUTOMATED_BRANCH_PREFIXES = ['agent/', 'chat/'];
+
+function isAutomatedBranch(headRef: string | undefined): boolean {
+    if (!headRef) return false;
+    return AUTOMATED_BRANCH_PREFIXES.some((prefix) => headRef.startsWith(prefix));
+}
+
 // ─── extractChangedFiles ─────────────────────────────────────────────────────
 
 describe('governance CI check — extractChangedFiles', () => {
@@ -91,6 +100,35 @@ describe('governance CI check — isAutomatedActor', () => {
     });
 });
 
+// ─── isAutomatedBranch ────────────────────────────────────────────────────────
+
+describe('governance CI check — isAutomatedBranch', () => {
+    test('identifies agent/ prefix as automated', () => {
+        expect(isAutomatedBranch('agent/corvid-agent/fix-bug-18f5k3c-abc123')).toBe(true);
+        expect(isAutomatedBranch('agent/some-agent/task-name')).toBe(true);
+    });
+
+    test('identifies chat/ prefix as automated', () => {
+        expect(isAutomatedBranch('chat/corvid-agent/a1b2c3d4e5f6')).toBe(true);
+    });
+
+    test('treats feature branches as non-automated', () => {
+        expect(isAutomatedBranch('feat/new-feature')).toBe(false);
+        expect(isAutomatedBranch('fix/bug-fix')).toBe(false);
+        expect(isAutomatedBranch('main')).toBe(false);
+    });
+
+    test('treats undefined/empty as non-automated', () => {
+        expect(isAutomatedBranch(undefined)).toBe(false);
+        expect(isAutomatedBranch('')).toBe(false);
+    });
+
+    test('does not match partial prefix (e.g. "agents/" or "chatbot/")', () => {
+        expect(isAutomatedBranch('agents/something')).toBe(false);
+        expect(isAutomatedBranch('chatbot/session')).toBe(false);
+    });
+});
+
 // ─── Enforcement logic ───────────────────────────────────────────────────────
 
 describe('governance CI check — enforcement decisions', () => {
@@ -143,6 +181,41 @@ describe('governance CI check — enforcement decisions', () => {
         expect(impact.tier).toBe(0);
         expect(impact.blockedFromAutomation).toBe(true);
         expect(impact.affectedPaths.some((p) => p.tier === 0)).toBe(true);
+    });
+
+    test('automated branch + Layer 0 change = blocked (even with human actor)', () => {
+        const files = ['server/councils/governance.ts', 'server/routes/agents.ts'];
+        const impact = assessImpact(files);
+        const actor = '0xLeif'; // human actor
+        const branch = 'agent/corvid-agent/fix-governance-18f5k3c-abc123';
+
+        expect(impact.tier).toBe(0);
+        expect(impact.blockedFromAutomation).toBe(true);
+        // Actor is human, but branch is automated — should still block
+        expect(isAutomatedActor(actor)).toBe(false);
+        expect(isAutomatedBranch(branch)).toBe(true);
+        const isAutomated = isAutomatedActor(actor) || isAutomatedBranch(branch);
+        expect(isAutomated).toBe(true);
+    });
+
+    test('human actor + manual branch + Layer 0 = allowed (warning only)', () => {
+        const impact = assessImpact(['server/councils/governance.ts']);
+        const actor = '0xLeif';
+        const branch = 'feat/governance-update';
+
+        expect(impact.tier).toBe(0);
+        const isAutomated = isAutomatedActor(actor) || isAutomatedBranch(branch);
+        expect(isAutomated).toBe(false);
+        // CI script would warn but exit(0)
+    });
+
+    test('chat/ branch + Layer 0 = blocked', () => {
+        const files = ['server/process/protected-paths.ts'];
+        const impact = assessImpact(files);
+        const branch = 'chat/corvid-agent/a1b2c3d4e5f6';
+
+        expect(impact.tier).toBe(0);
+        expect(isAutomatedBranch(branch)).toBe(true);
     });
 
     test('classifies all constitutional paths correctly for CI enforcement', () => {

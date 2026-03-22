@@ -21,6 +21,7 @@ import type {
     ScoreExplanation,
 } from './types';
 import { DEFAULT_WEIGHTS } from './types';
+import { isAgentBlocked, addToAgentBlocklist } from '../db/agent-blocklist';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ReputationScorer');
@@ -36,7 +37,8 @@ const REPUTATION_FLOOR = 0.1;
 
 // ─── Trust Level Thresholds ──────────────────────────────────────────────────
 
-function computeTrustLevel(score: number): TrustLevel {
+function computeTrustLevel(score: number, isBlacklisted = false): TrustLevel {
+    if (isBlacklisted) return 'blacklisted';
     if (score >= 90) return 'verified';
     if (score >= 70) return 'high';
     if (score >= 50) return 'medium';
@@ -475,16 +477,19 @@ export class ReputationScorer {
      * Compute the full reputation score for an agent.
      */
     computeScore(agentId: string): ReputationScore {
+        // Kill switch: blacklisted agents always get score 0
+        const blacklisted = isAgentBlocked(this.db, agentId);
+
         const components = this.computeComponents(agentId);
         const rawScore = this.computeOverall(components);
 
         // Apply time-based decay for inactive agents
         const decayFactor = computeDecayFactor(this.db, agentId);
-        const overallScore = Math.max(
+        const overallScore = blacklisted ? 0 : Math.max(
             1, // Never fully zero — minimum floor
             Math.round(rawScore * decayFactor),
         );
-        const trustLevel = computeTrustLevel(overallScore);
+        const trustLevel = computeTrustLevel(overallScore, blacklisted);
 
         // Check for existing attestation hash
         const existing = this.db.query(
@@ -554,6 +559,64 @@ export class ReputationScorer {
         );
 
         log.debug('Recorded reputation event', { id, agentId: input.agentId, type: input.eventType });
+
+        // ── Kill switch: auto-blacklist on critical security violations ──
+        if (input.eventType === 'security_violation') {
+            const severity = (input.metadata as Record<string, unknown>)?.severity;
+            if (severity === 'critical') {
+                // Instant blacklist — one confirmed malicious action = game over
+                if (!isAgentBlocked(this.db, input.agentId)) {
+                    const detail = (input.metadata as Record<string, unknown>)?.detail as string ?? 'Critical security violation';
+                    addToAgentBlocklist(this.db, input.agentId, {
+                        reason: 'security_violation',
+                        detail,
+                        blockedBy: 'kill-switch',
+                    });
+                    this.db.query(`
+                        INSERT INTO reputation_events (id, agent_id, event_type, score_impact, metadata)
+                        VALUES (?, ?, 'agent_blacklisted', -100, ?)
+                    `).run(
+                        crypto.randomUUID(),
+                        input.agentId,
+                        JSON.stringify({ triggeredBy: id, severity: 'critical', detail }),
+                    );
+                    this.computeScore(input.agentId);
+                    log.warn('KILL SWITCH: Agent blacklisted due to critical security violation', {
+                        agentId: input.agentId,
+                        eventId: id,
+                        detail,
+                    });
+                }
+            }
+
+            // Also check for accumulated violations — 3+ in 24 hours = auto-blacklist
+            const recentViolations = this.db.query(`
+                SELECT COUNT(*) as count FROM reputation_events
+                WHERE agent_id = ? AND event_type = 'security_violation'
+                AND created_at > datetime('now', '-1 day')
+            `).get(input.agentId) as { count: number };
+
+            if (recentViolations.count >= 3 && !isAgentBlocked(this.db, input.agentId)) {
+                addToAgentBlocklist(this.db, input.agentId, {
+                    reason: 'security_violation',
+                    detail: `${recentViolations.count} security violations in 24 hours`,
+                    blockedBy: 'kill-switch',
+                });
+                this.db.query(`
+                    INSERT INTO reputation_events (id, agent_id, event_type, score_impact, metadata)
+                    VALUES (?, ?, 'agent_blacklisted', -100, ?)
+                `).run(
+                    crypto.randomUUID(),
+                    input.agentId,
+                    JSON.stringify({ triggeredBy: id, reason: 'accumulated_violations', count: recentViolations.count }),
+                );
+                this.computeScore(input.agentId);
+                log.warn('KILL SWITCH: Agent blacklisted due to accumulated security violations', {
+                    agentId: input.agentId,
+                    violationCount: recentViolations.count,
+                });
+            }
+        }
     }
 
     /**

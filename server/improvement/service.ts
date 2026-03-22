@@ -45,6 +45,7 @@ export interface ImprovementRunResult {
 
 function computeMaxTasks(trustLevel: TrustLevel, requestedMax: number): number {
     switch (trustLevel) {
+        case 'blacklisted':
         case 'untrusted':
             return 0; // blocked
         case 'low':

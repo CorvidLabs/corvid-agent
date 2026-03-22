@@ -125,6 +125,11 @@ const MIGRATIONS: Record<number, string[]> = {
         ...agents.tables.filter((s) => s.includes('personas') || s.includes('agent_persona_assignments')),
         ...agents.indexes.filter((s) => s.includes('agent_persona_assignments')),
     ],
+    100: [
+        // Agent blocklist: kill switch for malicious agents
+        ...reputation.tables.filter((s) => s.includes('agent_blocklist')),
+        ...reputation.indexes.filter((s) => s.includes('agent_blocklist')),
+    ],
 };
 
 // ── Migration helpers ───────────────────────────────────────────────
