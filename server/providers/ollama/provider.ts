@@ -121,7 +121,9 @@ export class OllamaProvider extends BaseLlmProvider {
     /** null = not yet probed, true/false = detected */
     private gpuDetected: boolean | null = process.env.OLLAMA_MAX_PARALLEL ? true : null;
 
-    private readonly host = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    private get host(): string {
+        return process.env.OLLAMA_HOST || 'http://localhost:11434';
+    }
 
     /**
      * Get the host for a specific model. Cloud models (suffix "-cloud") require
