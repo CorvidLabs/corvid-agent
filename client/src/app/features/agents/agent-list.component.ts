@@ -8,6 +8,7 @@ import { PersonaService } from '../../core/services/persona.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Agent } from '../../core/models/agent.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
@@ -34,16 +35,16 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Agents</h2>
-                <a class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
-            </div>
+        <app-page-shell
+            title="Agents"
+            icon="agents"
+            [breadcrumbs]="[{ label: 'Agents' }]">
+            <a actions class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
 
             <!-- Search + Filters (sticky) -->
-            <div class="sticky-toolbar">
+            <div toolbar class="sticky-toolbar">
             <div class="search-bar">
                 <input
                     class="search-input"
@@ -95,7 +96,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                     </select>
                 </div>
             </div>
-            </div><!-- /sticky-toolbar -->
+            </div>
 
             @if (agentService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -176,12 +177,9 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn {
             padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;

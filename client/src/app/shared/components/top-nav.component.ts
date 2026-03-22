@@ -31,20 +31,45 @@ interface NavTab {
 
 const TABS: NavTab[] = [
     {
-        key: 'chat',
-        label: 'Chat',
+        key: 'home',
+        label: 'Home',
         icon: 'chat',
         route: '/chat',
-        matchRoutes: ['/chat', '/dashboard', '/sessions'],
+        matchRoutes: ['/chat'],
+        children: [],
+    },
+    {
+        key: 'dashboard',
+        label: 'Dashboard',
+        icon: 'dashboard',
+        route: '/dashboard',
+        matchRoutes: ['/dashboard'],
+        children: [],
+    },
+    {
+        key: 'sessions',
+        label: 'Sessions',
+        icon: 'sessions',
+        route: '/sessions',
+        matchRoutes: ['/sessions'],
         children: [
-            { label: 'Home', icon: 'chat', route: '/chat' },
-            { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
             { label: 'Conversations', icon: 'sessions', route: '/sessions' },
             { label: 'Work Tasks', icon: 'list', route: '/sessions/work-tasks' },
             { label: 'Councils', icon: 'users', route: '/sessions/councils' },
-            { label: 'Live Feed', icon: 'activity', route: '/sessions/feed' },
-            { label: 'Analytics', icon: 'bar-chart', route: '/sessions/analytics' },
-            { label: 'Logs', icon: 'terminal', route: '/sessions/logs' },
+        ],
+    },
+    {
+        key: 'observe',
+        label: 'Observe',
+        icon: 'eye',
+        route: '/observe',
+        matchRoutes: ['/observe'],
+        children: [
+            { label: 'Live Feed', icon: 'activity', route: '/observe/feed' },
+            { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
+            { label: 'Logs', icon: 'terminal', route: '/observe/logs' },
+            { label: 'Brain Viewer', icon: 'zap', route: '/observe/brain-viewer' },
+            { label: 'Reputation', icon: 'star', route: '/observe/reputation' },
         ],
     },
     {

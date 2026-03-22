@@ -7,6 +7,7 @@ import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Session, SessionStatus } from '../../core/models/session.model';
@@ -20,16 +21,16 @@ interface SessionGroup {
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Conversations</h2>
-                <a class="btn btn--primary" routerLink="/sessions/new">+ New Conversation</a>
-            </div>
+        <app-page-shell
+            title="Conversations"
+            icon="sessions"
+            [breadcrumbs]="[{ label: 'Sessions', route: '/sessions' }, { label: 'Conversations' }]">
+            <a actions class="btn btn--primary" routerLink="/sessions/new">+ New Conversation</a>
 
             <!-- Search + Filters (sticky) -->
-            <div class="sticky-toolbar">
+            <div toolbar class="sticky-toolbar">
             <div class="search-bar">
                 <input
                     class="search-input"
@@ -60,7 +61,7 @@ interface SessionGroup {
                 </select>
             </div>
 
-            </div><!-- /sticky-toolbar -->
+            </div>
 
             <!-- Bulk Actions -->
             @if (runningCount() > 0 || completedCount() > 0) {
@@ -127,12 +128,9 @@ interface SessionGroup {
                     </div>
                 }
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn { padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s; }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }

@@ -17,6 +17,7 @@ import { CommandPaletteComponent } from './shared/components/command-palette.com
 import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { GuidedTourComponent } from './shared/components/guided-tour.component';
+import { MobileBottomNavComponent } from './shared/components/mobile-bottom-nav.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
 import { ChatTabsService } from './core/services/chat-tabs.service';
@@ -25,7 +26,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent],
+    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent],
     template: `
         <div class="app-layout">
             <app-top-nav />
@@ -54,6 +55,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             (click)="scrollToTop()"
             aria-label="Scroll to top"
             title="Scroll to top">&#x25B2;</button>
+        <app-mobile-bottom-nav />
         <app-command-palette />
         <app-keyboard-shortcuts-overlay />
         <app-guided-tour />
@@ -96,6 +98,13 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             background: var(--accent-yellow-dim, rgba(255, 204, 0, 0.1));
             border-bottom-color: var(--accent-yellow, #fc0);
             color: var(--accent-yellow, #fc0);
+        }
+
+        /* Mobile: reserve space for bottom nav */
+        @media (max-width: 767px) {
+            .app-layout__content {
+                padding-bottom: 56px;
+            }
         }
     `,
 })
