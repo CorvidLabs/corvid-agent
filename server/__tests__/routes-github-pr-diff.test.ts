@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, mock, afterEach } from 'bun:test';
 import { handleGitHubPRDiffRoutes } from '../routes/github-pr-diff';
 
 const originalFetch = globalThis.fetch;
@@ -25,7 +25,7 @@ describe('GitHub PR Diff Routes', () => {
 
     it('returns 400 when owner is missing', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?repo=y&number=1');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const body = await res!.json();
@@ -34,21 +34,21 @@ describe('GitHub PR Diff Routes', () => {
 
     it('returns 400 when repo is missing', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?owner=x&number=1');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
     });
 
     it('returns 400 when number is missing', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?owner=x&repo=y');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
     });
 
     it('returns 400 for invalid owner format (SSRF prevention)', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?owner=../../etc&repo=y&number=1');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const body = await res!.json();
@@ -57,7 +57,7 @@ describe('GitHub PR Diff Routes', () => {
 
     it('returns 400 for invalid repo format', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?owner=x&repo=y%20z&number=1');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const body = await res!.json();
@@ -66,7 +66,7 @@ describe('GitHub PR Diff Routes', () => {
 
     it('returns 400 for non-numeric PR number', async () => {
         const { req, url } = fakeReq('GET', '/api/github/pr-diff?owner=x&repo=y&number=abc');
-        const res = handleGitHubPRDiffRoutes(req, url);
+        const res = await handleGitHubPRDiffRoutes(req, url);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const body = await res!.json();
@@ -116,7 +116,7 @@ describe('GitHub PR Diff Routes', () => {
         process.env.GITHUB_TOKEN = 'test-token-123';
 
         let capturedHeaders: Record<string, string> = {};
-        globalThis.fetch = mock((url: string | URL | Request, init?: RequestInit) => {
+        globalThis.fetch = mock((_fetchUrl: string | URL | Request, init?: RequestInit) => {
             capturedHeaders = Object.fromEntries(
                 Object.entries(init?.headers || {}),
             );
