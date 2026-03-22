@@ -17,6 +17,7 @@ import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { checkInjection } from '../lib/injection-guard';
 import { getAgent } from '../db/agents';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 
@@ -116,6 +117,10 @@ async function handleCreate(
 ): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateSessionSchema);
+        if (data.initialPrompt) {
+            const injectionDenied = checkInjection(db, data.initialPrompt, 'session_create', req);
+            if (injectionDenied) return injectionDenied;
+        }
         const session = createSession(db, data, tenantId);
 
         const ip = getClientIp(req);
@@ -201,6 +206,10 @@ async function handleResume(
         prompt = data?.prompt;
     } catch {
         // Empty body is fine for resume
+    }
+    if (prompt) {
+        const injectionDenied = checkInjection(db, prompt, 'session_resume', req);
+        if (injectionDenied) return injectionDenied;
     }
     try {
         processManager.resumeProcess(session, prompt);

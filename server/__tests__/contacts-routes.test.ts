@@ -9,7 +9,7 @@ let db: Database;
 
 const ctx: RequestContext = {
     authenticated: true,
-    tenantId: '',
+    tenantId: 'default',
 };
 
 function fakeReq(method: string, path: string, body?: unknown): { req: Request; url: URL } {
@@ -43,9 +43,9 @@ describe('GET /api/contacts', () => {
     });
 
     it('returns contacts with pagination', async () => {
-        createContact(db, '', 'Alice');
-        createContact(db, '', 'Bob');
-        createContact(db, '', 'Charlie');
+        createContact(db, 'default','Alice');
+        createContact(db, 'default','Bob');
+        createContact(db, 'default','Charlie');
 
         const { req, url } = fakeReq('GET', '/api/contacts?limit=2&offset=0');
         const res = handleContactRoutes(req, url, db, ctx) as Response;
@@ -55,8 +55,8 @@ describe('GET /api/contacts', () => {
     });
 
     it('supports search query param', async () => {
-        createContact(db, '', 'Alice Smith');
-        createContact(db, '', 'Bob Jones');
+        createContact(db, 'default','Alice Smith');
+        createContact(db, 'default','Bob Jones');
 
         const { req, url } = fakeReq('GET', '/api/contacts?search=alice');
         const res = handleContactRoutes(req, url, db, ctx) as Response;
@@ -106,7 +106,7 @@ describe('POST /api/contacts', () => {
 
 describe('GET /api/contacts/:id', () => {
     it('returns contact by id', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('GET', `/api/contacts/${contact.id}`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(200);
@@ -125,7 +125,7 @@ describe('GET /api/contacts/:id', () => {
 
 describe('PUT /api/contacts/:id', () => {
     it('updates display name', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('PUT', `/api/contacts/${contact.id}`, {
             displayName: 'Alice Updated',
         });
@@ -136,7 +136,7 @@ describe('PUT /api/contacts/:id', () => {
     });
 
     it('updates notes', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('PUT', `/api/contacts/${contact.id}`, {
             notes: 'new notes',
         });
@@ -147,7 +147,7 @@ describe('PUT /api/contacts/:id', () => {
     });
 
     it('can set notes to null', async () => {
-        const contact = createContact(db, '', 'Alice', 'has notes');
+        const contact = createContact(db, 'default','Alice', 'has notes');
         const { req, url } = fakeReq('PUT', `/api/contacts/${contact.id}`, {
             notes: null,
         });
@@ -170,7 +170,7 @@ describe('PUT /api/contacts/:id', () => {
 
 describe('DELETE /api/contacts/:id', () => {
     it('deletes contact and returns ok', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('DELETE', `/api/contacts/${contact.id}`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(200);
@@ -189,7 +189,7 @@ describe('DELETE /api/contacts/:id', () => {
 
 describe('GET /api/contacts/lookup', () => {
     it('looks up by name', async () => {
-        createContact(db, '', 'Alice');
+        createContact(db, 'default','Alice');
         const { req, url } = fakeReq('GET', '/api/contacts/lookup?name=Alice');
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(200);
@@ -204,8 +204,8 @@ describe('GET /api/contacts/lookup', () => {
     });
 
     it('looks up by platform + platform_id', async () => {
-        const contact = createContact(db, '', 'Alice');
-        addPlatformLink(db, '', contact.id, 'discord', '123456');
+        const contact = createContact(db, 'default','Alice');
+        addPlatformLink(db, 'default',contact.id, 'discord', '123456');
 
         const { req, url } = fakeReq('GET', '/api/contacts/lookup?platform=discord&platform_id=123456');
         const res = handleContactRoutes(req, url, db, ctx) as Response;
@@ -237,7 +237,7 @@ describe('GET /api/contacts/lookup', () => {
 
 describe('POST /api/contacts/:id/links', () => {
     it('adds a platform link', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('POST', `/api/contacts/${contact.id}/links`, {
             platform: 'discord',
             platformId: '12345',
@@ -259,7 +259,7 @@ describe('POST /api/contacts/:id/links', () => {
     });
 
     it('rejects invalid body', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('POST', `/api/contacts/${contact.id}/links`, {});
         const res = await handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(400);
@@ -268,8 +268,8 @@ describe('POST /api/contacts/:id/links', () => {
 
 describe('DELETE /api/contacts/:id/links/:linkId', () => {
     it('removes a platform link', async () => {
-        const contact = createContact(db, '', 'Alice');
-        const link = addPlatformLink(db, '', contact.id, 'github', 'alice');
+        const contact = createContact(db, 'default','Alice');
+        const link = addPlatformLink(db, 'default',contact.id, 'github', 'alice');
         const { req, url } = fakeReq('DELETE', `/api/contacts/${contact.id}/links/${link.id}`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(200);
@@ -278,7 +278,7 @@ describe('DELETE /api/contacts/:id/links/:linkId', () => {
     });
 
     it('returns 404 for missing link', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('DELETE', `/api/contacts/${contact.id}/links/nonexistent`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(404);
@@ -287,8 +287,8 @@ describe('DELETE /api/contacts/:id/links/:linkId', () => {
 
 describe('PUT /api/contacts/:id/links/:linkId/verify', () => {
     it('verifies a platform link', async () => {
-        const contact = createContact(db, '', 'Alice');
-        const link = addPlatformLink(db, '', contact.id, 'github', 'alice');
+        const contact = createContact(db, 'default','Alice');
+        const link = addPlatformLink(db, 'default',contact.id, 'github', 'alice');
         const { req, url } = fakeReq('PUT', `/api/contacts/${contact.id}/links/${link.id}/verify`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(200);
@@ -297,7 +297,7 @@ describe('PUT /api/contacts/:id/links/:linkId/verify', () => {
     });
 
     it('returns 404 for missing link', async () => {
-        const contact = createContact(db, '', 'Alice');
+        const contact = createContact(db, 'default','Alice');
         const { req, url } = fakeReq('PUT', `/api/contacts/${contact.id}/links/nonexistent/verify`);
         const res = handleContactRoutes(req, url, db, ctx) as Response;
         expect(res.status).toBe(404);

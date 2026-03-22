@@ -24,6 +24,7 @@ import { PermissionTier, requirePermissionTier } from '../permissions/governance
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema, CastVoteSchema, HumanApprovalSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
+import { checkInjection } from '../lib/injection-guard';
 import {
     launchCouncil,
     triggerReview,
@@ -289,6 +290,8 @@ async function handleLaunch(
 ): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, LaunchCouncilSchema);
+        const injectionDenied = checkInjection(db, data.prompt, 'council_launch', req);
+        if (injectionDenied) return injectionDenied;
 
         const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger, {
             voteType: data.voteType,
@@ -338,6 +341,8 @@ async function handleCouncilChat(
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
+    const injectionDenied = checkInjection(db, body.message, 'council_chat', req);
+    if (injectionDenied) return injectionDenied;
 
     const result = startCouncilChat(db, processManager, launchId, body.message);
     if (!result.ok) return json({ error: result.error }, result.status);
