@@ -673,8 +673,8 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
         if (task.status === 'completed') return fromIdx < this.stageOrder.indexOf('completed') ? 'done' : 'pending';
         if (task.status === 'failed') return fromIdx < taskIdx ? 'done' : 'pending';
-        if (fromIdx < taskIdx) return 'done';
         if (fromIdx === taskIdx - 1) return 'active';
+        if (fromIdx < taskIdx) return 'done';
         return 'pending';
     }
 
