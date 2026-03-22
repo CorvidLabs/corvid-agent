@@ -143,6 +143,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
+| `getRateLimitWaitMs` | `()` | `number` | Returns milliseconds to wait before next Discord API call (0 if not rate-limited) |
+| `discordFetch` | `(url, init)` | `Promise<Response>` | Rate-limit-aware fetch wrapper for Discord API that queues requests during 429 cooldowns |
 | `respondToInteraction` | `(interaction, content)` | `Promise<void>` | Send a text response to an interaction callback |
 | `respondToInteractionEmbed` | `(interaction, embed, ephemeral?)` | `Promise<void>` | Send an embed response to an interaction callback |
 | `respondToInteractionEmbeds` | `(interaction, embeds, ephemeral?)` | `Promise<void>` | Send multiple embeds in a single interaction response |
