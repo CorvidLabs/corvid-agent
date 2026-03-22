@@ -43,6 +43,7 @@ import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } f
 import { getAllRules } from './priority-rules';
 import type { HandlerContext } from './handlers/types';
 import { runAction, type RunActionDeps } from './execution';
+import { executePipeline } from './pipeline';
 import {
     shouldSkipByHealthGate,
     handleApprovalIfNeeded,
@@ -262,6 +263,19 @@ export class SchedulerService {
             const updatedSchedule = getSchedule(this.db, schedule.id);
             if (updatedSchedule) this.emit({ type: 'schedule_update', data: updatedSchedule });
 
+            // Pipeline mode: run steps sequentially with shared context.
+            if (schedule.executionMode === 'pipeline' && schedule.pipelineSteps?.length) {
+                this.notifyScheduleEvent(schedule, 'started',
+                    `Pipeline "${schedule.name}" started (${schedule.pipelineSteps.length} steps)`);
+                const emitFn = (e: { type: string; data: unknown }) => this.emit(e);
+                executePipeline(
+                    this.buildRunActionDeps(), this.buildHandlerContext(),
+                    schedule, schedule.pipelineSteps, emitFn,
+                );
+                return;
+            }
+
+            // Independent mode (default): run actions independently.
             for (const action of schedule.actions) {
                 if (this.runningExecutions.size >= MAX_CONCURRENT_EXECUTIONS) break;
 

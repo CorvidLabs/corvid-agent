@@ -43,6 +43,52 @@ export interface ScheduleAction {
     focusArea?: string;
 }
 
+// ─── Pipeline Types ─────────────────────────────────────────────────────────
+
+/** Execution mode for schedule actions: independent (default) or pipeline. */
+export type ScheduleExecutionMode = 'independent' | 'pipeline';
+
+/** Condition for whether a pipeline step should run based on previous step outcome. */
+export type PipelineStepCondition = 'always' | 'on_success' | 'on_failure';
+
+/** A single step in a pipeline, wrapping an action with pipeline-specific metadata. */
+export interface PipelineStep {
+    /** Unique label for this step (used as key in pipeline context). */
+    label: string;
+    /** The action to execute. */
+    action: ScheduleAction;
+    /** When this step should run relative to the previous step. Defaults to 'on_success'. */
+    condition?: PipelineStepCondition;
+}
+
+/** Shared context passed between pipeline steps during sequential execution. */
+export interface PipelineContext {
+    /** Results keyed by step label. */
+    stepResults: Record<string, PipelineStepResult>;
+    /** Accumulated summary across all steps. */
+    summary: string;
+    /** Whether any step has failed. */
+    hasFailure: boolean;
+}
+
+export interface PipelineStepResult {
+    label: string;
+    actionType: ScheduleActionType;
+    status: 'completed' | 'failed' | 'skipped';
+    result: string | null;
+    executionId: string;
+    durationMs: number;
+}
+
+/** Pre-defined pipeline template for common automation patterns. */
+export interface SchedulePipelineTemplate {
+    id: string;
+    name: string;
+    description: string;
+    steps: PipelineStep[];
+    outputDestinations?: ScheduleOutputDestination[];
+}
+
 export type ScheduleOutputDestinationType = 'discord_channel' | 'algochat_agent' | 'algochat_address';
 export type ScheduleOutputFormat = 'summary' | 'full' | 'on_error_only';
 
@@ -68,6 +114,10 @@ export interface AgentSchedule {
     notifyAddress: string | null;
     triggerEvents: ScheduleTriggerEvent[] | null;
     outputDestinations: ScheduleOutputDestination[] | null;
+    /** Execution mode: 'independent' runs actions in parallel, 'pipeline' runs steps sequentially with shared context. */
+    executionMode: ScheduleExecutionMode;
+    /** Pipeline steps — used when executionMode is 'pipeline'. */
+    pipelineSteps: PipelineStep[] | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
@@ -105,6 +155,8 @@ export interface CreateScheduleInput {
     notifyAddress?: string;
     triggerEvents?: ScheduleTriggerEvent[];
     outputDestinations?: ScheduleOutputDestination[];
+    executionMode?: ScheduleExecutionMode;
+    pipelineSteps?: PipelineStep[];
 }
 
 export interface UpdateScheduleInput {
@@ -120,4 +172,6 @@ export interface UpdateScheduleInput {
     notifyAddress?: string | null;
     triggerEvents?: ScheduleTriggerEvent[] | null;
     outputDestinations?: ScheduleOutputDestination[] | null;
+    executionMode?: ScheduleExecutionMode;
+    pipelineSteps?: PipelineStep[] | null;
 }

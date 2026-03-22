@@ -45,6 +45,8 @@ function createMockSchedule(overrides: Partial<AgentSchedule> = {}): AgentSchedu
         notifyAddress: null,
         triggerEvents: null,
         outputDestinations: null,
+        executionMode: 'independent',
+        pipelineSteps: null,
         lastRunAt: null,
         nextRunAt: null,
         createdAt: new Date().toISOString(),

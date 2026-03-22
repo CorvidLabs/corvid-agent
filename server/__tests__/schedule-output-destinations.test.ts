@@ -99,6 +99,8 @@ function makeSchedule(outputDestinations: ScheduleOutputDestination[] | null): A
         notifyAddress: null,
         triggerEvents: null,
         outputDestinations,
+        executionMode: 'independent',
+        pipelineSteps: null,
         lastRunAt: null,
         nextRunAt: null,
         createdAt: new Date().toISOString(),
