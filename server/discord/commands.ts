@@ -37,6 +37,7 @@ import {
     handleHelpCommand,
 } from './command-handlers/info-commands';
 import { handleCouncilCommand, handleMuteCommand, handleUnmuteCommand } from './command-handlers/moderation-commands';
+import { handleAgentSkillCommand, handleAgentPersonaCommand } from './command-handlers/agent-config-commands';
 import { handleComponentInteraction } from './command-handlers/component-handlers';
 import { handleAutocomplete } from './command-handlers/autocomplete-handler';
 
@@ -249,6 +250,74 @@ export async function registerSlashCommands(
                 { name: 'show', description: 'Show current bot configuration', type: 1 },
             ],
         },
+        {
+            name: 'agent-skill',
+            description: 'Manage skill bundles assigned to an agent',
+            type: 1,
+            default_member_permissions: '8',
+            options: [
+                {
+                    name: 'add',
+                    description: 'Assign a skill bundle to an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to configure', type: 3, required: true, autocomplete: true },
+                        { name: 'skill', description: 'Skill bundle to assign', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+                {
+                    name: 'remove',
+                    description: 'Unassign a skill bundle from an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to configure', type: 3, required: true, autocomplete: true },
+                        { name: 'skill', description: 'Skill bundle to remove', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+                {
+                    name: 'list',
+                    description: 'Show skill bundles assigned to an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to inspect', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+            ],
+        },
+        {
+            name: 'agent-persona',
+            description: 'Manage personas assigned to an agent',
+            type: 1,
+            default_member_permissions: '8',
+            options: [
+                {
+                    name: 'add',
+                    description: 'Assign a persona to an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to configure', type: 3, required: true, autocomplete: true },
+                        { name: 'persona', description: 'Persona to assign', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+                {
+                    name: 'remove',
+                    description: 'Unassign a persona from an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to configure', type: 3, required: true, autocomplete: true },
+                        { name: 'persona', description: 'Persona to remove', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+                {
+                    name: 'list',
+                    description: 'Show personas assigned to an agent',
+                    type: 1,
+                    options: [
+                        { name: 'agent', description: 'Agent to inspect', type: 3, required: true, autocomplete: true },
+                    ],
+                },
+            ],
+        },
     ];
 
     // Register globally or per-guild
@@ -410,6 +479,12 @@ export async function handleInteraction(
             await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options);
             break;
         }
+        case 'agent-skill':
+            await handleAgentSkillCommand(ctx, interaction, permLevel);
+            break;
+        case 'agent-persona':
+            await handleAgentPersonaCommand(ctx, interaction, permLevel);
+            break;
         default:
             await respondToInteraction(interaction, `Unknown command: ${commandName}`);
     }

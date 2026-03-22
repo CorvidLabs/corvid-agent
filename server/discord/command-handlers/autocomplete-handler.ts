@@ -10,6 +10,8 @@ import type { DiscordInteractionData } from '../types';
 import { InteractionCallbackType } from '../types';
 import { listAgents } from '../../db/agents';
 import { listProjects } from '../../db/projects';
+import { listBundles } from '../../db/skill-bundles';
+import { listPersonas } from '../../db/personas';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('DiscordCommands');
@@ -42,6 +44,25 @@ export async function handleAutocomplete(
             .slice(0, 25)
             .map(p => ({
                 name: `${p.name}${p.description ? ` — ${p.description}` : ''}`.slice(0, 100),
+                value: p.name,
+            }));
+    } else if (focused.name === 'skill') {
+        const bundles = listBundles(ctx.db);
+        choices = bundles
+            .filter(b => !query || b.name.toLowerCase().includes(query) ||
+                b.description.toLowerCase().includes(query))
+            .slice(0, 25)
+            .map(b => ({
+                name: `${b.name}${b.description ? ` — ${b.description}` : ''}`.slice(0, 100),
+                value: b.name,
+            }));
+    } else if (focused.name === 'persona') {
+        const personas = listPersonas(ctx.db);
+        choices = personas
+            .filter(p => !query || p.name.toLowerCase().includes(query))
+            .slice(0, 25)
+            .map(p => ({
+                name: `${p.name}${p.archetype !== 'custom' ? ` (${p.archetype})` : ''}`.slice(0, 100),
                 value: p.name,
             }));
     }
