@@ -59,8 +59,12 @@ export async function discordFetch(url: string, init: RequestInit): Promise<Resp
 
         // Cap at 5 minutes, minimum 1 second
         retryAfterMs = Math.max(1000, Math.min(retryAfterMs, 300_000));
-        rateLimitedUntil = Date.now() + retryAfterMs;
-        log.warn(`Discord 429 rate limited — pausing all API calls for ${retryAfterMs}ms`);
+
+        // Skip rate limit tracking during tests to prevent timeout delays
+        if (!process.env.BUN_TEST) {
+            rateLimitedUntil = Date.now() + retryAfterMs;
+            log.warn(`Discord 429 rate limited — pausing all API calls for ${retryAfterMs}ms`);
+        }
     }
 
     return response;
