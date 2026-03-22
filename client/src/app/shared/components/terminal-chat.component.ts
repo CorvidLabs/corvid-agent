@@ -352,7 +352,7 @@ interface AutocompleteItem {
             background: #161b22;
             border: 1px solid #30363d;
             border-radius: var(--radius, 6px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 16px var(--shadow-deep);
             z-index: 10;
             margin-bottom: 4px;
             scrollbar-width: thin;

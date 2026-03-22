@@ -58,10 +58,10 @@ const NAV_ITEMS: BottomNavItem[] = [
             align-items: stretch;
             justify-content: space-around;
             height: 56px;
-            background: linear-gradient(180deg, rgba(15, 16, 24, 0.97) 0%, rgba(10, 10, 18, 0.99) 100%);
+            background: var(--glass-bg-solid);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: 1px solid var(--border-faint);
             padding-bottom: env(safe-area-inset-bottom, 0);
         }
 

@@ -112,7 +112,7 @@ interface TooltipPos {
             position: absolute;
             border: 2px solid var(--accent-cyan, #00e5ff);
             border-radius: 8px;
-            box-shadow: 0 0 16px rgba(0, 229, 255, 0.4), inset 0 0 16px rgba(0, 229, 255, 0.05);
+            box-shadow: 0 0 16px var(--accent-cyan-glow), inset 0 0 16px rgba(0, 229, 255, 0.05);
             pointer-events: none;
             transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
         }
@@ -125,7 +125,7 @@ interface TooltipPos {
             border: 1px solid var(--border-bright, #3a3a5c);
             border-radius: var(--radius-lg, 12px);
             padding: 1rem 1.25rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.1);
+            box-shadow: 0 8px 32px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-dim);
             z-index: 10001;
             transition: top 0.3s ease, left 0.3s ease;
             animation: tour-fadein 0.25s ease;
@@ -197,7 +197,7 @@ interface TooltipPos {
 
         .tour-dot--active {
             background: var(--accent-cyan, #00e5ff);
-            box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+            box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
 
         .tour-dot--done {
@@ -222,13 +222,13 @@ interface TooltipPos {
         }
 
         .tour-btn--primary {
-            background: rgba(0, 229, 255, 0.12);
+            background: var(--accent-cyan-dim);
             border-color: var(--accent-cyan, #00e5ff);
             color: var(--accent-cyan, #00e5ff);
         }
         .tour-btn--primary:hover {
-            background: rgba(0, 229, 255, 0.22);
-            box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+            background: var(--accent-cyan-border);
+            box-shadow: 0 0 8px var(--accent-cyan-border);
         }
 
         .tour-btn--ghost {

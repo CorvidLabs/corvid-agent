@@ -170,32 +170,11 @@ import { firstValueFrom } from 'rxjs';
     styles: `
         .page { padding: 1.5rem; max-width: 640px; }
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .form { display: flex; flex-direction: column; gap: 1rem; }
-        .form__field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .form__label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-        .form__input {
-            padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-        }
-        .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-        .form__textarea { resize: vertical; min-height: 5em; line-height: 1.5; }
-        .form__hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
-        .form__fieldset { border: 1px solid var(--border-bright); border-radius: var(--radius); padding: 1rem; margin: 0; background: var(--bg-surface); }
-        .form__legend { font-weight: 600; font-size: 0.8rem; color: var(--accent-magenta); padding: 0 0.25rem; letter-spacing: 0.05em; }
-        .form__checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-top: 0.5rem; cursor: pointer; color: var(--text-primary); }
+        .form__textarea { min-height: 5em; line-height: 1.5; }
+        .form__hint { font-style: italic; }
+        .form__fieldset { background: var(--bg-surface); }
+        .form__legend { color: var(--accent-magenta); }
         .form__checkbox input[type="checkbox"] { accent-color: var(--accent-cyan); }
-        .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; min-height: 44px; }
         .color-picker { display: flex; align-items: center; gap: 0.5rem; }
         .color-picker__input {
             width: 44px; height: 44px; padding: 2px; border: 1px solid var(--border-bright);

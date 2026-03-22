@@ -100,7 +100,7 @@ import { RouterLink } from '@angular/router';
         .empty-state__action:hover {
             background: var(--accent-cyan);
             color: var(--bg-deep);
-            box-shadow: var(--glow-cyan), 0 0 20px rgba(0, 229, 255, 0.15);
+            box-shadow: var(--glow-cyan), 0 0 20px var(--accent-cyan-dim);
             transform: translateY(-1px);
         }
         .empty-state__action:active {

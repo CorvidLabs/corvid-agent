@@ -66,7 +66,7 @@ import {
     styles: `
         .overlay {
             position: fixed; inset: 0; z-index: 1000;
-            background: rgba(0, 0, 0, 0.7);
+            background: var(--overlay-heavy);
             display: flex; align-items: center; justify-content: center;
         }
         .browser {
@@ -74,7 +74,7 @@ import {
             background: var(--bg-surface); border: 1px solid var(--border-bright);
             border-radius: var(--radius-lg);
             display: flex; flex-direction: column;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px var(--shadow-deep);
         }
         .browser__header {
             display: flex; align-items: center; gap: 0.5rem;

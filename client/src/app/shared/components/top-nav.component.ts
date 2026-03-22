@@ -231,10 +231,10 @@ const TABS: NavTab[] = [
             justify-content: space-between;
             height: 48px;
             padding: 0 1.25rem;
-            background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
+            background: var(--glass-bg-solid);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid var(--border-subtle);
             position: relative;
             z-index: 100;
         }
@@ -293,8 +293,8 @@ const TABS: NavTab[] = [
         .topnav__tab--active {
             color: var(--accent-cyan);
             border-bottom-color: var(--accent-cyan);
-            text-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
-            background: linear-gradient(180deg, transparent 0%, rgba(0, 229, 255, 0.04) 100%);
+            text-shadow: 0 0 8px var(--accent-cyan-border);
+            background: linear-gradient(180deg, transparent 0%, var(--accent-cyan-subtle) 100%);
         }
         .topnav__tab-chevron {
             font-size: 0.6rem;
@@ -313,11 +313,11 @@ const TABS: NavTab[] = [
             background: rgba(22, 24, 34, 0.92);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-faint);
             border-radius: var(--radius-lg, 10px);
             padding: 0.4rem 0;
             z-index: 200;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.04);
+            box-shadow: 0 12px 40px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-subtle);
             animation: dropdownIn 0.15s ease-out;
         }
         @keyframes dropdownIn {
@@ -412,7 +412,7 @@ const TABS: NavTab[] = [
             gap: 0.5rem;
             padding: 0.3rem 0.7rem;
             background: rgba(12, 13, 20, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg, 10px);
             color: var(--text-tertiary);
             font-family: inherit;
@@ -422,9 +422,9 @@ const TABS: NavTab[] = [
             min-width: 160px;
         }
         .topnav__search-btn:hover {
-            border-color: rgba(0, 229, 255, 0.3);
+            border-color: var(--accent-cyan-border);
             color: var(--text-secondary);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.06);
+            box-shadow: 0 0 12px var(--accent-cyan-subtle);
         }
         .topnav__search-label {
             flex: 1;
@@ -483,7 +483,7 @@ const TABS: NavTab[] = [
                 display: block;
                 position: fixed;
                 inset: 0;
-                background: rgba(0, 0, 0, 0.6);
+                background: var(--overlay);
                 backdrop-filter: blur(2px);
                 z-index: 998;
             }

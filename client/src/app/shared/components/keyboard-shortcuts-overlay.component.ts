@@ -61,7 +61,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         .shortcuts-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: var(--overlay-heavy);
             backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
@@ -78,7 +78,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             max-height: 80vh;
             overflow-y: auto;
             box-shadow:
-                0 0 24px rgba(0, 229, 255, 0.15),
+                0 0 24px var(--accent-cyan-dim),
                 0 0 60px rgba(0, 229, 255, 0.05);
         }
         .shortcuts-panel__header {

@@ -162,7 +162,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         }
         .tab:hover .tab__close { opacity: 1; }
         .tab__close:hover {
-            background: var(--accent-red-dim, rgba(255, 51, 85, 0.15));
+            background: var(--accent-red-dim, var(--accent-red-dim));
             color: var(--accent-red, #f33);
         }
         .tab-bar__new {

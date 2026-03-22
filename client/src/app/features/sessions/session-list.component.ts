@@ -8,6 +8,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Session, SessionStatus } from '../../core/models/session.model';
@@ -21,7 +22,7 @@ interface SessionGroup {
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent, PageShellComponent, SkeletonComponent],
     template: `
         <app-page-shell
             title="Conversations"
@@ -73,18 +74,7 @@ interface SessionGroup {
             }
 
             @if (sessionService.loading()) {
-                <div class="skeleton-list">
-                    @for (_ of [1,2,3,4,5]; track _) {
-                        <div class="skeleton-row">
-                            <div class="skeleton skeleton--name"></div>
-                            <div class="skeleton skeleton--agent"></div>
-                            <div class="skeleton skeleton--status"></div>
-                            <div class="skeleton skeleton--cost"></div>
-                            <div class="skeleton skeleton--source"></div>
-                            <div class="skeleton skeleton--time"></div>
-                        </div>
-                    }
-                </div>
+                <app-skeleton variant="table" [count]="5" />
             } @else if (sessionService.sessions().length === 0) {
                 <app-empty-state
                     icon="  ____\n |    |\n | >> |\n |____|\n  \\__/"
@@ -131,10 +121,6 @@ interface SessionGroup {
         </app-page-shell>
     `,
     styles: `
-        .btn { padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s; }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
         .loading, .empty { color: var(--text-tertiary); font-size: 0.85rem; }
@@ -162,26 +148,6 @@ interface SessionGroup {
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 
-        /* Loading skeleton */
-        .skeleton-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-        .skeleton-row {
-            display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
-            padding: 0.75rem 1rem; border-top: 1px solid var(--border); gap: 0.5rem;
-        }
-        .skeleton-row:first-child { border-top: none; }
-        .skeleton {
-            height: 1rem; border-radius: var(--radius-sm);
-            background: linear-gradient(90deg, var(--bg-raised) 25%, var(--bg-hover) 50%, var(--bg-raised) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-        }
-        .skeleton--name { width: 80%; }
-        .skeleton--agent { width: 60%; }
-        .skeleton--status { width: 50%; }
-        .skeleton--cost { width: 40%; }
-        .skeleton--source { width: 45%; }
-        .skeleton--time { width: 55%; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
         /* Session groups */
         .session-group { margin-bottom: 1.5rem; }
@@ -223,8 +189,7 @@ interface SessionGroup {
         @media (max-width: 768px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
-            .skeleton-row { grid-template-columns: 2fr 1fr 1fr; }
-            .skeleton-row > :nth-child(n+4) { display: none; }
+
         }
     `,
 })

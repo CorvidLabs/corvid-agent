@@ -75,7 +75,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             font-weight: 700;
             margin: 0;
             color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+            text-shadow: 0 0 10px var(--accent-cyan-glow);
             letter-spacing: 0.08em;
         }
         .header__controls {
