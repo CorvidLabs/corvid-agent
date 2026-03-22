@@ -133,7 +133,7 @@ export class DiscoveryService {
             .do();
 
         const knownParticipants = new Set(
-            this.service.syncManager.getConversations().map((c) => c.participant),
+            this.service.syncManager.getConversations().map((c: { participant: string }) => c.participant),
         );
 
         const newSenders = new Set<string>();
@@ -166,7 +166,7 @@ export class DiscoveryService {
             }
 
             // Trigger a manual sync
-            this.service.syncManager.sync().catch((err) => {
+            this.service.syncManager.sync().catch((err: unknown) => {
                 log.warn('Fast-poll sync error', { error: err instanceof Error ? err.message : String(err) });
             });
         }, FAST_POLL_MS);
