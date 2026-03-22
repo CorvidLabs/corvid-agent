@@ -30,6 +30,8 @@ export interface SessionMessage {
     timestamp: string;
 }
 
+export type ToolAccessPolicy = 'full' | 'standard' | 'restricted';
+
 export interface CreateSessionInput {
     projectId?: string | null;
     agentId?: string;
@@ -39,6 +41,13 @@ export interface CreateSessionInput {
     councilLaunchId?: string;
     councilRole?: 'member' | 'reviewer' | 'chairman' | 'discusser';
     workDir?: string;
+    /** Tool access policy for this session. Controls whether expensive networking tools are available.
+     *  - 'full': all tools (default for web)
+     *  - 'standard': networking tools hidden unless explicitly allowed (default for chat sources)
+     *  - 'restricted': no networking tools (default for agent-to-agent) */
+    toolAccessPolicy?: ToolAccessPolicy;
+    /** Specific expensive tools to enable even under standard/restricted policy. */
+    allowedExpensiveTools?: string[];
 }
 
 export interface UpdateSessionInput {

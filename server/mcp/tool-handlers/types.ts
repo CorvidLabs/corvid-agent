@@ -19,6 +19,7 @@ import type { BrowserService } from '../../browser/service';
 import type { SessionInvocationBudget } from '../../a2a/invocation-guard';
 import type { ScheduleActionType } from '../../../shared/types/schedules';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAccessConfig, SessionMessageRateLimiter } from '../tool-guardrails';
 
 export interface McpToolContext {
     agentId: string;
@@ -80,6 +81,10 @@ export interface McpToolContext {
     invocationBudget?: SessionInvocationBudget;
     /** Browser automation service (Playwright + system Chrome). */
     browserService?: BrowserService;
+    /** Tool access configuration for session-level guardrails (closes #1054). */
+    toolAccessConfig?: ToolAccessConfig;
+    /** Per-session rate limiter for agent-to-agent messaging (closes #1054). */
+    messageRateLimiter?: SessionMessageRateLimiter;
 }
 
 export function textResult(text: string): CallToolResult {
