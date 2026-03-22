@@ -46,6 +46,8 @@ interface AgentSummary {
     lastActive: string | null;
     reputationScore: number | null;
     capabilities: string[];
+    recentTasksCompleted: number;
+    recentTasksFailed: number;
 }
 
 interface ActivityEvent {
@@ -233,7 +235,10 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                                 <div class="agent-card__top">
                                                     <div class="agent-card__info">
                                                         <div class="agent-card__name-row">
-                                                            <span class="agent-card__health-dot" [attr.data-health]="getAgentHealth(summary)"></span>
+                                                            <span class="agent-card__health-badge" [attr.data-health]="getAgentHealth(summary)">
+                                                                <span class="agent-card__health-dot"></span>
+                                                                {{ getAgentHealthLabel(summary) }}
+                                                            </span>
                                                             <span class="agent-card__name">{{ summary.agent.name }}</span>
                                                         </div>
                                                         <span class="agent-card__provider-badge" [attr.data-provider]="summary.agent.provider || 'anthropic'">
@@ -954,11 +959,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     /** Returns 'green' (active now), 'yellow' (active within 24h), 'red' (inactive >24h) */
     protected getAgentHealth(summary: AgentSummary): string {
+        // High failure rate is always a warning
+        const totalTasks = summary.recentTasksCompleted + summary.recentTasksFailed;
+        if (totalTasks >= 3 && summary.recentTasksFailed / totalTasks > 0.5) return 'red';
         if (summary.runningSessions > 0) return 'green';
-        if (!summary.lastActive) return 'red';
+        if (!summary.lastActive) return 'grey';
         const hoursAgo = (Date.now() - new Date(summary.lastActive).getTime()) / (1000 * 60 * 60);
+        if (hoursAgo < 1) return 'green';
         if (hoursAgo < 24) return 'yellow';
         return 'red';
+    }
+
+    protected getAgentHealthLabel(summary: AgentSummary): string {
+        const health = this.getAgentHealth(summary);
+        switch (health) {
+            case 'green': return summary.runningSessions > 0 ? 'Active' : 'Healthy';
+            case 'yellow': return 'Idle';
+            case 'red': {
+                const totalTasks = summary.recentTasksCompleted + summary.recentTasksFailed;
+                if (totalTasks >= 3 && summary.recentTasksFailed / totalTasks > 0.5) return 'Degraded';
+                return 'Offline';
+            }
+            case 'grey': return 'No Data';
+            default: return '';
+        }
     }
 
     protected sourceBarPct(count: number): number {
@@ -1275,6 +1299,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
                 const flockAgent = flockAgentMap.get(agent.name.toLowerCase());
 
+                const allTasks = this.workTaskService.tasks();
+                const agentTasks = allTasks.filter((t: { agentId: string }) => t.agentId === agent.id);
+                const recentTasksCompleted = agentTasks.filter((t: { status: string }) => t.status === 'completed').length;
+                const recentTasksFailed = agentTasks.filter((t: { status: string }) => t.status === 'failed').length;
+
                 return {
                     agent,
                     balance,
@@ -1282,6 +1311,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
                     lastActive: lastSession?.updatedAt ?? null,
                     reputationScore: flockAgent?.reputationScore ?? null,
                     capabilities: flockAgent?.capabilities ?? [],
+                    recentTasksCompleted,
+                    recentTasksFailed,
                 };
             }),
         );
