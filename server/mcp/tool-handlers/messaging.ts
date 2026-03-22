@@ -29,6 +29,20 @@ export async function handleSendMessage(
         );
     }
 
+    // Per-session messaging rate limit (#1054)
+    if (ctx.messageRateLimiter) {
+        const rateLimitErr = ctx.messageRateLimiter.check(args.to_agent);
+        if (rateLimitErr) {
+            log.warn('Session message rate limit hit', {
+                from: ctx.agentId,
+                to: args.to_agent,
+                sessionId: ctx.sessionId,
+                error: rateLimitErr,
+            });
+            return errorResult(rateLimitErr);
+        }
+    }
+
     try {
         // TODO(#1067): When ctx.sessionSource is 'discord', consider warning or blocking
         // cross-channel sends. For now, channel affinity is enforced via prompt-level routing
@@ -77,6 +91,9 @@ export async function handleSendMessage(
         });
 
         ctx.emitStatus?.(`Received reply from ${match.agentName}`);
+
+        // Record successful send for session rate limiting (#1054)
+        ctx.messageRateLimiter?.record(match.agentId);
 
         return textResult(`${response}\n\n[thread: ${threadId}]`);
     } catch (err) {

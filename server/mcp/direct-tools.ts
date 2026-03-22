@@ -46,6 +46,7 @@ import {
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
+import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
 import type { LlmToolDefinition } from '../providers/types';
@@ -812,6 +813,12 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         if (ctx.schedulerMode) {
             filtered = filtered.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
         }
+
+        // Tool guardrails: hide expensive networking tools from sessions that don't need them (#1054).
+        const toolAccessConfig: ToolAccessConfig = ctx.toolAccessConfig ?? {
+            policy: resolveToolAccessPolicy(ctx.sessionSource),
+        };
+        filtered = filterToolsByGuardrail(filtered, toolAccessConfig);
     }
 
     return filtered;

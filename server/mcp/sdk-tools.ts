@@ -5,6 +5,7 @@ import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMe
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
+import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -669,6 +670,13 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
     if (ctx.schedulerMode) {
         filteredTools = filteredTools.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
     }
+
+    // Tool guardrails: hide expensive networking tools from sessions that don't need them.
+    // This prevents small models from autonomously attempting agent-to-agent networking (#1054).
+    const toolAccessConfig: ToolAccessConfig = ctx.toolAccessConfig ?? {
+        policy: resolveToolAccessPolicy(ctx.sessionSource),
+    };
+    filteredTools = filterToolsByGuardrail(filteredTools, toolAccessConfig);
 
     return createSdkMcpServer({
         name: 'corvid-agent-tools',
