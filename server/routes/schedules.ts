@@ -15,6 +15,7 @@ import {
     updateScheduleNextRun,
 } from '../db/schedules';
 import { getNextCronDate } from '../scheduler/cron-parser';
+import { listPipelineTemplates, getPipelineTemplate } from '../scheduler/pipeline';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema, BulkScheduleActionSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
 import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
@@ -175,6 +176,19 @@ export function handleScheduleRoutes(
         return json({ configured: isGitHubConfigured() });
     }
 
+    // List pipeline templates
+    if (url.pathname === '/api/schedules/pipeline-templates' && req.method === 'GET') {
+        return json(listPipelineTemplates());
+    }
+
+    // Get single pipeline template
+    const templateMatch = url.pathname.match(/^\/api\/schedules\/pipeline-templates\/([^/]+)$/);
+    if (templateMatch && req.method === 'GET') {
+        const template = getPipelineTemplate(templateMatch[1]);
+        if (!template) return json({ error: 'Template not found' }, 404);
+        return json(template);
+    }
+
     return null;
 }
 
@@ -215,6 +229,12 @@ async function handleCreateSchedule(req: Request, db: Database, tenantId: string
 
         const injectionError = scanScheduleActions(data.actions);
         if (injectionError) return badRequest(injectionError);
+
+        // Also scan pipeline step actions if present
+        if (data.pipelineSteps?.length) {
+            const pipelineInjectionError = scanScheduleActions(data.pipelineSteps.map((s: { action: { prompt?: string; description?: string; message?: string } }) => s.action));
+            if (pipelineInjectionError) return badRequest(pipelineInjectionError);
+        }
 
         const schedule = createSchedule(db, data, tenantId);
 

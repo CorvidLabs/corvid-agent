@@ -502,6 +502,12 @@ const ScheduleOutputDestinationSchema = z.object({
     format: z.enum(['summary', 'full', 'on_error_only']).optional(),
 });
 
+const PipelineStepSchema = z.object({
+    label: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/, 'Label must be alphanumeric with dashes/underscores'),
+    action: ScheduleActionSchema,
+    condition: z.enum(['always', 'on_success', 'on_failure']).optional(),
+});
+
 export const CreateScheduleSchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
     name: z.string().min(1, 'name is required'),
@@ -515,9 +521,14 @@ export const CreateScheduleSchema = z.object({
     notifyAddress: z.string().min(1).optional(),
     triggerEvents: z.array(ScheduleTriggerEventSchema).optional(),
     outputDestinations: z.array(ScheduleOutputDestinationSchema).optional(),
+    executionMode: z.enum(['independent', 'pipeline']).optional(),
+    pipelineSteps: z.array(PipelineStepSchema).min(2, 'Pipeline requires at least 2 steps').max(10).optional(),
 }).refine(
     (d) => d.cronExpression || d.intervalMs || (d.triggerEvents && d.triggerEvents.length > 0),
     { message: 'Either cronExpression, intervalMs, or triggerEvents must be provided' },
+).refine(
+    (d) => d.executionMode !== 'pipeline' || (d.pipelineSteps && d.pipelineSteps.length >= 2),
+    { message: 'Pipeline mode requires pipelineSteps with at least 2 steps' },
 );
 
 export const UpdateScheduleSchema = z.object({
@@ -533,6 +544,8 @@ export const UpdateScheduleSchema = z.object({
     notifyAddress: z.string().min(1).nullable().optional(),
     triggerEvents: z.array(ScheduleTriggerEventSchema).nullable().optional(),
     outputDestinations: z.array(ScheduleOutputDestinationSchema).nullable().optional(),
+    executionMode: z.enum(['independent', 'pipeline']).optional(),
+    pipelineSteps: z.array(PipelineStepSchema).min(2).max(10).nullable().optional(),
 });
 
 export const ScheduleApprovalSchema = z.object({

@@ -10,8 +10,10 @@ import type {
     ScheduleStatus,
     ScheduleExecutionStatus,
     ScheduleActionType,
+    ScheduleExecutionMode,
     ScheduleTriggerEvent,
     ScheduleOutputDestination,
+    PipelineStep,
 } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
@@ -35,6 +37,8 @@ function rowToSchedule(row: Record<string, unknown>): AgentSchedule {
         notifyAddress: row.notify_address as string | null,
         triggerEvents: row.trigger_events ? JSON.parse(row.trigger_events as string) as ScheduleTriggerEvent[] : null,
         outputDestinations: row.output_destinations ? JSON.parse(row.output_destinations as string) as ScheduleOutputDestination[] : null,
+        executionMode: (row.execution_mode as ScheduleExecutionMode) ?? 'independent',
+        pipelineSteps: row.pipeline_steps ? JSON.parse(row.pipeline_steps as string) as PipelineStep[] : null,
         lastRunAt: row.last_run_at as string | null,
         nextRunAt: row.next_run_at as string | null,
         createdAt: row.created_at as string,
@@ -70,8 +74,8 @@ export function createSchedule(db: Database, input: CreateScheduleInput, tenantI
     db.query(`
         INSERT INTO agent_schedules (id, agent_id, name, description, cron_expression, interval_ms,
             actions, approval_policy, max_executions, max_budget_per_run, notify_address, trigger_events,
-            output_destinations, tenant_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            output_destinations, execution_mode, pipeline_steps, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -86,6 +90,8 @@ export function createSchedule(db: Database, input: CreateScheduleInput, tenantI
         input.notifyAddress ?? null,
         input.triggerEvents ? JSON.stringify(input.triggerEvents) : null,
         input.outputDestinations ? JSON.stringify(input.outputDestinations) : null,
+        input.executionMode ?? 'independent',
+        input.pipelineSteps ? JSON.stringify(input.pipelineSteps) : null,
         tenantId,
         now,
         now,
@@ -151,6 +157,8 @@ export function updateSchedule(db: Database, id: string, input: UpdateScheduleIn
     if (input.notifyAddress !== undefined) { fields.push('notify_address = ?'); values.push(input.notifyAddress); }
     if (input.triggerEvents !== undefined) { fields.push('trigger_events = ?'); values.push(input.triggerEvents ? JSON.stringify(input.triggerEvents) : null); }
     if (input.outputDestinations !== undefined) { fields.push('output_destinations = ?'); values.push(input.outputDestinations ? JSON.stringify(input.outputDestinations) : null); }
+    if (input.executionMode !== undefined) { fields.push('execution_mode = ?'); values.push(input.executionMode); }
+    if (input.pipelineSteps !== undefined) { fields.push('pipeline_steps = ?'); values.push(input.pipelineSteps ? JSON.stringify(input.pipelineSteps) : null); }
 
     if (fields.length === 0) return existing;
 
