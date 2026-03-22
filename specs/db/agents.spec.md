@@ -29,6 +29,7 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 | `setAgentWallet` | `(db: Database, agentId: string, walletAddress: string, encryptedMnemonic: string)` | `void` | Set the Algorand wallet address and encrypted mnemonic for an agent |
 | `getAgentWalletMnemonic` | `(db: Database, agentId: string)` | `string \| null` | Retrieve the encrypted wallet mnemonic for an agent |
 | `addAgentFunding` | `(db: Database, agentId: string, algoAmount: number)` | `void` | Increment the agent's `wallet_funded_algo` balance (additive) |
+| `getAgentByWalletAddress` | `(db: Database, walletAddress: string)` | `Agent \| null` | Look up an agent by its Algorand wallet address. Returns `null` if no match |
 | `getAlgochatEnabledAgents` | `(db: Database)` | `Agent[]` | List all agents with `algochat_enabled = 1`, ordered by `updated_at DESC` |
 
 ### Exported Types

@@ -124,10 +124,14 @@ describe('execFlockTesting', () => {
     });
 
     test('skips self-testing', async () => {
-        // Register self as an agent
+        // Register self as an agent in both the agents table and flock directory
+        db.query(`
+            INSERT INTO agents (id, name, wallet_address, tenant_id, created_at, updated_at)
+            VALUES ('agent-self', 'SelfAgent', 'agent-self-wallet', 'default', datetime('now'), datetime('now'))
+        `).run();
         db.query(`
             INSERT INTO flock_agents (id, address, name, description, instance_url, capabilities, status, reputation_score, attestation_count, council_participations, uptime_pct, registered_at, updated_at)
-            VALUES ('self', 'agent-self', 'SelfAgent', 'Self agent', 'http://self', '[]', 'active', 50, 0, 0, 100, datetime('now'), datetime('now'))
+            VALUES ('self', 'agent-self-wallet', 'SelfAgent', 'Self agent', 'http://self', '[]', 'active', 50, 0, 0, 100, datetime('now'), datetime('now'))
         `).run();
 
         const mockMessenger = {
