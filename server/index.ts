@@ -477,6 +477,39 @@ sessionLifecycle.start();
 
 log.info(`Server running at http://${BIND_HOST}:${PORT}`);
 
+// ─── Deferred Discord connection ────────────────────────────────────────────
+// Discord gateway is connected AFTER the HTTP server binds successfully.
+// This prevents wasted gateway connections during crash loops (EADDRINUSE),
+// which can trigger Cloudflare IP bans from rapid reconnection patterns.
+if (discordBridge) {
+    // Startup cooldown: check if another instance connected very recently.
+    // If we restarted within 10s of the last connection, add a delay to avoid
+    // hammering Discord's gateway during rapid restart cycles.
+    const cooldownFile = join(import.meta.dir, '..', '.discord-last-connect');
+    let cooldownMs = 0;
+    try {
+        const { existsSync, readFileSync, writeFileSync } = await import('fs');
+        if (existsSync(cooldownFile)) {
+            const lastConnect = parseInt(readFileSync(cooldownFile, 'utf-8'), 10);
+            const elapsed = Date.now() - lastConnect;
+            if (elapsed < 10_000) {
+                cooldownMs = Math.min(30_000, 10_000 - elapsed + 5_000);
+                log.warn(`Discord connection cooldown: waiting ${cooldownMs}ms (last connect ${elapsed}ms ago)`);
+            }
+        }
+        writeFileSync(cooldownFile, Date.now().toString());
+    } catch { /* ignore cooldown file errors */ }
+
+    if (cooldownMs > 0) {
+        setTimeout(() => {
+            log.info('Discord cooldown elapsed, connecting gateway');
+            discordBridge.start();
+        }, cooldownMs);
+    } else {
+        discordBridge.start();
+    }
+}
+
 // Global error handlers for 24/7 operation
 process.on('unhandledRejection', (reason) => {
     const message = reason instanceof Error ? reason.message : String(reason);

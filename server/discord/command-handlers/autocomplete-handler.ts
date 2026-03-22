@@ -46,7 +46,8 @@ export async function handleAutocomplete(
             }));
     }
 
-    const response = await fetch(
+    const { discordFetch } = await import('../embeds');
+    const response = await discordFetch(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
             method: 'POST',
