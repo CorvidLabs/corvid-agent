@@ -19,6 +19,7 @@ import type {
     RecordEventInput,
     ComponentExplanation,
     ScoreExplanation,
+    ReputationHistoryPoint,
 } from './types';
 import { DEFAULT_WEIGHTS } from './types';
 import { isAgentBlocked, addToAgentBlocklist } from '../db/agent-blocklist';
@@ -826,5 +827,74 @@ export class ReputationScorer {
             score.attestationHash,
             score.computedAt,
         );
+
+        // Record history snapshot (throttled to at most one per hour per agent)
+        this.recordHistorySnapshot(score);
+    }
+
+    private recordHistorySnapshot(score: ReputationScore): void {
+        try {
+            const recent = this.db.query(`
+                SELECT id FROM reputation_history
+                WHERE agent_id = ? AND computed_at > datetime('now', '-1 hour')
+                LIMIT 1
+            `).get(score.agentId) as { id: number } | null;
+
+            if (recent) return; // Already have a recent snapshot
+
+            this.db.query(`
+                INSERT INTO reputation_history
+                    (agent_id, overall_score, trust_level, task_completion, peer_rating,
+                     credit_pattern, security_compliance, activity_level, computed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                score.agentId,
+                score.overallScore,
+                score.trustLevel,
+                score.components.taskCompletion,
+                score.components.peerRating,
+                score.components.creditPattern,
+                score.components.securityCompliance,
+                score.components.activityLevel,
+                score.computedAt,
+            );
+        } catch {
+            // Non-critical — don't fail score computation if history recording fails
+        }
+    }
+
+    /**
+     * Get reputation score history for an agent over the specified number of days.
+     */
+    getHistory(agentId: string, days = 90): ReputationHistoryPoint[] {
+        const rows = this.db.query(`
+            SELECT overall_score, trust_level, task_completion, peer_rating,
+                   credit_pattern, security_compliance, activity_level, computed_at
+            FROM reputation_history
+            WHERE agent_id = ? AND computed_at > datetime('now', '-' || ? || ' days')
+            ORDER BY computed_at ASC
+        `).all(agentId, days) as {
+            overall_score: number;
+            trust_level: string;
+            task_completion: number;
+            peer_rating: number;
+            credit_pattern: number;
+            security_compliance: number;
+            activity_level: number;
+            computed_at: string;
+        }[];
+
+        return rows.map(row => ({
+            overallScore: row.overall_score,
+            trustLevel: row.trust_level,
+            components: {
+                taskCompletion: row.task_completion,
+                peerRating: row.peer_rating,
+                creditPattern: row.credit_pattern,
+                securityCompliance: row.security_compliance,
+                activityLevel: row.activity_level,
+            },
+            computedAt: row.computed_at,
+        }));
     }
 }

@@ -8,6 +8,7 @@ files:
 db_tables:
   - agent_reputation
   - reputation_events
+  - reputation_history
   - agents
   - work_tasks
   - sessions
@@ -45,6 +46,7 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 | `recordEvent` | `(input: RecordEventInput)` | `void` | Insert a reputation event |
 | `getEvents` | `(agentId: string, limit?: number)` | `ReputationEventRecord[]` | Return recent events for agent (default limit 50) |
 | `setAttestationHash` | `(agentId: string, hash: string)` | `void` | Update attestation hash on persisted score |
+| `getHistory` | `(agentId: string, days?: number)` | `ReputationHistoryPoint[]` | Return historical score snapshots for agent (default 90 days) |
 
 ### Exported Types (from `types.ts`)
 
@@ -62,6 +64,7 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 | `RecordEventInput` | Input for `recordEvent()` |
 | `ComponentExplanation` | Per-component breakdown: score, weight, weighted contribution, isDefault flag, reason string, evidence map, recentEvents |
 | `ScoreExplanation` | Full explanation: agentId, overallScore, trustLevel, decayFactor, rawScore, per-component explanations, computedAt |
+| `ReputationHistoryPoint` | Historical score snapshot: overallScore, trustLevel, components, computedAt |
 
 ## Invariants
 
@@ -149,6 +152,21 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 | score_impact | REAL | NOT NULL | Positive or negative impact |
 | metadata | TEXT | NOT NULL DEFAULT '{}' | JSON metadata |
 | created_at | TEXT | NOT NULL DEFAULT current_timestamp | ISO 8601 timestamp |
+
+### reputation_history
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing row ID |
+| agent_id | TEXT | NOT NULL | References agents.id |
+| overall_score | INTEGER | NOT NULL | Composite score 0-100 at this point in time |
+| trust_level | TEXT | NOT NULL | Trust level at this point in time |
+| task_completion | INTEGER | NOT NULL DEFAULT 0 | Task completion component |
+| peer_rating | INTEGER | NOT NULL DEFAULT 0 | Peer rating component |
+| credit_pattern | INTEGER | NOT NULL DEFAULT 0 | Credit pattern component |
+| security_compliance | INTEGER | NOT NULL DEFAULT 0 | Security compliance component |
+| activity_level | INTEGER | NOT NULL DEFAULT 0 | Activity level component |
+| computed_at | TEXT | NOT NULL | ISO 8601 timestamp of when the score was computed |
 
 ## Configuration
 

@@ -138,6 +138,15 @@ export interface ScoreExplanation {
     computedAt: string;
 }
 
+// ─── History ────────────────────────────────────────────────────────────────
+
+export interface ReputationHistoryPoint {
+    overallScore: number;
+    trustLevel: string;
+    components: ReputationComponents;
+    computedAt: string;
+}
+
 // ─── Input Types ────────────────────────────────────────────────────────────
 
 export interface RecordEventInput {

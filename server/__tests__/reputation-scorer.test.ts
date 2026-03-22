@@ -445,6 +445,93 @@ describe('computeExplanation', () => {
     });
 });
 
+// ─── getHistory ─────────────────────────────────────────────────────────────
+
+describe('getHistory', () => {
+    test('returns empty array when no history exists', () => {
+        const history = scorer.getHistory('agent-1');
+        expect(history).toEqual([]);
+    });
+
+    test('records history snapshot when computing score', () => {
+        scorer.computeScore('agent-1');
+
+        const history = scorer.getHistory('agent-1');
+        expect(history).toHaveLength(1);
+        expect(history[0].overallScore).toBeGreaterThanOrEqual(1);
+        expect(history[0].trustLevel).toBeDefined();
+        expect(history[0].components).toBeDefined();
+        expect(typeof history[0].components.taskCompletion).toBe('number');
+        expect(typeof history[0].components.peerRating).toBe('number');
+        expect(typeof history[0].components.creditPattern).toBe('number');
+        expect(typeof history[0].components.securityCompliance).toBe('number');
+        expect(typeof history[0].components.activityLevel).toBe('number');
+        expect(history[0].computedAt).toBeTruthy();
+    });
+
+    test('throttles snapshots to at most one per hour per agent', () => {
+        scorer.computeScore('agent-1');
+        scorer.computeScore('agent-1');
+        scorer.computeScore('agent-1');
+
+        const history = scorer.getHistory('agent-1');
+        expect(history).toHaveLength(1); // Only one snapshot despite 3 computations
+    });
+
+    test('returns history for the correct agent only', () => {
+        seedAgent('agent-2', 'Agent Two');
+        scorer.computeScore('agent-1');
+        scorer.computeScore('agent-2');
+
+        const history1 = scorer.getHistory('agent-1');
+        const history2 = scorer.getHistory('agent-2');
+        expect(history1).toHaveLength(1);
+        expect(history2).toHaveLength(1);
+    });
+
+    test('respects days parameter', () => {
+        // Insert an old snapshot manually
+        db.query(`
+            INSERT INTO reputation_history
+                (agent_id, overall_score, trust_level, task_completion, peer_rating,
+                 credit_pattern, security_compliance, activity_level, computed_at)
+            VALUES (?, 50, 'neutral', 50, 50, 50, 100, 0, datetime('now', '-100 days'))
+        `).run('agent-1');
+
+        scorer.computeScore('agent-1');
+
+        // Default 90 days should not include the 100-day-old snapshot
+        const recent = scorer.getHistory('agent-1', 90);
+        expect(recent).toHaveLength(1);
+
+        // 365 days should include both
+        const all = scorer.getHistory('agent-1', 365);
+        expect(all).toHaveLength(2);
+    });
+
+    test('returns history in ascending chronological order', () => {
+        // Insert multiple snapshots at different times
+        db.query(`
+            INSERT INTO reputation_history
+                (agent_id, overall_score, trust_level, task_completion, peer_rating,
+                 credit_pattern, security_compliance, activity_level, computed_at)
+            VALUES (?, 40, 'low', 40, 40, 40, 100, 0, datetime('now', '-2 days'))
+        `).run('agent-1');
+
+        db.query(`
+            INSERT INTO reputation_history
+                (agent_id, overall_score, trust_level, task_completion, peer_rating,
+                 credit_pattern, security_compliance, activity_level, computed_at)
+            VALUES (?, 60, 'neutral', 60, 60, 60, 100, 0, datetime('now', '-1 day'))
+        `).run('agent-1');
+
+        const history = scorer.getHistory('agent-1');
+        expect(history).toHaveLength(2);
+        expect(history[0].overallScore).toBe(40);
+        expect(history[1].overallScore).toBe(60);
+    });
+});
+
 // ─── edge cases ─────────────────────────────────────────────────────────────
 
 describe('edge cases', () => {
