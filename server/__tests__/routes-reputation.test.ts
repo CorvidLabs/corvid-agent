@@ -288,6 +288,46 @@ describe('Reputation Routes', () => {
         expect(data.aggregate.total).toBe(0);
     });
 
+    // ─── History ─────────────────────────────────────────────────────────────
+
+    it('GET /api/reputation/history/:agentId returns empty array when no history', async () => {
+        const freshId = crypto.randomUUID();
+        db.query("INSERT INTO agents (id, name) VALUES (?, 'Fresh')").run(freshId);
+
+        const { req, url } = fakeReq('GET', `/api/reputation/history/${freshId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(Array.isArray(data)).toBe(true);
+        expect(data).toHaveLength(0);
+    });
+
+    it('GET /api/reputation/history/:agentId returns history after score computation', async () => {
+        // Compute a score first so history is recorded
+        scorer.computeScore(agentId);
+
+        const { req, url } = fakeReq('GET', `/api/reputation/history/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.length).toBeGreaterThanOrEqual(1);
+        expect(data[0].overallScore).toBeDefined();
+        expect(data[0].trustLevel).toBeDefined();
+        expect(data[0].components).toBeDefined();
+        expect(data[0].computedAt).toBeDefined();
+    });
+
+    it('GET /api/reputation/history/:agentId respects days param', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/history/${agentId}?days=30`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(Array.isArray(data)).toBe(true);
+    });
+
     // ─── Explain ─────────────────────────────────────────────────────────────
 
     it('GET /api/reputation/explain/:agentId returns detailed explanation', async () => {
