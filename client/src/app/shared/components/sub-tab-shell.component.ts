@@ -50,7 +50,7 @@ export interface SubTab {
             gap: 0;
             padding: 0 1.25rem;
             background: rgba(12, 13, 20, 0.5);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid var(--border-subtle);
             overflow-x: auto;
             flex-shrink: 0;
             scrollbar-width: none;
@@ -73,12 +73,12 @@ export interface SubTab {
         }
         .tab-shell__tab:hover {
             color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--border-subtle);
         }
         .tab-shell__tab--active {
             color: var(--accent-cyan);
             border-bottom-color: var(--accent-cyan);
-            text-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+            text-shadow: 0 0 8px var(--accent-cyan-border);
         }
         .tab-shell__content {
             flex: 1;

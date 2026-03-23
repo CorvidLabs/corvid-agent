@@ -79,8 +79,8 @@ import type { Session } from '../../core/models/session.model';
         .rail {
             width: 100%;
             min-width: 0;
-            background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
-            border-left: 1px solid rgba(255, 255, 255, 0.04);
+            background: var(--glass-bg-solid);
+            border-left: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
             transition: width 0.2s ease, min-width 0.2s ease;

@@ -88,26 +88,26 @@ import type { NotificationType } from '../../core/models/notification.model';
 
         /* Type variants */
         .toast--success {
-            background: rgba(0, 255, 136, 0.1);
-            border-color: rgba(0, 255, 136, 0.3);
+            background: var(--accent-green-dim);
+            border-color: var(--accent-green-border);
             color: var(--accent-green);
         }
 
         .toast--error {
-            background: rgba(255, 51, 85, 0.12);
-            border-color: rgba(255, 51, 85, 0.35);
+            background: var(--accent-red-dim);
+            border-color: var(--accent-red-border);
             color: var(--accent-red);
         }
 
         .toast--warning {
-            background: rgba(255, 170, 0, 0.1);
-            border-color: rgba(255, 170, 0, 0.3);
+            background: var(--accent-amber-dim);
+            border-color: var(--accent-amber-border);
             color: var(--accent-amber);
         }
 
         .toast--info {
-            background: rgba(0, 229, 255, 0.1);
-            border-color: rgba(0, 229, 255, 0.3);
+            background: var(--accent-cyan-dim);
+            border-color: var(--accent-cyan-border);
             color: var(--accent-cyan);
         }
 

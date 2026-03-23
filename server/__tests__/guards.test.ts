@@ -612,6 +612,25 @@ describe('requiresAdminRole permission paths', () => {
     });
 });
 
+describe('requiresAdminRole new security-hardening paths', () => {
+    it('classifies Ollama model pull as admin', () => {
+        expect(requiresAdminRole('/api/ollama/models/pull')).toBe(true);
+    });
+    it('classifies Ollama model list as admin', () => {
+        expect(requiresAdminRole('/api/ollama/models')).toBe(true);
+    });
+    it('classifies exam run as admin', () => {
+        expect(requiresAdminRole('/api/exam/run')).toBe(true);
+    });
+    it('classifies plugins paths as admin', () => {
+        expect(requiresAdminRole('/api/plugins')).toBe(true);
+        expect(requiresAdminRole('/api/plugins/load')).toBe(true);
+    });
+    it('classifies discord send-image as admin', () => {
+        expect(requiresAdminRole('/api/discord/send-image')).toBe(true);
+    });
+});
+
 // --- createRequestContext ---------------------------------------------------
 
 describe('createRequestContext', () => {

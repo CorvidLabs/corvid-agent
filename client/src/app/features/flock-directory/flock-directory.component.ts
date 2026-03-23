@@ -9,6 +9,7 @@ import {
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type {
     FlockAgent,
     FlockAgentStatus,
@@ -27,6 +28,7 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [SkeletonComponent],
     template: `
         <div class="flock-page">
             <!-- Stats Header -->
@@ -113,7 +115,7 @@ interface FlockStats {
 
             <!-- Loading -->
             @if (loading()) {
-                <div class="flock-loading">Loading directory...</div>
+                <div class="flock-loading"><app-skeleton variant="card" [count]="6" /></div>
             }
 
             <!-- Agent Grid -->

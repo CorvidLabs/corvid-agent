@@ -85,7 +85,7 @@ interface CommandItem {
             position: fixed;
             inset: 0;
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.6);
+            background: var(--overlay);
             display: flex;
             justify-content: center;
             padding-top: 15vh;
@@ -101,7 +101,7 @@ interface CommandItem {
             background: var(--bg-surface, #1a1a2e);
             border: 1px solid var(--border-bright, #333);
             border-radius: 12px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 16px 48px var(--shadow-deep);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -180,7 +180,7 @@ interface CommandItem {
         }
         .palette__item:hover,
         .palette__item--active {
-            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.08));
+            background: var(--accent-cyan-dim, var(--accent-cyan-subtle));
             color: var(--text-primary, #eee);
         }
         .palette__item-icon {

@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -31,6 +31,9 @@
     "spec:coverage": "bash scripts/specsync.sh coverage",
     "spec:coverage:require": "bash scripts/specsync.sh check --require-coverage 100",
     "spec:generate": "bash scripts/specsync.sh generate",
+    "spec:score": "bash scripts/specsync.sh score",
+    "spec:watch": "bash scripts/specsync.sh watch",
+    "spec:resolve": "bash scripts/specsync.sh resolve",
     "openapi:validate": "bun scripts/openapi-validate.ts",
     "openapi:export": "bun scripts/openapi-validate.ts --export",
     "lint:sql": "bash scripts/check-sql-injection.sh",

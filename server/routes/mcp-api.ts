@@ -6,6 +6,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleRecordObservation, handleListObservations, handleBoostObservation, handleDismissObservation, handleObservationStats } from '../mcp/tool-handlers';
 import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema, McpRecordObservationSchema, McpListObservationsSchema, McpBoostObservationSchema, McpDismissObservationSchema, McpObservationStatsSchema } from '../lib/validation';
+import { checkInjection } from '../lib/injection-guard';
 import { json, handleRouteError } from '../lib/response';
 
 function extractResultText(result: CallToolResult): string {
@@ -98,6 +99,8 @@ export function handleMcpApiRoutes(
 async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, McpSendMessageSchema);
+        const injectionDenied = checkInjection(deps.db, data.message, 'mcp_send_message', req);
+        if (injectionDenied) return injectionDenied;
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleSendMessage(ctx, { to_agent: data.toAgent, message: data.message });
@@ -110,6 +113,8 @@ async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<R
 async function handleSaveMemoryRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, McpSaveMemorySchema);
+        const injectionDenied = checkInjection(deps.db, data.content, 'mcp_save_memory', req);
+        if (injectionDenied) return injectionDenied;
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleSaveMemory(ctx, { key: data.key, content: data.content });
@@ -187,6 +192,8 @@ async function handleListAgentsRoute(url: URL, deps: McpApiDeps): Promise<Respon
 async function handleRecordObservationRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, McpRecordObservationSchema);
+        const injectionDenied = checkInjection(deps.db, data.content, 'mcp_observation', req);
+        if (injectionDenied) return injectionDenied;
         const ctx = buildContext(deps, data.agentId);
         const result = await handleRecordObservation(ctx, {
             content: data.content,

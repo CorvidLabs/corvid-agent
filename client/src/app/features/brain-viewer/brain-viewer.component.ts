@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } 
 import { DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { firstValueFrom } from 'rxjs';
 
 // ─── API response types ─────────────────────────────────────────────────────
@@ -82,13 +83,13 @@ interface SyncStatus {
 @Component({
     selector: 'app-brain-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RelativeTimePipe],
+    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent],
     template: `
         <div class="brain-viewer">
             <h2>Brain Viewer</h2>
 
             @if (loading()) {
-                <p class="loading">Loading memory data...</p>
+                <div class="loading"><app-skeleton variant="card" [count]="4" /></div>
             } @else {
                 <!-- Sync Status Banner -->
                 @if (syncStatus()) {

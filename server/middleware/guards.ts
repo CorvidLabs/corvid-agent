@@ -307,5 +307,13 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname === '/api/algochat/network') return true;
     // Permission broker controls capability grants — admin-only to prevent privilege escalation
     if (pathname.startsWith('/api/permissions')) return true;
+    // Ollama model pull/delete consumes disk/bandwidth — admin-only
+    if (pathname === '/api/ollama/models/pull' || pathname === '/api/ollama/models') return true;
+    // Exam runs consume compute (agent sessions) — admin-only
+    if (pathname === '/api/exam/run') return true;
+    // Plugin load/unload/grant/revoke executes arbitrary code — admin-only
+    if (pathname.startsWith('/api/plugins')) return true;
+    // Discord image sending is an outbound action — admin-only
+    if (pathname === '/api/discord/send-image') return true;
     return false;
 }

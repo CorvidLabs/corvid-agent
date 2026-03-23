@@ -34,7 +34,7 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 |----------|-----------|---------|-------------|
 | `parseTscOutput` | `output: string` | `TscError[]` | Parses raw `tsc` stdout/stderr into structured error objects using regex matching. |
 | `parseTestOutput` | `output: string, exitCode: number` | `{ passed: boolean; summary: string; failureCount: number }` | Parses `bun test` output to extract pass/fail status, last 50 lines as summary, and failure count. |
-| `parseTodoOutput` | `output: string` | `{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }` | Parses grep output to count TODO/FIXME/HACK markers and collect up to 10 samples. |
+| `parseTodoOutput` | `output: string` | `{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }` | Parses grep output to count code-marker annotations (todo, fixme, hack) and collect up to 10 samples. |
 | `parseLargeFiles` | `output: string, threshold?: number` | `LargeFile[]` | Parses `wc -l` output to find `.ts` files exceeding the line threshold (default 500), sorted descending by size. |
 | `parseOutdatedOutput` | `output: string` | `OutdatedDep[]` | Parses `bun outdated` output to extract packages where current version differs from latest. |
 | `saveHealthSnapshot` | `db: Database, agentId: string, projectId: string, metrics: HealthMetrics` | `HealthSnapshot` | Inserts a health metrics snapshot into the `health_snapshots` table and returns the created record. |
@@ -50,7 +50,7 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 | `TscError` | Structured TypeScript compiler error: `file`, `line`, `col`, `code`, `message`. |
 | `LargeFile` | File exceeding size threshold: `file` path and `lines` count. |
 | `OutdatedDep` | Outdated dependency: `name`, `current` version, `latest` version. |
-| `HealthMetrics` | Full codebase health snapshot: TSC errors/pass, test pass/failures/summary, TODO/FIXME/HACK counts with samples, large files, outdated deps, collection timestamp and duration. |
+| `HealthMetrics` | Full codebase health snapshot: TSC errors/pass, test pass/failures/summary, code-marker counts (todo/fixme/hack) with samples, large files, outdated deps, collection timestamp and duration. |
 | `HealthSnapshot` | Persisted health record: `id`, `agentId`, `projectId`, all metric counts, boolean pass flags, and `collectedAt` timestamp. |
 | `TrendDirection` | Union type: `'improving' \| 'stable' \| 'regressing'`. |
 | `MetricTrend` | Per-metric trend result: `metric` name, `direction`, and raw `values` array. |
@@ -71,7 +71,7 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `collect` | `workingDir: string` | `Promise<HealthMetrics>` | Runs all sub-collectors (tsc, tests, TODOs, large files, outdated deps) in parallel and returns aggregated metrics. Individual failures return safe defaults. |
+| `collect` | `workingDir: string` | `Promise<HealthMetrics>` | Runs all sub-collectors (tsc, tests, code-markers, large files, outdated deps) in parallel and returns aggregated metrics. Individual failures return safe defaults. |
 
 #### AutonomousLoopService Methods
 
@@ -90,16 +90,18 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 
 ## Invariants
 
-1. All five sub-collectors in `CodebaseHealthCollector.collect()` run in parallel via `Promise.all`. Any individual failure is caught and returns a safe default; the overall collection never rejects.
+1. All five sub-collectors in `CodebaseHealthCollector.collect()` run in parallel via `Promise.all`. Any individual failure is caught and returns a safe default; the overall collection never rejects. Safe defaults per collector: TSC → `{ errors: [], passed: false }`, Tests → `{ passed: false, summary: 'Collection failed', failureCount: 0 }`, Markers → `{ todoCount: 0, fixmeCount: 0, hackCount: 0, samples: [] }`, Large files → `[]`, Outdated deps → `[]`.
 2. Subprocess spawns have a 60-second timeout (180 seconds for tests). Processes are killed if they exceed the timeout.
-3. Trend computation requires at least 2 snapshots; with fewer, an empty trend array is returned.
-4. Trend direction is determined by comparing the average of the older half of values to the newer half, with a 10% (or minimum 1) threshold for significance. All tracked metrics use "lower is better" semantics.
+3. Trend computation requires at least 2 snapshots; with fewer, an empty trend array is returned. Seven metrics are tracked: `tsc_errors`, `test_failures`, `todos`, `fixmes`, `hacks`, `large_files`, `outdated_deps`.
+4. Trend direction is determined by splitting values into first-half and second-half, comparing their averages, with a 10% (or minimum 1) threshold for significance. All tracked metrics use "lower is better" semantics.
 5. Reputation gating enforces strict task limits: `untrusted` = 0 (blocked, throws `AuthorizationError`), `low` = 1, `medium` = min(requested, 2), `high`/`verified` = min(requested, 5).
 6. The default `maxTasks` is 3 if not specified in options.
 7. `parseLargeFiles` only considers `.ts` files and uses a default threshold of 500 lines.
 8. `parseOutdatedOutput` filters out header lines and separator lines, only including entries where current and latest versions differ and both look like semver.
-9. After a session completes, learnings are saved to memory with key format `improvement_loop:outcome:{ISO timestamp}`.
-10. Completed work tasks add +5 reputation; failed tasks add -2 reputation.
+9. After a session completes, `registerFeedbackHooks` triggers `saveLearnings`, which filters work tasks created during the session (by `createdAt >= sessionCreatedAt`), saves each as a memory entry with key format `improvement_loop:outcome:{ISO timestamp}`, and registers completion callbacks for each task.
+10. Completed work tasks add +5 reputation; failed tasks add -2 reputation. If a PR exists on the completed task, it is also recorded in the outcome tracker for feedback analysis.
+11. Prompt builder applies display limits: first 15 TSC errors, first 10 large files, first 10 outdated deps, and past attempts truncated to 300 chars per entry.
+12. Daily review observation generation uses heuristic thresholds: failure rate ≥ 50% → "High failure rate", ≥ 25% → "Elevated failure rate". PR rejections, health degradation, and inactivity are also detected. If no issues and executions > 0, returns "All systems nominal".
 
 ## Behavioral Examples
 

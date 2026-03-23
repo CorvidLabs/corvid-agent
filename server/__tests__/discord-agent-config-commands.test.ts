@@ -1,0 +1,487 @@
+/**
+ * Tests for Discord /agent-skill and /agent-persona command handlers.
+ */
+
+import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import { runMigrations } from '../db/schema';
+import { handleInteraction, type InteractionContext } from '../discord/commands';
+import { InteractionType, PermissionLevel } from '../discord/types';
+import type { DiscordBridgeConfig, DiscordInteractionData } from '../discord/types';
+import { createAgent } from '../db/agents';
+import { createBundle, getAgentBundles } from '../db/skill-bundles';
+import { createPersona, getAgentPersonas } from '../db/personas';
+import {
+    handleAgentSkillCommand,
+    handleAgentPersonaCommand,
+} from '../discord/command-handlers/agent-config-commands';
+
+let db: Database;
+let capturedResponse: { type: number; data: Record<string, unknown> } | null = null;
+const originalFetch = globalThis.fetch;
+
+function createTestConfig(overrides: Partial<DiscordBridgeConfig> = {}): DiscordBridgeConfig {
+    return {
+        botToken: 'test-token',
+        channelId: '100000000000000001',
+        allowedUserIds: ['200000000000000001'],
+        publicMode: true,
+        defaultPermissionLevel: 3,
+        mode: 'chat',
+        ...overrides,
+    };
+}
+
+function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionContext {
+    return {
+        db,
+        config: createTestConfig(config),
+        processManager: {
+            startProcess: mock(() => {}),
+            stopProcess: mock(() => {}),
+            subscribe: mock(() => {}),
+            unsubscribe: mock(() => {}),
+            isRunning: mock(() => true),
+        } as unknown as InteractionContext['processManager'],
+        workTaskService: null,
+        delivery: {
+            track: mock(() => {}),
+            sendWithReceipt: mock(async (_channel: string, fn: () => Promise<unknown>) => ({ result: await fn() })),
+        } as unknown as InteractionContext['delivery'],
+        mutedUsers: new Set<string>(),
+        threadSessions: new Map(),
+        threadCallbacks: new Map(),
+        threadLastActivity: new Map(),
+        createStandaloneThread: mock(async () => '300000000000000001'),
+        subscribeForResponseWithEmbed: mock(() => {}),
+        sendTaskResult: mock(async () => {}),
+        muteUser: mock((_userId: string) => {}),
+        unmuteUser: mock((_userId: string) => {}),
+        mentionSessions: new Map(),
+        subscribeForInlineResponse: mock(() => {}),
+    };
+}
+
+function makeSubcommandInteraction(
+    commandName: string,
+    subcommandName: string,
+    subOptions: Array<{ name: string; value: string }>,
+): DiscordInteractionData {
+    return {
+        id: '400000000000000001',
+        type: InteractionType.APPLICATION_COMMAND,
+        token: 'test-interaction-token-long-enough-to-pass',
+        channel_id: '100000000000000001',
+        member: {
+            user: { id: '200000000000000001', username: 'testuser' },
+            roles: [],
+        },
+        data: {
+            name: commandName,
+            options: [
+                {
+                    name: subcommandName,
+                    type: 1,
+                    options: subOptions.map(o => ({ ...o, type: 3 })),
+                },
+            ],
+        },
+    } as unknown as DiscordInteractionData;
+}
+
+beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+    capturedResponse = null;
+
+    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+        if (init?.body) {
+            try {
+                capturedResponse = JSON.parse(String(init.body));
+            } catch { /* non-json body */ }
+        }
+        return new Response(JSON.stringify({ id: '500000000000000001' }), { status: 200 });
+    }) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+    db.close();
+    globalThis.fetch = originalFetch;
+});
+
+// ── /agent-skill ─────────────────────────────────────────────────────────────
+
+describe('handleAgentSkillCommand', () => {
+    test('rejects non-admin permission level', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        const interaction = makeSubcommandInteraction('agent-skill', 'list', [
+            { name: 'agent', value: agent.name },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.STANDARD);
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('admin permissions');
+    });
+
+    test('list returns "no bundles" embed when none assigned', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+        const interaction = makeSubcommandInteraction('agent-skill', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        expect(capturedResponse).not.toBeNull();
+        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        expect(embed?.description).toContain('No skill bundles assigned');
+    });
+
+    test('add assigns bundle and shows confirmation embed', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createBundle(db, { name: 'WebSearch', description: 'Web browsing tools' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'WebSearch' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        // Verify persisted to DB
+        const bundles = getAgentBundles(db, agent.id);
+        expect(bundles).toHaveLength(1);
+        expect(bundles[0].name).toBe('WebSearch');
+
+        // Verify embed response
+        expect(capturedResponse).not.toBeNull();
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; description: string; color: number }>)?.[0];
+        expect(embed?.title).toContain('Skill Added');
+        expect(embed?.description).toContain('WebSearch');
+        expect(embed?.color).toBe(0x57f287);
+    });
+
+    test('add is case-insensitive for agent and skill names', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createBundle(db, { name: 'WebSearch' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'testbot' },
+            { name: 'skill', value: 'websearch' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const bundles = getAgentBundles(db, agent.id);
+        expect(bundles).toHaveLength(1);
+    });
+
+    test('add strips model suffix from agent name', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'claude-opus-4-6' });
+        createBundle(db, { name: 'WebSearch' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'TestBot (claude-opus-4-6)' },
+            { name: 'skill', value: 'WebSearch' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const bundles = getAgentBundles(db, agent.id);
+        expect(bundles).toHaveLength(1);
+    });
+
+    test('add strips description suffix from skill name (autocomplete format)', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createBundle(db, { name: 'WebSearch', description: 'Web browsing tools' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'WebSearch — Web browsing tools' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const bundles = getAgentBundles(db, agent.id);
+        expect(bundles).toHaveLength(1);
+    });
+
+    test('remove unassigns bundle and shows confirmation embed', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createBundle(db, { name: 'WebSearch' });
+
+        // Pre-assign
+        const addInteraction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'WebSearch' },
+        ]);
+        await handleAgentSkillCommand(ctx, addInteraction, PermissionLevel.ADMIN);
+        expect(getAgentBundles(db, agent.id)).toHaveLength(1);
+
+        // Now remove
+        capturedResponse = null;
+        const removeInteraction = makeSubcommandInteraction('agent-skill', 'remove', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'WebSearch' },
+        ]);
+        await handleAgentSkillCommand(ctx, removeInteraction, PermissionLevel.ADMIN);
+
+        expect(getAgentBundles(db, agent.id)).toHaveLength(0);
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        expect(embed?.title).toContain('Skill Removed');
+        expect(embed?.color).toBe(0xed4245);
+    });
+
+    test('remove reports error when bundle not assigned', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createBundle(db, { name: 'WebSearch' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'remove', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'WebSearch' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('was not assigned');
+    });
+
+    test('reports error when agent not found', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'list', [
+            { name: 'agent', value: 'NonExistentBot' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Agent not found');
+        expect(content).toContain('TestBot');
+    });
+
+    test('reports error when skill bundle not found', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'skill', value: 'NonExistentSkill' },
+        ]);
+
+        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Skill bundle not found');
+    });
+
+    test('list shows all assigned bundles', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        const b1 = createBundle(db, { name: 'WebSearch' });
+        const b2 = createBundle(db, { name: 'CodeTools' });
+
+        for (const b of [b1, b2]) {
+            const interaction = makeSubcommandInteraction('agent-skill', 'add', [
+                { name: 'agent', value: 'TestBot' },
+                { name: 'skill', value: b.name },
+            ]);
+            await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
+        }
+
+        capturedResponse = null;
+        const listInteraction = makeSubcommandInteraction('agent-skill', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+        await handleAgentSkillCommand(ctx, listInteraction, PermissionLevel.ADMIN);
+
+        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        expect(embed?.description).toContain('WebSearch');
+        expect(embed?.description).toContain('CodeTools');
+        expect(getAgentBundles(db, agent.id)).toHaveLength(2);
+    });
+});
+
+// ── /agent-persona ────────────────────────────────────────────────────────────
+
+describe('handleAgentPersonaCommand', () => {
+    test('rejects non-admin permission level', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+        const interaction = makeSubcommandInteraction('agent-persona', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.STANDARD);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('admin permissions');
+    });
+
+    test('list returns "no personas" embed when none assigned', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+        const interaction = makeSubcommandInteraction('agent-persona', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        expect(embed?.description).toContain('No personas assigned');
+    });
+
+    test('add assigns persona and shows confirmation embed', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createPersona(db, { name: 'FriendlyHelper', archetype: 'professional', traits: [] });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'FriendlyHelper' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const personas = getAgentPersonas(db, agent.id);
+        expect(personas).toHaveLength(1);
+        expect(personas[0].name).toBe('FriendlyHelper');
+
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        expect(embed?.title).toContain('Persona Added');
+        expect(embed?.color).toBe(0x57f287);
+    });
+
+    test('add strips archetype suffix from persona name (autocomplete format)', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createPersona(db, { name: 'FriendlyHelper', archetype: 'professional', traits: [] });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'FriendlyHelper (assistant)' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        expect(getAgentPersonas(db, agent.id)).toHaveLength(1);
+    });
+
+    test('remove unassigns persona and shows confirmation embed', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createPersona(db, { name: 'FriendlyHelper', archetype: 'professional', traits: [] });
+
+        // Pre-assign
+        const addInteraction = makeSubcommandInteraction('agent-persona', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'FriendlyHelper' },
+        ]);
+        await handleAgentPersonaCommand(ctx, addInteraction, PermissionLevel.ADMIN);
+        expect(getAgentPersonas(db, agent.id)).toHaveLength(1);
+
+        // Now remove
+        capturedResponse = null;
+        const removeInteraction = makeSubcommandInteraction('agent-persona', 'remove', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'FriendlyHelper' },
+        ]);
+        await handleAgentPersonaCommand(ctx, removeInteraction, PermissionLevel.ADMIN);
+
+        expect(getAgentPersonas(db, agent.id)).toHaveLength(0);
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        expect(embed?.title).toContain('Persona Removed');
+        expect(embed?.color).toBe(0xed4245);
+    });
+
+    test('remove reports error when persona not assigned', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+        createPersona(db, { name: 'FriendlyHelper', archetype: 'professional', traits: [] });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'remove', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'FriendlyHelper' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('was not assigned');
+    });
+
+    test('reports error when agent not found', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'list', [
+            { name: 'agent', value: 'NonExistentBot' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Agent not found');
+    });
+
+    test('reports error when persona not found', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'add', [
+            { name: 'agent', value: 'TestBot' },
+            { name: 'persona', value: 'NonExistentPersona' },
+        ]);
+
+        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Persona not found');
+    });
+});
+
+// ── Integration via handleInteraction ─────────────────────────────────────────
+
+describe('handleInteraction dispatch', () => {
+    test('routes agent-skill to handler', async () => {
+        const ctx = createTestContext({ defaultPermissionLevel: 3 });
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-skill', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+
+        await handleInteraction(ctx, interaction);
+
+        expect(capturedResponse).not.toBeNull();
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string }>)?.[0];
+        expect(embed?.title).toContain('Skills: TestBot');
+    });
+
+    test('routes agent-persona to handler', async () => {
+        const ctx = createTestContext({ defaultPermissionLevel: 3 });
+        createAgent(db, { name: 'TestBot', model: 'test-model' });
+
+        const interaction = makeSubcommandInteraction('agent-persona', 'list', [
+            { name: 'agent', value: 'TestBot' },
+        ]);
+
+        await handleInteraction(ctx, interaction);
+
+        expect(capturedResponse).not.toBeNull();
+        const embed = (capturedResponse!.data?.embeds as Array<{ title: string }>)?.[0];
+        expect(embed?.title).toContain('Personas: TestBot');
+    });
+});
