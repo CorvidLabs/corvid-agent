@@ -105,22 +105,22 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 1. Every handler updates the execution status to either `completed` or `failed` before returning (or on error).
 2. Handlers that require an agent (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`, `execStatusCheckin`) fail with "Agent not found" if `getAgent` returns null.
 3. Handlers that create sessions (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`) require a project ID (from action or agent default) and fail with "No project configured" if unavailable.
-4. Session-based handlers set execution status to `running` with a `sessionId` before starting the process, then immediately mark `completed` (the session runs asynchronously).
+4. Session-based handlers set execution status to `running` with a `sessionId` before starting the process, then immediately mark `completed` (the session runs asynchronously — "early completion" pattern). All sessions are started with `{ schedulerMode: true, schedulerActionType: action.type }`.
 5. `execWorkTask` requires `ctx.workTaskService` to be non-null; fails with "Work task service not available" otherwise.
 6. `execImprovementLoop` requires `ctx.improvementLoopService` to be non-null; fails with "Improvement loop service not configured" otherwise.
-7. `execReputationAttestation` requires both `ctx.reputationScorer` and `ctx.reputationAttestation` to be non-null.
-8. `execOutcomeAnalysis` requires `ctx.outcomeTrackerService` to be non-null.
+7. `execReputationAttestation` requires both `ctx.reputationScorer` and `ctx.reputationAttestation` to be non-null. On-chain publishing is two-phase: compute score → create hash → attempt publish via `sendOnChainToSelf` with format `corvid-reputation:{agentId}:{hash}`. Publish is best-effort; failures are silently caught.
+8. `execOutcomeAnalysis` requires `ctx.outcomeTrackerService` to be non-null. Calls three methods in sequence: `checkOpenPrs()`, `analyzeWeekly()`, `saveAnalysisToMemory()`.
 9. `execDailyReview` requires `ctx.dailyReviewService` to be non-null.
 10. `execSendMessage` requires `ctx.agentMessenger` to be non-null.
-18. `execFlockTesting` requires `ctx.agentMessenger` to be non-null; fails with "Agent messenger not configured" otherwise.
-19. `execFlockTesting` skips testing the schedule's own agent (self-test prevention).
-11. `execCouncilLaunch` requires `councilId`, `projectId`, and `description` in the action; fails if any is missing.
-12. `execStarRepos` and `execForkRepos` require `action.repos` to be non-empty.
-13. `execSendMessage` requires `toAgentId` and `message` in the action.
-14. `execCustom` requires `action.prompt` to be non-empty.
-15. On-chain publishing in `execReputationAttestation` is best-effort; failures are silently caught.
-16. `execReviewPrs` instructs the agent to skip PRs it has already reviewed (deduplication via comment check).
-17. Multi-tenant support: handlers that need an agent use `ctx.resolveScheduleTenantId` to resolve the tenant.
+11. `execFlockTesting` requires `ctx.agentMessenger` to be non-null; fails with "Agent messenger not configured" otherwise. Tests use hardcoded config `{ mode: 'full', decayPerDay: 0.02 }`.
+12. `execFlockTesting` skips testing the schedule's own agent (self-test prevention via wallet address comparison).
+13. `execCouncilLaunch` requires `councilId`, `projectId`, and `description` in the action; fails if any is missing.
+14. `execStarRepos` and `execForkRepos` require `action.repos` to be non-empty. Repos are starred/forked sequentially, not in parallel.
+15. `execSendMessage` requires `toAgentId` and `message` in the action.
+16. `execCustom` requires `action.prompt` to be non-empty.
+17. `execReviewPrs` creates a separate session per repo (not one session for all repos) and instructs the agent to skip PRs it has already reviewed (deduplication via comment check). Default `maxPrs` is 5 per repo.
+18. Multi-tenant support: handlers that need an agent use `ctx.resolveScheduleTenantId` to resolve the tenant.
+19. `execStatusCheckin` evaluates system state via `SystemStateDetector`, resolves agent name (or first 8 chars of ID as fallback), and broadcasts via `sendOnChainToSelf` with format `[STATUS_CHECKIN] Agent: {name} | System: {states} | Schedules running: {count}`.
 
 ## Behavioral Examples
 

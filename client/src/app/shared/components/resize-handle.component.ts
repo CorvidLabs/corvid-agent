@@ -62,7 +62,7 @@ import {
 
         .resize-handle:hover,
         .resize-handle--dragging {
-            background: rgba(0, 229, 255, 0.08);
+            background: var(--accent-cyan-subtle);
         }
 
         .resize-handle__indicator {
@@ -84,7 +84,7 @@ import {
         .resize-handle:hover .resize-handle__indicator,
         .resize-handle--dragging .resize-handle__indicator {
             background: var(--accent-cyan, #00e5ff);
-            box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
 
         @media (max-width: 767px) {

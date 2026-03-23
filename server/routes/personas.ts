@@ -6,6 +6,7 @@ import {
     getAgentPersonas, assignPersona, unassignPersona,
 } from '../db/personas';
 import { getAgent } from '../db/agents';
+import { checkInjection } from '../lib/injection-guard';
 import { parseBodyOrThrow, ValidationError, CreatePersonaSchema, UpdatePersonaSchema, AssignPersonaSchema } from '../lib/validation';
 import { json } from '../lib/response';
 
@@ -120,6 +121,11 @@ export function handlePersonaRoutes(
 async function handleCreatePersona(req: Request, db: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreatePersonaSchema);
+        const textToScan = [data.voiceGuidelines, data.background, ...(data.exampleMessages ?? [])].filter(Boolean).join(' ');
+        if (textToScan) {
+            const injectionDenied = checkInjection(db, textToScan, 'persona_create', req);
+            if (injectionDenied) return injectionDenied;
+        }
         const persona = createPersona(db, data);
         return json(persona, 201);
     } catch (err) {
@@ -131,6 +137,11 @@ async function handleCreatePersona(req: Request, db: Database): Promise<Response
 async function handleUpdatePersona(req: Request, db: Database, id: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdatePersonaSchema);
+        const textToScan = [data.voiceGuidelines, data.background, ...(data.exampleMessages ?? [])].filter(Boolean).join(' ');
+        if (textToScan) {
+            const injectionDenied = checkInjection(db, textToScan, 'persona_update', req);
+            if (injectionDenied) return injectionDenied;
+        }
         const persona = updatePersona(db, id, data);
         if (!persona) return json({ error: 'Not found' }, 404);
         return json(persona);

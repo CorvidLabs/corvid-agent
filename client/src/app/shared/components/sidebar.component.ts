@@ -134,10 +134,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         }
         .sidebar {
             width: 100%;
-            background: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
+            background: var(--glass-bg-solid);
             min-height: 100%;
             padding: 1rem 0;
-            border-right: 1px solid rgba(255, 255, 255, 0.04);
+            border-right: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -187,9 +187,9 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         }
         .sidebar__link--active {
             color: var(--accent-cyan);
-            background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
+            background: linear-gradient(90deg, var(--accent-cyan-subtle) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
-            text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+            text-shadow: 0 0 8px var(--accent-cyan-border);
             animation: sidebarActiveGlow 0.3s ease-out;
         }
         @keyframes sidebarActiveGlow {
@@ -372,7 +372,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 display: block;
                 position: fixed;
                 inset: 0;
-                background: rgba(0, 0, 0, 0.6);
+                background: var(--overlay);
                 backdrop-filter: blur(2px);
                 z-index: 999;
             }

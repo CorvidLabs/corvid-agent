@@ -17,6 +17,7 @@ import { parseBodyOrThrow, ValidationError } from '../lib/validation';
 import { json } from '../lib/response';
 import { safeNumParam } from '../lib/response';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { z } from 'zod';
 
 const VALID_PLATFORMS = ['discord', 'algochat', 'github'] as const;
@@ -57,6 +58,8 @@ export function handleContactRoutes(
 
     // POST /api/contacts — create
     if (path === '/api/contacts' && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleCreate(req, db, tenantId);
     }
 
@@ -91,10 +94,14 @@ export function handleContactRoutes(
         }
 
         if (method === 'PUT') {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
             return handleUpdate(req, db, tenantId, contactId);
         }
 
         if (method === 'DELETE') {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
             const deleted = deleteContact(db, tenantId, contactId);
             if (deleted) {
                 recordAudit(db, 'contact_delete', tenantId, 'contact', contactId);
@@ -107,6 +114,8 @@ export function handleContactRoutes(
     // POST /api/contacts/:id/links — add platform link
     const addLinkMatch = path.match(/^\/api\/contacts\/([^/]+)\/links$/);
     if (addLinkMatch && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         const contactId = decodeURIComponent(addLinkMatch[1]);
         return handleAddLink(req, db, tenantId, contactId);
     }

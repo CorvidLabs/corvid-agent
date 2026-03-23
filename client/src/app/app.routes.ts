@@ -33,7 +33,10 @@ const SESSIONS_TABS: SubTab[] = [
     { label: 'Conversations', path: './', exact: true },
     { label: 'Work Tasks', path: 'work-tasks' },
     { label: 'Councils', path: 'councils' },
-    { label: 'Live Feed', path: 'feed' },
+];
+
+const OBSERVE_TABS: SubTab[] = [
+    { label: 'Live Feed', path: './', exact: true },
     { label: 'Analytics', path: 'analytics' },
     { label: 'Logs', path: 'logs' },
     { label: 'Brain Viewer', path: 'brain-viewer' },
@@ -124,7 +127,7 @@ export const routes: Routes = [
         ],
     },
 
-    // ── Sessions (consolidated — now includes Observe views) ─────────────
+    // ── Sessions ───────────────────────────────────────────────────────
     {
         path: 'sessions',
         component: SubTabShellComponent,
@@ -170,9 +173,28 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/councils/council-launch-view.component').then((m) => m.CouncilLaunchViewComponent),
             },
-            // Observe views (moved from /observe/* to /sessions/*)
+            // Backwards-compat: old observe views that lived under sessions/*
+            { path: 'feed', redirectTo: '/observe', pathMatch: 'full' },
+            { path: 'analytics', redirectTo: '/observe/analytics', pathMatch: 'full' },
+            { path: 'logs', redirectTo: '/observe/logs', pathMatch: 'full' },
+            { path: 'brain-viewer', redirectTo: '/observe/brain-viewer', pathMatch: 'full' },
+            { path: 'reputation', redirectTo: '/observe/reputation', pathMatch: 'full' },
             {
-                path: 'feed',
+                path: ':id',
+                loadComponent: () =>
+                    import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
+            },
+        ],
+    },
+
+    // ── Observe (monitoring & analytics) ─────────────────────────────
+    {
+        path: 'observe',
+        component: SubTabShellComponent,
+        data: { tabs: OBSERVE_TABS, groupLabel: 'Observe' },
+        children: [
+            {
+                path: '',
                 loadComponent: () =>
                     import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
             },
@@ -195,11 +217,6 @@ export const routes: Routes = [
                 path: 'reputation',
                 loadComponent: () =>
                     import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
-            },
-            {
-                path: ':id',
-                loadComponent: () =>
-                    import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
             },
         ],
     },
@@ -292,17 +309,12 @@ export const routes: Routes = [
     { path: 'councils', redirectTo: 'sessions/councils', pathMatch: 'full' },
     { path: 'council-launches/:id', redirectTo: 'sessions/council-launches/:id' },
 
-    // Old observe paths -> sessions/*
-    { path: 'observe', redirectTo: 'sessions/feed', pathMatch: 'full' },
-    { path: 'observe/analytics', redirectTo: 'sessions/analytics', pathMatch: 'full' },
-    { path: 'observe/logs', redirectTo: 'sessions/logs', pathMatch: 'full' },
-    { path: 'observe/brain-viewer', redirectTo: 'sessions/brain-viewer', pathMatch: 'full' },
-    { path: 'observe/reputation', redirectTo: 'sessions/reputation', pathMatch: 'full' },
-    { path: 'feed', redirectTo: 'sessions/feed', pathMatch: 'full' },
-    { path: 'analytics', redirectTo: 'sessions/analytics', pathMatch: 'full' },
-    { path: 'logs', redirectTo: 'sessions/logs', pathMatch: 'full' },
-    { path: 'brain-viewer', redirectTo: 'sessions/brain-viewer', pathMatch: 'full' },
-    { path: 'reputation', redirectTo: 'sessions/reputation', pathMatch: 'full' },
+    // Old flat observe paths -> observe/*
+    { path: 'feed', redirectTo: 'observe', pathMatch: 'full' },
+    { path: 'analytics', redirectTo: 'observe/analytics', pathMatch: 'full' },
+    { path: 'logs', redirectTo: 'observe/logs', pathMatch: 'full' },
+    { path: 'brain-viewer', redirectTo: 'observe/brain-viewer', pathMatch: 'full' },
+    { path: 'reputation', redirectTo: 'observe/reputation', pathMatch: 'full' },
 
     // Old automate paths -> settings/*
     { path: 'automate', redirectTo: 'settings/schedules', pathMatch: 'full' },

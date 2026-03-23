@@ -24,6 +24,7 @@ import {
     UpdateProposalSchema,
     TransitionProposalSchema,
 } from '../lib/validation';
+import { checkInjection } from '../lib/injection-guard';
 import { json, handleRouteError } from '../lib/response';
 import {
     createProposal,
@@ -136,6 +137,11 @@ export function handleProposalRoutes(
 async function handleCreate(req: Request, db: Database, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateProposalSchema);
+        const textToScan = [data.title, data.description].filter(Boolean).join(' ');
+        if (textToScan) {
+            const injectionDenied = checkInjection(db, textToScan, 'proposal_create', req);
+            if (injectionDenied) return injectionDenied;
+        }
 
         // Verify the council exists
         const council = getCouncil(db, data.councilId, tenantId);
@@ -152,6 +158,11 @@ async function handleCreate(req: Request, db: Database, tenantId: string): Promi
 async function handleUpdate(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateProposalSchema);
+        const textToScan = [data.title, data.description].filter(Boolean).join(' ');
+        if (textToScan) {
+            const injectionDenied = checkInjection(db, textToScan, 'proposal_update', req);
+            if (injectionDenied) return injectionDenied;
+        }
 
         const existing = getProposal(db, id, tenantId);
         if (!existing) return json({ error: 'Not found' }, 404);

@@ -391,7 +391,7 @@ async function handleRoutes(
     if (proposalResponse) return proposalResponse;
 
     if (workTaskService) {
-        const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService, context);
+        const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService, context, db);
         if (workTaskResponse) return workTaskResponse;
     }
 

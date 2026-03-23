@@ -67,17 +67,20 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 
 ## Invariants
 
-1. **Minimum schedule interval**: No schedule may fire more often than every 5 minutes (`MIN_SCHEDULE_INTERVAL_MS = 300,000`). Validated at schedule creation by `validateScheduleFrequency`
-2. **Max concurrent executions**: At most `MAX_CONCURRENT_EXECUTIONS` (2) actions run simultaneously. Skips tick if limit reached
-3. **Auto-pause on failure**: After `MAX_CONSECUTIVE_FAILURES` (5) consecutive failures, the schedule is automatically paused
-4. **Execution deduplication**: When `maxExecutions` is reached, the schedule status is set to `completed` and no further executions occur
-5. **Approval policy enforcement**: Actions requiring approval (based on `approvalPolicy` and action type) are held in `awaiting_approval` state until explicitly resolved
-6. **Destructive actions need approval**: Under `owner_approve` policy, these action types require approval: `work_task`, `github_suggest`, `fork_repo`, `codebase_review`, `dependency_audit`, `improvement_loop`. Under `council_approve`, all actions need approval. Under `auto`, none do
-7. **Config snapshot isolation**: Each execution captures a snapshot of the schedule config at creation time, so mid-flight edits don't corrupt running executions
-8. **No missed-run catch-up**: On startup, `next_run_at` is computed from now, not from `last_run_at`. Prevents thundering herd after restart
-9. **Idempotent start**: Calling `start()` when already running is a no-op
-10. **Notification best-effort**: On-chain notifications to `notifyAddress` are fire-and-forget; failures are logged but don't affect execution status
-11. **Schedule result broadcasting**: Completed executions for non-trivial action types (`work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`) broadcast results to AlgoChat via `sendOnChainToSelf`
+1. **Minimum schedule interval**: No schedule may fire more often than every 5 minutes (`MIN_SCHEDULE_INTERVAL_MS = 300,000`). For cron expressions, validated by computing two consecutive fire times and measuring the gap. For intervals, direct comparison against minimum.
+2. **Max concurrent executions**: At most `MAX_CONCURRENT_EXECUTIONS` (2) actions run simultaneously. Skips tick if limit reached.
+3. **Auto-pause on failure**: After `MAX_CONSECUTIVE_FAILURES` (5) consecutive failures, the schedule is automatically paused and `consecutiveFailures` is reset.
+4. **Execution deduplication**: When `maxExecutions` is reached, the schedule status is set to `completed` and no further executions occur.
+5. **Approval policy enforcement**: Actions requiring approval (based on `approvalPolicy` and action type) are held in `awaiting_approval` state until explicitly resolved.
+6. **Destructive actions need approval**: Under `owner_approve` policy, these action types require approval: `work_task`, `github_suggest`, `fork_repo`, `codebase_review`, `dependency_audit`, `improvement_loop`. Under `council_approve`, all actions need approval. Under `auto`, none do.
+7. **Config snapshot isolation**: Each execution captures a snapshot of the schedule config at creation time, so mid-flight edits don't corrupt running executions.
+8. **No missed-run catch-up**: On startup, `next_run_at` is computed from now, not from `last_run_at`. Prevents thundering herd after restart. Active schedules with NULL `next_run_at` have it set synchronously during initialization.
+9. **Idempotent start**: Calling `start()` when already running is a no-op.
+10. **Notification best-effort**: On-chain notifications to `notifyAddress` are fire-and-forget; failures are logged but don't affect execution status.
+11. **Schedule result broadcasting**: Completed executions for non-trivial action types (`work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`) broadcast results to AlgoChat via `sendOnChainToSelf`.
+12. **Health gate timing**: Health gates are evaluated AFTER `last_run_at` and `next_run_at` are committed, preventing rapid re-execution during health issues.
+13. **Tenant resolution**: Every execution resolves tenant ID via `resolveScheduleTenantId`, which queries the agents table and falls back to `DEFAULT_TENANT_ID`.
+14. **Event callback isolation**: Errors in event callbacks do not halt subsequent callbacks from being invoked.
 
 ## Behavioral Examples
 

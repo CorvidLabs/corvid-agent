@@ -8,6 +8,7 @@ import {
 } from '../db/skill-bundles';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
+import { checkInjection } from '../lib/injection-guard';
 import { parseBodyOrThrow, ValidationError, CreateSkillBundleSchema, UpdateSkillBundleSchema, AssignSkillBundleSchema } from '../lib/validation';
 import { json } from '../lib/response';
 
@@ -146,6 +147,10 @@ export function handleSkillBundleRoutes(
 async function handleCreateBundle(req: Request, db: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateSkillBundleSchema);
+        if (data.promptAdditions) {
+            const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_create', req);
+            if (injectionDenied) return injectionDenied;
+        }
         const bundle = createBundle(db, data);
         return json(bundle, 201);
     } catch (err) {
@@ -157,6 +162,10 @@ async function handleCreateBundle(req: Request, db: Database): Promise<Response>
 async function handleUpdateBundle(req: Request, db: Database, id: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateSkillBundleSchema);
+        if (data.promptAdditions) {
+            const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_update', req);
+            if (injectionDenied) return injectionDenied;
+        }
         const bundle = updateBundle(db, id, data);
         if (!bundle) return json({ error: 'Not found' }, 404);
         return json(bundle);

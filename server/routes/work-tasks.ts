@@ -1,6 +1,8 @@
+import type { Database } from 'bun:sqlite';
 import type { WorkTaskService } from '../work/service';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { checkInjection } from '../lib/injection-guard';
 import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
@@ -9,6 +11,7 @@ export function handleWorkTaskRoutes(
     url: URL,
     workTaskService: WorkTaskService,
     context?: RequestContext,
+    db?: Database,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -33,7 +36,7 @@ export function handleWorkTaskRoutes(
             const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
             if (denied) return denied;
         }
-        return handleCreate(req, workTaskService, tenantId);
+        return handleCreate(req, workTaskService, tenantId, db);
     }
 
     // POST /api/work-tasks/:id/cancel — cancel a running task
@@ -84,9 +87,13 @@ async function handleCancel(taskId: string, workTaskService: WorkTaskService): P
     return json(task);
 }
 
-async function handleCreate(req: Request, workTaskService: WorkTaskService, tenantId: string): Promise<Response> {
+async function handleCreate(req: Request, workTaskService: WorkTaskService, tenantId: string, db?: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateWorkTaskSchema);
+        if (db) {
+            const injectionDenied = checkInjection(db, data.description, 'work_task', req);
+            if (injectionDenied) return injectionDenied;
+        }
 
         const task = await workTaskService.create({
             agentId: data.agentId,
