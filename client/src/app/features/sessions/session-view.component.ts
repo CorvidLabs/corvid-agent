@@ -177,6 +177,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
             if (!newId || newId === this.sessionId) return;
             this.cleanupCurrentSession();
             this.sessionId = newId;
+            this.chatTabs.activeSessionId.set(newId);
             this.loadSession(newId);
         });
     }
