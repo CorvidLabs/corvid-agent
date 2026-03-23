@@ -5,11 +5,14 @@ import {
     OnInit,
     OnDestroy,
     signal,
+    computed,
     viewChild,
     ElementRef,
     AfterViewInit,
 } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import { TopNavComponent } from './shared/components/top-nav.component';
 import { ChatTabBarComponent } from './shared/components/chat-tab-bar.component';
 import { ActivityRailComponent } from './shared/components/activity-rail.component';
@@ -29,7 +32,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent, SidebarComponent],
     template: `
-        <div class="app-layout">
+        <div class="app-layout" [class.app-layout--session]="isSessionView()">
             <app-top-nav />
             @if (chatTabs.tabs().length > 0) {
                 <app-chat-tab-bar />
@@ -57,7 +60,9 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             (click)="scrollToTop()"
             aria-label="Scroll to top"
             title="Scroll to top">&#x25B2;</button>
-        <app-mobile-bottom-nav />
+        @if (!isSessionView()) {
+            <app-mobile-bottom-nav />
+        }
         <app-command-palette />
         <app-keyboard-shortcuts-overlay />
         <app-guided-tour />
@@ -112,10 +117,20 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
         }
 
-        /* Mobile: reserve space for bottom nav */
+        /* Mobile: reserve space for bottom nav (not in session view) */
         @media (max-width: 767px) {
             .app-layout__content {
                 padding-bottom: 56px;
+            }
+            .app-layout--session .app-layout__content {
+                padding-bottom: 0;
+            }
+        }
+
+        /* Hide chat tab bar on mobile — bottom nav handles navigation */
+        @media (max-width: 767px) {
+            :host ::ng-deep app-chat-tab-bar {
+                display: none;
             }
         }
     `,
@@ -125,19 +140,29 @@ export class App implements OnInit, OnDestroy {
     protected readonly chatTabs = inject(ChatTabsService);
     private readonly sessionService = inject(SessionService);
     private readonly _shortcuts = inject(KeyboardShortcutsService);
+    private readonly router = inject(Router);
 
     protected readonly sidebarOpen = signal(false);
     protected readonly showScrollTop = signal(false);
+    protected readonly isSessionView = signal(false);
     private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
+    private routerSub: Subscription | null = null;
 
     ngOnInit(): void {
         this.wsService.connect();
         this.sessionService.init();
+
+        // Track whether we're viewing a session (hides bottom nav on mobile)
+        this.isSessionView.set(this.router.url.startsWith('/sessions/'));
+        this.routerSub = this.router.events
+            .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+            .subscribe((e) => this.isSessionView.set(e.urlAfterRedirects.startsWith('/sessions/')));
     }
 
     ngOnDestroy(): void {
         this.sessionService.destroy();
         this.wsService.disconnect();
+        this.routerSub?.unsubscribe();
     }
 
     protected onScroll(event: Event): void {

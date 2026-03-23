@@ -117,6 +117,28 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
+
+        /* Mobile: compact header — hide meta, shrink actions */
+        @media (max-width: 767px) {
+            .session-view__header {
+                flex-wrap: wrap;
+                padding: 0.5rem 0.75rem;
+                gap: 0.5rem;
+            }
+            .session-view__meta {
+                display: none;
+            }
+            .session-view__actions {
+                gap: 0.25rem;
+            }
+            .export-group {
+                display: none;
+            }
+            .btn {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.65rem;
+            }
+        }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }

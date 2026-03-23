@@ -70,6 +70,22 @@ import { FormsModule } from '@angular/forms';
         }
         .input-bar__send:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .input-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* Mobile: tighter input bar */
+        @media (max-width: 767px) {
+            .input-bar {
+                padding: 0.5rem;
+                gap: 0.375rem;
+            }
+            .input-bar__field {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.8rem;
+            }
+            .input-bar__send {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.7rem;
+            }
+        }
     `,
 })
 export class SessionInputComponent {
