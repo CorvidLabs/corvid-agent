@@ -18,9 +18,12 @@ files:
   - server/db/migrations/087_session_metrics.ts
   - server/db/migrations/088_agent_display_columns_fixup.ts
   - server/db/migrations/089_flock_test_results.ts
+  - server/db/migrations/090_response_feedback.ts
   - server/db/migrations/091_contact_identities.ts
   - server/db/migrations/092_discord_mention_sessions.ts
   - server/db/migrations/093_mention_session_project_name.ts
+  - server/db/migrations/094_arc69_memory_asa.ts
+  - server/db/migrations/095_memory_observations.ts
   - server/db/migrations/096_mention_session_channel_id.ts
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
@@ -309,6 +312,17 @@ Creates `flock_test_results` and `flock_test_challenge_results` tables for stori
 | `up` | `(db: Database)` | `void` | Creates `flock_test_results` and `flock_test_challenge_results` tables with indexes for agent ID and test result lookups |
 | `down` | `(db: Database)` | `void` | Drops both tables and their indexes |
 
+### 090_response_feedback.ts
+
+Creates the `response_feedback` table for storing user feedback (thumbs-up/thumbs-down) on agent responses. Integrates with the reputation scoring system via `feedback_received` events.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `response_feedback` table with indexes on `agent_id` and `created_at` |
+| `down` | `(db: Database)` | `void` | Drops the `response_feedback` table |
+
 ### 091_contact_identities.ts
 
 Creates `contacts` and `contact_platform_links` tables for cross-platform identity mapping. Links Discord IDs, AlgoChat addresses, and GitHub handles to unified contact records.
@@ -341,6 +355,28 @@ Adds `project_name` column to `discord_mention_sessions` for persisting the proj
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `project_name` TEXT column to `discord_mention_sessions` |
 | `down` | `(db: Database)` | `void` | Drops `project_name` column from `discord_mention_sessions` |
+
+### 094_arc69_memory_asa.ts
+
+Adds `asa_id` column to `agent_memories` for linking memory records to on-chain ARC-69 ASAs. Includes a partial index on `(agent_id, asa_id)` for efficient lookups of on-chain memories.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `asa_id` INTEGER column to `agent_memories` (idempotent) and creates partial index `idx_agent_memories_asa` |
+| `down` | `(db: Database)` | `void` | Drops the index and `asa_id` column |
+
+### 095_memory_observations.ts
+
+Creates the `memory_observations` table and FTS5 virtual table for the observation pipeline. Observations are ephemeral memory candidates that can be promoted to permanent memories based on relevance scoring and access frequency.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `memory_observations` table with 4 indexes, `memory_observations_fts` FTS5 table, and 3 sync triggers |
+| `down` | `(db: Database)` | `void` | Drops triggers, FTS table, indexes, and `memory_observations` table |
 
 ### 096_mention_session_channel_id.ts
 
@@ -434,8 +470,7 @@ Creates the `reputation_history` table for storing periodic reputation score sna
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-22 | corvid-agent | Add migration 101 (reputation_history) to spec coverage |
-| 2026-03-22 | corvid-agent | Add migrations 099, 100 (variants, pipeline_schedules) to spec coverage |
+| 2026-03-23 | corvid-agent | Add missing migrations 090, 094, 095 to spec coverage |
 | 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |
 | 2026-03-20 | corvid-agent | Add migration 097 to spec coverage |
