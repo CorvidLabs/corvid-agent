@@ -4,6 +4,24 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Sandbox banner */
+.sandbox-banner {
+    display: flex; align-items: center; gap: .6rem;
+    background: var(--accent-amber-subtle, rgba(245,158,11,.12));
+    border: 1px solid var(--accent-amber, #f59e0b);
+    border-radius: 6px; padding: .5rem .9rem;
+    margin-bottom: .75rem; font-size: .8rem;
+    color: var(--text-primary);
+}
+.sandbox-banner__icon { font-size: 1rem; flex-shrink: 0; }
+.sandbox-banner__text { line-height: 1.4; }
+.sandbox-banner__text code {
+    font-family: var(--font-mono, monospace);
+    background: var(--bg-elevated, rgba(255,255,255,.05));
+    border-radius: 3px; padding: 0 4px;
+    font-size: .75rem;
+}
+
 /* Toolbar */
 .dash-toolbar {
     display: flex; justify-content: space-between; align-items: center;

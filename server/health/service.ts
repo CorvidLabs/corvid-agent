@@ -212,6 +212,7 @@ export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheck
         version: deps.version,
         uptime: Math.round((now - deps.startTime) / 1000),
         timestamp: new Date(now).toISOString(),
+        tryMode: process.env.TRY_MODE === 'true',
         dependencies,
     };
 
