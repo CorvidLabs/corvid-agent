@@ -9,6 +9,7 @@ import { loginCommand, logoutCommand } from './commands/login';
 import { interactiveCommand } from './commands/interactive';
 import { initCommand } from './commands/init';
 import { demoCommand } from './commands/demo';
+import { provisionCommand, listRoles } from './commands/provision';
 import { c, printError } from './render';
 
 // ─── Argument Parsing ───────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan('chat')} <prompt>                     Send a message to an agent
   ${c.cyan('session')} list|get|stop|resume      Manage sessions
   ${c.cyan('agent')} list|get|create             Manage agents
+  ${c.cyan('provision')}                         Generate identity bundle for a new instance
   ${c.cyan('login')}                             Log in to CorvidAgent Cloud
   ${c.cyan('logout')}                            Log out (remove saved token)
   ${c.cyan('config')} show|get|set               Manage CLI configuration
@@ -288,6 +290,33 @@ Removes the saved authentication token from ~/.corvid/config.json.
 `);
 }
 
+function printProvisionHelp(): void {
+    console.log(`
+${c.bold}corvid-agent provision${c.reset} — Generate identity bundle for a new agent instance
+
+${c.bold}Usage:${c.reset}
+  corvid-agent provision --name <name> [options]
+
+${c.bold}Options:${c.reset}
+  --name <name>        Agent name (required, alphanumeric/hyphens/underscores)
+  --role <role>        Role template (developer, reviewer, assistant, security)
+  --network <net>      Algorand network: localnet, testnet, mainnet (default: testnet)
+  --out-dir <path>     Output directory (default: ./corvid-agent-<name>)
+  --list-roles         Show available role templates
+  --help, -h           Show this help
+
+${c.bold}Description:${c.reset}
+  Generates a standalone configuration bundle for deploying a new corvid-agent
+  instance on another machine. Creates a wallet, encryption key, API key, and
+  .env file ready for deployment.
+
+${c.bold}Examples:${c.reset}
+  corvid-agent provision --name my-reviewer --role reviewer
+  corvid-agent provision --name prod-agent --network mainnet --out-dir ~/agents/prod
+  corvid-agent provision --list-roles
+`);
+}
+
 function printConfigHelp(): void {
     console.log(`
 ${c.bold}corvid-agent config${c.reset} — Manage CLI configuration
@@ -414,6 +443,26 @@ async function main(): Promise<void> {
                 const id = getPositional(1);
                 await agentCommand(action, id);
             }
+            break;
+        }
+
+        case 'provision': {
+            if (hasHelpFlag()) { printProvisionHelp(); return; }
+            if (args.includes('--list-roles')) {
+                listRoles();
+                return;
+            }
+            const provisionName = getFlag('name');
+            if (!provisionName) {
+                printError('Name required: corvid-agent provision --name <name>');
+                process.exit(1);
+            }
+            await provisionCommand({
+                name: provisionName,
+                role: getFlag('role'),
+                network: getFlag('network'),
+                outDir: getFlag('out-dir'),
+            });
             break;
         }
 
