@@ -337,5 +337,9 @@ export const routes: Routes = [
     { path: 'repo-blocklist', redirectTo: 'settings/repo-blocklist', pathMatch: 'full' },
     { path: 'marketplace', redirectTo: 'settings/marketplace', pathMatch: 'full' },
 
-    { path: '**', redirectTo: 'chat' },
+    {
+        path: '**',
+        loadComponent: () =>
+            import('./shared/components/route-error.component').then((m) => m.RouteErrorComponent),
+    },
 ];

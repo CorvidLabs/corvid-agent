@@ -118,6 +118,14 @@
     /* Yellow accent (used by some status badges) */
     --accent-yellow: #fbbf24;
 
+    /* Subtle borders — softer than --border for dividers and separators */
+    --border-subtle: rgba(30, 32, 53, 0.6);
+    --border-faint: rgba(30, 32, 53, 0.35);
+
+    /* Overlays — backdrop for modals, drawers, and popovers */
+    --overlay: rgba(0, 0, 0, 0.5);
+    --overlay-heavy: rgba(0, 0, 0, 0.75);
+
     /* Glassmorphism */
     --glass-bg: rgba(15, 16, 24, 0.6);
     --glass-bg-solid: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);

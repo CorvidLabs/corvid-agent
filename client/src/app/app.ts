@@ -18,6 +18,7 @@ import { ToastContainerComponent } from './shared/components/toast-container.com
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { GuidedTourComponent } from './shared/components/guided-tour.component';
 import { MobileBottomNavComponent } from './shared/components/mobile-bottom-nav.component';
+import { SidebarComponent } from './shared/components/sidebar.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
 import { ChatTabsService } from './core/services/chat-tabs.service';
@@ -26,7 +27,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent],
+    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent, SidebarComponent],
     template: `
         <div class="app-layout">
             <app-top-nav />
@@ -43,6 +44,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 </div>
             }
             <div class="app-layout__body">
+                <app-sidebar class="app-layout__sidebar" [(sidebarOpen)]="sidebarOpen" />
                 <main class="app-layout__content" role="main" id="main-content" #mainContent (scroll)="onScroll($event)">
                     <router-outlet />
                 </main>
@@ -100,6 +102,16 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             color: var(--accent-yellow, #fc0);
         }
 
+        /* Sidebar: hidden on mobile (top-nav handles mobile nav) */
+        .app-layout__sidebar {
+            display: none;
+        }
+        @media (min-width: 768px) {
+            .app-layout__sidebar {
+                display: flex;
+            }
+        }
+
         /* Mobile: reserve space for bottom nav */
         @media (max-width: 767px) {
             .app-layout__content {
@@ -114,6 +126,7 @@ export class App implements OnInit, OnDestroy {
     private readonly sessionService = inject(SessionService);
     private readonly _shortcuts = inject(KeyboardShortcutsService);
 
+    protected readonly sidebarOpen = signal(false);
     protected readonly showScrollTop = signal(false);
     private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
 

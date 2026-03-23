@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type {
     FlockAgent,
     FlockAgentStatus,
@@ -28,7 +29,7 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SkeletonComponent],
+    imports: [SkeletonComponent, EmptyStateComponent],
     template: `
         <div class="flock-page">
             <!-- Stats Header -->
@@ -121,17 +122,10 @@ interface FlockStats {
             <!-- Agent Grid -->
             @if (!loading()) {
                 @if (agents().length === 0) {
-                    <div class="flock-empty">
-                        <div class="flock-empty__icon">🔍</div>
-                        <h3 class="flock-empty__title">No agents found</h3>
-                        <p class="flock-empty__text">
-                            @if (searchQuery() || statusFilter() || capabilityFilter()) {
-                                Try adjusting your search or filters.
-                            } @else {
-                                No agents registered in the directory yet.
-                            }
-                        </p>
-                    </div>
+                    <app-empty-state
+                        icon="~?~"
+                        [title]="(searchQuery() || statusFilter() || capabilityFilter()) ? 'No matches' : 'No agents found'"
+                        [description]="(searchQuery() || statusFilter() || capabilityFilter()) ? 'Try adjusting your search or filters.' : 'No agents registered in the directory yet.'" />
                 } @else {
                     <div class="flock-grid stagger-children">
                         @for (agent of agents(); track agent.id) {
@@ -444,23 +438,7 @@ interface FlockStats {
             font-size: 0.8rem;
         }
 
-        /* Empty State */
-        .flock-empty {
-            padding: 3rem;
-            text-align: center;
-        }
-        .flock-empty__icon { font-size: 2rem; margin-bottom: 0.75rem; }
-        .flock-empty__title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: var(--text-primary, #eee);
-            margin: 0 0 0.5rem;
-        }
-        .flock-empty__text {
-            font-size: 0.8rem;
-            color: var(--text-tertiary, #666);
-            margin: 0;
-        }
+
 
         /* Agent Grid — fluid with container queries */
         :host { container-type: inline-size; }
