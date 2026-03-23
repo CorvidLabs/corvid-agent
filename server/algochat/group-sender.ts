@@ -1,8 +1,13 @@
 import type { ChatAccount } from '@corvidlabs/ts-algochat';
-import { encryptMessage, encodeEnvelope, PROTOCOL } from '@corvidlabs/ts-algochat';
 import type { AlgoChatService } from './service';
 import { createLogger } from '../lib/logger';
 import { ValidationError } from '../lib/errors';
+
+/** Lazily resolve the ts-algochat module (optional dependency). */
+async function getAlgoChat() {
+    return import('@corvidlabs/ts-algochat');
+}
+
 
 const log = createLogger('GroupSender');
 
@@ -36,12 +41,13 @@ const GROUP_PREFIX_MAX_BYTES = 13; // e.g. "[GRP:99/99]"
  *
  * @param maxPayload — max plaintext bytes per envelope (defaults to AlgoChat standard).
  */
-export function splitMessage(content: string, maxPayload?: number): string[] {
+export function splitMessage(content: string, maxPayload?: number, protocolOverride?: { MAX_PAYLOAD_SIZE: number; TAG_SIZE: number }): string[] {
     if (maxPayload !== undefined && maxPayload <= 0) {
         throw new ValidationError('maxPayload must be positive');
     }
-    const singleMax = maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE);
-    const multiMax = (maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE)) - GROUP_PREFIX_MAX_BYTES;
+    const proto = protocolOverride ?? { MAX_PAYLOAD_SIZE: 882, TAG_SIZE: 16 }; // safe defaults matching AlgoChat
+    const singleMax = maxPayload ?? (proto.MAX_PAYLOAD_SIZE - proto.TAG_SIZE);
+    const multiMax = (maxPayload ?? (proto.MAX_PAYLOAD_SIZE - proto.TAG_SIZE)) - GROUP_PREFIX_MAX_BYTES;
 
     const encoder = new TextEncoder();
     const contentBytes = encoder.encode(content).byteLength;
@@ -100,7 +106,8 @@ export async function sendGroupMessage(
     content: string,
     paymentMicro: number = 0,
 ): Promise<GroupSendResult> {
-    const chunks = splitMessage(content);
+    const algochatModule = await getAlgoChat();
+    const chunks = splitMessage(content, undefined, algochatModule.PROTOCOL);
 
     // Single chunk — use the standard path
     if (chunks.length === 1) {
@@ -137,15 +144,15 @@ export async function sendGroupMessage(
     // Build one payment transaction per chunk
     const transactions: InstanceType<typeof algosdk.Transaction>[] = [];
     for (let i = 0; i < orderedChunks.length; i++) {
-        const envelope = encryptMessage(
+        const envelope = algochatModule.encryptMessage(
             orderedChunks[i],
             senderAccount.encryptionKeys.publicKey,
             recipientPublicKey,
         );
-        const note = encodeEnvelope(envelope);
+        const note = algochatModule.encodeEnvelope(envelope);
 
         // Only the first transaction carries the payment; others are 0-amount
-        const amount = i === 0 ? (paymentMicro > 0 ? paymentMicro : PROTOCOL.MIN_PAYMENT) : PROTOCOL.MIN_PAYMENT;
+        const amount = i === 0 ? (paymentMicro > 0 ? paymentMicro : algochatModule.PROTOCOL.MIN_PAYMENT) : algochatModule.PROTOCOL.MIN_PAYMENT;
 
         const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
             sender: senderAccount.address,

@@ -10,8 +10,12 @@
  */
 import type { Database } from 'bun:sqlite';
 import type { ChatAccount } from '@corvidlabs/ts-algochat';
-import { encryptMessage, decryptMessage, encodeEnvelope, decodeEnvelope } from '@corvidlabs/ts-algochat';
 import { createLogger } from '../lib/logger';
+
+/** Lazily load ts-algochat (optional dependency). */
+async function getAlgoChat() {
+    return import('@corvidlabs/ts-algochat');
+}
 
 const log = createLogger('Arc69Store');
 
@@ -49,7 +53,8 @@ export interface Arc69NotePayload {
 // ── Helpers ────────────────────────────────────────────────────────
 
 /** Encrypt memory content as an AlgoChat self-to-self envelope, returned as base64. */
-function encryptContent(content: string, account: ChatAccount): string {
+async function encryptContent(content: string, account: ChatAccount): Promise<string> {
+    const { encryptMessage, encodeEnvelope } = await getAlgoChat();
     const envelope = encryptMessage(
         content,
         account.encryptionKeys.publicKey,
@@ -61,7 +66,8 @@ function encryptContent(content: string, account: ChatAccount): string {
 }
 
 /** Decrypt a base64-encoded AlgoChat envelope back to plaintext. */
-function decryptContent(envelopeB64: string, account: ChatAccount): string | null {
+async function decryptContent(envelopeB64: string, account: ChatAccount): Promise<string | null> {
+    const { decryptMessage, decodeEnvelope } = await getAlgoChat();
     const raw = atob(envelopeB64);
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
@@ -114,7 +120,7 @@ export async function createMemoryAsa(
     content: string,
 ): Promise<{ asaId: number; txid: string }> {
     const algosdk = (await import('algosdk')).default;
-    const envelopeB64 = encryptContent(content, ctx.chatAccount);
+    const envelopeB64 = await encryptContent(content, ctx.chatAccount);
     const note = buildNotePayload(key, ctx.agentId, envelopeB64);
 
     // Validate note fits in Algorand's 1024-byte limit
@@ -162,7 +168,7 @@ export async function updateMemoryAsa(
     content: string,
 ): Promise<{ txid: string }> {
     const algosdk = (await import('algosdk')).default;
-    const envelopeB64 = encryptContent(content, ctx.chatAccount);
+    const envelopeB64 = await encryptContent(content, ctx.chatAccount);
     const note = buildNotePayload(key, ctx.agentId, envelopeB64);
 
     if (note.byteLength > 1024) {
@@ -272,7 +278,7 @@ export async function readMemoryAsa(
         const payload = parseNotePayload(noteBytes);
         if (!payload) return null;
 
-        const content = decryptContent(payload.properties.envelope, ctx.chatAccount);
+        const content = await decryptContent(payload.properties.envelope, ctx.chatAccount);
         if (!content) return null;
 
         const confirmedRound = (tx.confirmedRound ?? tx['confirmed-round'] ?? 0) as number | bigint;

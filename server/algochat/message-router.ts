@@ -134,7 +134,7 @@ export class MessageRouter {
 
     /** Wire the SyncManager's onMessagesReceived to the dedup/group/routing pipeline. */
     setupMessageHandler(): void {
-        this.service.syncManager.on('onMessagesReceived', (participant, messages) => {
+        this.service.syncManager.on('onMessagesReceived', (participant: string, messages: Array<{ content: string; txid?: string; id?: string; round?: number; confirmedRound?: number; amount?: number; direction?: string; sender?: string }>) => {
             // Separate group chunks from regular messages, dedup by txid
             const groupChunks: Map<number, typeof messages> = new Map();
             const regularMessages: typeof messages = [];
@@ -194,7 +194,7 @@ export class MessageRouter {
                         continue;
                     }
 
-                    const totalAmount = chunks.reduce((sum, c) => {
+                    const totalAmount = chunks.reduce((sum: number, c) => {
                         const a = (c as unknown as Record<string, unknown>).amount;
                         return sum + (a != null ? Number(a) : 0);
                     }, 0);
