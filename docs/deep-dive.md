@@ -47,7 +47,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
 | Version | 0.47.0 |
-| Git commits | 916 |
+| Git commits | 918 |
 
 ### Tech Stack
 
