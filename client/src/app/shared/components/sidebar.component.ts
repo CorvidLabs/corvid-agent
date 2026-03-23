@@ -26,7 +26,7 @@ interface SidebarSection {
 }
 
 const SECTIONS: SidebarSection[] = [
-    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents'] },
+    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents', '/observe'] },
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions'] },
     { key: 'config', label: 'Settings', collapsible: true, defaultCollapsed: false, routes: ['/settings'] },
 ];
@@ -87,6 +87,12 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/observe" routerLinkActive="sidebar__link--active" title="Observe">
+                        <span class="sidebar__label">Observe</span>
+                        <span class="sidebar__abbr">O</span>
                     </a>
                 </li>
 

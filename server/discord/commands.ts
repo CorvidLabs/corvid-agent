@@ -22,6 +22,7 @@ import { resolvePermissionLevel } from './permissions';
 import { handleAdminCommand } from './admin-commands';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
 import type { MentionSessionInfo } from './message-handler';
+import type { GuildCache } from './guild-api';
 
 // Command handler imports
 import { handleSessionCommand, handleWorkCommand } from './command-handlers/session-commands';
@@ -248,6 +249,8 @@ export async function registerSlashCommands(
                     options: [{ name: 'enabled', description: 'Enable or disable public mode', type: 5, required: true }],
                 },
                 { name: 'show', description: 'Show current bot configuration', type: 1 },
+                { name: 'setup', description: 'Auto-configure roles and enable public mode', type: 1 },
+                { name: 'sync', description: 'Re-sync server roles and channels from Discord', type: 1 },
             ],
         },
         {
@@ -391,6 +394,10 @@ export interface InteractionContext {
     mentionSessions: Map<string, MentionSessionInfo>;
     /** Subscribe for adaptive inline response (used by /message command). */
     subscribeForInlineResponse: (sessionId: string, channelId: string, replyToMessageId: string, agentName: string, agentModel: string, onBotMessage?: (botMessageId: string) => void, projectName?: string, displayColor?: string | null) => void;
+    /** Cached guild roles/channels/info from Discord API. */
+    guildCache: GuildCache;
+    /** Trigger a guild data re-sync from Discord API. */
+    syncGuildData: () => void;
 }
 
 export async function handleInteraction(
@@ -476,7 +483,7 @@ export async function handleInteraction(
                 await respondToInteraction(interaction, 'Only admins can use `/admin` commands.');
                 break;
             }
-            await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options);
+            await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options, ctx.guildCache, ctx.syncGuildData);
             break;
         }
         case 'agent-skill':

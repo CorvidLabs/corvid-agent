@@ -47,7 +47,20 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                         } @else {
                             <button class="btn btn--primary" (click)="onResume()">Resume</button>
                         }
-                        <button class="btn btn--secondary" (click)="onDelete()">Delete</button>
+                        <button class="btn btn--secondary" (click)="showDeleteConfirm.set(true)">Delete</button>
+                        <div class="mobile-menu-wrapper">
+                            <button class="btn btn--secondary mobile-menu-btn" (click)="showMobileMenu.set(!showMobileMenu())" title="More actions">···</button>
+                            @if (showMobileMenu()) {
+                                <div class="mobile-menu-backdrop" (click)="showMobileMenu.set(false)"></div>
+                                <div class="mobile-menu">
+                                    <button class="mobile-menu__item" (click)="onCopyLog(); showMobileMenu.set(false)">
+                                        {{ logCopied() ? 'Copied!' : 'Copy Log' }}
+                                    </button>
+                                    <button class="mobile-menu__item" (click)="onExportJson(); showMobileMenu.set(false)">Export JSON</button>
+                                    <button class="mobile-menu__item" (click)="onExportMarkdown(); showMobileMenu.set(false)">Export Markdown</button>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
 
@@ -87,8 +100,26 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                     }
                 </div>
             }
+            @if (showDeleteConfirm()) {
+                <div class="confirm-overlay" (click)="showDeleteConfirm.set(false)">
+                    <div class="confirm-dialog" (click)="$event.stopPropagation()">
+                        <h3 class="confirm-dialog__title">Delete session?</h3>
+                        <p class="confirm-dialog__text">This will permanently delete this session and all its messages. This cannot be undone.</p>
+                        <div class="confirm-dialog__actions">
+                            <button class="btn btn--secondary" (click)="showDeleteConfirm.set(false)">Cancel</button>
+                            <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            }
         } @else {
-            <div class="page"><p>Loading...</p></div>
+            <div class="session-view__loading">
+                <div class="skeleton skeleton--title"></div>
+                <div class="skeleton skeleton--line"></div>
+                <div class="skeleton skeleton--line skeleton--short"></div>
+                <div class="skeleton skeleton--line"></div>
+                <div class="skeleton skeleton--line skeleton--medium"></div>
+            </div>
         }
     `,
     styles: `
@@ -167,6 +198,62 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
         }
         .question-card__input input:focus { outline: none; border-color: var(--accent-cyan); }
+
+        /* Delete confirmation overlay */
+        .confirm-overlay {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+        .confirm-dialog {
+            background: var(--bg-surface); border: 1px solid var(--border-bright);
+            border-radius: var(--radius-lg, 10px); padding: 1.5rem;
+            max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.2s ease;
+        }
+        .confirm-dialog__title { margin: 0 0 0.5rem; font-size: 1rem; color: var(--text-primary); }
+        .confirm-dialog__text { margin: 0 0 1.25rem; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+        .confirm-dialog__actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Mobile overflow menu */
+        .mobile-menu-wrapper { display: none; position: relative; z-index: 100; }
+        .mobile-menu-btn { font-size: 0.9rem; letter-spacing: 0.15em; }
+        .mobile-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
+        .mobile-menu {
+            position: absolute; right: 0; top: 100%; z-index: 101;
+            background: var(--bg-surface); border: 1px solid var(--border-bright);
+            border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            min-width: 160px; overflow: hidden; animation: slideUp 0.15s ease;
+        }
+        .mobile-menu__item {
+            display: block; width: 100%; padding: 0.6rem 0.75rem;
+            background: none; border: none; border-bottom: 1px solid var(--border);
+            color: var(--text-primary); font-family: inherit; font-size: 0.75rem;
+            text-align: left; cursor: pointer; transition: background 0.1s;
+        }
+        .mobile-menu__item:last-child { border-bottom: none; }
+        .mobile-menu__item:hover { background: var(--bg-hover); }
+
+        /* Loading skeleton */
+        .session-view__loading { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .skeleton {
+            height: 14px; border-radius: 4px;
+            background: linear-gradient(90deg, var(--bg-surface) 25%, rgba(255,255,255,0.04) 50%, var(--bg-surface) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+        .skeleton--title { height: 20px; width: 40%; margin-bottom: 0.5rem; }
+        .skeleton--line { width: 100%; }
+        .skeleton--short { width: 55%; }
+        .skeleton--medium { width: 80%; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        @media (max-width: 767px) {
+            .mobile-menu-wrapper { display: block; }
+        }
     `,
 })
 export class SessionViewComponent implements OnInit, OnDestroy {
@@ -184,6 +271,8 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     protected readonly logCopied = signal(false);
     protected readonly pendingApproval = signal<ApprovalRequestWire | null>(null);
     protected readonly pendingQuestion = signal<OwnerQuestionWire | null>(null);
+    protected readonly showDeleteConfirm = signal(false);
+    protected readonly showMobileMenu = signal(false);
 
     protected readonly events = computed(() => {
         const s = this.session();
@@ -337,14 +426,22 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
     protected async onStop(): Promise<void> {
         if (!this.sessionId) return;
-        await this.sessionService.stopSession(this.sessionId);
-        this.session.update((s) => s ? { ...s, status: 'stopped' } : s);
+        try {
+            await this.sessionService.stopSession(this.sessionId);
+            this.session.update((s) => s ? { ...s, status: 'stopped' } : s);
+        } catch (e) {
+            this.notifications.error('Failed to stop session', String(e));
+        }
     }
 
     protected async onResume(): Promise<void> {
         if (!this.sessionId) return;
-        await this.sessionService.resumeSession(this.sessionId);
-        this.session.update((s) => s ? { ...s, status: 'running' } : s);
+        try {
+            await this.sessionService.resumeSession(this.sessionId);
+            this.session.update((s) => s ? { ...s, status: 'running' } : s);
+        } catch (e) {
+            this.notifications.error('Failed to resume session', String(e));
+        }
     }
 
     protected onCopyLog(): void {
@@ -363,6 +460,8 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         navigator.clipboard.writeText(lines.join('\n')).then(() => {
             this.logCopied.set(true);
             setTimeout(() => this.logCopied.set(false), 2000);
+        }).catch(() => {
+            this.notifications.error('Failed to copy to clipboard');
         });
     }
 

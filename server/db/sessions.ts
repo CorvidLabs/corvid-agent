@@ -8,6 +8,9 @@ import type {
     AlgoChatConversation,
 } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('sessions');
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface SessionRow {
@@ -176,14 +179,14 @@ export function updateSessionAgent(db: Database, id: string, agentId: string): v
 export function updateSessionPid(db: Database, id: string, pid: number | null): void {
     const result = db.query("UPDATE sessions SET pid = ?, updated_at = datetime('now') WHERE id = ?").run(pid, id);
     if (result.changes === 0) {
-        console.warn(`[sessions] updateSessionPid: 0 rows affected for id=${id} pid=${pid}`);
+        log.warn(`updateSessionPid: 0 rows affected`, { id, pid });
     }
 }
 
 export function updateSessionStatus(db: Database, id: string, status: string): void {
     const result = db.query("UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
     if (result.changes === 0) {
-        console.warn(`[sessions] updateSessionStatus: 0 rows affected for id=${id} status=${status}`);
+        log.warn(`updateSessionStatus: 0 rows affected`, { id, status });
     }
 }
 
