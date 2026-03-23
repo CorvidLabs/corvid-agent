@@ -60,6 +60,24 @@ Discord messages include:
 
 Use `corvid_lookup_contact` to resolve Discord users to their other identities (GitHub, AlgoChat, etc.).
 
+## User Mentions & Pings
+
+To mention/ping a Discord user, you MUST use the Discord mention syntax with their numeric ID:
+
+```
+<@DISCORD_ID>
+```
+
+**Example:** `<@181969874455756800>` pings Leif. Writing `@Leif` or `@leif.algo` does NOT ping anyone — it renders as plain text.
+
+### Rules
+
+- **Always use `<@id>` format** — this is the only way to actually notify someone on Discord
+- **Never use `@DisplayName`** — it looks like a mention but does not ping or notify
+- Get the Discord ID from the incoming message metadata or via `corvid_lookup_contact`
+- Role mentions use `<@&ROLE_ID>` format
+- Channel mentions use `<#CHANNEL_ID>` format
+
 ## Message Formatting
 
 Discord supports a subset of Markdown:

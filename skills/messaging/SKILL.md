@@ -64,6 +64,18 @@ Your text response is automatically routed back through the originating channel'
 4. For AlgoChat — use `corvid_send_message`
 5. If you have no way to reach a channel, explain that you cannot
 
+## User Mentions by Channel
+
+When mentioning/pinging users, each channel has its own syntax:
+
+| Channel | Mention syntax | Example |
+|---------|---------------|---------|
+| Discord | `<@DISCORD_ID>` | `<@181969874455756800>` |
+| Telegram | `@username` | `@leif_algo` |
+| AlgoChat | Algorand address | `ALGO...` |
+
+**Critical:** On Discord, `@DisplayName` does NOT work — only `<@numeric_id>` actually pings/notifies the user. Get the Discord ID from the incoming message metadata or via `corvid_lookup_contact`.
+
 ## Message Formatting by Channel
 
 | Channel | Format | Limits |
