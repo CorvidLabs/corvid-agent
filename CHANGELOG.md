@@ -5,20 +5,29 @@ All notable changes to this project will be documented in this file.
 ## [0.45.0] - 2026-03-22
 
 ### Added
-- **UX overhaul (phases 1–3)** — security hardening and spec-sync v2.0.0 (#1389)
+- **UX overhaul (phases 1–5)** — chat-first layout, security hardening, spec-sync v2.0.0, icons, CSS vars, skeleton loaders (#1389, #1399)
+- **Security: injection guard + RBAC hardening** — input sanitization across all user-input routes (#1387)
+- **Discord: /agent-skill and /agent-persona commands** — manage skills and personas from Discord (#1386)
+- **CLI: provision command** — multi-agent deployment provisioning (#1392)
 - **Reputation score history** — tracking, trend chart, and agent comparison (#1385)
 - **Dashboard: log & diff viewers** — agent health badges (#1382)
 - **Dashboard: pipeline stages** — reputation trend chart (#1381)
 
 ### Fixed
+- **UI: remove duplicate chat tab bar** — fix duplicate tab bar in session view (#1400)
 - **UI: active tab on click** — set active tab immediately, no double-click needed (#1395, #1396)
+- **Consolidate duplicate isCloudModel** — single source of truth for cloud model detection (#1391)
 - **Security: RBAC guards** — add guards to discord-image and openrouter routes (#1380)
+
+### Removed
+- **Flock-directory contract** — remove dead contract code (#1390)
 
 ### Tests
 - Add unit tests for onboarding components — 49 tests (#1384)
 - A2A invocation guard coverage expansion (#1383)
 
 ### Docs
+- **API docs** — add request/response examples for ~150 endpoints (#1394)
 - Update version and stats for v0.44.0 release (#1379)
 
 ## [0.44.0] - 2026-03-22
