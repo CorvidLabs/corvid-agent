@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 
 /**
- * Migration 100: Add pipeline execution support to agent_schedules.
+ * Migration 103: Add pipeline execution support to agent_schedules.
  *
  * Adds execution_mode ('independent' | 'pipeline') and pipeline_steps (JSON)
  * columns for composable multi-action pipelines with shared context.

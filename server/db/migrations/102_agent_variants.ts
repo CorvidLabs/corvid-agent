@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 
 /**
- * Migration 100: Agent variant profiles — preset skill + persona combinations.
+ * Migration 102: Agent variant profiles — preset skill + persona combinations.
  *
  * - Creates `agent_variants` table (reusable variant templates)
  * - Creates `agent_variant_assignments` table (1:1 agent → variant)

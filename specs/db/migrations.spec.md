@@ -26,8 +26,8 @@ files:
   - server/db/migrations/098_schedule_output_destinations.ts
   - server/db/migrations/099_composable_personas.ts
   - server/db/migrations/100_agent_blocklist.ts
-  - server/db/migrations/100_agent_variants.ts
-  - server/db/migrations/100_pipeline_schedules.ts
+  - server/db/migrations/102_agent_variants.ts
+  - server/db/migrations/103_pipeline_schedules.ts
   - server/db/migrations/101_reputation_history.ts
 db_tables:
   - schema_version
@@ -397,7 +397,7 @@ Creates the `agent_blocklist` table for the agent kill switch. Tracks blackliste
 | `up` | `(db: Database)` | `void` | Creates `agent_blocklist` table with `agent_id` as primary key, plus index on `reason` |
 | `down` | `(db: Database)` | `void` | Drops the `agent_blocklist` table |
 
-### 100_agent_variants.ts
+### 102_agent_variants.ts
 
 Creates `agent_variants` and `agent_variant_assignments` tables for preset skill + persona combination profiles. Depends on migration 099 (composable personas).
 
@@ -408,7 +408,7 @@ Creates `agent_variants` and `agent_variant_assignments` tables for preset skill
 | `up` | `(db: Database)` | `void` | Creates `agent_variants` table (with unique name constraint) and `agent_variant_assignments` table (1:1 agent → variant), plus index on variant_id |
 | `down` | `(db: Database)` | `void` | Drops `agent_variant_assignments` and `agent_variants` tables |
 
-### 100_pipeline_schedules.ts
+### 103_pipeline_schedules.ts
 
 Adds pipeline execution support to `agent_schedules` with `execution_mode` and `pipeline_steps` columns for composable multi-action pipelines.
 
