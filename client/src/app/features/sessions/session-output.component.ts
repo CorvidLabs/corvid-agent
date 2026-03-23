@@ -413,6 +413,37 @@ interface ParsedEvent {
             letter-spacing: 0.08em;
             margin-left: 0.25rem;
         }
+
+        /* ── Mobile optimizations ── */
+        @media (max-width: 767px) {
+            .terminal { padding: 0.375rem 0.5rem; }
+            .line { gap: 0.375rem; }
+            .line + .line--assistant,
+            .line + .line--user {
+                margin-top: 0.25rem;
+                padding-top: 0.25rem;
+            }
+            .tool-group + .line--assistant,
+            .tool-group + .line--user {
+                margin-top: 0.25rem;
+                padding-top: 0.25rem;
+            }
+            .tool-group-children {
+                padding-left: 0.75rem;
+                margin-left: 0.25rem;
+            }
+            .text--result { max-height: 120px; }
+            .scroll-fab {
+                bottom: 0.5rem;
+                right: 0.5rem;
+                width: 2rem;
+                height: 2rem;
+                font-size: 0.85rem;
+            }
+            .prompt { display: none; }
+            .time { display: none; }
+            .copy-btn { opacity: 0.5; }
+        }
     `,
 })
 export class SessionOutputComponent implements AfterViewChecked, OnDestroy {

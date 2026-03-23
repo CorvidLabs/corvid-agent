@@ -138,6 +138,11 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                 padding: 0.25rem 0.5rem;
                 font-size: 0.65rem;
             }
+            .question-card {
+                margin: 0.5rem 0.5rem;
+                padding: 0.75rem;
+            }
+            .question-card__options { gap: 0.375rem; }
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
