@@ -92,6 +92,12 @@ export class FlockDirectoryService {
     private onChainClient: OnChainFlockClient | null = null;
     private signerConfig: OnChainSignerConfig | null = null;
 
+    /** Conflict resolver — set by bootstrap for cross-machine coordination. */
+    conflictResolver: import('./conflict-resolver').FlockConflictResolver | null = null;
+
+    /** Capability router — set by bootstrap for task routing. */
+    capabilityRouter: import('./capability-router').CapabilityRouter | null = null;
+
     constructor(private readonly db: Database) {}
 
     /**

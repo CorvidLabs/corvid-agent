@@ -59,6 +59,8 @@ import { OpenRouterProvider } from './providers/openrouter/provider';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
 import { FlockDirectoryService } from './flock-directory/service';
+import { FlockConflictResolver } from './flock-directory/conflict-resolver';
+import { CapabilityRouter } from './flock-directory/capability-router';
 import { BrowserService } from './browser/service';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
@@ -143,6 +145,8 @@ export interface ServiceContainer {
 
     // Agent directory
     flockDirectoryService: FlockDirectoryService;
+    flockConflictResolver: FlockConflictResolver;
+    capabilityRouter: CapabilityRouter;
 
     // Browser automation
     browserService: BrowserService;
@@ -288,6 +292,26 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const marketplaceService = new MarketplaceService(db);
     const marketplaceFederation = new MarketplaceFederation(db);
     const flockDirectoryService = new FlockDirectoryService(db);
+
+    // ── Flock conflict resolution & capability routing ──────────────────
+    const flockConflictResolver = new FlockConflictResolver(db, flockDirectoryService, {
+        selfAgentId: process.env.FLOCK_AGENT_ID ?? '',
+        selfAgentName: process.env.AGENT_NAME ?? 'corvid-agent',
+    });
+    flockConflictResolver.ensureSchema();
+
+    const capabilityRouter = new CapabilityRouter(
+        flockDirectoryService,
+        flockConflictResolver,
+        process.env.FLOCK_AGENT_ID ?? '',
+    );
+
+    workTaskService.setConflictResolver(flockConflictResolver);
+
+    // Attach to flock service so routes can access them through existing parameter
+    flockDirectoryService.conflictResolver = flockConflictResolver;
+    flockDirectoryService.capabilityRouter = capabilityRouter;
+
     const browserService = new BrowserService();
 
     const reputationScorer = new ReputationScorer(db);
@@ -497,6 +521,8 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         slackBridge,
         permissionBroker,
         flockDirectoryService,
+        flockConflictResolver,
+        capabilityRouter,
         browserService,
     };
 }
