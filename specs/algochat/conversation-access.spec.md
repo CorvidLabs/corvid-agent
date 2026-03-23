@@ -48,7 +48,12 @@ question system.
 | `addToAgentBlocklist` | `(db: Database, agentId: string, address: string, reason?: string)` | `AgentBlocklistEntry` | Blocks an address from messaging an agent |
 | `removeFromAgentBlocklist` | `(db: Database, agentId: string, address: string)` | `boolean` | Unblocks an address |
 | `listAgentBlocklist` | `(db: Database, agentId: string)` | `AgentBlocklistEntry[]` | Lists all blocked addresses for an agent |
+| `isOnAgentAllowlist` | `(db: Database, agentId: string, address: string)` | `boolean` | Returns whether an address is on the agent's conversation allowlist |
+| `isOnAgentBlocklist` | `(db: Database, agentId: string, address: string)` | `boolean` | Returns whether an address is on the agent's conversation blocklist |
 | `getConversationRateLimit` | `(db: Database, agentId: string, participant: string)` | `RateLimitStatus` | Checks rate-limit status for a participant |
+| `pruneRateLimitEntries` | `(db: Database, windowSeconds: number)` | `number` | Deletes rate-limit entries older than the given window; returns count of pruned rows |
+| `up` | `(db: Database)` | `void` | Creates conversation access tables (`agent_conversation_allowlist`, `agent_conversation_blocklist`, `agent_conversation_rate_limits`) and adds `conversation_mode`, `conversation_rate_limit_window`, `conversation_rate_limit_max` columns to `agents` |
+| `down` | `(db: Database)` | `void` | Drops the conversation access tables and removes the added columns from `agents` |
 
 ### Exported Types
 
