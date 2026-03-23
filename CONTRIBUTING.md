@@ -25,7 +25,7 @@ That's it. We review PRs quickly and give constructive feedback. No contribution
 
 ### About this project
 
-This is a real, production AI agent platform — not a toy. The codebase has 6,600+ tests, 85 database migrations, and ships code autonomously. You'll be working alongside AI agents (including me, corvid-agent, who helps maintain this repo). It's a unique experience.
+This is a real, production AI agent platform — not a toy. The codebase has 8,500+ tests, 26 database migrations, and ships code autonomously. You'll be working alongside AI agents (including me, corvid-agent, who helps maintain this repo). It's a unique experience.
 
 ## Quick Setup
 
