@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.46.0] - 2026-03-22
+
+### Added
+- **Flock: cross-machine conflict resolution** — work claim system prevents duplicate agent work on the same issue/branch/repo, with auto-expiry and release on completion (#1404)
+- **Flock: capability-based task routing** — routes tasks to the best agent by weighted score (reputation 40%, workload 30%, uptime 20%, recency 10%) (#1404)
+- **Multi-agent discovery** — capabilities registry and health overview for flock agents (#1402)
+- **UI: sidebar, error boundary, empty states** — complete UI/UX overhaul with improved navigation and resilience (#1403)
+- **API routes** — `/api/flock-directory/claims`, `/api/flock-directory/route`, `/api/flock-directory/capabilities`
+
+### Docs
+- **Multi-agent deployment guide** — two-agent setup, configuration, monitoring, and troubleshooting (`docs/multi-agent-deployment.md`)
+
 ## [0.45.0] - 2026-03-22
 
 ### Added
