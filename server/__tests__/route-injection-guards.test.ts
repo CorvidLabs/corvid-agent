@@ -142,7 +142,7 @@ describe('councils injection guard', () => {
     });
 
     test('blocks injection in council chat message', async () => {
-        const council = createCouncil(db, { name: 'Test Council', agentIds: [agentId] });
+        createCouncil(db, { name: 'Test Council', agentIds: [agentId] });
         const mockPm = {} as any;
         // Chat requires a launch ID in the path: /api/councils/:id/launches/:launchId/chat
         const { req, url } = fakeReq('POST', `/api/council-launches/fake-launch/chat`, {
@@ -159,7 +159,8 @@ describe('mcp-api injection guard', () => {
     const baseDeps = () => ({
         db,
         agentMessenger: { sendMessage: async () => ({ ok: true }) } as any,
-        walletService: null as any,
+        agentDirectory: {} as any,
+        agentWalletService: null as any,
     });
 
     test('blocks injection in send-message', async () => {
