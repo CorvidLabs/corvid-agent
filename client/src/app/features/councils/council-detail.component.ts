@@ -198,19 +198,25 @@ export class CouncilDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) return;
 
-        await this.agentService.loadAgents();
+        await this.agentService.loadAgents().catch(() => {});
         this.projectService.loadProjects();
 
         for (const a of this.agentService.agents()) {
             this.agentNameMap[a.id] = a.name;
         }
 
-        const council = await this.councilService.getCouncil(id);
+        let council;
+        try {
+            council = await this.councilService.getCouncil(id);
+        } catch {
+            this.router.navigate(['/sessions/councils']);
+            return;
+        }
         this.council.set(council);
         this.memberNames.set(council.agentIds.map((aid) => this.agentNameMap[aid] ?? aid.slice(0, 8)));
         this.chairmanName.set(council.chairmanAgentId ? (this.agentNameMap[council.chairmanAgentId] ?? '') : '');
 
-        const launches = await this.councilService.getCouncilLaunches(id);
+        const launches = await this.councilService.getCouncilLaunches(id).catch(() => [] as any[]);
         this.launches.set(launches);
     }
 
