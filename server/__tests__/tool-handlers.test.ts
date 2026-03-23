@@ -966,4 +966,33 @@ describe('handleListAgents', () => {
         const result = await handleListAgents(ctx);
         expect((result.content[0] as { text: string }).text).toContain('OTHERADDR');
     });
+
+    test('shows capabilities from Flock Directory when available', async () => {
+        const ctx = createMockContext({
+            flockDirectoryService: {
+                getByAddress: mock((addr: string) => {
+                    if (addr === 'OTHERADDR') {
+                        return {
+                            capabilities: ['code', 'review'],
+                            reputationScore: 85,
+                        };
+                    }
+                    return null;
+                }),
+            } as unknown as McpToolContext['flockDirectoryService'],
+        });
+        const result = await handleListAgents(ctx);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('[code, review]');
+        expect(text).toContain('rep: 85');
+    });
+
+    test('omits flock data gracefully when service unavailable', async () => {
+        const ctx = createMockContext({ flockDirectoryService: undefined });
+        const result = await handleListAgents(ctx);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('OtherBot');
+        // Should not crash, just show basic info
+        expect(result.isError).toBeFalsy();
+    });
 });

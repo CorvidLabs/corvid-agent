@@ -114,9 +114,25 @@ export async function handleListAgents(
             return textResult('No other agents available.');
         }
 
+        // Cross-reference Flock Directory for capabilities and reputation
+        const flockSvc = ctx.flockDirectoryService;
+
         const lines = others.map((a) => {
+            let extra = '';
+            if (flockSvc && a.walletAddress) {
+                const flockAgent = flockSvc.getByAddress(a.walletAddress);
+                if (flockAgent) {
+                    const caps = flockAgent.capabilities.length > 0
+                        ? ` [${flockAgent.capabilities.join(', ')}]`
+                        : '';
+                    const rep = flockAgent.reputationScore > 0
+                        ? ` rep: ${flockAgent.reputationScore}`
+                        : '';
+                    extra = `${caps}${rep}`;
+                }
+            }
             const wallet = a.walletAddress ? ` (wallet: ${a.walletAddress})` : '';
-            return `- ${a.agentName} [${a.agentId}]${wallet}`;
+            return `- ${a.agentName} [${a.agentId}]${wallet}${extra}`;
         });
 
         return textResult(`Available agents:\n\n${lines.join('\n')}`);
