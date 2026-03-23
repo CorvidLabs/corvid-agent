@@ -85,15 +85,43 @@
     --source-manual: #56d4e0;
     --source-work: #79b8ff;
 
-    /* Glow effects */
+    /* Subtle backgrounds — very low opacity for tinted surfaces */
+    --accent-cyan-subtle: rgba(0, 229, 255, 0.06);
+    --accent-green-subtle: rgba(0, 255, 136, 0.06);
+    --accent-red-subtle: rgba(255, 51, 85, 0.06);
+    --accent-amber-subtle: rgba(255, 170, 0, 0.06);
+    --accent-magenta-subtle: rgba(255, 0, 170, 0.06);
+    --accent-purple-subtle: rgba(167, 139, 250, 0.06);
+
+    /* Semi-transparent borders — for badges, pills, outlined elements */
+    --accent-cyan-border: rgba(0, 229, 255, 0.25);
+    --accent-green-border: rgba(0, 255, 136, 0.25);
+    --accent-red-border: rgba(255, 51, 85, 0.25);
+    --accent-amber-border: rgba(255, 170, 0, 0.25);
+    --accent-magenta-border: rgba(255, 0, 170, 0.25);
+
+    /* Glow colors — for box-shadow and text-shadow effects */
+    --accent-cyan-glow: rgba(0, 229, 255, 0.3);
+    --accent-green-glow: rgba(0, 255, 136, 0.3);
+    --accent-red-glow: rgba(255, 51, 85, 0.3);
+    --accent-amber-glow: rgba(255, 170, 0, 0.3);
+    --accent-magenta-glow: rgba(255, 0, 170, 0.3);
+
+    /* Glow effects (box-shadow shorthand) */
     --glow-cyan: 0 0 8px rgba(0, 229, 255, 0.25);
     --glow-magenta: 0 0 8px rgba(255, 0, 170, 0.25);
     --glow-green: 0 0 8px rgba(0, 255, 136, 0.25);
 
+    /* Shadows */
+    --shadow-deep: rgba(0, 0, 0, 0.5);
+
+    /* Yellow accent (used by some status badges) */
+    --accent-yellow: #fbbf24;
+
     /* Glassmorphism */
     --glass-bg: rgba(15, 16, 24, 0.6);
     --glass-bg-solid: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
-    --glass-border: var(--border-faint);
+    --glass-border: var(--border);
     --glass-blur: 12px;
 
     /* Gradients */
