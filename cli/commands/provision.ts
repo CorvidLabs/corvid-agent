@@ -26,25 +26,25 @@ const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
         description: 'Code review, implementation, and development tasks',
         systemPrompt: 'You are a developer agent. You help with code review, implementation, debugging, and development tasks. Be precise, follow best practices, and write clean code.',
         capabilities: ['code', 'review', 'test', 'algochat'],
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
     },
     reviewer: {
         description: 'Code review and quality assurance specialist',
         systemPrompt: 'You are a code review agent. You focus on code quality, security, performance, and best practices. Provide constructive, actionable feedback.',
         capabilities: ['review', 'test', 'algochat'],
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
     },
     assistant: {
         description: 'General-purpose conversational assistant',
         systemPrompt: 'You are a helpful assistant agent. You answer questions, provide information, and help with general tasks. Be concise and accurate.',
         capabilities: ['algochat'],
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-4-5',
     },
     security: {
         description: 'Security auditing and vulnerability analysis',
         systemPrompt: 'You are a security auditing agent. You analyze code for vulnerabilities, review security configurations, and recommend hardening measures. Follow OWASP guidelines.',
         capabilities: ['code', 'review', 'algochat'],
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
     },
 };
 
