@@ -214,7 +214,9 @@ async function handleResume(
     try {
         processManager.resumeProcess(session, prompt);
     } catch (err) {
-        log.error('Failed to resume process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('Failed to resume process', { sessionId: session.id, error: message });
+        return json({ ok: false, error: `Failed to resume: ${message}` }, 500);
     }
     return json({ ok: true });
 }
