@@ -208,18 +208,26 @@ export function generateOpenApiSpec(options: GeneratorOptions = {}): OpenApiSpec
         if (route.requestBody) {
             try {
                 const schema = zodToJsonSchema(route.requestBody);
+                const mediaType: Record<string, unknown> = { schema };
+                if (route.requestExample) {
+                    mediaType['example'] = route.requestExample;
+                }
                 operation.requestBody = {
                     required: true,
                     content: {
-                        'application/json': { schema },
+                        'application/json': mediaType as { schema: Record<string, unknown> },
                     },
                 };
             } catch {
                 // If schema conversion fails, provide a generic body
+                const mediaType: Record<string, unknown> = { schema: { type: 'object' } };
+                if (route.requestExample) {
+                    mediaType['example'] = route.requestExample;
+                }
                 operation.requestBody = {
                     required: true,
                     content: {
-                        'application/json': { schema: { type: 'object' } },
+                        'application/json': mediaType as { schema: Record<string, unknown> },
                     },
                 };
             }
@@ -228,12 +236,14 @@ export function generateOpenApiSpec(options: GeneratorOptions = {}): OpenApiSpec
         // Responses
         if (route.responses) {
             for (const [status, info] of Object.entries(route.responses)) {
+                const mediaType: Record<string, unknown> = { schema: { type: 'object' } };
+                if (info.example) {
+                    mediaType['example'] = info.example;
+                }
                 operation.responses[String(status)] = {
                     description: info.description,
                     content: {
-                        'application/json': {
-                            schema: { type: 'object' },
-                        },
+                        'application/json': mediaType as { schema: Record<string, unknown> },
                     },
                 };
             }

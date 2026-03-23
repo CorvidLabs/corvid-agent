@@ -9,6 +9,7 @@ export interface RouteEntry {
     description?: string;
     tags: string[];
     requestBody?: z.ZodType;    // Zod schema for request body
+    requestExample?: Record<string, unknown>;   // Example request body value
     auth: 'required' | 'admin' | 'none';
-    responses?: Record<number, { description: string }>;
+    responses?: Record<number, { description: string; example?: Record<string, unknown> }>;
 }
