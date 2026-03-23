@@ -171,4 +171,66 @@ describe('PermissionBroker', () => {
         expect(result.allowed).toBe(true);
         expect(result.reason).toContain('no permission mapping');
     });
+
+    // ── Edge cases ──────────────────────────────────────────────────────
+
+    test('tenant isolation — grants in one tenant do not leak to another', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+            tenantId: 'tenant-a',
+        });
+
+        const result = await broker.checkAction('agent-1', 'git:create_pr', 'tenant-b');
+        expect(result.allowed).toBe(false);
+    });
+
+    test('revoke by agent+action — only revokes matching grants', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        await broker.grant({ agentId: 'agent-1', action: 'msg:send', grantedBy: 'admin' });
+
+        const affected = broker.revoke({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            revokedBy: 'admin',
+        });
+        expect(affected).toBe(1);
+
+        // msg:send should still be active
+        const msgResult = await broker.checkAction('agent-1', 'msg:send');
+        expect(msgResult.allowed).toBe(true);
+    });
+
+    test('double-revoke returns 0 on second call', async () => {
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
+        broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
+        const second = broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
+        expect(second).toBe(0);
+    });
+
+    test('checkTool records checks in permission_checks table', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        await broker.checkTool('agent-1', 'corvid_github_create_pr', { sessionId: 'sess-42' });
+
+        const row = db.query(
+            'SELECT * FROM permission_checks WHERE agent_id = ? AND session_id = ? LIMIT 1',
+        ).get('agent-1', 'sess-42') as Record<string, unknown>;
+        expect(row).toBeTruthy();
+        expect(row.tool_name).toBe('corvid_github_create_pr');
+        expect(row.allowed).toBe(1);
+    });
+
+    test('getRequiredAction returns correct action for mapped tools', () => {
+        const action = broker.getRequiredAction('corvid_github_create_pr');
+        expect(action).toBe('git:create_pr');
+    });
+
+    test('getRequiredAction returns null for unmapped tools', () => {
+        expect(broker.getRequiredAction('unknown_tool')).toBeNull();
+    });
 });
