@@ -25,6 +25,7 @@ import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 // Mock worktree creation — git is not available in CI / test environments.
 mock.module('../lib/worktree', () => ({
     createWorktree: async () => ({ success: true, worktreeDir: '/tmp/mock-worktree' }),
+    resolveAndCreateWorktree: async () => ({ success: true, workDir: '/tmp/mock-worktree' }),
     generateChatBranchName: (agent: string, id: string) => `chat/${agent}/${id.slice(0, 8)}`,
     getWorktreeBaseDir: (dir: string) => `${dir}/.worktrees`,
     removeWorktree: async () => ({ success: true }),

@@ -46,7 +46,7 @@ import { createEventContext, runWithEventContext } from '../observability/event-
 import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
-import { createWorktree, generateChatBranchName } from '../lib/worktree';
+import { resolveAndCreateWorktree, generateChatBranchName } from '../lib/worktree';
 
 const log = createLogger('MessageRouter');
 
@@ -727,19 +727,16 @@ export class MessageRouter {
     private async createSessionWorktree(projectId: string | null): Promise<{ workDir: string; branch: string } | undefined> {
         if (!projectId) return undefined;
         const project = getProject(this.db, projectId);
-        if (!project?.workingDir) return undefined;
+        if (!project?.workingDir && !project?.gitUrl) return undefined;
+        if (!project) return undefined;
 
         const sessionId = crypto.randomUUID();
-        const branchName = generateChatBranchName('algochat', sessionId);
-        const result = await createWorktree({
-            projectWorkingDir: project.workingDir,
-            branchName,
-            worktreeId: `chat-${sessionId.slice(0, 12)}`,
-        });
+        const result = await resolveAndCreateWorktree(project, 'algochat', sessionId);
         if (!result.success) {
             throw new Error(`Worktree isolation failed: ${result.error ?? 'unknown error'}`);
         }
-        return { workDir: result.worktreeDir, branch: branchName };
+        const branchName = generateChatBranchName('algochat', sessionId);
+        return { workDir: result.workDir!, branch: branchName };
     }
 }
 

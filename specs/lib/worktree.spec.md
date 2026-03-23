@@ -1,6 +1,6 @@
 ---
 module: worktree
-version: 1
+version: 2
 status: active
 files:
   - server/lib/worktree.ts
@@ -24,6 +24,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | `createWorktree` | `(options: CreateWorktreeOptions)` | `Promise<CreateWorktreeResult>` | Creates an isolated git worktree with a new branch |
 | `removeWorktree` | `(projectWorkingDir: string, worktreeDir: string, options?: RemoveWorktreeOptions)` | `Promise<void>` | Removes a git worktree. With `cleanBranch: true`, auto-deletes branches with zero commits ahead of main. Idempotent |
 | `generateChatBranchName` | `(agentName: string, sessionId: string)` | `string` | Generates a branch name for chat session worktrees: `chat/{agentSlug}/{sessionIdPrefix}` |
+| `resolveAndCreateWorktree` | `(project: Project, agentName: string, sessionId: string)` | `Promise<ResolveAndCreateWorktreeResult>` | Resolves project dir (handling clone_on_demand/ephemeral) then creates a worktree. Ensures repo is cloned before worktree creation |
 
 ### Exported Types
 
@@ -32,6 +33,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | `CreateWorktreeOptions` | Options for worktree creation: `projectWorkingDir`, `branchName`, `worktreeId` |
 | `CreateWorktreeResult` | Result of worktree creation: `success`, `worktreeDir`, optional `error` |
 | `RemoveWorktreeOptions` | Options for worktree removal: `cleanBranch` (auto-delete empty branches) |
+| `ResolveAndCreateWorktreeResult` | Result of resolve+create: `success`, optional `workDir`, optional `error` |
 
 ## Invariants
 
@@ -96,6 +98,14 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 - **Then** the worktree directory is removed
 - **And** the branch is preserved (needed for PRs/review)
 
+### Scenario: Creating a worktree for a clone_on_demand project
+
+- **Given** a project with `dirStrategy: 'clone_on_demand'` and `gitUrl` set but no local clone
+- **When** `resolveAndCreateWorktree(project, 'corvid', sessionId)` is called
+- **Then** the repo is first cloned via `resolveProjectDir`
+- **And** a worktree is created from the cloned directory
+- **And** `{ success: true, workDir: '{worktreeDir}' }` is returned
+
 ### Scenario: Branch name generation
 
 - **Given** agent name `"Corvid Agent"` and session ID `"abc123def456-rest"`
@@ -118,15 +128,16 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | Module | What is used |
 |--------|-------------|
 | `server/lib/logger.ts` | `createLogger` for structured logging |
+| `server/lib/project-dir.ts` | `resolveProjectDir` for clone_on_demand/ephemeral directory resolution |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
 | `server/work/service.ts` | `getWorktreeBaseDir`, `createWorktree`, `removeWorktree` for work task isolation |
-| `server/discord/message-handler.ts` | `createWorktree`, `generateChatBranchName` for chat session isolation |
-| `server/discord/commands.ts` | `createWorktree`, `generateChatBranchName` for slash-command chat session isolation |
-| `server/algochat/message-router.ts` | `createWorktree`, `generateChatBranchName` for AlgoChat session isolation |
+| `server/discord/message-handler.ts` | `resolveAndCreateWorktree` for chat session isolation |
+| `server/discord/command-handlers/session-commands.ts` | `resolveAndCreateWorktree` for slash-command chat session isolation |
+| `server/algochat/message-router.ts` | `resolveAndCreateWorktree`, `generateChatBranchName` for AlgoChat session isolation |
 | `server/process/manager.ts` | `removeWorktree` (with `cleanBranch: true`) for chat worktree cleanup on session exit |
 
 ## Configuration
@@ -139,6 +150,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-23 | corvid-agent | Added `resolveAndCreateWorktree` — resolves project dir before worktree creation, fixing ENOENT for clone_on_demand projects |
 | 2026-03-18 | corvid-agent | Mandatory worktree isolation (invariants #7-#8); branch isolation prompt; session fails on worktree error |
 | 2026-03-15 | corvid-agent | Added `RemoveWorktreeOptions` / `cleanBranch` for smart branch cleanup; AlgoChat consumer |
 | 2026-03-12 | corvid-agent | Initial spec — extracted from WorkTaskService |
