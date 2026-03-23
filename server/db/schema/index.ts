@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 101;
+const SCHEMA_VERSION = 103;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -126,9 +126,24 @@ const MIGRATIONS: Record<number, string[]> = {
         ...agents.indexes.filter((s) => s.includes('agent_persona_assignments')),
     ],
     100: [
+        // Agent blocklist: kill switch for malicious agents
+        ...reputation.tables.filter((s) => s.includes('agent_blocklist')),
+        ...reputation.indexes.filter((s) => s.includes('agent_blocklist')),
+    ],
+    101: [
+        // Reputation score history: track score snapshots over time
+        ...reputation.tables.filter((s) => s.includes('reputation_history')),
+        ...reputation.indexes.filter((s) => s.includes('reputation_history')),
+    ],
+    102: [
         // Agent variant profiles: preset skill + persona combinations
         ...agents.tables.filter((s) => s.includes('agent_variants') || s.includes('agent_variant_assignments')),
         ...agents.indexes.filter((s) => s.includes('agent_variant_assignments')),
+    ],
+    103: [
+        // Pipeline execution support for agent_schedules
+        `ALTER TABLE agent_schedules ADD COLUMN execution_mode TEXT DEFAULT 'independent'`,
+        `ALTER TABLE agent_schedules ADD COLUMN pipeline_steps TEXT DEFAULT NULL`,
     ],
 };
 
