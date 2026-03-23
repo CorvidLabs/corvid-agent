@@ -82,10 +82,7 @@ export class IconComponent {
 
     svgHtml: SafeHtml = '';
 
-    private sanitizer = (() => {
-        // injected via constructor would be cleaner but this keeps it simple
-        return undefined as unknown as DomSanitizer;
-    })();
+    private sanitizer!: DomSanitizer;
 
     constructor(private _sanitizer: DomSanitizer) {
         this.sanitizer = _sanitizer;

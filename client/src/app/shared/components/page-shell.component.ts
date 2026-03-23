@@ -2,13 +2,8 @@ import {
     Component,
     ChangeDetectionStrategy,
     Input,
-    inject,
-    computed,
-    OnInit,
-    OnDestroy,
 } from '@angular/core';
-import { Router, RouterLink, NavigationEnd, ActivatedRoute } from '@angular/router';
-import { filter, Subscription } from 'rxjs';
+import { RouterLink } from '@angular/router';
 import { IconComponent } from './icon.component';
 
 export interface Breadcrumb {

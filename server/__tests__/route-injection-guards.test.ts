@@ -142,10 +142,10 @@ describe('councils injection guard', () => {
     });
 
     test('blocks injection in council chat message', async () => {
-        createCouncil(db, { name: 'Test Council', agentIds: [agentId] });
+        const council = createCouncil(db, { name: 'Test Council', agentIds: [agentId] });
         const mockPm = {} as any;
         // Chat requires a launch ID in the path: /api/councils/:id/launches/:launchId/chat
-        const { req, url } = fakeReq('POST', `/api/council-launches/fake-launch/chat`, {
+        const { req, url } = fakeReq('POST', `/api/council-launches/${council.id}/chat`, {
             message: INJECTION_PAYLOAD,
         });
         const res = handleCouncilRoutes(req, url, db, mockPm);
