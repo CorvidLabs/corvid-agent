@@ -14,14 +14,12 @@ import type { Session, SessionMessage } from '../../core/models/session.model';
 import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '@shared/ws-protocol';
 import { NotificationService } from '../../core/services/notification.service';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
-import { ChatTabBarComponent } from '../../shared/components/chat-tab-bar.component';
 
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, ChatTabBarComponent, DecimalPipe, RelativeTimePipe],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
     template: `
-        <app-chat-tab-bar />
         @if (session(); as s) {
             <div class="session-view">
                 <div class="session-view__header">
