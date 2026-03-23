@@ -30,6 +30,7 @@ import { isRepoOffLimits } from '../github/off-limits';
 import { searchOpenPrsForIssue } from '../github/operations';
 import { runBunInstall, runValidation } from './validation';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { FlockConflictResolver } from '../flock-directory/conflict-resolver';
 import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
 import { createWorktree, removeWorktree } from '../lib/worktree';
@@ -60,6 +61,7 @@ export class WorkTaskService {
     private processManager: ProcessManager;
     private astParserService: AstParserService | null;
     private agentMessenger: AgentMessenger | null = null;
+    private conflictResolver: FlockConflictResolver | null = null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
     private _shuttingDown = false;
 
@@ -84,6 +86,12 @@ export class WorkTaskService {
     /** Stall detector — tracks per-session consecutive non-tool turns. */
     private readonly stallDetector = new StallDetector();
 
+    /**
+     * In-memory claim tracking. Maps projectId → claimId.
+     * Used to release flock claims when tasks complete.
+     */
+    private _activeClaimMap = new Map<string, string>();
+
     /** True when the service is draining — no new tasks accepted. */
     get shuttingDown(): boolean {
         return this._shuttingDown;
@@ -98,6 +106,11 @@ export class WorkTaskService {
     /** Set the agent messenger (set after async AlgoChat init). */
     setAgentMessenger(messenger: AgentMessenger): void {
         this.agentMessenger = messenger;
+    }
+
+    /** Set the flock conflict resolver (set after flock directory init). */
+    setConflictResolver(resolver: FlockConflictResolver): void {
+        this.conflictResolver = resolver;
     }
 
     /** TaskQueueService reference — set by bootstrap after both are created. */
@@ -457,6 +470,40 @@ export class WorkTaskService {
                         error: err instanceof Error ? err.message : String(err),
                     });
                 }
+            }
+        }
+
+        // Flock conflict check: verify no other agent in the flock is working on the same issue/repo
+        if (this.conflictResolver && repoSlug) {
+            const claimResult = this.conflictResolver.checkAndClaim({
+                repo: repoSlug,
+                issueNumber: dedupIssueNumber ?? undefined,
+                description: input.description.slice(0, 200),
+            });
+
+            if (!claimResult.allowed) {
+                const blocker = claimResult.conflicts[0];
+                log.info('Work task blocked by flock conflict', {
+                    repo: repoSlug,
+                    issueNumber: dedupIssueNumber,
+                    blockedBy: blocker?.existingClaim.agentName,
+                    reason: blocker?.reason,
+                });
+                throw new ConflictError(
+                    `Another agent (${blocker?.existingClaim.agentName ?? 'unknown'}) is already working on this ${blocker?.reason === 'same_issue' ? 'issue' : 'repo'}. Skipping to avoid duplicate work.`,
+                    {
+                        repo: repoSlug,
+                        issueNumber: dedupIssueNumber,
+                        blockedByAgent: blocker?.existingClaim.agentName,
+                        conflictReason: blocker?.reason,
+                    },
+                );
+            }
+
+            // Store claim ID on the task for release on completion
+            if (claimResult.claim) {
+                // Will be released when the task completes (see onTaskComplete handler)
+                this._activeClaimMap.set(projectId, claimResult.claim.id);
             }
         }
 
@@ -1115,6 +1162,9 @@ export class WorkTaskService {
     private notifyCallbacks(taskId: string): void {
         const task = getWorkTask(this.db, taskId);
         if (task) {
+            // Release flock conflict claim for this project
+            this.releaseFlockClaim(task.projectId, task.status);
+
             // Fire-and-forget AlgoChat notification for task completion/failure
             if (this.agentMessenger && task.agentId) {
                 const msg = task.status === 'completed'
@@ -1193,6 +1243,18 @@ export class WorkTaskService {
                 error: err instanceof Error ? err.message : String(err),
             });
         });
+    }
+
+    /**
+     * Release the flock conflict claim for a project when a task finishes.
+     */
+    private releaseFlockClaim(projectId: string, status: string): void {
+        const claimId = this._activeClaimMap.get(projectId);
+        if (!claimId || !this.conflictResolver) return;
+
+        this.conflictResolver.releaseClaim(claimId, status === 'completed' ? 'completed' : 'task_failed');
+        this._activeClaimMap.delete(projectId);
+        log.debug('Released flock claim', { projectId, claimId, taskStatus: status });
     }
 
     private buildIterationPrompt(branchName: string, validationOutput: string): string {

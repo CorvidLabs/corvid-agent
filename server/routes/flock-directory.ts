@@ -1,5 +1,6 @@
 /**
- * Flock Directory routes — Agent registry CRUD, search, heartbeat.
+ * Flock Directory routes — Agent registry CRUD, search, heartbeat,
+ * conflict resolution, and capability routing.
  */
 import type { Database } from 'bun:sqlite';
 import type { FlockDirectoryService } from '../flock-directory/service';
@@ -35,6 +36,10 @@ export function handleFlockDirectoryRoutes(
     if (!flockDirectory) {
         return json({ error: 'Flock Directory not available' }, 503);
     }
+
+    // Access conflict resolver and capability router through the service
+    const conflictResolver = flockDirectory.conflictResolver;
+    const capabilityRouter = flockDirectory.capabilityRouter;
 
     const path = url.pathname;
     const method = req.method;
@@ -173,6 +178,68 @@ export function handleFlockDirectoryRoutes(
         const agent = flockDirectory.getByAddress(address);
         if (!agent) return notFound('Agent not found');
         return json(agent);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONFLICT RESOLUTION ROUTES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ─── List active work claims ────────────────────────────────────────────
+
+    if (path === '/api/flock-directory/claims' && method === 'GET') {
+        if (!conflictResolver) return json({ error: 'Conflict resolver not available' }, 503);
+        const repo = url.searchParams.get('repo') ?? undefined;
+        return json(conflictResolver.listActiveClaims(repo));
+    }
+
+    // ─── Conflict resolver stats ────────────────────────────────────────────
+
+    if (path === '/api/flock-directory/claims/stats' && method === 'GET') {
+        if (!conflictResolver) return json({ error: 'Conflict resolver not available' }, 503);
+        return json(conflictResolver.getStats());
+    }
+
+    // ─── Release a claim manually ───────────────────────────────────────────
+
+    const releaseClaimMatch = path.match(/^\/api\/flock-directory\/claims\/([^/]+)\/release$/);
+    if (releaseClaimMatch && method === 'POST') {
+        if (!conflictResolver) return json({ error: 'Conflict resolver not available' }, 503);
+        const ok = conflictResolver.releaseClaim(releaseClaimMatch[1], 'manual_release');
+        if (!ok) return notFound('Claim not found or already released');
+        return json({ ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CAPABILITY ROUTING ROUTES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ─── Route a task to the best agent ─────────────────────────────────────
+
+    if (path === '/api/flock-directory/route' && method === 'POST') {
+        if (!capabilityRouter) return json({ error: 'Capability router not available' }, 503);
+        return (async () => {
+            try {
+                const RouteSchema = z.object({
+                    actionType: z.string().optional(),
+                    requiredCapabilities: z.array(z.string()).optional(),
+                    excludeAgentIds: z.array(z.string()).optional(),
+                    repo: z.string().optional(),
+                });
+                const body = await parseBodyOrThrow(req, RouteSchema);
+                const result = capabilityRouter.route(body);
+                return json(result);
+            } catch (err) {
+                if (err instanceof ValidationError) return badRequest(err.message);
+                return handleRouteError(err);
+            }
+        })();
+    }
+
+    // ─── List known capabilities ────────────────────────────────────────────
+
+    if (path === '/api/flock-directory/capabilities' && method === 'GET') {
+        if (!capabilityRouter) return json({ error: 'Capability router not available' }, 503);
+        return json(capabilityRouter.listCapabilities());
     }
 
     return null;
