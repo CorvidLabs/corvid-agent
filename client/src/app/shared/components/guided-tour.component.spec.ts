@@ -157,8 +157,8 @@ describe('GuidedTourComponent', () => {
         fixture.detectChanges();
         // The target elements (.agent-card etc.) don't exist in the test DOM,
         // so spotlight should be null and no spotlight ring rendered
-        const ring = (fixture.nativeElement as HTMLElement).querySelector('.tour-spotlight-ring');
-        // May or may not render depending on timing — but no error should be thrown
+        // The target elements (.agent-card etc.) don't exist in the test DOM,
+        // so no error should be thrown even when spotlight ring is absent
         expect(component).toBeTruthy();
     });
 

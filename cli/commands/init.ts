@@ -459,7 +459,6 @@ ${c.bold}Setting up your AI developer...${c.reset}
                 const key = await prompt(rl, 'Paste your Anthropic API key');
                 if (key) {
                     envLines.push(`ANTHROPIC_API_KEY=${key}`);
-                    providerConfigured = true;
                 }
             } else if (choice === '2') {
                 console.log(`\n  Install Claude Code: ${c.cyan('https://claude.com/claude-code')}`);

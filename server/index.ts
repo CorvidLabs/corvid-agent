@@ -483,15 +483,15 @@ if (discordBridge) {
     const cooldownFile = join(import.meta.dir, '..', '.discord-last-connect');
     let cooldownMs = 0;
     try {
-        const { existsSync, readFileSync, writeFileSync } = await import('fs');
-        if (existsSync(cooldownFile)) {
+        const { readFileSync, writeFileSync } = await import('fs');
+        try {
             const lastConnect = parseInt(readFileSync(cooldownFile, 'utf-8'), 10);
             const elapsed = Date.now() - lastConnect;
             if (elapsed < 10_000) {
                 cooldownMs = Math.min(30_000, 10_000 - elapsed + 5_000);
                 log.warn(`Discord connection cooldown: waiting ${cooldownMs}ms (last connect ${elapsed}ms ago)`);
             }
-        }
+        } catch { /* file doesn't exist yet — no cooldown needed */ }
         writeFileSync(cooldownFile, Date.now().toString());
     } catch { /* ignore cooldown file errors */ }
 
