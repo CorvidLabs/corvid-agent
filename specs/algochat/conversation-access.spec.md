@@ -48,7 +48,12 @@ question system.
 | `addToAgentBlocklist` | `(db: Database, agentId: string, address: string, reason?: string)` | `AgentBlocklistEntry` | Blocks an address from messaging an agent |
 | `removeFromAgentBlocklist` | `(db: Database, agentId: string, address: string)` | `boolean` | Unblocks an address |
 | `listAgentBlocklist` | `(db: Database, agentId: string)` | `AgentBlocklistEntry[]` | Lists all blocked addresses for an agent |
+| `isOnAgentAllowlist` | `(db: Database, agentId: string, address: string)` | `boolean` | Returns true if the address is on the agent's conversation allowlist |
+| `isOnAgentBlocklist` | `(db: Database, agentId: string, address: string)` | `boolean` | Returns true if the address is on the agent's conversation blocklist |
 | `getConversationRateLimit` | `(db: Database, agentId: string, participant: string)` | `RateLimitStatus` | Checks rate-limit status for a participant |
+| `pruneRateLimitEntries` | `(db: Database, windowSeconds: number)` | `number` | Deletes rate-limit entries older than the given window; returns count of deleted rows |
+| `up` | `(db: Database)` | `void` | Migration 102 up — creates conversation access tables and columns |
+| `down` | `(db: Database)` | `void` | Migration 102 down — drops conversation access tables and columns |
 
 ### Exported Types
 
