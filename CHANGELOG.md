@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.45.0] - 2026-03-22
+
+### Added
+- **UX overhaul (phases 1–3)** — security hardening and spec-sync v2.0.0 (#1389)
+- **Reputation score history** — tracking, trend chart, and agent comparison (#1385)
+- **Dashboard: log & diff viewers** — agent health badges (#1382)
+- **Dashboard: pipeline stages** — reputation trend chart (#1381)
+
+### Fixed
+- **UI: active tab on click** — set active tab immediately, no double-click needed (#1395, #1396)
+- **Security: RBAC guards** — add guards to discord-image and openrouter routes (#1380)
+
+### Tests
+- Add unit tests for onboarding components — 49 tests (#1384)
+- A2A invocation guard coverage expansion (#1383)
+
+### Docs
+- Update version and stats for v0.44.0 release (#1379)
+
 ## [0.44.0] - 2026-03-22
 
 ### Added
