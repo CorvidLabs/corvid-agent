@@ -449,6 +449,72 @@ describe('Session Routes', () => {
         expect(res!.status).toBe(403);
     });
 
+    // ─── POST /api/sessions/:id/messages ───────────────────────────────────
+
+    describe('POST /api/sessions/:id/messages', () => {
+        it('adds a message with valid role and content', async () => {
+            const pm = createMockPM();
+            const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Msg Add Session' });
+            const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+            const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/messages`, {
+                role: 'assistant',
+                content: 'Hello from test',
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(201);
+            const data = await res!.json();
+            expect(data.role).toBe('assistant');
+            expect(data.content).toBe('Hello from test');
+            expect(data.id).toBeDefined();
+        });
+
+        it('returns 400 for missing role', async () => {
+            const pm = createMockPM();
+            const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Msg No Role' });
+            const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+            const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/messages`, { content: 'hi' });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(400);
+        });
+
+        it('returns 400 for invalid role', async () => {
+            const pm = createMockPM();
+            const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Msg Bad Role' });
+            const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+            const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/messages`, {
+                role: 'invalid',
+                content: 'hi',
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(400);
+            const data = await res!.json();
+            expect(data.error).toContain('role must be');
+        });
+
+        it('returns 400 for missing content', async () => {
+            const pm = createMockPM();
+            const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Msg No Content' });
+            const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+            const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/messages`, { role: 'user' });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(400);
+        });
+
+        it('returns 404 for unknown session', async () => {
+            const pm = createMockPM();
+            const { req, url } = fakeReq('POST', '/api/sessions/nonexistent/messages', {
+                role: 'user',
+                content: 'hi',
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            expect(res!.status).toBe(404);
+        });
+    });
+
     // ─── Ollama complexity warning ──────────────────────────────────────────
 
     describe('Ollama complexity warning on session create', () => {
