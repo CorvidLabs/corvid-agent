@@ -119,7 +119,7 @@ const LIMITED_TIER_FAMILIES = new Set<ModelFamily>([
  * Check if a model is a cloud model (hosted remotely via Ollama cloud proxy).
  * Cloud models are large remote models that deserve a tier boost.
  */
-function isCloudModel(name: string): boolean {
+export function isCloudModel(name: string): boolean {
     return name.includes(':cloud') || name.endsWith('-cloud');
 }
 

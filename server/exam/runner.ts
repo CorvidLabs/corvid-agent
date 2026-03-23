@@ -16,6 +16,8 @@ import type {
     ExamScorecard,
 } from './types';
 import { EXAM_CATEGORIES } from './types';
+import { isCloudModel } from '../lib/agent-tiers';
+export { isCloudModel } from '../lib/agent-tiers';
 
 const log = createLogger('ExamRunner');
 
@@ -29,11 +31,6 @@ export function parseModelSizeB(input: string): number | null {
     // Match patterns like ":8b", ":14b", ":671b", "4.0B", "14.8B"
     const match = input.match(/[\s:_-](\d+(?:\.\d+)?)\s*[bB](?:[^a-zA-Z]|$)/);
     return match ? parseFloat(match[1]) : null;
-}
-
-/** Check if a model is a cloud model (proxied through Ollama cloud). */
-export function isCloudModel(model: string): boolean {
-    return model.includes('-cloud');
 }
 
 /** Strip <think>...</think> blocks that some models emit for chain-of-thought reasoning. */

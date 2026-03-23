@@ -29,6 +29,7 @@ Provides agent infrastructure utilities: a tier system that maps models to capab
 | `getAgentTier` | `model: string` | `AgentTier` | Determines the agent tier from a model identifier. Heuristic: known API providers (Claude, OpenAI) map to `high`; cloud-suffixed models get boosted; Ollama families map to `standard` or `limited` based on family and parameter count; unknown models default to `limited`. |
 | `getAgentTierConfig` | `model: string` | `AgentTierConfig` | Returns the full tier configuration for a model by resolving its tier via `getAgentTier`. |
 | `getTierConfig` | `tier: AgentTier` | `AgentTierConfig` | Returns the tier configuration for a tier name directly (bypasses model detection). |
+| `isCloudModel` | `name: string` | `boolean` | Returns true if the model name contains ":cloud" or ends with "-cloud". |
 
 #### github-token-check.ts
 | Function | Parameters | Returns | Description |
