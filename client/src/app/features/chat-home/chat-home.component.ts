@@ -43,7 +43,7 @@ import { OnboardingComponent } from './onboarding.component';
                             (input)="onPromptInput($event)"
                             (keydown)="onKeydown($event)"
                             placeholder="Ask anything..."
-                            rows="3"
+                            rows="2"
                             [disabled]="launching()"
                             aria-label="Chat prompt"
                         ></textarea>
@@ -244,6 +244,8 @@ import { OnboardingComponent } from './onboarding.component';
             line-height: 1.6;
             resize: none;
             outline: none;
+            max-height: 200px;
+            overflow-y: auto;
         }
         .chat-home__textarea::placeholder {
             color: var(--text-tertiary);
@@ -557,7 +559,10 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     }
 
     onPromptInput(event: Event): void {
-        this.prompt.set((event.target as HTMLTextAreaElement).value);
+        const el = event.target as HTMLTextAreaElement;
+        this.prompt.set(el.value);
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }
 
     onAgentChange(event: Event): void {
@@ -640,6 +645,7 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
             this.router.navigate(['/sessions', session.id]);
         } catch (e) {
             this.notify.error('Failed to start session', String(e));
+        } finally {
             this.launching.set(false);
         }
     }

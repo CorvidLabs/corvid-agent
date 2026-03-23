@@ -63,6 +63,8 @@ export class ProcessManager {
     private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
     private ephemeralDirs: Map<string, ResolvedDir> = new Map();
+    /** Guard against concurrent resume/start for the same session. */
+    private startingSession: Set<string> = new Set();
     private db: Database;
     readonly approvalManager: ApprovalManager;
     readonly ownerQuestionManager: OwnerQuestionManager;
@@ -167,9 +169,15 @@ export class ProcessManager {
     }
 
     startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[] }): void {
+        if (this.startingSession.has(session.id)) {
+            log.warn(`Ignoring duplicate startProcess call for session ${session.id} — already starting`);
+            return;
+        }
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
+
+        this.startingSession.add(session.id);
 
         const project = session.projectId ? getProject(this.db, session.projectId) : null;
         if (session.projectId && !project) {
@@ -249,6 +257,7 @@ export class ProcessManager {
 
         if (resolved.error) {
             log.warn('Failed to resolve project directory', { projectId: project.id, error: resolved.error });
+            this.startingSession.delete(session.id);
             this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Failed to resolve project directory: ${resolved.error}`, type: 'dir_resolution_error' },
@@ -411,7 +420,68 @@ export class ProcessManager {
         this.registerProcess(session, sp);
     }
 
+    /**
+     * Resume a session with non-persistent dir strategy — resolve the project
+     * directory first (clone_on_demand / ephemeral), then delegate to
+     * startProcessWithResolvedDir which handles all provider routing.
+     */
+    private async resumeWithResolvedDir(
+        session: Session,
+        project: import('../../shared/types').Project,
+        prompt?: string,
+    ): Promise<void> {
+        const resolved = await resolveProjectDir(project);
+
+        if (resolved.error) {
+            log.warn('Resume: failed to resolve project directory', { projectId: project.id, error: resolved.error });
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message: `Failed to resolve project directory: ${resolved.error}`, type: 'dir_resolution_error' },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        if (resolved.ephemeral) {
+            this.ephemeralDirs.set(session.id, resolved);
+        }
+
+        const effectiveProject = { ...project, workingDir: resolved.dir };
+
+        // Save the user message and build resume prompt
+        if (prompt) {
+            addSessionMessage(this.db, session.id, 'user', prompt);
+        }
+        const resumePrompt = this.buildResumePrompt(session, prompt);
+
+        // Resolve agent and provider
+        let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
+        const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
+        const registry = LlmProviderRegistry.getInstance();
+        let provider = providerType ? registry.get(providerType) : undefined;
+
+        if (!provider && !providerType && !hasClaudeAccess()) {
+            const ollamaFallback = registry.get('ollama');
+            if (ollamaFallback) {
+                provider = ollamaFallback;
+                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                }
+            }
+        }
+
+        // Reuse startProcessWithResolvedDir — it handles SDK vs direct routing + registration
+        await this.startProcessWithResolvedDir(
+            session,
+            effectiveProject,
+            effectiveAgent,
+            resumePrompt ?? '',
+            provider,
+            { conversationOnly: session.name.startsWith('Discord message:') },
+        );
+    }
+
     private registerProcess(session: Session, process: SdkProcess): void {
+        this.startingSession.delete(session.id);
         this.processes.set(session.id, process);
         const now = Date.now();
         this.sessionMeta.set(session.id, {
@@ -511,7 +581,7 @@ export class ProcessManager {
         }
 
         const project = session.projectId ? getProject(this.db, session.projectId) : null;
-        const effectiveProject = project ?? {
+        const defaultProject = {
             id: 'general',
             name: 'General',
             description: '',
@@ -524,6 +594,14 @@ export class ProcessManager {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
+        const baseProject = project ?? defaultProject;
+
+        // Resolve project directory for non-persistent strategies (clone_on_demand, ephemeral)
+        if (baseProject.dirStrategy !== 'persistent' && baseProject.dirStrategy !== 'worktree') {
+            this.resumeWithResolvedDir(session, baseProject, prompt);
+            return;
+        }
+        const effectiveProject: import('../../shared/types').Project = baseProject;
 
         let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
@@ -718,6 +796,7 @@ export class ProcessManager {
      * (stopProcess, handleExit, shutdown) should funnel through here.
      */
     cleanupSessionState(sessionId: string): void {
+        this.startingSession.delete(sessionId);
         this.processes.delete(sessionId);
         this.sessionMeta.delete(sessionId);
         this.eventBus.removeSessionSubscribers(sessionId);
@@ -1007,7 +1086,6 @@ export class ProcessManager {
     }
 
     private handleExit(sessionId: string, code: number | null, errorMessage?: string): void {
-        log.info(`Process exited for session ${sessionId}`, { code });
         const meta = this.sessionMeta.get(sessionId);
         updateSessionPid(this.db, sessionId, null);
 
@@ -1181,6 +1259,23 @@ export class ProcessManager {
         for (const sessionId of this.sessionMeta.keys()) {
             if (isOrphan(sessionId)) {
                 this.sessionMeta.delete(sessionId);
+                pruned++;
+            }
+        }
+
+        // Fix DB-level stuck sessions: marked "running" but no live process.
+        // This catches cases where handleExit was never called (crash, OOM, signal).
+        const stuckSessions = this.db.query(
+            `SELECT id, pid FROM sessions WHERE status IN ('running', 'loading')`
+        ).all() as { id: string; pid: number | null }[];
+
+        for (const row of stuckSessions) {
+            if (!this.processes.has(row.id) && !this.resilienceManager.isPaused(row.id)) {
+                updateSessionStatus(this.db, row.id, 'idle');
+                updateSessionPid(this.db, row.id, null);
+                this.timerManager.cleanupSession(row.id);
+                this.approvalManager.cancelSession(row.id);
+                log.warn(`Pruned stuck session ${row.id} (pid=${row.pid}) — DB said running but no process exists`);
                 pruned++;
             }
         }

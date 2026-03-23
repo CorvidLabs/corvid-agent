@@ -529,7 +529,7 @@ export class SessionOutputComponent implements AfterViewChecked, OnDestroy {
     }
 
     protected onCopyMessage(content: string): void {
-        navigator.clipboard.writeText(content);
+        navigator.clipboard.writeText(content).catch(() => { /* clipboard unavailable */ });
     }
 
     protected showAllEvents(): void {

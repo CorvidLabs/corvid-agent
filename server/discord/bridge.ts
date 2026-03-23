@@ -55,6 +55,7 @@ import {
     archiveStaleThreads as archiveStaleThreadsImpl,
     createStandaloneThread as createStandaloneThreadImpl,
 } from './thread-manager';
+import { syncGuildData, loadGuildCache, type GuildCache } from './guild-api';
 
 const log = createLogger('DiscordBridge');
 
@@ -105,6 +106,13 @@ export class DiscordBridge {
     /** Periodic config reload timer — picks up DB changes without restart */
     private configReloadTimer: ReturnType<typeof setInterval> | null = null;
     private static readonly CONFIG_RELOAD_INTERVAL_MS = 30_000;
+
+    /** Periodic guild data sync timer — refreshes role/channel cache */
+    private guildSyncTimer: ReturnType<typeof setInterval> | null = null;
+    /** Guild roles/channels/info cache — auto-synced from Discord API */
+    private guildCache: GuildCache = { info: null, roles: [], channels: [] };
+    /** Sync guild data every 5 minutes */
+    private static readonly GUILD_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
     /** Global event subscriber for auto-recovering Discord thread subscriptions */
     private globalEventCallback: EventCallback | null = null;
@@ -181,6 +189,13 @@ export class DiscordBridge {
             this.reloadConfigFromDb();
         }, DiscordBridge.CONFIG_RELOAD_INTERVAL_MS);
 
+        // Load guild cache from DB immediately, then sync from Discord API
+        this.guildCache = loadGuildCache(this.db);
+        this.syncGuildDataAsync();
+        this.guildSyncTimer = setInterval(() => {
+            this.syncGuildDataAsync();
+        }, DiscordBridge.GUILD_SYNC_INTERVAL_MS);
+
         // Watch for Discord sessions that start producing events without a thread subscription.
         this.globalEventCallback = (sessionId, event) => {
             if (event.type !== 'assistant') return;
@@ -221,6 +236,10 @@ export class DiscordBridge {
         if (this.configReloadTimer) {
             clearInterval(this.configReloadTimer);
             this.configReloadTimer = null;
+        }
+        if (this.guildSyncTimer) {
+            clearInterval(this.guildSyncTimer);
+            this.guildSyncTimer = null;
         }
         if (this.slashCommandDebounceTimer) {
             clearTimeout(this.slashCommandDebounceTimer);
@@ -294,6 +313,22 @@ export class DiscordBridge {
         this.reputationScorer = scorer;
     }
 
+    /** Async guild data sync — fires and forgets, logs errors. */
+    private syncGuildDataAsync(): void {
+        syncGuildData(this.db, this.config.botToken, this.config.guildId)
+            .then(cache => {
+                if (cache) this.guildCache = cache;
+            })
+            .catch(err => {
+                log.warn('Guild data sync failed', { error: err instanceof Error ? err.message : String(err) });
+            });
+    }
+
+    /** Get the current guild cache (roles, channels, info). */
+    getGuildCache(): GuildCache {
+        return this.guildCache;
+    }
+
     // ── Delegation methods ──────────────────────────────────────────────
 
     private handleReaction(data: DiscordReactionData): void {
@@ -318,6 +353,7 @@ export class DiscordBridge {
             threadSessions: this.threadSessions,
             threadCallbacks: this.threadCallbacks,
             threadLastActivity: this.threadLastActivity,
+            guildCache: this.guildCache,
             createStandaloneThread: (channelId, name) =>
                 createStandaloneThreadImpl(this.config.botToken, channelId, name),
             subscribeForResponseWithEmbed: (sid, tid, an, am, pn, dc) =>
@@ -329,6 +365,7 @@ export class DiscordBridge {
             mentionSessions: this.mentionSessions,
             subscribeForInlineResponse: (sid, cid, rid, an, am, onBot, pn, dc) =>
                 subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc),
+            syncGuildData: () => this.syncGuildDataAsync(),
         };
         await handleInteractionImpl(ctx, interaction);
     }

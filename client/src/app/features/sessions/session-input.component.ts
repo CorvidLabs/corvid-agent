@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, output, signal, input, ElementRef, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, output, signal, input, ElementRef, viewChild, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -17,6 +17,7 @@ import { FormsModule } from '@angular/forms';
                 [placeholder]="placeholder()"
                 rows="1"
                 (keydown.enter)="onEnter($event)"
+                (input)="autoResize()"
                 aria-label="Message input">
             </textarea>
             <button
@@ -51,6 +52,9 @@ import { FormsModule } from '@angular/forms';
             font-family: inherit;
             font-size: 0.85rem;
             resize: none;
+            max-height: 150px;
+            overflow-y: auto;
+            transition: height 0.1s ease;
         }
         .input-bar__field:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .input-bar__field:disabled { opacity: 0.4; }
@@ -88,7 +92,7 @@ import { FormsModule } from '@angular/forms';
         }
     `,
 })
-export class SessionInputComponent {
+export class SessionInputComponent implements AfterViewInit {
     readonly disabled = input(false);
     readonly placeholder = input('Type a message...');
     readonly messageSent = output<string>();
@@ -96,12 +100,25 @@ export class SessionInputComponent {
     protected readonly messageText = signal('');
     private readonly inputEl = viewChild<ElementRef<HTMLTextAreaElement>>('inputEl');
 
+    ngAfterViewInit(): void {
+        this.autoResize();
+    }
+
+    protected autoResize(): void {
+        const el = this.inputEl()?.nativeElement;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+    }
+
     protected onSend(): void {
         const text = this.messageText().trim();
         if (!text) return;
         this.messageSent.emit(text);
         this.messageText.set('');
         this.inputEl()?.nativeElement.focus();
+        // Reset height after clearing
+        requestAnimationFrame(() => this.autoResize());
     }
 
     protected onEnter(event: Event): void {
