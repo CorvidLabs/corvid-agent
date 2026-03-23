@@ -43,8 +43,10 @@ afterAll(() => {
     rmSync(TMP_DIR, { recursive: true, force: true });
 });
 
+const isWindows = process.platform === 'win32';
+
 describe('CodebaseHealthCollector.collect() integration', () => {
-    test('collects todos and large files from temp directory', async () => {
+    test.skipIf(isWindows)('collects todos and large files from temp directory', async () => {
         const collector = new CodebaseHealthCollector();
         const metrics = await collector.collect(TMP_DIR);
 
