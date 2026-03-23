@@ -260,26 +260,63 @@ export async function handleReadOnChainMemories(
     args: { search?: string; limit?: number },
 ): Promise<CallToolResult> {
     try {
-        const memories = await ctx.agentMessenger.readOnChainMemories(
+        const allMemories: Array<{ key: string; content: string; txid: string; timestamp: string; asaId?: number; source: string }> = [];
+
+        // 1. Read ARC-69 ASA memories (localnet) — this is the primary storage format
+        const isLocalnet = ctx.network === 'localnet' || !ctx.network;
+        if (isLocalnet) {
+            try {
+                const arc69Ctx = await buildArc69Context(ctx);
+                if (arc69Ctx) {
+                    const { listMemoryAsas } = await import('../../memory/arc69-store');
+                    const asaMemories = await listMemoryAsas(arc69Ctx);
+                    for (const m of asaMemories) {
+                        if (args.search) {
+                            const searchLower = args.search.toLowerCase();
+                            if (!m.key.toLowerCase().includes(searchLower) && !m.content.toLowerCase().includes(searchLower)) {
+                                continue;
+                            }
+                        }
+                        allMemories.push({ ...m, source: 'arc69' });
+                    }
+                }
+            } catch (err) {
+                log.warn('ARC-69 ASA read failed in read_on_chain_memories', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        // 2. Read plain transaction memories
+        const plainMemories = await ctx.agentMessenger.readOnChainMemories(
             ctx.agentId,
             ctx.serverMnemonic,
             ctx.network,
             { limit: args.limit ?? 50, search: args.search },
         );
 
-        if (memories.length === 0) {
+        // Deduplicate: skip plain txn memories whose key already appeared in ARC-69 results
+        const arc69Keys = new Set(allMemories.map(m => m.key));
+        for (const m of plainMemories) {
+            if (!arc69Keys.has(m.key)) {
+                allMemories.push({ ...m, source: 'txn' });
+            }
+        }
+
+        if (allMemories.length === 0) {
             const msg = args.search
                 ? `No on-chain memories found matching "${args.search}".`
                 : 'No on-chain memories found.';
             return textResult(msg);
         }
 
-        const lines = memories.map((m: OnChainMemory) =>
-            `[${m.key}] ${m.content}\n  (txid: ${m.txid} | ${m.timestamp})`,
-        );
+        const lines = allMemories.map((m) => {
+            const id = m.asaId ? `ASA ${m.asaId}` : `txid: ${m.txid}`;
+            return `[${m.key}] ${m.content}\n  (${id} | ${m.timestamp})`;
+        });
 
         return textResult(
-            `Found ${memories.length} on-chain memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n\n')}`,
+            `Found ${allMemories.length} on-chain memor${allMemories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n\n')}`,
         );
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

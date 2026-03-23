@@ -37,6 +37,12 @@ export interface DiscordBridgeConfig {
      * Maps permission level → max messages per window.
      */
     rateLimitByLevel?: Record<number, number>;
+    /**
+     * Per-channel permission floors. Maps channel IDs to a minimum permission level.
+     * Users in that channel get at least this level, regardless of roles.
+     * Useful for invite-only channels where members don't have specific roles.
+     */
+    channelPermissions?: Record<string, number>;
 }
 
 /** Recursive option type — supports subcommand groups and subcommands with nested options. */

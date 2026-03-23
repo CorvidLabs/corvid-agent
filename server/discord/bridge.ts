@@ -274,6 +274,7 @@ export class DiscordBridge {
             this.config.rolePermissions = dbConfig.rolePermissions;
             this.config.defaultPermissionLevel = dbConfig.defaultPermissionLevel;
             this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
+            this.config.channelPermissions = dbConfig.channelPermissions;
 
             this.gateway.updatePresence(dbConfig.statusText, dbConfig.activityType);
 

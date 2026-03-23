@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { splitMessage, splitEmbedDescription } from '../discord/message-formatter';
+import { splitMessage, splitEmbedDescription, collapseCodeBlocks } from '../discord/message-formatter';
 
 describe('splitMessage', () => {
     test('returns single chunk for short messages', () => {
@@ -127,5 +127,63 @@ describe('splitEmbedDescription', () => {
     test('short text returns single chunk', () => {
         const result = splitEmbedDescription('Short text');
         expect(result).toEqual(['Short text']);
+    });
+});
+
+describe('collapseCodeBlocks', () => {
+    test('preserves small code blocks under threshold', () => {
+        const text = 'Here is some code:\n```ts\nconst x = 1;\nconst y = 2;\n```\nDone.';
+        expect(collapseCodeBlocks(text)).toBe(text);
+    });
+
+    test('collapses large code blocks exceeding threshold', () => {
+        const lines = Array.from({ length: 20 }, (_, i) => `const var${i} = ${i};`);
+        const text = `I created the file:\n\`\`\`typescript\n${lines.join('\n')}\n\`\`\`\nFile written.`;
+        const result = collapseCodeBlocks(text);
+        expect(result).not.toContain('const var0');
+        expect(result).toContain('typescript');
+        expect(result).toMatch(/\d+ lines/);
+        expect(result).toContain('I created the file:');
+        expect(result).toContain('File written.');
+    });
+
+    test('collapses multiple large code blocks independently', () => {
+        const lines1 = Array.from({ length: 15 }, (_, i) => `line${i}`);
+        const lines2 = Array.from({ length: 25 }, (_, i) => `row${i}`);
+        const text = `\`\`\`js\n${lines1.join('\n')}\n\`\`\`\nMiddle text.\n\`\`\`python\n${lines2.join('\n')}\n\`\`\``;
+        const result = collapseCodeBlocks(text);
+        expect(result).toContain('js');
+        expect(result).toContain('python');
+        expect(result).toContain('Middle text.');
+        // Both blocks should be collapsed (line counts include trailing newline)
+        expect(result).not.toContain('line0');
+        expect(result).not.toContain('row0');
+    });
+
+    test('uses "code" label when no language specified', () => {
+        const lines = Array.from({ length: 15 }, (_, i) => `line ${i}`);
+        const text = `\`\`\`\n${lines.join('\n')}\n\`\`\``;
+        const result = collapseCodeBlocks(text);
+        expect(result).toContain('code');
+        expect(result).toMatch(/\d+ lines/);
+        expect(result).not.toContain('line 0');
+    });
+
+    test('respects custom threshold', () => {
+        const lines = Array.from({ length: 5 }, (_, i) => `line ${i}`);
+        const text = `\`\`\`ts\n${lines.join('\n')}\n\`\`\``;
+        // With threshold of 3, should collapse
+        expect(collapseCodeBlocks(text, 3)).toMatch(/\d+ lines/);
+        // With threshold of 10, should preserve
+        expect(collapseCodeBlocks(text, 10)).toBe(text);
+    });
+
+    test('returns text unchanged when no code blocks present', () => {
+        const text = 'Just a regular message with no code.';
+        expect(collapseCodeBlocks(text)).toBe(text);
+    });
+
+    test('returns empty string for empty input', () => {
+        expect(collapseCodeBlocks('')).toBe('');
     });
 });

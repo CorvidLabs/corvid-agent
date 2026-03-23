@@ -426,7 +426,7 @@ export async function handleInteraction(
     if (!userId) return;
 
     // Role-based permission check
-    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles);
+    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles, interaction.channel_id);
     if (permLevel <= PermissionLevel.BLOCKED) {
         await respondToInteraction(interaction, 'You do not have permission to use this bot.');
         return;

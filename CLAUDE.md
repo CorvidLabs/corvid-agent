@@ -102,6 +102,23 @@ Detailed guides for every workflow and tool live in `skills/`. Key skills:
 - Skill bundles: `server/db/skill-bundles.ts`, routes: `server/routes/skill-bundles.ts`
 - Both injected at session start via `server/process/manager.ts`
 
+## Self-Knowledge: Check Before Claiming
+
+Before claiming you **cannot** do something or that a capability is **missing**:
+
+1. **Check your MCP tools** — list what's available in the current session
+2. **Check `skills/`** — read `skills/README.md` or the specific `skills/<name>/SKILL.md` for capability docs
+3. **Check `server/routes/`** — REST endpoints exist beyond MCP tools (e.g., `POST /api/discord/send-image`)
+4. **Check `specs/routes/routes.spec.md`** — the API reference for all HTTP endpoints
+
+**Never claim a capability doesn't exist without checking these locations first.** Filing an issue about a missing feature that already exists wastes developer time.
+
+## Verification Before Claims
+
+- **Deployment state**: Always `git fetch origin` and compare against `origin/main` before claiming deployed code is stale or out of date. Never base deployment claims solely on local branch state.
+- **Contact lookup**: Always use `corvid_lookup_contact` before claiming a contact cannot be found. Exhaust all lookup tools before giving up.
+- **Memory state**: Use `corvid_recall_memory` or `corvid_read_on_chain_memories` to check for memories before claiming none exist. Memories are stored as ARC-69 ASAs on localnet — `read_on_chain_memories` reads both ASA and plain transaction memories.
+
 ## Instance Configuration
 
 Operators can add deployment-specific configuration in `.claude/CLAUDE.md`. See the [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for details.

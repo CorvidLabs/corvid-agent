@@ -216,6 +216,20 @@ function findLastSentenceBoundary(text: string): number {
 }
 
 /**
+ * Collapse large fenced code blocks into a brief summary.
+ * Prevents tool output (e.g. Write tool file contents) from flooding
+ * Discord channels. Small code blocks are preserved as-is.
+ */
+export function collapseCodeBlocks(text: string, lineThreshold: number = 12): string {
+    return text.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang: string, content: string) => {
+        const lines = content.split('\n');
+        if (lines.length <= lineThreshold) return _match;
+        const langLabel = lang || 'code';
+        return `*\`[${langLabel} — ${lines.length} lines]\`*`;
+    });
+}
+
+/**
  * Hard-split text at maxLen boundaries. Last resort.
  */
 function hardSplit(text: string, maxLen: number): string[] {

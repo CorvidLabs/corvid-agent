@@ -19,6 +19,7 @@ import {
 } from '../middleware/auth';
 import { recordAudit } from '../db/audit';
 import { getDiscordConfigRaw, updateDiscordConfigBatch, deleteDiscordConfigKey, VALID_DISCORD_CONFIG_KEYS } from '../db/discord-config';
+import { loadGuildCache } from '../discord/guild-api';
 
 export function handleSettingsRoutes(req: Request, url: URL, db: Database, context?: RequestContext, authConfig?: AuthConfig | null): Response | Promise<Response> | null {
     // GET /api/settings — all settings (system metadata is admin-only)
@@ -65,6 +66,15 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
             if (denied) return denied;
         }
         return handleUpdateDiscordConfig(req, db, context);
+    }
+
+    // GET /api/settings/discord/guild-cache — get cached guild channels/roles (operator+)
+    if (url.pathname === '/api/settings/discord/guild-cache' && req.method === 'GET') {
+        if (context) {
+            const denied = tenantRoleGuard('operator')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleGetGuildCache(db);
     }
 
     // DELETE /api/settings/discord/:key — delete a Discord config key (owner-only)
@@ -266,6 +276,15 @@ function handleDeleteDiscordConfigKey(db: Database, key: string, context?: Reque
     const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
     recordAudit(db, 'discord_config_delete', actor, 'discord_config', null, key);
     return json({ ok: true, deleted: key });
+}
+
+function handleGetGuildCache(db: Database): Response {
+    const cache = loadGuildCache(db);
+    return json({
+        channels: cache.channels,
+        roles: cache.roles,
+        info: cache.info,
+    });
 }
 
 async function handlePurgeTestData(req: Request, db: Database, context?: RequestContext): Promise<Response> {

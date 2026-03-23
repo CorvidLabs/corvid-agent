@@ -752,5 +752,5 @@ export async function sendMessageWithFiles(
     }
 }
 
-/** Re-export splitEmbedDescription for use by other modules. */
-export { splitEmbedDescription } from './message-formatter';
+/** Re-export splitEmbedDescription and collapseCodeBlocks for use by other modules. */
+export { splitEmbedDescription, collapseCodeBlocks } from './message-formatter';

@@ -22,6 +22,7 @@ export function resolvePermissionLevel(
     mutedUsers: Set<string>,
     userId: string,
     memberRoles?: string[],
+    channelId?: string,
 ): number {
     // Muted users are always blocked
     if (mutedUsers.has(userId)) return PermissionLevel.BLOCKED;
@@ -37,15 +38,22 @@ export function resolvePermissionLevel(
     }
 
     // Public mode with role-based access
-    if (!config.rolePermissions || !memberRoles?.length) {
-        return config.defaultPermissionLevel ?? PermissionLevel.BASIC;
+    let maxLevel = config.defaultPermissionLevel ?? PermissionLevel.BASIC;
+
+    // Apply channel-level permission floor (e.g. invite-only channels with no roles)
+    if (channelId && config.channelPermissions?.[channelId] !== undefined) {
+        const channelFloor = config.channelPermissions[channelId];
+        if (channelFloor > maxLevel) {
+            maxLevel = channelFloor;
+        }
     }
 
-    let maxLevel = config.defaultPermissionLevel ?? PermissionLevel.BASIC;
-    for (const roleId of memberRoles) {
-        const level = config.rolePermissions[roleId];
-        if (level !== undefined && level > maxLevel) {
-            maxLevel = level;
+    if (config.rolePermissions && memberRoles?.length) {
+        for (const roleId of memberRoles) {
+            const level = config.rolePermissions[roleId];
+            if (level !== undefined && level > maxLevel) {
+                maxLevel = level;
+            }
         }
     }
     return maxLevel;
