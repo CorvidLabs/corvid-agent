@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -168,13 +169,27 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     private sessionId: string | null = null;
     private approvalCleanup: (() => void) | null = null;
     private questionTimeout: ReturnType<typeof setTimeout> | null = null;
+    private paramSub: Subscription | null = null;
 
-    async ngOnInit(): Promise<void> {
-        this.sessionId = this.route.snapshot.paramMap.get('id');
-        if (!this.sessionId) return;
+    ngOnInit(): void {
+        this.paramSub = this.route.paramMap.subscribe((params) => {
+            const newId = params.get('id');
+            if (!newId || newId === this.sessionId) return;
+            this.cleanupCurrentSession();
+            this.sessionId = newId;
+            this.loadSession(newId);
+        });
+    }
+
+    private async loadSession(sid: string): Promise<void> {
+        // Reset state for new session
+        this.session.set(null);
+        this.messages.set([]);
+        this.agentName.set('assistant');
+        this.pendingApproval.set(null);
+        this.pendingQuestion.set(null);
 
         // Subscribe to WebSocket FIRST so no events are missed during HTTP fetch
-        const sid = this.sessionId;
         this.sessionService.subscribeToSession(sid);
         this.approvalCleanup = this.wsService.onMessage((msg) => {
             if (msg.type === 'approval_request' && msg.request.sessionId === sid) {
@@ -223,14 +238,21 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         }
     }
 
-    ngOnDestroy(): void {
+    private cleanupCurrentSession(): void {
         if (this.sessionId) {
             this.sessionService.unsubscribeFromSession(this.sessionId);
         }
         this.approvalCleanup?.();
+        this.approvalCleanup = null;
         if (this.questionTimeout) {
             clearTimeout(this.questionTimeout);
+            this.questionTimeout = null;
         }
+    }
+
+    ngOnDestroy(): void {
+        this.cleanupCurrentSession();
+        this.paramSub?.unsubscribe();
     }
 
     protected onApprovalDecision(decision: ApprovalDecision): void {
