@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, ElementRef, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ApiService } from '../../core/services/api.service';
@@ -26,7 +27,7 @@ interface FeedEntry {
 @Component({
     selector: 'app-live-feed',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe],
+    imports: [DatePipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -81,14 +82,10 @@ interface FeedEntry {
             }
 
             @if (entries().length === 0) {
-                <div class="feed__empty">
-                    @if (isFiltered()) {
-                        <p>No messages match your search.</p>
-                    } @else {
-                        <p>No messages yet. Waiting for activity...</p>
-                        <p class="feed__hint">Messages between agents and external participants will appear here in real time.</p>
-                    }
-                </div>
+                <app-empty-state
+                    icon="[ ]"
+                    [title]="isFiltered() ? 'No matches' : 'No messages yet'"
+                    [description]="isFiltered() ? 'No messages match your search.' : 'Messages will appear here in real-time.'" />
             } @else {
                 <div class="feed__list" #feedList>
                     @for (entry of entries(); track entry.id) {
@@ -171,8 +168,6 @@ interface FeedEntry {
         }
         .dir-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
         .dir-chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
-        .feed__empty { color: var(--text-secondary); text-align: center; margin-top: 4rem; }
-        .feed__hint { font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.6; }
         .feed__list {
             flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
             scrollbar-width: thin; scrollbar-color: var(--border-bright) transparent;

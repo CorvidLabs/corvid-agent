@@ -4,6 +4,7 @@ import { McpServerService } from '../../core/services/mcp-server.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { McpServerConfig, CreateMcpServerConfigInput } from '../../core/models/mcp-server.model';
 
 interface OfficialMcpServer {
@@ -133,7 +134,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
 @Component({
     selector: 'app-mcp-server-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, SkeletonComponent],
+    imports: [FormsModule, SkeletonComponent, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -251,7 +252,10 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
             @if (mcpService.loading()) {
                 <app-skeleton variant="table" [count]="4" />
             } @else if (mcpService.servers().length === 0) {
-                <p class="empty">No custom MCP servers configured.</p>
+                <app-empty-state
+                    icon="{ }"
+                    title="No MCP Servers"
+                    description="No custom MCP servers configured." />
             } @else {
                 @if (globalServers().length > 0) {
                     <div class="section">
@@ -458,7 +462,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .loading { color: var(--text-secondary); font-size: 0.85rem; }
         .section { margin-bottom: 1.5rem; }
         .section__header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.75rem; }
         .section__header h3 { margin: 0; color: var(--text-primary); }

@@ -3,11 +3,12 @@ import { AllowlistService } from '../../core/services/allowlist.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 
 @Component({
     selector: 'app-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -45,7 +46,10 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
             @if (allowlistService.loading()) {
                 <app-skeleton variant="line" [count]="4" />
             } @else if (allowlistService.entries().length === 0) {
-                <p class="empty">No addresses in allowlist. All addresses are currently allowed.</p>
+                <app-empty-state
+                    icon="[*]"
+                    title="No Allowlist"
+                    description="No addresses in allowlist. All addresses are currently allowed." />
             } @else {
                 <div class="list" role="list">
                     @for (entry of allowlistService.entries(); track entry.address) {
@@ -107,7 +111,6 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
-        .empty { color: var(--text-tertiary); }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;

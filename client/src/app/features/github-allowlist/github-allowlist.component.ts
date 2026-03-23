@@ -3,11 +3,12 @@ import { GitHubAllowlistService } from '../../core/services/github-allowlist.ser
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 
 @Component({
     selector: 'app-github-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -45,7 +46,10 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
             @if (service.loading()) {
                 <app-skeleton variant="line" [count]="4" />
             } @else if (service.entries().length === 0) {
-                <p class="empty">No GitHub users in allowlist. All GitHub users are currently allowed.</p>
+                <app-empty-state
+                    icon="[*]"
+                    title="No GitHub Allowlist"
+                    description="No GitHub users in allowlist. All GitHub users are currently allowed." />
             } @else {
                 <div class="list" role="list">
                     @for (entry of service.entries(); track entry.username) {
@@ -107,7 +111,6 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
-        .empty { color: var(--text-tertiary); }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
