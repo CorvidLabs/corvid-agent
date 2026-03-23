@@ -96,6 +96,31 @@ You're currently running in try mode — an in-memory sandbox so users can explo
     if (!sessionRes.ok) throw new Error(`Failed to create session: ${await sessionRes.text()}`);
     const session = (await sessionRes.json()) as { id: string };
 
+    // Seed a welcome message so users see a live conversation immediately
+    const welcomeContent = `👋 Welcome to **corvid-agent** try mode!
+
+You're running in a sandboxed environment — no data is persisted and no API keys are required.
+
+Here's what you can explore:
+- **Chat** with me right here — ask questions, give me tasks, or just say hello
+- **Sessions** — each conversation is tracked as a session with full message history
+- **Agents** — I'm a pre-configured demo agent; you can create more in Settings
+- **Work Tasks** — schedule autonomous background tasks for agents to run
+- **Councils** — coordinate multiple agents to collaborate on complex problems
+
+Try asking me something like:
+- *"What can you do?"*
+- *"Explain the corvid-agent architecture"*
+- *"How do I set up a real agent?"*
+
+> **Sandbox mode** — nothing you do here is saved. Restart \`bun run try\` to reset.`;
+
+    await fetch(`${BASE_URL}/api/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'assistant', content: welcomeContent }),
+    });
+
     return { agentId: agent.id, sessionId: session.id, projectId: project.id };
 }
 

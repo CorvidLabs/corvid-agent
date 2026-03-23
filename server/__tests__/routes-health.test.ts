@@ -127,6 +127,33 @@ describe('routes/health', () => {
         expect(data.status).toBe('unhealthy');
     });
 
+    // ── tryMode ───────────────────────────────────────────────────────────
+
+    it('includes tryMode false by default', async () => {
+        const deps = createMockDeps(db);
+        const { req, url } = fakeReq('GET', '/health');
+        const res = await handleHealthRoutes(req, url, deps, db);
+        const data = await res!.json();
+        expect(data.tryMode).toBe(false);
+    });
+
+    it('includes tryMode true when TRY_MODE env is set', async () => {
+        const prev = process.env.TRY_MODE;
+        process.env.TRY_MODE = 'true';
+        resetHealthCache();
+        try {
+            const deps = createMockDeps(db);
+            const { req, url } = fakeReq('GET', '/health');
+            const res = await handleHealthRoutes(req, url, deps, db);
+            const data = await res!.json();
+            expect(data.tryMode).toBe(true);
+        } finally {
+            if (prev === undefined) delete process.env.TRY_MODE;
+            else process.env.TRY_MODE = prev;
+            resetHealthCache();
+        }
+    });
+
     // ── Health history ───────────────────────────────────────────────────
 
     it('returns health history with default params', async () => {

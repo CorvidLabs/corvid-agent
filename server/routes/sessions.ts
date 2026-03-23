@@ -6,6 +6,7 @@ import {
     updateSession,
     deleteSession,
     getSessionMessages,
+    addSessionMessage,
 } from '../db/sessions';
 import { getSessionMetrics } from '../db/session-metrics';
 import type { ProcessManager } from '../process/manager';
@@ -80,6 +81,14 @@ export async function handleSessionRoutes(
 
     if (action === 'messages' && method === 'GET') {
         return json(getSessionMessages(db, id, tenantId));
+    }
+
+    if (action === 'messages' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleAddMessage(req, db, id, tenantId);
     }
 
     if (action === 'stop' && method === 'POST') {
@@ -159,6 +168,26 @@ async function handleCreate(
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
+    }
+}
+
+async function handleAddMessage(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
+    try {
+        const session = getSession(db, id, tenantId);
+        if (!session) return json({ error: 'Not found' }, 404);
+        const body = await req.json() as { role?: string; content?: string };
+        const role = body?.role;
+        const content = body?.content;
+        if (typeof role !== 'string' || !role) return json({ error: 'role is required' }, 400);
+        if (typeof content !== 'string' || !content) return json({ error: 'content is required' }, 400);
+        if (role !== 'user' && role !== 'assistant' && role !== 'system') {
+            return json({ error: 'role must be user, assistant, or system' }, 400);
+        }
+        const message = addSessionMessage(db, id, role, content);
+        return json(message, 201);
+    } catch (err) {
+        log.error('Failed to add session message', { error: err instanceof Error ? err.message : String(err) });
+        return json({ error: 'Failed to add message' }, 500);
     }
 }
 

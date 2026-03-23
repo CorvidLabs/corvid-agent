@@ -79,6 +79,13 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             </div>
         } @else {
         <div class="dashboard">
+            <!-- Sandbox mode banner -->
+            @if (tryMode()) {
+                <div class="sandbox-banner">
+                    <span class="sandbox-banner__icon">&#x1F4E6;</span>
+                    <span class="sandbox-banner__text"><strong>Sandbox Mode</strong> — data won't persist. Restart <code>bun run try</code> to reset.</span>
+                </div>
+            }
             <!-- Top bar: view mode + customize toggle -->
             <div class="dash-toolbar">
                 <div class="dash-toolbar__left">
@@ -784,6 +791,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly selfTestRunning = signal(false);
     protected readonly loading = signal(true);
     protected readonly serverVersion = signal<string | null>(null);
+    protected readonly tryMode = signal(false);
     protected readonly flockAgents = signal<FlockAgent[]>([]);
     protected readonly flockStats = signal<{ total: number; active: number } | null>(null);
     protected readonly agentMessages = signal<AgentMessage[]>([]);
@@ -1348,9 +1356,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private async loadServerVersion(): Promise<void> {
         try {
             const health = await firstValueFrom(
-                this.apiService.get<{ version?: string }>('/health'),
+                this.apiService.get<{ version?: string; tryMode?: boolean }>('/health'),
             );
             if (health.version) this.serverVersion.set(health.version);
+            if (health.tryMode) this.tryMode.set(true);
         } catch {
             // Non-critical
         }

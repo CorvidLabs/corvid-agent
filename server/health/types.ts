@@ -17,6 +17,7 @@ export interface HealthCheckResult {
     version: string;
     uptime: number;
     timestamp: string;
+    tryMode?: boolean;
     dependencies: Record<string, DependencyHealth>;
     shutdown?: ShutdownInfo;
 }
