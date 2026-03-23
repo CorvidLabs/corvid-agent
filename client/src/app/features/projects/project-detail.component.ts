@@ -118,10 +118,15 @@ export class ProjectDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) return;
 
-        const project = await this.projectService.getProject(id);
-        this.project.set(project);
+        try {
+            const project = await this.projectService.getProject(id);
+            this.project.set(project);
+        } catch {
+            this.router.navigate(['/agents/projects']);
+            return;
+        }
 
-        await this.sessionService.loadSessions(id);
+        await this.sessionService.loadSessions(id).catch(() => {});
         this.sessions.set(this.sessionService.sessions());
     }
 

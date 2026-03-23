@@ -218,10 +218,19 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         });
 
         // Fetch session and messages in parallel
-        const [session, messages] = await Promise.all([
-            this.sessionService.getSession(sid),
-            this.sessionService.getMessages(sid),
-        ]);
+        let session: Session;
+        let messages: SessionMessage[];
+        try {
+            [session, messages] = await Promise.all([
+                this.sessionService.getSession(sid),
+                this.sessionService.getMessages(sid),
+            ]);
+        } catch {
+            // Session no longer exists — close the stale tab and navigate away
+            this.chatTabs.closeTab(sid);
+            this.router.navigate(['/chat']);
+            return;
+        }
         this.session.set(session);
         this.messages.set(messages);
 
