@@ -47,6 +47,8 @@ import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { resolveAndCreateWorktree, generateChatBranchName } from '../lib/worktree';
+import { checkConversationAccess } from './conversation-access';
+import { recordConversationMessage } from '../db/conversation-access';
 
 const log = createLogger('MessageRouter');
 
@@ -591,6 +593,26 @@ export class MessageRouter {
         const agentContent = deviceName ? `[From: ${deviceName}] ${messageContent}` : messageContent;
 
         let conversation = getConversationByParticipant(this.db, participant);
+
+        // ─── Per-agent conversation access control ───────────────────────
+        // Determine target agent and check conversation-level access.
+        // Owner always passes. Private agents reject non-owners silently.
+        {
+            const targetAgentId = conversation?.agentId ?? this.discoveryService.findAgentForNewConversation();
+            if (targetAgentId) {
+                const accessResult = checkConversationAccess(this.db, targetAgentId, participant, this.config);
+                if (!accessResult.allowed) {
+                    log.info('Conversation access denied', {
+                        agentId: targetAgentId,
+                        address: participant.slice(0, 8) + '...',
+                        reason: accessResult.reason,
+                    });
+                    return; // Silent denial — no response sent
+                }
+                // Record message for rate-limit tracking (only if access granted)
+                recordConversationMessage(this.db, targetAgentId, participant);
+            }
+        }
 
         if (!conversation) {
             const agentId = this.discoveryService.findAgentForNewConversation();

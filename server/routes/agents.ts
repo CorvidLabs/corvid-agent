@@ -8,6 +8,12 @@ import {
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
+import {
+    listAgentAllowlist, addToAgentAllowlist, removeFromAgentAllowlist,
+    listAgentBlocklist, addToAgentBlocklist, removeFromAgentBlocklist,
+} from '../db/conversation-access';
+import { setAgentConversationMode } from '../algochat/conversation-access';
+import type { ConversationMode } from '../../shared/types';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
 import { checkInjection } from '../lib/injection-guard';
@@ -95,6 +101,67 @@ export function handleAgentRoutes(
         const baseUrl = `${new URL(req.url).protocol}//${new URL(req.url).host}`;
         const card = buildAgentCardForAgent(agent, baseUrl);
         return json(card);
+    }
+
+    // ─── Conversation access control routes ────────────────────────────
+
+    // Conversation mode
+    const convModeMatch = path.match(/^\/api\/agents\/([^/]+)\/conversation-mode$/);
+    if (convModeMatch && method === 'GET') {
+        const agent = getAgent(db, convModeMatch[1], context.tenantId);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        return json({ mode: agent.conversationMode });
+    }
+    if (convModeMatch && method === 'PUT') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+        return handleSetConversationMode(req, convModeMatch[1], db, context);
+    }
+
+    // Per-agent conversation allowlist
+    const convAllowMatch = path.match(/^\/api\/agents\/([^/]+)\/conversation-allowlist$/);
+    if (convAllowMatch && method === 'GET') {
+        const agent = getAgent(db, convAllowMatch[1], context.tenantId);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        return json(listAgentAllowlist(db, convAllowMatch[1]));
+    }
+    if (convAllowMatch && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+        return handleAddToConvAllowlist(req, convAllowMatch[1], db, context);
+    }
+
+    const convAllowDelMatch = path.match(/^\/api\/agents\/([^/]+)\/conversation-allowlist\/([^/]+)$/);
+    if (convAllowDelMatch && method === 'DELETE') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+        const agent = getAgent(db, convAllowDelMatch[1], context.tenantId);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        const removed = removeFromAgentAllowlist(db, convAllowDelMatch[1], convAllowDelMatch[2]);
+        return removed ? json({ ok: true }) : json({ error: 'Not found' }, 404);
+    }
+
+    // Per-agent conversation blocklist
+    const convBlockMatch = path.match(/^\/api\/agents\/([^/]+)\/conversation-blocklist$/);
+    if (convBlockMatch && method === 'GET') {
+        const agent = getAgent(db, convBlockMatch[1], context.tenantId);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        return json(listAgentBlocklist(db, convBlockMatch[1]));
+    }
+    if (convBlockMatch && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+        return handleAddToConvBlocklist(req, convBlockMatch[1], db, context);
+    }
+
+    const convBlockDelMatch = path.match(/^\/api\/agents\/([^/]+)\/conversation-blocklist\/([^/]+)$/);
+    if (convBlockDelMatch && method === 'DELETE') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+        const agent = getAgent(db, convBlockDelMatch[1], context.tenantId);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        const removed = removeFromAgentBlocklist(db, convBlockDelMatch[1], convBlockDelMatch[2]);
+        return removed ? json({ ok: true }) : json({ error: 'Not found' }, 404);
     }
 
     const match = path.match(/^\/api\/agents\/([^/]+)$/);
@@ -307,4 +374,82 @@ function handleDeleteSpendingCap(agentId: string, db: Database, context: Request
     return deleted
         ? json({ ok: true, message: 'Spending cap removed, agent will use global default' })
         : json({ error: 'No spending cap found for agent' }, 404);
+}
+
+// ─── Conversation access control handlers ────────────────────────────────
+
+const VALID_CONVERSATION_MODES: ConversationMode[] = ['private', 'allowlist', 'public'];
+
+async function handleSetConversationMode(
+    req: Request,
+    agentId: string,
+    db: Database,
+    context: RequestContext,
+): Promise<Response> {
+    const agent = getAgent(db, agentId, context.tenantId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    let body: { mode: string };
+    try {
+        body = await req.json() as { mode: string };
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!body.mode || !VALID_CONVERSATION_MODES.includes(body.mode as ConversationMode)) {
+        return json({ error: `Invalid mode. Must be one of: ${VALID_CONVERSATION_MODES.join(', ')}` }, 400);
+    }
+
+    setAgentConversationMode(db, agentId, body.mode as ConversationMode);
+    const actor = context.walletAddress ?? getClientIp(req);
+    recordAudit(db, 'agent_conversation_mode_change', actor, 'agent', agentId, `mode=${body.mode}`, null, getClientIp(req));
+    return json({ ok: true, mode: body.mode });
+}
+
+async function handleAddToConvAllowlist(
+    req: Request,
+    agentId: string,
+    db: Database,
+    context: RequestContext,
+): Promise<Response> {
+    const agent = getAgent(db, agentId, context.tenantId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    let body: { address: string; label?: string };
+    try {
+        body = await req.json() as { address: string; label?: string };
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!body.address || typeof body.address !== 'string') {
+        return json({ error: 'address is required' }, 400);
+    }
+
+    const entry = addToAgentAllowlist(db, agentId, body.address, body.label);
+    return json(entry, 201);
+}
+
+async function handleAddToConvBlocklist(
+    req: Request,
+    agentId: string,
+    db: Database,
+    context: RequestContext,
+): Promise<Response> {
+    const agent = getAgent(db, agentId, context.tenantId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    let body: { address: string; reason?: string };
+    try {
+        body = await req.json() as { address: string; reason?: string };
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!body.address || typeof body.address !== 'string') {
+        return json({ error: 'address is required' }, 400);
+    }
+
+    const entry = addToAgentBlocklist(db, agentId, body.address, body.reason);
+    return json(entry, 201);
 }

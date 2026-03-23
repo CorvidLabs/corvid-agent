@@ -30,6 +30,9 @@ interface AgentRow {
     display_color: string | null;
     display_icon: string | null;
     avatar_url: string | null;
+    conversation_mode: string;
+    conversation_rate_limit_window: number;
+    conversation_rate_limit_max: number;
     disabled: number;
     created_at: string;
     updated_at: string;
@@ -60,6 +63,9 @@ function rowToAgent(row: AgentRow): Agent {
         displayColor: row.display_color ?? null,
         displayIcon: row.display_icon ?? null,
         avatarUrl: row.avatar_url ?? null,
+        conversationMode: (row.conversation_mode || 'private') as Agent['conversationMode'],
+        conversationRateLimitWindow: row.conversation_rate_limit_window ?? 3600,
+        conversationRateLimitMax: row.conversation_rate_limit_max ?? 10,
         disabled: row.disabled === 1,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -100,8 +106,9 @@ export function createAgent(db: Database, input: CreateAgentInput, tenantId: str
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
          algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions,
-         voice_enabled, voice_preset, display_color, display_icon, avatar_url, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         voice_enabled, voice_preset, display_color, display_icon, avatar_url,
+         conversation_mode, conversation_rate_limit_window, conversation_rate_limit_max, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -124,6 +131,9 @@ export function createAgent(db: Database, input: CreateAgentInput, tenantId: str
         input.displayColor ?? null,
         input.displayIcon ?? null,
         input.avatarUrl ?? null,
+        input.conversationMode ?? 'private',
+        input.conversationRateLimitWindow ?? 3600,
+        input.conversationRateLimitMax ?? 10,
         tenantId,
     );
 
@@ -202,6 +212,18 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput, t
         fields.push('avatar_url = ?');
         values.push(input.avatarUrl);
     }
+    if (input.conversationMode !== undefined) {
+        fields.push('conversation_mode = ?');
+        values.push(input.conversationMode);
+    }
+    if (input.conversationRateLimitWindow !== undefined) {
+        fields.push('conversation_rate_limit_window = ?');
+        values.push(input.conversationRateLimitWindow);
+    }
+    if (input.conversationRateLimitMax !== undefined) {
+        fields.push('conversation_rate_limit_max = ?');
+        values.push(input.conversationRateLimitMax);
+    }
     if (input.disabled !== undefined) {
         fields.push('disabled = ?');
         values.push(input.disabled ? 1 : 0);
@@ -250,6 +272,11 @@ export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT
 
         // health_snapshots (no cascade)
         db.query('DELETE FROM health_snapshots WHERE agent_id = ?').run(id);
+
+        // conversation access control (ON DELETE CASCADE, but explicit for safety)
+        db.query('DELETE FROM agent_conversation_allowlist WHERE agent_id = ?').run(id);
+        db.query('DELETE FROM agent_conversation_blocklist WHERE agent_id = ?').run(id);
+        db.query('DELETE FROM agent_conversation_rate_limits WHERE agent_id = ?').run(id);
 
         // Nullify optional FKs rather than delete entire records
         db.query('UPDATE councils SET chairman_agent_id = NULL WHERE chairman_agent_id = ?').run(id);
