@@ -59,6 +59,8 @@ function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionCo
         unmuteUser: mock((_userId: string) => {}),
         mentionSessions: new Map(),
         subscribeForInlineResponse: mock(() => {}),
+        guildCache: { info: null, roles: [], channels: [] },
+        syncGuildData: mock(() => {}),
     };
 }
 
