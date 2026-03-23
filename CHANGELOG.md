@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.47.0] - 2026-03-23
+
+### Added
+- **Discord: guild API integration** — admin setup/sync commands for server management (#1420)
+- **AlgoChat: conversation access control** — ownership-based access + stuck session fix + mobile UI improvements (#1418)
+
+### Fixed
+- **UI: top-nav navigation** — replace sidebar with single top-nav pattern for cleaner layout
+- **UI: graceful 404 handling** — detail views now handle missing resources without crashing (#1411)
+- **Worktree: project dir resolution** — resolve project dir before creating worktree for clone_on_demand projects (#1413)
+- **Specs: migration docs** — add missing docs for migrations 090, 094, 095 (#1412)
+
+### Changed
+- **Work system: session lifecycle refactor** — extract session lifecycle methods into dedicated module (#1406)
+
+### CI
+- Bump codecov/codecov-action to 5.5.3, anchore/sbom-action to 0.24.0, sigstore/cosign-installer (#1414–#1416)
+
 ## [0.46.0] - 2026-03-22
 
 ### Added
