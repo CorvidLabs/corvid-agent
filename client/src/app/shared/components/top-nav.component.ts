@@ -476,6 +476,9 @@ const TABS: NavTab[] = [
         }
 
         @media (max-width: 767px) {
+            .topnav {
+                height: 40px;
+            }
             .topnav__tabs, .topnav__right { display: none; }
             .topnav__hamburger { display: flex; }
 
@@ -491,7 +494,7 @@ const TABS: NavTab[] = [
                 display: flex;
                 flex-direction: column;
                 position: fixed;
-                top: 48px;
+                top: 40px;
                 left: 0;
                 right: 0;
                 bottom: 0;

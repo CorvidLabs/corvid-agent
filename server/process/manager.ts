@@ -453,6 +453,24 @@ export class ProcessManager {
     }
 
     resumeProcess(session: Session, prompt?: string): void {
+        // CRITICAL: Detect stale "running" state — DB says running but no in-memory process.
+        // This happens when a process crashes/exits without proper cleanup, or after server restart.
+        // Without this check, resume attempts silently fail and the session appears stuck.
+        if (!this.processes.has(session.id)) {
+            const dbState = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as { status: string; pid: number | null } | null;
+            if (dbState?.status === 'running') {
+                log.warn(`Session ${session.id} marked as 'running' in DB but has no in-memory process — resetting to idle before resume`, {
+                    stalePid: dbState.pid,
+                });
+                updateSessionStatus(this.db, session.id, 'idle');
+                updateSessionPid(this.db, session.id, null);
+                // Clean up any stale meta/timers from previous run
+                this.sessionMeta.delete(session.id);
+                this.timerManager.cleanupSession(session.id);
+                this.approvalManager.cancelSession(session.id);
+            }
+        }
+
         if (this.processes.has(session.id)) {
             const meta = this.sessionMeta.get(session.id);
             if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
@@ -676,16 +694,20 @@ export class ProcessManager {
         const cp = this.processes.get(sessionId);
         if (cp) {
             cp.kill();
-            updateSessionPid(this.db, sessionId, null);
-            updateSessionStatus(this.db, sessionId, 'stopped');
-
-            this.eventBus.emit(sessionId, {
-                type: 'session_stopped',
-                session_id: sessionId,
-            } as ClaudeStreamEvent);
-
-            this.cleanupSessionState(sessionId);
         }
+
+        // Always update DB and emit stop event, even if no in-memory process exists.
+        // This handles the case where the process died without proper cleanup but
+        // the DB still says 'running' — the Stop button should always work.
+        updateSessionPid(this.db, sessionId, null);
+        updateSessionStatus(this.db, sessionId, 'stopped');
+
+        this.eventBus.emit(sessionId, {
+            type: 'session_stopped',
+            session_id: sessionId,
+        } as ClaudeStreamEvent);
+
+        this.cleanupSessionState(sessionId);
     }
 
     /**

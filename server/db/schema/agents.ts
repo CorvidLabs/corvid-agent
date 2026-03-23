@@ -26,6 +26,9 @@ export const tables: string[] = [
         display_color             TEXT DEFAULT NULL,
         display_icon              TEXT DEFAULT NULL,
         avatar_url                TEXT DEFAULT NULL,
+        conversation_mode               TEXT NOT NULL DEFAULT 'private',
+        conversation_rate_limit_window  INTEGER NOT NULL DEFAULT 3600,
+        conversation_rate_limit_max     INTEGER NOT NULL DEFAULT 10,
         disabled                  INTEGER DEFAULT 0,
         tenant_id                 TEXT NOT NULL DEFAULT 'default',
         created_at                TEXT DEFAULT (datetime('now')),
@@ -132,6 +135,29 @@ export const tables: string[] = [
         forward_status TEXT NOT NULL DEFAULT 'pending',
         created_at     TEXT DEFAULT (datetime('now'))
     )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_conversation_allowlist (
+        agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        address    TEXT NOT NULL,
+        label      TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (agent_id, address)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_conversation_blocklist (
+        agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        address    TEXT NOT NULL,
+        reason     TEXT DEFAULT 'manual',
+        created_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (agent_id, address)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS agent_conversation_rate_limits (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id   TEXT NOT NULL,
+        address    TEXT NOT NULL,
+        message_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
 ];
 
 export const indexes: string[] = [
@@ -147,4 +173,7 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
     `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_conv_allow_agent ON agent_conversation_allowlist(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_conv_block_agent ON agent_conversation_blocklist(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_conv_rate_agent_addr ON agent_conversation_rate_limits(agent_id, address)`,
 ];

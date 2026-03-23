@@ -561,3 +561,130 @@ describe('edge cases', () => {
         expect(score.components.taskCompletion).toBe(50);
     });
 });
+
+// ─── kill switch: auto-blacklist ────────────────────────────────────────────
+
+describe('kill switch', () => {
+    test('critical security violation auto-blacklists agent', () => {
+        scorer.recordEvent({
+            agentId: 'agent-1',
+            eventType: 'security_violation',
+            scoreImpact: -100,
+            metadata: { severity: 'critical', detail: 'Attempted code injection' },
+        });
+
+        // Agent should be blacklisted
+        const { isAgentBlocked } = require('../db/agent-blocklist') as typeof import('../db/agent-blocklist');
+        expect(isAgentBlocked(db, 'agent-1')).toBe(true);
+
+        // Score should be 0
+        const cached = scorer.getCachedScore('agent-1');
+        expect(cached).not.toBeNull();
+        expect(cached!.overallScore).toBe(0);
+        expect(cached!.trustLevel).toBe('blacklisted');
+    });
+
+    test('3+ security violations in 24 hours auto-blacklists agent', () => {
+        for (let i = 0; i < 3; i++) {
+            scorer.recordEvent({
+                agentId: 'agent-1',
+                eventType: 'security_violation',
+                scoreImpact: -20,
+                metadata: { severity: 'warning' },
+            });
+        }
+
+        const { isAgentBlocked } = require('../db/agent-blocklist') as typeof import('../db/agent-blocklist');
+        expect(isAgentBlocked(db, 'agent-1')).toBe(true);
+    });
+
+    test('non-critical violations below threshold do not blacklist', () => {
+        scorer.recordEvent({
+            agentId: 'agent-1',
+            eventType: 'security_violation',
+            scoreImpact: -20,
+            metadata: { severity: 'warning' },
+        });
+        scorer.recordEvent({
+            agentId: 'agent-1',
+            eventType: 'security_violation',
+            scoreImpact: -20,
+            metadata: { severity: 'warning' },
+        });
+
+        const { isAgentBlocked } = require('../db/agent-blocklist') as typeof import('../db/agent-blocklist');
+        expect(isAgentBlocked(db, 'agent-1')).toBe(false);
+    });
+
+    test('blacklisted agent always gets score 0', () => {
+        // Give agent great stats first
+        for (let i = 0; i < 10; i++) seedWorkTask('agent-1', 'completed');
+        for (let i = 0; i < 15; i++) seedSession('agent-1', i);
+        seedMarketplaceReview('agent-1', 5);
+
+        // Verify high score before blacklist
+        const before = scorer.computeScore('agent-1');
+        expect(before.overallScore).toBeGreaterThan(50);
+
+        // Blacklist via critical violation
+        scorer.recordEvent({
+            agentId: 'agent-1',
+            eventType: 'security_violation',
+            scoreImpact: -100,
+            metadata: { severity: 'critical', detail: 'Test' },
+        });
+
+        const after = scorer.computeScore('agent-1');
+        expect(after.overallScore).toBe(0);
+        expect(after.trustLevel).toBe('blacklisted');
+    });
+
+    test('blacklist records agent_blacklisted event', () => {
+        scorer.recordEvent({
+            agentId: 'agent-1',
+            eventType: 'security_violation',
+            scoreImpact: -100,
+            metadata: { severity: 'critical', detail: 'injection' },
+        });
+
+        const events = scorer.getEvents('agent-1', 100);
+        const blacklistEvent = events.find(e => e.event_type === 'agent_blacklisted');
+        expect(blacklistEvent).toBeDefined();
+        expect(blacklistEvent!.score_impact).toBe(-100);
+    });
+});
+
+// ─── hasActivity / getActiveAgentIds ────────────────────────────────────────
+
+describe('hasActivity', () => {
+    test('returns false for agent with no activity', () => {
+        expect(scorer.checkHasActivity('agent-1')).toBe(false);
+    });
+
+    test('returns true when agent has recent sessions', () => {
+        seedSession('agent-1', 0);
+        expect(scorer.checkHasActivity('agent-1')).toBe(true);
+    });
+
+    test('returns true when agent has recent work tasks', () => {
+        seedWorkTask('agent-1', 'completed', 0);
+        expect(scorer.checkHasActivity('agent-1')).toBe(true);
+    });
+});
+
+describe('getActiveAgentIds', () => {
+    test('returns empty set when no agents have activity', () => {
+        const ids = scorer.getActiveAgentIds();
+        expect(ids.size).toBe(0);
+    });
+
+    test('returns IDs of agents with activity', () => {
+        seedAgent('agent-2', 'Two');
+        seedSession('agent-1', 0);
+        seedWorkTask('agent-2', 'completed', 0);
+
+        const ids = scorer.getActiveAgentIds();
+        expect(ids.has('agent-1')).toBe(true);
+        expect(ids.has('agent-2')).toBe(true);
+    });
+});
