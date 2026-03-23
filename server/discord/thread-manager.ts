@@ -25,6 +25,7 @@ import {
     hexColorToInt,
     assertSnowflake,
     splitEmbedDescription,
+    collapseCodeBlocks,
     buildFooterText,
     buildFooterWithStats,
     type DiscordFileAttachment,
@@ -199,7 +200,7 @@ export function subscribeForResponseWithEmbed(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = extractContentText(contentBlocks);
+            const content = collapseCodeBlocks(extractContentText(contentBlocks));
 
             if (content) {
                 receivedAnyContent = true;
@@ -541,7 +542,7 @@ export function subscribeForInlineResponse(
     const inlineCallback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
-            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            const content = collapseCodeBlocks(extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined));
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
@@ -714,7 +715,7 @@ export function subscribeForAdaptiveInlineResponse(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = extractContentText(contentBlocks);
+            const content = collapseCodeBlocks(extractContentText(contentBlocks));
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
@@ -974,7 +975,7 @@ export function subscribeForInlineProgressResponse(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = extractContentText(contentBlocks);
+            const content = collapseCodeBlocks(extractContentText(contentBlocks));
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
