@@ -16,6 +16,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { GuidedTourService } from '../../core/services/guided-tour.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { IconComponent } from '../../shared/components/icon.component';
 import { WidgetLayoutService, type WidgetId } from '../../core/services/widget-layout.service';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { FlockAgent } from '@shared/types/flock-directory';
@@ -68,7 +69,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
@@ -81,7 +82,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             <!-- Top bar: view mode + customize toggle -->
             <div class="dash-toolbar">
                 <div class="dash-toolbar__left">
-                    <span class="dash-toolbar__title">Dashboard</span>
+                    <span class="dash-toolbar__title"><app-icon name="dashboard" [size]="16" /> Dashboard</span>
                     <span class="connection-badge" [attr.data-status]="connectionState()">
                         <span class="connection-badge__dot"></span>
                         <span class="connection-badge__label">{{ connectionLabel() }}</span>
@@ -175,44 +176,68 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                         @if (widget.id === 'metrics') {
                             <div class="metrics-row stagger-scale">
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Total Agents</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="agents" [size]="14" /></span>
+                                        <span class="metric-card__label">Total Agents</span>
+                                    </div>
                                     <span class="metric-card__value">{{ agentService.agents().length }}</span>
                                     <a class="metric-card__link" routerLink="/agents">View all</a>
                                 </div>
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Active Sessions</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--amber"><app-icon name="activity" [size]="14" /></span>
+                                        <span class="metric-card__label">Active Sessions</span>
+                                    </div>
                                     <span class="metric-card__value metric-card__value--active">{{ runningSessions().length }}</span>
                                     <a class="metric-card__link" routerLink="/sessions">View all</a>
                                 </div>
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Total Projects</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--purple"><app-icon name="code" [size]="14" /></span>
+                                        <span class="metric-card__label">Total Projects</span>
+                                    </div>
                                     <span class="metric-card__value">{{ projectService.projects().length }}</span>
                                     <a class="metric-card__link" routerLink="/agents/projects">View all</a>
                                 </div>
                                 <div class="metric-card metric-card--highlight">
-                                    <span class="metric-card__label">API Cost (Today)</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--green"><app-icon name="bar-chart" [size]="14" /></span>
+                                        <span class="metric-card__label">API Cost (Today)</span>
+                                    </div>
                                     <span class="metric-card__value metric-card__value--usd">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</span>
                                 </div>
                                 @if (algochatStatus(); as status) {
                                     @if (status.enabled && status.address !== 'local') {
                                         <div class="metric-card">
-                                            <span class="metric-card__label">ALGO Balance</span>
+                                            <div class="metric-card__header">
+                                                <span class="metric-card__icon metric-card__icon--magenta"><app-icon name="wallet" [size]="14" /></span>
+                                                <span class="metric-card__label">ALGO Balance</span>
+                                            </div>
                                             <span class="metric-card__value metric-card__value--algo">{{ (status.balance / 1000000) | number:'1.2-4' }}</span>
                                             <span class="metric-card__sub">{{ status.network }}</span>
                                         </div>
                                     }
                                 }
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Credits Used</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="zap" [size]="14" /></span>
+                                        <span class="metric-card__label">Credits Used</span>
+                                    </div>
                                     <span class="metric-card__value">{{ overview()?.totalCreditsConsumed ?? 0 }}</span>
                                 </div>
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Work Tasks</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--amber"><app-icon name="terminal" [size]="14" /></span>
+                                        <span class="metric-card__label">Work Tasks</span>
+                                    </div>
                                     <span class="metric-card__value metric-card__value--work">{{ activeWorkTaskCount() }}</span>
                                     <a class="metric-card__link" routerLink="/sessions/work-tasks">View all</a>
                                 </div>
                                 <div class="metric-card">
-                                    <span class="metric-card__label">Total Sessions</span>
+                                    <div class="metric-card__header">
+                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="sessions" [size]="14" /></span>
+                                        <span class="metric-card__label">Total Sessions</span>
+                                    </div>
                                     <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
                                 </div>
                             </div>
@@ -223,7 +248,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             @if (agentSummaries().length > 0) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3>Agent Activity</h3>
+                                        <h3><app-icon name="agents" [size]="14" /> Agent Activity</h3>
                                         <div class="section__header-actions">
                                             <a class="section__link" routerLink="/agents">View all agents</a>
                                             <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['agents']" (click)="refreshWidget('agents')" title="Refresh">&#x21bb;</button>
@@ -302,7 +327,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                         @if (widget.id === 'active-sessions') {
                             <div class="section">
                                 <div class="section__header">
-                                    <h3>Active Sessions</h3>
+                                    <h3><app-icon name="activity" [size]="14" /> Active Sessions</h3>
                                     <div class="section__header-actions">
                                         <a class="section__link" routerLink="/sessions">View all sessions</a>
                                         <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['active-sessions']" (click)="refreshWidget('active-sessions')" title="Refresh">&#x21bb;</button>
@@ -348,7 +373,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             } @else {
                             <div class="section">
                                 <div class="section__header">
-                                    <h3>Spending Trend</h3>
+                                    <h3><app-icon name="bar-chart" [size]="14" /> Spending Trend</h3>
                                     <div class="section__header-actions">
                                         <div class="chart-controls">
                                             <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 7" (click)="loadSpending(7)">7d</button>
@@ -403,7 +428,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             } @else {
                             <div class="section">
                                 <div class="section__header">
-                                    <h3>Sessions Breakdown</h3>
+                                    <h3><app-icon name="sessions" [size]="14" /> Sessions Breakdown</h3>
                                     <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['session-chart']" (click)="refreshWidget('session-chart')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (sessionStats()) {
@@ -477,7 +502,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             } @else {
                             <div class="section">
                                 <div class="section__header">
-                                    <h3>Agent Usage</h3>
+                                    <h3><app-icon name="agents" [size]="14" /> Agent Usage</h3>
                                     <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['agent-usage-chart']" (click)="refreshWidget('agent-usage-chart')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (sessionStats() && sessionStats()!.byAgent.length > 0) {
@@ -522,7 +547,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             } @else {
                             <div class="section section--feed">
                                 <div class="section__header">
-                                    <h3>Recent Activity</h3>
+                                    <h3><app-icon name="clock" [size]="14" /> Recent Activity</h3>
                                     <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['activity']" (click)="refreshWidget('activity')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 @if (activityFeed().length === 0) {
@@ -540,12 +565,12 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                             <a class="activity-item" [routerLink]="event.link">
                                                 <span class="activity-item__icon" [attr.data-type]="event.type">
                                                     @switch (event.type) {
-                                                        @case ('session_started') { &gt; }
-                                                        @case ('session_completed') { &check; }
-                                                        @case ('session_error') { ! }
-                                                        @case ('work_task') { &gt;&gt; }
-                                                        @case ('council') { &amp; }
-                                                        @case ('agent_message') { @ }
+                                                        @case ('session_started') { <app-icon name="play" [size]="12" /> }
+                                                        @case ('session_completed') { <app-icon name="check" [size]="12" /> }
+                                                        @case ('session_error') { <app-icon name="alert" [size]="12" /> }
+                                                        @case ('work_task') { <app-icon name="terminal" [size]="12" /> }
+                                                        @case ('council') { <app-icon name="users" [size]="12" /> }
+                                                        @case ('agent_message') { <app-icon name="chat" [size]="12" /> }
                                                     }
                                                 </span>
                                                 <div class="activity-item__body">
@@ -564,7 +589,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                         <!-- quick-actions -->
                         @if (widget.id === 'quick-actions') {
                             <div class="section section--actions">
-                                <h3>Quick Actions</h3>
+                                <h3><app-icon name="zap" [size]="14" /> Quick Actions</h3>
                                 <div class="quick-actions">
                                     <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
                                     <button class="action-btn" (click)="navigateTo('/sessions/councils')">Launch Council</button>
@@ -587,7 +612,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             } @else {
                             <div class="section section--status">
                                 <div class="section__header">
-                                    <h3>System Status</h3>
+                                    <h3><app-icon name="server" [size]="14" /> System Status</h3>
                                     <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['system-status']" (click)="refreshWidget('system-status')" title="Refresh">&#x21bb;</button>
                                 </div>
                                 <div class="status-list">
@@ -642,7 +667,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             @if (flockAgents().length > 0) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3>Flock Directory</h3>
+                                        <h3><app-icon name="users" [size]="14" /> Flock Directory</h3>
                                         <div class="section__header-actions">
                                             @if (flockStats(); as stats) {
                                                 <span class="flock-stats">{{ stats.active }} active agents</span>
@@ -683,7 +708,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             @if (agentSummaries().length >= 2) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3>Agent Comparison</h3>
+                                    <h3><app-icon name="list" [size]="14" /> Agent Comparison</h3>
                                         <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['comparison']" (click)="refreshWidget('comparison')" title="Refresh">&#x21bb;</button>
                                     </div>
                                     <div class="comparison-table">

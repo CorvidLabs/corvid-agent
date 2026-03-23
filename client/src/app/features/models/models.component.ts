@@ -11,6 +11,7 @@ import { DecimalPipe, SlicePipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
@@ -72,7 +73,7 @@ interface LibraryResponse {
 @Component({
     selector: 'app-models',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SlicePipe],
+    imports: [DecimalPipe, SlicePipe, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -148,7 +149,7 @@ interface LibraryResponse {
             <!-- Installed Models Tab -->
             @if (activeTab() === 'installed') {
                 @if (loading()) {
-                    <p class="hint">Loading models...</p>
+                    <app-skeleton variant="card" [count]="4" />
                 } @else if (installedModels().length === 0) {
                     <div class="empty-state">
                         <p>No models installed yet.</p>
@@ -213,7 +214,7 @@ interface LibraryResponse {
                 </div>
 
                 @if (loadingLibrary()) {
-                    <p class="hint">Loading library...</p>
+                    <app-skeleton variant="card" [count]="6" />
                 } @else if (libraryModels().length === 0) {
                     <p class="hint">No models found.</p>
                 } @else {
@@ -253,7 +254,7 @@ interface LibraryResponse {
             <!-- OpenRouter Models Tab -->
             @if (activeTab() === 'openrouter') {
                 @if (loadingOpenRouter()) {
-                    <p class="hint">Loading OpenRouter models...</p>
+                    <app-skeleton variant="card" [count]="6" />
                 } @else if (openrouterModels().length === 0) {
                     <p class="hint">
                         No OpenRouter models available. Set <code>OPENROUTER_API_KEY</code> to enable.
