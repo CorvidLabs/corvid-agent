@@ -35,6 +35,19 @@ interface DiscordConfig {
     rate_limit_by_level?: string;
     status_text?: string;
     activity_type?: string;
+    guild_roles_cache?: string;
+    guild_channels_cache?: string;
+    guild_info_cache?: string;
+}
+
+interface GuildRole {
+    id: string;
+    name: string;
+    color: number;
+    position: number;
+    managed: boolean;
+    hoist: boolean;
+    permissions: string;
 }
 
 interface PSKContact {
@@ -228,12 +241,48 @@ interface PSKContact {
                                     <span class="discord-desc">Default agent for @mention replies (leave empty for first available).</span>
                                 </div>
                                 <div class="discord-field discord-field--wide">
-                                    <label class="discord-label" for="discord_roles">Role Permissions (JSON)</label>
-                                    <textarea class="discord-textarea" id="discord_roles" rows="3"
-                                        [ngModel]="discordValues()['role_permissions'] ?? discordConfig()?.role_permissions ?? '{}'"
-                                        (ngModelChange)="setDiscordValue('role_permissions', $event)"
-                                        placeholder='{"role_id": 3, "other_role_id": 1}'></textarea>
-                                    <span class="discord-desc">Maps Discord role IDs to permission levels (0-3). JSON object.</span>
+                                    <label class="discord-label">Role Permissions</label>
+                                    <span class="discord-desc">Assign permission levels to Discord roles. Roles not assigned use the default level.</span>
+                                    @if (guildRoles().length > 0) {
+                                        <div class="role-picker">
+                                            <div class="role-picker__header">
+                                                <span class="role-picker__col">Role</span>
+                                                <span class="role-picker__col role-picker__col--level">Permission Level</span>
+                                            </div>
+                                            <div class="role-picker__actions">
+                                                <button class="save-btn save-btn--sm" (click)="setAllRoles(3)">All Admin</button>
+                                                <button class="save-btn save-btn--sm" (click)="setAllRoles(2)">All Standard</button>
+                                                <button class="save-btn save-btn--sm" (click)="setAllRoles(1)">All Basic</button>
+                                                <button class="cancel-btn cancel-btn--sm" (click)="clearAllRoles()">Clear All</button>
+                                                <button class="save-btn save-btn--sm" (click)="autoSuggestRoles()">Auto-Suggest</button>
+                                            </div>
+                                            @for (role of guildRoles(); track role.id) {
+                                                <div class="role-picker__row" [class.role-picker__row--managed]="role.managed">
+                                                    <div class="role-picker__name">
+                                                        <span class="role-picker__dot" [style.background]="getRoleColor(role.color)"></span>
+                                                        <span class="role-picker__label">{{ role.name }}</span>
+                                                        @if (role.managed) {
+                                                            <span class="role-picker__badge">Bot</span>
+                                                        }
+                                                        @if (isAdminBitSet(role.permissions)) {
+                                                            <span class="role-picker__badge role-picker__badge--admin">Admin</span>
+                                                        }
+                                                    </div>
+                                                    <select class="discord-select role-picker__select"
+                                                        [ngModel]="getRolePermission(role.id)"
+                                                        (ngModelChange)="setRolePermission(role.id, $event)">
+                                                        <option value="">— Default —</option>
+                                                        <option value="0">0 — Blocked</option>
+                                                        <option value="1">1 — Basic</option>
+                                                        <option value="2">2 — Standard</option>
+                                                        <option value="3">3 — Admin</option>
+                                                    </select>
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <p class="muted">No guild roles cached. Use <code>/admin sync</code> in Discord to fetch roles.</p>
+                                    }
                                 </div>
                                 <div class="discord-field discord-field--wide">
                                     <label class="discord-label" for="discord_rate_limits">Rate Limits by Level (JSON)</label>
@@ -599,6 +648,94 @@ interface PSKContact {
         }
         .discord-actions { display: flex; gap: 0.5rem; align-items: center; }
 
+        /* Role picker */
+        .role-picker {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-top: 0.4rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .role-picker__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-tertiary);
+        }
+        .role-picker__col--level { min-width: 160px; text-align: right; }
+        .role-picker__actions {
+            display: flex;
+            gap: 0.35rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-surface);
+            flex-wrap: wrap;
+        }
+        .role-picker__row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.4rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+        .role-picker__row:last-child { border-bottom: none; }
+        .role-picker__row:hover { background: var(--bg-surface); }
+        .role-picker__row--managed { opacity: 0.6; }
+        .role-picker__name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .role-picker__dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .role-picker__label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .role-picker__badge {
+            font-size: 0.5rem;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text-tertiary);
+            border: 1px solid var(--border);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .role-picker__badge--admin {
+            color: var(--accent-amber);
+            border-color: var(--accent-amber);
+            background: var(--accent-amber-dim);
+        }
+        .role-picker__select {
+            min-width: 160px;
+            max-width: 160px;
+            font-size: 0.75rem;
+            padding: 0.3rem 0.4rem;
+        }
+
         .settings__section {
             background: var(--bg-surface);
             border: 1px solid var(--border);
@@ -874,6 +1011,21 @@ export class SettingsComponent implements OnInit {
     readonly savingDiscord = signal(false);
     readonly discordDirty = computed(() => Object.keys(this.discordValues()).length > 0);
 
+    // Guild roles parsed from cache
+    readonly guildRoles = computed<GuildRole[]>(() => {
+        const raw = this.discordConfig()?.guild_roles_cache;
+        if (!raw) return [];
+        try {
+            const roles = JSON.parse(raw) as GuildRole[];
+            // Sort by position descending (highest = most powerful first), filter out separator roles
+            return roles
+                .filter(r => !r.name.includes('\u2800') && r.name !== '@everyone')
+                .sort((a, b) => b.position - a.position);
+        } catch {
+            return [];
+        }
+    });
+
     // Multi-contact PSK state
     readonly pskContacts = signal<PSKContact[]>([]);
     readonly expandedContactId = signal<string | null>(null);
@@ -1121,6 +1273,82 @@ export class SettingsComponent implements OnInit {
 
     resetDiscordChanges(): void {
         this.discordValues.set({});
+    }
+
+    // ── Role picker methods ──────────────────────────────────────────
+
+    getRoleColor(color: number): string {
+        if (!color) return 'var(--text-tertiary)';
+        return '#' + color.toString(16).padStart(6, '0');
+    }
+
+    isAdminBitSet(permissions: string): boolean {
+        // Discord ADMINISTRATOR permission bit = 0x8
+        try {
+            return (BigInt(permissions) & BigInt(0x8)) !== BigInt(0);
+        } catch {
+            return false;
+        }
+    }
+
+    private parseRolePermissions(): Record<string, number> {
+        const raw = this.discordValues()['role_permissions']
+            ?? this.discordConfig()?.role_permissions
+            ?? '{}';
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return {};
+        }
+    }
+
+    getRolePermission(roleId: string): string {
+        const perms = this.parseRolePermissions();
+        return roleId in perms ? String(perms[roleId]) : '';
+    }
+
+    setRolePermission(roleId: string, value: string): void {
+        const perms = this.parseRolePermissions();
+        if (value === '') {
+            delete perms[roleId];
+        } else {
+            perms[roleId] = parseInt(value, 10);
+        }
+        this.setDiscordValue('role_permissions', JSON.stringify(perms));
+    }
+
+    setAllRoles(level: number): void {
+        const perms: Record<string, number> = {};
+        for (const role of this.guildRoles()) {
+            if (!role.managed) {
+                perms[role.id] = level;
+            }
+        }
+        this.setDiscordValue('role_permissions', JSON.stringify(perms));
+    }
+
+    clearAllRoles(): void {
+        this.setDiscordValue('role_permissions', '{}');
+    }
+
+    autoSuggestRoles(): void {
+        const perms: Record<string, number> = {};
+        for (const role of this.guildRoles()) {
+            if (role.managed) continue;
+            const name = role.name.toLowerCase();
+            const isAdmin = this.isAdminBitSet(role.permissions);
+
+            if (isAdmin || /admin|owner|council|sudo/.test(name)) {
+                perms[role.id] = 3;
+            } else if (/mod|staff|team|corvid team/.test(name)) {
+                perms[role.id] = 2;
+            } else if (/member|verified|trusted|holder|developer|artist|bot/.test(name)) {
+                perms[role.id] = 2;
+            } else if (role.hoist) {
+                perms[role.id] = 1;
+            }
+        }
+        this.setDiscordValue('role_permissions', JSON.stringify(perms));
     }
 
     async saveDiscordConfig(): Promise<void> {
