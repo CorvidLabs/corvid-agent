@@ -17,7 +17,7 @@ import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { scanForInjection } from '../lib/prompt-injection';
-import { createWorktree, generateChatBranchName } from '../lib/worktree';
+import { resolveAndCreateWorktree } from '../lib/worktree';
 import { recordAudit } from '../db/audit';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 import { updateDiscordConfig } from '../db/discord-config';
@@ -476,17 +476,13 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
 
     // Create an isolated git worktree so this chat session doesn't pollute
     // the main working tree (prevents branch collisions across sessions).
+    // Uses resolveAndCreateWorktree to handle clone_on_demand projects
+    // (clones the repo first if it doesn't exist locally).
     let workDir: string | undefined;
-    if (project.workingDir) {
-        const sessionId = crypto.randomUUID();
-        const branchName = generateChatBranchName(agent.name, sessionId);
-        const result = await createWorktree({
-            projectWorkingDir: project.workingDir,
-            branchName,
-            worktreeId: `chat-${sessionId.slice(0, 12)}`,
-        });
+    if (project.workingDir || project.gitUrl) {
+        const result = await resolveAndCreateWorktree(project, agent.name, crypto.randomUUID());
         if (result.success) {
-            workDir = result.worktreeDir;
+            workDir = result.workDir;
         } else {
             // Worktree isolation is mandatory — running without it risks
             // cross-session contamination of the shared working directory.
@@ -610,16 +606,10 @@ async function resumeExpiredThreadSession(
 
     // Create an isolated worktree for the new session
     let workDir: string | undefined;
-    if (project.workingDir) {
-        const tempId = crypto.randomUUID();
-        const branchName = generateChatBranchName(agent.name, tempId);
-        const result = await createWorktree({
-            projectWorkingDir: project.workingDir,
-            branchName,
-            worktreeId: `chat-${tempId.slice(0, 12)}`,
-        });
+    if (project.workingDir || project.gitUrl) {
+        const result = await resolveAndCreateWorktree(project, agent.name, crypto.randomUUID());
         if (result.success) {
-            workDir = result.worktreeDir;
+            workDir = result.workDir;
         }
     }
 

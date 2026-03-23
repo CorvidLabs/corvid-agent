@@ -7,6 +7,8 @@
 
 import { resolve, dirname } from 'node:path';
 import { createLogger } from './logger';
+import { resolveProjectDir } from './project-dir';
+import type { Project } from '../../shared/types';
 
 const log = createLogger('Worktree');
 
@@ -194,4 +196,41 @@ export function generateChatBranchName(agentName: string, sessionId: string): st
     const agentSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const sessionPrefix = sessionId.slice(0, 12);
     return `chat/${agentSlug}/${sessionPrefix}`;
+}
+
+export interface ResolveAndCreateWorktreeResult {
+    success: boolean;
+    workDir?: string;
+    error?: string;
+}
+
+/**
+ * Resolve a project's working directory (handling clone_on_demand/ephemeral)
+ * then create a worktree from it. This ensures the repo is cloned before
+ * attempting to create a worktree — fixing ENOENT errors for clone_on_demand projects.
+ */
+export async function resolveAndCreateWorktree(
+    project: Project,
+    agentName: string,
+    sessionId: string,
+): Promise<ResolveAndCreateWorktreeResult> {
+    // Step 1: Resolve the actual working directory (clone if needed)
+    const resolved = await resolveProjectDir(project);
+    if (resolved.error) {
+        return { success: false, error: `Failed to resolve project directory: ${resolved.error}` };
+    }
+
+    // Step 2: Create the worktree from the resolved directory
+    const branchName = generateChatBranchName(agentName, sessionId);
+    const result = await createWorktree({
+        projectWorkingDir: resolved.dir,
+        branchName,
+        worktreeId: `chat-${sessionId.slice(0, 12)}`,
+    });
+
+    if (!result.success) {
+        return { success: false, error: result.error };
+    }
+
+    return { success: true, workDir: result.worktreeDir };
 }

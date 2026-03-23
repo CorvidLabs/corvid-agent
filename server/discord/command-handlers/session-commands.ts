@@ -12,7 +12,7 @@ import { listAgents } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
-import { createWorktree, generateChatBranchName } from '../../lib/worktree';
+import { resolveAndCreateWorktree } from '../../lib/worktree';
 import {
     respondToInteraction,
     sendEmbed,
@@ -93,16 +93,10 @@ export async function handleSessionCommand(
     // Create an isolated git worktree so this session doesn't
     // pollute the main working tree (matches inline-mention pattern).
     let workDir: string | undefined;
-    if (project.workingDir) {
-        const tempId = crypto.randomUUID();
-        const branchName = generateChatBranchName(agent.name, tempId);
-        const result = await createWorktree({
-            projectWorkingDir: project.workingDir,
-            branchName,
-            worktreeId: `chat-${tempId.slice(0, 12)}`,
-        });
+    if (project.workingDir || project.gitUrl) {
+        const result = await resolveAndCreateWorktree(project, agent.name, crypto.randomUUID());
         if (result.success) {
-            workDir = result.worktreeDir;
+            workDir = result.workDir;
         } else {
             // Worktree isolation is mandatory — running without it risks
             // cross-session contamination of the shared working directory.
