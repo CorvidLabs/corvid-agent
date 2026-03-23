@@ -32,7 +32,7 @@ export async function handleComponentInteraction(
 
     assertSnowflake(interaction.channel_id, 'channel ID');
 
-    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles);
+    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles, interaction.channel_id);
     if (permLevel <= PermissionLevel.BLOCKED) {
         await respondToInteraction(interaction, 'You do not have permission to use this bot.');
         return;

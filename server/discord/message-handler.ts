@@ -193,7 +193,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     }
 
     // Resolve permission level (only reached when bot is actually addressed)
-    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, data.member?.roles);
+    const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, data.member?.roles, channelId);
     if (permLevel <= 0) {
         log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
         recordAudit(

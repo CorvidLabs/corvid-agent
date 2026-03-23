@@ -30,6 +30,8 @@ export interface DiscordDynamicConfig {
     defaultPermissionLevel: number;
     /** Rate limit overrides by permission level (JSON) */
     rateLimitByLevel: Record<number, number>;
+    /** Per-channel permission floors (JSON) */
+    channelPermissions: Record<string, number>;
     /** Bot status text */
     statusText: string;
     /** Activity type (0=Playing, 1=Streaming, 2=Listening, 3=Watching, 5=Competing) */
@@ -49,6 +51,7 @@ const DEFAULTS: DiscordDynamicConfig = {
     rolePermissions: {},
     defaultPermissionLevel: 1,
     rateLimitByLevel: {},
+    channelPermissions: {},
     statusText: 'corvid-agent',
     activityType: 3,
     interactedUsers: [],
@@ -87,6 +90,7 @@ export function getDiscordConfig(db: Database): DiscordDynamicConfig {
         rolePermissions: parseJsonOrDefault(map.get('role_permissions'), DEFAULTS.rolePermissions),
         defaultPermissionLevel: parseInt(map.get('default_permission_level') ?? String(DEFAULTS.defaultPermissionLevel), 10),
         rateLimitByLevel: parseJsonOrDefault(map.get('rate_limit_by_level'), DEFAULTS.rateLimitByLevel),
+        channelPermissions: parseJsonOrDefault(map.get('channel_permissions'), DEFAULTS.channelPermissions),
         statusText: map.get('status_text') ?? DEFAULTS.statusText,
         activityType: parseInt(map.get('activity_type') ?? String(DEFAULTS.activityType), 10),
         interactedUsers: parseCommaSeparated(map.get('interacted_users')),
@@ -144,6 +148,7 @@ export const VALID_DISCORD_CONFIG_KEYS = new Set([
     'role_permissions',
     'default_permission_level',
     'rate_limit_by_level',
+    'channel_permissions',
     'status_text',
     'activity_type',
 ]);
