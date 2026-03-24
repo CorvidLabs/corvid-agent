@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.51.0] - 2026-03-24
+
+### Added
+- **Conversational agents: starter presets** — add conversational agent presets and seed modules via AlgoChat for onboarding new agents (#1471)
+
+### Fixed
+- **Contacts: partial name match** — add partial name match and memory fallback to contact lookup tool (#1470)
+- **Security: CodeQL alerts** — resolve 10 CodeQL alerts (#312-#323) (#1469)
+
 ## [0.50.0] - 2026-03-24
 
 ### Added
