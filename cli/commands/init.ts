@@ -439,8 +439,8 @@ ${c.bold}Setting up your AI developer...${c.reset}
         envLines.push('OLLAMA_HOST=http://localhost:11434');
         if (!providerConfigured) {
             envLines.push('ENABLED_PROVIDERS=ollama');
+            providerConfigured = true;
         }
-        providerConfigured = true;
     }
 
     if (!providerConfigured) {

@@ -108,7 +108,7 @@ name: coding
 description: File operations and code execution
 ---
 # Coding Skill
-`);
+`, { mode: 0o600 });
 
         mkdirSync(join(skillsDir, 'search'), { recursive: true });
         writeFileSync(join(skillsDir, 'search', 'SKILL.md'), `---
@@ -116,7 +116,7 @@ name: search
 description: Web search and deep research
 ---
 # Search Skill
-`);
+`, { mode: 0o600 });
 
         const entries = discoverSkills(skillsDir);
         expect(entries.length).toBe(2);
@@ -131,7 +131,7 @@ name: git
 description: Git workflows and branching
 ---
 # Git Skill
-`);
+`, { mode: 0o600 });
 
         const entries = discoverSkills(skillsDir);
         expect(entries.length).toBe(1);
@@ -146,7 +146,7 @@ name: readme
 description: should be skipped
 ---
 Not a skill.
-`);
+`, { mode: 0o600 });
 
         const entries = discoverSkills(skillsDir);
         expect(entries.length).toBe(0);
@@ -155,7 +155,7 @@ Not a skill.
     test('skips files with invalid frontmatter', () => {
         const skillsDir = join(tmpBase, 'discover-invalid');
         mkdirSync(skillsDir, { recursive: true });
-        writeFileSync(join(skillsDir, 'bad.md'), 'No frontmatter here');
+        writeFileSync(join(skillsDir, 'bad.md'), 'No frontmatter here', { mode: 0o600 });
 
         const entries = discoverSkills(skillsDir);
         expect(entries.length).toBe(0);
@@ -186,7 +186,7 @@ description: A test
 # Full Body
 
 Detailed instructions here.
-`);
+`, { mode: 0o600 });
 
         const entry = {
             name: 'test-skill',
