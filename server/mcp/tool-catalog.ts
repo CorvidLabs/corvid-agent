@@ -43,6 +43,8 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     { name: 'corvid_delete_memory', description: 'Delete (forget) an on-chain ARC-69 memory', category: 'communication' },
     { name: 'corvid_read_on_chain_memories', description: 'Read memories directly from Algorand blockchain', category: 'communication' },
     { name: 'corvid_sync_on_chain_memories', description: 'Sync on-chain memories back to local SQLite cache', category: 'communication' },
+    { name: 'corvid_discord_send_message', description: 'Send a message to a Discord channel via embed or plain text', category: 'communication' },
+    { name: 'corvid_discord_send_image', description: 'Send an image to a Discord channel', category: 'communication' },
 
     // ── Agent Management ─────────────────────────────────────────────────
     { name: 'corvid_list_agents', description: 'List all available agents with names, IDs, and wallets', category: 'agents' },
