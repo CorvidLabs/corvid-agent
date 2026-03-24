@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, ElementRef, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ApiService } from '../../core/services/api.service';
@@ -27,7 +28,7 @@ interface FeedEntry {
 @Component({
     selector: 'app-live-feed',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe, EmptyStateComponent],
+    imports: [DatePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -81,7 +82,9 @@ interface FeedEntry {
                 </div>
             }
 
-            @if (entries().length === 0) {
+            @if (loading()) {
+                <app-skeleton variant="table" [count]="6" />
+            } @else if (entries().length === 0) {
                 <app-empty-state
                     icon="[ ]"
                     [title]="isFiltered() ? 'No matches' : 'No messages yet'"
@@ -293,6 +296,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     private walletToAgent: Record<string, Agent> = {};
     private agentColorMap: Record<string, number> = {};
     private nextColorIndex = 0;
+    protected readonly loading = signal(true);
     private seenMessageKeys = new Set<string>();
     private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -306,7 +310,11 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
         }
 
         // Load message history from DB
-        await this.loadHistory();
+        try {
+            await this.loadHistory();
+        } finally {
+            this.loading.set(false);
+        }
 
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (this.isFiltered()) return;

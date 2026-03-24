@@ -36,11 +36,14 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
             @if (wsService.serverRestarting()) {
                 <div class="app-layout__banner app-layout__banner--restart" role="alert">
+                    <span class="app-layout__banner-dot"></span>
                     Server is restarting — reconnecting automatically...
                 </div>
             } @else if (!wsService.connected()) {
                 <div class="app-layout__banner" role="alert">
+                    <span class="app-layout__banner-dot"></span>
                     Connection lost — reconnecting...
+                    <button class="app-layout__banner-retry" (click)="retryConnection()" type="button">Retry now</button>
                 </div>
             }
             <div class="app-layout__body">
@@ -96,6 +99,38 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             font-weight: 600;
             text-align: center;
             letter-spacing: 0.03em;
+        }
+        .app-layout__banner-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            margin-right: 0.5rem;
+            animation: bannerPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes bannerPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .app-layout__banner-retry {
+            margin-left: 0.75rem;
+            padding: 0.15rem 0.6rem;
+            background: transparent;
+            border: 1px solid currentColor;
+            border-radius: var(--radius-sm, 4px);
+            color: inherit;
+            font-family: inherit;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .app-layout__banner-retry:hover {
+            background: currentColor;
+            color: var(--bg-deep, #0a0a12);
         }
         .app-layout__banner--restart {
             background: var(--accent-yellow-dim, rgba(255, 204, 0, 0.1));
@@ -157,5 +192,10 @@ export class App implements OnInit, OnDestroy {
 
     protected scrollToTop(): void {
         this.mainContent()?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    protected retryConnection(): void {
+        this.wsService.disconnect();
+        this.wsService.connect();
     }
 }
