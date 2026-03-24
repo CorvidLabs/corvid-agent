@@ -323,6 +323,7 @@ export class SkillBundleListComponent implements OnInit {
             this.notify.error('Cannot delete preset bundles');
             return;
         }
+        if (!confirm(`Delete skill bundle "${bundle.name}"?`)) return;
         try {
             await this.bundleService.deleteBundle(bundle.id);
             this.expandedId.set(null);

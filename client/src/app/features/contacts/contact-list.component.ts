@@ -501,6 +501,7 @@ export class ContactListComponent implements OnInit {
     async removeLink(link: PlatformLink): Promise<void> {
         const c = this.selectedContact();
         if (!c) return;
+        if (!confirm(`Remove ${link.platform} link? This cannot be undone.`)) return;
         await this.contactService.removeLink(c.id, link.id);
         this.selectedContact.set(this.contactService.findById(c.id) ?? c);
     }
