@@ -20,6 +20,7 @@ import type { AgentDirectory } from './algochat/agent-directory';
 import type { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
+import { BuddyService } from './buddy/service';
 import { TaskQueueService } from './work/queue';
 import { SchedulerService } from './scheduler/service';
 import { UsageMonitor } from './usage/monitor';
@@ -104,6 +105,7 @@ export interface ServiceContainer {
     // Work orchestration
     selfTestService: SelfTestService;
     workTaskService: WorkTaskService;
+    buddyService: BuddyService;
     taskQueueService: TaskQueueService;
     schedulerService: SchedulerService;
     webhookService: WebhookService;
@@ -256,6 +258,10 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const taskQueueService = new TaskQueueService(db, workTaskService);
     workTaskService.setTaskQueueService(taskQueueService);
     taskQueueService.start();
+
+    // BuddyService — post-response review system for /message, /session, and /work
+    const buddyService = new BuddyService({ db, processManager });
+    workTaskService.setBuddyService(buddyService);
 
     const schedulerService = new SchedulerService(db, processManager, workTaskService);
     const webhookService = new WebhookService(db, processManager, workTaskService);
@@ -419,6 +425,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
                     : undefined,
             },
             workTaskService,
+            buddyService,
         );
         discordBridge.setReputationScorer(reputationScorer);
         // NOTE: discordBridge.start() is NOT called here — it's deferred until
@@ -492,6 +499,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         graduationService,
         selfTestService,
         workTaskService,
+        buddyService,
         taskQueueService,
         schedulerService,
         webhookService,

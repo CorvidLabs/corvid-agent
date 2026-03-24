@@ -41,11 +41,11 @@ describe('External MCP config loading parity (spec invariant #15)', () => {
     });
 
     test('resumeProcess loads external MCP configs for SDK path', () => {
-        // Extract the resumeProcess method body (large method, need 8000 chars)
+        // Extract the resumeProcess method body (large method, need 10000 chars)
         const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(session: Session');
         expect(startIdx).toBeGreaterThan(-1);
 
-        const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 8000);
+        const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 10000);
 
         // Must call getActiveServersForAgent for resumed SDK sessions
         expect(methodBody).toContain('getActiveServersForAgent(this.db, session.agentId)');
@@ -67,7 +67,7 @@ describe('External MCP config loading parity (spec invariant #15)', () => {
         const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(session: Session');
         expect(startIdx).toBeGreaterThan(-1);
 
-        const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 8000);
+        const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 10000);
 
         // Must pass externalMcpConfigs to startDirectProcess in resume path
         expect(methodBody).toContain('externalMcpConfigs: resumeExternalMcpConfigs');

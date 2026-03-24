@@ -1,8 +1,11 @@
 /**
  * Discord /message command handler.
  *
- * Pure conversation — no tools, no code execution, no web searches.
- * This is the first public-facing command for untrusted users.
+ * Tiered tool access based on permission level:
+ *   - BASIC/STANDARD: Memory + read-only tools (Read, Glob, Grep, corvid_recall_memory, corvid_read_on_chain_memories)
+ *   - ADMIN: Full unrestricted tool access (same as /session)
+ *
+ * Supports optional buddy agent for post-response review.
  */
 
 import type { InteractionContext } from '../commands';
@@ -18,6 +21,12 @@ import { respondToInteraction, sendTypingIndicator } from '../embeds';
 import { saveMentionSession } from '../../db/discord-mention-sessions';
 
 const log = createLogger('DiscordMessageCommand');
+
+/** Read-only built-in tools for non-admin /message sessions. */
+const MESSAGE_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'];
+
+/** MCP tools available to non-admin /message sessions (memory recall only). */
+const MESSAGE_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'];
 
 export async function handleMessageCommand(
     ctx: InteractionContext,
@@ -39,6 +48,9 @@ export async function handleMessageCommand(
         return;
     }
 
+    const buddyName = getOption('buddy');
+    const buddyRounds = getOption('rounds');
+
     const agents = listAgents(ctx.db);
     if (agents.length === 0) {
         await respondToInteraction(interaction, 'No agents configured.');
@@ -55,6 +67,25 @@ export async function handleMessageCommand(
         const names = agents.map(a => a.name).join(', ');
         await respondToInteraction(interaction, `Agent not found: "${agentName}". Available: ${names}`);
         return;
+    }
+
+    // Resolve buddy agent if specified
+    let buddyAgent: typeof agent | undefined;
+    if (buddyName) {
+        const cleanBuddyName = buddyName.split(' (')[0].trim();
+        buddyAgent = agents.find(a =>
+            a.name.toLowerCase() === cleanBuddyName.toLowerCase() ||
+            a.name.toLowerCase().replace(/\s+/g, '') === cleanBuddyName.toLowerCase().replace(/\s+/g, '')
+        );
+        if (!buddyAgent) {
+            const names = agents.map(a => a.name).join(', ');
+            await respondToInteraction(interaction, `Buddy agent not found: "${buddyName}". Available: ${names}`);
+            return;
+        }
+        if (buddyAgent.id === agent.id) {
+            await respondToInteraction(interaction, 'An agent cannot be its own buddy. Choose a different buddy agent.');
+            return;
+        }
     }
 
     const allProjects = listProjects(ctx.db);
@@ -74,32 +105,49 @@ export async function handleMessageCommand(
 
     // Acknowledge the command immediately
     const username = interaction.member?.user?.username ?? interaction.user?.username ?? userId;
-    await respondToInteraction(interaction, `**${agent.name}** is thinking...`);
+    const isAdmin = permLevel >= PermissionLevel.ADMIN;
+    const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
+    const toolLabel = isAdmin ? ' (full access)' : '';
+    await respondToInteraction(interaction, `**${agent.name}**${toolLabel} is thinking...${buddyLabel}`);
 
     // Start typing indicator
     sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});
 
-    // Create session with NO worktree (no coding tools = no git isolation needed)
-    // Session name prefix "Discord message:" signals conversation-only mode
+    // Create session — admins get full access, others get memory + read-only.
+    // Session name prefix determines tool tier on resume:
+    //   "Discord full-message:" → full tools (admin)
+    //   "Discord message:"      → restricted tools (memory + read-only)
+    const sessionNamePrefix = isAdmin ? 'Discord full-message' : 'Discord message';
     const session = createSession(ctx.db, {
         projectId: project.id,
         agentId: agent.id,
-        name: `Discord message:${channelId}`,
+        name: `${sessionNamePrefix}:${channelId}`,
         initialPrompt: message,
         source: 'discord' as SessionSource,
-        // No workDir — conversation only, no coding
+        // No workDir — even admin /message sessions don't need git isolation
     });
 
     const textWithContext = withAuthorContext(message, userId, username, channelId);
 
-    // Start the process in conversation-only mode (zero tools)
-    ctx.processManager.startProcess(session, textWithContext, { conversationOnly: true });
+    // Tiered tool access:
+    //   Admin: full tools (no conversationOnly, no toolAllowList)
+    //   Non-admin: read-only built-in tools + memory MCP tools
+    if (isAdmin) {
+        ctx.processManager.startProcess(session, textWithContext);
+    } else {
+        ctx.processManager.startProcess(session, textWithContext, {
+            toolAllowList: MESSAGE_BUILTIN_TOOLS,
+            mcpToolAllowList: MESSAGE_MCP_TOOLS,
+        });
+    }
 
     // Subscribe for inline response — replies appear as channel messages
     // that users can reply to for follow-up conversation
     const agentModel = agent.model || 'unknown';
     const agentDisplayColor = agent.displayColor;
     const projectNameForFooter = project.name;
+    // Non-admin sessions are restricted (memory + read-only), not fully conversationOnly
+    const isConversationOnly = !isAdmin;
 
     ctx.subscribeForInlineResponse(
         session.id, channelId, interaction.id, agent.name, agentModel,
@@ -112,7 +160,7 @@ export async function handleMessageCommand(
                 projectName: projectNameForFooter,
                 displayColor: agentDisplayColor,
                 channelId,
-                conversationOnly: true,
+                conversationOnly: isConversationOnly,
             };
             // Persist to in-memory map
             ctx.mentionSessions.set(botMessageId, info);
@@ -125,6 +173,24 @@ export async function handleMessageCommand(
                     error: err instanceof Error ? err.message : String(err),
                 });
             }
+
+            // Trigger buddy review after response is posted (if buddy was specified)
+            if (buddyAgent && ctx.buddyService) {
+                const maxRounds = buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined;
+                ctx.buddyService.startSession({
+                    leadAgentId: agent.id,
+                    buddyAgentId: buddyAgent.id,
+                    prompt: message,
+                    source: 'discord',
+                    maxRounds,
+                }).catch(err => {
+                    log.warn('Failed to start buddy review for /message', {
+                        sessionId: session.id,
+                        buddyAgentId: buddyAgent!.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            }
         },
         projectNameForFooter, agentDisplayColor,
     );
@@ -134,6 +200,8 @@ export async function handleMessageCommand(
         agentName: agent.name,
         userId,
         channelId,
-        conversationOnly: true,
+        isAdmin,
+        toolAccess: isAdmin ? 'full' : 'memory+read',
+        hasBuddy: !!buddyAgent,
     });
 }

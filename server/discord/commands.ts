@@ -10,6 +10,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
+import type { BuddyService } from '../buddy/service';
 import type {
     DiscordBridgeConfig,
     DiscordInteractionData,
@@ -78,6 +79,19 @@ export async function registerSlashCommands(
                     required: false,
                     autocomplete: true,
                 },
+                {
+                    name: 'buddy',
+                    description: 'Pair with a buddy agent for end-of-session review (optional)',
+                    type: 3,
+                    required: false,
+                    autocomplete: true,
+                },
+                {
+                    name: 'rounds',
+                    description: 'Max buddy review rounds (default: 3)',
+                    type: 4,
+                    required: false,
+                },
             ],
         },
         {
@@ -122,7 +136,7 @@ export async function registerSlashCommands(
         },
         {
             name: 'message',
-            description: 'Send a message to an agent (conversation only, no tools)',
+            description: 'Send a message to an agent (memory + read tools; admins get full access)',
             type: 1,
             options: [
                 {
@@ -137,6 +151,19 @@ export async function registerSlashCommands(
                     description: 'Your message',
                     type: 3,
                     required: true,
+                },
+                {
+                    name: 'buddy',
+                    description: 'Pair with a buddy agent for review (optional)',
+                    type: 3,
+                    required: false,
+                    autocomplete: true,
+                },
+                {
+                    name: 'rounds',
+                    description: 'Max buddy review rounds (default: 3)',
+                    type: 4,
+                    required: false,
                 },
             ],
         },
@@ -485,6 +512,8 @@ export interface InteractionContext {
     guildCache: GuildCache;
     /** Trigger a guild data re-sync from Discord API. */
     syncGuildData: () => void;
+    /** Buddy service for post-response review (optional — may not be initialized). */
+    buddyService?: BuddyService | null;
 }
 
 export async function handleInteraction(

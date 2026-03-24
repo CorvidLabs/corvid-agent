@@ -68,6 +68,12 @@ export interface ThreadSessionInfo {
      * threads created by STANDARD/ADMIN users (which may have tool access).
      */
     creatorPermLevel?: number;
+    /** Buddy config for end-of-session review (if specified). */
+    buddyConfig?: {
+        buddyAgentId: string;
+        buddyAgentName: string;
+        maxRounds?: number;
+    };
 }
 
 export interface ThreadCallbackInfo {

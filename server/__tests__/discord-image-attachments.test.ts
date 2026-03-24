@@ -27,11 +27,11 @@ function mockFetchSuccess() {
     globalThis.fetch = mock(async () => new Response(FAKE_IMAGE_DATA, {
         status: 200,
         headers: { 'content-type': 'image/png' },
-    })) as typeof fetch;
+    })) as unknown as typeof fetch;
 }
 
 function mockFetchFailure(status = 404) {
-    globalThis.fetch = mock(async () => new Response(null, { status })) as typeof fetch;
+    globalThis.fetch = mock(async () => new Response(null, { status })) as unknown as typeof fetch;
 }
 
 describe('isImageAttachment', () => {
@@ -95,7 +95,7 @@ describe('extractImageBlocks', () => {
             status: 200,
             headers: { 'content-type': 'image/png' },
         }));
-        globalThis.fetch = fetchMock as typeof fetch;
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
 
         await extractImageBlocks([makeAttachment({
             url: 'https://cdn.discordapp.com/original.png',
@@ -109,7 +109,7 @@ describe('extractImageBlocks', () => {
             status: 200,
             headers: { 'content-type': 'image/png' },
         }));
-        globalThis.fetch = fetchMock as typeof fetch;
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
 
         await extractImageBlocks([makeAttachment({
             url: 'https://cdn.discordapp.com/original.png',
@@ -181,7 +181,7 @@ describe('extractImageBlocks', () => {
     });
 
     test('skips images when fetch throws', async () => {
-        globalThis.fetch = mock(async () => { throw new Error('network error'); }) as typeof fetch;
+        globalThis.fetch = mock(async () => { throw new Error('network error'); }) as unknown as typeof fetch;
         const result = await extractImageBlocks([makeAttachment()]);
         expect(result.blocks).toHaveLength(0);
         expect(result.skipped).toBe(1);

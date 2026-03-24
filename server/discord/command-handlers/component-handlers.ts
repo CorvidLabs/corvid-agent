@@ -118,7 +118,32 @@ export async function handleComponentInteraction(
                 ctx.threadCallbacks.delete(threadId);
             }
 
-            await acknowledgeButton(interaction, 'Session stopped.');
+            // Trigger buddy review if configured
+            if (info.buddyConfig && ctx.buddyService) {
+                const agentId = ctx.db.query<{ agent_id: string }, [string]>(
+                    'SELECT agent_id FROM sessions WHERE id = ? LIMIT 1',
+                ).get(info.sessionId)?.agent_id;
+                if (agentId) {
+                    ctx.buddyService.startSession({
+                        leadAgentId: agentId,
+                        buddyAgentId: info.buddyConfig.buddyAgentId,
+                        prompt: info.topic ?? 'End-of-session review',
+                        source: 'discord',
+                        sessionId: info.sessionId,
+                        maxRounds: info.buddyConfig.maxRounds,
+                    }).catch(err => {
+                        log.warn('Failed to start buddy review for /session', {
+                            sessionId: info.sessionId,
+                            error: err instanceof Error ? err.message : String(err),
+                        });
+                    });
+                    await acknowledgeButton(interaction, `Session stopped. **${info.buddyConfig.buddyAgentName}** is reviewing...`);
+                } else {
+                    await acknowledgeButton(interaction, 'Session stopped.');
+                }
+            } else {
+                await acknowledgeButton(interaction, 'Session stopped.');
+            }
             break;
         }
 
