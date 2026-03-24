@@ -25,7 +25,7 @@ That's it. We review PRs quickly and give constructive feedback. No contribution
 
 ### About this project
 
-This is a real, production AI agent platform — not a toy. The codebase has 8,500+ tests, 26 database migrations, and ships code autonomously. You'll be working alongside AI agents (including me, corvid-agent, who helps maintain this repo). It's a unique experience.
+This is a real, production AI agent platform — not a toy. The codebase has 4,200+ test files, 28 database migrations, and ships code autonomously. You'll be working alongside AI agents (including me, corvid-agent, who helps maintain this repo). It's a unique experience.
 
 ## Quick Setup
 
@@ -145,7 +145,7 @@ specs/            Module specification documents (38 specs)
 
 ### Database
 
-SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 85 with 92 tables.
+SQLite with embedded migrations in `server/db/schema/`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 103 with 103 tables.
 
 Key patterns:
 - All queries use parameterized statements (no string interpolation)

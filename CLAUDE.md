@@ -15,7 +15,7 @@ server/          — Bun server (API, WebSocket, process management)
   mcp/           — MCP tool definitions and handlers (corvid_* tools)
   middleware/    — HTTP/WS auth, CORS, startup security checks
   process/       — Session lifecycle, SDK integration, approval flow, persona/skill injection
-  routes/        — HTTP API routes (34 modules)
+  routes/        — HTTP API routes (52 modules)
   selftest/      — Self-test service
   telegram/      — Bidirectional Telegram bridge (long-polling, voice notes, STT)
   voice/         — TTS via OpenAI tts-1, STT via Whisper, audio caching
@@ -31,7 +31,7 @@ skills/          — AI agent skills (30 skill files)
 ## Tech Stack
 
 - **Runtime:** Bun
-- **Database:** bun:sqlite (62 migrations)
+- **Database:** bun:sqlite (28 migration files, schema version 103)
 - **Agent SDK:** @anthropic-ai/claude-agent-sdk
 - **MCP:** @modelcontextprotocol/sdk
 - **Frontend:** Angular (standalone components, signals)
