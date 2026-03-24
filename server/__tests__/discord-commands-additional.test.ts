@@ -137,7 +137,7 @@ describe('Discord /schedule command', () => {
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('No active schedules');
+        expect(content).toContain('No schedules');
     });
 
     test('shows active schedules', async () => {

@@ -1,7 +1,7 @@
 /**
  * Discord informational command handlers.
  *
- * Handles `/agents`, `/status`, `/tasks`, `/schedule`, `/config`,
+ * Handles `/agents`, `/status`, `/tasks`, `/config`,
  * `/quickstart`, `/dashboard`, and `/help` commands.
  */
 
@@ -135,33 +135,7 @@ export async function handleTasksCommand(
     });
 }
 
-export async function handleScheduleCommand(
-    ctx: InteractionContext,
-    interaction: DiscordInteractionData,
-): Promise<void> {
-    const schedules = listActiveSchedules(ctx.db);
-    if (schedules.length === 0) {
-        await respondToInteraction(interaction, 'No active schedules configured.');
-        return;
-    }
-
-    const lines = schedules.slice(0, 15).map(s => {
-        const nextRun = s.nextRunAt
-            ? `<t:${Math.floor(new Date(s.nextRunAt).getTime() / 1000)}:R>`
-            : 'not scheduled';
-        const lastRun = s.lastRunAt
-            ? `<t:${Math.floor(new Date(s.lastRunAt).getTime() / 1000)}:R>`
-            : 'never';
-        return `\u2022 **${s.name}** — next: ${nextRun} · last: ${lastRun} · runs: ${s.executionCount}`;
-    });
-
-    await respondToInteractionEmbed(interaction, {
-        title: 'Schedules',
-        description: lines.join('\n'),
-        color: 0x57f287,
-        footer: { text: `${schedules.length} active schedule${schedules.length === 1 ? '' : 's'}` },
-    });
-}
+// handleScheduleCommand moved to ./schedule-commands.ts
 
 export async function handleConfigCommand(
     ctx: InteractionContext,
