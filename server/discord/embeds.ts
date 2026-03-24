@@ -73,19 +73,54 @@ export async function discordFetch(url: string, init: RequestInit): Promise<Resp
 /** Discord mention pattern: <@123456789> or <@!123456789> */
 const MENTION_RE = /<@!?\d{17,20}>/g;
 
+/** Standalone URL pattern — matches http(s) URLs not already inside markdown or angle brackets */
+const STANDALONE_URL_RE = /(?<![(<\[])(https?:\/\/[^\s>)\]]+)/g;
+
 /**
  * Extract Discord mentions from embed text so they can be placed in the
- * top-level `content` field where Discord will actually send notifications.
- * Mentions inside embed descriptions render as blue text but do NOT ping.
+ * top-level `content` field.  Mentions inside embeds render as blue text but
+ * do NOT ping; placing them in `content` restores native Discord behaviour.
+ *
+ * NOTE: URLs are handled separately — see {@link extractUrlsFromEmbed} and
+ * {@link stripUrlsFromEmbed}.  Discord won't auto-unfurl URLs in `content`
+ * when the message also contains rich embeds, so URLs must be sent as a
+ * separate follow-up message with no embeds attached.
  */
-export function extractMentionsFromEmbed(embed: DiscordEmbed): string | undefined {
+export function extractContentFromEmbed(embed: DiscordEmbed): string | undefined {
     const desc = embed.description;
     if (!desc) return undefined;
-    const matches = desc.match(MENTION_RE);
-    if (!matches || matches.length === 0) return undefined;
-    // Deduplicate mentions
-    return Array.from(new Set(matches)).join(' ');
+    const mentions = desc.match(MENTION_RE);
+    if (!mentions || mentions.length === 0) return undefined;
+    return Array.from(new Set(mentions)).join(' ');
 }
+
+/**
+ * Extract standalone URLs from embed description.
+ * Returns deduplicated URLs or undefined if none found.
+ */
+export function extractUrlsFromEmbed(embed: DiscordEmbed): string[] | undefined {
+    const desc = embed.description;
+    if (!desc) return undefined;
+    const urls = desc.match(STANDALONE_URL_RE);
+    if (!urls || urls.length === 0) return undefined;
+    return Array.from(new Set(urls));
+}
+
+/**
+ * Return a shallow copy of the embed with standalone URLs stripped from
+ * the description.  The original embed is not mutated.
+ */
+export function stripUrlsFromEmbed(embed: DiscordEmbed): DiscordEmbed {
+    if (!embed.description) return embed;
+    const stripped = embed.description
+        .replace(STANDALONE_URL_RE, '')
+        .replace(/\n{3,}/g, '\n\n')   // collapse triple+ newlines
+        .trim();
+    return { ...embed, description: stripped || undefined };
+}
+
+/** @deprecated Use extractContentFromEmbed instead */
+export const extractMentionsFromEmbed = extractContentFromEmbed;
 
 /** Discord snowflake IDs are purely numeric strings. */
 const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
@@ -285,12 +320,59 @@ export async function acknowledgeButton(interaction: DiscordInteractionData, mes
     }
 }
 
+/**
+ * Send a plain-text message (no embeds) to a Discord channel.
+ * Used internally to send URL follow-ups so Discord can auto-unfurl them.
+ */
+async function sendPlainMessage(
+    botToken: string,
+    channelId: string,
+    content: string,
+): Promise<void> {
+    try {
+        const response = await discordFetch(
+            `https://discord.com/api/v10/channels/${channelId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content }),
+            },
+        );
+        if (!response.ok) {
+            const error = await response.text();
+            log.error('Failed to send URL follow-up', { status: response.status, error: error.slice(0, 200) });
+        }
+    } catch (err) {
+        log.error('Error sending URL follow-up', { error: String(err) });
+    }
+}
+
+/**
+ * Send a follow-up message with extracted URLs so Discord auto-unfurls them.
+ * Discord won't unfurl URLs in `content` when rich embeds are present in the
+ * same message, so URLs must be in a separate embed-free message.
+ */
+async function sendUrlFollowUp(
+    botToken: string,
+    channelId: string,
+    embed: DiscordEmbed,
+): Promise<void> {
+    const urls = extractUrlsFromEmbed(embed);
+    if (!urls) return;
+    await sendPlainMessage(botToken, channelId, urls.join('\n'));
+}
+
 export async function sendEmbed(
     delivery: DeliveryTracker,
     botToken: string,
     channelId: string,
     embed: DiscordEmbed,
 ): Promise<string | null> {
+    const urls = extractUrlsFromEmbed(embed);
+    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -302,8 +384,8 @@ export async function sendEmbed(
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        embeds: [embed],
-                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
+                        embeds: [cleanEmbed],
+                        ...(extractContentFromEmbed(embed) ? { content: extractContentFromEmbed(embed) } : {}),
                     }),
                 },
             );
@@ -317,6 +399,8 @@ export async function sendEmbed(
             const data = await response.json() as { id: string };
             return data.id;
         });
+        // Send URLs as a separate message so Discord unfurls them
+        if (urls) await sendUrlFollowUp(botToken, channelId, embed);
         return result;
     } catch {
         // Error already logged by DeliveryTracker
@@ -400,6 +484,8 @@ export async function sendReplyEmbed(
 ): Promise<string | null> {
     assertSnowflake(channelId, 'channel ID');
     assertSnowflake(replyToMessageId, 'message ID');
+    const urls = extractUrlsFromEmbed(embed);
+    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -411,9 +497,9 @@ export async function sendReplyEmbed(
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        embeds: [embed],
+                        embeds: [cleanEmbed],
                         message_reference: { message_id: replyToMessageId },
-                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
+                        ...(extractContentFromEmbed(embed) ? { content: extractContentFromEmbed(embed) } : {}),
                     }),
                 },
             );
@@ -427,6 +513,8 @@ export async function sendReplyEmbed(
             const data = await response.json() as { id: string };
             return data.id;
         });
+        // Send URLs as a separate message so Discord unfurls them
+        if (urls) await sendUrlFollowUp(botToken, channelId, embed);
         return result;
     } catch {
         // Error already logged by DeliveryTracker
@@ -590,6 +678,8 @@ export async function editEmbed(
 ): Promise<void> {
     assertSnowflake(channelId, 'channel ID');
     assertSnowflake(messageId, 'message ID');
+    const urls = extractUrlsFromEmbed(embed);
+    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
     try {
         await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -601,8 +691,8 @@ export async function editEmbed(
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        embeds: [embed],
-                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
+                        embeds: [cleanEmbed],
+                        ...(extractContentFromEmbed(embed) ? { content: extractContentFromEmbed(embed) } : {}),
                     }),
                 },
             );
@@ -613,6 +703,8 @@ export async function editEmbed(
                 throw new Error(`Discord embed edit failed: ${response.status}`);
             }
         });
+        // Send URLs as a separate follow-up message so Discord unfurls them
+        if (urls) await sendUrlFollowUp(botToken, channelId, embed);
     } catch {
         // Error already logged by DeliveryTracker
     }
@@ -669,14 +761,17 @@ export async function sendEmbedWithFiles(
         }
     }
 
+    const urls = extractUrlsFromEmbed(embed);
+    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
+
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
             const payload: Record<string, unknown> = {
-                embeds: [embed],
+                embeds: [cleanEmbed],
                 attachments: files.map((f, i) => ({ id: i, filename: f.name })),
             };
-            const mentions = extractMentionsFromEmbed(embed);
-            if (mentions) payload.content = mentions;
+            const extracted = extractContentFromEmbed(embed);
+            if (extracted) payload.content = extracted;
 
             const form = buildMultipartBody(payload, files);
             const response = await discordFetch(
@@ -697,6 +792,8 @@ export async function sendEmbedWithFiles(
             const data = await response.json() as { id: string };
             return data.id;
         });
+        // Send URLs as a separate message so Discord unfurls them
+        if (urls) await sendUrlFollowUp(botToken, channelId, embed);
         return result;
     } catch {
         return null;
