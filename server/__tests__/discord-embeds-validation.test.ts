@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { assertSnowflake, assertInteractionToken, buildFooterText, buildFooterWithStats, extractMentionsFromEmbed } from '../discord/embeds';
+import { assertSnowflake, assertInteractionToken, buildFooterText, buildFooterWithStats, extractMentionsFromEmbed, extractContentFromEmbed, extractUrlsFromEmbed, stripUrlsFromEmbed } from '../discord/embeds';
 
 describe('assertSnowflake', () => {
     test('accepts valid snowflake IDs', () => {
@@ -153,5 +153,79 @@ describe('extractMentionsFromEmbed', () => {
     test('handles nickname-style mentions with !', () => {
         expect(extractMentionsFromEmbed({ description: 'Hey <@!180715808593281025>' }))
             .toBe('<@!180715808593281025>');
+    });
+});
+
+describe('extractContentFromEmbed (mentions only)', () => {
+    test('extracts mentions but not URLs', () => {
+        const result = extractContentFromEmbed({
+            description: 'Hey <@180715808593281025> check https://unsplash.com/photos/test',
+        });
+        expect(result).toBe('<@180715808593281025>');
+    });
+
+    test('returns undefined when only URLs present', () => {
+        expect(extractContentFromEmbed({ description: 'Check https://example.com/a' }))
+            .toBeUndefined();
+    });
+
+    test('returns undefined when no mentions or URLs', () => {
+        expect(extractContentFromEmbed({ description: 'Just plain text' })).toBeUndefined();
+    });
+});
+
+describe('extractUrlsFromEmbed', () => {
+    test('extracts standalone URLs', () => {
+        expect(extractUrlsFromEmbed({ description: 'Check this out https://unsplash.com/photos/kA5qHVY5HH0' }))
+            .toEqual(['https://unsplash.com/photos/kA5qHVY5HH0']);
+    });
+
+    test('extracts multiple URLs', () => {
+        expect(extractUrlsFromEmbed({ description: 'Here: https://example.com/a and https://example.com/b' }))
+            .toEqual(['https://example.com/a', 'https://example.com/b']);
+    });
+
+    test('does not extract URLs inside markdown links', () => {
+        expect(extractUrlsFromEmbed({ description: 'See [link](https://example.com/hidden)' }))
+            .toBeUndefined();
+    });
+
+    test('does not extract URLs inside angle brackets', () => {
+        expect(extractUrlsFromEmbed({ description: 'See <https://example.com/suppressed>' }))
+            .toBeUndefined();
+    });
+
+    test('deduplicates repeated URLs', () => {
+        expect(extractUrlsFromEmbed({ description: 'https://example.com/a then https://example.com/a again' }))
+            .toEqual(['https://example.com/a']);
+    });
+
+    test('returns undefined when no URLs', () => {
+        expect(extractUrlsFromEmbed({ description: 'Just plain text' })).toBeUndefined();
+    });
+});
+
+describe('stripUrlsFromEmbed', () => {
+    test('removes URLs from description', () => {
+        const result = stripUrlsFromEmbed({ description: 'Check this https://example.com/a out' });
+        expect(result.description).toBe('Check this  out');
+    });
+
+    test('preserves other embed fields', () => {
+        const embed = { description: 'URL: https://example.com', title: 'Test', color: 123 };
+        const result = stripUrlsFromEmbed(embed);
+        expect(result.title).toBe('Test');
+        expect(result.color).toBe(123);
+    });
+
+    test('collapses triple newlines after URL removal', () => {
+        const result = stripUrlsFromEmbed({ description: 'Before\n\nhttps://example.com\n\nAfter' });
+        expect(result.description).toBe('Before\n\nAfter');
+    });
+
+    test('does not mutate original embed', () => {
+        const original = { description: 'https://example.com text' };
+        stripUrlsFromEmbed(original);
+        expect(original.description).toBe('https://example.com text');
     });
 });

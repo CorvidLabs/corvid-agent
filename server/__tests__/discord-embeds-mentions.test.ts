@@ -44,6 +44,32 @@ describe('sendEmbed mention extraction', () => {
         expect(body.content).toBeUndefined();
         fetchSpy.mockRestore();
     });
+
+    test('strips URLs from embed and sends follow-up message', async () => {
+        tracker = new DeliveryTracker();
+        const fetchSpy = mockFetchOk();
+        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+            description: 'Check this out https://unsplash.com/photos/test',
+        });
+        // First call: embed (URLs stripped), second call: URL follow-up
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+        expect(embedBody.embeds[0].description).toBe('Check this out');
+        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
+        expect(followUpBody.content).toBe('https://unsplash.com/photos/test');
+        expect(followUpBody.embeds).toBeUndefined();
+        fetchSpy.mockRestore();
+    });
+
+    test('does not send follow-up when no URLs in embed', async () => {
+        tracker = new DeliveryTracker();
+        const fetchSpy = mockFetchOk();
+        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+            description: 'Just plain text, no URLs',
+        });
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        fetchSpy.mockRestore();
+    });
 });
 
 describe('sendReplyEmbed mention extraction', () => {
@@ -78,6 +104,20 @@ describe('sendReplyEmbed mention extraction', () => {
         expect(body.content).toBeUndefined();
         fetchSpy.mockRestore();
     });
+
+    test('strips URLs and sends follow-up for reply embeds', async () => {
+        tracker = new DeliveryTracker();
+        const fetchSpy = mockFetchOk();
+        await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+            description: 'See https://example.com/page',
+        });
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+        expect(embedBody.embeds[0].description).toBe('See');
+        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
+        expect(followUpBody.content).toBe('https://example.com/page');
+        fetchSpy.mockRestore();
+    });
 });
 
 describe('editEmbed mention extraction', () => {
@@ -109,6 +149,20 @@ describe('editEmbed mention extraction', () => {
         expect(fetchSpy).toHaveBeenCalledTimes(1);
         const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
         expect(body.content).toBeUndefined();
+        fetchSpy.mockRestore();
+    });
+
+    test('strips URLs and sends follow-up for edited embeds', async () => {
+        tracker = new DeliveryTracker();
+        const fetchSpy = mockFetchOk();
+        await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+            description: 'Updated with https://example.com/link',
+        });
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+        expect(embedBody.embeds[0].description).toBe('Updated with');
+        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
+        expect(followUpBody.content).toBe('https://example.com/link');
         fetchSpy.mockRestore();
     });
 });

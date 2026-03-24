@@ -164,7 +164,10 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `buildFooterWithStats` | `(ctx: FooterContext, stats?: FooterStats)` | `string` | Build footer with session context AND run stats (files, turns, tools, commits) |
 | `hexColorToInt` | `(hex: string)` | `number \| null` | Convert a hex color string (e.g. '#ff00aa') to a Discord embed color integer |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
-| `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field notifications |
+| `extractContentFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field (pings) |
+| `extractUrlsFromEmbed` | `(embed)` | `string[] \| undefined` | Extract standalone URLs from embed description (deduplicated) |
+| `stripUrlsFromEmbed` | `(embed)` | `DiscordEmbed` | Return shallow copy of embed with standalone URLs removed from description |
+| `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Deprecated alias for `extractContentFromEmbed` |
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
 | `sendMessageWithFiles` | `(delivery, botToken, channelId, content, files)` | `Promise<string \| null>` | Send a text message with file attachments via multipart/form-data |
 | `getRateLimitWaitMs` | `()` | `number` | Check if globally rate-limited; returns remaining wait ms or 0 |
@@ -585,3 +588,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-18 | corvid-agent | v14: Improved expired-session UX — thread message for deleted sessions now says "This session has expired and can no longer be resumed" with actionable guidance instead of vague "This conversation has ended". Fixes #1222 |
 | 2026-03-18 | corvid-agent | v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |
 | 2026-03-20 | corvid-agent | v16: File attachment support via `sendEmbedWithFiles` and `sendMessageWithFiles` (multipart/form-data, 25MB limit). Simplified embed footer to `agentName · status`. Added `image` and `thumbnail` fields to `DiscordEmbed`. `DiscordFileAttachment` interface |
+| 2026-03-23 | corvid-agent | v17: Renamed `extractMentionsFromEmbed` → `extractContentFromEmbed`. v18: Discord won't auto-unfurl URLs in `content` when rich embeds are present — URLs are now stripped from embed description via `stripUrlsFromEmbed` and sent as a separate follow-up message (no embeds) so Discord renders link previews. Added `extractUrlsFromEmbed` and `stripUrlsFromEmbed` helpers |
