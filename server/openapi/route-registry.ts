@@ -31,6 +31,7 @@ import { pluginRoutes } from './routes/plugins';
 import { escalationRoutes } from './routes/escalation';
 import { algochatRoutes } from './routes/algochat';
 import { integrationRoutes } from './routes/integrations';
+import { toolCatalogRoutes } from './routes/tool-catalog';
 
 export const routes: RouteEntry[] = [
     ...systemRoutes,
@@ -56,4 +57,5 @@ export const routes: RouteEntry[] = [
     ...escalationRoutes,
     ...algochatRoutes,
     ...integrationRoutes,
+    ...toolCatalogRoutes,
 ];

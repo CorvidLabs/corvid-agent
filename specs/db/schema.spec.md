@@ -85,6 +85,7 @@ db_tables:
   - mcp_server_configs
   - project_skills
   - agent_usdc_revenue
+  - discord_muted_users
 depends_on: []
 ---
 
@@ -246,6 +247,7 @@ Note: This module defines all other database tables in the system. Individual ta
 | 68 | `councils.on_chain_mode`, `council_launches.synthesis_txid` |
 | 69 | `agent_usdc_revenue` table |
 | 70 | AlgoChat defaults: update existing agents to `algochat_enabled=1`, councils to `on_chain_mode='full'` |
+| 103 | `discord_muted_users` — persist Discord mutes across restarts |
 
 ## Change Log
 

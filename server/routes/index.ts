@@ -37,6 +37,7 @@ import { handlePerformanceRoutes } from './performance';
 import { handleUsageRoutes } from './usage';
 import { handleFeedbackRoutes } from './feedback';
 import { handleOnboardingRoutes } from './onboarding';
+import { handleToolCatalogRoutes } from './tool-catalog';
 import { handleSecurityOverviewRoutes } from './security-overview';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import { handleDiscordImageRoutes } from './discord-image';
@@ -328,6 +329,10 @@ async function handleRoutes(
     // External MCP server config routes
     const mcpServerResponse = handleMcpServerRoutes(req, url, db, context);
     if (mcpServerResponse) return mcpServerResponse;
+
+    // Tool catalog (public, no auth required)
+    const toolCatalogResponse = handleToolCatalogRoutes(req, url);
+    if (toolCatalogResponse) return toolCatalogResponse;
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
     if (allowlistResponse) return allowlistResponse;

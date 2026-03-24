@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 102;
+const SCHEMA_VERSION = 103;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -137,6 +137,10 @@ const MIGRATIONS: Record<number, string[]> = {
         `ALTER TABLE agents ADD COLUMN conversation_rate_limit_max INTEGER NOT NULL DEFAULT 10`,
         ...agents.tables.filter((s) => s.includes('agent_conversation_')),
         ...agents.indexes.filter((s) => s.includes('agent_conv_')),
+    ],
+    103: [
+        // Persist Discord muted users across restarts
+        ...discord.tables.filter((s) => s.includes('discord_muted_users')),
     ],
 };
 

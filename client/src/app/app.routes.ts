@@ -18,6 +18,7 @@ const SETTINGS_TABS: SubTab[] = [
     { label: 'Webhooks', path: 'webhooks' },
     { label: 'Polling', path: 'mention-polling' },
     { label: 'MCP Servers', path: 'mcp-servers' },
+    { label: 'Contacts', path: 'contacts' },
 ];
 
 const AGENTS_TABS: SubTab[] = [
@@ -292,6 +293,11 @@ export const routes: Routes = [
                 path: 'mcp-servers',
                 loadComponent: () =>
                     import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
+            },
+            {
+                path: 'contacts',
+                loadComponent: () =>
+                    import('./features/contacts/contact-list.component').then((m) => m.ContactListComponent),
             },
         ],
     },

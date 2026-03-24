@@ -162,6 +162,18 @@ export class DiscordBridge {
         if (this.running) return;
         this.running = true;
         log.info('Discord bridge starting', { channelId: this.config.channelId, mode: this.mode });
+
+        // Load persisted muted users from DB
+        try {
+            const rows = this.db.query('SELECT user_id FROM discord_muted_users').all() as { user_id: string }[];
+            for (const row of rows) this.mutedUsers.add(row.user_id);
+            if (rows.length > 0) {
+                log.info('Loaded persisted muted users', { count: rows.length });
+            }
+        } catch (err) {
+            log.error('Failed to load muted users from DB', { error: err instanceof Error ? err.message : String(err) });
+        }
+
         this.gateway.start();
 
         if (this.config.appId) {
@@ -433,10 +445,20 @@ export class DiscordBridge {
 
     muteUser(userId: string): void {
         muteUserImpl(this.mutedUsers, userId);
+        try {
+            this.db.run('INSERT OR IGNORE INTO discord_muted_users (user_id) VALUES (?)', [userId]);
+        } catch (err) {
+            log.error('Failed to persist mute', { userId, error: err instanceof Error ? err.message : String(err) });
+        }
     }
 
     unmuteUser(userId: string): void {
         unmuteUserImpl(this.mutedUsers, userId);
+        try {
+            this.db.run('DELETE FROM discord_muted_users WHERE user_id = ?', [userId]);
+        } catch (err) {
+            log.error('Failed to persist unmute', { userId, error: err instanceof Error ? err.message : String(err) });
+        }
     }
 
     async sendMessage(channelId: string, content: string): Promise<void> {
