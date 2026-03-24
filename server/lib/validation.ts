@@ -476,7 +476,7 @@ export const OllamaDeleteModelSchema = z.object({
 // ─── Schedules ───────────────────────────────────────────────────────────────
 
 const ScheduleActionSchema = z.object({
-    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'codebase_review', 'dependency_audit', 'improvement_loop', 'memory_maintenance', 'reputation_attestation', 'outcome_analysis', 'daily_review', 'discord_post', 'custom']),
+    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'codebase_review', 'dependency_audit', 'improvement_loop', 'memory_maintenance', 'reputation_attestation', 'outcome_analysis', 'daily_review', 'custom']),
     repos: z.array(z.string()).optional(),
     description: z.string().optional(),
     projectId: z.string().optional(),
@@ -488,9 +488,6 @@ const ScheduleActionSchema = z.object({
     prompt: z.string().optional(),
     maxImprovementTasks: z.number().int().min(1).max(5).optional(),
     focusArea: z.string().optional(),
-    channelId: z.string().optional(),
-    embedTitle: z.string().optional(),
-    embedColor: z.number().int().optional(),
 });
 
 const ScheduleTriggerEventSchema = z.object({
