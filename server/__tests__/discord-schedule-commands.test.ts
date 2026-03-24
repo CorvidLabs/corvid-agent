@@ -44,7 +44,16 @@ function makeCtx(): InteractionContext {
         mutedUsers: new Set(),
         guildCache: null as any,
         syncGuildData: async () => {},
-        deliveryTracker: null as any,
+        processManager: {} as any,
+        workTaskService: null,
+        delivery: {} as any,
+        threadLastActivity: new Map(),
+        createStandaloneThread: async () => null,
+        subscribeForResponseWithEmbed: () => {},
+        sendTaskResult: async () => {},
+        muteUser: () => {},
+        unmuteUser: () => {},
+        subscribeForInlineResponse: () => {},
     };
 }
 
@@ -71,7 +80,7 @@ function seedAgent() {
     db.query(`INSERT INTO agents (id, name, wallet_address) VALUES ('agent-1', 'TestAgent', 'addr1')`).run();
 }
 
-function seedSchedule(name: string = 'Test Schedule', status: string = 'active') {
+function seedSchedule(name: string = 'Test Schedule', _status: string = 'active') {
     return createSchedule(db, {
         agentId: 'agent-1',
         name,

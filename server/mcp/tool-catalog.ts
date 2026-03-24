@@ -84,6 +84,10 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     { name: 'corvid_github_comment_on_pr', description: 'Add a comment to a pull request', category: 'github' },
     { name: 'corvid_github_follow_user', description: 'Follow a GitHub user', category: 'github' },
 
+    // ── Discord messaging ──────────────────────────────────────────────────────
+    { name: 'corvid_discord_send_message', description: 'Send a message to a Discord channel', category: 'notifications' },
+    { name: 'corvid_discord_send_image', description: 'Send an image to a Discord channel', category: 'notifications' },
+
     // ── Notifications & Reputation ────────────────────────────────────────
     { name: 'corvid_notify_owner', description: 'Send a notification to the server owner', category: 'notifications' },
     { name: 'corvid_ask_owner', description: 'Ask the owner a question and wait for response', category: 'notifications' },
