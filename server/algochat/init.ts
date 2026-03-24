@@ -42,6 +42,7 @@ import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import { createKeyProvider, assertProductionReady, detectPlaintextKeyConfig } from '../lib/key-provider';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
+import { seedConversationalAgents } from '../conversational/seed';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -363,4 +364,15 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
     workflowService.start();
     usageMeter.start();
     healthMonitorService.start();
+
+    // Seed conversational agent presets (#1185) — fire-and-forget, non-blocking
+    seedConversationalAgents({
+        db: deps.db,
+        walletService: algochatState.walletService,
+        flockDirectoryService: deps.flockDirectoryService,
+    }).catch((err) => {
+        log.warn('Conversational agent seeding failed (non-blocking)', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+    });
 }
