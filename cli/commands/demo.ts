@@ -31,6 +31,36 @@ async function waitForServer(baseUrl: string, maxWaitMs = 30_000): Promise<boole
     return false;
 }
 
+// ─── Provider Detection ─────────────────────────────────────────────────────
+
+interface ProviderInfo {
+    model: string;
+    provider?: string;
+}
+
+async function detectDemoProvider(baseUrl: string): Promise<ProviderInfo> {
+    // Query the server's health endpoint to check which providers are available
+    try {
+        const res = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(5_000) });
+        if (res.ok) {
+            const health = (await res.json()) as {
+                dependencies?: { llm?: { anthropic?: string; ollama?: string } };
+            };
+            const llm = health.dependencies?.llm;
+            if (llm?.anthropic === 'healthy') {
+                return { model: 'claude-sonnet-4-20250514' };
+            }
+            if (llm?.ollama === 'healthy') {
+                return { model: 'llama3.1', provider: 'ollama' };
+            }
+        }
+    } catch {
+        // Fall through to defaults
+    }
+    // Default to Claude — the SDK process will handle missing-provider errors
+    return { model: 'claude-sonnet-4-20250514' };
+}
+
 // ─── Seed Demo Agent ────────────────────────────────────────────────────────
 
 interface DemoData {
@@ -40,6 +70,8 @@ interface DemoData {
 }
 
 async function seedDemo(baseUrl: string, projectRoot: string): Promise<DemoData> {
+    const providerInfo = await detectDemoProvider(baseUrl);
+
     const projectRes = await fetch(`${baseUrl}/api/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,13 +84,10 @@ async function seedDemo(baseUrl: string, projectRoot: string): Promise<DemoData>
     if (!projectRes.ok) throw new Error(`Project creation failed: ${await projectRes.text()}`);
     const project = (await projectRes.json()) as { id: string };
 
-    const agentRes = await fetch(`${baseUrl}/api/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: 'Demo Agent',
-            description: 'A demo agent that introduces corvid-agent capabilities',
-            systemPrompt: `You are running inside corvid-agent, an AI agent orchestration platform. You are in demo mode — introduce yourself briefly and show what you can do.
+    const agentBody: Record<string, unknown> = {
+        name: 'Demo Agent',
+        description: 'A demo agent that introduces corvid-agent capabilities',
+        systemPrompt: `You are running inside corvid-agent, an AI agent orchestration platform. You are in demo mode — introduce yourself briefly and show what you can do.
 
 Demonstrate these capabilities concisely (1-2 lines each):
 1. You can analyze code — show by examining a file in the current project
@@ -68,8 +97,16 @@ Demonstrate these capabilities concisely (1-2 lines each):
 
 Keep your response under 15 lines. Be friendly and enthusiastic but concise.
 End by suggesting what the user can try next (e.g., ask you to review a file, explain the architecture, or check for bugs).`,
-            model: 'claude-sonnet-4-20250514',
-        }),
+        model: providerInfo.model,
+    };
+    if (providerInfo.provider) {
+        agentBody.provider = providerInfo.provider;
+    }
+
+    const agentRes = await fetch(`${baseUrl}/api/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agentBody),
     });
     if (!agentRes.ok) throw new Error(`Agent creation failed: ${await agentRes.text()}`);
     const agent = (await agentRes.json()) as { id: string };
