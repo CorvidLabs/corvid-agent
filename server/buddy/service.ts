@@ -12,6 +12,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { BuddySession, CreateBuddySessionInput } from '../../shared/types/buddy';
+import { BUDDY_DEFAULT_TOOLS } from '../../shared/types/buddy';
 import type { Session } from '../../shared/types/sessions';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -270,7 +271,7 @@ export class BuddyService {
 
             this.processManager.subscribe(session.id, callback);
 
-            this.processManager.startProcess(session, prompt, { conversationOnly: true });
+            this.processManager.startProcess(session, prompt, { toolAllowList: [...BUDDY_DEFAULT_TOOLS] });
 
             // Safety timeout: 5 minutes per turn
             const timer = setTimeout(() => {
@@ -302,6 +303,11 @@ export class BuddyService {
             `Review the output above. If it looks good, respond with "LGTM" or "Approved".`,
             `If you see issues, suggest specific improvements. Be concise and actionable.`,
             `Focus on correctness, completeness, and quality — not style preferences.`,
+            ``,
+            `## Tools`,
+            `You have read-only tools: Read (view files), Glob (find files), Grep (search code).`,
+            `Use them to verify claims, check referenced files, or inspect code the lead changed.`,
+            `You CANNOT modify files — your job is to review, not fix.`,
         ].join('\n');
     }
 

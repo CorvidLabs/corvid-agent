@@ -52,8 +52,13 @@ export interface CreateBuddySessionInput {
     maxRounds?: number;
 }
 
+/** Default read-only tools for buddy review sessions. */
+export const BUDDY_DEFAULT_TOOLS = ['Read', 'Glob', 'Grep'] as const;
+
 export interface BuddyConfig {
     buddyAgentId: string;
     maxRounds?: number;
     role?: BuddyRole;
+    /** Tools the buddy can use. Defaults to BUDDY_DEFAULT_TOOLS (read-only). */
+    toolAllowList?: string[];
 }

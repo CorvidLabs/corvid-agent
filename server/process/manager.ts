@@ -286,9 +286,13 @@ export class ProcessManager {
 
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        // Conversation-only sessions (or empty toolAllowList) get NO tools — pure text conversation
+        // Conversation-only sessions (or empty toolAllowList) get NO tools — pure text conversation.
+        // When toolAllowList has items, it's a restricted session (e.g. buddy review) — still skip MCP.
         const isNoTools = conversationOnly || (toolAllowList && toolAllowList.length === 0);
-        const mcpServers = isNoTools ? undefined : (session.agentId
+        const isRestrictedTools = !isNoTools && toolAllowList && toolAllowList.length > 0;
+        // No MCP for conversation-only, empty-allowlist, or restricted-tool sessions (e.g. buddy review)
+        const skipMcp = isNoTools || isRestrictedTools;
+        const mcpServers = skipMcp ? undefined : (session.agentId
             ? (() => {
                 const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
@@ -296,7 +300,7 @@ export class ProcessManager {
             : undefined);
 
         // Fetch external MCP server configs (Figma, Slack, etc.) for SDK sessions
-        const externalMcpConfigs = isNoTools ? [] : (session.agentId
+        const externalMcpConfigs = skipMcp ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : []);
 
@@ -317,6 +321,7 @@ export class ProcessManager {
                 personaPrompt: config.personaPrompt,
                 skillPrompt: config.skillPrompt,
                 conversationOnly: isNoTools || conversationOnly,
+                toolAllowList: isRestrictedTools ? toolAllowList : undefined,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);

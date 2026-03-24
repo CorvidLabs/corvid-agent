@@ -47,7 +47,7 @@ Orchestrates paired agent collaboration (buddy mode). When buddy mode is active,
 6. **Turn timeout**: Each agent turn has a 5-minute safety timeout; if exceeded, the process is stopped and partial output (if any) is used
 7. **Early approval**: If the buddy's response is a short approval (under 300 chars, contains "lgtm"/"approved"/etc., no negative qualifiers), the loop ends early
 8. **Negative qualifier rejection**: Responses containing "not approved", "but", "however", "issues" near approval words are NOT treated as approvals
-9. **Conversation-only sessions**: Each agent turn creates a lightweight `conversationOnly` session — no tool use
+9. **Read-only buddy tools**: Buddy sessions use `toolAllowList` with `BUDDY_DEFAULT_TOOLS` (Read, Glob, Grep) — buddies can inspect code but not modify it. MCP servers are not loaded for restricted-tool sessions.
 
 ## Behavioral Examples
 
@@ -93,7 +93,7 @@ Orchestrates paired agent collaboration (buddy mode). When buddy mode is active,
 | `server/db/sessions` | `createSession` |
 | `server/process/manager` | `ProcessManager` (subscribe, unsubscribe, startProcess, stopProcess) |
 | `server/process/types` | `ClaudeStreamEvent`, `extractContentText` |
-| `shared/types/buddy` | `BuddySession`, `CreateBuddySessionInput` |
+| `shared/types/buddy` | `BuddySession`, `CreateBuddySessionInput`, `BUDDY_DEFAULT_TOOLS` |
 | `shared/types/sessions` | `Session` |
 
 ### Consumed By
