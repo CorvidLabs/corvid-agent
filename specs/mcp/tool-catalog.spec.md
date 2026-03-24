@@ -39,6 +39,7 @@ Provides a structured, categorized view of all available MCP tools for API endpo
 |----------|------|-------------|
 | `TOOL_CATALOG` | `ToolCatalogEntry[]` | Full catalog of all MCP tools |
 | `TOOL_CATEGORIES` | `ToolCategory[]` | Tool category definitions |
+| `toolCatalogRoutes` | `RouteEntry[]` | OpenAPI route definitions for `GET /api/tools` |
 
 ## Invariants
 
