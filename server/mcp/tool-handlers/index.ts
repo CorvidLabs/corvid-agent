@@ -81,6 +81,9 @@ export { handleLookupContact } from './contacts';
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
 
+// ─── Discord messaging ─────────────────────────────────────────────────────
+export { handleDiscordSendMessage, handleDiscordSendImage } from './discord';
+
 // ─── Browser automation ────────────────────────────────────────────────────
 export { handleBrowser } from './browser';
 
