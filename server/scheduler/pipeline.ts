@@ -56,12 +56,15 @@ export function buildPipelineSummary(ctx: PipelineContext): string {
  * Returns a PipelineContext with all step results and an aggregated summary.
  * Each step creates its own execution record, and results are passed forward.
  */
+export type RunActionFn = typeof runAction;
+
 export async function executePipeline(
     deps: RunActionDeps,
     hctx: HandlerContext,
     schedule: AgentSchedule,
     steps: PipelineStep[],
     emitFn: (event: { type: string; data: unknown }) => void,
+    runActionFn: RunActionFn = runAction,
 ): Promise<PipelineContext> {
     const ctx: PipelineContext = {
         stepResults: {},
@@ -110,7 +113,7 @@ export async function executePipeline(
         const startTime = Date.now();
 
         // runAction handles dispatch, error handling, lock cleanup, and notifications.
-        await runAction(deps, hctx, execution.id, schedule, action);
+        await runActionFn(deps, hctx, execution.id, schedule, action);
 
         const durationMs = Date.now() - startTime;
         const updated = getExecution(deps.db, execution.id);

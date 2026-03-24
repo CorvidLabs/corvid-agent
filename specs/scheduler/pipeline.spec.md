@@ -30,6 +30,12 @@ Runs schedule actions sequentially with shared context as composable multi-step 
 | `getPipelineTemplate` | `(templateId: string)` | `SchedulePipelineTemplate \| undefined` | Looks up a pipeline template by ID |
 | `listPipelineTemplates` | `()` | `SchedulePipelineTemplate[]` | Returns a copy of all available pipeline templates |
 
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `RunActionFn` | Function signature for the `runAction` dependency, injectable for testing |
+
 ### Exported Constants
 
 | Constant | Type | Description |
