@@ -40,6 +40,7 @@ import {
     execMarketplaceBilling,
     execFlockTesting,
     execCustom,
+    execDiscordPost,
 } from './handlers';
 
 const log = createLogger('Scheduler');
@@ -77,6 +78,7 @@ async function dispatchAction(
         case 'status_checkin':         await execStatusCheckin(hctx, executionId, schedule); break;
         case 'marketplace_billing':    execMarketplaceBilling(hctx, executionId); break;
         case 'flock_testing':          await execFlockTesting(hctx, executionId, schedule); break;
+        case 'discord_post':           await execDiscordPost(hctx, executionId, schedule, action); break;
         case 'custom':                 await execCustom(hctx, executionId, schedule, action); break;
         default:
             updateExecutionStatus(db, executionId, 'failed', {

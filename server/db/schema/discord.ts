@@ -7,6 +7,12 @@ export const tables: string[] = [
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
+    `CREATE TABLE IF NOT EXISTS discord_muted_users (
+        user_id    TEXT PRIMARY KEY,
+        muted_by   TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+
     `CREATE TABLE IF NOT EXISTS discord_mention_sessions (
         bot_message_id  TEXT PRIMARY KEY,
         session_id      TEXT NOT NULL,

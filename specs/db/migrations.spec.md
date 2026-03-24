@@ -32,6 +32,8 @@ files:
   - server/db/migrations/100_agent_variants.ts
   - server/db/migrations/100_pipeline_schedules.ts
   - server/db/migrations/101_reputation_history.ts
+  - server/db/migrations/102_conversation_access.ts
+  - server/db/migrations/103_discord_muted_users.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -466,10 +468,33 @@ Creates the `reputation_history` table for storing periodic reputation score sna
 | `up` | `(db: Database)` | `void` | Creates `reputation_history` table with 3 indexes (agent_id, computed_at, compound agent+time) |
 | `down` | `(db: Database)` | `void` | Drops the `reputation_history` table |
 
+### 102_conversation_access.ts
+
+Adds conversation access control for conversational agents. Adds `conversation_mode`, `conversation_rate_limit_window`, and `conversation_rate_limit_max` columns to `agents`. Creates `agent_conversation_allowlist`, `agent_conversation_blocklist`, and `agent_conversation_rate_limits` tables for per-agent access management.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds 3 columns to `agents`, creates allowlist/blocklist/rate-limit tables with indexes |
+| `down` | `(db: Database)` | `void` | Drops the 3 tables and removes the 3 columns from `agents` |
+
+### 103_discord_muted_users.ts
+
+Creates the `discord_muted_users` table for persisting Discord mutes across server restarts. Replaces the in-memory `Set` that was lost on restart.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `discord_muted_users` table with `user_id` (PK), `muted_by`, and `created_at` columns |
+| `down` | `(db: Database)` | `void` | Drops the `discord_muted_users` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-23 | corvid-agent | Add migrations 102, 103 to spec coverage |
 | 2026-03-23 | corvid-agent | Add missing migrations 090, 094, 095 to spec coverage |
 | 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |
 | 2026-03-21 | corvid-agent | Add migration 098 to spec coverage |

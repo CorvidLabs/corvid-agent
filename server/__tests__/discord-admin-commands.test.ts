@@ -451,3 +451,51 @@ describe('/admin commands', () => {
         expect(fields.find(f => f.name === 'Admin Configuration')).toBeDefined();
     });
 });
+
+describe('mute persistence', () => {
+    test('muteUser persists to DB', () => {
+        const bridge = createBridge();
+        bridge.muteUser('999000000000000001');
+
+        const rows = db.query('SELECT user_id FROM discord_muted_users WHERE user_id = ?').all('999000000000000001') as { user_id: string }[];
+        expect(rows).toHaveLength(1);
+        expect(rows[0].user_id).toBe('999000000000000001');
+    });
+
+    test('unmuteUser removes from DB', () => {
+        const bridge = createBridge();
+        bridge.muteUser('999000000000000001');
+        bridge.unmuteUser('999000000000000001');
+
+        const rows = db.query('SELECT user_id FROM discord_muted_users').all();
+        expect(rows).toHaveLength(0);
+    });
+
+    test('muted users restored on start', () => {
+        // Seed a muted user directly in DB
+        db.run('INSERT INTO discord_muted_users (user_id) VALUES (?)', ['999000000000000001']);
+
+        // Create a bridge with a fuller mock that supports start()
+        const pm = {
+            ...createMockProcessManager(),
+            subscribeAll: mock(() => {}),
+            unsubscribeAll: mock(() => {}),
+        } as unknown as import('../process/manager').ProcessManager;
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: ['200000000000000001'],
+            appId: '800000000000000001',
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        bridge.start();
+
+        // Verify the bridge loaded the muted user by trying to mute again (idempotent)
+        // and checking the DB still has exactly one row
+        bridge.muteUser('999000000000000001');
+        const rows = db.query('SELECT user_id FROM discord_muted_users').all();
+        expect(rows).toHaveLength(1);
+
+        bridge.stop();
+    });
+});

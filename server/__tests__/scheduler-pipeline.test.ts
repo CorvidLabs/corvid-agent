@@ -154,7 +154,7 @@ describe('Pipeline Templates', () => {
             'send_message', 'github_suggest', 'codebase_review', 'dependency_audit',
             'improvement_loop', 'memory_maintenance', 'reputation_attestation',
             'outcome_analysis', 'daily_review', 'status_checkin', 'marketplace_billing',
-            'flock_testing', 'custom',
+            'flock_testing', 'discord_post', 'custom',
         ];
         const templates = listPipelineTemplates();
         for (const tmpl of templates) {
@@ -203,5 +203,36 @@ describe('Template variable patterns', () => {
         const improveStep = template.steps.find((s) => s.label === 'improve');
         expect(improveStep).toBeDefined();
         expect(improveStep!.action.prompt).toContain('{{pipeline.steps.audit.result}}');
+    });
+
+    it('daily-digest-discord template posts daily review to Discord', () => {
+        const template = getPipelineTemplate('daily-digest-discord')!;
+        expect(template).toBeDefined();
+        expect(template.steps.length).toBe(2);
+        expect(template.steps[0].action.type).toBe('daily_review');
+        expect(template.steps[1].action.type).toBe('discord_post');
+        expect(template.steps[1].action.embedTitle).toBe('Daily Digest');
+        expect(template.steps[1].action.message).toContain('{{pipeline.steps.review.result}}');
+    });
+
+    it('release-announcement template generates notes then posts', () => {
+        const template = getPipelineTemplate('release-announcement')!;
+        expect(template).toBeDefined();
+        expect(template.steps.length).toBe(2);
+        expect(template.steps[0].action.type).toBe('custom');
+        expect(template.steps[1].action.type).toBe('discord_post');
+        expect(template.steps[1].action.embedTitle).toBe('New Release');
+        expect(template.steps[1].action.message).toContain('{{pipeline.steps.notes.result}}');
+    });
+
+    it('cross-channel-summary template aggregates review and status', () => {
+        const template = getPipelineTemplate('cross-channel-summary')!;
+        expect(template).toBeDefined();
+        expect(template.steps.length).toBe(3);
+        expect(template.steps[0].action.type).toBe('daily_review');
+        expect(template.steps[1].action.type).toBe('status_checkin');
+        expect(template.steps[2].action.type).toBe('discord_post');
+        expect(template.steps[2].action.message).toContain('{{pipeline.steps.review.result}}');
+        expect(template.steps[2].action.message).toContain('{{pipeline.steps.status.result}}');
     });
 });

@@ -32,11 +32,12 @@ import {
     handleStatusCommand,
     handleDashboardCommand,
     handleTasksCommand,
-    handleScheduleCommand,
     handleConfigCommand,
     handleQuickstartCommand,
     handleHelpCommand,
+    handleToolsCommand,
 } from './command-handlers/info-commands';
+import { handleScheduleCommand } from './command-handlers/schedule-commands';
 import { handleCouncilCommand, handleMuteCommand, handleUnmuteCommand } from './command-handlers/moderation-commands';
 import { handleAgentSkillCommand, handleAgentPersonaCommand } from './command-handlers/agent-config-commands';
 import { handleComponentInteraction } from './command-handlers/component-handlers';
@@ -130,7 +131,58 @@ export async function registerSlashCommands(
         { name: 'status', description: 'Show system status and key metrics', type: 1 },
         { name: 'dashboard', description: 'Comprehensive system overview with agents, tasks, and schedules', type: 1 },
         { name: 'tasks', description: 'View active work tasks and queue status', type: 1 },
-        { name: 'schedule', description: 'Show schedule status and next runs', type: 1 },
+        {
+            name: 'schedule',
+            description: 'Manage scheduled actions',
+            type: 1,
+            options: [
+                { name: 'list', description: 'Show all schedules and their status', type: 1 },
+                {
+                    name: 'create',
+                    description: 'Create a new scheduled action',
+                    type: 1,
+                    options: [
+                        { name: 'name', description: 'Schedule name', type: 3, required: true },
+                        { name: 'cron', description: 'Cron expression (e.g. "0 9 * * *" for 9am daily)', type: 3 },
+                        { name: 'action_type', description: 'Action type', type: 3, choices: [
+                            { name: 'Discord Post', value: 'discord_post' },
+                            { name: 'Daily Review', value: 'daily_review' },
+                            { name: 'Status Check-in', value: 'status_checkin' },
+                            { name: 'Codebase Review', value: 'codebase_review' },
+                            { name: 'Dependency Audit', value: 'dependency_audit' },
+                            { name: 'PR Review', value: 'review_prs' },
+                        ]},
+                        { name: 'channel', description: 'Discord channel ID for discord_post actions', type: 3 },
+                        { name: 'template', description: 'Pipeline template ID (use /schedule templates to see options)', type: 3 },
+                    ],
+                },
+                {
+                    name: 'pause',
+                    description: 'Pause a schedule',
+                    type: 1,
+                    options: [
+                        { name: 'schedule', description: 'Schedule ID (use /schedule list to find)', type: 3, required: true },
+                    ],
+                },
+                {
+                    name: 'resume',
+                    description: 'Resume a paused schedule',
+                    type: 1,
+                    options: [
+                        { name: 'schedule', description: 'Schedule ID', type: 3, required: true },
+                    ],
+                },
+                {
+                    name: 'delete',
+                    description: 'Delete a schedule permanently',
+                    type: 1,
+                    options: [
+                        { name: 'schedule', description: 'Schedule ID', type: 3, required: true },
+                    ],
+                },
+                { name: 'templates', description: 'List available pipeline templates', type: 1 },
+            ],
+        },
         {
             name: 'config',
             description: 'Show current bot configuration (non-sensitive)',
@@ -151,6 +203,28 @@ export async function registerSlashCommands(
         },
         { name: 'quickstart', description: 'Guided walkthrough for new users', type: 1 },
         { name: 'help', description: 'Show available commands and usage', type: 1 },
+        {
+            name: 'tools',
+            description: 'Browse the MCP tool catalog',
+            type: 1,
+            options: [
+                {
+                    name: 'category',
+                    description: 'Filter by category',
+                    type: 3,
+                    required: false,
+                    choices: [
+                        { name: 'Communication & Memory', value: 'communication' },
+                        { name: 'Agent Management', value: 'agents' },
+                        { name: 'Session & Work', value: 'work' },
+                        { name: 'Research', value: 'research' },
+                        { name: 'GitHub', value: 'github' },
+                        { name: 'Notifications & Reputation', value: 'notifications' },
+                        { name: 'Code Tools', value: 'code' },
+                    ],
+                },
+            ],
+        },
         {
             name: 'mute',
             description: 'Mute a user from bot interactions (admin only)',
@@ -458,7 +532,7 @@ export async function handleInteraction(
             await handleTasksCommand(ctx, interaction);
             break;
         case 'schedule':
-            await handleScheduleCommand(ctx, interaction);
+            await handleScheduleCommand(ctx, interaction, permLevel);
             break;
         case 'config':
             await handleConfigCommand(ctx, interaction, permLevel);
@@ -471,6 +545,9 @@ export async function handleInteraction(
             break;
         case 'help':
             await handleHelpCommand(interaction);
+            break;
+        case 'tools':
+            await handleToolsCommand(interaction, getOption);
             break;
         case 'mute':
             await handleMuteCommand(ctx, interaction, permLevel, getOption);

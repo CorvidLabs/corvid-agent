@@ -12,6 +12,8 @@ files:
   - server/discord/command-handlers/component-handlers.ts
   - server/discord/command-handlers/autocomplete-handler.ts
   - server/discord/command-handlers/message-commands.ts
+  - server/discord/command-handlers/schedule-commands.ts
+  - server/discord/command-handlers/agent-config-commands.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
   - server/discord/permissions.ts
@@ -105,13 +107,26 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `handleAgentsCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/agents` command — lists available agents with their models |
 | `handleStatusCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/status` command — shows bot status and active sessions |
 | `handleTasksCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/tasks` command — shows active work tasks and queue status |
-| `handleScheduleCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/schedule` command — shows active schedules with next/last run times |
 | `handleConfigCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle the `/config` command — shows bot configuration (admin-only) |
 | `handleQuickstartCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/quickstart` command — shows Discord onboarding flow |
 | `handleHelpCommand` | `(interaction)` | `Promise<void>` | Handle the `/help` command — shows available commands and usage |
+| `handleToolsCommand` | `(interaction, getOption)` | `Promise<void>` | Handle the `/tools` command — browse the MCP tool catalog with optional category filter |
 | `handleDashboardCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/dashboard` command — shows multi-embed server overview with agents, work, and schedules |
 | `formatUptime` | `(seconds)` | `string` | Format seconds into human-readable uptime string (e.g. "2d 5h 30m") |
 | `measureDbLatency` | `(db)` | `number` | Measure database latency with a trivial query, returns milliseconds |
+
+### Exported Functions (from command-handlers/schedule-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleScheduleCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle the `/schedule` command with subcommands: list, create, pause, resume, delete, templates |
+
+### Exported Functions (from command-handlers/agent-config-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleAgentSkillCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle `/agent-skill add\|remove\|list` for hot-swapping skill bundles |
+| `handleAgentPersonaCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle `/agent-persona add\|remove\|list` for managing agent personas |
 
 ### Exported Functions (from command-handlers/moderation-commands.ts)
 
@@ -361,7 +376,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50)
 23. **Prompt injection scanning**: All incoming messages (channel @mentions and thread messages) are scanned via `scanForInjection()`. Blocked messages are audited and rejected
 24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute`, `/admin`, `/config` require ADMIN. `/agents`, `/status`, `/tasks`, `/schedule`, `/help` require BASIC
-25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions
+25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions. Mutes are persisted in the `discord_muted_users` DB table and restored on bridge start
 
 ### Response Formatting
 

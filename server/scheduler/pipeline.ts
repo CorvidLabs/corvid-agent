@@ -56,12 +56,15 @@ export function buildPipelineSummary(ctx: PipelineContext): string {
  * Returns a PipelineContext with all step results and an aggregated summary.
  * Each step creates its own execution record, and results are passed forward.
  */
+export type RunActionFn = typeof runAction;
+
 export async function executePipeline(
     deps: RunActionDeps,
     hctx: HandlerContext,
     schedule: AgentSchedule,
     steps: PipelineStep[],
     emitFn: (event: { type: string; data: unknown }) => void,
+    runActionFn: RunActionFn = runAction,
 ): Promise<PipelineContext> {
     const ctx: PipelineContext = {
         stepResults: {},
@@ -110,7 +113,7 @@ export async function executePipeline(
         const startTime = Date.now();
 
         // runAction handles dispatch, error handling, lock cleanup, and notifications.
-        await runAction(deps, hctx, execution.id, schedule, action);
+        await runActionFn(deps, hctx, execution.id, schedule, action);
 
         const durationMs = Date.now() - startTime;
         const updated = getExecution(deps.db, execution.id);
@@ -212,6 +215,84 @@ export const PIPELINE_TEMPLATES: SchedulePipelineTemplate[] = [
                 action: {
                     type: 'status_checkin',
                     description: 'Post status with review findings',
+                },
+                condition: 'always',
+            },
+        ],
+    },
+    {
+        id: 'daily-digest-discord',
+        name: 'Daily Digest → Discord',
+        description: 'Run a daily review then post the summary as a rich embed to a Discord channel.',
+        steps: [
+            {
+                label: 'review',
+                action: { type: 'daily_review', description: 'Generate daily review stats' },
+                condition: 'always',
+            },
+            {
+                label: 'post',
+                action: {
+                    type: 'discord_post',
+                    embedTitle: 'Daily Digest',
+                    embedColor: 0x2ecc71,
+                    message: '{{pipeline.steps.review.result}}',
+                    description: 'Post daily digest to Discord',
+                },
+                condition: 'on_success',
+            },
+        ],
+    },
+    {
+        id: 'release-announcement',
+        name: 'Release Notes → Discord Announcement',
+        description: 'Generate release notes from recent commits and post to Discord.',
+        steps: [
+            {
+                label: 'notes',
+                action: {
+                    type: 'custom',
+                    prompt: 'Summarize the most recent release: list key changes from the latest tagged commits, group by category (features, fixes, improvements). Keep it concise — 5-10 bullet points max.',
+                    description: 'Generate release notes',
+                },
+                condition: 'always',
+            },
+            {
+                label: 'announce',
+                action: {
+                    type: 'discord_post',
+                    embedTitle: 'New Release',
+                    embedColor: 0x5865f2,
+                    message: '{{pipeline.steps.notes.result}}',
+                    description: 'Post release announcement to Discord',
+                },
+                condition: 'on_success',
+            },
+        ],
+    },
+    {
+        id: 'cross-channel-summary',
+        name: 'Cross-Channel Activity Summary',
+        description: 'Gather activity from daily review and status, then post an aggregate summary to Discord.',
+        steps: [
+            {
+                label: 'review',
+                action: { type: 'daily_review', description: 'Gather execution and PR stats' },
+                condition: 'always',
+            },
+            {
+                label: 'status',
+                action: { type: 'status_checkin', description: 'Capture system state' },
+                condition: 'always',
+            },
+            {
+                label: 'summarize',
+                action: {
+                    type: 'discord_post',
+                    embedTitle: 'Activity Summary',
+                    embedColor: 0x3498db,
+                    message: 'Review: {{pipeline.steps.review.result}}\n\nStatus: {{pipeline.steps.status.result}}',
+                    description: 'Post aggregated summary to Discord',
                 },
                 condition: 'always',
             },

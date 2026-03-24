@@ -15,7 +15,7 @@ export async function handleManageSchedule(
         description?: string;
         cron_expression?: string;
         interval_minutes?: number;
-        schedule_actions?: Array<{ type: string; repos?: string[]; description?: string; project_id?: string; to_agent_id?: string; message?: string; prompt?: string }>;
+        schedule_actions?: Array<{ type: string; repos?: string[]; description?: string; project_id?: string; to_agent_id?: string; message?: string; prompt?: string; channel_id?: string; embed_title?: string; embed_color?: number }>;
         approval_policy?: string;
         max_executions?: number;
         schedule_id?: string;
@@ -52,6 +52,9 @@ export async function handleManageSchedule(
                     toAgentId: a.to_agent_id,
                     message: a.message,
                     prompt: a.prompt,
+                    channelId: a.channel_id,
+                    embedTitle: a.embed_title,
+                    embedColor: a.embed_color,
                 }));
 
                 const outputDestinations = args.output_destinations?.map((d) => ({

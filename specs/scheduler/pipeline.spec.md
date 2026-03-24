@@ -30,11 +30,17 @@ Runs schedule actions sequentially with shared context as composable multi-step 
 | `getPipelineTemplate` | `(templateId: string)` | `SchedulePipelineTemplate \| undefined` | Looks up a pipeline template by ID |
 | `listPipelineTemplates` | `()` | `SchedulePipelineTemplate[]` | Returns a copy of all available pipeline templates |
 
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `RunActionFn` | Function signature for the `runAction` dependency, injectable for testing |
+
 ### Exported Constants
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `PIPELINE_TEMPLATES` | `SchedulePipelineTemplate[]` | Built-in pipeline templates: `github-digest-discord`, `audit-and-improve`, `review-and-report` |
+| `PIPELINE_TEMPLATES` | `SchedulePipelineTemplate[]` | Built-in pipeline templates: `github-digest-discord`, `audit-and-improve`, `review-and-report`, `daily-digest-discord`, `release-announcement`, `cross-channel-summary` |
 
 ## Invariants
 
@@ -72,6 +78,24 @@ Runs schedule actions sequentially with shared context as composable multi-step 
 - **When** `getPipelineTemplate('github-digest-discord')` is called
 - **Then** returns the template with 2 steps: review and notify
 
+### Scenario: Daily digest pipeline template
+
+- **Given** the `daily-digest-discord` template is used
+- **When** the pipeline runs
+- **Then** step 1 runs `daily_review`, step 2 runs `discord_post` with `embedTitle: 'Daily Digest'` and the review result interpolated into the message
+
+### Scenario: Release announcement pipeline template
+
+- **Given** the `release-announcement` template is used
+- **When** the pipeline runs
+- **Then** step 1 runs `custom` to generate release notes, step 2 runs `discord_post` with `embedTitle: 'New Release'` and the notes interpolated
+
+### Scenario: Cross-channel summary pipeline template
+
+- **Given** the `cross-channel-summary` template is used
+- **When** the pipeline runs
+- **Then** step 1 runs `daily_review`, step 2 runs `status_checkin`, step 3 runs `discord_post` aggregating both results
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -106,3 +130,4 @@ Runs schedule actions sequentially with shared context as composable multi-step 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-22 | corvid-agent | Initial spec |
+| 2026-03-23 | corvid-agent | Added 3 Discord proactive messaging templates: daily-digest-discord, release-announcement, cross-channel-summary |
