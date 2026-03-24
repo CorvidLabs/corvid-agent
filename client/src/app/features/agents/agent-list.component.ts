@@ -119,11 +119,13 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                             <div class="agent-card__top">
                                 <div class="agent-card__title-row">
                                     <span class="agent-card__health-dot" [attr.data-health]="getHealthLevel(card)" aria-hidden="true"></span>
-                                    @if (card.agent.avatarUrl) {
+                                    @if (card.agent.avatarUrl && !avatarErrors().has(card.agent.id)) {
                                         <img class="agent-card__avatar" [src]="card.agent.avatarUrl"
-                                             [alt]="card.agent.name + ' avatar'" (error)="onAvatarError($event)" />
+                                             [alt]="card.agent.name + ' avatar'" (error)="onAvatarError(card.agent.id)" />
                                     } @else if (card.agent.displayIcon) {
                                         <span class="agent-card__icon">{{ card.agent.displayIcon }}</span>
+                                    } @else {
+                                        <span class="agent-card__icon agent-card__icon--fallback" aria-hidden="true">[&gt;_]</span>
                                     }
                                     <span class="agent-card__name"
                                           [style.color]="card.agent.displayColor || ''">{{ card.agent.name }}</span>
@@ -271,6 +273,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card:hover::before { opacity: 1; }
         .agent-card__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-bright); flex-shrink: 0; }
         .agent-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
+        .agent-card__icon--fallback { font-size: 0.65rem; font-family: var(--font-mono, monospace); color: var(--text-tertiary); background: var(--bg-input); border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
         .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; }
         .agent-card__health-dot {
@@ -334,6 +337,7 @@ export class AgentListComponent implements OnInit {
     protected readonly filterPermission = signal<string | null>(null);
     protected readonly hideInactive = signal(true);
     protected readonly agentCards = signal<AgentCard[]>([]);
+    protected readonly avatarErrors = signal<Set<string>>(new Set());
     protected readonly permissionModes = ['default', 'plan', 'auto-edit', 'full-auto'];
 
     protected readonly filteredAgents = computed(() => {
@@ -398,8 +402,10 @@ export class AgentListComponent implements OnInit {
         return PROVIDER_COLORS[provider ?? 'anthropic'] ?? DEFAULT_PROVIDER_COLOR;
     }
 
-    protected onAvatarError(event: Event): void {
-        (event.target as HTMLImageElement).style.display = 'none';
+    protected onAvatarError(agentId: string): void {
+        const errors = new Set(this.avatarErrors());
+        errors.add(agentId);
+        this.avatarErrors.set(errors);
     }
 
     /** Health level based on activity recency */

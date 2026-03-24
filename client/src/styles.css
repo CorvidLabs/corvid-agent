@@ -321,6 +321,17 @@ select:focus-visible {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
 }
+.form__error {
+    font-size: var(--text-xs);
+    color: var(--accent-red);
+    margin-top: 0.15rem;
+}
+.form__input.ng-invalid.ng-touched {
+    border-color: var(--accent-red);
+}
+.form__input.ng-invalid.ng-touched:focus {
+    box-shadow: 0 0 0 1px rgba(255, 51, 85, 0.2), 0 0 12px rgba(255, 51, 85, 0.08);
+}
 .form__row { display: flex; gap: 0.5rem; align-items: stretch; }
 .form__row .form__input { flex: 1; }
 .form__fieldset {
