@@ -56,6 +56,15 @@ export async function handleAutocomplete(
                 name: `${b.name}${b.description ? ` — ${b.description}` : ''}`.slice(0, 100),
                 value: b.name,
             }));
+    } else if (focused.name === 'buddy') {
+        const agents = listAgents(ctx.db);
+        choices = agents
+            .filter(a => !query || a.name.toLowerCase().includes(query))
+            .slice(0, 25)
+            .map(a => ({
+                name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
+                value: a.name,
+            }));
     } else if (focused.name === 'persona') {
         const personas = listPersonas(ctx.db);
         choices = personas

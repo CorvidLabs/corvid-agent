@@ -19,6 +19,7 @@ import {
     getAgentMessage,
 } from '../db/agent-messages';
 import { getProjectByName, listProjects } from '../db/projects';
+import { listAgents } from '../db/agents';
 import { ValidationError, NotFoundError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 
@@ -93,10 +94,14 @@ export class WorkCommandRouter {
             return;
         }
 
-        // Parse --project flag
+        // Parse --project and --buddy flags
         let projectId: string | undefined;
+        let buddyAgentId: string | undefined;
+        let buddyMaxRounds: number | undefined;
         let taskDescription = description;
-        const projectMatch = description.match(/^--project\s+(\S+)\s+([\s\S]*)$/i);
+
+        // Parse --project flag
+        const projectMatch = taskDescription.match(/--project\s+(\S+)/i);
         if (projectMatch) {
             const projectName = projectMatch[1];
             const project = getProjectByName(this.db, projectName);
@@ -106,11 +111,37 @@ export class WorkCommandRouter {
                 return;
             }
             projectId = project.id;
-            taskDescription = projectMatch[2].trim();
-            if (!taskDescription) {
-                respond('Usage: /work --project <name> <task description>');
+            taskDescription = taskDescription.replace(/--project\s+\S+/i, '').trim();
+        }
+
+        // Parse --buddy flag
+        const buddyMatch = taskDescription.match(/--buddy\s+(\S+)/i);
+        if (buddyMatch) {
+            const buddyName = buddyMatch[1];
+            const agents = listAgents(this.db);
+            const buddyAgent = agents.find(a =>
+                a.name.toLowerCase() === buddyName.toLowerCase() ||
+                a.name.toLowerCase().replace(/\s+/g, '') === buddyName.toLowerCase().replace(/\s+/g, '')
+            );
+            if (!buddyAgent) {
+                const names = agents.map(a => a.name).join(', ');
+                respond(`Buddy agent not found: "${buddyName}". Available: ${names}`);
                 return;
             }
+            buddyAgentId = buddyAgent.id;
+            taskDescription = taskDescription.replace(/--buddy\s+\S+/i, '').trim();
+        }
+
+        // Parse --rounds flag
+        const roundsMatch = taskDescription.match(/--rounds\s+(\d+)/i);
+        if (roundsMatch) {
+            buddyMaxRounds = parseInt(roundsMatch[1], 10);
+            taskDescription = taskDescription.replace(/--rounds\s+\d+/i, '').trim();
+        }
+
+        if (!taskDescription) {
+            respond('Usage: /work [--project <name>] [--buddy <agent>] [--rounds <n>] <task description>');
+            return;
         }
 
         this.workTaskService.create({
@@ -119,6 +150,7 @@ export class WorkCommandRouter {
             projectId,
             source: 'algochat',
             requesterInfo: { participant },
+            buddyConfig: buddyAgentId ? { buddyAgentId, maxRounds: buddyMaxRounds } : undefined,
         }).then((task) => {
             const lines = [
                 `✓ Work task created: ${task.id}`,

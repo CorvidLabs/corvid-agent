@@ -57,4 +57,9 @@ export interface CreateWorkTaskInput {
     /** Model tier for the work task session: 'opus', 'sonnet', or 'haiku'.
      *  If omitted, the router uses complexity analysis to auto-select. */
     modelTier?: string;
+    /** Optional buddy agent config — pairs another agent for review. */
+    buddyConfig?: {
+        buddyAgentId: string;
+        maxRounds?: number;
+    };
 }

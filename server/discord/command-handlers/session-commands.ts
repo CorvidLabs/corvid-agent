@@ -169,6 +169,8 @@ export async function handleWorkCommand(
 
     const workAgentName = getOption('agent');
     const workProjectName = getOption('project');
+    const buddyName = getOption('buddy');
+    const buddyRounds = getOption('rounds');
 
     // Resolve agent
     const allAgents = listAgents(ctx.db);
@@ -208,8 +210,24 @@ export async function handleWorkCommand(
         workProjectId = workProject.id;
     }
 
+    // Resolve buddy agent if specified
+    let buddyAgent: typeof workAgent | undefined;
+    if (buddyName) {
+        const cleanBuddyName = buddyName.split(' (')[0].trim();
+        buddyAgent = allAgents.find(a =>
+            a.name.toLowerCase() === cleanBuddyName.toLowerCase() ||
+            a.name.toLowerCase().replace(/\s+/g, '') === cleanBuddyName.toLowerCase().replace(/\s+/g, '')
+        );
+        if (!buddyAgent) {
+            const names = allAgents.map(a => a.name).join(', ');
+            await respondToInteraction(interaction, `Buddy agent not found: "${buddyName}". Available: ${names}`);
+            return;
+        }
+    }
+
     // Defer the response since task creation may take a moment
-    await respondToInteraction(interaction, `Creating work task for **${workAgent.name}**...`);
+    const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
+    await respondToInteraction(interaction, `Creating work task for **${workAgent.name}**${buddyLabel}...`);
 
     const channelId = interaction.channel_id;
     try {
@@ -219,6 +237,10 @@ export async function handleWorkCommand(
             projectId: workProjectId,
             source: 'discord',
             requesterInfo: { discordUserId: userId },
+            buddyConfig: buddyAgent ? {
+                buddyAgentId: buddyAgent.id,
+                maxRounds: buddyRounds ? parseInt(buddyRounds, 10) : undefined,
+            } : undefined,
         });
 
         // Send a rich confirmation embed in the channel
@@ -227,6 +249,9 @@ export async function handleWorkCommand(
                 { name: 'Agent', value: workAgent.name, inline: true },
                 { name: 'Status', value: 'In Progress', inline: true },
             ];
+            if (buddyAgent) {
+                fields.push({ name: 'Buddy', value: buddyAgent.name, inline: true });
+            }
             if (task.branchName) {
                 fields.push({ name: 'Branch', value: `\`${task.branchName}\``, inline: false });
             }
