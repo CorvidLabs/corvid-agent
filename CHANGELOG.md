@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.49.0] - 2026-03-24
+
+### Added
+- **Try-mode: auto-detect AI provider** — zero-config sandbox auto-detects Claude, OpenAI, Gemini, Ollama, and OpenRouter from environment; no manual provider selection needed (#1463)
+
+### Fixed
+- **Discord: image attachments** — download and base64-encode image attachments at receive time instead of passing expiring CDN URLs to Claude, fixing image analysis loops (#1464)
+- **Flock: test reliability** — increase test timeouts and add multi-turn thread continuity for flock tests (#1456)
+
+### Tests
+- **Buddy mode + auth middleware coverage** — add 823 lines of tests covering buddy DB operations, buddy approval logic, and auth middleware edge cases (#1462)
+
 ## [0.48.0] - 2026-03-24
 
 ### Added
