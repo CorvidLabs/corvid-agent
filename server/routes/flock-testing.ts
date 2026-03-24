@@ -74,7 +74,7 @@ export function handleFlockTestingRoutes(
         return (async () => {
             try {
                 const transport: TestTransport = {
-                    async sendAndWait(agentAddress: string, message: string, timeoutMs: number): Promise<string | null> {
+                    async sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null> {
                         // agentAddress is an Algorand wallet address — resolve to agent UUID
                         const targetAgent = getAgentByWalletAddress(db, agentAddress);
                         if (!targetAgent) return null;
@@ -85,6 +85,7 @@ export function handleFlockTestingRoutes(
                                     fromAgentId: 'flock-tester',
                                     toAgentId: targetAgent.id,
                                     content: `[FLOCK-TEST] ${message}`,
+                                    threadId,
                                 },
                                 timeoutMs,
                             );

@@ -24,8 +24,12 @@ export interface TestTransport {
     /**
      * Send a message to the agent and wait for a response.
      * Returns the response text, or null if the agent doesn't respond within timeoutMs.
+     *
+     * @param threadId - Optional thread ID to maintain conversation context across
+     *                   multi-turn challenges. If provided, messages will be linked
+     *                   in the same thread so the agent can recall earlier turns.
      */
-    sendAndWait(agentAddress: string, message: string, timeoutMs: number): Promise<string | null>;
+    sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null>;
 }
 
 // ─── Test Run Configuration ───────────────────────────────────────────────────
@@ -197,7 +201,9 @@ export class FlockTestRunner {
 
     private async executeChallenge(agentAddress: string, challenge: Challenge): Promise<ChallengeResult> {
         try {
-            // For multi-turn challenges, send all messages except the last as setup
+            // For multi-turn challenges, send all messages except the last as setup.
+            // Use a shared threadId so the agent can recall earlier turns.
+            const threadId = challenge.messages.length > 1 ? crypto.randomUUID() : undefined;
             let lastResponse: string | null = null;
             let totalTimeMs = 0;
 
@@ -207,6 +213,7 @@ export class FlockTestRunner {
                     agentAddress,
                     challenge.messages[i],
                     challenge.timeoutMs,
+                    threadId,
                 );
                 const elapsed = Date.now() - start;
                 totalTimeMs += elapsed;
