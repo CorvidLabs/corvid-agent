@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.48.0] - 2026-03-24
+
+### Added
+- **Buddy mode: collaborative agent review** — pair agents for real-time code review sessions with configurable review styles and automatic feedback (#1454)
+- **Buddy mode: read-only tools** — buddies get Read, Glob, Grep tools for code verification without write access (#1454)
+- **Councils: heartbeat polling** — wire heartbeat polling into council discussion flow for liveness checks (#1440)
+- **Scheduler: discord_post action** — add discord_post action type and pipeline templates for scheduled Discord posts (#1441)
+- **MCP: Discord tools** — add send_message and send_image MCP tools for Discord integration (#1434)
+
+### Fixed
+- **Security: CodeQL alerts** — resolve high-severity CodeQL alerts (#1433)
+- **Discord: URL unfurling** — send URLs as separate follow-up so Discord auto-unfurls them (#1435)
+- **CI: Windows test skip** — skip health-collector integration test on Windows (#1432)
+- **CI: guild-api spec** — add missing spec for guild-api.ts (#1431)
+- **Governance: tier violation** — revert Layer 0/1 file changes to resolve governance tier violation (#1442)
+
 ## [0.47.0] - 2026-03-23
 
 ### Added
