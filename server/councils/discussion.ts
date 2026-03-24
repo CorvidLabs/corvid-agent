@@ -28,6 +28,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage, CouncilAgentError } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { getModelPricing } from '../providers/cost-table';
+import { waitForSessions } from '../lib/wait-sessions';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { assessImpact, GOVERNANCE_TIERS } from './governance';
@@ -798,76 +799,8 @@ export function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): 
     return parts.join('\n\n---\n\n');
 }
 
-// ─── Session waiting utility ─────────────────────────────────────────────────
-
-/** Result of waiting for a set of sessions — indicates which completed and which timed out. */
-export interface WaitForSessionsResult {
-    /** Session IDs that completed (exited or stopped) before the timeout. */
-    completed: string[];
-    /** Session IDs still running when the timeout fired. */
-    timedOut: string[];
-}
-
-export function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<WaitForSessionsResult> {
-    return new Promise<WaitForSessionsResult>((resolve) => {
-        let settled = false;
-        const pending = new Set(sessionIds);
-        const completed: string[] = [];
-        const callbacks = new Map<string, EventCallback>();
-
-        const finish = (): void => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            for (const [sid, cb] of callbacks) {
-                processManager.unsubscribe(sid, cb);
-            }
-            callbacks.clear();
-            resolve({ completed, timedOut: Array.from(pending) });
-        };
-
-        const markCompleted = (sessionId: string): void => {
-            if (pending.delete(sessionId)) {
-                completed.push(sessionId);
-            }
-        };
-
-        const checkDone = (): void => {
-            if (pending.size === 0) finish();
-        };
-
-        // Timeout: resolve even if some sessions are stuck
-        const effectiveTimeout = timeoutMs ?? MIN_ROUND_TIMEOUT_MS;
-        const timer = setTimeout(() => {
-            if (!settled) {
-                const timedOutIds = Array.from(pending);
-                log.warn(`waitForSessions timed out (${Math.round(effectiveTimeout / 60000)}m) with ${timedOutIds.length} sessions still pending: ${timedOutIds.join(', ')}`);
-                finish();
-            }
-        }, effectiveTimeout);
-
-        // Subscribe FIRST, then check isRunning — this closes the race window
-        // where a process exits between the isRunning check and subscribe call.
-        for (const sessionId of sessionIds) {
-            const callback: EventCallback = (sid, event) => {
-                if (sid !== sessionId) return;
-                if (event.type === 'session_exited' || event.type === 'session_stopped') {
-                    markCompleted(sessionId);
-                    checkDone();
-                }
-            };
-            callbacks.set(sessionId, callback);
-            processManager.subscribe(sessionId, callback);
-
-            // If the process already exited before we subscribed, handle it now
-            if (!processManager.isRunning(sessionId)) {
-                markCompleted(sessionId);
-            }
-        }
-
-        checkDone();
-    });
-}
+// waitForSessions + WaitForSessionsResult imported from ../lib/wait-sessions
+// (enhanced version with heartbeat polling + safety timeout — fixes #710)
 
 // ─── On-chain messaging ──────────────────────────────────────────────────────
 
