@@ -88,7 +88,7 @@ corvid-agent init --mcp    # add corvid-agent MCP tools
 vibekit init               # add blockchain MCP tools (deploy, assets, indexer)
 ```
 
-Your AI editor gets 48 corvid-agent tools (code, GitHub, scheduling, agents) plus 42 VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
+Your AI editor gets 50 corvid-agent tools (code, GitHub, scheduling, agents) plus 42 VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
 
 **[VibeKit integration guide →](docs/vibekit-integration.md)**
 
@@ -113,7 +113,7 @@ skills/
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 48 MCP tools, ~380 API endpoints, 8,500+ unit tests, 362 E2E test files.
+Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 50 MCP tools, ~380 API endpoints, 4,200+ test files, 33 E2E spec files.
 
 **[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
 
