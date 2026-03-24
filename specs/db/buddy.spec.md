@@ -26,6 +26,7 @@ CRUD helpers for buddy mode database tables: pairings (which agents can pair), s
 | `createBuddyPairing` | `(db: Database, agentId: string, buddyAgentId: string, opts?: { maxRounds?: number; buddyRole?: BuddyRole })` | `BuddyPairing` | Creates a new buddy pairing with defaults (maxRounds=5, buddyRole='reviewer') |
 | `getBuddyPairing` | `(db: Database, id: string)` | `BuddyPairing \| null` | Fetches a single pairing by ID |
 | `listBuddyPairings` | `(db: Database, agentId: string)` | `BuddyPairing[]` | Lists all pairings for a given agent, ordered by created_at |
+| `getDefaultBuddyForAgent` | `(db: Database, agentId: string)` | `BuddyPairing \| null` | Returns the first enabled pairing for an agent (by created_at), or null if none |
 | `updateBuddyPairing` | `(db: Database, id: string, updates: { enabled?: boolean; maxRounds?: number; buddyRole?: BuddyRole })` | `void` | Updates specified fields on a pairing; no-op if updates object is empty |
 | `deleteBuddyPairing` | `(db: Database, id: string)` | `void` | Deletes a pairing by ID |
 | `createBuddySession` | `(db: Database, input: CreateBuddySessionInput)` | `BuddySession` | Creates a new buddy session record |
