@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.50.0] - 2026-03-24
+
+### Added
+- **Discord: tiered /message tool access** — restrict /message tool availability based on Discord role tiers (admin/mod/trusted/default) with configurable allow-lists per tier (#1466)
+- **Discord: buddy review support** — buddy agents can now review /message tool usage and approve or flag messages before sending (#1466)
+
+### Fixed
+- **Tests: resumeProcess scan window** — widen test scan window from 8000 to 10000 chars to accommodate tiered access code in process manager (#1466)
+- **Tests: fetch mock casts** — fix pre-existing TypeScript errors in discord-image-attachments tests by casting fetch mocks through `unknown` (#1466)
+
 ## [0.49.0] - 2026-03-24
 
 ### Added
