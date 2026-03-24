@@ -422,28 +422,28 @@ describe('Council Discussion: Event Types', () => {
 // ─── Heartbeat Polling (fixes #710) ─────────────────────────────────────────
 
 describe('Council Discussion: Heartbeat Polling', () => {
-    // TODO: Enable after heartbeat polling is wired into councils/discussion.ts (Layer 0 — requires manual commit)
-    it.skip('heartbeat detects sessions that stopped without emitting events', async () => {
+    it('heartbeat detects sessions that stopped without emitting events', async () => {
         const { pm, markRunning, running } = createMockPM();
 
         markRunning('s1');
         markRunning('s2');
 
-        // Main timeout must be longer than HEARTBEAT_INTERVAL_MS so the
-        // heartbeat gets a chance to fire before the timeout resolves.
-        const promise = waitForSessions(pm, ['s1', 's2'], HEARTBEAT_INTERVAL_MS * 3);
+        // Use a short heartbeat interval for fast CI; main timeout must be
+        // longer so the heartbeat fires before the timeout resolves.
+        const heartbeatMs = 50;
+        const promise = waitForSessions(pm, ['s1', 's2'], heartbeatMs * 10, { heartbeatMs });
 
         // Silently remove sessions from running WITHOUT emitting events —
         // simulates the race condition where exit events are lost.
         running.delete('s1');
         running.delete('s2');
 
-        // The heartbeat (every 30s) should detect both sessions are no longer
-        // running and mark them completed.
+        // The heartbeat should detect both sessions are no longer running
+        // and mark them completed.
         const result = await promise;
         expect(result.completed.sort()).toEqual(['s1', 's2']);
         expect(result.timedOut).toEqual([]);
-    }, { timeout: HEARTBEAT_INTERVAL_MS * 3 + 5000 });
+    });
 
     it('heartbeat does not double-count sessions already completed by events', async () => {
         const { pm, markRunning, emitExit } = createMockPM();

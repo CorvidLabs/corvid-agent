@@ -47,7 +47,6 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `startCouncilChat` | `db: Database, processManager: ProcessManager, launchId: string, message: string` | `CouncilChatResult \| CouncilChatError` | Start or resume a follow-up chat session with the chairman agent about a completed council's synthesis. |
 | `buildDiscussionPrompt` | `originalPrompt: string, memberResponses: { agentId: string; agentName: string; label: string; content: string }[], priorDiscussion: CouncilDiscussionMessage[], round: number` | `string` | Build the prompt sent to each agent during a discussion round, including original question, member responses, and prior discussion history. |
 | `formatDiscussionMessages` | `messages: CouncilDiscussionMessage[]` | `string` | Format discussion messages grouped by round into a readable string. |
-| `waitForSessions` | `processManager: ProcessManager, sessionIds: string[], timeoutMs?: number` | `Promise<WaitForSessionsResult>` | Wait for a set of sessions to complete, with timeout. Returns which sessions completed vs timed out. |
 | `aggregateSessionResponses` | `db: Database, allSessions: Session[]` | `string[]` | Collect last assistant response from each session, labelled by agent name. Prefers reviewer sessions over member sessions. Re-exported from synthesis module. |
 | `triggerReview` _(synthesis.ts)_ | `db: Database, processManager: ProcessManager, launchId: string, emitLog: EmitLogFn, broadcastStageChange: BroadcastStageChangeFn, watchAutoAdvance?: WatchAutoAdvanceFn` | `{ ok: true; reviewSessionIds: string[] } \| { ok: false; error: string; status: number }` | Core review logic: collects member responses, creates review sessions for each agent, updates stage, optionally sets up auto-advance watcher. |
 | `finishWithAggregatedSynthesis` _(synthesis.ts)_ | `db: Database, launchId: string, emitLog: EmitLogFn, broadcastStageChange: BroadcastStageChangeFn` | `void` | Aggregate all session responses and mark launch as complete without a chairman synthesis step. |
@@ -60,7 +59,6 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `LaunchCouncilResult` | `{ launchId: string; sessionIds: string[] }` — result of launching a council. |
 | `CouncilChatResult` | `{ ok: true; sessionId: string; created: boolean }` — successful chat start/resume result. |
 | `CouncilChatError` | `{ ok: false; error: string; status: number }` — failed chat attempt. |
-| `WaitForSessionsResult` | `{ completed: string[]; timedOut: string[] }` — result of waiting for sessions with timeout. |
 | `EmitLogFn` | `(db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string) => void` — callback type for structured log emission. |
 | `BroadcastStageChangeFn` | `(launchId: string, stage: string, sessionIds?: string[]) => void` — callback type for broadcasting stage transitions to WS clients. |
 | `WatchAutoAdvanceFn` | `(db: Database, processManager: ProcessManager, launchId: string, sessionIds: string[], role: 'member' \| 'reviewer') => void` — callback type for auto-advance watcher injection. |
@@ -125,7 +123,7 @@ _(none)_
 11. On-chain discussion messages are sent best-effort (fire-and-forget) via `AgentMessenger.sendOnChainBestEffort`.
 12. All stage changes, logs, and discussion messages are broadcast to registered listeners (used by WebSocket layer).
 13. If discussion rounds fail, the system falls through to trigger review anyway as a recovery mechanism.
-14. `waitForSessions` resolves with partial results on timeout rather than rejecting, reporting which sessions completed and which timed out.
+14. Session waiting (via `waitForSessions` from `lib/wait-sessions`) resolves with partial results on timeout rather than rejecting, reporting which sessions completed and which timed out. Heartbeat polling detects sessions that exit without emitting events.
 15. On-chain discussion messages are only sent when council `onChainMode` is `'full'`.
 16. Synthesis attestation (SHA-256 hash) is published on-chain when `onChainMode` is `'attestation'`.
 17. Governance votes use reputation-weighted voting via `evaluateWeightedVote`. Each agent's vote is weighted by their reputation score (0–100, default 50 if unavailable).

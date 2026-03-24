@@ -1,20 +1,9 @@
 name: E2E
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-      - "LICENSE"
-      - ".github/ISSUE_TEMPLATE/**"
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-      - "LICENSE"
-      - ".github/ISSUE_TEMPLATE/**"
+  # Push/PR triggers disabled while E2E tests are paused (conserving CI minutes).
+  # Re-enable push/pull_request triggers when credits are replenished and the
+  # job below is uncommented.  See #1436.
   workflow_call:
   workflow_dispatch:
 
