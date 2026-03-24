@@ -225,6 +225,11 @@ export async function handleWorkCommand(
         }
     }
 
+    if (buddyAgent && buddyAgent.id === workAgent.id) {
+        await respondToInteraction(interaction, 'An agent cannot be its own buddy. Choose a different buddy agent.');
+        return;
+    }
+
     // Defer the response since task creation may take a moment
     const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
     await respondToInteraction(interaction, `Creating work task for **${workAgent.name}**${buddyLabel}...`);
@@ -239,7 +244,7 @@ export async function handleWorkCommand(
             requesterInfo: { discordUserId: userId },
             buddyConfig: buddyAgent ? {
                 buddyAgentId: buddyAgent.id,
-                maxRounds: buddyRounds ? parseInt(buddyRounds, 10) : undefined,
+                maxRounds: buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined,
             } : undefined,
         });
 

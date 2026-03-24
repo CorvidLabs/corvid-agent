@@ -132,11 +132,17 @@ export class WorkCommandRouter {
             taskDescription = taskDescription.replace(/--buddy\s+\S+/i, '').trim();
         }
 
-        // Parse --rounds flag
+        // Parse --rounds flag (clamp to 1-10)
+
         const roundsMatch = taskDescription.match(/--rounds\s+(\d+)/i);
         if (roundsMatch) {
-            buddyMaxRounds = parseInt(roundsMatch[1], 10);
+            buddyMaxRounds = Math.max(1, Math.min(10, parseInt(roundsMatch[1], 10)));
             taskDescription = taskDescription.replace(/--rounds\s+\d+/i, '').trim();
+        }
+
+        if (buddyAgentId && buddyAgentId === agentId) {
+            respond('An agent cannot be its own buddy. Choose a different buddy agent.');
+            return;
         }
 
         if (!taskDescription) {

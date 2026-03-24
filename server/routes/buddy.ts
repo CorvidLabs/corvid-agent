@@ -110,6 +110,8 @@ export function handleBuddyRoutes(
     return null;
 }
 
+const VALID_BUDDY_ROLES: BuddyRole[] = ['reviewer', 'collaborator', 'validator'];
+
 async function handleCreatePairing(
     req: Request,
     db: Database,
@@ -119,8 +121,20 @@ async function handleCreatePairing(
     const agent = getAgent(db, agentId, tenantId);
     if (!agent) return json({ error: 'Agent not found' }, 404);
 
-    const body = await req.json() as { buddyAgentId?: string; maxRounds?: number; buddyRole?: BuddyRole };
+    let body: { buddyAgentId?: string; maxRounds?: number; buddyRole?: BuddyRole };
+    try {
+        body = await req.json();
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
     if (!body.buddyAgentId) return json({ error: 'buddyAgentId is required' }, 400);
+
+    if (body.buddyRole && !VALID_BUDDY_ROLES.includes(body.buddyRole)) {
+        return json({ error: `Invalid buddyRole. Must be one of: ${VALID_BUDDY_ROLES.join(', ')}` }, 400);
+    }
+    if (body.maxRounds !== undefined && (body.maxRounds < 1 || body.maxRounds > 10)) {
+        return json({ error: 'maxRounds must be between 1 and 10' }, 400);
+    }
 
     const buddyAgent = getAgent(db, body.buddyAgentId, tenantId);
     if (!buddyAgent) return json({ error: 'Buddy agent not found' }, 404);
@@ -149,7 +163,20 @@ async function handleUpdatePairing(
     const pairing = getBuddyPairing(db, id);
     if (!pairing) return json({ error: 'Not found' }, 404);
 
-    const body = await req.json() as { enabled?: boolean; maxRounds?: number; buddyRole?: BuddyRole };
+    let body: { enabled?: boolean; maxRounds?: number; buddyRole?: BuddyRole };
+    try {
+        body = await req.json();
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (body.buddyRole && !VALID_BUDDY_ROLES.includes(body.buddyRole)) {
+        return json({ error: `Invalid buddyRole. Must be one of: ${VALID_BUDDY_ROLES.join(', ')}` }, 400);
+    }
+    if (body.maxRounds !== undefined && (body.maxRounds < 1 || body.maxRounds > 10)) {
+        return json({ error: 'maxRounds must be between 1 and 10' }, 400);
+    }
+
     updateBuddyPairing(db, id, body);
     const updated = getBuddyPairing(db, id);
     return json(updated);

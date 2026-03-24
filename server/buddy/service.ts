@@ -69,10 +69,16 @@ export class BuddyService {
         const buddyAgent = getAgent(this.db, input.buddyAgentId);
         if (!leadAgent) throw new Error(`Lead agent not found: ${input.leadAgentId}`);
         if (!buddyAgent) throw new Error(`Buddy agent not found: ${input.buddyAgentId}`);
+        if (input.leadAgentId === input.buddyAgentId) {
+            throw new Error('Lead and buddy agent cannot be the same');
+        }
+
+        // Clamp maxRounds to a safe range
+        const maxRounds = Math.max(1, Math.min(10, input.maxRounds ?? DEFAULT_MAX_ROUNDS));
 
         const session = createBuddySession(this.db, {
             ...input,
-            maxRounds: input.maxRounds ?? DEFAULT_MAX_ROUNDS,
+            maxRounds,
         });
 
         log.info('Buddy session started', {
@@ -242,22 +248,23 @@ export class BuddyService {
      */
     private captureSessionOutput(session: Session, prompt: string): Promise<string | null> {
         return new Promise((resolve) => {
-            const chunks: string[] = [];
             let resolved = false;
+            let resultText = '';
+
+            const done = (text: string | null) => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
+                this.processManager.unsubscribe(session.id, callback);
+                resolve(text);
+            };
 
             const callback = (sid: string, event: ClaudeStreamEvent) => {
                 if (sid !== session.id) return;
 
-                if (event.type === 'assistant' && event.message?.content) {
-                    const text = extractContentText(event.message.content);
-                    if (text) chunks.push(text);
-                }
                 if (event.type === 'result') {
-                    resolved = true;
-                    this.processManager.unsubscribe(session.id, callback);
-                    const text = event.result ? extractContentText(event.result) : '';
-                    if (text) chunks.push(text);
-                    resolve(chunks.join('') || null);
+                    resultText = event.result ? extractContentText(event.result) : '';
+                    done(resultText || null);
                 }
             };
 
@@ -266,12 +273,10 @@ export class BuddyService {
             this.processManager.startProcess(session, prompt, { conversationOnly: true });
 
             // Safety timeout: 5 minutes per turn
-            setTimeout(() => {
-                if (!resolved) {
-                    this.processManager.unsubscribe(session.id, callback);
-                    this.processManager.stopProcess(session.id);
-                    resolve(chunks.join('') || null);
-                }
+            const timer = setTimeout(() => {
+                log.warn('Buddy turn timed out', { sessionId: session.id });
+                this.processManager.stopProcess(session.id);
+                done(resultText || null);
             }, 5 * 60 * 1000);
         });
     }
@@ -323,13 +328,26 @@ export class BuddyService {
 
     private isApproval(output: string): boolean {
         const lower = output.toLowerCase().trim();
-        const approvalPhrases = ['lgtm', 'looks good to me', 'approved', 'no issues', 'ship it'];
-        // Check if the output is short and contains an approval phrase
-        if (lower.length < 200) {
-            return approvalPhrases.some((phrase) => lower.includes(phrase));
-        }
-        // For longer outputs, check the first line
-        const firstLine = lower.split('\n')[0];
-        return approvalPhrases.some((phrase) => firstLine.includes(phrase));
+
+        // Only treat short responses as approvals — a long response with
+        // "approved" buried inside is likely qualified feedback, not a sign-off.
+        if (lower.length > 300) return false;
+
+        // Reject if negative qualifiers appear near approval words
+        const negativePatterns = [
+            /\bnot\s+approved\b/,
+            /\bnot\s+lgtm\b/,
+            /\bhaven'?t\s+approved\b/,
+            /\bdo\s+not\b/,
+            /\bdon'?t\b/,
+            /\bwith\s+reservations?\b/,
+            /\bbut\b/,
+            /\bhowever\b/,
+            /\bissues?\s+(with|found|remain|still)/,
+        ];
+        if (negativePatterns.some((p) => p.test(lower))) return false;
+
+        const approvalPhrases = ['lgtm', 'looks good to me', 'approved', 'no issues found', 'no issues', 'ship it'];
+        return approvalPhrases.some((phrase) => lower.includes(phrase));
     }
 }

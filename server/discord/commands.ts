@@ -78,13 +78,6 @@ export async function registerSlashCommands(
                     required: false,
                     autocomplete: true,
                 },
-                {
-                    name: 'buddy',
-                    description: 'Pair with a buddy agent for review (optional)',
-                    type: 3,
-                    required: false,
-                    autocomplete: true,
-                },
             ],
         },
         {
@@ -144,13 +137,6 @@ export async function registerSlashCommands(
                     description: 'Your message',
                     type: 3,
                     required: true,
-                },
-                {
-                    name: 'buddy',
-                    description: 'Pair with a buddy agent for review (optional)',
-                    type: 3,
-                    required: false,
-                    autocomplete: true,
                 },
             ],
         },
