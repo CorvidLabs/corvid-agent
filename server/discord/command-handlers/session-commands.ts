@@ -39,6 +39,8 @@ export async function handleSessionCommand(
     const agentName = getOption('agent');
     const topic = getOption('topic');
     const projectName = getOption('project');
+    const buddyName = getOption('buddy');
+    const buddyRounds = getOption('rounds');
     if (!agentName || !topic) {
         await respondToInteraction(interaction, 'Please provide both an agent and a topic.');
         return;
@@ -60,6 +62,25 @@ export async function handleSessionCommand(
         const names = agents.map(a => a.name).join(', ');
         await respondToInteraction(interaction, `Agent not found: "${agentName}". Available: ${names}`);
         return;
+    }
+
+    // Resolve buddy agent if specified
+    let buddyAgent: typeof agent | undefined;
+    if (buddyName) {
+        const cleanBuddyName = buddyName.split(' (')[0].trim();
+        buddyAgent = agents.find(a =>
+            a.name.toLowerCase() === cleanBuddyName.toLowerCase() ||
+            a.name.toLowerCase().replace(/\s+/g, '') === cleanBuddyName.toLowerCase().replace(/\s+/g, '')
+        );
+        if (!buddyAgent) {
+            const names = agents.map(a => a.name).join(', ');
+            await respondToInteraction(interaction, `Buddy agent not found: "${buddyName}". Available: ${names}`);
+            return;
+        }
+        if (buddyAgent.id === agent.id) {
+            await respondToInteraction(interaction, 'An agent cannot be its own buddy. Choose a different buddy agent.');
+            return;
+        }
     }
 
     const allProjects = listProjects(ctx.db);
@@ -124,6 +145,11 @@ export async function handleSessionCommand(
         projectName: project.name,
         displayColor: agent.displayColor,
         creatorPermLevel: permLevel,
+        buddyConfig: buddyAgent ? {
+            buddyAgentId: buddyAgent.id,
+            buddyAgentName: buddyAgent.name,
+            maxRounds: buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined,
+        } : undefined,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
@@ -131,8 +157,9 @@ export async function handleSessionCommand(
     ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name, agent.displayColor);
 
     // Post a welcome embed with Stop button in the thread
+    const buddyLabel = buddyAgent ? `\nBuddy: **${buddyAgent.name}** (reviews at end-of-session)` : '';
     sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
-        description: `**${agent.name}** is working on: ${topic}`,
+        description: `**${agent.name}** is working on: ${topic}${buddyLabel}`,
         color: hexColorToInt(agent.displayColor) ?? agentColor(agent.name),
         footer: { text: buildFooterText({ agentName: agent.name, agentModel: agent.model || 'unknown', sessionId: session.id, projectName: project.name }) },
     }, [
@@ -141,8 +168,9 @@ export async function handleSessionCommand(
         ),
     ]).catch((err) => log.debug('Failed to send welcome embed', { error: err instanceof Error ? err.message : String(err) }));
 
+    const buddyResp = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
     await respondToInteraction(interaction,
-        `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
+        `Session started in <#${threadId}> with **${agent.name}**${buddyResp}.\nTopic: ${topic}`);
 }
 
 export async function handleWorkCommand(

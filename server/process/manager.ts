@@ -168,7 +168,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[] }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[]; mcpToolAllowList?: string[] }): void {
         if (this.startingSession.has(session.id)) {
             log.warn(`Ignoring duplicate startProcess call for session ${session.id} — already starting`);
             return;
@@ -235,9 +235,9 @@ export class ProcessManager {
         const effectiveProject = baseProject;
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         }
     }
 
@@ -251,7 +251,7 @@ export class ProcessManager {
         effectiveAgent: import('../../shared/types').Agent | null,
         resolvedPrompt: string,
         provider: import('../providers/types').LlmProvider | undefined,
-        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[] },
+        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; conversationOnly?: boolean; toolAllowList?: string[]; mcpToolAllowList?: string[] },
     ): Promise<void> {
         const resolved = await resolveProjectDir(project);
 
@@ -273,13 +273,13 @@ export class ProcessManager {
         }
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         }
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType, conversationOnly?: boolean, toolAllowList?: string[]): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType, conversationOnly?: boolean, toolAllowList?: string[], mcpToolAllowList?: string[]): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
             : project;
@@ -287,19 +287,24 @@ export class ProcessManager {
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
         // Conversation-only sessions (or empty toolAllowList) get NO tools — pure text conversation.
-        // When toolAllowList has items, it's a restricted session (e.g. buddy review) — still skip MCP.
+        // When toolAllowList has items, it's a restricted session (e.g. buddy review).
+        // If mcpToolAllowList is also set, load MCP with only those tools (e.g. memory tools for /message).
         const isNoTools = conversationOnly || (toolAllowList && toolAllowList.length === 0);
         const isRestrictedTools = !isNoTools && toolAllowList && toolAllowList.length > 0;
-        // No MCP for conversation-only, empty-allowlist, or restricted-tool sessions (e.g. buddy review)
-        const skipMcp = isNoTools || isRestrictedTools;
+        const hasMcpAllowList = mcpToolAllowList && mcpToolAllowList.length > 0;
+        // Skip MCP unless the caller explicitly requested specific MCP tools
+        const skipMcp = isNoTools || (isRestrictedTools && !hasMcpAllowList);
         const mcpServers = skipMcp ? undefined : (session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
+                // When mcpToolAllowList is set, override resolvedToolPermissions to restrict MCP tools
+                const effectivePermissions = hasMcpAllowList ? mcpToolAllowList : config.resolvedToolPermissions;
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, effectivePermissions, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined);
 
         // Fetch external MCP server configs (Figma, Slack, etc.) for SDK sessions
+        // Skip external MCP for restricted sessions unless MCP allow list is explicitly set
         const externalMcpConfigs = skipMcp ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : []);
@@ -358,6 +363,7 @@ export class ProcessManager {
         schedulerActionType?: ScheduleActionType,
         conversationOnly?: boolean,
         toolAllowList?: string[],
+        mcpToolAllowList?: string[],
     ): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -365,12 +371,18 @@ export class ProcessManager {
 
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        // Conversation-only sessions get NO tool context
+        // Conversation-only sessions get NO tool context.
+        // When mcpToolAllowList is set, load MCP with only those tools (e.g. memory tools for /message).
+        const hasMcpAllowList = mcpToolAllowList && mcpToolAllowList.length > 0;
         const mcpToolContext = conversationOnly ? null : (session.agentId
-            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType)
+            ? (() => {
+                const effectivePermissions = hasMcpAllowList ? mcpToolAllowList : config.resolvedToolPermissions;
+                return this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, effectivePermissions, schedulerActionType);
+            })()
             : null);
 
-        const externalMcpConfigs = conversationOnly ? [] : (session.agentId
+        // Skip external MCP for conversation-only or restricted MCP sessions
+        const externalMcpConfigs = (conversationOnly || hasMcpAllowList) ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : []);
 
@@ -634,20 +646,29 @@ export class ProcessManager {
 
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
-        // Detect conversation-only sessions by name convention
-        const isConversationOnly = session.name.startsWith('Discord message:');
+        // Detect tool tier for Discord /message sessions by name convention:
+        //   "Discord message:"      → restricted tools (memory + read-only, non-admin)
+        //   "Discord full-message:" → full tools (admin /message, same as /session)
+        //   anything else           → full tools (normal session)
+        const isRestrictedMessage = session.name.startsWith('Discord message:') && !session.name.startsWith('Discord full-message:');
+        const isConversationOnly = false; // /message sessions always get at least memory + read tools now
+        const resumeToolAllowList = isRestrictedMessage ? ['Read', 'Glob', 'Grep'] : undefined;
+        const resumeMcpToolAllowList = isRestrictedMessage ? ['corvid_recall_memory', 'corvid_read_on_chain_memories'] : undefined;
 
         // Load external MCP configs for resumed sessions (Figma, GitHub, etc.)
-        const resumeExternalMcpConfigs = isConversationOnly ? [] : (session.agentId
+        // Skip for restricted /message sessions
+        const resumeExternalMcpConfigs = isRestrictedMessage ? [] : (session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : []);
 
         let sp: SdkProcess;
         try {
             if (providerInstance && providerInstance.executionMode === 'direct') {
-                const mcpToolContext = isConversationOnly ? null : (session.agentId
-                    ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions)
-                    : null);
+                // For restricted /message sessions, override permissions to only expose memory tools
+                const effectivePermissions = resumeMcpToolAllowList ?? resumeConfig.resolvedToolPermissions;
+                const mcpToolContext = session.agentId
+                    ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, effectivePermissions)
+                    : null;
                 const councilModelResume = process.env.COUNCIL_MODEL;
                 const modelOverrideResume = (session.councilRole === 'chairman' && councilModelResume)
                     ? councilModelResume
@@ -668,13 +689,16 @@ export class ProcessManager {
                     skillPrompt: resumeConfig.skillPrompt,
                     modelOverride: modelOverrideResume,
                     externalMcpConfigs: resumeExternalMcpConfigs,
-                    toolAllowList: isConversationOnly ? [] : undefined,
+                    toolAllowList: resumeToolAllowList,
                     conversationOnly: isConversationOnly,
                 });
             } else {
-                const mcpServers = isConversationOnly ? undefined : (session.agentId
+                // For restricted /message sessions, override MCP tool permissions
+                const effectivePermissions = resumeMcpToolAllowList ?? resumeConfig.resolvedToolPermissions;
+                const hasMcpTools = !isConversationOnly && (resumeMcpToolAllowList || !isRestrictedMessage);
+                const mcpServers = !hasMcpTools ? undefined : (session.agentId
                     ? (() => {
-                        const ctx = this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions);
+                        const ctx = this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, effectivePermissions);
                         return ctx ? [createCorvidMcpServer(ctx)] : undefined;
                     })()
                     : undefined);
@@ -693,6 +717,7 @@ export class ProcessManager {
                     skillPrompt: resumeConfig.skillPrompt,
                     externalMcpConfigs: resumeExternalMcpConfigs,
                     conversationOnly: isConversationOnly,
+                    toolAllowList: resumeToolAllowList,
                 });
             }
         } catch (err) {

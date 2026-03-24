@@ -63,6 +63,7 @@ export class DiscordBridge {
     private db: Database;
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null;
+    private buddyService: import('../buddy/service').BuddyService | null;
     private config: DiscordBridgeConfig;
     private gateway: DiscordGateway;
 
@@ -122,11 +123,13 @@ export class DiscordBridge {
         processManager: ProcessManager,
         config: DiscordBridgeConfig,
         workTaskService?: WorkTaskService,
+        buddyService?: import('../buddy/service').BuddyService,
     ) {
         this.db = db;
         this.processManager = processManager;
         this.config = config;
         this.workTaskService = workTaskService ?? null;
+        this.buddyService = buddyService ?? null;
         this.gateway = new DiscordGateway(config, {
             onMessage: (data) => {
                 this.handleMessage(data).catch(err => {
@@ -379,6 +382,7 @@ export class DiscordBridge {
             subscribeForInlineResponse: (sid, cid, rid, an, am, onBot, pn, dc) =>
                 subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc),
             syncGuildData: () => this.syncGuildDataAsync(),
+            buddyService: this.buddyService,
         };
         await handleInteractionImpl(ctx, interaction);
     }
