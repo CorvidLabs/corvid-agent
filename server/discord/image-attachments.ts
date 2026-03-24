@@ -72,12 +72,15 @@ export interface ExtractedImages {
 
 /**
  * Extract image attachments from a Discord message and convert them to
- * Claude API content blocks using URL image sources.
+ * Claude API content blocks using base64-encoded image data.
+ *
+ * Downloads images at receive time so that expired Discord CDN URLs
+ * don't cause failures when Claude processes the message later.
  *
  * Applies size limits and format validation. Skips attachments that are
- * too large or have unsupported formats.
+ * too large, unsupported, or fail to download.
  */
-export function extractImageBlocks(attachments: DiscordAttachment[] | undefined): ExtractedImages {
+export async function extractImageBlocks(attachments: DiscordAttachment[] | undefined): Promise<ExtractedImages> {
     if (!attachments || attachments.length === 0) {
         return { blocks: [], skipped: 0 };
     }
@@ -110,24 +113,51 @@ export function extractImageBlocks(attachments: DiscordAttachment[] | undefined)
             continue;
         }
 
-        // Use proxy_url (longer-lived) with fallback to url
+        // Download the image now — Discord CDN URLs expire, so we can't
+        // rely on Claude being able to fetch them later.
         const imageUrl = attachment.proxy_url || attachment.url;
+        const mediaType = inferMediaType(attachment);
 
-        blocks.push({
-            type: 'image',
-            source: {
-                type: 'url',
+        try {
+            const resp = await fetch(imageUrl);
+            if (!resp.ok) {
+                skipped++;
+                log.warn('Failed to download image attachment', {
+                    filename: attachment.filename,
+                    url: imageUrl,
+                    status: resp.status,
+                });
+                continue;
+            }
+
+            const arrayBuffer = await resp.arrayBuffer();
+            const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+            blocks.push({
+                type: 'image',
+                source: {
+                    type: 'base64',
+                    media_type: mediaType,
+                    data: base64Data,
+                },
+            } as ContentBlockParam);
+
+            log.debug('Downloaded and encoded image attachment', {
+                filename: attachment.filename,
+                contentType: mediaType,
+                size: attachment.size,
+                base64Length: base64Data.length,
+                width: attachment.width,
+                height: attachment.height,
+            });
+        } catch (err) {
+            skipped++;
+            log.warn('Error downloading image attachment', {
+                filename: attachment.filename,
                 url: imageUrl,
-            },
-        } as ContentBlockParam);
-
-        log.debug('Extracted image attachment', {
-            filename: attachment.filename,
-            contentType: inferMediaType(attachment),
-            size: attachment.size,
-            width: attachment.width,
-            height: attachment.height,
-        });
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     return { blocks, skipped };
@@ -164,11 +194,11 @@ export function appendAttachmentUrls(text: string, attachments: DiscordAttachmen
  * ensuring the agent can see them even if image content blocks are not
  * rendered by the runtime.
  */
-export function buildMultimodalContent(
+export async function buildMultimodalContent(
     text: string,
     attachments: DiscordAttachment[] | undefined,
-): string | ContentBlockParam[] {
-    const { blocks: imageBlocks, skipped } = extractImageBlocks(attachments);
+): Promise<string | ContentBlockParam[]> {
+    const { blocks: imageBlocks, skipped } = await extractImageBlocks(attachments);
 
     // Always include attachment URLs in the text as a fallback
     const textWithUrls = appendAttachmentUrls(text, attachments);

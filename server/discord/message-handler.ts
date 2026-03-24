@@ -553,7 +553,7 @@ async function handleMentionReplyResume(
     }
 
     // Build multimodal content if images are attached
-    const contextualContent = buildMultimodalContent(withAuthorContext(cleanText, authorId, authorUsername, channelId), attachments);
+    const contextualContent = await buildMultimodalContent(withAuthorContext(cleanText, authorId, authorUsername, channelId), attachments);
     log.info('Mention-reply resume: sending content to session', {
         sessionId,
         hasAttachments: (attachments?.length ?? 0) > 0,
@@ -717,7 +717,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     }
 
     // Build multimodal content if images are attached
-    const contextualContent = buildMultimodalContent(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
+    const contextualContent = await buildMultimodalContent(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
         // resumeProcess only accepts strings — include attachment URLs in text so images aren't lost
