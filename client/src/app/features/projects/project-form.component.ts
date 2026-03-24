@@ -15,16 +15,24 @@ import { DirBrowserComponent } from '../../shared/components/dir-browser.compone
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
                     <label for="name" class="form__label">Name</label>
-                    <input id="name" formControlName="name" class="form__input" />
+                    <input id="name" formControlName="name" class="form__input"
+                           [attr.aria-describedby]="form.get('name')?.invalid && form.get('name')?.touched ? 'name-error' : null" />
+                    @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+                        <span id="name-error" class="form__error" role="alert">Project name is required.</span>
+                    }
                 </div>
 
                 <div class="form__field">
                     <label for="workingDir" class="form__label">Working Directory</label>
                     <div class="form__row">
                         <input id="workingDir" formControlName="workingDir" class="form__input"
-                               placeholder="/path/to/project" />
+                               placeholder="/path/to/project"
+                               [attr.aria-describedby]="form.get('workingDir')?.invalid && form.get('workingDir')?.touched ? 'workingDir-error' : null" />
                         <button type="button" class="btn btn--secondary" (click)="showBrowser.set(true)">Browse</button>
                     </div>
+                    @if (form.get('workingDir')?.hasError('required') && form.get('workingDir')?.touched) {
+                        <span id="workingDir-error" class="form__error" role="alert">Working directory is required.</span>
+                    }
                 </div>
 
                 @if (showBrowser()) {

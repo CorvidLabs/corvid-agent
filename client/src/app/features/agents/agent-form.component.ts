@@ -20,7 +20,11 @@ import { firstValueFrom } from 'rxjs';
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
                     <label for="name" class="form__label">Name</label>
-                    <input id="name" formControlName="name" class="form__input" />
+                    <input id="name" formControlName="name" class="form__input"
+                           [attr.aria-describedby]="form.get('name')?.invalid && form.get('name')?.touched ? 'name-error' : null" />
+                    @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+                        <span id="name-error" class="form__error" role="alert">Agent name is required.</span>
+                    }
                 </div>
 
                 <div class="form__field">
