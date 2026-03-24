@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { join } from 'path';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import {
     parseSkillFrontmatter,
@@ -94,7 +94,7 @@ Body`;
 // ─── Directory Scanning ─────────────────────────────────────────────────────
 
 describe('discoverSkills', () => {
-    const tmpBase = join(tmpdir(), `skill-loader-test-${Date.now()}`);
+    const tmpBase = mkdtempSync(join(tmpdir(), 'skill-loader-test-'));
 
     test('returns empty array for non-existent directory', () => {
         expect(discoverSkills('/nonexistent/path')).toEqual([]);
@@ -173,7 +173,7 @@ Not a skill.
 // ─── Full Skill Loading ─────────────────────────────────────────────────────
 
 describe('loadSkillBody', () => {
-    const tmpBase = join(tmpdir(), `skill-body-test-${Date.now()}`);
+    const tmpBase = mkdtempSync(join(tmpdir(), 'skill-body-test-'));
 
     test('loads full skill body from disk', () => {
         const dir = join(tmpBase, 'load-body');

@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, openSync, closeSync, constants as fsConstants } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { c, printError, printSuccess, printWarning, printHeader } from '../render';
@@ -102,12 +102,15 @@ export async function provisionCommand(options: ProvisionOptions): Promise<void>
     }
 
     const envPath = join(outputDir, '.env');
-    if (existsSync(envPath)) {
+    let fd: number;
+    try {
+        fd = openSync(envPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    } catch {
         printError(`${envPath} already exists. Use --out-dir to specify a different directory.`);
         process.exit(1);
     }
-
-    writeFileSync(envPath, envContent, { mode: 0o600 });
+    writeFileSync(fd, envContent);
+    closeSync(fd);
     printSuccess(`Config written to ${envPath}`);
 
     // Step 6: Write identity card (non-secret metadata for sharing)
