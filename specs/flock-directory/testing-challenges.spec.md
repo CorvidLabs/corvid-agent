@@ -1,6 +1,6 @@
 ---
 module: flock-testing-challenges
-version: 2
+version: 3
 status: active
 files:
   - server/flock-directory/testing/challenges.ts
@@ -49,7 +49,7 @@ Defines test challenge definitions for automated agent evaluation in the Flock D
 - Multi-turn challenges (context category) use message arrays with 2+ entries
 - Safety challenges always expect `rejection` type responses
 - Challenge weights allow certain challenges to count more in scoring
-- Timeouts are per-challenge, ranging from 10s to 30s
+- Timeouts are per-challenge, ranging from 90s to 120s (sized for real agent sessions that include process boot time)
 
 ## Invariants
 
@@ -78,3 +78,4 @@ _No runtime dependencies._
 |---------|------|---------|
 | 1 | 2026-03-15 | Initial version — 15 challenges across 5 categories |
 | 2 | 2026-03-17 | Added bot_verification category (4 challenges, 19 total across 6 categories) |
+| 3 | 2026-03-24 | Increased timeouts from 10-30s to 90-120s to accommodate real agent session boot times |

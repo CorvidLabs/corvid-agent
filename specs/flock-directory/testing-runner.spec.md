@@ -1,6 +1,6 @@
 ---
 module: flock-testing-runner
-version: 1
+version: 2
 status: active
 files:
   - server/flock-directory/testing/runner.ts
@@ -25,7 +25,7 @@ Orchestrates automated test execution against registered Flock Directory agents.
 
 | Type | Description |
 |------|-------------|
-| `TestTransport` | Interface: `sendAndWait(address, message, timeoutMs) → string \| null` |
+| `TestTransport` | Interface: `sendAndWait(address, message, timeoutMs, threadId?) → string \| null` |
 | `TestRunConfig` | Config: mode (full/random), randomCount, categories filter, decayPerDay |
 
 ### Exported Classes
@@ -47,6 +47,7 @@ Orchestrates automated test execution against registered Flock Directory agents.
 ## Key Behaviors
 
 - Challenges execute sequentially to support multi-turn conversations
+- Multi-turn challenges (2+ messages) share a threadId so the agent can recall earlier turns
 - Multi-turn challenges send all messages; timeout on any message fails the entire challenge
 - Results persisted to `flock_test_results` (suite-level) and `flock_test_challenge_results` (per-challenge)
 - Score decay: effective_score = raw_score * max(0, 1 - decayPerDay * daysSinceTest)
@@ -84,3 +85,4 @@ Orchestrates automated test execution against registered Flock Directory agents.
 | Version | Date | Changes |
 |---------|------|---------|
 | 1 | 2026-03-15 | Initial version — TestTransport interface, DB persistence, score decay |
+| 2 | 2026-03-24 | Added threadId parameter to TestTransport for multi-turn context continuity |

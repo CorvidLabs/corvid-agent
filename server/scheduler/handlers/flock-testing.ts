@@ -21,7 +21,7 @@ const log = createLogger('FlockTestingHandler');
  */
 function createAlgoChatTransport(ctx: HandlerContext, senderAgentId: string): TestTransport {
     return {
-        async sendAndWait(agentAddress: string, message: string, timeoutMs: number): Promise<string | null> {
+        async sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null> {
             if (!ctx.agentMessenger) return null;
 
             // agentAddress is an Algorand wallet address — resolve to agent UUID
@@ -37,6 +37,7 @@ function createAlgoChatTransport(ctx: HandlerContext, senderAgentId: string): Te
                         fromAgentId: senderAgentId,
                         toAgentId: targetAgent.id,
                         content: `[FLOCK-TEST] ${message}`,
+                        threadId,
                     },
                     timeoutMs,
                 );
