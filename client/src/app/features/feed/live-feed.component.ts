@@ -515,6 +515,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     }
 
     protected onClear(): void {
+        if (!confirm('Clear all feed messages? This cannot be undone.')) return;
         this.rawEntries.set([]);
         this.expandedIds.set(new Set());
         this.seenMessageKeys.clear();

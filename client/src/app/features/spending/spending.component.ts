@@ -293,6 +293,7 @@ export class SpendingComponent implements OnInit {
     }
 
     async removeCap(agentId: string): Promise<void> {
+        if (!confirm('Remove spending cap? The agent will revert to default limits.')) return;
         try {
             await firstValueFrom(this.api.delete(`/agents/${agentId}/spending-cap`));
             this.notify.success('Spending cap removed');

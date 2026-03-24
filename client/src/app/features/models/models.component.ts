@@ -526,6 +526,7 @@ export class ModelsComponent implements OnInit, OnDestroy {
     }
 
     async deleteModel(model: string): Promise<void> {
+        if (!confirm(`Delete model "${model}"? This cannot be undone.`)) return;
         this.deletingModel.set(model);
         try {
             await firstValueFrom(
