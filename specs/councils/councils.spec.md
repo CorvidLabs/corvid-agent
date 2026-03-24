@@ -47,6 +47,7 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `startCouncilChat` | `db: Database, processManager: ProcessManager, launchId: string, message: string` | `CouncilChatResult \| CouncilChatError` | Start or resume a follow-up chat session with the chairman agent about a completed council's synthesis. |
 | `buildDiscussionPrompt` | `originalPrompt: string, memberResponses: { agentId: string; agentName: string; label: string; content: string }[], priorDiscussion: CouncilDiscussionMessage[], round: number` | `string` | Build the prompt sent to each agent during a discussion round, including original question, member responses, and prior discussion history. |
 | `formatDiscussionMessages` | `messages: CouncilDiscussionMessage[]` | `string` | Format discussion messages grouped by round into a readable string. |
+| `waitForSessions` | `processManager: ProcessManager, sessionIds: string[], timeoutMs?: number` | `Promise<WaitForSessionsResult>` | Wait for a set of agent sessions to complete using subscribe-first pattern. Resolves with partial results on timeout rather than rejecting. |
 | `aggregateSessionResponses` | `db: Database, allSessions: Session[]` | `string[]` | Collect last assistant response from each session, labelled by agent name. Prefers reviewer sessions over member sessions. Re-exported from synthesis module. |
 | `triggerReview` _(synthesis.ts)_ | `db: Database, processManager: ProcessManager, launchId: string, emitLog: EmitLogFn, broadcastStageChange: BroadcastStageChangeFn, watchAutoAdvance?: WatchAutoAdvanceFn` | `{ ok: true; reviewSessionIds: string[] } \| { ok: false; error: string; status: number }` | Core review logic: collects member responses, creates review sessions for each agent, updates stage, optionally sets up auto-advance watcher. |
 | `finishWithAggregatedSynthesis` _(synthesis.ts)_ | `db: Database, launchId: string, emitLog: EmitLogFn, broadcastStageChange: BroadcastStageChangeFn` | `void` | Aggregate all session responses and mark launch as complete without a chairman synthesis step. |
@@ -56,6 +57,7 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 
 | Type | Description |
 |------|-------------|
+| `WaitForSessionsResult` | `{ completed: string[]; timedOut: string[] }` — result of waiting for sessions, indicating which completed and which timed out. |
 | `LaunchCouncilResult` | `{ launchId: string; sessionIds: string[] }` — result of launching a council. |
 | `CouncilChatResult` | `{ ok: true; sessionId: string; created: boolean }` — successful chat start/resume result. |
 | `CouncilChatError` | `{ ok: false; error: string; status: number }` — failed chat attempt. |

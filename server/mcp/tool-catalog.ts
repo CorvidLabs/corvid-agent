@@ -44,6 +44,10 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     { name: 'corvid_read_on_chain_memories', description: 'Read memories directly from Algorand blockchain', category: 'communication' },
     { name: 'corvid_sync_on_chain_memories', description: 'Sync on-chain memories back to local SQLite cache', category: 'communication' },
 
+    // ── Discord Messaging ─────────────────────────────────────────────────
+    { name: 'corvid_discord_send_message', description: 'Send a message to a Discord channel', category: 'communication' },
+    { name: 'corvid_discord_send_image', description: 'Send an image to a Discord channel', category: 'communication' },
+
     // ── Agent Management ─────────────────────────────────────────────────
     { name: 'corvid_list_agents', description: 'List all available agents with names, IDs, and wallets', category: 'agents' },
     { name: 'corvid_discover_agent', description: 'Fetch a remote agent\'s A2A Agent Card for capabilities', category: 'agents' },
