@@ -110,6 +110,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `handleConfigCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle the `/config` command — shows bot configuration (admin-only) |
 | `handleQuickstartCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/quickstart` command — shows Discord onboarding flow |
 | `handleHelpCommand` | `(interaction)` | `Promise<void>` | Handle the `/help` command — shows available commands and usage |
+| `handleToolsCommand` | `(interaction, getOption)` | `Promise<void>` | Handle the `/tools` command — browse the MCP tool catalog with optional category filter |
 | `handleDashboardCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/dashboard` command — shows multi-embed server overview with agents, work, and schedules |
 | `formatUptime` | `(seconds)` | `string` | Format seconds into human-readable uptime string (e.g. "2d 5h 30m") |
 | `measureDbLatency` | `(db)` | `number` | Measure database latency with a trivial query, returns milliseconds |

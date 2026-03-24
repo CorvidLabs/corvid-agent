@@ -35,6 +35,7 @@ import {
     handleConfigCommand,
     handleQuickstartCommand,
     handleHelpCommand,
+    handleToolsCommand,
 } from './command-handlers/info-commands';
 import { handleScheduleCommand } from './command-handlers/schedule-commands';
 import { handleCouncilCommand, handleMuteCommand, handleUnmuteCommand } from './command-handlers/moderation-commands';
@@ -202,6 +203,28 @@ export async function registerSlashCommands(
         },
         { name: 'quickstart', description: 'Guided walkthrough for new users', type: 1 },
         { name: 'help', description: 'Show available commands and usage', type: 1 },
+        {
+            name: 'tools',
+            description: 'Browse the MCP tool catalog',
+            type: 1,
+            options: [
+                {
+                    name: 'category',
+                    description: 'Filter by category',
+                    type: 3,
+                    required: false,
+                    choices: [
+                        { name: 'Communication & Memory', value: 'communication' },
+                        { name: 'Agent Management', value: 'agents' },
+                        { name: 'Session & Work', value: 'work' },
+                        { name: 'Research', value: 'research' },
+                        { name: 'GitHub', value: 'github' },
+                        { name: 'Notifications & Reputation', value: 'notifications' },
+                        { name: 'Code Tools', value: 'code' },
+                    ],
+                },
+            ],
+        },
         {
             name: 'mute',
             description: 'Mute a user from bot interactions (admin only)',
@@ -522,6 +545,9 @@ export async function handleInteraction(
             break;
         case 'help':
             await handleHelpCommand(interaction);
+            break;
+        case 'tools':
+            await handleToolsCommand(interaction, getOption);
             break;
         case 'mute':
             await handleMuteCommand(ctx, interaction, permLevel, getOption);

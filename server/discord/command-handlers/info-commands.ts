@@ -2,7 +2,7 @@
  * Discord informational command handlers.
  *
  * Handles `/agents`, `/status`, `/tasks`, `/config`,
- * `/quickstart`, `/dashboard`, and `/help` commands.
+ * `/quickstart`, `/dashboard`, `/help`, and `/tools` commands.
  */
 
 import type { InteractionContext } from '../commands';
@@ -17,6 +17,7 @@ import {
     respondToInteractionEmbeds,
     type DiscordEmbed,
 } from '../embeds';
+import { getToolCatalog, getToolCatalogGrouped, TOOL_CATEGORIES } from '../../mcp/tool-catalog';
 
 export async function handleAgentsCommand(
     ctx: InteractionContext,
@@ -326,6 +327,7 @@ export async function handleHelpCommand(
                     '`/dashboard` — Comprehensive system overview',
                     '`/tasks` — View active work tasks and queue status',
                     '`/schedule` — Show schedule status and next runs',
+                    '`/tools` — Browse the MCP tool catalog',
                     '`/help` — Show this help message',
                 ].join('\n'),
                 inline: false,
@@ -355,4 +357,58 @@ export async function handleHelpCommand(
         ],
         footer: { text: 'New here? Try /quickstart for a guided walkthrough' },
     });
+}
+
+export async function handleToolsCommand(
+    interaction: DiscordInteractionData,
+    getOption: (name: string) => string | undefined,
+): Promise<void> {
+    const category = getOption('category');
+
+    if (category) {
+        // Single category — show detailed tool list
+        const { tools } = getToolCatalog(category);
+        const cat = TOOL_CATEGORIES.find(c => c.name === category);
+        if (tools.length === 0) {
+            await respondToInteraction(interaction, `No tools found in category "${category}".`);
+            return;
+        }
+
+        const toolLines = tools.map(t => {
+            const flags = [
+                t.conditional ? '\u{1F527}' : '',
+                t.restricted ? '\u{1F512}' : '',
+            ].filter(Boolean).join('');
+            return `\u2022 \`${t.name}\` — ${t.description}${flags ? ` ${flags}` : ''}`;
+        });
+
+        await respondToInteractionEmbed(interaction, {
+            title: `Tools — ${cat?.label ?? category}`,
+            description: cat?.description ?? '',
+            color: 0x5865f2,
+            fields: [
+                { name: `${tools.length} tool${tools.length === 1 ? '' : 's'}`, value: toolLines.join('\n'), inline: false },
+            ],
+            footer: { text: '\u{1F527} = requires special service \u00b7 \u{1F512} = restricted' },
+        });
+    } else {
+        // Overview — show all categories with tool counts
+        const grouped = getToolCatalogGrouped();
+        const totalTools = grouped.reduce((sum, g) => sum + g.tools.length, 0);
+
+        const fields = grouped.map(g => ({
+            name: `${g.category.label} (${g.tools.length})`,
+            value: g.tools.slice(0, 4).map(t => `\`${t.name}\``).join(', ')
+                + (g.tools.length > 4 ? ` _+${g.tools.length - 4} more_` : ''),
+            inline: false,
+        }));
+
+        await respondToInteractionEmbed(interaction, {
+            title: 'MCP Tool Catalog',
+            description: `**${totalTools} tools** across ${grouped.length} categories. Use \`/tools category:<name>\` to see details.`,
+            color: 0x5865f2,
+            fields,
+            footer: { text: 'Also available at GET /api/tools' },
+        });
+    }
 }

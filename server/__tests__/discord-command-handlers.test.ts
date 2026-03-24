@@ -25,6 +25,7 @@ import {
     handleConfigCommand,
     handleQuickstartCommand,
     handleHelpCommand,
+    handleToolsCommand,
     formatUptime,
     measureDbLatency,
 } from '../discord/command-handlers/info-commands';
@@ -772,6 +773,61 @@ describe('handleHelpCommand', () => {
         expect(fieldNames).toContain('Information');
         expect(fieldNames).toContain('Advanced');
         expect(fieldNames).toContain('Admin Configuration');
+    });
+});
+
+describe('handleToolsCommand', () => {
+    test('returns overview with all categories when no filter', async () => {
+        const interaction = makeInteraction('tools');
+        const getOption = () => undefined;
+
+        await handleToolsCommand(interaction, getOption);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string; fields: Array<{ name: string }> }>;
+        expect(embeds[0].title).toBe('MCP Tool Catalog');
+        expect(embeds[0].description).toContain('tools');
+        expect(embeds[0].fields.length).toBeGreaterThanOrEqual(7);
+    });
+
+    test('filters by category', async () => {
+        const interaction = makeInteraction('tools', [{ name: 'category', value: 'github' }]);
+        const getOption = (name: string) => name === 'category' ? 'github' : undefined;
+
+        await handleToolsCommand(interaction, getOption);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
+        expect(embeds[0].title).toContain('GitHub');
+        expect(embeds[0].fields[0].value).toContain('corvid_github_star_repo');
+    });
+
+    test('handles unknown category', async () => {
+        const interaction = makeInteraction('tools', [{ name: 'category', value: 'nonexistent' }]);
+        const getOption = (name: string) => name === 'category' ? 'nonexistent' : undefined;
+
+        await handleToolsCommand(interaction, getOption);
+
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('No tools found');
+    });
+
+    test('shows conditional and restricted flags', async () => {
+        const interaction = makeInteraction('tools', [{ name: 'category', value: 'code' }]);
+        const getOption = (name: string) => name === 'category' ? 'code' : undefined;
+
+        await handleToolsCommand(interaction, getOption);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ footer: { text: string } }>;
+        expect(embeds[0].footer.text).toContain('requires special service');
+    });
+
+    test('dispatches via handleInteraction', async () => {
+        const ctx = createTestContext();
+        const interaction = makeInteraction('tools');
+
+        await handleInteraction(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string }>;
+        expect(embeds[0].title).toBe('MCP Tool Catalog');
     });
 });
 
