@@ -34,6 +34,7 @@ files:
   - server/db/migrations/101_reputation_history.ts
   - server/db/migrations/102_conversation_access.ts
   - server/db/migrations/103_discord_muted_users.ts
+  - server/db/migrations/104_buddy_mode.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -490,10 +491,22 @@ Creates the `discord_muted_users` table for persisting Discord mutes across serv
 | `up` | `(db: Database)` | `void` | Creates `discord_muted_users` table with `user_id` (PK), `muted_by`, and `created_at` columns |
 | `down` | `(db: Database)` | `void` | Drops the `discord_muted_users` table |
 
+### 104_buddy_mode.ts
+
+Creates `buddy_pairings`, `buddy_sessions`, and `buddy_messages` tables for paired agent collaboration. Buddy mode pairs exactly 2 agents for back-and-forth review, as opposed to councils (3+ agents, voting, synthesis).
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `buddy_pairings`, `buddy_sessions`, `buddy_messages` tables with 7 indexes |
+| `down` | `(db: Database)` | `void` | Drops `buddy_messages`, `buddy_sessions`, `buddy_pairings` tables |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-24 | corvid-agent | Add migration 104 to spec coverage |
 | 2026-03-23 | corvid-agent | Add migrations 102, 103 to spec coverage |
 | 2026-03-23 | corvid-agent | Add missing migrations 090, 094, 095 to spec coverage |
 | 2026-03-22 | corvid-agent | Add migration 100 (agent_blocklist) to spec coverage |

@@ -105,6 +105,19 @@ export async function registerSlashCommands(
                     required: false,
                     autocomplete: true,
                 },
+                {
+                    name: 'buddy',
+                    description: 'Pair with a buddy agent for review (optional)',
+                    type: 3,
+                    required: false,
+                    autocomplete: true,
+                },
+                {
+                    name: 'rounds',
+                    description: 'Max buddy review rounds (default: 3)',
+                    type: 4,
+                    required: false,
+                },
             ],
         },
         {

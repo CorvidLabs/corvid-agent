@@ -116,6 +116,16 @@ export class WorkTaskService {
         this.conflictResolver = resolver;
     }
 
+    /** Buddy service — set after bootstrap. */
+    private _buddyService: import('../buddy/service').BuddyService | null = null;
+
+    /** Per-task buddy config. Maps taskId → { buddyAgentId, maxRounds }. */
+    private _buddyConfigMap = new Map<string, { buddyAgentId: string; maxRounds?: number }>();
+
+    setBuddyService(buddyService: import('../buddy/service').BuddyService): void {
+        this._buddyService = buddyService;
+    }
+
     /** TaskQueueService reference — set by bootstrap after both are created. */
     private _taskQueueService: { getQueueStatus(): { activeCount: number; pendingCount: number; maxConcurrency: number; activeByProject: Record<string, string> } } | null = null;
 
@@ -538,6 +548,7 @@ export class WorkTaskService {
             // Track priority in memory
             this.setTaskPriority(task, priority);
             this.storeTierOverride(task.id, input.modelTier);
+            this.storeBuddyConfig(task.id, input);
 
             log.info('Work task queued behind active task', {
                 taskId: task.id,
@@ -580,6 +591,7 @@ export class WorkTaskService {
             // Track priority in memory
             this.setTaskPriority(task, priority);
             this.storeTierOverride(task.id, input.modelTier);
+            this.storeBuddyConfig(task.id, input);
 
             // Pause the preempted task and track preemption in memory
             pauseWorkTask(this.db, activeTask.id);
@@ -615,6 +627,9 @@ export class WorkTaskService {
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId, priority });
 
+        // Store buddy config if provided
+        this.storeBuddyConfig(task.id, input);
+
         this.emitCreationNotifications(task, input);
         return this.executeTask(task, agent, project);
     }
@@ -636,6 +651,65 @@ export class WorkTaskService {
             task.id,
             `Created work task (P${task.priority}): ${input.description.slice(0, 200)}`,
         );
+    }
+
+    /** Store buddy config for a task if provided in the input. */
+    private storeBuddyConfig(taskId: string, input: CreateWorkTaskInput): void {
+        if (input.buddyConfig?.buddyAgentId) {
+            this._buddyConfigMap.set(taskId, {
+                buddyAgentId: input.buddyConfig.buddyAgentId,
+                maxRounds: input.buddyConfig.maxRounds,
+            });
+
+            // Register a completion callback that triggers buddy review
+            this.onComplete(taskId, (completedTask) => {
+                this.triggerBuddyReview(completedTask).catch((err) => {
+                    log.warn('Failed to trigger buddy review', {
+                        taskId: completedTask.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            });
+        }
+    }
+
+    /** Trigger buddy review after a work task completes. */
+    private async triggerBuddyReview(task: WorkTask): Promise<void> {
+        const buddyConfig = this._buddyConfigMap.get(task.id);
+        if (!buddyConfig || !this._buddyService) return;
+
+        // Only review successful completions
+        if (task.status !== 'completed') {
+            this._buddyConfigMap.delete(task.id);
+            return;
+        }
+
+        log.info('Triggering buddy review', {
+            taskId: task.id,
+            buddyAgentId: buddyConfig.buddyAgentId,
+        });
+
+        const reviewPrompt = [
+            `Review this completed work task:`,
+            ``,
+            `**Task:** ${task.description}`,
+            task.branchName ? `**Branch:** ${task.branchName}` : '',
+            task.prUrl ? `**PR:** ${task.prUrl}` : '',
+            task.summary ? `\n**Summary:**\n${task.summary.slice(0, 4000)}` : '',
+            ``,
+            `Please review the work and provide feedback. If the PR URL is available, review the changes.`,
+        ].filter(Boolean).join('\n');
+
+        await this._buddyService.startSession({
+            leadAgentId: task.agentId,
+            buddyAgentId: buddyConfig.buddyAgentId,
+            prompt: reviewPrompt,
+            source: (task.source as 'web' | 'discord' | 'algochat' | 'cli' | 'agent') || 'web',
+            workTaskId: task.id,
+            maxRounds: buddyConfig.maxRounds,
+        });
+
+        this._buddyConfigMap.delete(task.id);
     }
 
     /**

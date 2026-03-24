@@ -25,13 +25,14 @@ import * as reputation from './reputation';
 import * as schedules from './schedules';
 import * as sessions from './sessions';
 import * as webhooks from './webhooks';
+import * as buddy from './buddy';
 import * as work from './work';
 import * as workflows from './workflows';
 
 // ── Domain modules (order: tables first, then indexes) ──────────────
 
 const domains = [
-    agents, algochat, auth, contacts, councils, credits, discord, flock,
+    agents, algochat, auth, buddy, contacts, councils, credits, discord, flock,
     marketplace, memory, modelExams, monitoring, notifications, projects,
     reputation, schedules, sessions, webhooks, work, workflows,
 ] as const;
@@ -46,7 +47,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 103;
+const SCHEMA_VERSION = 104;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -141,6 +142,11 @@ const MIGRATIONS: Record<number, string[]> = {
     103: [
         // Persist Discord muted users across restarts
         ...discord.tables.filter((s) => s.includes('discord_muted_users')),
+    ],
+    104: [
+        // Buddy mode: paired agent collaboration
+        ...buddy.tables,
+        ...buddy.indexes,
     ],
 };
 

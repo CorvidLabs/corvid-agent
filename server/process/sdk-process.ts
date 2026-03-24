@@ -107,6 +107,8 @@ export interface SdkProcessOptions {
     skillPrompt?: string;
     /** When true, disable ALL tools — pure conversation mode for untrusted users. */
     conversationOnly?: boolean;
+    /** When provided, only these built-in tools are allowed — all others are disallowed. */
+    toolAllowList?: string[];
 }
 
 /** All built-in Claude Code tools that must be blocked in conversation-only mode. */
@@ -142,6 +144,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         personaPrompt,
         skillPrompt,
         conversationOnly,
+        toolAllowList,
     } = options;
 
     const abortController = new AbortController();
@@ -302,9 +305,13 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
 
     // Conversation-only mode: block ALL built-in tools. No file ops, no bash, no web, nothing.
     // This is the security lockdown for untrusted public-facing sessions.
+    // toolAllowList mode: only allow specific tools (e.g. read-only for buddy review).
     const systemDisallowed: string[] = [];
     if (conversationOnly) {
         systemDisallowed.push(...ALL_BUILTIN_TOOLS);
+    } else if (toolAllowList && toolAllowList.length > 0) {
+        const allowed = new Set(toolAllowList);
+        systemDisallowed.push(...ALL_BUILTIN_TOOLS.filter(t => !allowed.has(t)));
     }
     // Plan mode tools (EnterPlanMode, ExitPlanMode) require an interactive user
     // to approve plans. They're incompatible with bypassPermissions mode and will

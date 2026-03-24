@@ -24,6 +24,7 @@ files:
   - server/db/schema/webhooks.ts
   - server/db/schema/work.ts
   - server/db/schema/workflows.ts
+  - server/db/schema/buddy.ts
 db_tables:
   - schema_version
   - projects
@@ -86,6 +87,9 @@ db_tables:
   - project_skills
   - agent_usdc_revenue
   - discord_muted_users
+  - buddy_pairings
+  - buddy_sessions
+  - buddy_messages
 depends_on: []
 ---
 

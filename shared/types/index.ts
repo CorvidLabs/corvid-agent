@@ -19,3 +19,4 @@ export * from './flock-directory';
 export * from './agent-config';
 export * from './plugins';
 export * from './variants';
+export * from './buddy';
