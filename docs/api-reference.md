@@ -70,6 +70,12 @@ Role-based access levels:
 - [Feed](#feed)
 - [AlgoChat](#algochat)
 - [Wallets](#wallets)
+- [Tool Catalog](#tool-catalog)
+- [OpenRouter](#openrouter)
+- [Variants](#variants)
+- [GitHub PR Diff](#github-pr-diff)
+- [Marketplace Analytics](#marketplace-analytics)
+- [Health](#health)
 
 ---
 
@@ -827,6 +833,8 @@ Cron-based and event-driven scheduling with approval policies, bulk operations, 
 | GET | `/api/scheduler/health` | Scheduler health | any |
 | GET | `/api/scheduler/system-state` | Live system state | any |
 | GET | `/api/github/status` | GitHub integration status | any |
+| GET | `/api/schedules/pipeline-templates` | List pipeline templates | any |
+| GET | `/api/schedules/pipeline-templates/{name}` | Get pipeline template by name | any |
 
 ### Create Schedule
 
@@ -934,6 +942,51 @@ curl http://localhost:3000/api/scheduler/health \
   "recentFailures": 0
 }
 ```
+
+### Pipeline Templates
+
+List available pipeline templates for creating multi-step scheduled pipelines.
+
+```bash
+curl http://localhost:3000/api/schedules/pipeline-templates \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "code-review-pipeline",
+    "name": "Code Review Pipeline",
+    "description": "Multi-step code review with linting and testing",
+    "steps": [...]
+  }
+]
+```
+
+### Get Pipeline Template
+
+```bash
+curl http://localhost:3000/api/schedules/pipeline-templates/code-review-pipeline \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "id": "code-review-pipeline",
+  "name": "Code Review Pipeline",
+  "description": "Multi-step code review with linting and testing",
+  "steps": [
+    { "name": "lint", "action": { "type": "work_task", "prompt": "Run linter" } },
+    { "name": "test", "action": { "type": "work_task", "prompt": "Run tests" } }
+  ]
+}
+```
+
+**404** if template name not found.
 
 ---
 
@@ -4612,6 +4665,428 @@ curl -X POST http://localhost:3000/api/wallets/ALGO7XYZ1234.../credits \
 
 ```json
 { "ok": true, "balance": 600 }
+```
+
+---
+
+## Tool Catalog
+
+Discoverable MCP tool listing. Returns all registered tools, optionally filtered or grouped by category.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/tools` | List all tools | any |
+
+### Query Parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `category` | string | — | Filter tools by category |
+| `grouped` | `"true"` | — | When `true`, returns tools grouped by category |
+
+### List Tools
+
+```bash
+curl http://localhost:3000/api/tools \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+[
+  {
+    "name": "corvid_recall_memory",
+    "description": "Recall a stored memory by key",
+    "category": "memory",
+    "inputSchema": { ... }
+  }
+]
+```
+
+### List Tools Grouped
+
+```bash
+curl "http://localhost:3000/api/tools?grouped=true" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "memory": [
+    { "name": "corvid_recall_memory", "description": "Recall a stored memory by key", ... }
+  ],
+  "github": [
+    { "name": "corvid_github_create_pr", "description": "Create a pull request", ... }
+  ]
+}
+```
+
+---
+
+## OpenRouter
+
+OpenRouter model discovery. Provides endpoints for listing available models with pricing information for the dashboard model selector.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/openrouter/status` | Provider availability | any |
+| GET | `/api/openrouter/models` | List all OpenRouter models | any |
+| GET | `/api/openrouter/models/configured` | List models in cost table | any |
+
+### Provider Status
+
+```bash
+curl http://localhost:3000/api/openrouter/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "available",
+  "info": { "name": "openrouter", "type": "openrouter" },
+  "configuredModels": 12
+}
+```
+
+**503** if OpenRouter provider is not registered:
+
+```json
+{ "status": "unavailable", "reason": "OpenRouter provider not registered" }
+```
+
+### List Models
+
+```bash
+curl "http://localhost:3000/api/openrouter/models?q=claude" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `q` | string | — | Search filter on model id/name |
+
+**Response (200):**
+
+```json
+{
+  "models": [
+    {
+      "id": "anthropic/claude-sonnet-4",
+      "name": "Claude Sonnet 4",
+      "contextLength": 200000,
+      "pricing": {
+        "promptPerMillion": 3.0,
+        "completionPerMillion": 15.0
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+### Configured Models
+
+```bash
+curl http://localhost:3000/api/openrouter/models/configured \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "models": [
+    { "id": "anthropic/claude-sonnet-4", "provider": "openrouter", "costPerInputToken": 0.000003 }
+  ]
+}
+```
+
+---
+
+## Variants
+
+Agent behavior variants. Create reusable configuration presets (model, temperature, system prompt overrides) and apply them to agents.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/variants` | List all variants | any |
+| POST | `/api/variants` | Create variant | operator |
+| GET | `/api/variants/{id}` | Get variant by ID | any |
+| PUT | `/api/variants/{id}` | Update variant | operator |
+| DELETE | `/api/variants/{id}` | Delete variant | operator |
+| GET | `/api/agents/{id}/variant` | Get agent's active variant | any |
+| POST | `/api/agents/{id}/variant` | Apply variant to agent | operator |
+| DELETE | `/api/agents/{id}/variant` | Remove variant from agent | operator |
+
+### Create Variant
+
+```bash
+curl -X POST http://localhost:3000/api/variants \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Creative Writer",
+    "description": "Higher temperature for creative tasks",
+    "config": {
+      "temperature": 0.9,
+      "systemPrompt": "You are a creative writing assistant."
+    }
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "var-abc123",
+  "name": "Creative Writer",
+  "description": "Higher temperature for creative tasks",
+  "config": { "temperature": 0.9, "systemPrompt": "You are a creative writing assistant." },
+  "createdAt": "2026-03-20T10:00:00Z"
+}
+```
+
+### Apply Variant to Agent
+
+```bash
+curl -X POST http://localhost:3000/api/agents/agent-1/variant \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "variantId": "var-abc123" }'
+```
+
+**Response (201):**
+
+```json
+{ "ok": true }
+```
+
+### Remove Variant from Agent
+
+```bash
+curl -X DELETE http://localhost:3000/api/agents/agent-1/variant \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{ "ok": true }
+```
+
+**404** if no variant is assigned.
+
+---
+
+## GitHub PR Diff
+
+Proxies a GitHub pull request diff request, returning the unified diff as a string. Requires `GITHUB_TOKEN` or `GH_TOKEN` environment variable for private repos.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/github/pr-diff` | Get PR unified diff | viewer |
+
+### Query Parameters
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `owner` | string | yes | Repository owner |
+| `repo` | string | yes | Repository name |
+| `number` | integer | yes | Pull request number |
+
+All parameters are validated against `^[a-zA-Z0-9._-]+$` (owner, repo) and `^\d+$` (number) to prevent SSRF.
+
+### Get PR Diff
+
+```bash
+curl "http://localhost:3000/api/github/pr-diff?owner=CorvidLabs&repo=corvid-agent&number=1400" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+"diff --git a/server/index.ts b/server/index.ts\nindex 1234567..abcdef0 100644\n--- a/server/index.ts\n+++ b/server/index.ts\n@@ -1,3 +1,4 @@\n+import { newFeature } from './feature';\n ..."
+```
+
+**400** if `owner`, `repo`, or `number` is missing or fails validation.
+
+---
+
+## Marketplace Analytics
+
+Seller analytics and buyer usage views for marketplace listings.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/marketplace/listings/{id}/analytics` | Seller analytics for a listing | any |
+| GET | `/api/marketplace/usage` | Buyer usage summary | any |
+
+### Seller Analytics
+
+```bash
+curl "http://localhost:3000/api/marketplace/listings/listing-1/analytics?days=30" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | integer | 30 | Number of days to look back |
+
+**Response (200):**
+
+```json
+{
+  "listingId": "listing-1",
+  "totalPurchases": 45,
+  "totalRevenue": 1250,
+  "dailyBreakdown": [
+    { "date": "2026-03-23", "purchases": 3, "revenue": 75 }
+  ]
+}
+```
+
+**404** if listing not found.
+
+### Buyer Usage
+
+```bash
+curl "http://localhost:3000/api/marketplace/usage?tenantId=tenant-1" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tenantId` | string | yes | Tenant ID |
+
+**Response (200):**
+
+```json
+{
+  "tenantId": "tenant-1",
+  "totalSpend": 320,
+  "activeLicenses": 5,
+  "usageByListing": [
+    { "listingId": "listing-1", "name": "Code Reviewer", "spend": 120 }
+  ]
+}
+```
+
+**400** if `tenantId` is missing.
+
+---
+
+## Health
+
+Health check endpoints for liveness probes, readiness probes, full health status, and history. These endpoints do **not** require authentication.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/health` | Full health check | none |
+| GET | `/api/health` | Full health check (alias) | none |
+| GET | `/health/live` | Liveness probe | none |
+| GET | `/health/ready` | Readiness probe | none |
+| GET | `/api/health/history` | Health history snapshots | none |
+
+### Liveness Probe
+
+Returns immediately. Used by orchestrators (k8s, Docker) to confirm the process is alive.
+
+```bash
+curl http://localhost:3000/health/live
+```
+
+**Response (200):**
+
+```json
+{ "status": "alive" }
+```
+
+### Readiness Probe
+
+Checks that dependencies (database, providers) are ready to accept traffic.
+
+```bash
+curl http://localhost:3000/health/ready
+```
+
+**Response (200):**
+
+```json
+{ "status": "ready" }
+```
+
+**503** if not ready:
+
+```json
+{ "status": "not_ready", "reason": "Database not connected" }
+```
+
+### Full Health Check
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "healthy",
+  "uptime": 86400,
+  "version": "0.46.0",
+  "checks": {
+    "database": "ok",
+    "scheduler": "ok",
+    "providers": "ok"
+  }
+}
+```
+
+**503** if unhealthy.
+
+### Health History
+
+```bash
+curl "http://localhost:3000/api/health/history?hours=24&limit=100"
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hours` | integer (1–720) | 24 | Look-back window in hours |
+| `limit` | integer (1–1000) | 100 | Max snapshots to return |
+
+**Response (200):**
+
+```json
+{
+  "uptime": { "totalChecks": 288, "healthyChecks": 286, "uptimePercent": 99.31 },
+  "snapshots": [
+    {
+      "id": "snap-1",
+      "status": "healthy",
+      "checkedAt": "2026-03-24T00:00:00Z",
+      "details": { ... }
+    }
+  ]
+}
 ```
 
 ---
