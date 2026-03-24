@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, mkdirSync, openSync, closeSync, constants as fsConstants } from 'fs';
+import { writeFileSync, mkdirSync, openSync, closeSync, constants as fsConstants } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { c, printError, printSuccess, printWarning, printHeader } from '../render';
@@ -97,9 +97,7 @@ export async function provisionCommand(options: ProvisionOptions): Promise<void>
 
     // Step 5: Write output
     const outputDir = outDir ?? join(process.cwd(), `corvid-agent-${name}`);
-    if (!existsSync(outputDir)) {
-        mkdirSync(outputDir, { recursive: true });
-    }
+    mkdirSync(outputDir, { recursive: true });
 
     const envPath = join(outputDir, '.env');
     let fd: number;
