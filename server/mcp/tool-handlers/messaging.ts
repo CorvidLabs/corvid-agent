@@ -44,8 +44,9 @@ export async function handleSendMessage(
     }
 
     try {
-        // Channel affinity is enforced via prompt-level routing in
-        // prependRoutingContext() and getResponseRoutingPrompt().
+        // TODO(#1067): When ctx.sessionSource is 'discord', consider warning or blocking
+        // cross-channel sends. For now, channel affinity is enforced via prompt-level routing
+        // hints in prependRoutingContext() and getResponseRoutingPrompt().
 
         // Resolve to_agent by name (case-insensitive) or ID
         const available = await ctx.agentDirectory.listAvailable();
