@@ -45,6 +45,7 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `triggerSynthesis` | `db: Database, processManager: ProcessManager, launchId: string, chairmanOverride?: string` | `{ ok: true; synthesisSessionId: string } \| { ok: false; error: string; status: number }` | Trigger chairman synthesis stage — delegates to synthesis module with injected infrastructure callbacks. |
 | `abortCouncil` | `db: Database, processManager: ProcessManager, launchId: string` | `{ ok: true; killed: number; aggregated: number } \| { ok: false; error: string; status: number }` | Manually end a council: kills running sessions, aggregates available responses, marks complete. |
 | `startCouncilChat` | `db: Database, processManager: ProcessManager, launchId: string, message: string` | `CouncilChatResult \| CouncilChatError` | Start or resume a follow-up chat session with the chairman agent about a completed council's synthesis. |
+| `waitForSessions` | `processManager: ProcessManager, sessionIds: string[], timeoutMs?: number` | `Promise<WaitForSessionsResult>` | Wait for multiple sessions to complete or timeout. Resolves with partial results on timeout rather than rejecting. |
 | `buildDiscussionPrompt` | `originalPrompt: string, memberResponses: { agentId: string; agentName: string; label: string; content: string }[], priorDiscussion: CouncilDiscussionMessage[], round: number` | `string` | Build the prompt sent to each agent during a discussion round, including original question, member responses, and prior discussion history. |
 | `formatDiscussionMessages` | `messages: CouncilDiscussionMessage[]` | `string` | Format discussion messages grouped by round into a readable string. |
 | `aggregateSessionResponses` | `db: Database, allSessions: Session[]` | `string[]` | Collect last assistant response from each session, labelled by agent name. Prefers reviewer sessions over member sessions. Re-exported from synthesis module. |
@@ -65,6 +66,7 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `GovernanceVoteCastEvent` | `{ launchId: string; agentId: string; vote: 'approve' \| 'reject' \| 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }` — emitted when an agent casts a governance vote. |
 | `GovernanceVoteResolvedEvent` | `{ launchId: string; status: 'approved' \| 'rejected' \| 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }` — emitted when a governance vote is resolved. |
 | `GovernanceQuorumReachedEvent` | `{ launchId: string; weightedApprovalRatio: number; threshold: number }` — emitted when a governance vote reaches quorum. |
+| `WaitForSessionsResult` | `{ completed: string[]; timedOut: string[] }` — result of waiting for multiple sessions, reporting which completed and which timed out. |
 
 ### Exported Functions (server/councils/governance.ts)
 
