@@ -232,7 +232,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         tool(
             'corvid_manage_schedule',
             'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
-            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom. ' +
+            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, discord_post, custom. ' +
             'Use action="list" to view schedules, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
                 action: z.enum(['list', 'create', 'update', 'pause', 'resume', 'history']).describe('What to do'),
@@ -241,13 +241,16 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create/update)'),
                 interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create/update)'),
                 schedule_actions: z.array(z.object({
-                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom'),
+                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, daily_review, discord_post, custom'),
                     repos: z.array(z.string()).optional().describe('Target repo(s) in owner/name format'),
                     description: z.string().optional().describe('Work task description'),
                     project_id: z.string().optional().describe('Project ID'),
                     to_agent_id: z.string().optional().describe('Target agent ID (for send_message)'),
-                    message: z.string().optional().describe('Message content (for send_message)'),
+                    message: z.string().optional().describe('Message content (for send_message or discord_post)'),
                     prompt: z.string().optional().describe('Arbitrary prompt (for custom action type)'),
+                    channel_id: z.string().optional().describe('Discord channel ID (for discord_post)'),
+                    embed_title: z.string().optional().describe('Embed title (for discord_post)'),
+                    embed_color: z.number().optional().describe('Embed color as decimal (for discord_post)'),
                 })).optional().describe('Actions to perform (for create/update)'),
                 approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
                 max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),

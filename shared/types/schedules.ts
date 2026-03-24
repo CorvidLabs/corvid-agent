@@ -18,6 +18,7 @@ export type ScheduleActionType =
     | 'status_checkin'
     | 'marketplace_billing'
     | 'flock_testing'
+    | 'discord_post'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
@@ -41,6 +42,12 @@ export interface ScheduleAction {
     prompt?: string;
     maxImprovementTasks?: number;
     focusArea?: string;
+    /** Discord channel ID for discord_post actions. */
+    channelId?: string;
+    /** Optional embed title for discord_post actions. */
+    embedTitle?: string;
+    /** Optional embed color (decimal) for discord_post actions. */
+    embedColor?: number;
 }
 
 // ─── Pipeline Types ─────────────────────────────────────────────────────────

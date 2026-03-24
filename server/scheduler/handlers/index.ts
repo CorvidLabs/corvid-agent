@@ -16,4 +16,5 @@ export {
 } from './maintenance';
 export { execMarketplaceBilling } from './marketplace-billing';
 export { execFlockTesting } from './flock-testing';
+export { execDiscordPost } from './discord-post';
 export type { HandlerContext } from './types';

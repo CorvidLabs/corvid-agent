@@ -11,6 +11,7 @@ files:
   - server/scheduler/handlers/maintenance.ts
   - server/scheduler/handlers/review.ts
   - server/scheduler/handlers/flock-testing.ts
+  - server/scheduler/handlers/discord-post.ts
   - server/scheduler/handlers/work-task.ts
 db_tables:
   - schedule_executions
@@ -89,6 +90,12 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 |----------|-----------|---------|-------------|
 | `execMarketplaceBilling` | `(ctx: HandlerContext, executionId: string)` | `void` | Processes marketplace subscription renewals, past-due expiries, and cancelled subscription expiries via `SubscriptionService.processRenewals` |
 
+#### discord-post.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `execDiscordPost` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Sends a message or embed to a Discord channel via the bot API. Requires `action.channelId` and `DISCORD_BOT_TOKEN`. Supports plain text (`message` only) or rich embeds (`embedTitle` + `message`). |
+
 #### maintenance.ts
 
 | Function | Parameters | Returns | Description |
@@ -118,6 +125,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 14. `execStarRepos` and `execForkRepos` require `action.repos` to be non-empty. Repos are starred/forked sequentially, not in parallel.
 15. `execSendMessage` requires `toAgentId` and `message` in the action.
 16. `execCustom` requires `action.prompt` to be non-empty.
+16a. `execDiscordPost` requires `action.channelId` to be non-empty and `DISCORD_BOT_TOKEN` env var to be set. If `embedTitle` is provided, sends an embed; otherwise sends plain text. Both `message` and `embedTitle` being absent is an error.
 17. `execReviewPrs` creates a separate session per repo (not one session for all repos) and instructs the agent to skip PRs it has already reviewed (deduplication via comment check). Default `maxPrs` is 5 per repo.
 18. Multi-tenant support: handlers that need an agent use `ctx.resolveScheduleTenantId` to resolve the tenant.
 19. `execStatusCheckin` evaluates system state via `SystemStateDetector`, resolves agent name (or first 8 chars of ID as fallback), and broadcasts via `sendOnChainToSelf` with format `[STATUS_CHECKIN] Agent: {name} | System: {states} | Schedules running: {count}`.
@@ -154,6 +162,18 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 - **When** `execWorkTask` is called
 - **Then** execution is immediately marked as `failed` with "Work task service not available"
 
+### Scenario: Discord post with embed
+
+- **Given** an action with `type: 'discord_post'`, `channelId: '123'`, `embedTitle: 'Daily Digest'`, and `message: 'Summary text'`
+- **When** `execDiscordPost` is called with `DISCORD_BOT_TOKEN` set
+- **Then** a Discord embed is sent to channel 123 with title "Daily Digest" and description "Summary text", and execution is marked `completed`
+
+### Scenario: Discord post plain text
+
+- **Given** an action with `type: 'discord_post'`, `channelId: '123'`, and `message: 'Hello'` (no `embedTitle`)
+- **When** `execDiscordPost` is called
+- **Then** a plain text message "Hello" is sent to channel 123
+
 ### Scenario: Daily review summary
 
 - **Given** `ctx.dailyReviewService` is available and returns execution/PR/health stats
@@ -169,6 +189,10 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | No project configured | Execution marked `failed` with "No project configured for agent" |
 | Required service is null | Execution marked `failed` with service-specific message |
 | Missing required action fields | Execution marked `failed` with field-specific message |
+| No `channelId` for discord_post | Execution marked `failed` with "No channelId provided" |
+| No `DISCORD_BOT_TOKEN` env var | Execution marked `failed` with "DISCORD_BOT_TOKEN not configured" |
+| No message or embedTitle | Execution marked `failed` with "No message or embedTitle provided" |
+| Discord API returns non-OK | Execution marked `failed` with status code and error body |
 | Handler throws an exception | Caught internally, execution marked `failed` with error message |
 | On-chain publish fails (reputation) | Silently caught; attestation still created off-chain |
 
@@ -209,3 +233,4 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 |------|--------|--------|
 | 2026-03-13 | corvid-agent | Initial spec |
 | 2026-03-17 | corvid-agent | Added `execFlockTesting` handler for automated Flock Directory agent testing |
+| 2026-03-23 | corvid-agent | Added `execDiscordPost` handler for direct Discord channel posting |
