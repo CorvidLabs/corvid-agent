@@ -52,6 +52,10 @@ export const DEFAULT_CORE_TOOLS: readonly string[] = [
     'corvid_github_comment_on_pr',
     'corvid_github_follow_user',
 
+    // ── Discord messaging ──────────────────────────────────────────────────────
+    'corvid_discord_send_message',
+    'corvid_discord_send_image',
+
     // ── Notifications & reputation ───────────────────────────────────────────
     'corvid_notify_owner',
     'corvid_ask_owner',

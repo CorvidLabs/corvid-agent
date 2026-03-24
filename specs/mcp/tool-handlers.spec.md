@@ -26,6 +26,7 @@ files:
   - server/mcp/tool-handlers/contacts.ts
   - server/mcp/tool-handlers/observations.ts
   - server/mcp/tool-handlers/browser.ts
+  - server/mcp/tool-handlers/discord.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -110,6 +111,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleBoostObservation` | `(ctx, { id, score_boost? })` | `Promise<CallToolResult>` | Boost an observation's relevance score |
 | `handleDismissObservation` | `(ctx, { id })` | `Promise<CallToolResult>` | Dismiss an observation to prevent graduation |
 | `handleObservationStats` | `(ctx)` | `Promise<CallToolResult>` | Get observation count statistics by status |
+| `handleDiscordSendMessage` | `(ctx, { channel_id, message, reply_to? })` | `Promise<CallToolResult>` | Send a text message to a Discord channel by ID |
+| `handleDiscordSendImage` | `(ctx, { channel_id, image_base64, filename?, content_type?, message? })` | `Promise<CallToolResult>` | Send an image (base64) to a Discord channel, optionally with a text message |
 | `handleBrowser` | `(ctx, { action, tab_id?, url?, query?, selector?, code?, text?, key?, value?, direction?, amount?, x?, y?, full_page?, max_length?, ms? })` | `Promise<CallToolResult>` | Browser automation via Playwright: tab management, navigation, reading, interaction, screenshots, JS execution |
 
 ## Invariants
@@ -175,6 +178,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `server/improvement/health-store.ts` | `getRecentSnapshots`, `computeTrends`, `formatTrendsForPrompt` |
 | `server/db/repo-blocklist.ts` | `listRepoBlocklist`, `addToRepoBlocklist`, `removeFromRepoBlocklist`, `isRepoBlocked` |
 | `server/db/contacts.ts` | `findContactByName`, `findContactByPlatformId` |
+| `server/discord/embeds.ts` | `sendDiscordMessage`, `sendMessageWithFiles` |
+| `server/lib/delivery-tracker.ts` | `getDeliveryTracker` |
 | `server/db/observations.ts` | `recordObservation`, `listObservations`, `searchObservations`, `boostObservation`, `dismissObservation`, `countObservations` |
 
 ### Consumed By
@@ -204,3 +209,4 @@ Internal constants (not env-configurable):
 | 2026-02-24 | corvid-agent | Updated files list after refactor into domain-specific modules (#233) |
 | 2026-03-19 | corvid-agent | Documented observation tool handlers |
 | 2026-03-20 | corvid-agent | Added handleBrowser and browser.ts |
+| 2026-03-23 | corvid-agent | Added Discord messaging tools: handleDiscordSendMessage, handleDiscordSendImage (#1422) |

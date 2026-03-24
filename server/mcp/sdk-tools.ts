@@ -4,6 +4,7 @@ import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
+import { handleDiscordSendMessage, handleDiscordSendImage } from './tool-handlers/discord';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { getAgent } from '../db/agents';
@@ -41,6 +42,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_comment_on_pr',
     'corvid_github_follow_user',
     'corvid_manage_workflow',
+    'corvid_discord_send_message',
+    'corvid_discord_send_image',
     'corvid_notify_owner',
     'corvid_ask_owner',
     'corvid_configure_notifications',
@@ -601,6 +604,34 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 limit: z.number().optional().describe('Max results to return (default 20)'),
             },
             async (args) => handleFlockDirectory(ctx, args),
+        ),
+
+        // ─── Discord messaging ──────────────────────────────────────────
+        tool(
+            'corvid_discord_send_message',
+            'Send a text message to a specific Discord channel. ' +
+            'Requires the channel ID (numeric snowflake). ' +
+            'Use this to proactively post messages, status updates, or replies to Discord channels.',
+            {
+                channel_id: z.string().describe('Discord channel ID (numeric snowflake)'),
+                message: z.string().describe('The text message to send'),
+                reply_to: z.string().optional().describe('Message ID to reply to (creates a threaded reply)'),
+            },
+            async (args) => handleDiscordSendMessage(ctx, args),
+        ),
+        tool(
+            'corvid_discord_send_image',
+            'Send an image or file to a specific Discord channel. ' +
+            'Provide the image as a base64-encoded string. ' +
+            'Optionally include a text message alongside the image.',
+            {
+                channel_id: z.string().describe('Discord channel ID (numeric snowflake)'),
+                image_base64: z.string().describe('Base64-encoded image data'),
+                filename: z.string().optional().describe('Filename for the attachment (default: "image.png")'),
+                content_type: z.string().optional().describe('MIME type (default: "image/png")'),
+                message: z.string().optional().describe('Optional text message to include with the image'),
+            },
+            async (args) => handleDiscordSendImage(ctx, args),
         ),
 
         // ─── Contact identity lookup ────────────────────────────────────
