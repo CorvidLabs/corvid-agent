@@ -17,14 +17,23 @@ No coding experience required. You describe what you want in plain English, and 
 
 ## Quick start
 
+**Option A — one-line installer** (auto-detects everything):
 ```bash
-# One-line install
 curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
 
-# Or clone and init manually
+**Option B — clone and setup**:
+```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
-corvid-agent init          # auto-detects your AI provider, creates .env, installs deps
+bun run setup              # guided wizard: detects AI provider, creates .env, installs deps
 bun run dev                # starts server + dashboard at http://localhost:3000
+```
+
+**Option C — Docker** (no Bun/Node required):
+```bash
+git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
+cp .env.example .env       # edit with your API keys (or leave defaults for local Ollama)
+docker compose up -d       # builds and starts at http://localhost:3000
 ```
 
 Add corvid-agent tools to your AI editor (Claude Code, Cursor, Copilot):

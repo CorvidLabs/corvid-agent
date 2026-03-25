@@ -4,6 +4,7 @@ You're about to get your own AI developer. Here's how.
 
 **Pick your path:**
 - [I just want to try it](#the-fastest-way-30-seconds) — one command, no setup
+- [I prefer Docker](#docker-one-command) — `docker compose up` and done
 - [I'm a developer](#for-developers) — connect GitHub, set up automations
 - [I'm setting this up for a team](#for-teams) — shared server, chat integrations
 - [I need enterprise deployment](#for-enterprise) — Docker, K8s, multi-tenant
@@ -26,6 +27,22 @@ The installer will:
 **That's it.** No API key needed if you have Claude Code or Ollama installed.
 
 > **Don't have a terminal open?** On Mac, press `Cmd + Space`, type "Terminal", and hit Enter. On Windows, use WSL2 ([install guide](https://learn.microsoft.com/en-us/windows/wsl/install)).
+
+---
+
+## Docker (one command)
+
+If you have Docker installed and prefer containers:
+
+```bash
+git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
+cp .env.example .env       # edit with your API keys (or leave defaults for Ollama)
+docker compose up -d
+```
+
+Open `http://localhost:3000` — that's it. Your data persists in a Docker volume.
+
+To stop: `docker compose down`. To update: `git pull && docker compose up -d --build`.
 
 ---
 
@@ -239,8 +256,10 @@ Need production-grade deployment with security and compliance?
 | Command | What it does |
 |---------|-------------|
 | `curl ... \| bash` | Install everything from scratch |
+| `bun run setup` | Guided setup wizard (same as `corvid-agent init`) |
 | `bun run dev` | Start the server |
 | `bun run try` | Try it without any setup (sandbox mode) |
+| `docker compose up -d` | Start with Docker (no Bun required) |
 | `corvid-agent` | Interactive terminal chat |
 | `corvid-agent init` | Guided setup wizard |
 | `corvid-agent init --mcp` | Add tools to your AI editor |
