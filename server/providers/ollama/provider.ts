@@ -126,12 +126,12 @@ export class OllamaProvider extends BaseLlmProvider {
     }
 
     /**
-     * Get the host for a specific model. Cloud models (suffix "-cloud") require
-     * the local Ollama instance because cloud proxying uses locally-stored auth.
+     * Get the host for a specific model. Cloud models (suffix "-cloud" or ":cloud")
+     * require the local Ollama instance because cloud proxying uses locally-stored auth.
      * If OLLAMA_HOST points to a non-local address, cloud models fall back to localhost.
      */
     private hostForModel(model: string): string {
-        if (model.includes('-cloud')) {
+        if (model.includes('-cloud') || model.endsWith(':cloud')) {
             const configuredHost = this.host;
             // If host is already localhost, use it directly
             if (configuredHost.includes('localhost') || configuredHost.includes('127.0.0.1')) {

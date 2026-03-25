@@ -241,11 +241,14 @@ describe('FallbackManager', () => {
     let fallback: FallbackManager;
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const savedOpenaiKey = process.env.OPENAI_API_KEY;
+    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
 
     beforeEach(() => {
         // Set dummy API keys so registry doesn't auto-restrict to ollama-only
         process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
         process.env.OPENAI_API_KEY = 'sk-test-dummy';
+        // Explicitly allow all providers to avoid cross-test env pollution
+        process.env.ENABLED_PROVIDERS = 'anthropic,openai,ollama,openrouter,cursor';
         registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
         registry.register(createMockProvider('anthropic', ['claude-sonnet-4-5-20250929']));
         registry.register(createMockProvider('openai', ['gpt-4o']));
@@ -257,6 +260,8 @@ describe('FallbackManager', () => {
         else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
         if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
         else process.env.OPENAI_API_KEY = savedOpenaiKey;
+        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
     });
 
     test('DEFAULT_FALLBACK_CHAINS has expected chains', () => {
