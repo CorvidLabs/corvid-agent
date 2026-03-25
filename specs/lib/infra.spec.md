@@ -176,6 +176,12 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `DeviceAuthorizeSchema` | Auth Flow | Validates device authorization: `userCode`, `tenantId`, `email`, `approve` (all required). |
 | `PSKContactNicknameSchema` | PSK Contacts | Validates PSK contact: `nickname` (required). |
 | `CreditGrantSchema` | Wallet Credits | Validates credit grant: `amount` (positive finite number), optional `reference`. |
+| `PermissionGrantSchema` | Permissions | Validates permission grant: `agent_id`, `action` (required), optional `granted_by`, `reason`, `expires_at`, `tenant_id`. |
+| `PermissionRevokeSchema` | Permissions | Validates permission revoke: requires `grant_id` or `agent_id`, optional `action`, `revoked_by`, `reason`, `tenant_id`. |
+| `PermissionEmergencyRevokeSchema` | Permissions | Validates emergency revoke: `agent_id` (required), optional `revoked_by`, `reason`. |
+| `PermissionCheckSchema` | Permissions | Validates permission check: `agent_id`, `tool_name` (required), optional `session_id`, `tenant_id`. |
+| `PermissionApplyRoleSchema` | Permissions | Validates role apply: `agent_id`, `role` (required), optional `granted_by`, `tenant_id`, `expires_at`, `reason`. |
+| `PermissionRevokeRoleSchema` | Permissions | Validates role revoke: `agent_id`, `role` (required), optional `revoked_by`, `tenant_id`, `reason`. |
 | `CastVoteSchema` | Councils | Validates council vote: `agentId` (required), `vote` (approve/reject/abstain), optional `reason`. |
 | `HumanApprovalSchema` | Councils | Validates human approval: `approvedBy` (required). |
 | `CreateProposalSchema` | Governance Proposals | Validates proposal creation: `councilId`, `title`, `authorId` (required), optional `description`, `governanceTier` (0-2), `affectedPaths`, `quorumThreshold`, `minimumVoters`. |
