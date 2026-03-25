@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { assertSnowflake, assertInteractionToken, buildFooterText, buildFooterWithStats, extractMentionsFromEmbed, extractContentFromEmbed, extractUrlsFromEmbed, stripUrlsFromEmbed } from '../discord/embeds';
+import { assertSnowflake, assertInteractionToken, buildFooterText, buildFooterWithStats, extractMentionsFromEmbed, extractContentFromEmbed, extractUrlsFromEmbed, stripUrlsFromEmbed, ensureDiscordEmbedRenderable } from '../discord/embeds';
 
 describe('assertSnowflake', () => {
     test('accepts valid snowflake IDs', () => {
@@ -227,5 +227,31 @@ describe('stripUrlsFromEmbed', () => {
         const original = { description: 'https://example.com text' };
         stripUrlsFromEmbed(original);
         expect(original.description).toBe('https://example.com text');
+    });
+});
+
+describe('ensureDiscordEmbedRenderable', () => {
+    test('adds link hint when URL strip removed all description text', () => {
+        const stripped = { footer: { text: 'Corvid · opus' } };
+        const out = ensureDiscordEmbedRenderable(stripped, { urlStripRemovedAllText: true });
+        expect(out.description).toContain('next message');
+        expect(out.footer?.text).toBe('Corvid · opus');
+    });
+
+    test('adds generic body when footer exists but description is empty', () => {
+        const out = ensureDiscordEmbedRenderable(
+            { description: undefined, footer: { text: 'Agent · sid:abcd1234 · working...' } },
+        );
+        expect(out.description).toBe('No text to display.');
+    });
+
+    test('leaves embed unchanged when description is present', () => {
+        const embed = { description: 'Hello', footer: { text: 'footer' } };
+        expect(ensureDiscordEmbedRenderable(embed)).toEqual(embed);
+    });
+
+    test('does not add fallback for image-only embeds', () => {
+        const embed = { image: { url: 'attachment://x.png' }, footer: { text: 'f' } };
+        expect(ensureDiscordEmbedRenderable(embed)).toEqual(embed);
     });
 });

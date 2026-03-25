@@ -33,6 +33,13 @@ import {
 
 const log = createLogger('DiscordThreadManager');
 
+/** Drop whitespace-only chunks so Discord never receives empty-looking embed bodies. */
+function visibleEmbedParts(text: string): string[] {
+    return splitEmbedDescription(text.trim())
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+}
+
 /**
  * Normalize a SQLite UTC timestamp by appending 'Z' if it doesn't already
  * have a timezone indicator, so `new Date()` parses it as UTC rather than local.
@@ -169,7 +176,7 @@ export function subscribeForResponseWithEmbed(
         const text = buffer;
         buffer = '';
 
-        const parts = splitEmbedDescription(text);
+        const parts = visibleEmbedParts(text);
         for (const part of parts) {
             await sendEmbed(delivery, botToken, threadId, {
                 description: part,
@@ -206,7 +213,7 @@ export function subscribeForResponseWithEmbed(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = collapseCodeBlocks(extractContentText(contentBlocks));
+            const content = collapseCodeBlocks(extractContentText(contentBlocks)).trim();
 
             if (content) {
                 receivedAnyContent = true;
@@ -234,23 +241,26 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'tool_status' && event.statusMessage) {
-            receivedAnyActivity = true;
-            const now = Date.now();
-            if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
-                lastStatusTime = now;
-                sendEmbed(delivery, botToken, threadId, {
-                    description: `⏳ ${event.statusMessage}`,
-                    color: 0x95a5a6,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
-                }).catch((err) => {
-                    log.debug('Tool status embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
-                });
-            }
-            if (now - lastTypingTime >= TYPING_REFRESH_MS) {
-                lastTypingTime = now;
-                sendTypingIndicator(botToken, threadId).catch((err) => {
-                    log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
-                });
+            const statusText = event.statusMessage.trim();
+            if (statusText) {
+                receivedAnyActivity = true;
+                const now = Date.now();
+                if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
+                    lastStatusTime = now;
+                    sendEmbed(delivery, botToken, threadId, {
+                        description: `⏳ ${statusText}`,
+                        color: 0x95a5a6,
+                        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+                    }).catch((err) => {
+                        log.debug('Tool status embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
+                if (now - lastTypingTime >= TYPING_REFRESH_MS) {
+                    lastTypingTime = now;
+                    sendTypingIndicator(botToken, threadId).catch((err) => {
+                        log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
             }
         }
 
@@ -521,7 +531,7 @@ export function subscribeForInlineResponse(
         const text = buffer;
         buffer = '';
 
-        const parts = splitEmbedDescription(text);
+        const parts = visibleEmbedParts(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
             const embedPayload = {
@@ -548,7 +558,7 @@ export function subscribeForInlineResponse(
     const inlineCallback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
-            const content = collapseCodeBlocks(extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined));
+            const content = collapseCodeBlocks(extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined)).trim();
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
@@ -655,7 +665,7 @@ export function subscribeForAdaptiveInlineResponse(
         const text = buffer;
         buffer = '';
 
-        const parts = splitEmbedDescription(text);
+        const parts = visibleEmbedParts(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
             const embedPayload = {
@@ -721,7 +731,7 @@ export function subscribeForAdaptiveInlineResponse(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = collapseCodeBlocks(extractContentText(contentBlocks));
+            const content = collapseCodeBlocks(extractContentText(contentBlocks)).trim();
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
@@ -740,19 +750,22 @@ export function subscribeForAdaptiveInlineResponse(
         }
 
         if (event.type === 'tool_status' && event.statusMessage) {
-            receivedAnyActivity = true;
-            // Upgrade to progress mode on first tool use
-            upgradeToProgressMode();
-            const now = Date.now();
-            if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
-                lastStatusTime = now;
-                editEmbed(delivery, botToken, channelId, progressMessageId, {
-                    description: `\u23f3 ${event.statusMessage}`,
-                    color: 0x5865f2,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
-                }).catch((err) => {
-                    log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
-                });
+            const statusText = event.statusMessage.trim();
+            if (statusText) {
+                receivedAnyActivity = true;
+                // Upgrade to progress mode on first tool use
+                upgradeToProgressMode();
+                const now = Date.now();
+                if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
+                    lastStatusTime = now;
+                    editEmbed(delivery, botToken, channelId, progressMessageId, {
+                        description: `\u23f3 ${statusText}`,
+                        color: 0x5865f2,
+                        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+                    }).catch((err) => {
+                        log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
             }
         }
 
@@ -930,7 +943,7 @@ export function subscribeForInlineProgressResponse(
         const text = buffer;
         buffer = '';
 
-        const parts = splitEmbedDescription(text);
+        const parts = visibleEmbedParts(text);
         for (let i = 0; i < parts.length; i++) {
             let sentId: string | null = null;
             const embedPayload = {
@@ -981,7 +994,7 @@ export function subscribeForInlineProgressResponse(
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
-            const content = collapseCodeBlocks(extractContentText(contentBlocks));
+            const content = collapseCodeBlocks(extractContentText(contentBlocks)).trim();
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
@@ -1000,17 +1013,20 @@ export function subscribeForInlineProgressResponse(
         }
 
         if (event.type === 'tool_status' && event.statusMessage) {
-            receivedAnyActivity = true;
-            const now = Date.now();
-            if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
-                lastStatusTime = now;
-                editEmbed(delivery, botToken, channelId, progressMessageId, {
-                    description: `\u23f3 ${event.statusMessage}`,
-                    color: 0x5865f2,
-                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
-                }).catch((err) => {
-                    log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
-                });
+            const statusText = event.statusMessage.trim();
+            if (statusText) {
+                receivedAnyActivity = true;
+                const now = Date.now();
+                if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
+                    lastStatusTime = now;
+                    editEmbed(delivery, botToken, channelId, progressMessageId, {
+                        description: `\u23f3 ${statusText}`,
+                        color: 0x5865f2,
+                        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+                    }).catch((err) => {
+                        log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
             }
         }
 
