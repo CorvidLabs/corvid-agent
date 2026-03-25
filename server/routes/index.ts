@@ -444,7 +444,6 @@ async function handleRoutes(
     // Flock Testing routes (test results, stats, on-demand test trigger)
     const flockTestResponse = await handleFlockTestingRoutes(req, url, db, null, context, {
         flockDirectory,
-        agentMessenger,
     });
     if (flockTestResponse) return flockTestResponse;
 

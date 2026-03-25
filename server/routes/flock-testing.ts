@@ -2,10 +2,9 @@
  * Flock Directory testing routes — Agent test results, stats, and on-demand test trigger.
  */
 import type { Database } from 'bun:sqlite';
-import { FlockTestRunner, type TestTransport } from '../flock-directory/testing/runner';
+import { FlockTestRunner } from '../flock-directory/testing/runner';
+import { createA2ATransport } from '../flock-directory/testing/a2a-transport';
 import type { FlockDirectoryService } from '../flock-directory/service';
-import type { AgentMessenger } from '../algochat/agent-messenger';
-import { getAgentByWalletAddress } from '../db/agents';
 import type { RequestContext } from '../middleware/guards';
 import { json, notFound, safeNumParam, handleRouteError } from '../lib/response';
 
@@ -15,7 +14,6 @@ const testCooldowns = new Map<string, number>();
 
 export interface FlockTestingDeps {
     flockDirectory?: FlockDirectoryService | null;
-    agentMessenger?: AgentMessenger | null;
 }
 
 export function handleFlockTestingRoutes(
@@ -37,13 +35,9 @@ export function handleFlockTestingRoutes(
     if (runMatch && method === 'POST') {
         const agentId = runMatch[1];
         const flockDirectory = deps?.flockDirectory;
-        const agentMessenger = deps?.agentMessenger;
 
         if (!flockDirectory) {
             return json({ error: 'Flock Directory not available' }, 503);
-        }
-        if (!agentMessenger) {
-            return json({ error: 'Agent messenger not configured — cannot send test challenges' }, 503);
         }
 
         // Enforce cooldown
@@ -73,29 +67,7 @@ export function handleFlockTestingRoutes(
 
         return (async () => {
             try {
-                const transport: TestTransport = {
-                    async sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null> {
-                        // agentAddress is an Algorand wallet address — resolve to agent UUID
-                        const targetAgent = getAgentByWalletAddress(db, agentAddress);
-                        if (!targetAgent) return null;
-
-                        try {
-                            const result = await agentMessenger.invokeAndWait(
-                                {
-                                    fromAgentId: 'flock-tester',
-                                    toAgentId: targetAgent.id,
-                                    content: `[FLOCK-TEST] ${message}`,
-                                    threadId,
-                                },
-                                timeoutMs,
-                            );
-                            return result.response;
-                        } catch {
-                            return null;
-                        }
-                    },
-                };
-
+                const transport = createA2ATransport(db);
                 const runner = new FlockTestRunner(db, transport);
                 const result = await runner.runTest(agent.id, agent.address, { mode: 'full', decayPerDay: 0.02 });
 

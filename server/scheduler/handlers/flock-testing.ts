@@ -3,51 +3,19 @@
  *
  * Runs the test suite against all active agents in the Flock Directory,
  * scoring them on responsiveness, accuracy, context, efficiency, safety,
- * and bot verification. Updates reputation scores based on test results.
+ * and bot verification. Uses A2A HTTP transport to avoid self-test deadlocks
+ * and keep test conversations off-chain.
  */
 import type { AgentSchedule } from '../../../shared/types';
 import { updateExecutionStatus } from '../../db/schedules';
 import { getAgentByWalletAddress } from '../../db/agents';
 import { FlockDirectoryService } from '../../flock-directory/service';
-import { FlockTestRunner, type TestTransport, type TestRunConfig } from '../../flock-directory/testing/runner';
+import { FlockTestRunner, type TestRunConfig } from '../../flock-directory/testing/runner';
+import { createA2ATransport } from '../../flock-directory/testing/a2a-transport';
 import { createLogger } from '../../lib/logger';
 import type { HandlerContext } from './types';
 
 const log = createLogger('FlockTestingHandler');
-
-/**
- * AlgoChat-based test transport.
- * Sends a message to an agent via AlgoChat and waits for a response.
- */
-function createAlgoChatTransport(ctx: HandlerContext, senderAgentId: string): TestTransport {
-    return {
-        async sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null> {
-            if (!ctx.agentMessenger) return null;
-
-            // agentAddress is an Algorand wallet address — resolve to agent UUID
-            const targetAgent = getAgentByWalletAddress(ctx.db, agentAddress);
-            if (!targetAgent) {
-                log.warn('No agent found for wallet address', { agentAddress });
-                return null;
-            }
-
-            try {
-                const result = await ctx.agentMessenger.invokeAndWait(
-                    {
-                        fromAgentId: senderAgentId,
-                        toAgentId: targetAgent.id,
-                        content: `[FLOCK-TEST] ${message}`,
-                        threadId,
-                    },
-                    timeoutMs,
-                );
-                return result.response;
-            } catch {
-                return null;
-            }
-        },
-    };
-}
 
 /**
  * Run automated tests against all active Flock Directory agents.
@@ -56,19 +24,15 @@ function createAlgoChatTransport(ctx: HandlerContext, senderAgentId: string): Te
  * 1. Runs the full test suite (or random subset based on schedule config)
  * 2. Records results to the database
  * 3. Updates the agent's reputation score with the test-derived score
+ *
+ * Uses A2A HTTP transport so test challenges go over standard HTTP,
+ * keeping test conversations off-chain while results are recorded on-chain.
  */
 export async function execFlockTesting(
     ctx: HandlerContext,
     executionId: string,
     schedule: AgentSchedule,
 ): Promise<void> {
-    if (!ctx.agentMessenger) {
-        updateExecutionStatus(ctx.db, executionId, 'failed', {
-            result: 'Agent messenger not configured — cannot send test challenges',
-        });
-        return;
-    }
-
     try {
         const flockService = new FlockDirectoryService(ctx.db);
         const activeAgents = flockService.listActive();
@@ -80,7 +44,7 @@ export async function execFlockTesting(
             return;
         }
 
-        const transport = createAlgoChatTransport(ctx, schedule.agentId);
+        const transport = createA2ATransport(ctx.db);
         const runner = new FlockTestRunner(ctx.db, transport);
 
         const config: TestRunConfig = {
