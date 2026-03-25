@@ -219,8 +219,20 @@ function createBuddyDiscordCallback(
                 ? BUDDY_LEAD_COLOR
                 : BUDDY_REVIEW_COLOR;
 
-        const roleLabel = event.role === 'lead' ? '💬' : event.approved ? '✅' : '🔍';
-        const roundLabel = `Round ${event.round}/${event.maxRounds}`;
+        // Clear, descriptive labels so the flow is obvious
+        let statusLabel: string;
+        if (event.role === 'lead' && event.round === 1) {
+            statusLabel = 'Initial Response';
+        } else if (event.role === 'lead') {
+            statusLabel = `Revised Response (Round ${event.round})`;
+        } else if (event.approved) {
+            statusLabel = 'Approved';
+        } else {
+            statusLabel = 'Review & Feedback';
+        }
+
+        const roleIcon = event.role === 'lead' ? '💬' : event.approved ? '✅' : '🔍';
+        const roundInfo = `${event.round}/${event.maxRounds}`;
 
         // Truncate content for Discord embed limit (4096 chars)
         const content = event.content.length > 3900
@@ -232,8 +244,8 @@ function createBuddyDiscordCallback(
             color,
             footer: {
                 text: buildFooterText({
-                    agentName: `${roleLabel} ${event.agentName}`,
-                    status: `${event.role} · ${roundLabel}`,
+                    agentName: `${roleIcon} ${event.agentName}`,
+                    status: `${statusLabel} · Round ${roundInfo}`,
                 }),
             },
         });

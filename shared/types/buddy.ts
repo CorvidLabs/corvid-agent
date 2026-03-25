@@ -75,6 +75,9 @@ export interface CreateBuddySessionInput {
 /** Default read-only tools for buddy review sessions. */
 export const BUDDY_DEFAULT_TOOLS = ['Read', 'Glob', 'Grep'] as const;
 
+/** MCP tools buddy agents can use for memory/context lookups. */
+export const BUDDY_DEFAULT_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'] as const;
+
 export interface BuddyConfig {
     buddyAgentId: string;
     maxRounds?: number;
