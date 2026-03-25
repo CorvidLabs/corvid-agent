@@ -1,6 +1,6 @@
 ---
 module: discord-message-commands
-version: 2
+version: 5
 status: draft
 files:
   - server/discord/command-handlers/message-commands.ts
@@ -46,7 +46,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 ## Invariants
 
 1. **Requires `PermissionLevel.BASIC` or higher** — rejects with permission error otherwise.
-2. **Both `agent` and `message` options are required**; responds with error if either is missing.
+2. **`agent` and `text` options are required** (legacy `message` option still accepted during rollout); responds with error if the body is missing. Optional **`project`** (autocomplete) overrides the agent default project when set. If `project` is omitted, resolution is the agent’s default project, else the first project in the DB — not a special “sandbox” unless that is how the project is named or configured.
 3. **Agent name matching is case-insensitive** and strips model suffixes like ` (claude-opus-4-6)`.
 4. **BASIC/STANDARD callers use restricted tools** — receive `MESSAGE_BUILTIN_TOOLS` + `MESSAGE_MCP_TOOLS`.
 5. **Trusted STANDARD channels may use full tools** — full access is granted when channel is in `message_full_tool_channel_ids`, the user is STANDARD+, and the channel's permission floor in `channel_permissions` is STANDARD+.
@@ -61,15 +61,21 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 
 ### Scenario: Successful message command
 
-- **Given** a user with BASIC permission sends `/message agent:CorvidAgent message:Hello`
+- **Given** a user with BASIC permission sends `/message` with agent CorvidAgent and text `Hello`
 - **When** `handleMessageCommand` is called
 - **Then** acknowledges the interaction, creates a restricted session with `MESSAGE_BUILTIN_TOOLS`, starts the process, and subscribes for inline response
 
 ### Scenario: Admin sends /message
 
-- **Given** an ADMIN user sends `/message agent:CorvidAgent message:fix the bug`
+- **Given** an ADMIN user sends `/message` with agent CorvidAgent and text `fix the bug`
 - **When** `handleMessageCommand` is called
 - **Then** the session is created with full tool access (no `/message` allow-list restrictions), and session name prefix `Discord admin message:`
+
+### Scenario: User picks an explicit project on /message
+
+- **Given** projects `A` and `B` exist, the chosen agent defaults to `A`, and the user sends `/message` with `project:B`
+- **When** `handleMessageCommand` is called
+- **Then** the session uses project `B` (same resolution rules as `/session`)
 
 ### Scenario: STANDARD user in trusted channel sends /message
 
@@ -79,7 +85,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 
 ### Scenario: Message with buddy
 
-- **Given** a user sends `/message agent:CorvidAgent message:review this buddy:SonnetAgent`
+- **Given** a user sends `/message` with agent CorvidAgent, text `review this`, and buddy SonnetAgent
 - **When** the lead agent responds and buddy session starts
 - **Then** each buddy round is posted to the Discord channel as a colored embed (lead color vs buddy color)
 
@@ -100,7 +106,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | Condition | Behavior |
 |-----------|----------|
 | Permission level below BASIC | Responds with permission denied message |
-| Missing agent or message option | Responds with "Please provide both an agent and a message." |
+| Missing agent or message body (`text` / legacy `message`) | Responds with "Please provide both an agent and a message." |
 | No agents configured | Responds with "No agents configured." |
 | Agent name not found | Responds with available agent names |
 | Buddy agent same as lead | Responds with "An agent cannot be its own buddy." |
@@ -137,3 +143,5 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | 2026-03-20 | corvid-agent | Initial spec |
 | 2026-03-24 | corvid-agent | v2: Remove admin full-access bypass — all /message sessions use restricted tools. Add visible buddy conversations via onRoundComplete callback. |
 | 2026-03-25 | corvid-agent | v3: Reintroduce admin full-access `/message` sessions with explicit `Discord admin message:` naming and centralized permission-based policy resolver. |
+| 2026-03-25 | corvid-agent | v4: Optional `/message` `project` parameter (autocomplete); align project resolution with `/session`. |
+| 2026-03-25 | corvid-agent | v5: Slash option `message` renamed to `text` (handler still accepts legacy `message`); document default project resolution. |

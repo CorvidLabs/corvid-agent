@@ -9,7 +9,7 @@
  * round-by-round embeds in the channel.
  */
 
-import type { SessionSource } from '../../../shared/types';
+import type { Project, SessionSource } from '../../../shared/types';
 import type { BuddyRoundEvent } from '../../../shared/types/buddy';
 import { listAgents } from '../../db/agents';
 import { saveMentionSession } from '../../db/discord-mention-sessions';
@@ -112,12 +112,14 @@ export async function handleMessageCommand(
   }
 
   const agentName = getOption('agent');
-  const message = getOption('message');
+  // Option was renamed from `message` → `text` to avoid clashing with command name `/message` in some clients.
+  const message = getOption('text') ?? getOption('message');
   if (!agentName || !message) {
     await respondToInteraction(interaction, 'Please provide both an agent and a message.');
     return;
   }
 
+  const projectNameOpt = getOption('project');
   const buddyName = getOption('buddy');
   const buddyRounds = getOption('rounds');
 
@@ -161,9 +163,19 @@ export async function handleMessageCommand(
   }
 
   const allProjects = listProjects(ctx.db);
-  const project = agent.defaultProjectId
-    ? (allProjects.find((p) => p.id === agent.defaultProjectId) ?? allProjects[0])
-    : allProjects[0];
+  let project: Project | undefined;
+  if (projectNameOpt) {
+    project = allProjects.find((p) => p.name.toLowerCase() === projectNameOpt.toLowerCase());
+    if (!project) {
+      const names = allProjects.map((p) => p.name).join(', ');
+      await respondToInteraction(interaction, `Project not found: "${projectNameOpt}". Available: ${names}`);
+      return;
+    }
+  } else {
+    project = agent.defaultProjectId
+      ? (allProjects.find((p) => p.id === agent.defaultProjectId) ?? allProjects[0])
+      : allProjects[0];
+  }
   if (!project) {
     await respondToInteraction(interaction, 'No projects configured.');
     return;

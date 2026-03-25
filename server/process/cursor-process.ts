@@ -89,6 +89,19 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       cursorSessionId = event.session_id as string;
       log.debug(`Captured cursor session ID: ${cursorSessionId}`);
     }
+
+    // cursor-agent emits `result` events after each turn, not just at session end.
+    // Forwarding these causes the thread-manager to unsubscribe prematurely,
+    // dropping all subsequent assistant messages. The manager's handleExit
+    // emits `session_exited` when the process truly ends.
+    if (event.type === 'result') {
+      log.debug('Filtering cursor-agent result event (will use session_exited instead)', {
+        sessionId: session.id,
+        subtype: event.subtype,
+      });
+      return;
+    }
+
     onEvent(event);
   });
 
@@ -149,7 +162,16 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       },
     });
 
-    readStream(currentProc.stdout, onEvent);
+    readStream(currentProc.stdout, (event) => {
+      if (event.type === 'result') {
+        log.debug('Filtering cursor-agent result event on resume', {
+          sessionId: session.id,
+          subtype: event.subtype,
+        });
+        return;
+      }
+      onEvent(event);
+    });
     readStream(currentProc.stderr, (event) => {
       const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
       log.debug(`cursor-agent stderr (resume): ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
@@ -246,6 +268,7 @@ async function readStream(
 
         try {
           const event = JSON.parse(trimmed) as ClaudeStreamEvent;
+          log.debug('cursor-agent event', { type: event.type, subtype: event.subtype });
           onEvent(event);
         } catch {
           // Non-JSON output (spinners, progress bars) — skip silently
