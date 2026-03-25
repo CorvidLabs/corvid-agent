@@ -118,27 +118,53 @@ export async function handleMessageCommand(
     // Start typing indicator
     sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});
 
-    // All /message sessions use restricted tools — no admin bypass.
-    // For full tool access, use /session or @mention.
+    // When buddy mode is active, skip the inline response entirely and let
+    // the buddy service handle the full conversation as visible embeds.
+    // This prevents the double-response problem (lead responding inline AND
+    // again inside the buddy round loop).
+    if (buddyAgent && ctx.buddyService) {
+        const maxRounds = buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined;
+        ctx.buddyService.startSession({
+            leadAgentId: agent.id,
+            buddyAgentId: buddyAgent.id,
+            prompt: withAuthorContext(message, userId, username, channelId),
+            source: 'discord',
+            maxRounds,
+            onRoundComplete: createBuddyDiscordCallback(ctx, channelId),
+        }).catch(err => {
+            log.warn('Failed to start buddy session for /message', {
+                agentName: agent.name,
+                buddyAgentId: buddyAgent!.id,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
+
+        log.info('Message command started (buddy mode)', {
+            agentName: agent.name,
+            buddyName: buddyAgent.name,
+            userId,
+            channelId,
+            hasBuddy: true,
+        });
+        return;
+    }
+
+    // Non-buddy mode: standard inline response flow
     const session = createSession(ctx.db, {
         projectId: project.id,
         agentId: agent.id,
         name: `Discord message:${channelId}`,
         initialPrompt: message,
         source: 'discord' as SessionSource,
-        // No workDir — restricted tools means no git isolation needed
     });
 
     const textWithContext = withAuthorContext(message, userId, username, channelId);
 
-    // All /message sessions get the same sandboxed tool set
     ctx.processManager.startProcess(session, textWithContext, {
         toolAllowList: MESSAGE_BUILTIN_TOOLS,
         mcpToolAllowList: MESSAGE_MCP_TOOLS,
     });
 
-    // Subscribe for inline response — replies appear as channel messages
-    // that users can reply to for follow-up conversation
     const agentModel = agent.model || 'unknown';
     const agentDisplayColor = agent.displayColor;
     const projectNameForFooter = project.name;
@@ -146,7 +172,6 @@ export async function handleMessageCommand(
     ctx.subscribeForInlineResponse(
         session.id, channelId, interaction.id, agent.name, agentModel,
         (botMessageId) => {
-            // Track the mention session so follow-up replies work
             const info = {
                 sessionId: session.id,
                 agentName: agent.name,
@@ -156,35 +181,13 @@ export async function handleMessageCommand(
                 channelId,
                 conversationOnly: true,
             };
-            // Persist to in-memory map
             ctx.mentionSessions.set(botMessageId, info);
-            // Persist to DB for recovery after restart
             try {
                 saveMentionSession(ctx.db, botMessageId, info);
             } catch (err) {
                 log.warn('Failed to persist message session', {
                     botMessageId,
                     error: err instanceof Error ? err.message : String(err),
-                });
-            }
-
-            // Trigger buddy review after response is posted (if buddy was specified)
-            if (buddyAgent && ctx.buddyService) {
-                const maxRounds = buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined;
-                ctx.buddyService.startSession({
-                    leadAgentId: agent.id,
-                    buddyAgentId: buddyAgent.id,
-                    prompt: message,
-                    source: 'discord',
-                    maxRounds,
-                    // Post each buddy round as a visible embed in the channel
-                    onRoundComplete: createBuddyDiscordCallback(ctx, channelId),
-                }).catch(err => {
-                    log.warn('Failed to start buddy review for /message', {
-                        sessionId: session.id,
-                        buddyAgentId: buddyAgent!.id,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
                 });
             }
         },
@@ -197,7 +200,7 @@ export async function handleMessageCommand(
         userId,
         channelId,
         toolAccess: 'memory+read',
-        hasBuddy: !!buddyAgent,
+        hasBuddy: false,
     });
 }
 

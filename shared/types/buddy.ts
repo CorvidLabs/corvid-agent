@@ -66,6 +66,8 @@ export interface CreateBuddySessionInput {
     workTaskId?: string;
     sessionId?: string;
     maxRounds?: number;
+    /** MCP tools to allow for buddy agents (e.g. memory recall). */
+    mcpToolAllowList?: string[];
     /** Optional callback for posting round outputs to Discord or other channels. */
     onRoundComplete?: BuddyRoundCallback;
 }
