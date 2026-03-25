@@ -174,6 +174,9 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `respondToInteraction` | `(interaction, content)` | `Promise<void>` | Send a text response to an interaction callback |
 | `respondToInteractionEmbed` | `(interaction, embed, ephemeral?)` | `Promise<void>` | Send an embed response to an interaction callback |
 | `respondToInteractionEmbeds` | `(interaction, embeds, ephemeral?)` | `Promise<void>` | Send multiple embeds in a single interaction response |
+| `deferInteraction` | `(interaction, ephemeral?)` | `Promise<void>` | Defer a slash command response — shows "thinking..." in Discord; follow up with `editDeferredResponse()` |
+| `editDeferredResponse` | `(interaction, content, embeds?)` | `Promise<void>` | Edit the deferred "thinking..." response with final content (requires `DISCORD_APP_ID` env var) |
+| `respondEphemeral` | `(interaction, content)` | `Promise<void>` | Send an ephemeral (only-visible-to-user) text response to an interaction callback |
 | `acknowledgeButton` | `(interaction, message)` | `Promise<void>` | Acknowledge a button press with an ephemeral message |
 | `sendEmbed` | `(delivery, botToken, channelId, embed)` | `Promise<void>` | Send an embed to a channel |
 | `sendMessageWithEmbed` | `(delivery, botToken, channelId, content?, embed)` | `Promise<void>` | Send text content + embed to a channel |

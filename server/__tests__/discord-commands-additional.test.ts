@@ -18,8 +18,15 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 
 let db: Database;
-let capturedResponse: { type: number; data: Record<string, unknown> } | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let capturedResponse: Record<string, any> | null = null;
 const originalFetch = globalThis.fetch;
+const originalAppId = process.env.DISCORD_APP_ID;
+
+/** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
+function getContent(): string {
+    return (capturedResponse?.data?.content ?? capturedResponse?.content) as string;
+}
 
 function createTestConfig(): DiscordBridgeConfig {
     return {
@@ -82,6 +89,7 @@ beforeEach(() => {
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
     capturedResponse = null;
+    process.env.DISCORD_APP_ID = 'test-app-id';
 
     // Mock fetch to capture interaction responses
     globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
@@ -97,6 +105,8 @@ beforeEach(() => {
 afterEach(() => {
     db.close();
     globalThis.fetch = originalFetch;
+    if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
+    else delete process.env.DISCORD_APP_ID;
 });
 
 describe('Discord /tasks command', () => {
@@ -199,7 +209,7 @@ describe('Discord /session model suffix stripping', () => {
         ]));
 
         expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        const content = getContent();
         // Should succeed and mention the agent, not show "Agent not found"
         expect(content).toContain('TestAgent');
         expect(content).not.toContain('Agent not found');
@@ -216,7 +226,7 @@ describe('Discord /session model suffix stripping', () => {
         ]));
 
         expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        const content = getContent();
         expect(content).toContain('MyAssistant');
         expect(content).not.toContain('Agent not found');
     });

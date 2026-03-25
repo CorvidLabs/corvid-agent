@@ -6,6 +6,16 @@
  */
 
 import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
+
+// Mock worktree creation — git is not available in test environments.
+mock.module('../lib/worktree', () => ({
+    createWorktree: async () => ({ success: true, worktreeDir: '/tmp/mock-worktree' }),
+    resolveAndCreateWorktree: async () => ({ success: true, workDir: '/tmp/mock-worktree' }),
+    generateChatBranchName: (agent: string, id: string) => `chat/${agent}/${id.slice(0, 8)}`,
+    getWorktreeBaseDir: (dir: string) => `${dir}/.worktrees`,
+    removeWorktree: async () => ({ success: true }),
+}));
+
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleInteraction, type InteractionContext } from '../discord/commands';
@@ -40,8 +50,15 @@ import {
 } from '../discord/command-handlers/session-commands';
 
 let db: Database;
-let capturedResponse: { type: number; data: Record<string, unknown> } | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let capturedResponse: Record<string, any> | null = null;
 const originalFetch = globalThis.fetch;
+const originalAppId = process.env.DISCORD_APP_ID;
+
+/** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
+function getResponseContent(): string {
+    return (capturedResponse?.data?.content ?? capturedResponse?.content) as string;
+}
 
 function createTestConfig(overrides: Partial<DiscordBridgeConfig> = {}): DiscordBridgeConfig {
     return {
@@ -154,6 +171,7 @@ beforeEach(() => {
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
     capturedResponse = null;
+    process.env.DISCORD_APP_ID = 'test-app-id';
 
     globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
         if (init?.body) {
@@ -168,6 +186,8 @@ beforeEach(() => {
 afterEach(() => {
     db.close();
     globalThis.fetch = originalFetch;
+    if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
+    else delete process.env.DISCORD_APP_ID;
 });
 
 // ── Autocomplete Handler ────────────────────────────────────────────
@@ -1092,7 +1112,7 @@ describe('handleSessionCommand', () => {
 
         await handleSessionCommand(ctx, interaction, PermissionLevel.STANDARD, getOption, '200000000000000001');
 
-        const content = capturedResponse!.data?.content as string;
+        const content = getResponseContent();
         expect(content).toContain('Failed to create');
     });
 
@@ -1110,7 +1130,7 @@ describe('handleSessionCommand', () => {
 
         await handleSessionCommand(ctx, interaction, PermissionLevel.STANDARD, getOption, '200000000000000001');
 
-        const content = capturedResponse!.data?.content as string;
+        const content = getResponseContent();
         expect(content).toContain('Session started');
         expect(content).toContain('TestAgent');
         expect(ctx.processManager.startProcess).toHaveBeenCalled();
@@ -1132,7 +1152,7 @@ describe('handleSessionCommand', () => {
 
         await handleSessionCommand(ctx, interaction, PermissionLevel.STANDARD, getOption, '200000000000000001');
 
-        const content = capturedResponse!.data?.content as string;
+        const content = getResponseContent();
         expect(content).toContain('TestAgent');
         expect(content).not.toContain('Agent not found');
     });
