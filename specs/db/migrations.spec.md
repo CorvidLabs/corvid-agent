@@ -35,6 +35,7 @@ files:
   - server/db/migrations/102_conversation_access.ts
   - server/db/migrations/103_discord_muted_users.ts
   - server/db/migrations/104_buddy_mode.ts
+  - server/db/migrations/105_session_restart_pending.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -502,10 +503,22 @@ Creates `buddy_pairings`, `buddy_sessions`, and `buddy_messages` tables for pair
 | `up` | `(db: Database)` | `void` | Creates `buddy_pairings`, `buddy_sessions`, `buddy_messages` tables with 7 indexes |
 | `down` | `(db: Database)` | `void` | Drops `buddy_messages`, `buddy_sessions`, `buddy_pairings` tables |
 
+### 105_session_restart_pending.ts
+
+Adds `restart_pending` flag to `sessions` table. When the server shuts down or restarts, active sessions are marked with this flag so they can be automatically resumed on next startup, rather than being silently lost.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `restart_pending` INTEGER DEFAULT 0 column to `sessions` and creates partial index `idx_sessions_restart_pending` |
+| `down` | `(db: Database)` | `void` | Drops the index and `restart_pending` column |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-25 | corvid-agent | Add migration 105 to spec coverage |
 | 2026-03-24 | corvid-agent | Add migration 104 to spec coverage |
 | 2026-03-23 | corvid-agent | Add migrations 102, 103 to spec coverage |
 | 2026-03-23 | corvid-agent | Add missing migrations 090, 094, 095 to spec coverage |
