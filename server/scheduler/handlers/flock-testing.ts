@@ -37,6 +37,13 @@ export async function execFlockTesting(
         const flockService = new FlockDirectoryService(ctx.db);
         const activeAgents = flockService.listActive();
 
+        if (!ctx.agentMessenger) {
+            updateExecutionStatus(ctx.db, executionId, 'failed', {
+                result: 'Agent messenger not configured',
+            });
+            return;
+        }
+
         if (activeAgents.length === 0) {
             updateExecutionStatus(ctx.db, executionId, 'completed', {
                 result: 'No active agents in Flock Directory to test',

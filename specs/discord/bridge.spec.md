@@ -94,11 +94,18 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `handleSessionCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/session` slash command — creates a threaded conversation with a selected agent |
 | `handleWorkCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/work` slash command — creates an autonomous work task |
 
+### Exported Constants (from command-handlers/message-commands.ts)
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MESSAGE_BUILTIN_TOOLS` | `['Read', 'Glob', 'Grep']` | Read-only built-in tools for all `/message` sessions |
+| `MESSAGE_MCP_TOOLS` | `['corvid_recall_memory', 'corvid_read_on_chain_memories']` | MCP tools for all `/message` sessions |
+
 ### Exported Functions (from command-handlers/message-commands.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — starts a pure conversation session (no tools, no code execution) with a selected agent. Available at BASIC permission level for untrusted users. Persists the mention session to both the in-memory map and the database for follow-up replies. |
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — starts a sandboxed conversation session with restricted tools. Available at BASIC permission level. Persists the mention session to both the in-memory map and the database for follow-up replies. |
 
 ### Exported Functions (from command-handlers/info-commands.ts)
 

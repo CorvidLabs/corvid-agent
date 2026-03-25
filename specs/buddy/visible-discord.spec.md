@@ -22,8 +22,15 @@ Makes buddy agent conversations visible to Discord users in real-time. When a bu
 
 | Type | Description |
 |------|-------------|
+| `BuddyServiceDeps` | Interface: `{ db: Database; processManager: ProcessManager }` |
 | `BuddyRoundCallback` | `(round: BuddyRoundEvent) => Promise<void>` — called after each agent turn |
 | `BuddyRoundEvent` | `{ buddySessionId: string; agentId: string; agentName: string; role: 'lead' \| 'buddy'; round: number; maxRounds: number; content: string; approved: boolean }` |
+
+### Exported Classes
+
+| Class | Description |
+|-------|-------------|
+| `BuddyService` | Manages buddy session lifecycle and the lead-buddy conversation loop |
 
 ### Changes to Existing Types
 
