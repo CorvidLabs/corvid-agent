@@ -1,6 +1,6 @@
 ---
 module: direct-process
-version: 1
+version: 2
 status: active
 files:
   - server/process/direct-process.ts
@@ -36,7 +36,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
 | `buildSessionMetrics` | `(state: SessionMetricsState)` | `DirectProcessMetrics` | Build a DirectProcessMetrics object from loop state variables. Pure function — derives `stallDetected` from `terminationReason` and maps field names |
 | `trackToolCall` | `(log: string[], toolName: string, outcome: 'ok' \| 'error' \| 'exception')` | `void` | Append a tool-call entry to the log, capped at 20 entries |
-| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
+| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, stall_repetitive_loop, stall_quality_exhausted, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
 | `buildResultEvent` | `(base: {...}, escalationInput: BuildEscalationInput)` | `ClaudeStreamEvent` | Build a result event with optional escalation metadata attached. Used for both success and error result events |
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
 | `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Re-exported from `context-management.ts` |
@@ -168,3 +168,4 @@ Internal constants:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-03-25 | corvid-agent | Add escalation handling for `stall_repetitive_loop` and `stall_quality_exhausted` termination reasons |

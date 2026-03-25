@@ -102,6 +102,17 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       return;
     }
 
+    // Synthesize tool_status events from cursor-agent's tool_call events
+    // so the Discord thread-manager can show "⏳ Reading file..." status.
+    // Cast needed: cursor-agent emits `tool_call` which isn't in ClaudeStreamEvent union.
+    const rawType = (event as { type: string }).type;
+    if (rawType === 'tool_call' && (event as { subtype?: string }).subtype === 'started') {
+      const toolStatus = describeCursorToolCall(event);
+      if (toolStatus) {
+        onEvent({ type: 'tool_status', statusMessage: toolStatus } as ClaudeStreamEvent);
+      }
+    }
+
     onEvent(event);
   });
 
@@ -169,6 +180,13 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
           subtype: event.subtype,
         });
         return;
+      }
+      const rawType = (event as { type: string }).type;
+      if (rawType === 'tool_call' && (event as { subtype?: string }).subtype === 'started') {
+        const toolStatus = describeCursorToolCall(event);
+        if (toolStatus) {
+          onEvent({ type: 'tool_status', statusMessage: toolStatus } as ClaudeStreamEvent);
+        }
       }
       onEvent(event);
     });
@@ -240,6 +258,48 @@ function buildArgs(project: Project, agent: Agent | null, worktree?: string, wor
   }
 
   return args;
+}
+
+/**
+ * Extract a human-readable description from a cursor-agent tool_call event.
+ * Returns e.g. "Reading package.json" or "Running: git status"
+ */
+// biome-ignore lint/suspicious/noExplicitAny: cursor-agent tool_call shape is dynamic
+function describeCursorToolCall(event: any): string | null {
+  const tc = event.tool_call;
+  if (!tc || typeof tc !== 'object') return null;
+
+  if (tc.readToolCall) {
+    const path = tc.readToolCall.args?.path;
+    return path ? `Reading ${basename(path)}` : 'Reading file';
+  }
+  if (tc.writeToolCall) {
+    const path = tc.writeToolCall.args?.path;
+    return path ? `Writing ${basename(path)}` : 'Writing file';
+  }
+  if (tc.editToolCall) {
+    const path = tc.editToolCall.args?.path;
+    return path ? `Editing ${basename(path)}` : 'Editing file';
+  }
+  if (tc.shellToolCall || tc.terminalToolCall) {
+    const cmd = (tc.shellToolCall ?? tc.terminalToolCall)?.args?.command;
+    return cmd ? `Running: ${cmd.slice(0, 60)}` : 'Running command';
+  }
+  if (tc.globToolCall || tc.listFilesToolCall) {
+    return 'Listing files';
+  }
+  if (tc.grepToolCall || tc.searchToolCall) {
+    const pattern = (tc.grepToolCall ?? tc.searchToolCall)?.args?.pattern;
+    return pattern ? `Searching: ${pattern.slice(0, 50)}` : 'Searching files';
+  }
+
+  const toolName = Object.keys(tc)[0]?.replace(/ToolCall$/, '');
+  return toolName ? `Using ${toolName}` : null;
+}
+
+function basename(p: string): string {
+  const idx = p.lastIndexOf('/');
+  return idx >= 0 ? p.slice(idx + 1) : p;
 }
 
 async function readStream(

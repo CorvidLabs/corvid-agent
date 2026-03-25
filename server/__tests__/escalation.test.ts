@@ -38,6 +38,20 @@ describe('buildEscalationInfo', () => {
         expect(result!.remainingWork).toContain('maximum iteration limit');
     });
 
+    test('returns escalation info for stall_repetitive_loop', () => {
+        const result = buildEscalationInfo(makeInput({ terminationReason: 'stall_repetitive_loop' }));
+        expect(result).not.toBeNull();
+        expect(result!.reason).toBe('stall_repetitive_loop');
+        expect(result!.remainingWork).toContain('identical arguments');
+    });
+
+    test('returns escalation info for stall_quality_exhausted', () => {
+        const result = buildEscalationInfo(makeInput({ terminationReason: 'stall_quality_exhausted' }));
+        expect(result).not.toBeNull();
+        expect(result!.reason).toBe('stall_quality_exhausted');
+        expect(result!.remainingWork).toContain('quality nudges');
+    });
+
     test('returns null for normal termination', () => {
         const result = buildEscalationInfo(makeInput({ terminationReason: 'normal' }));
         expect(result).toBeNull();
@@ -60,6 +74,7 @@ describe('buildEscalationInfo', () => {
                 totalLowQualityResponses: 4,
                 totalVacuousToolCalls: 2,
                 qualityNudgeCount: 2,
+                nudgesExhausted: false,
             },
         }));
         expect(result).not.toBeNull();
@@ -74,6 +89,7 @@ describe('buildEscalationInfo', () => {
                 totalLowQualityResponses: 1,
                 totalVacuousToolCalls: 0,
                 qualityNudgeCount: 0,
+                nudgesExhausted: false,
             },
         }));
         expect(result).toBeNull();
