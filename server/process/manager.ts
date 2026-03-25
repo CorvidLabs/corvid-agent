@@ -1080,7 +1080,7 @@ export class ProcessManager {
 
         if (event.type === 'assistant' && event.message?.content) {
             const text = extractContentText(event.message.content);
-            if (text) {
+            if (text?.trim()) {
                 addSessionMessage(this.db, sessionId, 'assistant', text);
             }
         }
