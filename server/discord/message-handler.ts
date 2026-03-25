@@ -95,6 +95,8 @@ export interface MentionSessionInfo {
     channelId?: string;
     /** When true, this session uses pure conversation mode (no tools). */
     conversationOnly?: boolean;
+    /** Minimum permission level required to continue this session via reply. */
+    minResponderPermLevel?: number;
 }
 
 /** Context needed by the message handler to access bridge state. */
@@ -281,7 +283,19 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
             }
         }
         if (existingSession) {
-            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions, data.author.id, data.author.username, data.attachments);
+            await handleMentionReplyResume(
+                ctx,
+                channelId,
+                userId,
+                data.id,
+                text,
+                existingSession,
+                permLevel,
+                data.mentions,
+                data.author.id,
+                data.author.username,
+                data.attachments,
+            );
             return;
         }
         // If we can't find the session in memory or DB, fall through to create new
@@ -534,6 +548,7 @@ async function handleMentionReplyResume(
     messageId: string,
     text: string,
     sessionInfo: MentionSessionInfo,
+    userPermLevel: number,
     mentions?: Array<{ id: string; username: string }>,
     authorId?: string,
     authorUsername?: string,
@@ -544,6 +559,23 @@ async function handleMentionReplyResume(
     if (!cleanText && !hasAttachments) return;
 
     const { sessionId, agentName, agentModel, projectName, displayColor, conversationOnly } = sessionInfo;
+    const minResponderPermLevel = sessionInfo.minResponderPermLevel ?? PermissionLevel.BASIC;
+    if (userPermLevel < minResponderPermLevel) {
+        log.warn('Blocked reply to protected Discord session', {
+            sessionId,
+            channelId,
+            userId: _userId,
+            userPermLevel,
+            minResponderPermLevel,
+        });
+        await sendDiscordMessage(
+            ctx.delivery,
+            ctx.config.botToken,
+            channelId,
+            `Hey <@${_userId}>! This conversation requires higher access. Use \`/message\` to start your own session. 👋`,
+        );
+        return;
+    }
     const session = getSession(ctx.db, sessionId);
 
     if (!session) {

@@ -57,6 +57,7 @@ import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { OpenRouterProvider } from './providers/openrouter/provider';
+import { hasCursorAccess, getCursorBinPath } from './process/cursor-process';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
 import { FlockDirectoryService } from './flock-directory/service';
@@ -196,6 +197,12 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     providerRegistry.register(new OpenRouterProvider());
     const ollamaProvider = new OllamaProvider();
     providerRegistry.register(ollamaProvider);
+
+    // Cursor Agent CLI detection — not an LLM provider, but a CLI process
+    // spawned by ProcessManager when agent.provider === 'cursor'.
+    if (hasCursorAccess()) {
+        log.info(`Cursor Agent CLI available at ${getCursorBinPath()}`);
+    }
 
     // Ollama startup validation — health-check when Ollama is the only enabled provider
     const isOllamaOnly = !providerRegistry.get('anthropic') && !providerRegistry.get('openai');

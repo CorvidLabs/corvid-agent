@@ -4,6 +4,7 @@ import type { ClaudeStreamEvent } from './types';
 import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { startDirectProcess, summarizeConversation } from './direct-process';
+import { spawnCursorProcess, hasCursorAccess as hasCursorCli } from './cursor-process';
 import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
@@ -44,6 +45,7 @@ const log = createLogger('ProcessManager');
 // well under context-window limits while leaving headroom for tool outputs,
 // system messages, and safety buffers. Revisit if model context windows change.
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
+const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 interface SessionMeta {
     startedAt: number;
@@ -59,6 +61,10 @@ interface SessionMeta {
 }
 
 export class ProcessManager {
+    private isRestrictedDiscordMessageSession(sessionName: string): boolean {
+        return sessionName.startsWith(DISCORD_RESTRICTED_MESSAGE_PREFIX);
+    }
+
     private processes: Map<string, SdkProcess> = new Map();
     private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
@@ -234,7 +240,9 @@ export class ProcessManager {
         // Use a minimal default project when session has no project
         const effectiveProject = baseProject;
 
-        if (provider && provider.executionMode === 'direct') {
+        if (providerType === 'cursor') {
+            this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
+        } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
             this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -272,7 +280,10 @@ export class ProcessManager {
             this.ephemeralDirs.set(session.id, resolved);
         }
 
-        if (provider && provider.executionMode === 'direct') {
+        const effectiveProviderType = effectiveAgent?.provider as LlmProviderType | undefined;
+        if (effectiveProviderType === 'cursor') {
+            this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
+        } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
             this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -391,6 +402,12 @@ export class ProcessManager {
             ? councilModel
             : undefined;
 
+        // Translate SDK tool names to direct-process equivalents and merge
+        // mcpToolAllowList since direct processes use a single toolAllowList.
+        const resolvedToolAllowList = conversationOnly
+            ? []
+            : resolveDirectToolAllowList(toolAllowList, mcpToolAllowList);
+
         let sp: SdkProcess;
         try {
             const isPollSession = session.name.startsWith('Poll:');
@@ -410,7 +427,7 @@ export class ProcessManager {
                 skillPrompt: config.skillPrompt,
                 modelOverride,
                 externalMcpConfigs,
-                toolAllowList: conversationOnly ? [] : (toolAllowList ?? (isPollSession ? ['run_command'] : undefined)),
+                toolAllowList: resolvedToolAllowList ?? (isPollSession ? ['run_command'] : undefined),
                 conversationOnly,
             });
         } catch (err) {
@@ -493,8 +510,74 @@ export class ProcessManager {
             effectiveAgent,
             resumePrompt ?? '',
             provider,
-            { conversationOnly: session.name.startsWith('Discord message:') },
+            { conversationOnly: this.isRestrictedDiscordMessageSession(session.name) },
         );
+    }
+
+    private startCursorProcessWrapped(
+        session: Session,
+        project: import('../../shared/types').Project,
+        agent: import('../../shared/types').Agent | null,
+        prompt: string,
+    ): void {
+        if (!hasCursorCli()) {
+            const message = 'cursor-agent CLI not found. Install it or set CURSOR_AGENT_BIN env var.';
+            log.error(message, { sessionId: session.id });
+            this.startingSession.delete(session.id);
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        const effectiveProject = session.workDir
+            ? { ...project, workingDir: session.workDir }
+            : project;
+
+        let sp: SdkProcess;
+        try {
+            sp = spawnCursorProcess({
+                session,
+                project: effectiveProject,
+                agent,
+                prompt,
+                onEvent: (event) => this.handleEvent(session.id, event),
+                onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(`Failed to start cursor process for session ${session.id}`, { error: message });
+            updateSessionStatus(this.db, session.id, 'error');
+            this.startingSession.delete(session.id);
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message: `Failed to start cursor process: ${message}`, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message: `Failed to start cursor process: ${message}`,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        this.registerProcess(session, sp);
     }
 
     private registerProcess(session: Session, process: SdkProcess): void {
@@ -647,9 +730,9 @@ export class ProcessManager {
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         // Detect tool tier for Discord /message sessions by name convention:
-        //   "Discord message:"      → restricted tools (memory + read-only, all users)
-        //   anything else           → full tools (normal session)
-        const isRestrictedMessage = session.name.startsWith('Discord message:');
+        //   "Discord message:"      → restricted tools (BASIC/STANDARD callers)
+        //   anything else           → full tools (admin /message + normal sessions)
+        const isRestrictedMessage = this.isRestrictedDiscordMessageSession(session.name);
         const isConversationOnly = false; // /message sessions always get at least memory + read tools now
         const resumeToolAllowList = isRestrictedMessage ? ['Read', 'Glob', 'Grep'] : undefined;
         const resumeMcpToolAllowList = isRestrictedMessage ? ['corvid_recall_memory', 'corvid_read_on_chain_memories'] : undefined;
@@ -662,7 +745,16 @@ export class ProcessManager {
 
         let sp: SdkProcess;
         try {
-            if (providerInstance && providerInstance.executionMode === 'direct') {
+            if (providerType === 'cursor') {
+                sp = spawnCursorProcess({
+                    session,
+                    project: effectiveProject,
+                    agent: effectiveAgent,
+                    prompt: resumePrompt ?? '',
+                    onEvent: (event) => this.handleEvent(session.id, event),
+                    onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
+                });
+            } else if (providerInstance && providerInstance.executionMode === 'direct') {
                 // For restricted /message sessions, override permissions to only expose memory tools
                 const effectivePermissions = resumeMcpToolAllowList ?? resumeConfig.resolvedToolPermissions;
                 const mcpToolContext = session.agentId
@@ -988,7 +1080,7 @@ export class ProcessManager {
 
         if (event.type === 'assistant' && event.message?.content) {
             const text = extractContentText(event.message.content);
-            if (text) {
+            if (text?.trim()) {
                 addSessionMessage(this.db, sessionId, 'assistant', text);
             }
         }
@@ -1372,4 +1464,48 @@ export class ProcessManager {
 
         return pruned;
     }
+}
+
+// SDK (Claude Code) tool names → direct-process (Ollama) equivalents
+const SDK_TO_DIRECT_TOOL_MAP: Record<string, string> = {
+    'Read': 'read_file',
+    'Write': 'write_file',
+    'Edit': 'edit_file',
+    'Glob': 'list_files',
+    'Grep': 'search_files',
+    'Shell': 'run_command',
+};
+
+/**
+ * Translate SDK-style tool names to direct-process names and merge
+ * mcpToolAllowList. Returns undefined if both inputs are empty/absent
+ * (meaning "allow all tools").
+ */
+function resolveDirectToolAllowList(
+    toolAllowList?: string[],
+    mcpToolAllowList?: string[],
+): string[] | undefined {
+    const hasToolList = toolAllowList && toolAllowList.length > 0;
+    const hasMcpList = mcpToolAllowList && mcpToolAllowList.length > 0;
+
+    if (!hasToolList && !hasMcpList) return undefined;
+
+    const result: string[] = [];
+
+    if (hasToolList) {
+        for (const name of toolAllowList) {
+            const mapped = SDK_TO_DIRECT_TOOL_MAP[name];
+            result.push(mapped ?? name);
+        }
+    }
+
+    if (hasMcpList) {
+        for (const name of mcpToolAllowList) {
+            if (!result.includes(name)) {
+                result.push(name);
+            }
+        }
+    }
+
+    return result.length > 0 ? result : undefined;
 }

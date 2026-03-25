@@ -290,6 +290,7 @@ export class DiscordBridge {
             this.config.defaultPermissionLevel = dbConfig.defaultPermissionLevel;
             this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
             this.config.channelPermissions = dbConfig.channelPermissions;
+            this.config.messageFullToolChannelIds = dbConfig.messageFullToolChannelIds;
 
             this.gateway.updatePresence(dbConfig.statusText, dbConfig.activityType);
 

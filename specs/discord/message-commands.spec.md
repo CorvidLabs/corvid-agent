@@ -14,7 +14,7 @@ depends_on:
 
 ## Purpose
 
-Handles the Discord `/message` slash command — a lightweight, sandboxed interaction mode. All users (including admins) get the same restricted tool set: read-only code tools and memory recall. This is intentionally lighter than `/session` or `@mention` — messages are for quick questions, not real work. For full tool access, use `/session`.
+Handles the Discord `/message` slash command with permission-tiered tool access. BASIC/STANDARD callers get a lightweight restricted tool set (read-only code tools and memory recall), while ADMIN callers get full tool access. This keeps public usage safe while letting trusted operators run fully capable ad-hoc conversations.
 
 ## Public API
 
@@ -23,7 +23,16 @@ Handles the Discord `/message` slash command — a lightweight, sandboxed intera
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MESSAGE_BUILTIN_TOOLS` | `['Read', 'Glob', 'Grep']` | Read-only built-in tools for all `/message` sessions |
-| `MESSAGE_MCP_TOOLS` | `['corvid_recall_memory', 'corvid_read_on_chain_memories']` | MCP tools for all `/message` sessions |
+| `MESSAGE_MCP_TOOLS` | `['corvid_recall_memory', 'corvid_read_on_chain_memories']` | MCP tools for restricted `/message` sessions |
+| `RESTRICTED_MESSAGE_SESSION_PREFIX` | `'Discord message:'` | Session name prefix used for restricted `/message` sessions |
+| `STAFF_MESSAGE_SESSION_PREFIX` | `'Discord staff message:'` | Session name prefix used for full-access trusted-channel `/message` sessions by STANDARD users |
+| `ADMIN_MESSAGE_SESSION_PREFIX` | `'Discord admin message:'` | Session name prefix used for full-access admin `/message` sessions |
+
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `MessageToolPolicy` | Shape returned by `resolveMessageToolPolicy`: `sessionName`, `toolAllowList?`, `mcpToolAllowList?`, `accessLabel` |
 
 ### Exported Functions
 
@@ -31,18 +40,22 @@ Handles the Discord `/message` slash command — a lightweight, sandboxed intera
 |----------|-----------|---------|-------------|
 | `getBuddyStatusLabel` | `(role: string, round: number, approved: boolean)` | `string` | Compute a human-readable status label for a buddy round event (e.g. "Initial Response", "Review & Feedback", "Approved") |
 | `getBuddyRoleIcon` | `(role: string, approved: boolean)` | `string` | Compute the role icon emoji for a buddy round event (💬 for lead, ✅ for approved buddy, 🔍 for reviewing buddy) |
-| `handleMessageCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number, getOption: (name: string) => string \| undefined, userId: string)` | `Promise<void>` | Handles the `/message` slash command with sandboxed tool access for all permission levels |
+| `resolveMessageToolPolicy` | `(config: DiscordBridgeConfig, permLevel: number, channelId: string)` | `MessageToolPolicy` | Resolves session naming and tool allow-lists based on caller tier + trusted channel policy |
+| `handleMessageCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number, getOption: (name: string) => string \| undefined, userId: string)` | `Promise<void>` | Handles the `/message` slash command with permission-tiered tool access |
 
 ## Invariants
 
 1. **Requires `PermissionLevel.BASIC` or higher** — rejects with permission error otherwise.
 2. **Both `agent` and `message` options are required**; responds with error if either is missing.
 3. **Agent name matching is case-insensitive** and strips model suffixes like ` (claude-opus-4-6)`.
-4. **ALL sessions use restricted tools** — no admin bypass. Everyone gets `MESSAGE_BUILTIN_TOOLS` + `MESSAGE_MCP_TOOLS` regardless of permission level.
-5. **Session name follows the pattern `Discord message:<channelId>`** — no "full-message" variant.
-6. **No worktree is created** — restricted tools means no git isolation needed.
-7. **The mention session is persisted** both in-memory (`ctx.mentionSessions`) and in the database for server restart recovery.
-8. **Buddy sessions get visible callback** — when a buddy is specified, the `onRoundComplete` callback posts each round's output as a colored embed in the channel.
+4. **BASIC/STANDARD callers use restricted tools** — receive `MESSAGE_BUILTIN_TOOLS` + `MESSAGE_MCP_TOOLS`.
+5. **Trusted STANDARD channels may use full tools** — full access is granted when channel is in `message_full_tool_channel_ids`, the user is STANDARD+, and the channel's permission floor in `channel_permissions` is STANDARD+.
+6. **ADMIN callers use full tool access** — no built-in or MCP allow-list restriction is applied.
+7. **Session naming encodes tool tier** — restricted sessions use `Discord message:<channelId>`; trusted STANDARD full-access sessions use `Discord staff message:<channelId>`; admin full-access sessions use `Discord admin message:<channelId>`.
+8. **Reply continuation enforces minimum responder tier** — full-access `/message` replies require STANDARD+, while restricted sessions allow BASIC+.
+9. **No worktree is created** — `/message` remains an inline channel conversation flow.
+10. **The mention session is persisted** both in-memory (`ctx.mentionSessions`) and in the database for server restart recovery.
+11. **Buddy sessions get visible callback** — when a buddy is specified, the `onRoundComplete` callback posts each round's output as a colored embed in the channel.
 
 ## Behavioral Examples
 
@@ -56,7 +69,13 @@ Handles the Discord `/message` slash command — a lightweight, sandboxed intera
 
 - **Given** an ADMIN user sends `/message agent:CorvidAgent message:fix the bug`
 - **When** `handleMessageCommand` is called
-- **Then** the session is created with the SAME restricted tools as any other user — admin does not get full access via `/message`
+- **Then** the session is created with full tool access (no `/message` allow-list restrictions), and session name prefix `Discord admin message:`
+
+### Scenario: STANDARD user in trusted channel sends /message
+
+- **Given** a STANDARD user sends `/message` in a channel listed in `message_full_tool_channel_ids`, and `channel_permissions[channelId] >= STANDARD`
+- **When** `handleMessageCommand` is called
+- **Then** the session is created with full tool access and session name prefix `Discord staff message:`
 
 ### Scenario: Message with buddy
 
@@ -117,3 +136,4 @@ Handles the Discord `/message` slash command — a lightweight, sandboxed intera
 |------|--------|--------|
 | 2026-03-20 | corvid-agent | Initial spec |
 | 2026-03-24 | corvid-agent | v2: Remove admin full-access bypass — all /message sessions use restricted tools. Add visible buddy conversations via onRoundComplete callback. |
+| 2026-03-25 | corvid-agent | v3: Reintroduce admin full-access `/message` sessions with explicit `Discord admin message:` naming and centralized permission-based policy resolver. |

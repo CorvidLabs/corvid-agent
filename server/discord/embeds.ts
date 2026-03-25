@@ -119,6 +119,50 @@ export function stripUrlsFromEmbed(embed: DiscordEmbed): DiscordEmbed {
     return { ...embed, description: stripped || undefined };
 }
 
+/** When URL stripping removed all narrative text, explain why a follow-up message may appear. */
+const EMBED_LINK_STRIP_FALLBACK =
+    'Links are in the next message (Discord only previews URLs when they are not attached to an embed).';
+
+/** Footer-only embeds confuse users; always provide a visible body when nothing else renders. */
+const EMBED_EMPTY_BODY_FALLBACK = 'No text to display.';
+
+function hasVisibleEmbedBody(e: DiscordEmbed): boolean {
+    if (e.title?.trim()) return true;
+    if (e.description?.trim()) return true;
+    if (e.fields?.some((f) => f.name?.trim() || f.value?.trim())) return true;
+    if (e.image?.url?.trim()) return true;
+    if (e.thumbnail?.url?.trim()) return true;
+    return false;
+}
+
+/**
+ * Ensure an embed will show readable body text in Discord, not just a footer.
+ * Call after {@link stripUrlsFromEmbed} when sending embeds to channels.
+ */
+export function ensureDiscordEmbedRenderable(
+    embed: DiscordEmbed,
+    opts?: { urlStripRemovedAllText?: boolean },
+): DiscordEmbed {
+    const e: DiscordEmbed = { ...embed };
+    if (typeof e.description === 'string') {
+        const t = e.description.trim();
+        e.description = t.length > 0 ? t : undefined;
+    }
+    if (hasVisibleEmbedBody(e)) return e;
+    if (opts?.urlStripRemovedAllText) {
+        return { ...e, description: EMBED_LINK_STRIP_FALLBACK };
+    }
+    return { ...e, description: EMBED_EMPTY_BODY_FALLBACK };
+}
+
+function prepareOutboundEmbed(embed: DiscordEmbed): DiscordEmbed {
+    const urlList = extractUrlsFromEmbed(embed);
+    const hadDesc = Boolean(embed.description?.trim());
+    const stripped = urlList ? stripUrlsFromEmbed(embed) : embed;
+    const urlStripRemovedAllText = Boolean(urlList && hadDesc && !stripped.description?.trim());
+    return ensureDiscordEmbedRenderable(stripped, { urlStripRemovedAllText });
+}
+
 /** @deprecated Use extractContentFromEmbed instead */
 export const extractMentionsFromEmbed = extractContentFromEmbed;
 
@@ -454,7 +498,7 @@ export async function sendEmbed(
     embed: DiscordEmbed,
 ): Promise<string | null> {
     const urls = extractUrlsFromEmbed(embed);
-    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
+    const cleanEmbed = prepareOutboundEmbed(embed);
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -567,7 +611,7 @@ export async function sendReplyEmbed(
     assertSnowflake(channelId, 'channel ID');
     assertSnowflake(replyToMessageId, 'message ID');
     const urls = extractUrlsFromEmbed(embed);
-    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
+    const cleanEmbed = prepareOutboundEmbed(embed);
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -761,7 +805,7 @@ export async function editEmbed(
     assertSnowflake(channelId, 'channel ID');
     assertSnowflake(messageId, 'message ID');
     const urls = extractUrlsFromEmbed(embed);
-    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
+    const cleanEmbed = prepareOutboundEmbed(embed);
     try {
         await delivery.sendWithReceipt('discord', async () => {
             const response = await discordFetch(
@@ -844,7 +888,7 @@ export async function sendEmbedWithFiles(
     }
 
     const urls = extractUrlsFromEmbed(embed);
-    const cleanEmbed = urls ? stripUrlsFromEmbed(embed) : embed;
+    const cleanEmbed = prepareOutboundEmbed(embed);
 
     try {
         const { result } = await delivery.sendWithReceipt('discord', async () => {
