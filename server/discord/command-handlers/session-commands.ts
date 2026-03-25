@@ -15,6 +15,9 @@ import { createLogger } from '../../lib/logger';
 import { resolveAndCreateWorktree } from '../../lib/worktree';
 import {
     respondToInteraction,
+    deferInteraction,
+    editDeferredResponse,
+    respondEphemeral,
     sendEmbed,
     sendEmbedWithButtons,
     buildActionRow,
@@ -33,7 +36,7 @@ export async function handleSessionCommand(
     userId: string,
 ): Promise<void> {
     if (permLevel < PermissionLevel.STANDARD) {
-        await respondToInteraction(interaction, 'You need a higher role to create sessions. Try @mentioning the bot for a quick reply.');
+        await respondEphemeral(interaction, 'You need a higher role to create sessions. Try @mentioning the bot for a quick reply.');
         return;
     }
     const agentName = getOption('agent');
@@ -102,12 +105,15 @@ export async function handleSessionCommand(
         return;
     }
 
+    // Defer immediately — user sees "thinking..." while we set up thread + worktree
+    await deferInteraction(interaction);
+
     // Create a standalone thread in the channel where the command was invoked
     const threadName = `${agent.name} — ${topic}`;
     const targetChannelId = interaction.channel_id || ctx.config.channelId;
     const threadId = await ctx.createStandaloneThread(targetChannelId, threadName);
     if (!threadId) {
-        await respondToInteraction(interaction, 'Failed to create conversation thread.');
+        await editDeferredResponse(interaction, 'Failed to create conversation thread.');
         return;
     }
 
@@ -121,7 +127,7 @@ export async function handleSessionCommand(
         } else {
             // Worktree isolation is mandatory — running without it risks
             // cross-session contamination of the shared working directory.
-            await respondToInteraction(interaction,
+            await editDeferredResponse(interaction,
                 `Failed to create isolated worktree: ${result.error ?? 'unknown error'}. Please try again.`);
             return;
         }
@@ -169,7 +175,7 @@ export async function handleSessionCommand(
     ]).catch((err) => log.debug('Failed to send welcome embed', { error: err instanceof Error ? err.message : String(err) }));
 
     const buddyResp = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
-    await respondToInteraction(interaction,
+    await editDeferredResponse(interaction,
         `Session started in <#${threadId}> with **${agent.name}**${buddyResp}.\nTopic: ${topic}`);
 }
 
@@ -181,7 +187,7 @@ export async function handleWorkCommand(
     userId: string,
 ): Promise<void> {
     if (permLevel < PermissionLevel.STANDARD) {
-        await respondToInteraction(interaction, 'You need a higher role to create work tasks.');
+        await respondEphemeral(interaction, 'You need a higher role to create work tasks.');
         return;
     }
     if (!ctx.workTaskService) {

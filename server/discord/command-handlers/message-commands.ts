@@ -19,7 +19,7 @@ import { createSession } from '../../db/sessions';
 import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
 import { withAuthorContext } from '../message-handler';
-import { respondToInteraction, sendTypingIndicator, sendEmbed, buildFooterText } from '../embeds';
+import { respondToInteraction, respondEphemeral, sendTypingIndicator, sendEmbed, buildFooterText } from '../embeds';
 import { saveMentionSession } from '../../db/discord-mention-sessions';
 
 const log = createLogger('DiscordMessageCommand');
@@ -57,7 +57,7 @@ export async function handleMessageCommand(
 ): Promise<void> {
     // /message is available at BASIC level — the first command for external users
     if (permLevel < PermissionLevel.BASIC) {
-        await respondToInteraction(interaction, 'You do not have permission to use this command.');
+        await respondEphemeral(interaction, 'You do not have permission to use this command.');
         return;
     }
 

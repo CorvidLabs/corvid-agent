@@ -5,6 +5,8 @@ import { chatCommand } from './commands/chat';
 import { sessionCommand } from './commands/session';
 import { agentCommand } from './commands/agent';
 import { configCommand } from './commands/config';
+import { settingsCommand } from './commands/settings';
+import { pluginCommand, type PluginAction } from './commands/plugin';
 import { loginCommand, logoutCommand } from './commands/login';
 import { interactiveCommand } from './commands/interactive';
 import { initCommand } from './commands/init';
@@ -76,6 +78,8 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan('provision')}                         Generate identity bundle for a new instance
   ${c.cyan('login')}                             Log in to CorvidAgent Cloud
   ${c.cyan('logout')}                            Log out (remove saved token)
+  ${c.cyan('settings')} [show|credits|discord]    View/update server runtime settings
+  ${c.cyan('plugin')} list|load|unload|grant     Manage plugins
   ${c.cyan('config')} show|get|set               Manage CLI configuration
 
 ${c.bold}Global Options:${c.reset}
@@ -317,6 +321,74 @@ ${c.bold}Examples:${c.reset}
 `);
 }
 
+function printSettingsHelp(): void {
+    console.log(`
+${c.bold}corvid-agent settings${c.reset} — View/update server runtime settings
+
+${c.bold}Usage:${c.reset}
+  corvid-agent settings [action] [key] [value]
+
+${c.bold}Actions:${c.reset}
+  show                      Show all settings (default)
+  credits                   Show credit configuration
+  credits <key> <value>     Update a credit config value
+  discord                   Show Discord runtime config
+  discord <key> <value>     Update a Discord config value
+  api-key                   Show API key status and expiry
+
+${c.bold}Options:${c.reset}
+  --help, -h                Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent settings                                 ${c.gray('# show all')}
+  corvid-agent settings credits                         ${c.gray('# credit config only')}
+  corvid-agent settings credits credits_per_algo 2000   ${c.gray('# update a value')}
+  corvid-agent settings discord                         ${c.gray('# Discord config')}
+  corvid-agent settings discord mode allowlist           ${c.gray('# update Discord mode')}
+  corvid-agent settings api-key                         ${c.gray('# API key status')}
+
+${c.bold}Note:${c.reset}
+  This manages ${c.bold}server${c.reset} settings (credits, Discord, API keys).
+  For ${c.bold}CLI${c.reset} settings (serverUrl, authToken), use: corvid-agent config
+`);
+}
+
+function printPluginHelp(): void {
+    console.log(`
+${c.bold}corvid-agent plugin${c.reset} — Manage plugins
+
+${c.bold}Usage:${c.reset}
+  corvid-agent plugin [action] [args...]
+
+${c.bold}Actions:${c.reset}
+  list                              List loaded and registered plugins
+  load <package>                    Load a plugin from an npm package
+  unload <name>                     Unload a plugin by name
+  grant <name> <capability>         Grant a capability to a plugin
+  revoke <name> <capability>        Revoke a capability from a plugin
+
+${c.bold}Capabilities:${c.reset}
+  db:read             Read-only database access
+  network:outbound    Make HTTP requests
+  fs:project-dir      Read project files
+  agent:read          Read agent configuration
+  session:read        Read session data
+
+${c.bold}Options:${c.reset}
+  --help, -h          Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent plugin list                                ${c.gray('# list all plugins')}
+  corvid-agent plugin load corvid-plugin-jira             ${c.gray('# load from npm')}
+  corvid-agent plugin unload jira                         ${c.gray('# unload by name')}
+  corvid-agent plugin grant jira network:outbound         ${c.gray('# grant capability')}
+  corvid-agent plugin revoke jira db:read                 ${c.gray('# revoke capability')}
+
+${c.bold}Plugin Development:${c.reset}
+  See docs/plugins.md for the plugin API and example template.
+`);
+}
+
 function printConfigHelp(): void {
     console.log(`
 ${c.bold}corvid-agent config${c.reset} — Manage CLI configuration
@@ -475,6 +547,28 @@ async function main(): Promise<void> {
             if (hasHelpFlag()) { printLogoutHelp(); return; }
             await logoutCommand();
             break;
+
+        case 'settings': {
+            if (hasHelpFlag()) { printSettingsHelp(); return; }
+            const settingsAction = (getPositional(0) ?? 'show') as 'show' | 'credits' | 'discord' | 'api-key';
+            await settingsCommand(settingsAction, {
+                key: getPositional(1),
+                value: getPositional(2),
+            });
+            break;
+        }
+
+        case 'plugin':
+        case 'plugins': {
+            if (hasHelpFlag()) { printPluginHelp(); return; }
+            const pluginAction = (getPositional(0) ?? 'list') as PluginAction;
+            await pluginCommand(pluginAction, {
+                name: getPositional(1),
+                packageName: getPositional(1),
+                capability: getPositional(2),
+            });
+            break;
+        }
 
         case 'config': {
             if (hasHelpFlag()) { printConfigHelp(); return; }

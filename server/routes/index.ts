@@ -26,6 +26,7 @@ import { handleBillingRoutes } from './billing';
 import { handleAuthFlowRoutes } from './auth-flow';
 import { handleA2ARoutes } from './a2a';
 import { handlePluginRoutes } from './plugins';
+import type { PluginRegistry } from '../plugins/registry';
 import { handlePersonaRoutes } from './personas';
 import { handleBuddyRoutes } from './buddy';
 import { handleVariantRoutes } from './variants';
@@ -162,6 +163,7 @@ export interface RouteServices {
     performanceCollector?: PerformanceCollector | null;
     outcomeTracker?: OutcomeTrackerService | null;
     flockDirectory?: FlockDirectoryService | null;
+    pluginRegistry?: PluginRegistry | null;
 }
 
 export async function handleRequest(
@@ -192,6 +194,7 @@ export async function handleRequest(
     flockDirectory?: FlockDirectoryService | null,
     onAgentChange?: (() => void) | null,
     graduationService?: MemoryGraduationService | null,
+    pluginRegistry?: PluginRegistry | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -249,7 +252,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory, onAgentChange, graduationService);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory, onAgentChange, graduationService, pluginRegistry);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -295,6 +298,7 @@ async function handleRoutes(
     flockDirectory?: FlockDirectoryService | null,
     onAgentChange?: (() => void) | null,
     graduationService?: MemoryGraduationService | null,
+    pluginRegistry?: PluginRegistry | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -455,8 +459,8 @@ async function handleRoutes(
     const authFlowResponse = handleAuthFlowRoutes(req, url, db);
     if (authFlowResponse) return authFlowResponse;
 
-    // Plugin routes (registry not yet instantiated — returns 503 until enabled)
-    const pluginResponse = handlePluginRoutes(req, url, db, null);
+    // Plugin routes
+    const pluginResponse = handlePluginRoutes(req, url, db, pluginRegistry ?? null);
     if (pluginResponse) return pluginResponse;
 
     // A2A inbound task routes

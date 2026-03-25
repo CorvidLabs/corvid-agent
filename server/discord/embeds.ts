@@ -299,6 +299,88 @@ export async function respondToInteractionEmbeds(
     }
 }
 
+/**
+ * Defer a slash command response — shows "thinking..." in Discord.
+ * Follow up later with editDeferredResponse().
+ */
+export async function deferInteraction(interaction: DiscordInteractionData, ephemeral = false): Promise<void> {
+    assertSnowflake(interaction.id, 'interaction ID');
+    assertInteractionToken(interaction.token);
+    const response = await discordFetch(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: InteractionCallbackType.DEFERRED_CHANNEL_MESSAGE,
+                data: ephemeral ? { flags: 64 } : {},
+            }),
+        },
+    );
+
+    if (!response.ok) {
+        const error = await response.text();
+        log.error('Failed to defer interaction', { status: response.status, error: error.slice(0, 200) });
+    }
+}
+
+/**
+ * Edit the deferred "thinking..." response with the final content.
+ */
+export async function editDeferredResponse(
+    interaction: DiscordInteractionData,
+    content: string,
+    embeds?: DiscordEmbed[],
+): Promise<void> {
+    assertInteractionToken(interaction.token);
+    const appId = process.env.DISCORD_APP_ID;
+    if (!appId) {
+        log.error('DISCORD_APP_ID not set — cannot edit deferred response');
+        return;
+    }
+    const body: Record<string, unknown> = {};
+    if (content) body.content = content.slice(0, MAX_MESSAGE_LENGTH);
+    if (embeds) body.embeds = embeds;
+
+    const response = await discordFetch(
+        `https://discord.com/api/v10/webhooks/${appId}/${interaction.token}/messages/@original`,
+        {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        },
+    );
+
+    if (!response.ok) {
+        const error = await response.text();
+        log.error('Failed to edit deferred response', { status: response.status, error: error.slice(0, 200) });
+    }
+}
+
+/**
+ * Respond to an interaction with an ephemeral (only-visible-to-user) message.
+ */
+export async function respondEphemeral(interaction: DiscordInteractionData, content: string): Promise<void> {
+    assertSnowflake(interaction.id, 'interaction ID');
+    assertInteractionToken(interaction.token);
+    const response = await discordFetch(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: InteractionCallbackType.CHANNEL_MESSAGE,
+                data: { content: content.slice(0, MAX_MESSAGE_LENGTH), flags: 64 },
+            }),
+        },
+    );
+
+    if (!response.ok) {
+        const error = await response.text();
+        log.error('Failed to send ephemeral response', { status: response.status, error: error.slice(0, 200) });
+    }
+}
+
 export async function acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);

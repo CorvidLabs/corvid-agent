@@ -18,7 +18,7 @@ import type {
 import { InteractionType, PermissionLevel } from './types';
 import { createLogger } from '../lib/logger';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { respondToInteraction } from './embeds';
+import { respondToInteraction, respondEphemeral } from './embeds';
 import { resolvePermissionLevel } from './permissions';
 import { handleAdminCommand } from './admin-commands';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
@@ -234,12 +234,34 @@ export async function registerSlashCommands(
             description: 'Launch a council deliberation on a topic',
             type: 1,
             default_member_permissions: '8',
-            options: [{
-                name: 'topic',
-                description: 'The topic to deliberate on',
-                type: 3,
-                required: true,
-            }],
+            options: [
+                {
+                    name: 'topic',
+                    description: 'The topic to deliberate on',
+                    type: 3,
+                    required: true,
+                },
+                {
+                    name: 'council_name',
+                    description: 'Pick an existing council (leave blank to use agents instead)',
+                    type: 3,
+                    required: false,
+                    autocomplete: true,
+                },
+                {
+                    name: 'agents',
+                    description: 'Comma-separated agent names for ad-hoc council (e.g. "Corvid,Buddy")',
+                    type: 3,
+                    required: false,
+                },
+                {
+                    name: 'project',
+                    description: 'Project context (defaults to first available)',
+                    type: 3,
+                    required: false,
+                    autocomplete: true,
+                },
+            ],
         },
         { name: 'quickstart', description: 'Guided walkthrough for new users', type: 1 },
         { name: 'help', description: 'Show available commands and usage', type: 1 },
@@ -544,7 +566,7 @@ export async function handleInteraction(
     // Role-based permission check
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles, interaction.channel_id);
     if (permLevel <= PermissionLevel.BLOCKED) {
-        await respondToInteraction(interaction, 'You do not have permission to use this bot.');
+        await respondEphemeral(interaction, 'You do not have permission to use this bot.');
         return;
     }
 
@@ -599,7 +621,7 @@ export async function handleInteraction(
             break;
         case 'admin': {
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Only admins can use `/admin` commands.');
+                await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
                 break;
             }
             await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options, ctx.guildCache, ctx.syncGuildData);

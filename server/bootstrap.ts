@@ -63,6 +63,7 @@ import { FlockDirectoryService } from './flock-directory/service';
 import { FlockConflictResolver } from './flock-directory/conflict-resolver';
 import { CapabilityRouter } from './flock-directory/capability-router';
 import { BrowserService } from './browser/service';
+import { PluginRegistry } from './plugins/registry';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
 
@@ -152,6 +153,9 @@ export interface ServiceContainer {
 
     // Browser automation
     browserService: BrowserService;
+
+    // Plugin system
+    pluginRegistry: PluginRegistry;
 }
 
 /**
@@ -319,6 +323,9 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     flockDirectoryService.capabilityRouter = capabilityRouter;
 
     const browserService = new BrowserService();
+
+    // ── Plugin system ──────────────────────────────────────────────────
+    const pluginRegistry = new PluginRegistry(db);
 
     const reputationScorer = new ReputationScorer(db);
     const reputationAttestation = new ReputationAttestation(db);
@@ -532,5 +539,6 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         flockConflictResolver,
         capabilityRouter,
         browserService,
+        pluginRegistry,
     };
 }

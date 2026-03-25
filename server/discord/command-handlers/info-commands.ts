@@ -13,6 +13,7 @@ import { getActiveWorkTasks, countPendingTasks, countActiveTasks } from '../../d
 import { listActiveSchedules } from '../../db/schedules';
 import {
     respondToInteraction,
+    respondEphemeral,
     respondToInteractionEmbed,
     respondToInteractionEmbeds,
     type DiscordEmbed,
@@ -144,7 +145,7 @@ export async function handleConfigCommand(
     permLevel: number,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Only admins can view bot configuration.');
+        await respondEphemeral(interaction, 'Only admins can view bot configuration.');
         return;
     }
     const configFields: Array<{ name: string; value: string; inline?: boolean }> = [

@@ -27,6 +27,7 @@ Global options:
 - [status](#status)
 - [agent](#agent)
 - [session](#session)
+- [settings](#settings)
 - [config](#config)
 - [login](#login)
 - [logout](#logout)
@@ -284,6 +285,122 @@ corvid-agent session get abc12345
 corvid-agent session stop abc12345
 corvid-agent session resume abc12345
 ```
+
+---
+
+## settings
+
+View and update server runtime settings. Wraps the `/api/settings` REST endpoints.
+
+```bash
+corvid-agent settings [action] [key] [value]
+```
+
+### Actions
+
+#### `settings show`
+
+Show all settings (credits, Discord config, system stats). Default action.
+
+```bash
+corvid-agent settings
+corvid-agent settings show
+```
+
+#### `settings credits`
+
+Show or update credit configuration.
+
+```bash
+corvid-agent settings credits                         # show
+corvid-agent settings credits credits_per_algo 2000   # update
+```
+
+#### `settings discord`
+
+Show or update Discord runtime configuration.
+
+```bash
+corvid-agent settings discord                          # show
+corvid-agent settings discord mode allowlist            # update
+corvid-agent settings discord allowed_user_ids '["id"]' # JSON values
+```
+
+#### `settings api-key`
+
+Show API key status, expiry, and rotation info.
+
+```bash
+corvid-agent settings api-key
+```
+
+### Examples
+
+```bash
+corvid-agent settings                                   # show all
+corvid-agent settings credits                           # credit config
+corvid-agent settings credits credits_per_algo 5000     # update credit rate
+corvid-agent settings discord                           # Discord config
+corvid-agent settings api-key                           # API key health
+```
+
+---
+
+## plugin
+
+Manage plugins. Wraps the `/api/plugins` REST endpoints.
+
+```bash
+corvid-agent plugin [action] [args...]
+```
+
+### Actions
+
+#### `plugin list`
+
+List all loaded and registered plugins. Default action.
+
+```bash
+corvid-agent plugin list
+```
+
+#### `plugin load`
+
+Load a plugin from an npm package.
+
+```bash
+corvid-agent plugin load corvid-plugin-jira
+```
+
+#### `plugin unload`
+
+Unload a plugin by name.
+
+```bash
+corvid-agent plugin unload jira
+```
+
+#### `plugin grant` / `plugin revoke`
+
+Grant or revoke capabilities for a plugin.
+
+```bash
+corvid-agent plugin grant jira network:outbound
+corvid-agent plugin revoke jira db:read
+```
+
+Available capabilities: `db:read`, `network:outbound`, `fs:project-dir`, `agent:read`, `session:read`.
+
+### Examples
+
+```bash
+corvid-agent plugin list                              # list all plugins
+corvid-agent plugin load corvid-plugin-jira           # load from npm
+corvid-agent plugin unload jira                       # unload by name
+corvid-agent plugin grant jira network:outbound       # grant capability
+```
+
+See [Plugin System docs](plugins.md) for writing your own plugins.
 
 ---
 
