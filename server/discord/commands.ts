@@ -136,7 +136,7 @@ export async function registerSlashCommands(
         },
         {
             name: 'message',
-            description: 'Send a message to an agent (memory + read tools; admins get full access)',
+            description: 'Send a quick message to an agent (memory + read tools only)',
             type: 1,
             options: [
                 {

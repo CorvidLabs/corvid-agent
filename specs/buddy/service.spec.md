@@ -1,6 +1,6 @@
 ---
 module: buddy-service
-version: 1
+version: 2
 status: draft
 files:
   - server/buddy/service.ts
@@ -22,6 +22,8 @@ Orchestrates paired agent collaboration (buddy mode). When buddy mode is active,
 | Type | Description |
 |------|-------------|
 | `BuddyServiceDeps` | Interface: `{ db: Database; processManager: ProcessManager }` |
+| `BuddyRoundCallback` | `(round: BuddyRoundEvent) => Promise<void>` — called after each agent turn |
+| `BuddyRoundEvent` | `{ buddySessionId: string; agentId: string; agentName: string; role: 'lead' \| 'buddy'; round: number; maxRounds: number; content: string; approved: boolean }` |
 
 ### Exported Classes
 
@@ -48,6 +50,8 @@ Orchestrates paired agent collaboration (buddy mode). When buddy mode is active,
 7. **Early approval**: If the buddy's response is a short approval (under 300 chars, contains "lgtm"/"approved"/etc., no negative qualifiers), the loop ends early
 8. **Negative qualifier rejection**: Responses containing "not approved", "but", "however", "issues" near approval words are NOT treated as approvals
 9. **Read-only buddy tools**: Buddy sessions use `toolAllowList` with `BUDDY_DEFAULT_TOOLS` (Read, Glob, Grep) — buddies can inspect code but not modify it. MCP servers are not loaded for restricted-tool sessions.
+10. **Optional round callback**: `CreateBuddySessionInput.onRoundComplete` is called after every agent turn (lead and buddy). Callback errors are logged but do not break the conversation loop.
+11. **Approved flag in callback**: The `approved` field in `BuddyRoundEvent` is `true` only on the final buddy turn when the buddy approves (LGTM). All other rounds have `approved: false`.
 
 ## Behavioral Examples
 
@@ -101,9 +105,11 @@ Orchestrates paired agent collaboration (buddy mode). When buddy mode is active,
 | Module | What is used |
 |--------|-------------|
 | `server/routes/buddy` | Route handlers start buddy sessions via this service |
+| `server/discord/command-handlers/message-commands` | Passes `onRoundComplete` for visible buddy conversations |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-24 | corvid-agent | Initial spec |
+| 2026-03-24 | corvid-agent | v2: Add BuddyRoundCallback and onRoundComplete for visible conversations |

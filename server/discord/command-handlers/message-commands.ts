@@ -1,32 +1,39 @@
 /**
  * Discord /message command handler.
  *
- * Tiered tool access based on permission level:
- *   - BASIC/STANDARD: Memory + read-only tools (Read, Glob, Grep, corvid_recall_memory, corvid_read_on_chain_memories)
- *   - ADMIN: Full unrestricted tool access (same as /session)
+ * Lightweight sandbox mode — ALL users (including admins) get the same
+ * restricted tool set: read-only code tools + memory recall. For full
+ * tool access, use /session or @mention.
  *
- * Supports optional buddy agent for post-response review.
+ * Supports optional buddy agent for post-response review with visible
+ * round-by-round embeds in the channel.
  */
 
 import type { InteractionContext } from '../commands';
 import type { DiscordInteractionData } from '../types';
 import { PermissionLevel } from '../types';
 import type { SessionSource } from '../../../shared/types';
+import type { BuddyRoundEvent } from '../../../shared/types/buddy';
 import { listAgents } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
 import { withAuthorContext } from '../message-handler';
-import { respondToInteraction, sendTypingIndicator } from '../embeds';
+import { respondToInteraction, sendTypingIndicator, sendEmbed, buildFooterText } from '../embeds';
 import { saveMentionSession } from '../../db/discord-mention-sessions';
 
 const log = createLogger('DiscordMessageCommand');
 
-/** Read-only built-in tools for non-admin /message sessions. */
-const MESSAGE_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'];
+/** Read-only built-in tools for all /message sessions. */
+export const MESSAGE_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'];
 
-/** MCP tools available to non-admin /message sessions (memory recall only). */
-const MESSAGE_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'];
+/** MCP tools available to all /message sessions (memory recall only). */
+export const MESSAGE_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'];
+
+/** Buddy role colors for Discord embeds. */
+const BUDDY_LEAD_COLOR = 0x3498db;   // Blue — lead agent
+const BUDDY_REVIEW_COLOR = 0x9b59b6; // Purple — buddy reviewer
+const BUDDY_APPROVED_COLOR = 0x2ecc71; // Green — buddy approved
 
 export async function handleMessageCommand(
     ctx: InteractionContext,
@@ -105,49 +112,36 @@ export async function handleMessageCommand(
 
     // Acknowledge the command immediately
     const username = interaction.member?.user?.username ?? interaction.user?.username ?? userId;
-    const isAdmin = permLevel >= PermissionLevel.ADMIN;
     const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
-    const toolLabel = isAdmin ? ' (full access)' : '';
-    await respondToInteraction(interaction, `**${agent.name}**${toolLabel} is thinking...${buddyLabel}`);
+    await respondToInteraction(interaction, `**${agent.name}** is thinking...${buddyLabel}`);
 
     // Start typing indicator
     sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});
 
-    // Create session — admins get full access, others get memory + read-only.
-    // Session name prefix determines tool tier on resume:
-    //   "Discord full-message:" → full tools (admin)
-    //   "Discord message:"      → restricted tools (memory + read-only)
-    const sessionNamePrefix = isAdmin ? 'Discord full-message' : 'Discord message';
+    // All /message sessions use restricted tools — no admin bypass.
+    // For full tool access, use /session or @mention.
     const session = createSession(ctx.db, {
         projectId: project.id,
         agentId: agent.id,
-        name: `${sessionNamePrefix}:${channelId}`,
+        name: `Discord message:${channelId}`,
         initialPrompt: message,
         source: 'discord' as SessionSource,
-        // No workDir — even admin /message sessions don't need git isolation
+        // No workDir — restricted tools means no git isolation needed
     });
 
     const textWithContext = withAuthorContext(message, userId, username, channelId);
 
-    // Tiered tool access:
-    //   Admin: full tools (no conversationOnly, no toolAllowList)
-    //   Non-admin: read-only built-in tools + memory MCP tools
-    if (isAdmin) {
-        ctx.processManager.startProcess(session, textWithContext);
-    } else {
-        ctx.processManager.startProcess(session, textWithContext, {
-            toolAllowList: MESSAGE_BUILTIN_TOOLS,
-            mcpToolAllowList: MESSAGE_MCP_TOOLS,
-        });
-    }
+    // All /message sessions get the same sandboxed tool set
+    ctx.processManager.startProcess(session, textWithContext, {
+        toolAllowList: MESSAGE_BUILTIN_TOOLS,
+        mcpToolAllowList: MESSAGE_MCP_TOOLS,
+    });
 
     // Subscribe for inline response — replies appear as channel messages
     // that users can reply to for follow-up conversation
     const agentModel = agent.model || 'unknown';
     const agentDisplayColor = agent.displayColor;
     const projectNameForFooter = project.name;
-    // Non-admin sessions are restricted (memory + read-only), not fully conversationOnly
-    const isConversationOnly = !isAdmin;
 
     ctx.subscribeForInlineResponse(
         session.id, channelId, interaction.id, agent.name, agentModel,
@@ -160,7 +154,7 @@ export async function handleMessageCommand(
                 projectName: projectNameForFooter,
                 displayColor: agentDisplayColor,
                 channelId,
-                conversationOnly: isConversationOnly,
+                conversationOnly: true,
             };
             // Persist to in-memory map
             ctx.mentionSessions.set(botMessageId, info);
@@ -183,6 +177,8 @@ export async function handleMessageCommand(
                     prompt: message,
                     source: 'discord',
                     maxRounds,
+                    // Post each buddy round as a visible embed in the channel
+                    onRoundComplete: createBuddyDiscordCallback(ctx, channelId),
                 }).catch(err => {
                     log.warn('Failed to start buddy review for /message', {
                         sessionId: session.id,
@@ -200,8 +196,43 @@ export async function handleMessageCommand(
         agentName: agent.name,
         userId,
         channelId,
-        isAdmin,
-        toolAccess: isAdmin ? 'full' : 'memory+read',
+        toolAccess: 'memory+read',
         hasBuddy: !!buddyAgent,
     });
+}
+
+/**
+ * Create a callback that posts buddy round outputs as Discord embeds.
+ * Lead rounds get blue, buddy reviews get purple, approvals get green.
+ */
+function createBuddyDiscordCallback(
+    ctx: InteractionContext,
+    channelId: string,
+): (event: BuddyRoundEvent) => Promise<void> {
+    return async (event: BuddyRoundEvent) => {
+        const color = event.approved
+            ? BUDDY_APPROVED_COLOR
+            : event.role === 'lead'
+                ? BUDDY_LEAD_COLOR
+                : BUDDY_REVIEW_COLOR;
+
+        const roleLabel = event.role === 'lead' ? '💬' : event.approved ? '✅' : '🔍';
+        const roundLabel = `Round ${event.round}/${event.maxRounds}`;
+
+        // Truncate content for Discord embed limit (4096 chars)
+        const content = event.content.length > 3900
+            ? event.content.slice(0, 3900) + '\n\n*...truncated*'
+            : event.content;
+
+        await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
+            description: content,
+            color,
+            footer: {
+                text: buildFooterText({
+                    agentName: `${roleLabel} ${event.agentName}`,
+                    status: `${event.role} · ${roundLabel}`,
+                }),
+            },
+        });
+    };
 }

@@ -11,8 +11,11 @@
 
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
-import type { BuddySession, CreateBuddySessionInput } from '../../shared/types/buddy';
+import type { BuddySession, CreateBuddySessionInput, BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
 import { BUDDY_DEFAULT_TOOLS } from '../../shared/types/buddy';
+
+// Re-export for callers that import from the service module
+export type { BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
 import type { Session } from '../../shared/types/sessions';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -91,7 +94,7 @@ export class BuddyService {
         });
 
         // Run the conversation loop asynchronously
-        this.runConversationLoop(session.id).catch((err) => {
+        this.runConversationLoop(session.id, input.onRoundComplete).catch((err) => {
             log.error('Buddy conversation loop failed', {
                 sessionId: session.id,
                 error: err instanceof Error ? err.message : String(err),
@@ -107,7 +110,7 @@ export class BuddyService {
      * Run the back-and-forth conversation between lead and buddy.
      * Each round: lead produces output → buddy reviews → repeat.
      */
-    private async runConversationLoop(buddySessionId: string): Promise<void> {
+    private async runConversationLoop(buddySessionId: string, onRoundComplete?: BuddyRoundCallback): Promise<void> {
         const session = getBuddySession(this.db, buddySessionId);
         if (!session) return;
 
@@ -132,6 +135,18 @@ export class BuddyService {
             this.emitSessionUpdate(buddySessionId);
             return;
         }
+
+        // Notify about lead's initial output
+        await this.invokeRoundCallback(onRoundComplete, {
+            buddySessionId,
+            agentId: session.leadAgentId,
+            agentName: leadAgent.name,
+            role: 'lead',
+            round: 1,
+            maxRounds: session.maxRounds,
+            content: lastLeadOutput,
+            approved: false,
+        });
 
         // Buddy review rounds
         for (let round = 1; round <= session.maxRounds; round++) {
@@ -165,7 +180,21 @@ export class BuddyService {
             }
 
             // Check if buddy says "LGTM" / approves — stop early
-            if (this.isApproval(buddyOutput)) {
+            const approved = this.isApproval(buddyOutput);
+
+            // Notify about buddy's review
+            await this.invokeRoundCallback(onRoundComplete, {
+                buddySessionId,
+                agentId: session.buddyAgentId,
+                agentName: buddyAgent.name,
+                role: 'buddy',
+                round,
+                maxRounds: session.maxRounds,
+                content: buddyOutput,
+                approved,
+            });
+
+            if (approved) {
                 log.info('Buddy approved — ending early', { sessionId: buddySessionId, round });
                 break;
             }
@@ -196,6 +225,18 @@ export class BuddyService {
                 });
                 break;
             }
+
+            // Notify about lead's revised output
+            await this.invokeRoundCallback(onRoundComplete, {
+                buddySessionId,
+                agentId: session.leadAgentId,
+                agentName: leadAgent.name,
+                role: 'lead',
+                round: round + 1,
+                maxRounds: session.maxRounds,
+                content: lastLeadOutput,
+                approved: false,
+            });
         }
 
         updateBuddySessionStatus(this.db, buddySessionId, 'completed');
@@ -330,6 +371,24 @@ export class BuddyService {
             `Address the feedback above. This is revision round ${round}.`,
             `Produce your updated output. If you disagree with the feedback, explain why.`,
         ].join('\n');
+    }
+
+    /** Invoke the round callback if provided. Errors are logged but never propagated. */
+    private async invokeRoundCallback(
+        callback: BuddyRoundCallback | undefined,
+        event: BuddyRoundEvent,
+    ): Promise<void> {
+        if (!callback) return;
+        try {
+            await callback(event);
+        } catch (err) {
+            log.warn('Buddy round callback failed', {
+                buddySessionId: event.buddySessionId,
+                role: event.role,
+                round: event.round,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     private isApproval(output: string): boolean {
