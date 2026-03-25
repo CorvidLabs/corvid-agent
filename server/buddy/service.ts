@@ -12,7 +12,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { BuddySession, CreateBuddySessionInput, BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
-import { BUDDY_DEFAULT_TOOLS } from '../../shared/types/buddy';
+import { BUDDY_DEFAULT_TOOLS, BUDDY_DEFAULT_MCP_TOOLS } from '../../shared/types/buddy';
 
 // Re-export for callers that import from the service module
 export type { BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
@@ -312,7 +312,10 @@ export class BuddyService {
 
             this.processManager.subscribe(session.id, callback);
 
-            this.processManager.startProcess(session, prompt, { toolAllowList: [...BUDDY_DEFAULT_TOOLS] });
+            this.processManager.startProcess(session, prompt, {
+                toolAllowList: [...BUDDY_DEFAULT_TOOLS],
+                mcpToolAllowList: [...BUDDY_DEFAULT_MCP_TOOLS],
+            });
 
             // Safety timeout: 5 minutes per turn
             const timer = setTimeout(() => {
@@ -332,23 +335,27 @@ export class BuddyService {
         maxRounds: number,
     ): string {
         return [
-            `You are ${buddyName}, acting as a buddy reviewer for ${leadName}.`,
+            `You are ${buddyName}, having a collaborative discussion with ${leadName}.`,
             ``,
-            `## Original Task`,
+            `## Original Question/Task`,
             originalPrompt,
             ``,
-            `## ${leadName}'s Output (Round ${round}/${maxRounds})`,
+            `## ${leadName}'s Response (Round ${round}/${maxRounds})`,
             leadOutput.slice(0, 8000),
             ``,
             `## Your Role`,
-            `Review the output above. If it looks good, respond with "LGTM" or "Approved".`,
-            `If you see issues, suggest specific improvements. Be concise and actionable.`,
-            `Focus on correctness, completeness, and quality — not style preferences.`,
+            `You're a knowledgeable colleague reviewing ${leadName}'s response. This is a real conversation — engage genuinely:`,
+            ``,
+            `- **If the response has errors or gaps**: Point them out clearly with corrections. Share what you know. This is NOT approval — say what's wrong and what the right answer is.`,
+            `- **If you have additional useful context**: Add it! Don't just say "looks good" — enrich the response with your knowledge.`,
+            `- **Only say "LGTM" or "Approved" if the response is genuinely complete and correct** — no corrections needed, no important context missing.`,
+            ``,
+            `Be direct and substantive. You're here to make the output better, not to rubber-stamp it.`,
+            `Use your memory tools (corvid_recall_memory) to look up relevant context before responding.`,
             ``,
             `## Tools`,
-            `You have read-only tools: Read (view files), Glob (find files), Grep (search code).`,
-            `Use them to verify claims, check referenced files, or inspect code the lead changed.`,
-            `You CANNOT modify files — your job is to review, not fix.`,
+            `You have: Read (view files), Glob (find files), Grep (search code), corvid_recall_memory, corvid_read_on_chain_memories.`,
+            `Use them to verify claims, check facts, and look up context before responding.`,
         ].join('\n');
     }
 
@@ -396,7 +403,26 @@ export class BuddyService {
 
         // Only treat short responses as approvals — a long response with
         // "approved" buried inside is likely qualified feedback, not a sign-off.
-        if (lower.length > 300) return false;
+        if (lower.length > 200) return false;
+
+        // Reject if the response contains substantive content patterns —
+        // corrections, new info, or suggestions mean it's feedback, not approval
+        const substantivePatterns = [
+            /\bactually\b/,
+            /\bcorrect(ion|ly|ed)?\b/,
+            /\bwrong\b/,
+            /\bmissing\b/,
+            /\bshould\s+(be|have|include)\b/,
+            /\binstead\b/,
+            /\bi('d| would) (add|suggest|recommend|note)\b/,
+            /\bfor (context|reference|clarity)\b/,
+            /\bto clarify\b/,
+            /\bfyi\b/,
+            /\bnote that\b/,
+            /\bin fact\b/,
+            /\bhere'?s\s+(what|how|the|some|more)\b/,
+        ];
+        if (substantivePatterns.some((p) => p.test(lower))) return false;
 
         // Reject if negative qualifiers appear near approval words
         const negativePatterns = [
@@ -409,10 +435,12 @@ export class BuddyService {
             /\bbut\b/,
             /\bhowever\b/,
             /\bissues?\s+(with|found|remain|still)/,
+            /\balso\b/,
+            /\badditionally\b/,
         ];
         if (negativePatterns.some((p) => p.test(lower))) return false;
 
-        const approvalPhrases = ['lgtm', 'looks good to me', 'approved', 'no issues found', 'no issues', 'ship it'];
+        const approvalPhrases = ['lgtm', 'looks good to me', 'approved', 'no issues', 'ship it'];
         return approvalPhrases.some((phrase) => lower.includes(phrase));
     }
 }

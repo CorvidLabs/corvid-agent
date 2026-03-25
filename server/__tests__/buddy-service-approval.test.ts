@@ -91,13 +91,48 @@ describe('isApproval', () => {
     // ── Length threshold ─────────────────────────────────────────────
     describe('rejects long responses', () => {
         test('approval buried in long text is not detected', () => {
-            const longText = 'x'.repeat(250) + ' LGTM ' + 'y'.repeat(100);
+            const longText = 'x'.repeat(150) + ' LGTM ' + 'y'.repeat(100);
             expect(isApproval(longText)).toBe(false);
         });
 
         test('short approval within limit is detected', () => {
             const text = 'Code review complete. LGTM.';
             expect(isApproval(text)).toBe(true);
+        });
+    });
+
+    // ── Substantive content rejection ────────────────────────────────
+    describe('rejects responses with substantive corrections', () => {
+        test('buddy provides correction with "actually"', () => {
+            expect(isApproval('LGTM. Actually, the name is different.')).toBe(false);
+        });
+
+        test('buddy says something is missing', () => {
+            expect(isApproval('Approved, but there is context missing.')).toBe(false);
+        });
+
+        test('buddy adds info with "note that"', () => {
+            expect(isApproval('LGTM. Note that the API changed last week.')).toBe(false);
+        });
+
+        test('buddy says "should be"', () => {
+            expect(isApproval('Approved. The value should be 42.')).toBe(false);
+        });
+
+        test('buddy uses "also"', () => {
+            expect(isApproval('LGTM. Also worth mentioning the cache.')).toBe(false);
+        });
+
+        test('buddy uses "additionally"', () => {
+            expect(isApproval('Approved. Additionally, check the logs.')).toBe(false);
+        });
+
+        test('buddy says "here\'s what"', () => {
+            expect(isApproval("LGTM. Here's what I'd change though.")).toBe(false);
+        });
+
+        test('buddy says "in fact"', () => {
+            expect(isApproval('Approved. In fact the config is different.')).toBe(false);
         });
     });
 

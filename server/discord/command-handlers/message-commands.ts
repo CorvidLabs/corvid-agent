@@ -35,6 +35,19 @@ const BUDDY_LEAD_COLOR = 0x3498db;   // Blue — lead agent
 const BUDDY_REVIEW_COLOR = 0x9b59b6; // Purple — buddy reviewer
 const BUDDY_APPROVED_COLOR = 0x2ecc71; // Green — buddy approved
 
+/** Compute a human-readable status label for a buddy round event. */
+export function getBuddyStatusLabel(role: string, round: number, approved: boolean): string {
+    if (role === 'lead' && round === 1) return 'Initial Response';
+    if (role === 'lead') return `Revised Response (Round ${round})`;
+    if (approved) return 'Approved';
+    return 'Review & Feedback';
+}
+
+/** Compute the role icon emoji for a buddy round event. */
+export function getBuddyRoleIcon(role: string, approved: boolean): string {
+    return role === 'lead' ? '💬' : approved ? '✅' : '🔍';
+}
+
 export async function handleMessageCommand(
     ctx: InteractionContext,
     interaction: DiscordInteractionData,
@@ -219,8 +232,9 @@ function createBuddyDiscordCallback(
                 ? BUDDY_LEAD_COLOR
                 : BUDDY_REVIEW_COLOR;
 
-        const roleLabel = event.role === 'lead' ? '💬' : event.approved ? '✅' : '🔍';
-        const roundLabel = `Round ${event.round}/${event.maxRounds}`;
+        const statusLabel = getBuddyStatusLabel(event.role, event.round, event.approved);
+        const roleIcon = getBuddyRoleIcon(event.role, event.approved);
+        const roundInfo = `${event.round}/${event.maxRounds}`;
 
         // Truncate content for Discord embed limit (4096 chars)
         const content = event.content.length > 3900
@@ -232,8 +246,8 @@ function createBuddyDiscordCallback(
             color,
             footer: {
                 text: buildFooterText({
-                    agentName: `${roleLabel} ${event.agentName}`,
-                    status: `${event.role} · ${roundLabel}`,
+                    agentName: `${roleIcon} ${event.agentName}`,
+                    status: `${statusLabel} · Round ${roundInfo}`,
                 }),
             },
         });
