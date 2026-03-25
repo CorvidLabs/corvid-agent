@@ -29,6 +29,8 @@ Handles the Discord `/message` slash command — a lightweight, sandboxed intera
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
+| `getBuddyStatusLabel` | `(role: string, round: number, approved: boolean)` | `string` | Compute a human-readable status label for a buddy round event (e.g. "Initial Response", "Review & Feedback", "Approved") |
+| `getBuddyRoleIcon` | `(role: string, approved: boolean)` | `string` | Compute the role icon emoji for a buddy round event (💬 for lead, ✅ for approved buddy, 🔍 for reviewing buddy) |
 | `handleMessageCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number, getOption: (name: string) => string \| undefined, userId: string)` | `Promise<void>` | Handles the `/message` slash command with sandboxed tool access for all permission levels |
 
 ## Invariants
