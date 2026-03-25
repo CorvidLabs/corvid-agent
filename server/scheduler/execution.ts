@@ -74,7 +74,7 @@ async function dispatchAction(
         case 'memory_maintenance':     await execMemoryMaintenance(hctx, executionId, schedule); break;
         case 'reputation_attestation': await execReputationAttestation(hctx, executionId, schedule); break;
         case 'outcome_analysis':       await execOutcomeAnalysis(hctx, executionId, schedule); break;
-        case 'daily_review':           execDailyReview(hctx, executionId, schedule); break;
+        case 'daily_review':           await execDailyReview(hctx, executionId, schedule); break;
         case 'status_checkin':         await execStatusCheckin(hctx, executionId, schedule); break;
         case 'marketplace_billing':    execMarketplaceBilling(hctx, executionId); break;
         case 'flock_testing':          await execFlockTesting(hctx, executionId, schedule); break;
