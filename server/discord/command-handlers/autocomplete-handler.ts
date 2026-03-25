@@ -12,6 +12,7 @@ import { listAgents } from '../../db/agents';
 import { listProjects } from '../../db/projects';
 import { listBundles } from '../../db/skill-bundles';
 import { listPersonas } from '../../db/personas';
+import { listCouncils } from '../../db/councils';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('DiscordCommands');
@@ -64,6 +65,15 @@ export async function handleAutocomplete(
             .map(a => ({
                 name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
                 value: a.name,
+            }));
+    } else if (focused.name === 'council_name') {
+        const councils = listCouncils(ctx.db);
+        choices = councils
+            .filter(c => !query || c.name.toLowerCase().includes(query))
+            .slice(0, 25)
+            .map(c => ({
+                name: `${c.name}${c.description ? ` — ${c.description}` : ''}`.slice(0, 100),
+                value: c.name,
             }));
     } else if (focused.name === 'persona') {
         const personas = listPersonas(ctx.db);
