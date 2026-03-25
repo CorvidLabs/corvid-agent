@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.1] - 2026-03-25
+
+### Fixed
+- **CI: test reliability** — fix env var race condition in Discord tests, update buddy tools count assertion (#1494)
+
 ## [0.53.0] - 2026-03-25
 
 ### Added
