@@ -74,7 +74,7 @@ describe('BUDDY_DEFAULT_MCP_TOOLS', () => {
         expect(BUDDY_DEFAULT_MCP_TOOLS).toContain('corvid_read_on_chain_memories');
     });
 
-    test('has exactly 2 tools', () => {
-        expect(BUDDY_DEFAULT_MCP_TOOLS).toHaveLength(2);
+    test('has exactly 12 tools', () => {
+        expect(BUDDY_DEFAULT_MCP_TOOLS).toHaveLength(12);
     });
 });

@@ -53,6 +53,7 @@ let db: Database;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let capturedResponse: Record<string, any> | null = null;
 const originalFetch = globalThis.fetch;
+const originalAppId = process.env.DISCORD_APP_ID;
 
 /** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
 function getResponseContent(): string {
@@ -185,7 +186,8 @@ beforeEach(() => {
 afterEach(() => {
     db.close();
     globalThis.fetch = originalFetch;
-    delete process.env.DISCORD_APP_ID;
+    if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
+    else delete process.env.DISCORD_APP_ID;
 });
 
 // ── Autocomplete Handler ────────────────────────────────────────────
