@@ -925,3 +925,56 @@ export const CreditGrantSchema = z.object({
     amount: z.number().positive().finite(),
     reference: z.string().optional(),
 });
+
+// ─── Permissions ────────────────────────────────────────────────────────────
+
+export const PermissionGrantSchema = z.object({
+	agent_id: z.string().min(1),
+	action: z.string().min(1),
+	granted_by: z.string().optional(),
+	reason: z.string().optional(),
+	expires_at: z.string().nullable().optional(),
+	tenant_id: z.string().optional(),
+});
+
+export const PermissionRevokeSchema = z.object({
+	grant_id: z.number().optional(),
+	agent_id: z.string().optional(),
+	action: z.string().optional(),
+	revoked_by: z.string().optional(),
+	reason: z.string().optional(),
+	tenant_id: z.string().optional(),
+}).refine(
+	(d) => d.grant_id !== undefined || d.agent_id !== undefined,
+	{ message: 'grant_id or agent_id is required' },
+);
+
+export const PermissionEmergencyRevokeSchema = z.object({
+	agent_id: z.string().min(1),
+	revoked_by: z.string().optional(),
+	reason: z.string().optional(),
+});
+
+export const PermissionCheckSchema = z.object({
+	agent_id: z.string().min(1),
+	tool_name: z.string().min(1),
+	session_id: z.string().optional(),
+	tenant_id: z.string().optional(),
+});
+
+export const PermissionApplyRoleSchema = z.object({
+	agent_id: z.string().min(1),
+	role: z.string().min(1),
+	granted_by: z.string().optional(),
+	tenant_id: z.string().optional(),
+	expires_at: z.string().nullable().optional(),
+	reason: z.string().optional(),
+});
+
+export const PermissionRevokeRoleSchema = z.object({
+	agent_id: z.string().min(1),
+	role: z.string().min(1),
+	revoked_by: z.string().optional(),
+	tenant_id: z.string().optional(),
+	reason: z.string().optional(),
+});
