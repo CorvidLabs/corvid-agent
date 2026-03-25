@@ -105,6 +105,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
+| `getBuddyStatusLabel` | `(role, round, approved)` | `string` | Compute a human-readable status label for a buddy round event |
+| `getBuddyRoleIcon` | `(role, approved)` | `string` | Compute the role icon emoji for a buddy round event |
 | `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — starts a sandboxed conversation session with restricted tools. Available at BASIC permission level. Persists the mention session to both the in-memory map and the database for follow-up replies. |
 
 ### Exported Functions (from command-handlers/info-commands.ts)
@@ -159,6 +161,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
+| `getBuddyStatusLabel` | `(role, round, approved)` | `string` | Compute a human-readable status label for a buddy round event |
+| `getBuddyRoleIcon` | `(role, approved)` | `string` | Compute the role icon emoji for a buddy round event |
 | `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — pure conversation mode with no tools, for untrusted users at BASIC permission level |
 
 ### Exported Functions (from embeds.ts)
