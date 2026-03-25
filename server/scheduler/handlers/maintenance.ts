@@ -9,6 +9,13 @@ import { createSession } from '../../db/sessions';
 import { summarizeOldMemories } from '../../memory/summarizer';
 import type { HandlerContext } from './types';
 
+/** SHA-256 hash of the daily review summary for on-chain attestation. */
+async function hashSummary(text: string): Promise<string> {
+    const data = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function execMemoryMaintenance(
     ctx: HandlerContext,
     executionId: string,
@@ -99,11 +106,11 @@ export async function execOutcomeAnalysis(
     }
 }
 
-export function execDailyReview(
+export async function execDailyReview(
     ctx: HandlerContext,
     executionId: string,
     schedule: AgentSchedule,
-): void {
+): Promise<void> {
     if (!ctx.dailyReviewService) {
         updateExecutionStatus(ctx.db, executionId, 'failed', {
             result: 'Daily review service not configured',
@@ -113,12 +120,26 @@ export function execDailyReview(
 
     try {
         const result = ctx.dailyReviewService.run(schedule.agentId);
+
+        // Publish daily activity attestation on-chain
+        let attestationNote = '';
+        if (ctx.agentMessenger) {
+            try {
+                const hash = await hashSummary(result.summary);
+                const note = `corvid-daily-review:${schedule.agentId}:${result.date}:${hash}`;
+                const txid = await ctx.agentMessenger.sendOnChainToSelf(schedule.agentId, note);
+                attestationNote = txid ? ` attestation=${hash.slice(0, 16)}... txid=${txid}` : ` attestation=${hash.slice(0, 16)}... (off-chain)`;
+            } catch {
+                // On-chain attestation is best-effort
+            }
+        }
+
         const summary = [
             `Executions: ${result.executions.completed} completed, ${result.executions.failed} failed (${result.executions.total} total).`,
             `PRs: ${result.prs.opened} opened, ${result.prs.merged} merged, ${result.prs.closed} closed.`,
             `Health: ${result.health.uptimePercent}% uptime (${result.health.snapshotCount} snapshots).`,
             result.observations.length > 0 ? `Observations: ${result.observations.join('; ')}` : '',
-        ].filter(Boolean).join(' ');
+        ].filter(Boolean).join(' ') + attestationNote;
 
         updateExecutionStatus(ctx.db, executionId, 'completed', { result: summary });
     } catch (err) {
