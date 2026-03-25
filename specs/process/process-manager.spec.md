@@ -157,6 +157,7 @@ Side effects on construction:
 12. **Event emission before cleanup**: All exit/stop paths emit events BEFORE removing subscribers, so listeners receive the final event
 13. **Orphan pruning**: Every 5 minutes, removes subscriber/meta entries for sessions with no active process and not paused
 14. **Memory cleanup single source**: `cleanupSessionState` is the single entry point for all cleanup (process, meta, subscribers, paused state, timers, approval/question managers)
+15. **Cursor per-turn metrics**: When the Cursor CLI completes a model turn it emits `result` events that must not be broadcast (Discord and other listeners treat `result` as session end). The manager accepts synthetic `session_turn_metrics` events from `cursor-process` to persist cost and `session_metrics` rows without broadcasting `result`
 
 ## Behavioral Examples
 
@@ -227,7 +228,7 @@ Side effects on construction:
 | `server/process/event-bus.ts` | `SessionEventBus` |
 | `server/process/mcp-service-container.ts` | `McpServiceContainer`, `McpServices` |
 | `server/process/session-config-resolver.ts` | `resolveSessionConfig` |
-| `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
+| `server/process/types.ts` | `ClaudeStreamEvent`, `SessionTurnMetricsEvent`, `extractContentText` |
 | `server/db/sessions.ts` | Session CRUD, message operations |
 | `server/db/projects.ts` | `getProject` |
 | `server/db/agents.ts` | `getAgent`, `getAlgochatEnabledAgents` |

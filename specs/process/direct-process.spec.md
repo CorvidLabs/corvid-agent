@@ -17,6 +17,8 @@ depends_on:
 
 Direct execution engine for non-SDK providers (e.g., Ollama). Implements the same `SdkProcess` interface so the ProcessManager and WebSocket clients are unaware of the difference between SDK and direct mode. Manages the full agentic loop: slot acquisition, tool execution, context management, repeat detection, hallucination detection, nudging, and summary epilogue.
 
+Emits `message_stop` at the end of each model iteration (tool-chain step or text-only branch) so downstream logic that mirrors the Claude SDK stream (for example work-queue chain-continuation stall detection) receives the same turn boundaries as the Anthropic SDK path.
+
 ## Public API
 
 ### Exported Types

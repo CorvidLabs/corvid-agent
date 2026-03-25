@@ -19,7 +19,7 @@
 import type { Agent, Project, Session } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import type { SdkProcess } from './sdk-process';
-import type { ClaudeStreamEvent } from './types';
+import type { ClaudeStreamEvent, DirectProcessMetrics, SessionTurnMetricsEvent } from './types';
 
 const log = createLogger('CursorProcess');
 
@@ -82,31 +82,44 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   const pid = currentProc.pid;
   let cursorSessionId: string | null = null;
   let killed = false;
+  /** Tool calls started in the current cursor-agent turn (for metrics parity). */
+  let turnToolCallCount = 0;
 
-  readStream(currentProc.stdout, (event) => {
+  function forwardCursorStdoutEvent(event: ClaudeStreamEvent): void {
     // Capture the cursor-agent session ID from the init event for --resume
     if (event.type === 'system' && 'session_id' in event && typeof event.session_id === 'string') {
       cursorSessionId = event.session_id as string;
       log.debug(`Captured cursor session ID: ${cursorSessionId}`);
     }
 
-    // cursor-agent emits `result` events after each turn, not just at session end.
-    // Forwarding these causes the thread-manager to unsubscribe prematurely,
-    // dropping all subsequent assistant messages. The manager's handleExit
-    // emits `session_exited` when the process truly ends.
+    // cursor-agent emits `result` after each turn. Forwarding them unsubscribes
+    // Discord/work listeners early. Instead: end-of-turn markers + internal metrics.
     if (event.type === 'result') {
       log.debug('Filtering cursor-agent result event (will use session_exited instead)', {
         sessionId: session.id,
         subtype: event.subtype,
       });
+      onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
+      const raw = event as unknown as Record<string, unknown>;
+      const metrics = mapCursorResultToTurnMetrics(raw, agent, turnToolCallCount);
+      turnToolCallCount = 0;
+      const costTurns = extractCursorCostAndTurns(raw);
+      onEvent({
+        type: 'session_turn_metrics',
+        metrics,
+        ...costTurns,
+      } as SessionTurnMetricsEvent);
       return;
     }
 
-    // Synthesize tool_status events from cursor-agent's tool_call events
-    // so the Discord thread-manager can show "⏳ Reading file..." status.
-    // Cast needed: cursor-agent emits `tool_call` which isn't in ClaudeStreamEvent union.
     const rawType = (event as { type: string }).type;
     if (rawType === 'tool_call' && (event as { subtype?: string }).subtype === 'started') {
+      turnToolCallCount++;
+      // Match Claude SDK / direct-process so stall detection & dashboards see tool use.
+      onEvent({
+        type: 'content_block_start',
+        content_block: { type: 'tool_use' },
+      } as ClaudeStreamEvent);
       const toolStatus = describeCursorToolCall(event);
       if (toolStatus) {
         onEvent({ type: 'tool_status', statusMessage: toolStatus } as ClaudeStreamEvent);
@@ -114,7 +127,9 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
     }
 
     onEvent(event);
-  });
+  }
+
+  readStream(currentProc.stdout, forwardCursorStdoutEvent);
 
   readStream(currentProc.stderr, (event) => {
     const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
@@ -173,23 +188,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       },
     });
 
-    readStream(currentProc.stdout, (event) => {
-      if (event.type === 'result') {
-        log.debug('Filtering cursor-agent result event on resume', {
-          sessionId: session.id,
-          subtype: event.subtype,
-        });
-        return;
-      }
-      const rawType = (event as { type: string }).type;
-      if (rawType === 'tool_call' && (event as { subtype?: string }).subtype === 'started') {
-        const toolStatus = describeCursorToolCall(event);
-        if (toolStatus) {
-          onEvent({ type: 'tool_status', statusMessage: toolStatus } as ClaudeStreamEvent);
-        }
-      }
-      onEvent(event);
-    });
+    readStream(currentProc.stdout, forwardCursorStdoutEvent);
     readStream(currentProc.stderr, (event) => {
       const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
       log.debug(`cursor-agent stderr (resume): ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
@@ -300,6 +299,54 @@ function describeCursorToolCall(event: any): string | null {
 function basename(p: string): string {
   const idx = p.lastIndexOf('/');
   return idx >= 0 ? p.slice(idx + 1) : p;
+}
+
+function extractCursorCostAndTurns(raw: Record<string, unknown>): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
+  const out: Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> = {};
+  if (typeof raw.total_cost_usd === 'number') out.total_cost_usd = raw.total_cost_usd;
+  if (typeof raw.num_turns === 'number') out.num_turns = raw.num_turns;
+  return out;
+}
+
+function isDirectProcessMetricsShape(v: unknown): v is DirectProcessMetrics {
+  if (!v || typeof v !== 'object') return false;
+  const m = v as Record<string, unknown>;
+  return typeof m.model === 'string' && typeof m.tier === 'string' && typeof m.totalIterations === 'number';
+}
+
+function mapCursorResultToTurnMetrics(
+  raw: Record<string, unknown>,
+  agent: Agent | null,
+  turnToolCallCount: number,
+): DirectProcessMetrics {
+  const nested = raw.metrics;
+  if (isDirectProcessMetricsShape(nested)) {
+    return {
+      ...nested,
+      toolCallCount: Math.max(nested.toolCallCount ?? 0, turnToolCallCount),
+    };
+  }
+  const model = (typeof raw.model === 'string' && raw.model) || agent?.model || 'cursor';
+  const numTurns = typeof raw.num_turns === 'number' ? raw.num_turns : 1;
+  const durationMs = typeof raw.duration_ms === 'number' ? raw.duration_ms : 0;
+  return {
+    model,
+    tier: 'unknown',
+    totalIterations: numTurns,
+    toolCallCount: turnToolCallCount,
+    maxChainDepth: 0,
+    nudgeCount: 0,
+    midChainNudgeCount: 0,
+    explorationDriftCount: 0,
+    stallDetected: false,
+    stallType: null,
+    terminationReason: 'normal',
+    durationMs,
+    needsSummary: false,
+    totalLowQualityResponses: 0,
+    totalVacuousToolCalls: 0,
+    qualityNudgeCount: 0,
+  };
 }
 
 async function readStream(

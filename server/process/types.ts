@@ -113,6 +113,19 @@ export interface ResultEvent extends BaseStreamEvent {
     escalation?: EscalationInfo;
 }
 
+/**
+ * Per-turn metrics and cost from integrations that suppress `result` on the
+ * event bus (e.g. cursor-agent emits `result` after every turn; forwarding
+ * that would unsubscribe Discord/work listeners early). ProcessManager
+ * consumes this for DB cost/metrics only — it is not broadcast to subscribers.
+ */
+export interface SessionTurnMetricsEvent extends BaseStreamEvent {
+    type: 'session_turn_metrics';
+    metrics: DirectProcessMetrics;
+    total_cost_usd?: number;
+    num_turns?: number;
+}
+
 /** Error occurred */
 export interface ErrorEvent extends BaseStreamEvent {
     type: 'error';
@@ -235,6 +248,7 @@ export type ClaudeStreamEvent =
     | AssistantEvent
     | ThinkingEvent
     | ResultEvent
+    | SessionTurnMetricsEvent
     | ErrorEvent
     | ToolStatusEvent
     | SystemEvent

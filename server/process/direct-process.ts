@@ -317,6 +317,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             }
         }
 
+        /** End-of-turn marker aligned with Claude SDK streams (work-queue stall detection). */
+        function emitModelTurnEnd(): void {
+            onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
+        }
+
         try {
 
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
@@ -429,6 +434,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         needsSummary = true;
                         terminationReason = 'stall_repeat';
                         stallType = 'repeat';
+                        emitModelTurnEnd();
                         break;
                     }
                 } else {
@@ -447,6 +453,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         needsSummary = true;
                         terminationReason = 'stall_same_tool';
                         stallType = 'same_tool';
+                        emitModelTurnEnd();
                         break;
                     }
                 } else {
@@ -591,6 +598,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     });
                     stallType = 'repetitive_loop';
                     terminationReason = 'stall_repetitive_loop';
+                    emitModelTurnEnd();
                     break;
                 }
 
@@ -614,10 +622,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     });
                     stallType = 'quality_nudges_exhausted';
                     terminationReason = 'stall_quality_exhausted';
+                    emitModelTurnEnd();
                     break;
                 }
 
                 // Continue loop to let the model process tool results
+                emitModelTurnEnd();
                 continue;
             }
 
@@ -647,6 +657,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         + 'Call the next tool now by outputting ONLY the JSON array: '
                         + '[{"name": "tool_name", "arguments": {...}}]',
                 });
+                emitModelTurnEnd();
                 continue;
             }
 
@@ -669,17 +680,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     sessionId: session.id,
                 });
                 messages.push({ role: 'user', content: buildQualityNudge() });
+                emitModelTurnEnd();
                 continue;
             }
 
             // Skip nudging if we've already nudged too many times or tools are disabled
             if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
+                emitModelTurnEnd();
                 break;
             }
 
             // After tools have been called, only allow mid-chain nudges (handled above).
             // Standard nudges are for initial engagement only.
             if (toolsEverCalled) {
+                emitModelTurnEnd();
                 break;
             }
 
@@ -693,9 +707,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 log.info(`Nudging model to continue (iteration=${iteration}, reason=${nudgeReason}, nudge=${nudgeCount}/${MAX_NUDGES})`);
                 const nudge = buildNudgeMessage(nudgeReason, directTools);
                 messages.push({ role: 'user', content: nudge });
+                emitModelTurnEnd();
                 continue;
             }
 
+            emitModelTurnEnd();
             break;
         }
 
@@ -742,6 +758,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                             content: [{ type: 'text', text: summaryResult.content }],
                         },
                     } as ClaudeStreamEvent);
+                    emitModelTurnEnd();
                 }
             } catch (err) {
                 log.warn('Final summary call failed', {
