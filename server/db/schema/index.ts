@@ -148,6 +148,11 @@ const MIGRATIONS: Record<number, string[]> = {
         ...buddy.tables,
         ...buddy.indexes,
     ],
+    105: [
+        // Session restart recovery flag
+        `ALTER TABLE sessions ADD COLUMN restart_pending INTEGER NOT NULL DEFAULT 0`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
+    ],
 };
 
 // ── Migration helpers ───────────────────────────────────────────────

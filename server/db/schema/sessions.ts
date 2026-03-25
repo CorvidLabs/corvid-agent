@@ -64,4 +64,5 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
 ];
