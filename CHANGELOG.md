@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.0] - 2026-03-25
+
+### Added
+- **DX: frictionless onboarding** — root `docker-compose.yml`, `bun run setup` wizard, improved quickstart paths (#1460)
+- **CLI: settings command** — `corvid-agent settings` for viewing/editing config, plus cookbook docs (#1488, #1490)
+- **CLI: plugin system** — `corvid-agent plugin` commands for listing, installing, and managing plugins (#1489, #1491)
+- **Discord: council selection** — `/council` now supports `council_name`, `agents`, and `project` options for picking councils, ad-hoc agent groups, and project context (#1492)
+- **Discord: responsive interface** — collapsible embeds and mobile-friendly layouts for Discord commands (#1491)
+
+### Fixed
+- **Buddy: review tool visibility** — expand buddy review tools (Read, Glob, Grep, code_symbols, find_references) for better context during reviews (#1492)
+
 ## [0.52.0] - 2026-03-25
 
 ### Added
