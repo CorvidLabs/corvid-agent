@@ -16,6 +16,7 @@ import {
     updateSchedule,
     deleteSchedule,
 } from '../../db/schedules';
+import type { ScheduleAction, ScheduleActionType } from '../../../shared/types';
 import { respondToInteraction, respondToInteractionEmbed } from '../embeds';
 import { listPipelineTemplates, getPipelineTemplate } from '../../scheduler/pipeline';
 import { createLogger } from '../../lib/logger';
@@ -189,8 +190,8 @@ async function handleScheduleCreate(
         return;
     }
 
-    const actions = [{
-        type: actionType as any,
+    const actions: ScheduleAction[] = [{
+        type: actionType as ScheduleActionType,
         ...(channelId ? { channelId } : {}),
         ...(actionType === 'discord_post' ? { message: `Scheduled post from "${name}"` } : {}),
     }];
