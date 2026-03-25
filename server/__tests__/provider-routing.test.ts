@@ -332,6 +332,8 @@ describe('ProcessManager provider_selected event', () => {
         } catch {
             // Expected — no real process to spawn in some envs
         }
+        // Stop immediately to prevent async spawn errors leaking between tests
+        pm.stopProcess(session.id);
 
         const providerEvent = events.find(
             (e) => e.type === 'system' && e.subtype === 'provider_selected',
@@ -352,6 +354,8 @@ describe('ProcessManager provider_selected event', () => {
         } catch {
             // Expected
         }
+        // Stop immediately to prevent async spawn errors leaking between tests
+        pm.stopProcess(session.id);
 
         const providerEvent = events.find(
             (e) => e.type === 'system' && e.subtype === 'provider_selected',
