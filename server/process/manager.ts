@@ -88,7 +88,7 @@ export class ProcessManager {
         this.ownerQuestionManager.setDatabase(db);
 
         this.timerManager = new SessionTimerManager({
-            onTimeout: (sessionId) => this.stopProcess(sessionId),
+            onTimeout: (sessionId) => this.stopProcess(sessionId, 'inactivity_timeout'),
             onStablePeriod: (sessionId) => {
                 const meta = this.sessionMeta.get(sessionId);
                 if (meta && meta.restartCount > 0) {
@@ -161,10 +161,10 @@ export class ProcessManager {
      */
     private cleanupStaleSessions(): void {
         const result = this.db.query(
-            `UPDATE sessions SET status = 'idle', pid = NULL WHERE status IN ('running', 'loading')`
+            `UPDATE sessions SET status = 'idle', pid = NULL, restart_pending = 1 WHERE status IN ('running', 'loading')`
         ).run();
         if (result.changes > 0) {
-            log.info(`Reset ${result.changes} stale session(s) from previous run`);
+            log.info(`Reset ${result.changes} stale session(s) from previous run (marked restart_pending)`);
         }
     }
 
@@ -797,8 +797,23 @@ export class ProcessManager {
         return parts.join('\n');
     }
 
-    stopProcess(sessionId: string): void {
+    stopProcess(sessionId: string, reason?: string): void {
         const cp = this.processes.get(sessionId);
+        const meta = this.sessionMeta.get(sessionId);
+        const session = getSession(this.db, sessionId);
+        const durationMs = meta ? Date.now() - meta.startedAt : null;
+
+        log.info('Stopping session', {
+            sessionId,
+            name: session?.name ?? 'unknown',
+            source: meta?.source ?? session?.source ?? 'unknown',
+            reason: reason ?? 'user_stop',
+            hadProcess: !!cp,
+            durationMs,
+            durationHuman: durationMs ? `${Math.round(durationMs / 1000)}s` : 'unknown',
+            turnCount: meta?.turnCount ?? 0,
+        });
+
         if (cp) {
             cp.kill();
         }
@@ -914,8 +929,19 @@ export class ProcessManager {
         this.approvalManager.shutdown();
         this.ownerQuestionManager.shutdown();
 
+        // Mark all active sessions as restart_pending BEFORE killing them,
+        // so the next server instance knows to resume them.
+        const activeIds = [...this.processes.keys()];
+        if (activeIds.length > 0) {
+            const placeholders = activeIds.map(() => '?').join(',');
+            this.db.query(
+                `UPDATE sessions SET restart_pending = 1 WHERE id IN (${placeholders})`
+            ).run(...activeIds);
+            log.info(`Marked ${activeIds.length} active session(s) as restart_pending`);
+        }
+
         for (const [sessionId] of this.processes) {
-            this.stopProcess(sessionId);
+            this.stopProcess(sessionId, 'server_shutdown');
         }
 
         this.eventBus.clearAllSessionSubscribers();
@@ -1014,7 +1040,7 @@ export class ProcessManager {
                                     recoverable: true,
                                 },
                             } as ClaudeStreamEvent);
-                            this.stopProcess(sessionId);
+                            this.stopProcess(sessionId, 'credits_exhausted');
                             return;
                         }
                         if (result.isLow) {
@@ -1116,10 +1142,34 @@ export class ProcessManager {
 
     private handleExit(sessionId: string, code: number | null, errorMessage?: string): void {
         const meta = this.sessionMeta.get(sessionId);
+        const session = getSession(this.db, sessionId);
         updateSessionPid(this.db, sessionId, null);
 
         const status = code === 0 ? 'idle' : 'error';
         updateSessionStatus(this.db, sessionId, status);
+
+        // Structured logging for all session exits
+        const durationMs = meta ? Date.now() - meta.startedAt : null;
+        const exitInfo = {
+            sessionId,
+            name: session?.name ?? 'unknown',
+            agentId: session?.agentId ?? 'unknown',
+            source: meta?.source ?? session?.source ?? 'unknown',
+            status,
+            exitCode: code,
+            durationMs,
+            durationHuman: durationMs ? `${Math.round(durationMs / 1000)}s` : 'unknown',
+            turnCount: meta?.turnCount ?? 0,
+            restartCount: meta?.restartCount ?? 0,
+            costUsd: meta?.lastKnownCostUsd ?? 0,
+            errorMessage: errorMessage ?? null,
+        };
+
+        if (code !== 0) {
+            log.error('Session exited abnormally', exitInfo);
+        } else {
+            log.info('Session exited cleanly', exitInfo);
+        }
 
         // Broadcast exit status to dashboard
         if (this.broadcastFn) {
@@ -1129,11 +1179,13 @@ export class ProcessManager {
         // Log unexpected exits as system messages so the user can see what happened
         if (code !== 0) {
             const detail = errorMessage ? `: ${errorMessage}` : '';
+            const durationStr = durationMs ? ` after ${Math.round(durationMs / 1000)}s` : '';
             addSessionMessage(this.db, sessionId, 'system',
-                `Session exited unexpectedly (code ${code})${detail}. Send a message to resume.`);
+                `Session exited unexpectedly (code ${code})${detail}${durationStr}. Turns: ${meta?.turnCount ?? 0}. Send a message to resume.`);
         } else if (meta) {
             // Clean exit — record it so the conversation shows the boundary
-            addSessionMessage(this.db, sessionId, 'system', 'Session completed.');
+            const durationStr = durationMs ? ` after ${Math.round(durationMs / 1000)}s` : '';
+            addSessionMessage(this.db, sessionId, 'system', `Session completed${durationStr}. Turns: ${meta.turnCount}.`);
         }
 
         // Two-tier memory: auto-save session summary on clean exit

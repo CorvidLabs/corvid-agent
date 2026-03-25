@@ -46,6 +46,7 @@ export const tables: string[] = [
         council_role      TEXT DEFAULT NULL,
         work_dir          TEXT DEFAULT NULL,
         credits_consumed  REAL DEFAULT 0,
+        restart_pending   INTEGER NOT NULL DEFAULT 0,
         tenant_id         TEXT NOT NULL DEFAULT 'default',
         created_at        TEXT DEFAULT (datetime('now')),
         updated_at        TEXT DEFAULT (datetime('now'))
@@ -63,4 +64,5 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
 ];

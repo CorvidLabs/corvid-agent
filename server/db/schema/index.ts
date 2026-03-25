@@ -47,7 +47,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 104;
+const SCHEMA_VERSION = 105;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -147,6 +147,11 @@ const MIGRATIONS: Record<number, string[]> = {
         // Buddy mode: paired agent collaboration
         ...buddy.tables,
         ...buddy.indexes,
+    ],
+    105: [
+        // Session restart recovery flag
+        `ALTER TABLE sessions ADD COLUMN restart_pending INTEGER NOT NULL DEFAULT 0`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
     ],
 };
 
