@@ -43,6 +43,7 @@ import { createKeyProvider, assertProductionReady, detectPlaintextKeyConfig } fr
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
 import { seedConversationalAgents } from '../conversational/seed';
+import { seedDefaultBuddyPairings } from '../buddy/seed';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -370,6 +371,9 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
         db: deps.db,
         walletService: algochatState.walletService,
         flockDirectoryService: deps.flockDirectoryService,
+    }).then(() => {
+        // Seed default buddy pairings after conversational agents exist
+        seedDefaultBuddyPairings({ db: deps.db });
     }).catch((err) => {
         log.warn('Conversational agent seeding failed (non-blocking)', {
             error: err instanceof Error ? err.message : String(err),
