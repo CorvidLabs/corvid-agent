@@ -19,8 +19,10 @@ mock.module('../lib/worktree', () => ({
 import { Database } from 'bun:sqlite';
 import { createAgent } from '../db/agents';
 import { createCouncil } from '../db/councils';
+import { createPersona } from '../db/personas';
 import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
+import { createBundle } from '../db/skill-bundles';
 // Direct imports for unit-level tests
 import { handleAutocomplete } from '../discord/command-handlers/autocomplete-handler';
 import { handleComponentInteraction } from '../discord/command-handlers/component-handlers';
@@ -363,6 +365,67 @@ describe('handleAutocomplete', () => {
     const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
     expect(choices).toHaveLength(1);
     expect(choices[0].value).toBe('my-project');
+  });
+
+  test('returns skill choices filtered by query', async () => {
+    const ctx = createTestContext();
+    createBundle(db, { name: 'xyzzy-review', description: 'Xyzzy review skill' });
+    createBundle(db, { name: 'deploy-helper', description: 'Deployment automation' });
+
+    const interaction = makeAutocompleteInteraction('session', [{ name: 'skill', value: 'xyzzy', focused: true }]);
+
+    await handleAutocomplete(ctx, interaction);
+
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices).toHaveLength(1);
+    expect(choices[0].value).toBe('xyzzy-review');
+  });
+
+  test('returns buddy choices filtered by query', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'ReviewBot', model: 'test-model' });
+    createAgent(db, { name: 'CodeBot', model: 'other-model' });
+
+    const interaction = makeAutocompleteInteraction('session', [{ name: 'buddy', value: 'review', focused: true }]);
+
+    await handleAutocomplete(ctx, interaction);
+
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices).toHaveLength(1);
+    expect(choices[0].value).toBe('ReviewBot');
+  });
+
+  test('returns council choices filtered by query', async () => {
+    const ctx = createTestContext();
+    const a1 = createAgent(db, { name: 'CouncilAgent1', model: 'test-model' });
+    createCouncil(db, { name: 'security-review', description: 'Security review council', agentIds: [a1.id] });
+    createCouncil(db, { name: 'architecture', description: 'Architecture council', agentIds: [a1.id] });
+
+    const interaction = makeAutocompleteInteraction('session', [
+      { name: 'council_name', value: 'security', focused: true },
+    ]);
+
+    await handleAutocomplete(ctx, interaction);
+
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices).toHaveLength(1);
+    expect(choices[0].value).toBe('security-review');
+  });
+
+  test('returns persona choices filtered by query', async () => {
+    const ctx = createTestContext();
+    createPersona(db, { name: 'Friendly Helper', archetype: 'friendly' });
+    createPersona(db, { name: 'Code Reviewer', archetype: 'custom' });
+
+    const interaction = makeAutocompleteInteraction('session', [
+      { name: 'persona', value: 'friendly', focused: true },
+    ]);
+
+    await handleAutocomplete(ctx, interaction);
+
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices).toHaveLength(1);
+    expect(choices[0].value).toBe('Friendly Helper');
   });
 });
 
