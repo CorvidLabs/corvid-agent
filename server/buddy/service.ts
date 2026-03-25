@@ -12,7 +12,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { BuddySession, CreateBuddySessionInput, BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
-import { BUDDY_DEFAULT_TOOLS } from '../../shared/types/buddy';
+import { BUDDY_DEFAULT_TOOLS, BUDDY_DEFAULT_MCP_TOOLS } from '../../shared/types/buddy';
 
 // Re-export for callers that import from the service module
 export type { BuddyRoundCallback, BuddyRoundEvent } from '../../shared/types/buddy';
