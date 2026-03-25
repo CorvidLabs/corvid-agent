@@ -1,3 +1,4 @@
+import { getSession } from './db/sessions';
 import { getDb, initDb } from './db/connection';
 import { getCurrentVersion } from './db/migrate';
 import { initDiscordConfigFromEnv } from './db/discord-config';
@@ -469,6 +470,23 @@ wirePostInit(algochatInitDeps);
 
 // Start session lifecycle cleanup after server is running
 sessionLifecycle.start();
+
+// Resume sessions that were interrupted by the previous server shutdown/crash
+const pendingIds = sessionLifecycle.getAndClearRestartPendingSessions();
+if (pendingIds.length > 0) {
+    log.info(`Resuming ${pendingIds.length} interrupted session(s)`);
+    for (const id of pendingIds) {
+        const session = getSession(db, id);
+        if (session) {
+            try {
+                processManager.resumeProcess(session);
+                log.info(`Resumed interrupted session ${id}`, { name: session.name, source: session.source });
+            } catch (err) {
+                log.error(`Failed to resume session ${id}`, { error: err instanceof Error ? err.message : String(err) });
+            }
+        }
+    }
+}
 
 log.info(`Server running at http://${BIND_HOST}:${PORT}`);
 

@@ -123,7 +123,7 @@ export class SessionLifecycleManager {
 
             if (!alive) {
                 this.db.query(`
-                    UPDATE sessions SET status = 'stopped', pid = NULL, updated_at = datetime('now')
+                    UPDATE sessions SET status = 'stopped', pid = NULL, restart_pending = 1, updated_at = datetime('now')
                     WHERE id = ?
                 `).run(session.id);
                 reaped++;
@@ -139,6 +139,27 @@ export class SessionLifecycleManager {
         if (reaped > 0) {
             log.info(`Reaped ${reaped} stale session(s) from previous server instance`);
         }
+    }
+
+    /**
+     * Return session IDs that were interrupted by a server restart and should be resumed.
+     * Clears the restart_pending flag so they won't be picked up again.
+     */
+    getAndClearRestartPendingSessions(): string[] {
+        const rows = this.db.query(
+            `SELECT id FROM sessions WHERE restart_pending = 1`
+        ).all() as Array<{ id: string }>;
+
+        if (rows.length === 0) return [];
+
+        const ids = rows.map(r => r.id);
+        const placeholders = ids.map(() => '?').join(',');
+        this.db.query(
+            `UPDATE sessions SET restart_pending = 0 WHERE id IN (${placeholders})`
+        ).run(...ids);
+
+        log.info(`Found ${ids.length} restart-pending session(s) to resume`);
+        return ids;
     }
 
     /**

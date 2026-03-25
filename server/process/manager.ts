@@ -161,10 +161,10 @@ export class ProcessManager {
      */
     private cleanupStaleSessions(): void {
         const result = this.db.query(
-            `UPDATE sessions SET status = 'idle', pid = NULL WHERE status IN ('running', 'loading')`
+            `UPDATE sessions SET status = 'idle', pid = NULL, restart_pending = 1 WHERE status IN ('running', 'loading')`
         ).run();
         if (result.changes > 0) {
-            log.info(`Reset ${result.changes} stale session(s) from previous run`);
+            log.info(`Reset ${result.changes} stale session(s) from previous run (marked restart_pending)`);
         }
     }
 
@@ -913,6 +913,17 @@ export class ProcessManager {
         this.resilienceManager.shutdown();
         this.approvalManager.shutdown();
         this.ownerQuestionManager.shutdown();
+
+        // Mark all active sessions as restart_pending BEFORE killing them,
+        // so the next server instance knows to resume them.
+        const activeIds = [...this.processes.keys()];
+        if (activeIds.length > 0) {
+            const placeholders = activeIds.map(() => '?').join(',');
+            this.db.query(
+                `UPDATE sessions SET restart_pending = 1 WHERE id IN (${placeholders})`
+            ).run(...activeIds);
+            log.info(`Marked ${activeIds.length} active session(s) as restart_pending`);
+        }
 
         for (const [sessionId] of this.processes) {
             this.stopProcess(sessionId);
