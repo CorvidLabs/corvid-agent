@@ -1,0 +1,12 @@
+# Spec-Sync Rules
+
+This project uses spec-sync for spec-to-code validation. Specs live in the `specs/` directory.
+
+## Rules
+
+- Before editing a module, read its spec at `specs/<module>/<module>.spec.md`
+- Check `specs/<module>/tasks.md` for outstanding work and `specs/<module>/context.md` for decisions
+- After modifying code, ensure `specsync check` still passes
+- When creating new modules, run `specsync add-spec <module-name>` first
+- Keep specs in sync: if you change exports, parameters, or types, update the spec's Public API table
+- Run `specsync check --strict` before committing

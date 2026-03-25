@@ -122,3 +122,30 @@ Before claiming you **cannot** do something or that a capability is **missing**:
 ## Instance Configuration
 
 Operators can add deployment-specific configuration in `.claude/CLAUDE.md`. See the [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for details.
+
+# Spec-Sync Integration
+
+This project uses [spec-sync](https://github.com/CorvidLabs/spec-sync) for bidirectional spec-to-code validation.
+
+## Before modifying any module
+
+1. Read the relevant spec in `specs/<module>/<module>.spec.md`
+2. Check companion files: `specs/<module>/tasks.md` and `specs/<module>/context.md`
+3. After changes, run `specsync check` to verify specs still pass
+
+## Before creating a PR
+
+Run `specsync check --strict` — all specs must pass with zero warnings.
+
+## When adding new modules
+
+Run `specsync add-spec <module-name>` to scaffold the spec and companion files, then fill in the spec before writing code.
+
+## Key commands
+
+- `specsync check` — validate all specs against source code
+- `specsync check --json` — machine-readable validation output
+- `specsync coverage` — show which modules lack specs
+- `specsync score` — quality score for each spec (0-100)
+- `specsync add-spec <name>` — scaffold a new spec with companion files
+- `specsync resolve --remote` — verify cross-project dependencies
