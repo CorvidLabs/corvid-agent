@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.0] - 2026-03-25
+
+### Added
+- **Buddy mode: visible review rounds** — buddy review rounds now visible in Discord with sandbox `/message` support (#1477)
+- **Buddy mode: default pairings** — seed default buddy pairings on startup for zero-config buddy reviews (#1476)
+- **Buddy mode: improved review quality** — memory tools and tighter approval detection for more accurate buddy reviews (#1480)
+- **Scheduler: on-chain attestation** — daily activity attestation published on-chain via scheduler (#1474)
+- **Flock: A2A HTTP transport** — replace AlgoChat transport with A2A HTTP for flock agent communication (#1475)
+- **Security: Zod validation** — add Zod input validation to all permission API endpoints (#1479)
+
+### Fixed
+- **Sessions: auto-resume** — automatically resume sessions interrupted by server restarts
+- **Health collector: false positives** — eliminate false-positive FIXME/HACK/TODO counts in health reports (#1484)
+- **Types: schedule action** — replace `as any` with proper `ScheduleActionType` (#1472)
+
+### Changed
+- **Deps: SDK + types** — update @anthropic-ai/claude-agent-sdk to 0.2.83, @types/bun to 1.3.11, @types/node to 25.5.0 (#1482)
+- **Spec sync: v2.1.0** — update spec-sync tooling to v2.1.0 (#1481)
+- **Docs: sync stale counts** — refresh test, spec, and MCP tool counts in documentation (#1483)
+
 ## [0.51.0] - 2026-03-24
 
 ### Added
