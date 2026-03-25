@@ -32,6 +32,8 @@ export interface DiscordDynamicConfig {
     rateLimitByLevel: Record<number, number>;
     /** Per-channel permission floors (JSON) */
     channelPermissions: Record<string, number>;
+    /** Channel IDs where STANDARD users get full /message tools (comma-separated) */
+    messageFullToolChannelIds: string[];
     /** Bot status text */
     statusText: string;
     /** Activity type (0=Playing, 1=Streaming, 2=Listening, 3=Watching, 5=Competing) */
@@ -52,6 +54,7 @@ const DEFAULTS: DiscordDynamicConfig = {
     defaultPermissionLevel: 1,
     rateLimitByLevel: {},
     channelPermissions: {},
+    messageFullToolChannelIds: [],
     statusText: 'corvid-agent',
     activityType: 3,
     interactedUsers: [],
@@ -91,6 +94,7 @@ export function getDiscordConfig(db: Database): DiscordDynamicConfig {
         defaultPermissionLevel: parseInt(map.get('default_permission_level') ?? String(DEFAULTS.defaultPermissionLevel), 10),
         rateLimitByLevel: parseJsonOrDefault(map.get('rate_limit_by_level'), DEFAULTS.rateLimitByLevel),
         channelPermissions: parseJsonOrDefault(map.get('channel_permissions'), DEFAULTS.channelPermissions),
+        messageFullToolChannelIds: parseCommaSeparated(map.get('message_full_tool_channel_ids')),
         statusText: map.get('status_text') ?? DEFAULTS.statusText,
         activityType: parseInt(map.get('activity_type') ?? String(DEFAULTS.activityType), 10),
         interactedUsers: parseCommaSeparated(map.get('interacted_users')),
@@ -149,6 +153,7 @@ export const VALID_DISCORD_CONFIG_KEYS = new Set([
     'default_permission_level',
     'rate_limit_by_level',
     'channel_permissions',
+    'message_full_tool_channel_ids',
     'status_text',
     'activity_type',
 ]);
@@ -167,6 +172,7 @@ export function initDiscordConfigFromEnv(db: Database): void {
         ['DISCORD_ROLE_PERMISSIONS', 'role_permissions'],
         ['DISCORD_DEFAULT_PERMISSION_LEVEL', 'default_permission_level'],
         ['DISCORD_RATE_LIMIT_BY_LEVEL', 'rate_limit_by_level'],
+        ['DISCORD_MESSAGE_FULL_TOOL_CHANNEL_IDS', 'message_full_tool_channel_ids'],
         ['DISCORD_STATUS', 'status_text'],
         ['DISCORD_ACTIVITY_TYPE', 'activity_type'],
     ];

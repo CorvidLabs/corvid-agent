@@ -45,6 +45,7 @@ const log = createLogger('ProcessManager');
 // well under context-window limits while leaving headroom for tool outputs,
 // system messages, and safety buffers. Revisit if model context windows change.
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
+const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 interface SessionMeta {
     startedAt: number;
@@ -60,6 +61,10 @@ interface SessionMeta {
 }
 
 export class ProcessManager {
+    private isRestrictedDiscordMessageSession(sessionName: string): boolean {
+        return sessionName.startsWith(DISCORD_RESTRICTED_MESSAGE_PREFIX);
+    }
+
     private processes: Map<string, SdkProcess> = new Map();
     private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
@@ -397,6 +402,12 @@ export class ProcessManager {
             ? councilModel
             : undefined;
 
+        // Translate SDK tool names to direct-process equivalents and merge
+        // mcpToolAllowList since direct processes use a single toolAllowList.
+        const resolvedToolAllowList = conversationOnly
+            ? []
+            : resolveDirectToolAllowList(toolAllowList, mcpToolAllowList);
+
         let sp: SdkProcess;
         try {
             const isPollSession = session.name.startsWith('Poll:');
@@ -416,7 +427,7 @@ export class ProcessManager {
                 skillPrompt: config.skillPrompt,
                 modelOverride,
                 externalMcpConfigs,
-                toolAllowList: conversationOnly ? [] : (toolAllowList ?? (isPollSession ? ['run_command'] : undefined)),
+                toolAllowList: resolvedToolAllowList ?? (isPollSession ? ['run_command'] : undefined),
                 conversationOnly,
             });
         } catch (err) {
@@ -499,7 +510,7 @@ export class ProcessManager {
             effectiveAgent,
             resumePrompt ?? '',
             provider,
-            { conversationOnly: session.name.startsWith('Discord message:') },
+            { conversationOnly: this.isRestrictedDiscordMessageSession(session.name) },
         );
     }
 
@@ -719,9 +730,9 @@ export class ProcessManager {
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         // Detect tool tier for Discord /message sessions by name convention:
-        //   "Discord message:"      → restricted tools (memory + read-only, all users)
-        //   anything else           → full tools (normal session)
-        const isRestrictedMessage = session.name.startsWith('Discord message:');
+        //   "Discord message:"      → restricted tools (BASIC/STANDARD callers)
+        //   anything else           → full tools (admin /message + normal sessions)
+        const isRestrictedMessage = this.isRestrictedDiscordMessageSession(session.name);
         const isConversationOnly = false; // /message sessions always get at least memory + read tools now
         const resumeToolAllowList = isRestrictedMessage ? ['Read', 'Glob', 'Grep'] : undefined;
         const resumeMcpToolAllowList = isRestrictedMessage ? ['corvid_recall_memory', 'corvid_read_on_chain_memories'] : undefined;
@@ -1453,4 +1464,48 @@ export class ProcessManager {
 
         return pruned;
     }
+}
+
+// SDK (Claude Code) tool names → direct-process (Ollama) equivalents
+const SDK_TO_DIRECT_TOOL_MAP: Record<string, string> = {
+    'Read': 'read_file',
+    'Write': 'write_file',
+    'Edit': 'edit_file',
+    'Glob': 'list_files',
+    'Grep': 'search_files',
+    'Shell': 'run_command',
+};
+
+/**
+ * Translate SDK-style tool names to direct-process names and merge
+ * mcpToolAllowList. Returns undefined if both inputs are empty/absent
+ * (meaning "allow all tools").
+ */
+function resolveDirectToolAllowList(
+    toolAllowList?: string[],
+    mcpToolAllowList?: string[],
+): string[] | undefined {
+    const hasToolList = toolAllowList && toolAllowList.length > 0;
+    const hasMcpList = mcpToolAllowList && mcpToolAllowList.length > 0;
+
+    if (!hasToolList && !hasMcpList) return undefined;
+
+    const result: string[] = [];
+
+    if (hasToolList) {
+        for (const name of toolAllowList) {
+            const mapped = SDK_TO_DIRECT_TOOL_MAP[name];
+            result.push(mapped ?? name);
+        }
+    }
+
+    if (hasMcpList) {
+        for (const name of mcpToolAllowList) {
+            if (!result.includes(name)) {
+                result.push(name);
+            }
+        }
+    }
+
+    return result.length > 0 ? result : undefined;
 }

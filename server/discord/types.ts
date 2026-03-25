@@ -43,6 +43,12 @@ export interface DiscordBridgeConfig {
      * Useful for invite-only channels where members don't have specific roles.
      */
     channelPermissions?: Record<string, number>;
+    /**
+     * Channel IDs where STANDARD-tier users may use full `/message` tool access
+     * (same capabilities as admin in that channel, but replies still require STANDARD+).
+     * Admins always have full `/message` in any monitored channel.
+     */
+    messageFullToolChannelIds?: string[];
 }
 
 /** Recursive option type — supports subcommand groups and subcommands with nested options. */

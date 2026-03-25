@@ -1,9 +1,9 @@
 /**
  * Discord /message command handler.
  *
- * Lightweight sandbox mode — ALL users (including admins) get the same
- * restricted tool set: read-only code tools + memory recall. For full
- * tool access, use /session or @mention.
+ * Lightweight command mode with policy-based tool access.
+ * - BASIC/STANDARD users get restricted tools (read-only + memory recall)
+ * - ADMIN users get full tool access
  *
  * Supports optional buddy agent for post-response review with visible
  * round-by-round embeds in the channel.
@@ -19,7 +19,7 @@ import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
 import { buildFooterText, respondEphemeral, respondToInteraction, sendEmbed, sendTypingIndicator } from '../embeds';
 import { withAuthorContext } from '../message-handler';
-import type { DiscordInteractionData } from '../types';
+import type { DiscordBridgeConfig, DiscordInteractionData } from '../types';
 import { PermissionLevel } from '../types';
 
 const log = createLogger('DiscordMessageCommand');
@@ -29,6 +29,56 @@ export const MESSAGE_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'];
 
 /** MCP tools available to all /message sessions (memory recall only). */
 export const MESSAGE_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'];
+
+/** Restricted /message session prefix (tool-sandboxed). */
+export const RESTRICTED_MESSAGE_SESSION_PREFIX = 'Discord message:';
+
+/** Full-access /message session prefix for trusted STANDARD channels. */
+export const STAFF_MESSAGE_SESSION_PREFIX = 'Discord staff message:';
+
+/** Full-access /message session prefix (admin callers). */
+export const ADMIN_MESSAGE_SESSION_PREFIX = 'Discord admin message:';
+
+export interface MessageToolPolicy {
+  sessionName: string;
+  toolAllowList?: string[];
+  mcpToolAllowList?: string[];
+  accessLabel: 'restricted' | 'full';
+}
+
+/**
+ * Resolve tool access policy for /message sessions.
+ * Keep this centralized so user/channel policy can be expanded later.
+ */
+export function resolveMessageToolPolicy(
+  config: DiscordBridgeConfig,
+  permLevel: number,
+  channelId: string,
+): MessageToolPolicy {
+  if (permLevel >= PermissionLevel.ADMIN) {
+    return {
+      sessionName: `${ADMIN_MESSAGE_SESSION_PREFIX}${channelId}`,
+      accessLabel: 'full',
+    };
+  }
+
+  const channelFloor = config.channelPermissions?.[channelId];
+  const hasStandardFloor = channelFloor !== undefined && channelFloor >= PermissionLevel.STANDARD;
+  const fullToolChannel = config.messageFullToolChannelIds?.includes(channelId) ?? false;
+  if (permLevel >= PermissionLevel.STANDARD && fullToolChannel && hasStandardFloor) {
+    return {
+      sessionName: `${STAFF_MESSAGE_SESSION_PREFIX}${channelId}`,
+      accessLabel: 'full',
+    };
+  }
+
+  return {
+    sessionName: `${RESTRICTED_MESSAGE_SESSION_PREFIX}${channelId}`,
+    toolAllowList: MESSAGE_BUILTIN_TOOLS,
+    mcpToolAllowList: MESSAGE_MCP_TOOLS,
+    accessLabel: 'restricted',
+  };
+}
 
 /** Buddy role colors for Discord embeds. */
 const BUDDY_LEAD_COLOR = 0x3498db; // Blue — lead agent
@@ -176,10 +226,11 @@ export async function handleMessageCommand(
   }
 
   // Non-buddy mode: standard inline response flow
+  const toolPolicy = resolveMessageToolPolicy(ctx.config, permLevel, channelId);
   const session = createSession(ctx.db, {
     projectId: project.id,
     agentId: agent.id,
-    name: `Discord message:${channelId}`,
+    name: toolPolicy.sessionName,
     initialPrompt: message,
     source: 'discord' as SessionSource,
   });
@@ -187,8 +238,8 @@ export async function handleMessageCommand(
   const textWithContext = withAuthorContext(message, userId, username, channelId);
 
   ctx.processManager.startProcess(session, textWithContext, {
-    toolAllowList: MESSAGE_BUILTIN_TOOLS,
-    mcpToolAllowList: MESSAGE_MCP_TOOLS,
+    toolAllowList: toolPolicy.toolAllowList,
+    mcpToolAllowList: toolPolicy.mcpToolAllowList,
   });
 
   const agentModel = agent.model || 'unknown';
@@ -210,6 +261,7 @@ export async function handleMessageCommand(
         displayColor: agentDisplayColor,
         channelId,
         conversationOnly: true,
+        minResponderPermLevel: toolPolicy.accessLabel === 'full' ? PermissionLevel.STANDARD : PermissionLevel.BASIC,
       };
       ctx.mentionSessions.set(botMessageId, info);
       try {
@@ -230,7 +282,7 @@ export async function handleMessageCommand(
     agentName: agent.name,
     userId,
     channelId,
-    toolAccess: 'memory+read',
+    toolAccess: toolPolicy.accessLabel,
     hasBuddy: false,
   });
 }
@@ -285,6 +337,7 @@ function createBuddyDiscordCallback(
         displayColor: isLead ? agentInfo.leadDisplayColor : agentInfo.buddyDisplayColor,
         channelId,
         conversationOnly: true,
+        minResponderPermLevel: PermissionLevel.STANDARD,
       };
       ctx.mentionSessions.set(botMessageId, sessionInfo);
       try {

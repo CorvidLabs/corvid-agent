@@ -163,7 +163,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `getBuddyStatusLabel` | `(role, round, approved)` | `string` | Compute a human-readable status label for a buddy round event |
 | `getBuddyRoleIcon` | `(role, approved)` | `string` | Compute the role icon emoji for a buddy round event |
-| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command — pure conversation mode with no tools, for untrusted users at BASIC permission level |
+| `handleMessageCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/message` slash command with permission-tiered tool access |
+| `resolveMessageToolPolicy` | `(config, permLevel, channelId)` | `MessageToolPolicy` | Resolves session naming and tool allow-lists based on caller permission tier |
+| `RESTRICTED_MESSAGE_SESSION_PREFIX` | — | `string` | Session name prefix for restricted `/message` sessions |
+| `STAFF_MESSAGE_SESSION_PREFIX` | — | `string` | Session name prefix for trusted-channel full-access `/message` sessions |
+| `ADMIN_MESSAGE_SESSION_PREFIX` | — | `string` | Session name prefix for admin full-access `/message` sessions |
+| `MessageToolPolicy` | — | `interface` | Shape returned by `resolveMessageToolPolicy` (sessionName, toolAllowList, mcpToolAllowList, accessLabel) |
 
 ### Exported Functions (from embeds.ts)
 
@@ -191,6 +196,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a clean footer: `agentName` or `agentName · status` |
 | `buildFooterWithStats` | `(ctx: FooterContext, stats?: FooterStats)` | `string` | Build footer with session context AND run stats (files, turns, tools, commits) |
+| `ensureDiscordEmbedRenderable` | `(embed)` | `DiscordEmbed` | Clamp embed fields/description to Discord size limits so the API never rejects |
 | `hexColorToInt` | `(hex: string)` | `number \| null` | Convert a hex color string (e.g. '#ff00aa') to a Discord embed color integer |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
 | `extractContentFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field (pings) |
