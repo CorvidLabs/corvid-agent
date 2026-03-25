@@ -76,7 +76,20 @@ export interface CreateBuddySessionInput {
 export const BUDDY_DEFAULT_TOOLS = ['Read', 'Glob', 'Grep'] as const;
 
 /** MCP tools buddy agents can use for memory/context lookups. */
-export const BUDDY_DEFAULT_MCP_TOOLS = ['corvid_recall_memory', 'corvid_read_on_chain_memories'] as const;
+export const BUDDY_DEFAULT_MCP_TOOLS = [
+    'corvid_recall_memory',
+    'corvid_read_on_chain_memories',
+    'corvid_code_symbols',
+    'corvid_find_references',
+    'corvid_current_project',
+    'corvid_list_projects',
+    'corvid_github_repo_info',
+    'corvid_github_get_pr_diff',
+    'corvid_github_list_prs',
+    'corvid_github_list_issues',
+    'corvid_check_reputation',
+    'corvid_lookup_contact',
+] as const;
 
 export interface BuddyConfig {
     buddyAgentId: string;

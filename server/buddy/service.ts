@@ -354,8 +354,11 @@ export class BuddyService {
             `Use your memory tools (corvid_recall_memory) to look up relevant context before responding.`,
             ``,
             `## Tools`,
-            `You have: Read (view files), Glob (find files), Grep (search code), corvid_recall_memory, corvid_read_on_chain_memories.`,
-            `Use them to verify claims, check facts, and look up context before responding.`,
+            `You have: Read (view files), Glob (find files), Grep (search code), corvid_recall_memory, corvid_read_on_chain_memories,`,
+            `corvid_code_symbols (analyze code structure), corvid_find_references (find usages), corvid_current_project, corvid_list_projects,`,
+            `corvid_github_repo_info, corvid_github_get_pr_diff, corvid_github_list_prs, corvid_github_list_issues,`,
+            `corvid_check_reputation, corvid_lookup_contact.`,
+            `Use them to verify claims, check code, look up context, and review PRs before responding.`,
         ].join('\n');
     }
 
