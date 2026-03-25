@@ -242,6 +242,7 @@ Need production-grade deployment with security and compliance?
 
 ## What's next?
 
+- **[Cookbook](cookbook.md)** — copy-paste recipes for common workflows
 - **[Use cases](use-cases.md)** — detailed examples for every audience
 - **[How it works](how-it-works.md)** — under the hood
 - **[Business guide](business-guide.md)** — setting up agents for your team
@@ -264,4 +265,5 @@ Need production-grade deployment with security and compliance?
 | `corvid-agent init` | Guided setup wizard |
 | `corvid-agent init --mcp` | Add tools to your AI editor |
 | `corvid-agent demo` | Quick demo |
+| `corvid-agent settings` | View/update server runtime settings |
 | `corvid-agent status` | Check if server is running |
