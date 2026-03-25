@@ -647,10 +647,9 @@ export class ProcessManager {
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         // Detect tool tier for Discord /message sessions by name convention:
-        //   "Discord message:"      → restricted tools (memory + read-only, non-admin)
-        //   "Discord full-message:" → full tools (admin /message, same as /session)
+        //   "Discord message:"      → restricted tools (memory + read-only, all users)
         //   anything else           → full tools (normal session)
-        const isRestrictedMessage = session.name.startsWith('Discord message:') && !session.name.startsWith('Discord full-message:');
+        const isRestrictedMessage = session.name.startsWith('Discord message:');
         const isConversationOnly = false; // /message sessions always get at least memory + read tools now
         const resumeToolAllowList = isRestrictedMessage ? ['Read', 'Glob', 'Grep'] : undefined;
         const resumeMcpToolAllowList = isRestrictedMessage ? ['corvid_recall_memory', 'corvid_read_on_chain_memories'] : undefined;

@@ -41,6 +41,22 @@ export interface BuddyMessage {
     createdAt: string;
 }
 
+/** Event emitted after each agent turn in a buddy session. */
+export interface BuddyRoundEvent {
+    buddySessionId: string;
+    agentId: string;
+    agentName: string;
+    role: 'lead' | 'buddy';
+    round: number;
+    maxRounds: number;
+    content: string;
+    /** True only when the buddy approves (LGTM) on their final turn. */
+    approved: boolean;
+}
+
+/** Callback invoked after each agent turn — used for Discord visibility. */
+export type BuddyRoundCallback = (event: BuddyRoundEvent) => Promise<void>;
+
 export interface CreateBuddySessionInput {
     leadAgentId: string;
     buddyAgentId: string;
@@ -50,6 +66,8 @@ export interface CreateBuddySessionInput {
     workTaskId?: string;
     sessionId?: string;
     maxRounds?: number;
+    /** Optional callback for posting round outputs to Discord or other channels. */
+    onRoundComplete?: BuddyRoundCallback;
 }
 
 /** Default read-only tools for buddy review sessions. */
