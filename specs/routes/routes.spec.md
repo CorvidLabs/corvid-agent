@@ -49,6 +49,7 @@ files:
   - server/routes/security-overview.ts
   - server/routes/contacts.ts
   - server/routes/discord-image.ts
+  - server/routes/cursor.ts
   - server/routes/variants.ts
 db_tables: []
 depends_on:
@@ -132,6 +133,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
 | `handleContactRoutes` | contacts.ts | Contact identity CRUD and cross-platform lookup |
 | `handleDiscordImageRoutes` | discord-image.ts | Send images to Discord channels via `POST /api/discord/send-image` (base64, file path, or multipart) |
+| `handleCursorRoutes` | cursor.ts | Cursor CLI status and model discovery endpoints |
 | `handleVariantRoutes` | variants.ts | Agent variant profile CRUD and agent-variant assignment/removal |
 
 ### Exported Functions (projects.ts)
@@ -632,6 +634,14 @@ Every request passes through these stages in order:
 | GET | `/api/agents/:id/variant` | variants.ts | Get the variant applied to an agent |
 | POST | `/api/agents/:id/variant` | variants.ts | Apply a variant to an agent |
 | DELETE | `/api/agents/:id/variant` | variants.ts | Remove variant from an agent |
+
+### Cursor
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/cursor/status` | cursor.ts | Check cursor-agent CLI availability and configured model count |
+| GET | `/api/cursor/models` | cursor.ts | List models discovered from `cursor-agent --list-models` (cached) |
+| GET | `/api/cursor/models/configured` | cursor.ts | List configured cursor models from provider cost table |
 
 ### Inline Routes (index.ts)
 

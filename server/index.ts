@@ -201,7 +201,7 @@ try {
       if (pid === myPid) continue;
       log.warn(`Killing stale process ${pid} on port ${PORT}`);
       try {
-        process.kill(Number(pid), 'SIGTERM');
+        Bun.spawnSync(['kill', '-TERM', pid], { stdout: 'ignore', stderr: 'ignore' });
       } catch {
         /* already dead */
       }
