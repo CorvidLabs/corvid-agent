@@ -23,7 +23,7 @@ import {
     assignPersona,
     unassignPersona,
 } from '../../db/personas';
-import { respondToInteraction, respondToInteractionEmbed } from '../embeds';
+import { respondToInteraction, respondEphemeral, respondToInteractionEmbed } from '../embeds';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('DiscordCommands');
@@ -53,7 +53,7 @@ export async function handleAgentSkillCommand(
     permLevel: number,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Managing agent skills requires admin permissions.');
+        await respondEphemeral(interaction, 'Managing agent skills requires admin permissions.');
         return;
     }
 
@@ -184,7 +184,7 @@ export async function handleAgentPersonaCommand(
     permLevel: number,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Managing agent personas requires admin permissions.');
+        await respondEphemeral(interaction, 'Managing agent personas requires admin permissions.');
         return;
     }
 

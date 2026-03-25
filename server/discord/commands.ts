@@ -18,7 +18,7 @@ import type {
 import { InteractionType, PermissionLevel } from './types';
 import { createLogger } from '../lib/logger';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { respondToInteraction } from './embeds';
+import { respondToInteraction, respondEphemeral } from './embeds';
 import { resolvePermissionLevel } from './permissions';
 import { handleAdminCommand } from './admin-commands';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
@@ -544,7 +544,7 @@ export async function handleInteraction(
     // Role-based permission check
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles, interaction.channel_id);
     if (permLevel <= PermissionLevel.BLOCKED) {
-        await respondToInteraction(interaction, 'You do not have permission to use this bot.');
+        await respondEphemeral(interaction, 'You do not have permission to use this bot.');
         return;
     }
 
@@ -599,7 +599,7 @@ export async function handleInteraction(
             break;
         case 'admin': {
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Only admins can use `/admin` commands.');
+                await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
                 break;
             }
             await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options, ctx.guildCache, ctx.syncGuildData);

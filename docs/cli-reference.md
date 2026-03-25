@@ -346,6 +346,64 @@ corvid-agent settings api-key                           # API key health
 
 ---
 
+## plugin
+
+Manage plugins. Wraps the `/api/plugins` REST endpoints.
+
+```bash
+corvid-agent plugin [action] [args...]
+```
+
+### Actions
+
+#### `plugin list`
+
+List all loaded and registered plugins. Default action.
+
+```bash
+corvid-agent plugin list
+```
+
+#### `plugin load`
+
+Load a plugin from an npm package.
+
+```bash
+corvid-agent plugin load corvid-plugin-jira
+```
+
+#### `plugin unload`
+
+Unload a plugin by name.
+
+```bash
+corvid-agent plugin unload jira
+```
+
+#### `plugin grant` / `plugin revoke`
+
+Grant or revoke capabilities for a plugin.
+
+```bash
+corvid-agent plugin grant jira network:outbound
+corvid-agent plugin revoke jira db:read
+```
+
+Available capabilities: `db:read`, `network:outbound`, `fs:project-dir`, `agent:read`, `session:read`.
+
+### Examples
+
+```bash
+corvid-agent plugin list                              # list all plugins
+corvid-agent plugin load corvid-plugin-jira           # load from npm
+corvid-agent plugin unload jira                       # unload by name
+corvid-agent plugin grant jira network:outbound       # grant capability
+```
+
+See [Plugin System docs](plugins.md) for writing your own plugins.
+
+---
+
 ## config
 
 Manage CLI configuration. Config is stored in `~/.corvid/config.json`.

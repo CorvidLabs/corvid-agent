@@ -13,6 +13,7 @@ import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
 import {
     respondToInteraction,
+    respondEphemeral,
     sendEmbed,
 } from '../embeds';
 
@@ -25,7 +26,7 @@ export async function handleCouncilCommand(
     getOption: (name: string) => string | undefined,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Council deliberation requires admin permissions.');
+        await respondEphemeral(interaction, 'Council deliberation requires admin permissions.');
         return;
     }
     const topic = getOption('topic');
@@ -87,7 +88,7 @@ export async function handleMuteCommand(
     getOption: (name: string) => string | undefined,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Only admins can mute users.');
+        await respondEphemeral(interaction, 'Only admins can mute users.');
         return;
     }
     const targetUser = getOption('user');
@@ -106,7 +107,7 @@ export async function handleUnmuteCommand(
     getOption: (name: string) => string | undefined,
 ): Promise<void> {
     if (permLevel < PermissionLevel.ADMIN) {
-        await respondToInteraction(interaction, 'Only admins can unmute users.');
+        await respondEphemeral(interaction, 'Only admins can unmute users.');
         return;
     }
     const targetUser = getOption('user');

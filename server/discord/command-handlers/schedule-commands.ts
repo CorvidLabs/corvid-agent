@@ -17,7 +17,7 @@ import {
     deleteSchedule,
 } from '../../db/schedules';
 import type { ScheduleAction, ScheduleActionType } from '../../../shared/types';
-import { respondToInteraction, respondToInteractionEmbed } from '../embeds';
+import { respondToInteraction, respondEphemeral, respondToInteractionEmbed } from '../embeds';
 import { listPipelineTemplates, getPipelineTemplate } from '../../scheduler/pipeline';
 import { createLogger } from '../../lib/logger';
 
@@ -56,28 +56,28 @@ export async function handleScheduleCommand(
             break;
         case 'create':
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Creating schedules requires admin permissions.');
+                await respondEphemeral(interaction, 'Creating schedules requires admin permissions.');
                 return;
             }
             await handleScheduleCreate(ctx, interaction, getSubOption);
             break;
         case 'pause':
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Pausing schedules requires admin permissions.');
+                await respondEphemeral(interaction, 'Pausing schedules requires admin permissions.');
                 return;
             }
             await handleSchedulePause(ctx, interaction, getSubOption);
             break;
         case 'resume':
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Resuming schedules requires admin permissions.');
+                await respondEphemeral(interaction, 'Resuming schedules requires admin permissions.');
                 return;
             }
             await handleScheduleResume(ctx, interaction, getSubOption);
             break;
         case 'delete':
             if (permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Deleting schedules requires admin permissions.');
+                await respondEphemeral(interaction, 'Deleting schedules requires admin permissions.');
                 return;
             }
             await handleScheduleDelete(ctx, interaction, getSubOption);

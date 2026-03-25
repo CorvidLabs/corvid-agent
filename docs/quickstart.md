@@ -243,6 +243,7 @@ Need production-grade deployment with security and compliance?
 ## What's next?
 
 - **[Cookbook](cookbook.md)** — copy-paste recipes for common workflows
+- **[Plugin system](plugins.md)** — extend CorvidAgent with custom tools
 - **[Use cases](use-cases.md)** — detailed examples for every audience
 - **[How it works](how-it-works.md)** — under the hood
 - **[Business guide](business-guide.md)** — setting up agents for your team

@@ -13,6 +13,7 @@ import { archiveThread } from '../thread-manager';
 import { createLogger } from '../../lib/logger';
 import {
     respondToInteraction,
+    respondEphemeral,
     acknowledgeButton,
     assertSnowflake,
 } from '../embeds';
@@ -34,7 +35,7 @@ export async function handleComponentInteraction(
 
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, interaction.member?.roles, interaction.channel_id);
     if (permLevel <= PermissionLevel.BLOCKED) {
-        await respondToInteraction(interaction, 'You do not have permission to use this bot.');
+        await respondEphemeral(interaction, 'You do not have permission to use this bot.');
         return;
     }
 
@@ -43,7 +44,7 @@ export async function handleComponentInteraction(
     switch (action) {
         case 'resume_thread': {
             if (permLevel < PermissionLevel.STANDARD) {
-                await respondToInteraction(interaction, 'You need a higher role to resume sessions.');
+                await respondEphemeral(interaction, 'You need a higher role to resume sessions.');
                 return;
             }
             const threadId = interaction.channel_id;
@@ -68,7 +69,7 @@ export async function handleComponentInteraction(
 
         case 'new_session': {
             if (permLevel < PermissionLevel.STANDARD) {
-                await respondToInteraction(interaction, 'You need a higher role to create sessions.');
+                await respondEphemeral(interaction, 'You need a higher role to create sessions.');
                 return;
             }
             await respondToInteraction(interaction, 'Use `/session` to start a new conversation with an agent.');
@@ -107,7 +108,7 @@ export async function handleComponentInteraction(
             }
 
             if (info.ownerUserId && info.ownerUserId !== userId && permLevel < PermissionLevel.ADMIN) {
-                await respondToInteraction(interaction, 'Only the session owner or an admin can stop this session.');
+                await respondEphemeral(interaction, 'Only the session owner or an admin can stop this session.');
                 return;
             }
 
