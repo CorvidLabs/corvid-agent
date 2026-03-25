@@ -138,7 +138,7 @@ If you use Claude Code, Cursor, or GitHub Copilot:
 corvid-agent init --mcp
 ```
 
-This adds corvid-agent's 46 tools to your editor. Your AI assistant can then manage agents, create work tasks, and more — right from your IDE.
+This adds corvid-agent's 50 tools to your editor. Your AI assistant can then manage agents, create work tasks, and more — right from your IDE.
 
 ---
 
@@ -185,7 +185,7 @@ Already comfortable with the basics? Here's how to unlock the full power:
 
 1. **Connect GitHub** — [see above](#connect-github-optional). This lets the agent review PRs, fix issues, and open PRs on your repos.
 2. **Set up schedules** — [see above](#set-up-automated-schedules). Auto-review PRs, triage issues, generate tests on a cron.
-3. **Add MCP tools to your editor** — `corvid-agent init --mcp` adds 46 tools to Claude Code, Cursor, or Copilot.
+3. **Add MCP tools to your editor** — `corvid-agent init --mcp` adds 50 tools to Claude Code, Cursor, or Copilot.
 4. **Use work tasks** — programmatic code changes with isolated branches, validation, and auto-PR:
    ```bash
    curl -X POST http://localhost:3000/api/work-tasks \

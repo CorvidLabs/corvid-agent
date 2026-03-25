@@ -200,7 +200,7 @@ The stdio server exposes 4 core tools: `corvid_send_message`, `corvid_save_memor
 
 The full `corvid-agent-mcp` npm package exposes 14 tools including agents, sessions, work tasks, and projects.
 
-When connected via the web dashboard or Claude Agent SDK, all 46 tools are available.
+When connected via the web dashboard or Claude Agent SDK, all 50 tools are available.
 
 ---
 
