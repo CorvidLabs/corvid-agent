@@ -3,7 +3,9 @@ import {
     scoreResponseQuality,
     countVacuousToolCalls,
     ResponseQualityTracker,
+    RepetitiveToolCallDetector,
     buildQualityNudge,
+    buildLoopNudge,
     type ToolCallQualityInput,
 } from '../lib/response-quality';
 
@@ -232,6 +234,109 @@ describe('buildQualityNudge', () => {
     });
 });
 
+// ── RepetitiveToolCallDetector ────────────────────────────────────────────
+
+describe('RepetitiveToolCallDetector', () => {
+    test('does not trigger for distinct tool calls', () => {
+        const detector = new RepetitiveToolCallDetector();
+        const result1 = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        const result2 = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'b.ts' } }]);
+        const result3 = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'c.ts' } }]);
+        expect(result1).toBe(false);
+        expect(result2).toBe(false);
+        expect(result3).toBe(false);
+    });
+
+    test('triggers after N identical tool calls', () => {
+        const detector = new RepetitiveToolCallDetector(3);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        const result = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        expect(result).toBe(true);
+        expect(detector.loopDetected).toBe(true);
+        expect(detector.totalLoopsDetected).toBe(1);
+    });
+
+    test('does not trigger when args differ', () => {
+        const detector = new RepetitiveToolCallDetector(3);
+        detector.recordToolCalls([{ name: 'search', arguments: { query: 'foo' } }]);
+        detector.recordToolCalls([{ name: 'search', arguments: { query: 'bar' } }]);
+        const result = detector.recordToolCalls([{ name: 'search', arguments: { query: 'foo' } }]);
+        expect(result).toBe(false);
+    });
+
+    test('reset clears state', () => {
+        const detector = new RepetitiveToolCallDetector(3);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        detector.reset();
+        const result = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        expect(result).toBe(false);
+        expect(detector.loopDetected).toBe(false);
+    });
+
+    test('tracks total loops across resets', () => {
+        const detector = new RepetitiveToolCallDetector(2);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        expect(detector.totalLoopsDetected).toBe(1);
+        detector.reset();
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'b.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'b.ts' } }]);
+        expect(detector.totalLoopsDetected).toBe(2);
+    });
+
+    test('respects window size — old calls fall off', () => {
+        const detector = new RepetitiveToolCallDetector(3, 4);
+        // Fill window with different calls, then repeat
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'a.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'b.ts' } }]);
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'c.ts' } }]);
+        // Now repeat c.ts — the first 'a.ts' has fallen off, window is [b, c, c]
+        detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'c.ts' } }]);
+        // Only 2 consecutive c.ts, not 3 — should not trigger
+        expect(detector.loopDetected).toBe(false);
+        // One more c.ts → window is [c, c, c, c] → triggers
+        const result = detector.recordToolCalls([{ name: 'read_file', arguments: { path: 'c.ts' } }]);
+        expect(result).toBe(true);
+    });
+
+    test('arg order does not affect fingerprint', () => {
+        const detector = new RepetitiveToolCallDetector(2);
+        detector.recordToolCalls([{ name: 'search', arguments: { query: 'foo', limit: 10 } }]);
+        const result = detector.recordToolCalls([{ name: 'search', arguments: { limit: 10, query: 'foo' } }]);
+        expect(result).toBe(true);
+    });
+});
+
+// ── buildLoopNudge ──────────────────────────────────────────────────────
+
+describe('buildLoopNudge', () => {
+    test('includes tool name in message', () => {
+        const nudge = buildLoopNudge('read_file');
+        expect(nudge).toContain('read_file');
+        expect(nudge).toContain('STOP');
+        expect(nudge).toContain('DIFFERENT');
+    });
+});
+
+// ── ResponseQualityTracker nudge exhaustion ─────────────────────────────
+
+describe('ResponseQualityTracker nudge exhaustion', () => {
+    test('nudgesExhausted is false by default', () => {
+        const tracker = new ResponseQualityTracker();
+        expect(tracker.nudgesExhausted).toBe(false);
+        expect(tracker.getMetrics().nudgesExhausted).toBe(false);
+    });
+
+    test('markNudgesExhausted sets the flag', () => {
+        const tracker = new ResponseQualityTracker();
+        tracker.markNudgesExhausted();
+        expect(tracker.nudgesExhausted).toBe(true);
+        expect(tracker.getMetrics().nudgesExhausted).toBe(true);
+    });
+});
+
 // ── buildSessionMetrics integration ──────────────────────────────────────
 
 describe('buildSessionMetrics with quality metrics', () => {
@@ -256,6 +361,7 @@ describe('buildSessionMetrics with quality metrics', () => {
                 totalLowQualityResponses: 3,
                 totalVacuousToolCalls: 2,
                 qualityNudgeCount: 1,
+                nudgesExhausted: false,
             },
         });
         expect(m.totalLowQualityResponses).toBe(3);

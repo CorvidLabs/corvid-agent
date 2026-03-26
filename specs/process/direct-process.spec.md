@@ -1,6 +1,6 @@
 ---
 module: direct-process
-version: 1
+version: 2
 status: active
 files:
   - server/process/direct-process.ts
@@ -16,6 +16,8 @@ depends_on:
 ## Purpose
 
 Direct execution engine for non-SDK providers (e.g., Ollama). Implements the same `SdkProcess` interface so the ProcessManager and WebSocket clients are unaware of the difference between SDK and direct mode. Manages the full agentic loop: slot acquisition, tool execution, context management, repeat detection, hallucination detection, nudging, and summary epilogue.
+
+Emits `message_stop` at the end of each model iteration (tool-chain step or text-only branch) so downstream logic that mirrors the Claude SDK stream (for example work-queue chain-continuation stall detection) receives the same turn boundaries as the Anthropic SDK path.
 
 ## Public API
 
@@ -36,7 +38,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
 | `buildSessionMetrics` | `(state: SessionMetricsState)` | `DirectProcessMetrics` | Build a DirectProcessMetrics object from loop state variables. Pure function — derives `stallDetected` from `terminationReason` and maps field names |
 | `trackToolCall` | `(log: string[], toolName: string, outcome: 'ok' \| 'error' \| 'exception')` | `void` | Append a tool-call entry to the log, capped at 20 entries |
-| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
+| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, stall_repetitive_loop, stall_quality_exhausted, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
 | `buildResultEvent` | `(base: {...}, escalationInput: BuildEscalationInput)` | `ClaudeStreamEvent` | Build a result event with optional escalation metadata attached. Used for both success and error result events |
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
 | `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Re-exported from `context-management.ts` |
@@ -168,3 +170,4 @@ Internal constants:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-03-25 | corvid-agent | Add escalation handling for `stall_repetitive_loop` and `stall_quality_exhausted` termination reasons |

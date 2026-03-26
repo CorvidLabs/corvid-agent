@@ -19,7 +19,7 @@
 import type { Agent, Project, Session } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import type { SdkProcess } from './sdk-process';
-import type { ClaudeStreamEvent } from './types';
+import type { ClaudeStreamEvent, DirectProcessMetrics, SessionTurnMetricsEvent } from './types';
 
 const log = createLogger('CursorProcess');
 
@@ -82,15 +82,54 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   const pid = currentProc.pid;
   let cursorSessionId: string | null = null;
   let killed = false;
+  /** Tool calls started in the current cursor-agent turn (for metrics parity). */
+  let turnToolCallCount = 0;
 
-  readStream(currentProc.stdout, (event) => {
+  function forwardCursorStdoutEvent(event: ClaudeStreamEvent): void {
     // Capture the cursor-agent session ID from the init event for --resume
     if (event.type === 'system' && 'session_id' in event && typeof event.session_id === 'string') {
       cursorSessionId = event.session_id as string;
       log.debug(`Captured cursor session ID: ${cursorSessionId}`);
     }
+
+    // cursor-agent emits `result` after each turn. Forwarding them unsubscribes
+    // Discord/work listeners early. Instead: end-of-turn markers + internal metrics.
+    if (event.type === 'result') {
+      log.debug('Filtering cursor-agent result event (will use session_exited instead)', {
+        sessionId: session.id,
+        subtype: event.subtype,
+      });
+      onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
+      const raw = event as unknown as Record<string, unknown>;
+      const metrics = mapCursorResultToTurnMetrics(raw, agent, turnToolCallCount);
+      turnToolCallCount = 0;
+      const costTurns = extractCursorCostAndTurns(raw);
+      onEvent({
+        type: 'session_turn_metrics',
+        metrics,
+        ...costTurns,
+      } as SessionTurnMetricsEvent);
+      return;
+    }
+
+    const rawType = (event as { type: string }).type;
+    if (rawType === 'tool_call' && (event as { subtype?: string }).subtype === 'started') {
+      turnToolCallCount++;
+      // Match Claude SDK / direct-process so stall detection & dashboards see tool use.
+      onEvent({
+        type: 'content_block_start',
+        content_block: { type: 'tool_use' },
+      } as ClaudeStreamEvent);
+      const toolStatus = describeCursorToolCall(event);
+      if (toolStatus) {
+        onEvent({ type: 'tool_status', statusMessage: toolStatus } as ClaudeStreamEvent);
+      }
+    }
+
     onEvent(event);
-  });
+  }
+
+  readStream(currentProc.stdout, forwardCursorStdoutEvent);
 
   readStream(currentProc.stderr, (event) => {
     const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
@@ -149,7 +188,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       },
     });
 
-    readStream(currentProc.stdout, onEvent);
+    readStream(currentProc.stdout, forwardCursorStdoutEvent);
     readStream(currentProc.stderr, (event) => {
       const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
       log.debug(`cursor-agent stderr (resume): ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
@@ -220,6 +259,96 @@ function buildArgs(project: Project, agent: Agent | null, worktree?: string, wor
   return args;
 }
 
+/**
+ * Extract a human-readable description from a cursor-agent tool_call event.
+ * Returns e.g. "Reading package.json" or "Running: git status"
+ */
+// biome-ignore lint/suspicious/noExplicitAny: cursor-agent tool_call shape is dynamic
+function describeCursorToolCall(event: any): string | null {
+  const tc = event.tool_call;
+  if (!tc || typeof tc !== 'object') return null;
+
+  if (tc.readToolCall) {
+    const path = tc.readToolCall.args?.path;
+    return path ? `Reading ${basename(path)}` : 'Reading file';
+  }
+  if (tc.writeToolCall) {
+    const path = tc.writeToolCall.args?.path;
+    return path ? `Writing ${basename(path)}` : 'Writing file';
+  }
+  if (tc.editToolCall) {
+    const path = tc.editToolCall.args?.path;
+    return path ? `Editing ${basename(path)}` : 'Editing file';
+  }
+  if (tc.shellToolCall || tc.terminalToolCall) {
+    const cmd = (tc.shellToolCall ?? tc.terminalToolCall)?.args?.command;
+    return cmd ? `Running: ${cmd.slice(0, 60)}` : 'Running command';
+  }
+  if (tc.globToolCall || tc.listFilesToolCall) {
+    return 'Listing files';
+  }
+  if (tc.grepToolCall || tc.searchToolCall) {
+    const pattern = (tc.grepToolCall ?? tc.searchToolCall)?.args?.pattern;
+    return pattern ? `Searching: ${pattern.slice(0, 50)}` : 'Searching files';
+  }
+
+  const toolName = Object.keys(tc)[0]?.replace(/ToolCall$/, '');
+  return toolName ? `Using ${toolName}` : null;
+}
+
+function basename(p: string): string {
+  const idx = p.lastIndexOf('/');
+  return idx >= 0 ? p.slice(idx + 1) : p;
+}
+
+function extractCursorCostAndTurns(raw: Record<string, unknown>): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
+  const out: Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> = {};
+  if (typeof raw.total_cost_usd === 'number') out.total_cost_usd = raw.total_cost_usd;
+  if (typeof raw.num_turns === 'number') out.num_turns = raw.num_turns;
+  return out;
+}
+
+function isDirectProcessMetricsShape(v: unknown): v is DirectProcessMetrics {
+  if (!v || typeof v !== 'object') return false;
+  const m = v as Record<string, unknown>;
+  return typeof m.model === 'string' && typeof m.tier === 'string' && typeof m.totalIterations === 'number';
+}
+
+function mapCursorResultToTurnMetrics(
+  raw: Record<string, unknown>,
+  agent: Agent | null,
+  turnToolCallCount: number,
+): DirectProcessMetrics {
+  const nested = raw.metrics;
+  if (isDirectProcessMetricsShape(nested)) {
+    return {
+      ...nested,
+      toolCallCount: Math.max(nested.toolCallCount ?? 0, turnToolCallCount),
+    };
+  }
+  const model = (typeof raw.model === 'string' && raw.model) || agent?.model || 'cursor';
+  const numTurns = typeof raw.num_turns === 'number' ? raw.num_turns : 1;
+  const durationMs = typeof raw.duration_ms === 'number' ? raw.duration_ms : 0;
+  return {
+    model,
+    tier: 'unknown',
+    totalIterations: numTurns,
+    toolCallCount: turnToolCallCount,
+    maxChainDepth: 0,
+    nudgeCount: 0,
+    midChainNudgeCount: 0,
+    explorationDriftCount: 0,
+    stallDetected: false,
+    stallType: null,
+    terminationReason: 'normal',
+    durationMs,
+    needsSummary: false,
+    totalLowQualityResponses: 0,
+    totalVacuousToolCalls: 0,
+    qualityNudgeCount: 0,
+  };
+}
+
 async function readStream(
   stream: ReadableStream<Uint8Array> | null,
   onEvent: (event: ClaudeStreamEvent) => void,
@@ -246,6 +375,7 @@ async function readStream(
 
         try {
           const event = JSON.parse(trimmed) as ClaudeStreamEvent;
+          log.debug('cursor-agent event', { type: event.type, subtype: event.subtype });
           onEvent(event);
         } catch {
           // Non-JSON output (spinners, progress bars) — skip silently

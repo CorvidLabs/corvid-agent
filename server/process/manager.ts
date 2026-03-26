@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
-import type { ClaudeStreamEvent } from './types';
+import type { ClaudeStreamEvent, DirectProcessMetrics } from './types';
 import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { startDirectProcess, summarizeConversation } from './direct-process';
@@ -1068,11 +1068,118 @@ export class ProcessManager {
         return this.resilienceManager.getPausedSessionIds();
     }
 
+    /** @returns false if the session was stopped (e.g. credits exhausted) and the caller must abort. */
+    private applyCostUpdateIfPresent(
+        sessionId: string,
+        event: Pick<ClaudeStreamEvent, 'total_cost_usd' | 'num_turns'>,
+    ): boolean {
+        if (event.total_cost_usd === undefined) return true;
+
+        updateSessionCost(
+            this.db,
+            sessionId,
+            event.total_cost_usd,
+            event.num_turns ?? 0,
+        );
+
+        const costMeta = this.sessionMeta.get(sessionId);
+        if (costMeta) {
+            const delta = event.total_cost_usd - costMeta.lastKnownCostUsd;
+            if (delta > 0) {
+                try {
+                    recordApiCost(this.db, delta);
+                } catch (err) {
+                    log.warn(`Failed to record API cost`, { error: err instanceof Error ? err.message : String(err) });
+                }
+            }
+            costMeta.lastKnownCostUsd = event.total_cost_usd;
+
+            if (costMeta.source === 'algochat') {
+                const participantAddr = getParticipantForSession(this.db, sessionId);
+                if (participantAddr && this.isOwnerAddress?.(participantAddr)) {
+                    // Owners are exempt from credit deduction
+                } else if (participantAddr) {
+                    const creditResult = deductTurnCredits(this.db, participantAddr, sessionId);
+                    if (!creditResult.success) {
+                        log.warn(`Credits exhausted mid-session -- pausing session ${sessionId}`, {
+                            participantAddr: participantAddr.slice(0, 8) + '...',
+                        });
+                        this.eventBus.emit(sessionId, {
+                            type: 'error',
+                            error: {
+                                message: `Session paused: credits exhausted. Send ALGO to resume. Use /credits to check balance.`,
+                                type: 'credits_exhausted',
+                            },
+                        } as ClaudeStreamEvent);
+                        this.eventBus.emit(sessionId, {
+                            type: 'session_error',
+                            session_id: sessionId,
+                            error: {
+                                message: 'Session paused: credits exhausted. Send ALGO to resume.',
+                                errorType: 'credits_exhausted',
+                                severity: 'warning',
+                                recoverable: true,
+                            },
+                        } as ClaudeStreamEvent);
+                        this.stopProcess(sessionId, 'credits_exhausted');
+                        return false;
+                    }
+                    if (creditResult.isLow) {
+                        const config = getCreditConfig(this.db);
+                        log.info(`Low credits warning for session ${sessionId}`, {
+                            remaining: creditResult.creditsRemaining,
+                            threshold: config.lowCreditThreshold,
+                        });
+                        this.eventBus.emit(sessionId, {
+                            type: 'system',
+                            statusMessage: `Low credits: ${creditResult.creditsRemaining} remaining. Send ALGO to top up.`,
+                        });
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private persistDirectSessionMetrics(sessionId: string, metrics: DirectProcessMetrics): void {
+        try {
+            insertSessionMetrics(this.db, {
+                sessionId,
+                model: metrics.model,
+                tier: metrics.tier,
+                totalIterations: metrics.totalIterations,
+                toolCallCount: metrics.toolCallCount,
+                maxChainDepth: metrics.maxChainDepth,
+                nudgeCount: metrics.nudgeCount,
+                midChainNudgeCount: metrics.midChainNudgeCount,
+                explorationDriftCount: metrics.explorationDriftCount,
+                stallDetected: metrics.stallDetected,
+                stallType: metrics.stallType,
+                terminationReason: metrics.terminationReason,
+                durationMs: metrics.durationMs,
+                needsSummary: metrics.needsSummary,
+            });
+        } catch (err) {
+            log.warn('Failed to persist session metrics', {
+                sessionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
     private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
         const meta = this.sessionMeta.get(sessionId);
         if (meta) {
             meta.lastActivityAt = Date.now();
             this.timerManager.startSessionTimeout(sessionId);
+        }
+
+        // Cursor (and similar): per-turn cost/metrics without broadcasting `result`
+        // (Discord / work-queue listeners treat `result` as end-of-session).
+        if (event.type === 'session_turn_metrics') {
+            if (!this.applyCostUpdateIfPresent(sessionId, event)) return;
+            this.persistDirectSessionMetrics(sessionId, event.metrics);
+            return;
         }
 
         // Broadcast granular activity status so the dashboard reflects what the agent is doing
@@ -1085,97 +1192,10 @@ export class ProcessManager {
             }
         }
 
-        if (event.total_cost_usd !== undefined) {
-            updateSessionCost(
-                this.db,
-                sessionId,
-                event.total_cost_usd,
-                event.num_turns ?? 0,
-            );
+        if (!this.applyCostUpdateIfPresent(sessionId, event)) return;
 
-            const costMeta = this.sessionMeta.get(sessionId);
-            if (costMeta) {
-                const delta = event.total_cost_usd - costMeta.lastKnownCostUsd;
-                if (delta > 0) {
-                    try {
-                        recordApiCost(this.db, delta);
-                    } catch (err) {
-                        log.warn(`Failed to record API cost`, { error: err instanceof Error ? err.message : String(err) });
-                    }
-                }
-                costMeta.lastKnownCostUsd = event.total_cost_usd;
-
-                if (costMeta.source === 'algochat') {
-                    const participantAddr = getParticipantForSession(this.db, sessionId);
-                    if (participantAddr && this.isOwnerAddress?.(participantAddr)) {
-                        // Owners are exempt from credit deduction
-                    } else if (participantAddr) {
-                        const result = deductTurnCredits(this.db, participantAddr, sessionId);
-                        if (!result.success) {
-                            log.warn(`Credits exhausted mid-session -- pausing session ${sessionId}`, {
-                                participantAddr: participantAddr.slice(0, 8) + '...',
-                            });
-                            this.eventBus.emit(sessionId, {
-                                type: 'error',
-                                error: {
-                                    message: `Session paused: credits exhausted. Send ALGO to resume. Use /credits to check balance.`,
-                                    type: 'credits_exhausted',
-                                },
-                            } as ClaudeStreamEvent);
-                            this.eventBus.emit(sessionId, {
-                                type: 'session_error',
-                                session_id: sessionId,
-                                error: {
-                                    message: 'Session paused: credits exhausted. Send ALGO to resume.',
-                                    errorType: 'credits_exhausted',
-                                    severity: 'warning',
-                                    recoverable: true,
-                                },
-                            } as ClaudeStreamEvent);
-                            this.stopProcess(sessionId, 'credits_exhausted');
-                            return;
-                        }
-                        if (result.isLow) {
-                            const config = getCreditConfig(this.db);
-                            log.info(`Low credits warning for session ${sessionId}`, {
-                                remaining: result.creditsRemaining,
-                                threshold: config.lowCreditThreshold,
-                            });
-                            this.eventBus.emit(sessionId, {
-                                type: 'system',
-                                statusMessage: `Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        // Persist session metrics from direct-process when available
         if (event.type === 'result' && 'metrics' in event && event.metrics) {
-            try {
-                insertSessionMetrics(this.db, {
-                    sessionId,
-                    model: event.metrics.model,
-                    tier: event.metrics.tier,
-                    totalIterations: event.metrics.totalIterations,
-                    toolCallCount: event.metrics.toolCallCount,
-                    maxChainDepth: event.metrics.maxChainDepth,
-                    nudgeCount: event.metrics.nudgeCount,
-                    midChainNudgeCount: event.metrics.midChainNudgeCount,
-                    explorationDriftCount: event.metrics.explorationDriftCount,
-                    stallDetected: event.metrics.stallDetected,
-                    stallType: event.metrics.stallType,
-                    terminationReason: event.metrics.terminationReason,
-                    durationMs: event.metrics.durationMs,
-                    needsSummary: event.metrics.needsSummary,
-                });
-            } catch (err) {
-                log.warn('Failed to persist session metrics', {
-                    sessionId,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
+            this.persistDirectSessionMetrics(sessionId, event.metrics);
         }
 
         this.eventBus.emit(sessionId, event);

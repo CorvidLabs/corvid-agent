@@ -1,6 +1,6 @@
 ---
 module: response-quality
-version: 1
+version: 2
 status: draft
 files:
   - server/lib/response-quality.ts
@@ -23,12 +23,14 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 | `scoreResponseQuality` | `text: string, hasToolCalls: boolean` | `ResponseQualityScore` | Scores text response quality from 0.0 (pure cheerleading) to 1.0 (highly substantive) based on positive/negative signal heuristics. |
 | `countVacuousToolCalls` | `toolCalls: ToolCallQualityInput[]` | `number` | Counts semantically empty tool calls (e.g. trivial save_memory, status-only workflow updates). |
 | `buildQualityNudge` | _(none)_ | `string` | Returns a corrective nudge message to inject when consecutive low-quality responses are detected. |
+| `buildLoopNudge` | `toolName: string` | `string` | Returns a corrective nudge message for repetitive tool call loops, naming the repeated tool. |
 
 ### Exported Classes
 
 | Class | Description |
 |-------|-------------|
-| `ResponseQualityTracker` | Stateful tracker for consecutive low-quality responses within a session. Records scores, vacuous tool calls, and nudge counts. |
+| `ResponseQualityTracker` | Stateful tracker for consecutive low-quality responses within a session. Records scores, vacuous tool calls, nudge counts, and nudge-exhaustion state. |
+| `RepetitiveToolCallDetector` | Detects when a model repeatedly calls the same tool with identical arguments N times, indicating a stuck loop. Tracks a sliding window of fingerprinted calls. |
 
 ### Exported Types
 
@@ -37,7 +39,7 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 | `ResponseQualityScore` | Score (0–1) with array of contributing `QualitySignal` values. |
 | `QualitySignal` | Union of signal identifiers (e.g. `cheerleading_phrases`, `has_code_blocks`, `vacuous_workflow_update`). |
 | `ToolCallQualityInput` | Tool call shape with `name` and `arguments` for quality analysis. |
-| `ResponseQualityMetrics` | Aggregate metrics: `totalLowQualityResponses`, `totalVacuousToolCalls`, `qualityNudgeCount`. |
+| `ResponseQualityMetrics` | Aggregate metrics: `totalLowQualityResponses`, `totalVacuousToolCalls`, `qualityNudgeCount`, `nudgesExhausted`. |
 
 ## Invariants
 
@@ -46,6 +48,9 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 3. Empty text without tool calls scores 0.0.
 4. `ResponseQualityTracker` resets consecutive count on any above-threshold response.
 5. Nudge trigger requires `CONSECUTIVE_LOW_QUALITY_TRIGGER` (default 2) consecutive low-quality responses.
+6. `RepetitiveToolCallDetector` uses stable fingerprints (sorted JSON args) for deterministic comparison.
+7. Loop detection requires `threshold` (default 3) consecutive identical tool calls within the sliding window.
+8. `nudgesExhausted` is only set when `markNudgesExhausted()` is explicitly called after nudge cap is reached.
 
 ## Signals
 
@@ -71,6 +76,8 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 3. **Tool-only response** — empty text with tool calls → score 1.0, signal: `has_tool_calls`.
 4. **Vacuous save_memory** — `corvid_save_memory({ key: "x", content: "ok" })` → flagged as vacuous (content < 10 chars).
 5. **Consecutive low quality** — two text responses both scoring < 0.35 → tracker triggers nudge injection on the second.
+6. **Repetitive tool loop** — `read_file({ path: "a.ts" })` called 3 times in a row → detector returns true, nudge injected naming the tool.
+7. **Nudge exhaustion** — all quality nudges used without improvement → `nudgesExhausted` set, session terminated with `stall_quality_exhausted`.
 
 ## Error Cases
 
@@ -87,3 +94,4 @@ None. This module is self-contained with no external dependencies.
 | Version | Date | Description |
 |---------|------|-------------|
 | 1 | 2026-03-18 | Initial spec — scoring, vacuous detection, tracker, nudge builder. |
+| 2 | 2026-03-25 | Add RepetitiveToolCallDetector, buildLoopNudge, nudge-exhaustion tracking. |

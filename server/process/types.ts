@@ -75,7 +75,7 @@ export interface DirectProcessMetrics {
     explorationDriftCount: number;
     stallDetected: boolean;
     stallType: string | null;
-    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'max_iterations' | 'abort' | 'error';
+    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'max_iterations' | 'abort' | 'error';
     durationMs: number;
     needsSummary: boolean;
     /** Response quality metrics (cheerleading detection). */
@@ -89,7 +89,7 @@ export interface EscalationInfo {
     /** Whether this session is eligible for escalation. */
     canEscalate: boolean;
     /** Why escalation was suggested. */
-    reason: 'stall_repeat' | 'stall_same_tool' | 'max_iterations' | 'low_quality';
+    reason: 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'max_iterations' | 'low_quality';
     /** The original prompt that started this session. */
     originalPrompt: string;
     /** Summary of tools called and their results (redacted of secrets). */
@@ -111,6 +111,19 @@ export interface ResultEvent extends BaseStreamEvent {
     metrics?: DirectProcessMetrics;
     /** Escalation metadata when session terminated abnormally. */
     escalation?: EscalationInfo;
+}
+
+/**
+ * Per-turn metrics and cost from integrations that suppress `result` on the
+ * event bus (e.g. cursor-agent emits `result` after every turn; forwarding
+ * that would unsubscribe Discord/work listeners early). ProcessManager
+ * consumes this for DB cost/metrics only — it is not broadcast to subscribers.
+ */
+export interface SessionTurnMetricsEvent extends BaseStreamEvent {
+    type: 'session_turn_metrics';
+    metrics: DirectProcessMetrics;
+    total_cost_usd?: number;
+    num_turns?: number;
 }
 
 /** Error occurred */
@@ -235,6 +248,7 @@ export type ClaudeStreamEvent =
     | AssistantEvent
     | ThinkingEvent
     | ResultEvent
+    | SessionTurnMetricsEvent
     | ErrorEvent
     | ToolStatusEvent
     | SystemEvent

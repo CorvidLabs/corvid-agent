@@ -26,7 +26,9 @@ import {
     scoreResponseQuality,
     countVacuousToolCalls,
     ResponseQualityTracker,
+    RepetitiveToolCallDetector,
     buildQualityNudge,
+    buildLoopNudge,
     type ResponseQualityMetrics,
     type ToolCallQualityInput,
 } from '../lib/response-quality';
@@ -277,7 +279,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let terminationReason: DirectProcessMetrics['terminationReason'] = 'normal';
         let stallType: string | null = null;
         const qualityTracker = new ResponseQualityTracker();
+        const loopDetector = new RepetitiveToolCallDetector();
         const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
+        const MAX_LOOP_NUDGES = 2;
         /* c8 ignore next -- integration-level process loop */
         const toolCallLog: string[] = []; // Brief log of tool calls for escalation
         const loopStartTime = Date.now();
@@ -311,6 +315,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     message: warning.message,
                 } as ClaudeStreamEvent);
             }
+        }
+
+        /** End-of-turn marker aligned with Claude SDK streams (work-queue stall detection). */
+        function emitModelTurnEnd(): void {
+            onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
         }
 
         try {
@@ -425,6 +434,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         needsSummary = true;
                         terminationReason = 'stall_repeat';
                         stallType = 'repeat';
+                        emitModelTurnEnd();
                         break;
                     }
                 } else {
@@ -443,6 +453,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         needsSummary = true;
                         terminationReason = 'stall_same_tool';
                         stallType = 'same_tool';
+                        emitModelTurnEnd();
                         break;
                     }
                 } else {
@@ -554,12 +565,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 }
 
                 // Vacuous tool call detection: flag semantically empty tool calls
-                const vacuousCount = countVacuousToolCalls(
-                    result.toolCalls.map((tc: LlmToolCall): ToolCallQualityInput => ({
-                        name: tc.name,
-                        arguments: tc.arguments as Record<string, unknown>,
-                    })),
-                );
+                const toolCallInputs = result.toolCalls.map((tc: LlmToolCall): ToolCallQualityInput => ({
+                    name: tc.name,
+                    arguments: tc.arguments as Record<string, unknown>,
+                }));
+                const vacuousCount = countVacuousToolCalls(toolCallInputs);
                 if (vacuousCount > 0) {
                     qualityTracker.recordVacuousToolCalls(vacuousCount);
                     log.info('Vacuous tool calls detected', {
@@ -567,6 +577,29 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         tools: result.toolCalls.map((tc: LlmToolCall) => tc.name).join(', '),
                         sessionId: session.id,
                     });
+                }
+
+                // Repetitive tool call loop detection
+                const isLoop = loopDetector.recordToolCalls(toolCallInputs);
+                if (isLoop && loopDetector.totalLoopsDetected <= MAX_LOOP_NUDGES) {
+                    const repeatedTool = result.toolCalls[result.toolCalls.length - 1]?.name ?? 'unknown';
+                    log.warn('Repetitive tool call loop detected', {
+                        tool: repeatedTool,
+                        totalLoops: loopDetector.totalLoopsDetected,
+                        sessionId: session.id,
+                    });
+                    messages.push({ role: 'user', content: buildLoopNudge(repeatedTool) });
+                    loopDetector.reset(); // Give the model a chance to recover
+                } else if (isLoop && loopDetector.totalLoopsDetected > MAX_LOOP_NUDGES) {
+                    // Loop nudges exhausted — terminate the loop
+                    log.warn('Repetitive loop nudges exhausted — breaking tool loop', {
+                        totalLoops: loopDetector.totalLoopsDetected,
+                        sessionId: session.id,
+                    });
+                    stallType = 'repetitive_loop';
+                    terminationReason = 'stall_repetitive_loop';
+                    emitModelTurnEnd();
+                    break;
                 }
 
                 // Score text quality alongside tool calls
@@ -580,9 +613,21 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         sessionId: session.id,
                     });
                     messages.push({ role: 'user', content: buildQualityNudge() });
+                } else if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount >= MAX_QUALITY_NUDGES) {
+                    // Quality nudges exhausted — mark for escalation
+                    qualityTracker.markNudgesExhausted();
+                    log.warn('Quality nudges exhausted without improvement', {
+                        totalLowQuality: qualityTracker.getMetrics().totalLowQualityResponses,
+                        sessionId: session.id,
+                    });
+                    stallType = 'quality_nudges_exhausted';
+                    terminationReason = 'stall_quality_exhausted';
+                    emitModelTurnEnd();
+                    break;
                 }
 
                 // Continue loop to let the model process tool results
+                emitModelTurnEnd();
                 continue;
             }
 
@@ -612,6 +657,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         + 'Call the next tool now by outputting ONLY the JSON array: '
                         + '[{"name": "tool_name", "arguments": {...}}]',
                 });
+                emitModelTurnEnd();
                 continue;
             }
 
@@ -634,17 +680,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     sessionId: session.id,
                 });
                 messages.push({ role: 'user', content: buildQualityNudge() });
+                emitModelTurnEnd();
                 continue;
             }
 
             // Skip nudging if we've already nudged too many times or tools are disabled
             if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
+                emitModelTurnEnd();
                 break;
             }
 
             // After tools have been called, only allow mid-chain nudges (handled above).
             // Standard nudges are for initial engagement only.
             if (toolsEverCalled) {
+                emitModelTurnEnd();
                 break;
             }
 
@@ -658,9 +707,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 log.info(`Nudging model to continue (iteration=${iteration}, reason=${nudgeReason}, nudge=${nudgeCount}/${MAX_NUDGES})`);
                 const nudge = buildNudgeMessage(nudgeReason, directTools);
                 messages.push({ role: 'user', content: nudge });
+                emitModelTurnEnd();
                 continue;
             }
 
+            emitModelTurnEnd();
             break;
         }
 
@@ -707,6 +758,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                             content: [{ type: 'text', text: summaryResult.content }],
                         },
                     } as ClaudeStreamEvent);
+                    emitModelTurnEnd();
                 }
             } catch (err) {
                 log.warn('Final summary call failed', {
@@ -1059,7 +1111,9 @@ export interface SessionMetricsState {
  */
 export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMetrics {
     const stallDetected = state.terminationReason === 'stall_repeat'
-        || state.terminationReason === 'stall_same_tool';
+        || state.terminationReason === 'stall_same_tool'
+        || state.terminationReason === 'stall_repetitive_loop'
+        || state.terminationReason === 'stall_quality_exhausted';
     return {
         model: state.model,
         tier: state.tier,
@@ -1106,7 +1160,11 @@ export interface BuildEscalationInput {
  */
 export function buildEscalationInfo(input: BuildEscalationInput): EscalationInfo | null {
     const escalationReasons = new Set<EscalationInfo['reason']>([
-        'stall_repeat', 'stall_same_tool', 'max_iterations',
+        'stall_repeat',
+        'stall_same_tool',
+        'stall_repetitive_loop',
+        'stall_quality_exhausted',
+        'max_iterations',
     ]);
 
     // Check for low-quality termination (session ended but with many low-quality responses)
@@ -1142,6 +1200,10 @@ function buildRemainingWorkDescription(reason: EscalationInfo['reason']): string
             return 'Model entered a repeat loop — same tool call made multiple times without progress.';
         case 'stall_same_tool':
             return 'Model called the same tool repeatedly with varying arguments without making progress.';
+        case 'stall_repetitive_loop':
+            return 'Model repeatedly called the same tool with identical arguments and exhausted recovery nudges.';
+        case 'stall_quality_exhausted':
+            return 'Model continued producing low-quality output after all corrective quality nudges were exhausted.';
         case 'max_iterations':
             return 'Model reached the maximum iteration limit before completing the task.';
         case 'low_quality':

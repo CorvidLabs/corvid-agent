@@ -216,6 +216,94 @@ function isVacuousToolCall(tc: ToolCallQualityInput): boolean {
     return false;
 }
 
+// ── Repetitive tool call detection ────────────────────────────────────────
+
+/** Default number of identical tool calls before flagging a loop. */
+const REPETITIVE_TOOL_CALL_THRESHOLD = 3;
+
+/**
+ * Detects when a model repeatedly calls the same tool with identical arguments,
+ * indicating it's stuck in a loop rather than making progress.
+ */
+export class RepetitiveToolCallDetector {
+    private readonly threshold: number;
+    /** Sliding window of recent tool call fingerprints. */
+    private readonly recentCalls: string[] = [];
+    /** Maximum window size — only the most recent N calls are tracked. */
+    private readonly windowSize: number;
+    private _loopDetected = false;
+    private _totalLoopsDetected = 0;
+
+    constructor(threshold = REPETITIVE_TOOL_CALL_THRESHOLD, windowSize = 10) {
+        this.threshold = threshold;
+        this.windowSize = windowSize;
+    }
+
+    /**
+     * Record a batch of tool calls from a single model turn.
+     * @returns true if a repetitive loop is detected.
+     */
+    recordToolCalls(toolCalls: ToolCallQualityInput[]): boolean {
+        for (const tc of toolCalls) {
+            const fingerprint = this.fingerprint(tc);
+            this.recentCalls.push(fingerprint);
+        }
+
+        // Trim to window size
+        while (this.recentCalls.length > this.windowSize) {
+            this.recentCalls.shift();
+        }
+
+        // Check if the last N calls are identical
+        if (this.recentCalls.length >= this.threshold) {
+            const tail = this.recentCalls.slice(-this.threshold);
+            const allSame = tail.every((fp) => fp === tail[0]);
+            if (allSame) {
+                this._loopDetected = true;
+                this._totalLoopsDetected++;
+                return true;
+            }
+        }
+
+        this._loopDetected = false;
+        return false;
+    }
+
+    /** Whether the most recent check detected a loop. */
+    get loopDetected(): boolean {
+        return this._loopDetected;
+    }
+
+    /** Total number of loop detections during this session. */
+    get totalLoopsDetected(): number {
+        return this._totalLoopsDetected;
+    }
+
+    /** Reset state (e.g. after a corrective nudge breaks the loop). */
+    reset(): void {
+        this.recentCalls.length = 0;
+        this._loopDetected = false;
+    }
+
+    /**
+     * Create a stable fingerprint for a tool call.
+     * Uses tool name + sorted JSON of arguments for deterministic comparison.
+     */
+    private fingerprint(tc: ToolCallQualityInput): string {
+        const sortedArgs = JSON.stringify(tc.arguments, Object.keys(tc.arguments).sort());
+        return `${tc.name}::${sortedArgs}`;
+    }
+}
+
+/**
+ * Build a corrective nudge for repetitive tool call loops.
+ */
+export function buildLoopNudge(toolName: string): string {
+    return `STOP. You are calling \`${toolName}\` repeatedly with the same arguments. `
+        + 'This is not making progress. Try a DIFFERENT approach: '
+        + 'use a different tool, change the arguments, or report what you found so far.';
+}
+
 // ── Consecutive tracking ─────────────────────────────────────────────────
 
 /** Quality threshold below which a response is considered low-quality. */
@@ -233,6 +321,7 @@ export class ResponseQualityTracker {
     private totalLowQuality = 0;
     private totalVacuousToolCalls = 0;
     private qualityNudgeCount = 0;
+    private _nudgesExhausted = false;
     private readonly threshold: number;
     private readonly trigger: number;
 
@@ -268,12 +357,29 @@ export class ResponseQualityTracker {
         return ++this.qualityNudgeCount;
     }
 
+    /**
+     * Signal that all nudges have been used without quality improvement.
+     * Call this when nudge limit is reached and response quality is still low.
+     */
+    markNudgesExhausted(): void {
+        this._nudgesExhausted = true;
+    }
+
+    /**
+     * Whether nudges have been exhausted without improvement.
+     * Callers can use this to trigger escalation (e.g. to the stall escalator).
+     */
+    get nudgesExhausted(): boolean {
+        return this._nudgesExhausted;
+    }
+
     /** Get metrics for inclusion in session metrics. */
     getMetrics(): ResponseQualityMetrics {
         return {
             totalLowQualityResponses: this.totalLowQuality,
             totalVacuousToolCalls: this.totalVacuousToolCalls,
             qualityNudgeCount: this.qualityNudgeCount,
+            nudgesExhausted: this._nudgesExhausted,
         };
     }
 }
@@ -282,6 +388,7 @@ export interface ResponseQualityMetrics {
     totalLowQualityResponses: number;
     totalVacuousToolCalls: number;
     qualityNudgeCount: number;
+    nudgesExhausted: boolean;
 }
 
 // ── Nudge message ────────────────────────────────────────────────────────

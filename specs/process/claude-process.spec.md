@@ -44,7 +44,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | Type | Description |
 |------|-------------|
 | `ContentBlock` | Interface with `type: string` and optional `text: string`. Represents a content block in assistant messages. |
-| `ClaudeStreamEvent` | Discriminated union of all 20 stream event types, discriminated on the `type` field. The canonical event type for the process subsystem. |
+| `ClaudeStreamEvent` | Discriminated union of all stream event types, discriminated on the `type` field. The canonical event type for the process subsystem. |
 | `ClaudeStreamEventType` | String literal union of all event type discriminants (`'message_start' \| 'message_delta' \| ...`). |
 | `MessageStartEvent` | Event emitted when a message begins. Contains optional `message` with `role` and `content`. |
 | `MessageDeltaEvent` | Event emitted for incremental message content. Contains optional `delta` with `type` and `text`. |
@@ -55,6 +55,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `AssistantEvent` | Event carrying a complete assistant message with `role: 'assistant'` and `content`. |
 | `ThinkingEvent` | Event indicating thinking/heartbeat status via `thinking: boolean`. |
 | `ResultEvent` | Event emitted on session completion. Contains required `total_cost_usd` and optional `result`. |
+| `SessionTurnMetricsEvent` | Internal-only metrics payload (`session_turn_metrics`): per-turn `DirectProcessMetrics` and optional cost fields. Emitted by Cursor integration; ProcessManager persists to DB without broadcasting as `result`. |
 | `ErrorEvent` | Event carrying an error with `message` and `type` fields. |
 | `ToolStatusEvent` | Synthetic event for tool execution status updates. Contains `statusMessage`. |
 | `SystemEvent` | Synthetic system notification. Contains optional `statusMessage` and `message`. |
