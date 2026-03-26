@@ -2,11 +2,8 @@ import { describe, test, expect } from 'bun:test';
 import {
     detectModelFamily,
     getToolInstructionPrompt,
-    getResponseRoutingPrompt,
     getCodingToolPrompt,
     getCodebaseContextPrompt,
-    getMessagingSafetyPrompt,
-    getWorktreeIsolationPrompt,
 } from '../providers/ollama/tool-prompt-templates';
 
 describe('getCodebaseContextPrompt', () => {
