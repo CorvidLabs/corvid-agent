@@ -81,7 +81,9 @@ export function getToolInstructionPrompt(
 }
 
 /** Families that use text-based tool calling and need full schemas in prompt. */
-const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['qwen3']);
+const TEXT_BASED_FAMILIES = new Set<ModelFamily>([
+    'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral',
+]);
 
 /** Format tool definitions as a compact reference for the system prompt. */
 function formatToolSchemas(toolDefs: ToolSchema[]): string {

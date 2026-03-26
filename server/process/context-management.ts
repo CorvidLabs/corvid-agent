@@ -114,7 +114,7 @@ const COMPRESSION_TIERS = [
     { name: 'tier4', threshold: 0.90, description: 'full context summary + last 2 exchanges' },
 ] as const;
 
-export type ConversationMessage = { role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string };
+export type ConversationMessage = { role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string; toolCalls?: import('../providers/types').LlmToolCall[] };
 
 /**
  * Compress tool result messages in-place by truncating content older than

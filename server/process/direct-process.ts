@@ -119,8 +119,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     let idleResolver: ((msg: string | null) => void) | null = null;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Council deliberation sessions (member, discusser, reviewer) should reason,
-    // not call tools. Only chairman/chat sessions get tools.
+    // Council deliberation sessions get tools so they can demonstrate
+    // full capabilities (tool use, memory, code reading, etc.)
     const isDeliberationSession = session.councilRole === 'member'
         || session.councilRole === 'discusser'
         || session.councilRole === 'reviewer';
@@ -134,8 +134,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     // External MCP client manager for third-party MCP servers
     const externalMcpManager = new ExternalMcpClientManager();
 
-    // Build tools — skip for council deliberation and conversation-only sessions
-    let directTools = (isDeliberationSession || options.conversationOnly) ? [] : buildDirectTools(mcpToolContext, codingCtx);
+    // Build tools — council deliberation sessions now get tools for full capability testing
+    let directTools = options.conversationOnly ? [] : buildDirectTools(mcpToolContext, codingCtx);
     // Filter to allowlist if specified (e.g. poll sessions only need run_command)
     if (options.toolAllowList && options.toolAllowList.length > 0) {
         const allowed = new Set(options.toolAllowList);
@@ -159,7 +159,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     // Connect external MCP servers and merge their tools before starting the loop
     const initPromise = (async () => {
-        if (!isDeliberationSession && externalMcpConfigs && externalMcpConfigs.length > 0) {
+        if (externalMcpConfigs && externalMcpConfigs.length > 0) {
             await externalMcpManager.connectAll(externalMcpConfigs);
             const externalTools = externalMcpManager.getAllTools();
             for (const t of externalTools) {
@@ -176,7 +176,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     let systemPrompt = '';
 
     // Conversation history for the current session
-    const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
+    const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string; toolCalls?: LlmToolCall[] }> = [];
 
     // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
     const effectivePrompt = prependRoutingContext(prompt, session.source, tierConfig);
@@ -464,8 +464,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     sameToolNameCount = 0;
                 }
 
-                // Add assistant message with tool call indication
-                messages.push({ role: 'assistant', content: result.content || '' });
+                // Add assistant message with tool call indication (include toolCalls so
+                // providers can reconstruct the full assistant turn for the next API call)
+                messages.push({ role: 'assistant', content: result.content || '', toolCalls: result.toolCalls });
 
                 for (const toolCall of result.toolCalls) {
                     if (aborted) return;
@@ -1280,13 +1281,13 @@ export function buildSystemPrompt(
 ): string {
     const parts: string[] = [];
 
-    // Council deliberation sessions: override with reasoning-only instructions
+    // Council deliberation sessions: use tools + reasoning
     if (isDeliberation) {
         parts.push(
             'You are a council member participating in a structured deliberation.',
-            'Answer the question directly using your expertise and reasoning.',
-            'Do NOT attempt to call tools, read files, or review code — you have no tools available.',
-            'Provide your analysis, recommendations, and trade-offs based on your knowledge.',
+            'Use your available tools to research, verify, and gather information before answering.',
+            'You have access to tools for reading files, running commands, saving/recalling memories, and interacting with AlgoChat.',
+            'Provide your analysis, recommendations, and trade-offs based on evidence you gather.',
             'Be specific and opinionated. Take a clear position rather than listing generic pros and cons.',
         );
         if (agent?.systemPrompt) {
