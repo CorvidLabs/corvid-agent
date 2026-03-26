@@ -2,6 +2,9 @@ import { describe, test, expect } from 'bun:test';
 import {
     detectModelFamily,
     getToolInstructionPrompt,
+    getCompactToolInstructionPrompt,
+    getCompactResponseRoutingPrompt,
+    getCompactCodingToolPrompt,
     getCodingToolPrompt,
     getCodebaseContextPrompt,
 } from '../providers/ollama/tool-prompt-templates';
@@ -105,6 +108,95 @@ describe('getToolInstructionPrompt', () => {
         const result = getToolInstructionPrompt('qwen3', ['list_files'], toolDefs);
         expect(result).toContain('Tool Schemas');
         expect(result).toContain('list_files');
+    });
+});
+
+describe('getCompactToolInstructionPrompt', () => {
+    test('includes tool list and rules', () => {
+        const result = getCompactToolInstructionPrompt('llama', ['list_files', 'read_file']);
+        expect(result).toContain('## Tool Usage');
+        expect(result).toContain('list_files, read_file');
+        expect(result).toContain('Rules:');
+        expect(result).toContain('NEVER write scripts to send messages');
+    });
+
+    test('includes JSON format guidance for text-based families', () => {
+        const result = getCompactToolInstructionPrompt('qwen3', ['list_files']);
+        expect(result).toContain('JSON array');
+        expect(result).toContain('list_files');
+        expect(result).toContain('No code blocks');
+    });
+
+    test('includes tool schemas for text-based families when toolDefs provided', () => {
+        const toolDefs = [
+            { name: 'list_files', description: 'List files', parameters: { type: 'object' as const, properties: { path: { type: 'string', description: 'Dir' } }, required: ['path'] } },
+        ];
+        const result = getCompactToolInstructionPrompt('nemotron', ['list_files'], toolDefs);
+        expect(result).toContain('list_files');
+    });
+
+    test('does not include JSON format guidance for non-text-based families', () => {
+        const result = getCompactToolInstructionPrompt('llama', ['list_files']);
+        expect(result).not.toContain('JSON array');
+    });
+
+    test('handles empty tool names', () => {
+        const result = getCompactToolInstructionPrompt('llama', []);
+        expect(result).toContain('## Tool Usage');
+        expect(result).not.toContain('Available tools:');
+    });
+
+    test('is shorter than full getToolInstructionPrompt', () => {
+        const tools = ['list_files', 'read_file', 'corvid_send_message'];
+        const compact = getCompactToolInstructionPrompt('llama', tools);
+        const full = getToolInstructionPrompt('llama', tools);
+        expect(compact.length).toBeLessThan(full.length);
+    });
+});
+
+describe('getCompactResponseRoutingPrompt', () => {
+    test('includes routing header', () => {
+        const result = getCompactResponseRoutingPrompt();
+        expect(result).toContain('## Response Routing');
+    });
+
+    test('instructs direct text reply', () => {
+        const result = getCompactResponseRoutingPrompt();
+        expect(result).toContain('Reply with text directly');
+        expect(result).toContain('corvid_send_message');
+    });
+
+    test('includes channel affinity rule', () => {
+        const result = getCompactResponseRoutingPrompt();
+        expect(result).toContain('same channel');
+    });
+
+    test('returns identical result on repeated calls (pure function)', () => {
+        expect(getCompactResponseRoutingPrompt()).toBe(getCompactResponseRoutingPrompt());
+    });
+});
+
+describe('getCompactCodingToolPrompt', () => {
+    test('includes coding tools header', () => {
+        const result = getCompactCodingToolPrompt();
+        expect(result).toContain('## Coding Tools');
+    });
+
+    test('includes key instructions', () => {
+        const result = getCompactCodingToolPrompt();
+        expect(result).toContain('edit_file');
+        expect(result).toContain('write_file');
+        expect(result).toContain('Read files before editing');
+    });
+
+    test('is shorter than full getCodingToolPrompt', () => {
+        const compact = getCompactCodingToolPrompt();
+        const full = getCodingToolPrompt();
+        expect(compact.length).toBeLessThan(full.length);
+    });
+
+    test('returns identical result on repeated calls (pure function)', () => {
+        expect(getCompactCodingToolPrompt()).toBe(getCompactCodingToolPrompt());
     });
 });
 
