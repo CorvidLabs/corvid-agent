@@ -227,16 +227,22 @@ export class OllamaProvider extends BaseLlmProvider {
     private static readonly THINKING_MODEL_FAMILIES = new Set(['qwen3']);
 
     /**
-     * Model families where the native Ollama `tools` API parameter causes
-     * severe performance degradation. For these models, tools are described
-     * only in the system prompt and tool calls are extracted from the model's
-     * text output via extractToolCallsFromContent().
+     * Model families where the native Ollama `tools` API parameter either
+     * causes severe performance degradation or doesn't work reliably.
      *
-     * Qwen3 8B in particular takes 10x+ longer when `tools` is in the API
-     * request, even with `think: false`, because it spends excessive time
-     * evaluating tool schemas during prompt processing.
+     * For these models, tools are described only in the system prompt and
+     * tool calls are extracted from the model's text output via
+     * extractToolCallsFromContent().
+     *
+     * - qwen3: 10x+ slower when `tools` is in the API request
+     * - kimi, minimax, gemini, glm, devstral: Cloud-proxied models where
+     *   the Ollama proxy doesn't reliably translate native tool_calls back.
+     *   These models output tool call JSON in text when instructed via
+     *   system prompt, which the text-based extractor handles well.
      */
-    private static readonly TEXT_BASED_TOOL_FAMILIES = new Set(['qwen3']);
+    private static readonly TEXT_BASED_TOOL_FAMILIES = new Set([
+        'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral',
+    ]);
 
     /**
      * Acquire an inference slot for the given model. Blocks until enough
@@ -467,13 +473,27 @@ export class OllamaProvider extends BaseLlmProvider {
             messages.push({ role: 'system', content: params.systemPrompt });
         }
 
-        // Conversation messages
+        // Conversation messages — preserve tool_calls on assistant messages and
+        // tool call IDs on tool result messages so the Ollama API (especially
+        // cloud-proxied models) can match tool results to their originating calls.
         for (const m of params.messages) {
             if (m.role === 'tool' && useTextBasedTools) {
                 // Remap tool results to user messages for models without native tools API.
                 // Use a distinct delimiter that the model is unlikely to generate on its own.
                 // The «» brackets are rare in training data and help prevent hallucination.
                 messages.push({ role: 'user', content: `«tool_output»\n${m.content}\n«/tool_output»` });
+            } else if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0 && !useTextBasedTools) {
+                // Include tool_calls in the assistant message so the API knows
+                // which tool calls the subsequent tool-result messages answer.
+                messages.push({
+                    role: 'assistant',
+                    content: m.content,
+                    tool_calls: m.toolCalls.map((tc) => ({
+                        id: tc.id,
+                        type: 'function' as const,
+                        function: { name: tc.name, arguments: tc.arguments },
+                    })),
+                });
             } else {
                 messages.push({ role: m.role, content: m.content });
             }
@@ -556,6 +576,9 @@ export class OllamaProvider extends BaseLlmProvider {
         let content = '';
         let thinking = '';
         let finalData: OllamaChatResponse | null = null;
+        // Accumulate tool_calls from ALL chunks — some models send them
+        // in non-final stream chunks and the done:true chunk omits them.
+        let streamedToolCalls: OllamaChatMessage['tool_calls'] = [];
         let lastActivitySignal = 0;
         const ACTIVITY_INTERVAL = 10_000; // Signal activity every 10s
         const STREAM_IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 min — abort if no data arrives
@@ -591,6 +614,9 @@ export class OllamaProvider extends BaseLlmProvider {
                         }
                         if (chunk.message?.thinking) {
                             thinking += chunk.message.thinking;
+                        }
+                        if (chunk.message?.tool_calls && chunk.message.tool_calls.length > 0) {
+                            streamedToolCalls!.push(...chunk.message.tool_calls);
                         }
                         if (chunk.done) {
                             finalData = chunk;
@@ -629,10 +655,15 @@ export class OllamaProvider extends BaseLlmProvider {
             reader.releaseLock();
         }
 
-        // Parse tool calls from final response (native tool call format)
+        // Parse tool calls from response — check both the final done chunk
+        // and any tool_calls accumulated during streaming (some models send
+        // tool_calls in non-final chunks and the done chunk omits them).
         let toolCalls: LlmToolCall[] | undefined;
-        if (finalData?.message?.tool_calls && finalData.message.tool_calls.length > 0) {
-            toolCalls = finalData.message.tool_calls.map((tc) => ({
+        const nativeToolCalls = (finalData?.message?.tool_calls && finalData.message.tool_calls.length > 0)
+            ? finalData.message.tool_calls
+            : (streamedToolCalls.length > 0 ? streamedToolCalls : null);
+        if (nativeToolCalls) {
+            toolCalls = nativeToolCalls.map((tc) => ({
                 id: tc.id || crypto.randomUUID().slice(0, 8),
                 name: tc.function.name,
                 arguments: tc.function.arguments,
@@ -716,15 +747,21 @@ export class OllamaProvider extends BaseLlmProvider {
     /** Extract the model family from a model name (e.g., "qwen3:8b" → "qwen3"). */
     private getModelFamily(modelName: string): string {
         const lower = modelName.toLowerCase();
-        // Match known families
+        // Match known families — order matters: more specific before generic
         if (lower.startsWith('qwen3')) return 'qwen3';
         if (lower.startsWith('qwen2')) return 'qwen2';
         if (lower.includes('llama')) return 'llama';
         if (lower.includes('mistral')) return 'mistral';
+        if (lower.includes('devstral')) return 'devstral';
         if (lower.includes('phi')) return 'phi';
         if (lower.includes('gemma')) return 'gemma';
         if (lower.includes('command-r')) return 'command-r';
         if (lower.includes('nemotron')) return 'nemotron';
+        if (lower.includes('minimax')) return 'minimax';
+        if (lower.includes('kimi')) return 'kimi';
+        if (lower.includes('glm')) return 'glm';
+        if (lower.includes('gemini')) return 'gemini';
+        if (lower.includes('deepseek')) return 'deepseek';
         // Fallback: use the part before the colon
         return lower.split(':')[0].split('-')[0];
     }

@@ -48,7 +48,7 @@ export interface LlmToolCall {
 export interface LlmCompletionParams {
     model: string;
     systemPrompt: string;
-    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>;
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string; toolCalls?: LlmToolCall[] }>;
     maxTokens?: number;
     temperature?: number;
     tools?: LlmToolDefinition[];
