@@ -167,6 +167,7 @@ export interface CreateScheduleInput {
 }
 
 export interface UpdateScheduleInput {
+    agentId?: string;
     name?: string;
     description?: string;
     cronExpression?: string;

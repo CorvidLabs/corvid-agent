@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
-import { listSchedules, createSchedule, updateSchedule, listExecutions } from '../../db/schedules';
+import { listSchedules, getSchedule, createSchedule, updateSchedule, listExecutions } from '../../db/schedules';
 import { validateScheduleFrequency } from '../../scheduler/service';
 import { createLogger } from '../../lib/logger';
 
@@ -10,7 +10,7 @@ const log = createLogger('McpToolHandlers');
 export async function handleManageSchedule(
     ctx: McpToolContext,
     args: {
-        action: 'list' | 'create' | 'update' | 'pause' | 'resume' | 'history';
+        action: 'list' | 'create' | 'update' | 'get' | 'pause' | 'resume' | 'history';
         name?: string;
         description?: string;
         cron_expression?: string;
@@ -18,6 +18,7 @@ export async function handleManageSchedule(
         schedule_actions?: Array<{ type: string; repos?: string[]; description?: string; project_id?: string; to_agent_id?: string; message?: string; prompt?: string }>;
         approval_policy?: string;
         max_executions?: number;
+        agent_id?: string;
         schedule_id?: string;
         output_destinations?: Array<{ type: string; target: string; format?: string }>;
     },
@@ -61,7 +62,7 @@ export async function handleManageSchedule(
                 }));
 
                 const schedule = createSchedule(ctx.db, {
-                    agentId: ctx.agentId,
+                    agentId: args.agent_id ?? ctx.agentId,
                     name: args.name,
                     description: args.description,
                     cronExpression: args.cron_expression,
@@ -80,12 +81,43 @@ export async function handleManageSchedule(
                 );
             }
 
+            case 'get': {
+                if (!args.schedule_id) return errorResult('schedule_id is required for get');
+                const schedule = getSchedule(ctx.db, args.schedule_id);
+                if (!schedule) return errorResult('Schedule not found');
+
+                const details = [
+                    `**${schedule.name}** [${schedule.id}]`,
+                    `  Agent: ${schedule.agentId}`,
+                    `  Status: ${schedule.status}`,
+                    `  Description: ${schedule.description || '(none)'}`,
+                    `  Cron: ${schedule.cronExpression || '(none)'}`,
+                    schedule.intervalMs ? `  Interval: ${schedule.intervalMs / 60000}m` : null,
+                    `  Approval: ${schedule.approvalPolicy}`,
+                    `  Executions: ${schedule.executionCount}${schedule.maxExecutions ? `/${schedule.maxExecutions}` : ''}`,
+                    schedule.maxBudgetPerRun ? `  Max budget/run: $${schedule.maxBudgetPerRun}` : null,
+                    `  Execution mode: ${schedule.executionMode}`,
+                    `  Last run: ${schedule.lastRunAt ?? 'never'}`,
+                    `  Next run: ${schedule.nextRunAt ?? 'pending'}`,
+                    `  Created: ${schedule.createdAt}`,
+                    `  Updated: ${schedule.updatedAt}`,
+                    `  Actions: ${JSON.stringify(schedule.actions, null, 2)}`,
+                    schedule.outputDestinations ? `  Output destinations: ${JSON.stringify(schedule.outputDestinations, null, 2)}` : null,
+                    schedule.triggerEvents ? `  Trigger events: ${JSON.stringify(schedule.triggerEvents, null, 2)}` : null,
+                    schedule.pipelineSteps ? `  Pipeline steps: ${JSON.stringify(schedule.pipelineSteps, null, 2)}` : null,
+                    schedule.notifyAddress ? `  Notify: ${schedule.notifyAddress}` : null,
+                ].filter(Boolean).join('\n');
+
+                return textResult(details);
+            }
+
             case 'update': {
                 if (!args.schedule_id) return errorResult('schedule_id is required for update');
 
                 const updateInput: import('../../../shared/types').UpdateScheduleInput = {};
                 const changedFields: string[] = [];
 
+                if (args.agent_id !== undefined) { updateInput.agentId = args.agent_id; changedFields.push('agent_id'); }
                 if (args.name !== undefined) { updateInput.name = args.name; changedFields.push('name'); }
                 if (args.description !== undefined) { updateInput.description = args.description; changedFields.push('description'); }
                 if (args.cron_expression !== undefined) { updateInput.cronExpression = args.cron_expression; changedFields.push('cron_expression'); }
@@ -123,7 +155,7 @@ export async function handleManageSchedule(
                 }
 
                 if (changedFields.length === 0) {
-                    return errorResult('No fields to update. Provide at least one of: name, description, cron_expression, interval_minutes, schedule_actions, approval_policy, max_executions');
+                    return errorResult('No fields to update. Provide at least one of: agent_id, name, description, cron_expression, interval_minutes, schedule_actions, approval_policy, max_executions');
                 }
 
                 // Validate frequency if timing changed
@@ -169,7 +201,7 @@ export async function handleManageSchedule(
             }
 
             default:
-                return errorResult(`Unknown action: ${args.action}. Use list, create, update, pause, resume, or history.`);
+                return errorResult(`Unknown action: ${args.action}. Use list, create, get, update, pause, resume, or history.`);
         }
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
