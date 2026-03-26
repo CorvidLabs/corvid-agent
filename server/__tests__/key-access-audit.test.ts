@@ -208,9 +208,9 @@ describe('Key access audit actions', () => {
         const enc = await encryptMnemonicWithPassphrase(mnemonic, OLD);
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a1', 'Agent1', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${enc}', wallet_address = 'ADDR1' WHERE id = 'a1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(enc, 'ADDR1', 'a1');
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a2', 'Agent2', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${enc}', wallet_address = 'ADDR2' WHERE id = 'a2'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(enc, 'ADDR2', 'a2');
 
         const result = await rotateWalletEncryptionKey(db, OLD, NEW, 'testnet');
         expect(result.success).toBe(true);

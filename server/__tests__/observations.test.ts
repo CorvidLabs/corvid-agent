@@ -27,7 +27,7 @@ function createTestDb(): Database {
     db.exec('PRAGMA journal_mode = WAL');
     // The observations migration references agents(id) FK, so create a stub table
     db.exec(`CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY)`);
-    db.exec(`INSERT INTO agents (id) VALUES ('${AGENT_ID}')`);
+    db.prepare('INSERT INTO agents (id) VALUES (?)').run(AGENT_ID);
     up(db);
     return db;
 }
@@ -365,7 +365,7 @@ describe('purgeOldObservations', () => {
         dismissObservation(db, obs.id);
 
         // Manually set created_at to 60 days ago
-        db.exec(`UPDATE memory_observations SET created_at = datetime('now', '-60 days') WHERE id = '${obs.id}'`);
+        db.prepare("UPDATE memory_observations SET created_at = datetime('now', '-60 days') WHERE id = ?").run(obs.id);
 
         const purged = purgeOldObservations(db, 30);
         // purge count includes FTS trigger changes, so just verify it's > 0
@@ -380,7 +380,7 @@ describe('purgeOldObservations', () => {
             source: 'session',
             content: 'still active',
         });
-        db.exec(`UPDATE memory_observations SET created_at = datetime('now', '-60 days') WHERE id = '${obs.id}'`);
+        db.prepare("UPDATE memory_observations SET created_at = datetime('now', '-60 days') WHERE id = ?").run(obs.id);
 
         const purged = purgeOldObservations(db, 30);
         expect(purged).toBe(0);

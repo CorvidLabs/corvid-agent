@@ -477,10 +477,10 @@ describe('DiscoveryService', () => {
 
         test('should include agent wallet addresses from DB', () => {
             const agent1 = createAgent(db, { name: 'Agent 1' });
-            db.exec(`UPDATE agents SET wallet_address = 'AGENT_WALLET_1' WHERE id = '${agent1.id}'`);
+            db.prepare('UPDATE agents SET wallet_address = ? WHERE id = ?').run('AGENT_WALLET_1', agent1.id);
 
             const agent2 = createAgent(db, { name: 'Agent 2' });
-            db.exec(`UPDATE agents SET wallet_address = 'AGENT_WALLET_2' WHERE id = '${agent2.id}'`);
+            db.prepare('UPDATE agents SET wallet_address = ? WHERE id = ?').run('AGENT_WALLET_2', agent2.id);
 
             const service = createMockService();
             const discovery = new DiscoveryService(db, createMockConfig(), service, () => true);
@@ -513,7 +513,7 @@ describe('DiscoveryService', () => {
 
             // Add a new agent after first call
             const lateAgent = createAgent(db, { name: 'Late Agent' });
-            db.exec(`UPDATE agents SET wallet_address = 'LATE_WALLET' WHERE id = '${lateAgent.id}'`);
+            db.prepare('UPDATE agents SET wallet_address = ? WHERE id = ?').run('LATE_WALLET', lateAgent.id);
 
             const second = discovery.getAgentWalletAddresses();
 
@@ -530,7 +530,7 @@ describe('DiscoveryService', () => {
 
             // Add a new agent
             const lateAgent = createAgent(db, { name: 'Late Agent' });
-            db.exec(`UPDATE agents SET wallet_address = 'LATE_WALLET' WHERE id = '${lateAgent.id}'`);
+            db.prepare('UPDATE agents SET wallet_address = ? WHERE id = ?').run('LATE_WALLET', lateAgent.id);
 
             // Simulate TTL expiration by manipulating internal state
             // Access the private field via any cast

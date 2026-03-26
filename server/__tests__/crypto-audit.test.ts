@@ -181,7 +181,7 @@ describe('Wallet Encryption Key Rotation', () => {
 
         // Store in DB
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('agent-1', 'TestAgent', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'TESTADDR' WHERE id = 'agent-1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'TESTADDR', 'agent-1');
 
         // Store in keystore
         writeFileSync(TEST_KEYSTORE_PATH, JSON.stringify({
@@ -202,7 +202,7 @@ describe('Wallet Encryption Key Rotation', () => {
         const encrypted = await encryptMnemonic(mnemonic, null, 'testnet');
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('agent-1', 'TestAgent', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'TESTADDR' WHERE id = 'agent-1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'TESTADDR', 'agent-1');
 
         writeFileSync(TEST_KEYSTORE_PATH, JSON.stringify({
             TestAgent: { address: 'TESTADDR', encryptedMnemonic: encrypted },
@@ -239,9 +239,9 @@ describe('Wallet Encryption Key Rotation', () => {
         }), { encoding: 'utf-8', mode: 0o600 });
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a1', 'Agent1', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'ADDR1' WHERE id = 'a1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'ADDR1', 'a1');
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a2', 'Agent2', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'ADDR2' WHERE id = 'a2'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'ADDR2', 'a2');
 
         await rotateWalletEncryptionKey(db, OLD_PASSPHRASE, NEW_PASSPHRASE, 'testnet');
 
@@ -273,7 +273,7 @@ describe('Wallet Encryption Key Rotation', () => {
         const encrypted = await encryptMnemonic(mnemonic, null, 'testnet');
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('agent-1', 'TestAgent', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'TESTADDR' WHERE id = 'agent-1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'TESTADDR', 'agent-1');
 
         // Try to rotate with wrong old passphrase — should fail
         const result = await rotateWalletEncryptionKey(db, 'wrong-passphrase-that-is-long-enough-32chars', NEW_PASSPHRASE, 'testnet');
@@ -294,7 +294,7 @@ describe('Wallet Encryption Key Rotation', () => {
         const encrypted = await encryptMnemonic(mnemonic, null, 'testnet');
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('agent-1', 'TestAgent', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'TESTADDR' WHERE id = 'agent-1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'TESTADDR', 'agent-1');
 
         await rotateWalletEncryptionKey(db, OLD_PASSPHRASE, NEW_PASSPHRASE, 'testnet');
 
@@ -312,7 +312,7 @@ describe('Wallet Encryption Key Rotation', () => {
         const encrypted = await encryptMnemonic(mnemonic, null, 'testnet');
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('agent-1', 'TestAgent', 'test', 'test')`);
-        db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${encrypted}', wallet_address = 'TESTADDR' WHERE id = 'agent-1'`);
+        db.prepare('UPDATE agents SET wallet_mnemonic_encrypted = ?, wallet_address = ? WHERE id = ?').run(encrypted, 'TESTADDR', 'agent-1');
 
         await rotateWalletEncryptionKey(db, OLD_PASSPHRASE, NEW_PASSPHRASE, 'testnet');
 

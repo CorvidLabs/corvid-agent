@@ -21,7 +21,7 @@ function createTestDb(): Database {
 
     // Minimal schema needed for graduation service
     db.exec(`CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY)`);
-    db.exec(`INSERT INTO agents (id) VALUES ('${AGENT_ID}')`);
+    db.prepare('INSERT INTO agents (id) VALUES (?)').run(AGENT_ID);
 
     // agent_memories table (used by saveMemory in graduation)
     db.exec(`
