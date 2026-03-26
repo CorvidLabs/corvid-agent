@@ -834,7 +834,7 @@ describe('SSRF Prevention', () => {
 describe('Cross-Tenant Isolation', () => {
     test('resolveAgentTenant returns undefined for DEFAULT_TENANT_ID agent', () => {
         const db = createTenantTestDb();
-        db.exec(`INSERT INTO agents (id, tenant_id) VALUES ('agent-1', '${DEFAULT_TENANT_ID}')`);
+        db.prepare('INSERT INTO agents (id, tenant_id) VALUES (?, ?)').run('agent-1', DEFAULT_TENANT_ID);
         const result = resolveAgentTenant(db, 'agent-1');
         expect(result).toBeUndefined();
         db.close();
@@ -865,7 +865,7 @@ describe('Cross-Tenant Isolation', () => {
 
     test('resolveCouncilTenant returns undefined for default tenant', () => {
         const db = createTenantTestDb();
-        db.exec(`INSERT INTO agents (id, tenant_id) VALUES ('agent-c1', '${DEFAULT_TENANT_ID}')`);
+        db.prepare('INSERT INTO agents (id, tenant_id) VALUES (?, ?)').run('agent-c1', DEFAULT_TENANT_ID);
         db.exec(`INSERT INTO sessions (id, agent_id, council_launch_id) VALUES ('session-c1', 'agent-c1', 'launch-1')`);
         const result = resolveCouncilTenant(db, 'launch-1');
         expect(result).toBeUndefined();
