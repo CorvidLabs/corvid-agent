@@ -661,7 +661,7 @@ export class OllamaProvider extends BaseLlmProvider {
         let toolCalls: LlmToolCall[] | undefined;
         const nativeToolCalls = (finalData?.message?.tool_calls && finalData.message.tool_calls.length > 0)
             ? finalData.message.tool_calls
-            : (streamedToolCalls && streamedToolCalls.length > 0 ? streamedToolCalls : null);
+            : (streamedToolCalls.length > 0 ? streamedToolCalls : null);
         if (nativeToolCalls) {
             toolCalls = nativeToolCalls.map((tc) => ({
                 id: tc.id || crypto.randomUUID().slice(0, 8),
