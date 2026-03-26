@@ -254,7 +254,7 @@ export class CodebaseHealthCollector {
 
     private async countTodos(cwd: string): Promise<{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }> {
         const { stdout } = await spawnAndCapture(
-            ['grep', '-rn', '--exclude-dir=node_modules', '// TODO\\|// FIXME\\|// HACK\\|/\\* TODO\\|/\\* FIXME\\|/\\* HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
+            ['grep', '-rn', '--exclude-dir=node_modules', '--exclude-dir=__tests__', '--exclude=health-collector.ts', '// TODO\\|// FIXME\\|// HACK\\|/\\* TODO\\|/\\* FIXME\\|/\\* HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
             cwd,
         );
         return parseTodoOutput(stdout);
