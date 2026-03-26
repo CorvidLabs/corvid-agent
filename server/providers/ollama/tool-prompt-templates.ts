@@ -133,12 +133,46 @@ Always respond via the same channel the message originated from. If a message ca
  */
 export function getCodingToolPrompt(): string {
     return `## Coding Tool Guidelines
-1. Before editing a file, always read it first.
-2. Use list_files and search_files to explore before making changes.
+1. Before editing a file, always read it first with read_file.
+2. Use list_files to see directory contents and search_files to find code by keyword.
 3. Use edit_file for targeted changes (string replacement). Use write_file for new files or complete rewrites.
 4. After making changes, run relevant commands to verify (type checking, tests).
 5. File paths are relative to the project directory.
-6. Some files are protected and cannot be modified.`;
+6. Some files are protected and cannot be modified.
+7. When investigating code, start with list_files to orient, then read_file on specific files. Do NOT try to read the entire project.`;
+}
+
+/**
+ * Get codebase context prompt. Gives agents basic orientation about the
+ * CorvidAgent project so they're not dropped in blind.
+ */
+export function getCodebaseContextPrompt(): string {
+    return `## Codebase Context
+
+This is the **CorvidAgent** project — a multi-agent AI platform built with TypeScript and Bun.
+
+### Project Structure
+- \`server/\` — Backend server code (API routes, providers, database, agent processes)
+- \`server/db/\` — SQLite database layer (corvid-agent.db)
+- \`server/providers/ollama/\` — Ollama provider for local/cloud model integration
+- \`server/process/\` — Agent session management (direct-process for Ollama, sdk-process for Claude)
+- \`server/mcp/\` — MCP tool server and skill loader
+- \`server/routes/\` — API endpoints
+- \`dashboard/\` — Frontend dashboard (React)
+- \`specs/\` — Project specifications
+- \`tests/\` — Test suites
+
+### Key Technologies
+- **Runtime**: Bun (not Node.js) — use \`bun\` for all commands, e.g. \`bun x tsc\`, \`bun test\`
+- **Language**: TypeScript throughout
+- **Database**: SQLite via better-sqlite3
+- **GitHub owner**: CorvidLabs (not corvid-agent)
+
+### Common Tasks
+- Type checking: \`bun x tsc --noEmit\`
+- Run tests: \`bun test\`
+- Spec check: \`bun run spec:check\`
+- Start server: \`bun run dev\``;
 }
 
 /**
@@ -185,6 +219,12 @@ function getCommonToolInstructions(toolNames: string[]): string {
         ? `Available tools: ${toolNames.join(', ')}`
         : '';
 
+    // Build a worked example using actual available tools
+    const hasListFiles = toolNames.includes('list_files');
+    const hasReadFile = toolNames.includes('read_file');
+    const hasRunCommand = toolNames.includes('run_command');
+    const workedExample = buildWorkedExample(hasListFiles, hasReadFile, hasRunCommand);
+
     return `## Tool Usage Instructions
 
 ${toolList}
@@ -197,12 +237,80 @@ ${toolList}
 5. Do not invent or hallucinate tool names — only use tools from the available list.
 6. Stay focused on the task. Do NOT explore directories or read files unrelated to what you were asked to do.
 7. When you receive a tool result, evaluate it and take the next logical action. Do NOT stop to narrate or explain — just call the next tool.
-8. NEVER write scripts, code, or shell commands to send messages, post to APIs, or communicate through any channel (Discord, Slack, email, HTTP, webhooks, etc.). You may ONLY send messages using your provided MCP tools (e.g. corvid_send_message). If no tool exists for the target channel or protocol, inform the user that you cannot send messages through that channel — do NOT generate a workaround script.`;
+8. NEVER write scripts, code, or shell commands to send messages, post to APIs, or communicate through any channel (Discord, Slack, email, HTTP, webhooks, etc.). You may ONLY send messages using your provided MCP tools (e.g. corvid_send_message). If no tool exists for the target channel or protocol, inform the user that you cannot send messages through that channel — do NOT generate a workaround script.
+
+### Worked Example — Multi-Step Tool Usage
+
+Here is an example of how to correctly chain tool calls to complete a task. Follow this pattern:
+
+${workedExample}
+
+The key pattern: TOOL CALL → receive result → evaluate → NEXT TOOL CALL → ... → FINAL TEXT ANSWER. Never stop in the middle.`;
+}
+
+/**
+ * Build a worked example using the actual tools available to the agent.
+ * This gives models concrete demonstrations rather than abstract rules.
+ */
+function buildWorkedExample(hasListFiles: boolean, hasReadFile: boolean, hasRunCommand: boolean): string {
+    if (hasListFiles && hasReadFile) {
+        return `**Task**: "What does the server entry point do?"
+
+**Step 1** — You call: list_files with path "server/"
+**Result** — You receive a file listing showing index.ts, routes/, db/, etc.
+**Step 2** — You call: read_file with path "server/index.ts"
+**Result** — You receive the file contents showing the server setup code.
+**Step 3** — You respond with plain text: "The server entry point in server/index.ts sets up the HTTP server, registers routes, and initializes the database connection."
+
+Notice: NO narration between steps. NO "Let me read the file" or "I'll check this". Just tool call → result → next action → final answer.`;
+    }
+    if (hasRunCommand) {
+        return `**Task**: "Check if there are any TypeScript errors"
+
+**Step 1** — You call: run_command with command "bun x tsc --noEmit"
+**Result** — You receive compiler output showing 2 errors in server/routes/api.ts
+**Step 2** — You respond with plain text: "There are 2 TypeScript errors in server/routes/api.ts: [describe errors]"
+
+Notice: NO narration between steps. Just tool call → result → final answer.`;
+    }
+    return `**Task**: "What tools do I have?"
+
+**Step 1** — You respond with plain text listing the available tools and what they do.
+
+For multi-step tasks: call a tool → receive result → evaluate → call next tool → ... → final text answer. Never stop in the middle.`;
 }
 
 function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []): string | null {
-    // Build a dynamic few-shot example using the first available tool
+    // Build dynamic few-shot examples using actual available tools
+    const hasListFiles = toolNames.includes('list_files');
+    const hasReadFile = toolNames.includes('read_file');
+    const hasSearchFiles = toolNames.includes('search_files');
     const exampleTool = toolNames[0] ?? 'tool_name';
+
+    // Text-based families need explicit JSON format examples
+    const textBasedExample = (toolName: string) => `
+**Correct tool call format** (output ONLY this, no other text):
+[{"name": "${toolName}", "arguments": {"path": "server/"}}]
+
+**WRONG** (do NOT do these):
+- \`\`\`json\\n[{"name": "${toolName}", ...}]\\n\`\`\` ← NO code blocks
+- Let me check the files: [{"name": "${toolName}", ...}] ← NO surrounding text
+- I'll use the ${toolName} tool to... ← NO narration, just the JSON`;
+
+    // Multi-step example for text-based families
+    const textBasedMultiStep = hasListFiles && hasReadFile ? `
+**Example multi-step interaction:**
+
+Turn 1 — You output:
+[{"name": "list_files", "arguments": {"path": "server/"}}]
+
+Turn 2 — System provides result. You see index.ts in the listing. You output:
+[{"name": "read_file", "arguments": {"path": "server/index.ts"}}]
+
+Turn 3 — System provides file contents. You now have enough info. You output:
+"The server entry point initializes the HTTP server and database connection."
+
+Key: Each turn is EITHER a tool call OR text. Never both.` : '';
 
     switch (family) {
         case 'llama':
@@ -213,53 +321,67 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
 - Do NOT ask for permission or confirmation. Take action immediately.
 - Do NOT explore the entire project. Only read files directly needed for your specific task.
 - When you have finished ALL necessary tool calls and have completed the task, provide your final response as plain text.
-- If the task involves creating a PR or making changes, you must actually use the tools to do it — do not just describe what you would do.`;
+- If the task involves creating a PR or making changes, you must actually use the tools to do it — do not just describe what you would do.
+- Common mistake: stopping after the first tool call and summarizing. Do NOT do this — keep calling tools until the task is done.`;
 
         case 'qwen2':
             return `### Qwen-specific guidance
 - Use the structured tool call format. Do not embed tool calls within markdown code blocks.
 - When chaining multiple operations, process each tool result and immediately proceed to the next step.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Do NOT narrate or explain between tool calls. Just call the next tool.
+- Provide your final answer as plain text only after all tool operations are complete.
+- Common mistake: wrapping tool calls in \`\`\`json blocks or adding explanatory text. Do NOT do this.`;
 
         case 'qwen3':
             return `### Qwen3 Tool Calling Format
-- To call a tool, output ONLY a JSON array on its own with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
+**Critical rules:**
+- To call a tool, output ONLY a JSON array on its own line. Nothing else.
 - Do NOT wrap tool calls in markdown code blocks (\`\`\`). Output raw JSON only.
 - Do NOT write any text before or after the JSON array. Either output a tool call OR text, never both.
-- CRITICAL: Use tool names EXACTLY as listed above. Do NOT invent tool names or add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
+- Use tool names EXACTLY as listed above. Do NOT invent tool names or add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
 - Tool results will be provided inside «tool_output»...«/tool_output» tags. Wait for these before proceeding.
 - NEVER generate fake tool results yourself. NEVER write «tool_output» tags. Only the system writes those.
 - NEVER pretend a tool was called or fabricate output. If you need information, call the tool.
 - When chaining multiple operations, call ONE tool at a time and wait for its result before calling the next.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'mistral':
             return `### Mistral-specific guidance
 - You support function calling natively. Use the tool call mechanism directly.
+- CRITICAL: After each tool result, immediately continue to the next tool call. Do NOT stop to explain.
 - For multi-step tasks, continue making tool calls until all steps are complete.
+- Do NOT narrate your plan. Do NOT describe what you're about to do. Just call the tool.
 - Keep your final text response concise and focused on the result.`;
 
         case 'command-r':
             return `### Command-R specific guidance
 - Use the provided tool definitions for function calling.
 - When multiple tool calls are needed, execute them sequentially, processing each result before proceeding.
+- Do NOT stop after one tool call if the task requires more investigation.
 - Respond with a clear, direct answer after all tool operations complete.`;
 
         case 'hermes':
             return `### Hermes-specific guidance
-- Use the tool calling format as provided. Do not wrap tool calls in XML or custom tags.
-- Complete all steps of a multi-step task before providing your final response.`;
+- Use the tool calling format as provided. Do NOT wrap tool calls in XML or custom tags.
+- Do NOT output <tool_call> or similar XML tags — use the native function calling format.
+- Complete all steps of a multi-step task before providing your final response.
+- Common mistake: embedding tool calls in XML tags. The system handles tool routing — just output the call.`;
 
         case 'nemotron':
             return `### Nemotron-specific guidance
 - Use the native tool calling format. Process results and continue with follow-up calls as needed.
-- Provide concise final responses after tool operations complete.`;
+- CRITICAL: Do NOT stop after one tool call. If the task needs more steps, keep going.
+- Do NOT narrate between tool calls. Just call the next tool.
+- Provide concise final responses after tool operations complete.
+${textBasedMultiStep}`;
 
         case 'phi':
             return `### Phi-specific guidance
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
 - Use the exact tool names from the available tools list. Do not invent tool names.
 - After receiving a tool result, evaluate the result and continue with the next tool call if needed.
 - Do not narrate your actions. Either call a tool OR provide your final text answer.
@@ -267,8 +389,8 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
 
         case 'gemma':
             return `### Gemma-specific guidance
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
 - Use the exact tool names from the available tools list. Do not invent tool names.
 - After receiving a tool result, evaluate the result and continue with the next tool call if needed.
 - Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
@@ -276,62 +398,87 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
 
         case 'deepseek':
             return `### DeepSeek-specific guidance
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+${textBasedExample(hasSearchFiles ? 'search_files' : exampleTool)}
+
 - Use the exact tool names from the available tools list. Do not invent tool names.
 - After receiving a tool result, evaluate the result and continue with the next tool call if needed.
 - Call one tool at a time and wait for its result before calling the next.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Do NOT narrate or explain between tool calls. Just call the next tool directly.
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'minimax':
             return `### MiniMax-specific guidance
-- You are MiniMax M2.5, a large cloud-hosted model. Use the native tool calling format.
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+You are MiniMax M2.5, a large cloud-hosted model with strong reasoning capabilities.
+
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
+**Critical rules:**
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks, no narration.
 - Use the exact tool names from the available tools list. Do not invent tool names.
-- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- After receiving a tool result, evaluate it and immediately call the next tool if more steps are needed.
 - Call one tool at a time and wait for its result before calling the next.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Do NOT use shell commands like \`find\` or \`grep\` via run_command when list_files or search_files are available. Use the dedicated tools instead.
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'glm':
             return `### GLM-specific guidance
-- You are GLM-5, a large cloud-hosted model from Zhipu AI. Use the native tool calling format.
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+You are GLM-5, a large cloud-hosted model from Zhipu AI.
+
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
+**Critical rules:**
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks, no narration.
 - Use the exact tool names from the available tools list. Do not invent tool names.
-- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- After receiving a tool result, evaluate it and immediately call the next tool if needed.
 - Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'kimi':
             return `### Kimi-specific guidance
-- You are Kimi K2.5, a large cloud-hosted model from Moonshot AI. Use the native tool calling format.
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
-- Use the exact tool names from the available tools list. Do not invent tool names.
-- CRITICAL: After receiving a tool result, you MUST continue working. Evaluate the result and immediately make the next tool call.
+You are Kimi K2.5, a large cloud-hosted model from Moonshot AI with strong reasoning.
+
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
+**Critical rules:**
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks, no narration.
+- Use the exact tool names from the available tools list. Do NOT invent tool names or use wrong names.
+- CRITICAL: After receiving a tool result, you MUST continue working. Evaluate the result and immediately output the next tool call. Do NOT stop to explain what you found.
 - Call one tool at a time and wait for its result before calling the next.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Do NOT output XML tags like <tool_call> or <function_call>. Just output raw JSON.
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'devstral':
             return `### Devstral-specific guidance
-- You are Devstral, a coding-focused cloud model from Mistral AI. Use the native tool calling format.
+You are Devstral, a coding-focused cloud model from Mistral AI optimized for software engineering.
+
+${textBasedExample(hasReadFile ? 'read_file' : exampleTool)}
+
+**Critical rules:**
 - You have strong coding capabilities. Use them for file operations and code analysis.
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks.
 - Use the exact tool names from the available tools list. Do not invent tool names.
-- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- After receiving a tool result, evaluate it and continue with the next tool call if needed.
+- Leverage your code understanding — when reading files, identify patterns and issues.
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'gemini':
             return `### Gemini-specific guidance
-- You are a Gemini model from Google. Use the native tool calling format.
-- To call a tool, output a JSON array with this exact format:
-[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+You are a Gemini model from Google with strong multimodal and reasoning capabilities.
+
+${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
+
+**Critical rules:**
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks.
 - Use the exact tool names from the available tools list. Do not invent tool names.
-- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- After receiving a tool result, evaluate it and continue with the next tool call if needed.
 - Call one tool at a time and wait for its result before calling the next.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
         case 'unknown':
         default:

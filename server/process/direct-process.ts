@@ -15,7 +15,7 @@ import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getCodebaseContextPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { escalateTier, inferModelTier } from '../work/chain-continuation';
@@ -1328,9 +1328,10 @@ export function buildSystemPrompt(
             parts.push('', getResponseRoutingPrompt());
         }
 
-        // Add coding tool guidelines if coding tools are present
+        // Add coding tool guidelines and codebase context if coding tools are present
         if (toolNames.includes('read_file')) {
             parts.push('', getCodingToolPrompt());
+            parts.push('', getCodebaseContextPrompt());
         }
 
         // Always add messaging safety instructions when tools are available.
