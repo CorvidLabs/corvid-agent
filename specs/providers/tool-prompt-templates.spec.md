@@ -31,6 +31,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 | `getResponseRoutingPrompt` | `()` | `string` | When to use corvid_send_message vs text |
 | `getCodingToolPrompt` | `()` | `string` | File operation guidelines |
 | `getMessagingSafetyPrompt` | `()` | `string` | Prevent script-based message sending |
+| `getCodebaseContextPrompt` | `()` | `string` | Basic orientation about CorvidAgent project structure for agents |
 | `getWorktreeIsolationPrompt` | `()` | `string` | Git branch isolation rules for worktree sessions |
 
 ## Invariants
@@ -45,6 +46,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 8. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
 9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
 10. **Worktree isolation always appended**: `getWorktreeIsolationPrompt()` is unconditionally appended to both SDK and direct process system prompts, instructing the agent to stay on its own branch and not interact with other sessions' branches
+11. **Codebase context appended for Ollama agents**: `getCodebaseContextPrompt()` is appended in `direct-process.ts` to give Ollama-backed agents basic orientation about project structure, runtime, and common commands
 
 ## Behavioral Examples
 
@@ -84,7 +86,7 @@ None (standalone module).
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
+| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
 | `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt` |
 
 ## Change Log
