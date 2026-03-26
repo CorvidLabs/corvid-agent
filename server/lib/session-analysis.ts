@@ -42,6 +42,87 @@ const SUBSTANTIVE_PATTERNS: RegExp[] = [
 /** Responses longer than this character count are considered substantive. */
 const MAX_CHEERLEADING_LENGTH = 200;
 
+// ── Repetition detection ──────────────────────────────────────────────────
+
+/**
+ * Normalize text for comparison: lowercase, collapse whitespace, strip punctuation.
+ */
+function normalizeForComparison(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Extract character trigrams from normalized text.
+ */
+function extractTrigrams(text: string): Set<string> {
+    const trigrams = new Set<string>();
+    for (let i = 0; i <= text.length - 3; i++) {
+        trigrams.add(text.slice(i, i + 3));
+    }
+    return trigrams;
+}
+
+/**
+ * Compute Jaccard similarity between two trigram sets (0.0 – 1.0).
+ */
+function trigramSimilarity(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 && b.size === 0) return 1.0;
+    if (a.size === 0 || b.size === 0) return 0.0;
+    let intersection = 0;
+    for (const t of a) {
+        if (b.has(t)) intersection++;
+    }
+    return intersection / (a.size + b.size - intersection);
+}
+
+/**
+ * Minimum similarity threshold to consider two responses "repetitive".
+ * Empirically: Ollama loops typically produce >0.65 similarity; genuine
+ * progress (even incremental) stays below 0.55.
+ */
+export const REPETITION_SIMILARITY_THRESHOLD = 0.6;
+
+/**
+ * Number of recent responses to compare against for repetition detection.
+ */
+export const REPETITION_WINDOW = 3;
+
+/**
+ * Returns true if `currentText` is too similar to any of the `recentTexts`.
+ *
+ * Uses character-trigram Jaccard similarity which is lightweight and
+ * tolerant of minor rephrasings (which is exactly the failure mode we
+ * want to catch with Ollama loops).
+ *
+ * @param currentText  The latest model response text.
+ * @param recentTexts  The N most recent prior response texts (newest first).
+ * @param threshold    Similarity threshold (default REPETITION_SIMILARITY_THRESHOLD).
+ */
+export function isRepetitiveResponse(
+    currentText: string,
+    recentTexts: string[],
+    threshold = REPETITION_SIMILARITY_THRESHOLD,
+): boolean {
+    const currentNorm = normalizeForComparison(currentText);
+    if (currentNorm.length < 20) return false; // Too short to meaningfully compare
+
+    const currentTrigrams = extractTrigrams(currentNorm);
+
+    for (const prev of recentTexts) {
+        const prevNorm = normalizeForComparison(prev);
+        if (prevNorm.length < 20) continue;
+        const prevTrigrams = extractTrigrams(prevNorm);
+        if (trigramSimilarity(currentTrigrams, prevTrigrams) >= threshold) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // ── Core detection ───────────────────────────────────────────────────────
 
 /**

@@ -246,7 +246,8 @@ describe('OllamaStallEscalator — escalation trigger', () => {
         for (let i = 0; i < 3; i++) { ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent()); }
         await Promise.resolve();
         expect(e.isEscalated(sid)).toBe(true);
-        expect(notifier.notify).toHaveBeenCalledTimes(1);
+        // 2 notifications: 1 pre-escalation warning at threshold-1 + 1 escalation at threshold
+        expect(notifier.notify).toHaveBeenCalledTimes(2);
     });
 
     test('creates work task with escalated_from_session_id in requesterInfo', async () => {
@@ -321,6 +322,80 @@ describe('OllamaStallEscalator — config flags', () => {
 
     test('exports boolean OLLAMA_STALL_ESCALATION_ENABLED constant', () => {
         expect(typeof OLLAMA_STALL_ESCALATION_ENABLED).toBe('boolean');
+    });
+});
+
+// ── Graduated escalation (pre-escalation warning) ─────────────────────────
+
+describe('OllamaStallEscalator — graduated escalation', () => {
+    let ms: ReturnType<typeof createMockEventSource>;
+    let notifier: ReturnType<typeof createMockNotifier>;
+
+    beforeEach(() => {
+        ms = createMockEventSource();
+        notifier = createMockNotifier();
+        mockGetAgent.mockImplementation((_db, id) => ollamaAgentStub(id as string));
+        mockCreateWorkTask.mockClear();
+    });
+
+    test('emits warning notification at threshold-1 before escalation', async () => {
+        new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 3 });
+        const sid = 'sid-grad1';
+        // Turn 1 — stall, no warning yet
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        await Promise.resolve();
+        expect(notifier.notify).not.toHaveBeenCalled();
+        // Turn 2 — stall, threshold-1 reached → warning
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        await Promise.resolve();
+        expect(notifier.notify).toHaveBeenCalledTimes(1);
+        const call = notifier.notify.mock.calls[0][0] as { level: string; title?: string };
+        expect(call.level).toBe('info');
+        expect(call.title).toMatch(/warning/i);
+        // Turn 3 — stall, threshold reached → escalation
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        await Promise.resolve();
+        expect(notifier.notify).toHaveBeenCalledTimes(2);
+        const escCall = notifier.notify.mock.calls[1][0] as { level: string; title?: string };
+        expect(escCall.level).toBe('warning');
+    });
+
+    test('does not warn when threshold is 1 (no room for warning)', async () => {
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 1 });
+        const sid = 'sid-grad2';
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        await Promise.resolve();
+        // Should go straight to escalation (warning level), no info-level warning
+        expect(e.isEscalated(sid)).toBe(true);
+        expect(notifier.notify).toHaveBeenCalledTimes(1);
+        const call = notifier.notify.mock.calls[0][0] as { level: string };
+        expect(call.level).toBe('warning');
+    });
+
+    test('isWarned returns true after pre-escalation warning', async () => {
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 3 });
+        const sid = 'sid-grad3';
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        expect(e.isWarned(sid)).toBe(false);
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        expect(e.isWarned(sid)).toBe(true);
+    });
+
+    test('warning is only sent once even with multiple stalls at threshold-1', async () => {
+        // This can't happen naturally (threshold-1 → threshold immediately),
+        // but verify the flag prevents duplicates
+        const e = new OllamaStallEscalator({ eventSource: ms.source, db: dummyDb, notificationService: notifier as never, ...diOverrides, threshold: 4 });
+        const sid = 'sid-grad4';
+        // 3 stalls to reach threshold-1
+        for (let i = 0; i < 3; i++) { ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent()); }
+        await Promise.resolve();
+        expect(e.isWarned(sid)).toBe(true);
+        expect(notifier.notify).toHaveBeenCalledTimes(1);
+        // Turn 4 triggers escalation
+        ms.emit(sid, cheerleadingEvent()); ms.emit(sid, resultEvent());
+        await Promise.resolve();
+        // 1 warning + 1 escalation = 2 notifications
+        expect(notifier.notify).toHaveBeenCalledTimes(2);
     });
 });
 

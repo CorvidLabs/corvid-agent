@@ -27,8 +27,10 @@ import {
     countVacuousToolCalls,
     ResponseQualityTracker,
     RepetitiveToolCallDetector,
+    RepetitionTracker,
     buildQualityNudge,
     buildLoopNudge,
+    buildRepetitionNudge,
     type ResponseQualityMetrics,
     type ToolCallQualityInput,
 } from '../lib/response-quality';
@@ -280,6 +282,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let stallType: string | null = null;
         const qualityTracker = new ResponseQualityTracker();
         const loopDetector = new RepetitiveToolCallDetector();
+        const repetitionTracker = new RepetitionTracker();
         const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
         const MAX_LOOP_NUDGES = 2;
         /* c8 ignore next -- integration-level process loop */
@@ -665,7 +668,31 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             const textQuality = scoreResponseQuality(responseText, false);
             const needsTextQualityNudge = qualityTracker.recordResponse(textQuality);
 
+            // Repetition detection: check if this response rephrases recent ones
+            const repetitionAction = repetitionTracker.recordResponse(responseText);
+
             messages.push({ role: 'assistant', content: responseText });
+
+            // Repetition loop — higher priority than quality nudge because
+            // repetitive loops are a harder failure mode to escape
+            if (repetitionAction === 'break') {
+                log.warn('Repetitive response loop detected — breaking', {
+                    ...repetitionTracker.getMetrics(),
+                    sessionId: session.id,
+                });
+                needsSummary = true;
+                terminationReason = 'stall_repetitive';
+                stallType = 'repetitive';
+                break;
+            }
+            if (repetitionAction === 'nudge' && iteration < MAX_TOOL_ITERATIONS - 1) {
+                log.info('Repetitive response detected — injecting repetition nudge', {
+                    ...repetitionTracker.getMetrics(),
+                    sessionId: session.id,
+                });
+                messages.push({ role: 'user', content: buildRepetitionNudge() });
+                continue;
+            }
 
             // Cheerleading detection: if consecutive low-quality text responses,
             // inject a corrective nudge before the standard nudge system
@@ -1113,7 +1140,8 @@ export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMe
     const stallDetected = state.terminationReason === 'stall_repeat'
         || state.terminationReason === 'stall_same_tool'
         || state.terminationReason === 'stall_repetitive_loop'
-        || state.terminationReason === 'stall_quality_exhausted';
+        || state.terminationReason === 'stall_quality_exhausted'
+        || state.terminationReason === 'stall_repetitive';
     return {
         model: state.model,
         tier: state.tier,
@@ -1164,6 +1192,7 @@ export function buildEscalationInfo(input: BuildEscalationInput): EscalationInfo
         'stall_same_tool',
         'stall_repetitive_loop',
         'stall_quality_exhausted',
+        'stall_repetitive',
         'max_iterations',
     ]);
 
@@ -1204,6 +1233,8 @@ function buildRemainingWorkDescription(reason: EscalationInfo['reason']): string
             return 'Model repeatedly called the same tool with identical arguments and exhausted recovery nudges.';
         case 'stall_quality_exhausted':
             return 'Model continued producing low-quality output after all corrective quality nudges were exhausted.';
+        case 'stall_repetitive':
+            return 'Model produced repetitive text responses — rephrasing the same content without making forward progress.';
         case 'max_iterations':
             return 'Model reached the maximum iteration limit before completing the task.';
         case 'low_quality':

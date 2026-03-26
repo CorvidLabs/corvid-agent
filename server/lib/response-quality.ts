@@ -391,6 +391,70 @@ export interface ResponseQualityMetrics {
     nudgesExhausted: boolean;
 }
 
+// ── Repetition tracking ───────────────────────────────────────────────────
+
+import { isRepetitiveResponse, REPETITION_WINDOW } from './session-analysis';
+
+/** Number of consecutive repetitive responses before breaking the loop. */
+export const REPETITION_BREAK_THRESHOLD = 3;
+
+/**
+ * Tracks recent response texts and detects repetitive output loops.
+ * Designed for Ollama sessions where the model rephrases the same content
+ * each turn without making forward progress.
+ */
+export class RepetitionTracker {
+    private readonly recentTexts: string[] = [];
+    private consecutiveRepetitions = 0;
+    private totalRepetitions = 0;
+    private readonly window: number;
+    private readonly breakThreshold: number;
+
+    constructor(window = REPETITION_WINDOW, breakThreshold = REPETITION_BREAK_THRESHOLD) {
+        this.window = window;
+        this.breakThreshold = breakThreshold;
+    }
+
+    /**
+     * Record a response and check for repetition.
+     * @param text The model's response text.
+     * @returns `'nudge'` if a repetition nudge should be injected,
+     *          `'break'` if the loop should be terminated,
+     *          `null` if the response is not repetitive.
+     */
+    recordResponse(text: string): 'nudge' | 'break' | null {
+        const trimmed = (text || '').trim();
+
+        if (trimmed.length > 0 && isRepetitiveResponse(trimmed, this.recentTexts)) {
+            this.consecutiveRepetitions++;
+            this.totalRepetitions++;
+
+            // Add to history after comparison
+            this.recentTexts.unshift(trimmed);
+            if (this.recentTexts.length > this.window) this.recentTexts.pop();
+
+            if (this.consecutiveRepetitions >= this.breakThreshold) {
+                return 'break';
+            }
+            return 'nudge';
+        }
+
+        // Not repetitive — reset consecutive counter, add to history
+        this.consecutiveRepetitions = 0;
+        this.recentTexts.unshift(trimmed);
+        if (this.recentTexts.length > this.window) this.recentTexts.pop();
+        return null;
+    }
+
+    /** Get metrics for session telemetry. */
+    getMetrics(): { consecutiveRepetitions: number; totalRepetitions: number } {
+        return {
+            consecutiveRepetitions: this.consecutiveRepetitions,
+            totalRepetitions: this.totalRepetitions,
+        };
+    }
+}
+
 // ── Nudge message ────────────────────────────────────────────────────────
 
 /**
@@ -401,4 +465,16 @@ export function buildQualityNudge(): string {
         + 'Read the original task and execute the next concrete step. '
         + 'Do NOT restate the task. Do NOT write encouragement. '
         + 'Call a tool or write specific code/analysis now.';
+}
+
+/**
+ * Build a stronger corrective nudge for repetitive responses.
+ * Used when the model keeps rephrasing the same content across turns.
+ */
+export function buildRepetitionNudge(): string {
+    return 'CRITICAL: You are repeating yourself. Your last several responses say the same thing in different words. '
+        + 'This is NOT progress. STOP rephrasing and take a DIFFERENT action: '
+        + '1. If you are stuck, call a tool to gather new information. '
+        + '2. If you lack a tool, say exactly what you cannot do and why. '
+        + '3. Do NOT restate your previous response in any form.';
 }

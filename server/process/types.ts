@@ -75,7 +75,7 @@ export interface DirectProcessMetrics {
     explorationDriftCount: number;
     stallDetected: boolean;
     stallType: string | null;
-    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'max_iterations' | 'abort' | 'error';
+    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'stall_repetitive' | 'max_iterations' | 'abort' | 'error';
     durationMs: number;
     needsSummary: boolean;
     /** Response quality metrics (cheerleading detection). */
@@ -89,7 +89,7 @@ export interface EscalationInfo {
     /** Whether this session is eligible for escalation. */
     canEscalate: boolean;
     /** Why escalation was suggested. */
-    reason: 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'max_iterations' | 'low_quality';
+    reason: 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'stall_repetitive' | 'max_iterations' | 'low_quality';
     /** The original prompt that started this session. */
     originalPrompt: string;
     /** Summary of tools called and their results (redacted of secrets). */

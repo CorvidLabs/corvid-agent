@@ -23,6 +23,7 @@ Heuristic detection of "cheerleading" responses — agent turns that acknowledge
 |----------|-----------|---------|-------------|
 | `isCheerleadingResponse` | `events: ClaudeStreamEvent[]` | `boolean` | Returns `true` if the turn contains no tool calls, is short, lacks substantive markers, and matches forward-commitment or enthusiasm patterns. |
 | `isStallTurn` | `events: ClaudeStreamEvent[]` | `boolean` | Returns `true` if the turn is cheerleading or has no tool calls and text shorter than `MIN_SUBSTANTIVE_LENGTH`. Used by OllamaStallEscalator. |
+| `isRepetitiveResponse` | `currentText: string, recentTexts: string[], threshold?: number` | `boolean` | Returns `true` if `currentText` is too similar (by character-trigram Jaccard similarity) to any of the `recentTexts`. Threshold defaults to `REPETITION_SIMILARITY_THRESHOLD`. |
 
 ### Exported Constants
 
@@ -30,6 +31,8 @@ Heuristic detection of "cheerleading" responses — agent turns that acknowledge
 |----------|------|-------------|
 | `CHEERLEADING_WARNING_THRESHOLD` | `number` | Number of consecutive cheerleading turns (2) that should trigger an owner warning. |
 | `MIN_SUBSTANTIVE_LENGTH` | `number` | Minimum response length (in characters, default 100) below which a no-tool-call turn is considered a stall. |
+| `REPETITION_SIMILARITY_THRESHOLD` | `number` | Minimum trigram Jaccard similarity (default 0.6) to consider two responses "repetitive". |
+| `REPETITION_WINDOW` | `number` | Number of recent responses (default 3) to compare against for repetition detection. |
 
 ## Invariants
 
@@ -71,6 +74,7 @@ Heuristic detection of "cheerleading" responses — agent turns that acknowledge
 | Module | What is used |
 |--------|-------------|
 | `process/session-cheerleading-detector` | `isCheerleadingResponse`, `CHEERLEADING_WARNING_THRESHOLD` |
+| `lib/response-quality` | `isRepetitiveResponse`, `REPETITION_WINDOW` |
 
 ## Change Log
 

@@ -5,7 +5,8 @@ status: draft
 files:
   - server/lib/response-quality.ts
 db_tables: []
-depends_on: []
+depends_on:
+  - specs/lib/session-analysis.spec.md
 ---
 
 # Response Quality
@@ -24,6 +25,7 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 | `countVacuousToolCalls` | `toolCalls: ToolCallQualityInput[]` | `number` | Counts semantically empty tool calls (e.g. trivial save_memory, status-only workflow updates). |
 | `buildQualityNudge` | _(none)_ | `string` | Returns a corrective nudge message to inject when consecutive low-quality responses are detected. |
 | `buildLoopNudge` | `toolName: string` | `string` | Returns a corrective nudge message for repetitive tool call loops, naming the repeated tool. |
+| `buildRepetitionNudge` | _(none)_ | `string` | Returns a stronger corrective nudge for repetitive responses where the model keeps rephrasing the same content across turns. |
 
 ### Exported Classes
 
@@ -31,6 +33,13 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 |-------|-------------|
 | `ResponseQualityTracker` | Stateful tracker for consecutive low-quality responses within a session. Records scores, vacuous tool calls, nudge counts, and nudge-exhaustion state. |
 | `RepetitiveToolCallDetector` | Detects when a model repeatedly calls the same tool with identical arguments N times, indicating a stuck loop. Tracks a sliding window of fingerprinted calls. |
+| `RepetitionTracker` | Tracks recent response texts and detects repetitive output loops. Returns `'nudge'`, `'break'`, or `null` based on consecutive repetition count vs. break threshold. Designed for Ollama sessions where the model rephrases the same content each turn. |
+
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `REPETITION_BREAK_THRESHOLD` | `number` | Number of consecutive repetitive responses (default 3) before the RepetitionTracker signals `'break'` to terminate the loop. |
 
 ### Exported Types
 
@@ -87,7 +96,11 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 
 ## Dependencies
 
-None. This module is self-contained with no external dependencies.
+### Consumes
+
+| Module | What is used |
+|--------|-------------|
+| `lib/session-analysis` | `isRepetitiveResponse`, `REPETITION_WINDOW` |
 
 ## Change Log
 
