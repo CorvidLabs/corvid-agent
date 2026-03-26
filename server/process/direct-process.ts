@@ -15,7 +15,8 @@ import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getCodebaseContextPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { getToolInstructionPrompt, getCompactToolInstructionPrompt, getResponseRoutingPrompt, getCompactResponseRoutingPrompt, getCodingToolPrompt, getCompactCodingToolPrompt, getCodebaseContextPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { OllamaProvider } from '../providers/ollama/provider';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { escalateTier, inferModelTier } from '../work/chain-continuation';
@@ -1317,28 +1318,46 @@ export function buildSystemPrompt(
     if (personaPrompt) parts.push('', personaPrompt);
     if (skillPrompt) parts.push('', `## Skill Instructions\n${skillPrompt}`);
 
-    // Append tool-specific instructions when tools are available
+    // Append tool-specific instructions when tools are available.
+    // Cloud-proxied models get compact prompts to stay within tight server-side
+    // timeouts (~90s) — fewer tokens = faster processing.
     const toolNames = toolDefs.map((t) => t.name);
+    const isCloud = OllamaProvider.isCloudModel(model);
     if (hasTools && toolDefs.length > 0) {
         const family = detectModelFamily(model);
-        parts.push('', getToolInstructionPrompt(family, toolNames, toolDefs));
 
-        // Add response routing instructions if messaging tools are present
-        if (toolNames.includes('corvid_send_message')) {
-            parts.push('', getResponseRoutingPrompt());
+        if (isCloud) {
+            // Compact mode for cloud models — essential rules only
+            parts.push('', getCompactToolInstructionPrompt(family, toolNames, toolDefs));
+
+            if (toolNames.includes('corvid_send_message')) {
+                parts.push('', getCompactResponseRoutingPrompt());
+            }
+
+            if (toolNames.includes('read_file')) {
+                parts.push('', getCompactCodingToolPrompt());
+                // Skip getCodebaseContextPrompt() — it's orientation text that
+                // cloud models can infer from file reads.
+            }
+            // Messaging safety is folded into getCompactToolInstructionPrompt rule #5.
+        } else {
+            parts.push('', getToolInstructionPrompt(family, toolNames, toolDefs));
+
+            if (toolNames.includes('corvid_send_message')) {
+                parts.push('', getResponseRoutingPrompt());
+            }
+
+            if (toolNames.includes('read_file')) {
+                parts.push('', getCodingToolPrompt());
+                parts.push('', getCodebaseContextPrompt());
+            }
+
+            // Always add messaging safety instructions when tools are available.
+            // Unlike response routing (gated on corvid_send_message) or coding guidance
+            // (gated on read_file), this is unconditional — any agent with tools must not
+            // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
+            parts.push('', getMessagingSafetyPrompt());
         }
-
-        // Add coding tool guidelines and codebase context if coding tools are present
-        if (toolNames.includes('read_file')) {
-            parts.push('', getCodingToolPrompt());
-            parts.push('', getCodebaseContextPrompt());
-        }
-
-        // Always add messaging safety instructions when tools are available.
-        // Unlike response routing (gated on corvid_send_message) or coding guidance
-        // (gated on read_file), this is unconditional — any agent with tools must not
-        // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
-        parts.push('', getMessagingSafetyPrompt());
     }
 
     // Add focus/scoping instructions for non-high-tier agents
