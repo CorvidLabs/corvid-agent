@@ -44,6 +44,7 @@ import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
 import { seedConversationalAgents } from '../conversational/seed';
 import { seedDefaultBuddyPairings } from '../buddy/seed';
+import { seedAlphaOpsAgents } from '../alpha-ops/seed';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -376,6 +377,17 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
         seedDefaultBuddyPairings({ db: deps.db });
     }).catch((err) => {
         log.warn('Conversational agent seeding failed (non-blocking)', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+    });
+
+    // Seed Alpha Ops agents (Rook, Jackdaw, Pica, Condor, Kite) — fire-and-forget, non-blocking
+    seedAlphaOpsAgents({
+        db: deps.db,
+        walletService: algochatState.walletService,
+        flockDirectoryService: deps.flockDirectoryService,
+    }).catch((err) => {
+        log.warn('Alpha Ops agent seeding failed (non-blocking)', {
             error: err instanceof Error ? err.message : String(err),
         });
     });
