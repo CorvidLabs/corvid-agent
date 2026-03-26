@@ -145,6 +145,7 @@ export function updateSchedule(db: Database, id: string, input: UpdateScheduleIn
     const fields: string[] = [];
     const values: (string | number | null)[] = [];
 
+    if (input.agentId !== undefined) { fields.push('agent_id = ?'); values.push(input.agentId); }
     if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
     if (input.description !== undefined) { fields.push('description = ?'); values.push(input.description); }
     if (input.cronExpression !== undefined) { fields.push('cron_expression = ?'); values.push(input.cronExpression); }

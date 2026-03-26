@@ -233,9 +233,9 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'corvid_manage_schedule',
             'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
             'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom. ' +
-            'Use action="list" to view schedules, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
+            'Use action="list" to view schedules, "get" to see full details of one, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
-                action: z.enum(['list', 'create', 'update', 'pause', 'resume', 'history']).describe('What to do'),
+                action: z.enum(['list', 'create', 'update', 'get', 'pause', 'resume', 'history']).describe('What to do'),
                 name: z.string().optional().describe('Schedule name (for create/update)'),
                 description: z.string().optional().describe('Schedule description (for create/update)'),
                 cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create/update)'),
@@ -251,7 +251,8 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 })).optional().describe('Actions to perform (for create/update)'),
                 approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
                 max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),
-                schedule_id: z.string().optional().describe('Schedule ID (for update/pause/resume/history)'),
+                agent_id: z.string().optional().describe('Agent ID to assign this schedule to (for create/update). Defaults to the calling agent.'),
+                schedule_id: z.string().optional().describe('Schedule ID (for get/update/pause/resume/history)'),
                 output_destinations: z.array(z.object({
                     type: z.string().describe('Destination type: discord_channel, algochat_agent, or algochat_address'),
                     target: z.string().describe('Target: Discord channel ID, agent ID, or Algorand address'),
