@@ -235,13 +235,13 @@ export class OllamaProvider extends BaseLlmProvider {
      * extractToolCallsFromContent().
      *
      * - qwen3: 10x+ slower when `tools` is in the API request
-     * - kimi, minimax, gemini, glm, devstral: Cloud-proxied models where
+     * - kimi, minimax, gemini, glm, devstral, nemotron: Cloud-proxied models where
      *   the Ollama proxy doesn't reliably translate native tool_calls back.
      *   These models output tool call JSON in text when instructed via
      *   system prompt, which the text-based extractor handles well.
      */
     private static readonly TEXT_BASED_TOOL_FAMILIES = new Set([
-        'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral',
+        'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron',
     ]);
 
     /**
