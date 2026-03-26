@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.54.0] - 2026-03-26
+
+### Added
+- **Schedules: get action + agent_id** — schedule API now supports `get` action and `agent_id` parameter for create/update (#1519)
+- **Cursor: routing parity** — fallback chains, diagnostics, and full test coverage for Cursor routing (#1503)
+- **Ollama: loop detection** — hardened loop detection and escalation for more reliable model interactions (#1506)
+- **Ollama: cloud tool calling** — text-based tool calling for cloud models with streaming tool_call accumulation (#1508)
+- **Ollama: codebase context** — codebase context prompt and worked examples for all model families (#1518)
+
+### Security
+- **YAML CVE** — address GHSA-48c2-rrv3-qjmp yaml stack overflow vulnerability (#1515)
+- **SQL injection** — replace string interpolation with parameterized queries in test files (#1509)
+
+### Fixed
+- **Health collector** — exclude test files and self from health-collector counts (#1517)
+- **Discord** — gateway/message reliability and quality-stall escalation (#1502)
+- **Providers** — enforce provider isolation in fallback chains (#1505)
+- **Buddy + Cursor** — Ollama tool mapping, blank message filtering, embed fixes (#1501)
+
+### Docs & Tests
+- **API reference** — add missing Cursor, Buddy, and conversation-mode endpoints (#1516)
+- **Tests** — mixed-provider smoke tests for Ollama + Cursor (#1507), cursor route endpoint coverage (#1504)
+
 ## [0.53.1] - 2026-03-25
 
 ### Fixed
