@@ -39,6 +39,7 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `SessionResilienceCallbacks` | Callback interface for resilience manager: resumeProcess, stopProcess, isRunning, clearTimers, cancelApprovals (from session-resilience-manager.ts) |
 | `SessionTimerCallbacks` | Callback interface for timer manager: onTimeout, onStablePeriod, isRunning, getLastActivityAt (from session-timer-manager.ts) |
 | `SessionTimerConfig` | Timer configuration: agentTimeoutMs, stablePeriodMs, timeoutCheckIntervalMs (from session-timer-manager.ts) |
+| `RoutingDecision` | Result of a provider routing decision: provider, reason, fallback flag, effectiveModel |
 
 ### Exported Classes
 
@@ -48,6 +49,12 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `McpServiceContainer` | Manages MCP service registration and tool context building (from mcp-service-container.ts) |
 | `SessionResilienceManager` | Handles session recovery: API outage pause/resume, crash restart with exponential backoff, orphan pruning (from session-resilience-manager.ts) |
 | `SessionTimerManager` | Manages timer-based session concerns: stable-period timers, per-session inactivity timeouts, fallback timeout checker (from session-timer-manager.ts) |
+
+### Exported Functions (from manager.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolveProviderRouting` | `(opts: { providerType, agentModel, hasCursorBinary, hasClaudeAccess, hasOllamaProvider, ollamaDefaultModel? })` | `RoutingDecision` | Pure function to determine provider routing decision based on agent config and system state |
 
 ### Exported Functions (from session-config-resolver.ts)
 
@@ -147,7 +154,7 @@ Side effects on construction:
 2. **Stale session cleanup on startup**: All sessions with status `running` are reset to `idle` with `pid = NULL` on construction
 3. **Persona/skill prompt injection**: If an agent has a persona, `composePersonaPrompt` is called and injected. Skill bundle prompts from both agent-level and project-level are merged
 4. **Tool permission resolution chain**: Agent base permissions -> merge agent skill bundle tools -> merge project skill bundle tools (only if agent has no explicit `mcpToolPermissions`)
-5. **Provider routing**: If agent has an explicit provider, use it. If no provider and no Claude access, auto-fallback to Ollama. SDK process for Claude; direct process for Ollama/other providers
+5. **Provider routing**: Resolved by `resolveProviderRouting()`. If agent has cursor provider but binary is missing, fallback to SDK (clearing Cursor-only models). If no provider and no Claude access, auto-fallback to Ollama. SDK process for Claude; direct process for Ollama/other providers
 6. **Context reset**: After `MAX_TURNS_BEFORE_CONTEXT_RESET` (8) user messages, the process is killed and restarted through the resume path with capped message history (last 20 messages)
 7. **Resume prompt construction**: Builds a `<conversation_history>` block from the last 20 messages (each truncated to 2000 chars), then appends the new prompt
 8. **Auto-restart for AlgoChat**: Non-zero exits from AlgoChat sessions trigger auto-restart with exponential backoff (5s * 3^n, max 3 restarts). Restart counter resets after 10 minutes of stability

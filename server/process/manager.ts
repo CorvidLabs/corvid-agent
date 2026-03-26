@@ -47,6 +47,67 @@ const log = createLogger('ProcessManager');
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
+/** Result of a provider routing decision — exported for testing. */
+export interface RoutingDecision {
+    /** Which provider to use (sdk, cursor, ollama). */
+    provider: string;
+    /** Why this provider was selected. */
+    reason: 'default' | 'agent_config' | 'no_claude_access' | 'cursor_binary_missing';
+    /** Whether this was a fallback from the original intent. */
+    fallback: boolean;
+    /** Model to use (may be cleared if original model is incompatible with the fallback provider). */
+    effectiveModel: string;
+}
+
+/**
+ * Determine the provider routing decision based on agent config and system state.
+ * Pure function — no side effects, suitable for unit testing.
+ */
+export function resolveProviderRouting(opts: {
+    providerType: LlmProviderType | undefined;
+    agentModel: string;
+    hasCursorBinary: boolean;
+    hasClaudeAccess: boolean;
+    hasOllamaProvider: boolean;
+    ollamaDefaultModel?: string;
+}): RoutingDecision {
+    const { providerType, agentModel, hasCursorBinary, hasClaudeAccess: hasCloud, hasOllamaProvider, ollamaDefaultModel } = opts;
+
+    // Cursor agent configured but binary missing → degrade to SDK
+    if (providerType === 'cursor' && !hasCursorBinary) {
+        const isCursorOnlyModel = agentModel === 'auto'
+            || agentModel.startsWith('composer')
+            || agentModel.startsWith('gpt-')
+            || agentModel.startsWith('gemini-')
+            || agentModel.startsWith('grok-');
+        return {
+            provider: 'sdk',
+            reason: 'cursor_binary_missing',
+            fallback: true,
+            effectiveModel: isCursorOnlyModel ? '' : agentModel,
+        };
+    }
+
+    // No explicit provider + no cloud access → try Ollama
+    if (!providerType && !hasCloud && hasOllamaProvider) {
+        const isOllamaModel = !agentModel || agentModel.includes(':') || agentModel.startsWith('qwen') || agentModel.startsWith('llama');
+        return {
+            provider: 'ollama',
+            reason: 'no_claude_access',
+            fallback: true,
+            effectiveModel: isOllamaModel ? agentModel : (ollamaDefaultModel ?? ''),
+        };
+    }
+
+    // Normal routing
+    return {
+        provider: providerType ?? 'sdk',
+        reason: providerType ? 'agent_config' : 'default',
+        fallback: false,
+        effectiveModel: agentModel,
+    };
+}
+
 interface SessionMeta {
     startedAt: number;
     source: string;
@@ -201,16 +262,36 @@ export class ProcessManager {
         const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
         const registry = LlmProviderRegistry.getInstance();
         let provider = providerType ? registry.get(providerType) : undefined;
+        const ollamaProvider = registry.get('ollama');
 
-        // Auto-fallback: no explicit provider + no Claude access -> try Ollama
-        if (!provider && !providerType && !hasClaudeAccess()) {
-            const ollamaFallback = registry.get('ollama');
-            if (ollamaFallback) {
+        // Resolve the routing decision (pure function — testable independently)
+        const routingDecision = resolveProviderRouting({
+            providerType,
+            agentModel: effectiveAgent?.model ?? '',
+            hasCursorBinary: hasCursorCli(),
+            hasClaudeAccess: hasClaudeAccess(),
+            hasOllamaProvider: !!ollamaProvider,
+            ollamaDefaultModel: ollamaProvider?.getInfo().defaultModel,
+        });
+
+        // Apply routing decision side effects
+        if (routingDecision.fallback) {
+            if (routingDecision.reason === 'no_claude_access' && ollamaProvider) {
                 log.info(`No Claude access -- falling back to Ollama for session ${session.id}`);
-                provider = ollamaFallback;
-                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                provider = ollamaProvider;
+                if (effectiveAgent && routingDecision.effectiveModel !== effectiveAgent.model) {
                     log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model -- will use Ollama default`, { agentId: effectiveAgent.id });
-                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                    effectiveAgent = { ...effectiveAgent, model: routingDecision.effectiveModel };
+                }
+            } else if (routingDecision.reason === 'cursor_binary_missing') {
+                log.warn(`Agent configured for cursor but cursor-agent binary not found — falling back to SDK`, {
+                    sessionId: session.id,
+                    agentId: effectiveAgent?.id,
+                    agentModel: effectiveAgent?.model,
+                });
+                if (effectiveAgent && routingDecision.effectiveModel !== effectiveAgent.model) {
+                    log.info(`Clearing Cursor-specific model "${effectiveAgent.model}" for SDK fallback`);
+                    effectiveAgent = { ...effectiveAgent, model: routingDecision.effectiveModel };
                 }
             }
         }
@@ -240,7 +321,25 @@ export class ProcessManager {
         // Use a minimal default project when session has no project
         const effectiveProject = baseProject;
 
-        if (providerType === 'cursor') {
+        // Log and emit the provider routing decision for observability
+        log.info(`Provider routing decision for session ${session.id}`, {
+            provider: routingDecision.provider,
+            reason: routingDecision.reason,
+            fallback: routingDecision.fallback ?? false,
+            agentId: effectiveAgent?.id,
+            model: effectiveAgent?.model,
+            source: session.source,
+        });
+        this.eventBus.emit(session.id, {
+            type: 'system',
+            session_id: session.id,
+            subtype: 'provider_selected',
+            statusMessage: `Provider: ${routingDecision.provider}${routingDecision.fallback ? ` (fallback: ${routingDecision.reason})` : ''}`,
+        } as ClaudeStreamEvent);
+
+        // Route: use cursor only if explicitly configured AND binary is available
+        const useCursor = providerType === 'cursor' && hasCursorCli();
+        if (useCursor) {
             this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
         } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -281,7 +380,9 @@ export class ProcessManager {
         }
 
         const effectiveProviderType = effectiveAgent?.provider as LlmProviderType | undefined;
-        if (effectiveProviderType === 'cursor') {
+        // Use cursor only if explicitly configured AND binary is available (same fallback as startProcess)
+        const useCursorHere = effectiveProviderType === 'cursor' && hasCursorCli();
+        if (useCursorHere) {
             this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
         } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -715,17 +816,36 @@ export class ProcessManager {
         const registry = LlmProviderRegistry.getInstance();
         let providerInstance = providerType ? registry.get(providerType) : undefined;
 
-        if (!providerInstance && !providerType && !hasClaudeAccess()) {
-            const ollamaFallback = registry.get('ollama');
-            if (ollamaFallback) {
+        const ollamaResumeProvider = registry.get('ollama');
+        const resumeRouting = resolveProviderRouting({
+            providerType,
+            agentModel: effectiveAgent?.model ?? '',
+            hasCursorBinary: hasCursorCli(),
+            hasClaudeAccess: hasClaudeAccess(),
+            hasOllamaProvider: !!ollamaResumeProvider,
+            ollamaDefaultModel: ollamaResumeProvider?.getInfo().defaultModel,
+        });
+
+        if (resumeRouting.fallback) {
+            if (resumeRouting.reason === 'no_claude_access' && ollamaResumeProvider) {
                 log.info(`No Claude access -- falling back to Ollama for resumed session ${session.id}`);
-                providerInstance = ollamaFallback;
-                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                providerInstance = ollamaResumeProvider;
+                if (effectiveAgent && resumeRouting.effectiveModel !== effectiveAgent.model) {
                     log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model -- will use Ollama default`, { agentId: effectiveAgent.id });
-                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                    effectiveAgent = { ...effectiveAgent, model: resumeRouting.effectiveModel };
+                }
+            } else if (resumeRouting.reason === 'cursor_binary_missing') {
+                log.warn(`Agent configured for cursor but cursor-agent binary not found on resume — falling back to SDK`, {
+                    sessionId: session.id,
+                    agentId: effectiveAgent?.id,
+                });
+                if (effectiveAgent && resumeRouting.effectiveModel !== effectiveAgent.model) {
+                    effectiveAgent = { ...effectiveAgent, model: resumeRouting.effectiveModel };
                 }
             }
         }
+
+        const useCursorOnResume = providerType === 'cursor' && hasCursorCli();
 
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
@@ -745,7 +865,7 @@ export class ProcessManager {
 
         let sp: SdkProcess;
         try {
-            if (providerType === 'cursor') {
+            if (useCursorOnResume) {
                 sp = spawnCursorProcess({
                     session,
                     project: effectiveProject,
