@@ -24,6 +24,7 @@ Role-based access levels:
 - [Reputation](#reputation)
 - [Billing](#billing)
 - [Agents](#agents)
+- [Buddy](#buddy)
 - [Sessions](#sessions)
 - [Schedules](#schedules)
 - [Work Tasks](#work-tasks)
@@ -72,6 +73,7 @@ Role-based access levels:
 - [Wallets](#wallets)
 - [Tool Catalog](#tool-catalog)
 - [OpenRouter](#openrouter)
+- [Cursor](#cursor)
 - [Variants](#variants)
 - [GitHub PR Diff](#github-pr-diff)
 - [Marketplace Analytics](#marketplace-analytics)
@@ -625,6 +627,14 @@ Agent lifecycle management, wallet integration, inter-agent invocation, spending
 | PUT | `/api/agents/{id}/spending-cap` | Set spending cap | operator |
 | DELETE | `/api/agents/{id}/spending-cap` | Remove spending cap | operator |
 | GET | `/api/agents/{id}/agent-card` | Get A2A agent card | any |
+| GET | `/api/agents/{id}/conversation-mode` | Get conversation mode | any |
+| PUT | `/api/agents/{id}/conversation-mode` | Set conversation mode | operator |
+| GET | `/api/agents/{id}/conversation-allowlist` | List conversation allowlist | any |
+| POST | `/api/agents/{id}/conversation-allowlist` | Add to conversation allowlist | operator |
+| DELETE | `/api/agents/{id}/conversation-allowlist/{entryId}` | Remove from conversation allowlist | operator |
+| GET | `/api/agents/{id}/conversation-blocklist` | List conversation blocklist | any |
+| POST | `/api/agents/{id}/conversation-blocklist` | Add to conversation blocklist | operator |
+| DELETE | `/api/agents/{id}/conversation-blocklist/{entryId}` | Remove from conversation blocklist | operator |
 
 ### Create Agent
 
@@ -730,6 +740,94 @@ curl -X PUT http://localhost:3000/api/agents/agent-1/spending-cap \
     "dailyLimitMicroalgos": 10000000,
     "dailyLimitUsdc": 5000000
   }'
+```
+
+---
+
+## Buddy
+
+Buddy mode pairing and session management. Create pairings between agents so one can act as a reviewer, collaborator, or validator for another. Track buddy sessions and their message history.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/agents/{id}/buddy-pairings` | List buddy pairings for agent | any |
+| POST | `/api/agents/{id}/buddy-pairings` | Create buddy pairing | operator |
+| GET | `/api/buddy-pairings/{id}` | Get buddy pairing by ID | any |
+| PUT | `/api/buddy-pairings/{id}` | Update buddy pairing | operator |
+| DELETE | `/api/buddy-pairings/{id}` | Delete buddy pairing | operator |
+| GET | `/api/buddy-sessions` | List buddy sessions | any |
+| GET | `/api/buddy-sessions/{id}` | Get buddy session by ID | any |
+| GET | `/api/buddy-sessions/{id}/messages` | List messages for buddy session | any |
+
+### Create Buddy Pairing
+
+```bash
+curl -X POST http://localhost:3000/api/agents/agent-1/buddy-pairings \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "buddyAgentId": "agent-2",
+    "buddyRole": "reviewer",
+    "maxRounds": 3
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "bp-abc123",
+  "leadAgentId": "agent-1",
+  "buddyAgentId": "agent-2",
+  "buddyRole": "reviewer",
+  "maxRounds": 3,
+  "enabled": true,
+  "createdAt": "2026-03-26T10:00:00Z"
+}
+```
+
+### Request Body: Create Buddy Pairing
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `buddyAgentId` | string | yes | ID of the buddy agent |
+| `buddyRole` | enum | no | `reviewer`, `collaborator`, `validator` |
+| `maxRounds` | number | no | Max conversation rounds (1-10) |
+
+### Update Buddy Pairing
+
+```bash
+curl -X PUT http://localhost:3000/api/buddy-pairings/bp-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": false,
+    "maxRounds": 5
+  }'
+```
+
+### List Buddy Sessions
+
+```bash
+curl "http://localhost:3000/api/buddy-sessions?leadAgentId=agent-1&status=active&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `leadAgentId` | string | — | Filter by lead agent |
+| `buddyAgentId` | string | — | Filter by buddy agent |
+| `workTaskId` | string | — | Filter by work task |
+| `status` | enum | — | `active`, `completed`, `failed` |
+| `limit` | number | 50 | Max results |
+
+### Get Buddy Session Messages
+
+```bash
+curl http://localhost:3000/api/buddy-sessions/bs-xyz/messages \
+  -H "Authorization: Bearer $API_KEY"
 ```
 
 ---
@@ -4806,6 +4904,91 @@ curl http://localhost:3000/api/openrouter/models/configured \
 {
   "models": [
     { "id": "anthropic/claude-sonnet-4", "provider": "openrouter", "costPerInputToken": 0.000003 }
+  ]
+}
+```
+
+---
+
+## Cursor
+
+Cursor Agent CLI model discovery. Provides endpoints for checking cursor-agent CLI availability and listing models accessible through Cursor.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/cursor/status` | Provider availability | any |
+| GET | `/api/cursor/models` | List all Cursor models | any |
+| GET | `/api/cursor/models/configured` | List models in cost table | any |
+
+### Provider Status
+
+```bash
+curl http://localhost:3000/api/cursor/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "available",
+  "bin": "/usr/local/bin/cursor-agent",
+  "configuredModels": 5
+}
+```
+
+**When unavailable:**
+
+```json
+{
+  "status": "unavailable",
+  "bin": null,
+  "configuredModels": 0
+}
+```
+
+### List Models
+
+Queries the cursor-agent CLI for available models. Results are cached for 5 minutes. Falls back to the cost table if the CLI is unreachable.
+
+```bash
+curl http://localhost:3000/api/cursor/models \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "models": [
+    { "id": "claude-sonnet-4", "name": "Claude Sonnet 4" },
+    { "id": "gpt-4o", "name": "GPT-4o" }
+  ],
+  "total": 2
+}
+```
+
+**503** if cursor-agent CLI is not available:
+
+```json
+{ "error": "cursor-agent CLI not available", "models": [] }
+```
+
+### Configured Models
+
+```bash
+curl http://localhost:3000/api/cursor/models/configured \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "models": [
+    { "model": "claude-sonnet-4", "provider": "cursor", "displayName": "Claude Sonnet 4" }
   ]
 }
 ```
