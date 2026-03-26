@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { isCheerleadingResponse, CHEERLEADING_WARNING_THRESHOLD } from '../lib/session-analysis';
+import {
+    isCheerleadingResponse,
+    CHEERLEADING_WARNING_THRESHOLD,
+    isRepetitiveResponse,
+    REPETITION_SIMILARITY_THRESHOLD,
+} from '../lib/session-analysis';
 import type { ClaudeStreamEvent } from '../process/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -197,5 +202,65 @@ describe('isCheerleadingResponse — mixed turns', () => {
 describe('CHEERLEADING_WARNING_THRESHOLD', () => {
     test('threshold is 2', () => {
         expect(CHEERLEADING_WARNING_THRESHOLD).toBe(2);
+    });
+});
+
+// ── isRepetitiveResponse ──────────────────────────────────────────────────
+
+describe('isRepetitiveResponse', () => {
+    test('returns false with no prior responses', () => {
+        expect(isRepetitiveResponse('Hello, I will investigate the bug.', [])).toBe(false);
+    });
+
+    test('returns false for distinct responses', () => {
+        const recent = [
+            'The issue is in server/lib/crypto.ts — the hash function uses MD5.',
+        ];
+        expect(isRepetitiveResponse(
+            'I fixed the auth module by adding proper input validation to the login handler.',
+            recent,
+        )).toBe(false);
+    });
+
+    test('detects near-identical rephrasing as repetitive', () => {
+        const recent = [
+            'I will investigate the login bug and find the root cause in the authentication system.',
+        ];
+        expect(isRepetitiveResponse(
+            'Let me investigate the login bug and find the root cause in the authentication system.',
+            recent,
+        )).toBe(true);
+    });
+
+    test('detects shuffled sentence order as repetitive', () => {
+        const recent = [
+            'The authentication system has a bug in the login handler. I need to investigate the root cause and fix it.',
+        ];
+        expect(isRepetitiveResponse(
+            'I need to investigate the root cause and fix the bug in the login handler of the authentication system.',
+            recent,
+        )).toBe(true);
+    });
+
+    test('ignores very short texts (below 20 chars)', () => {
+        expect(isRepetitiveResponse('ok sure', ['ok sure'])).toBe(false);
+    });
+
+    test('compares against multiple recent responses', () => {
+        const recent = [
+            'Something completely different about database migrations.',
+            'I will investigate the login bug and find the root cause in the authentication system.',
+        ];
+        // Should match the second recent response
+        expect(isRepetitiveResponse(
+            'Let me investigate the login bug and find the root cause in the authentication system.',
+            recent,
+        )).toBe(true);
+    });
+
+    test('exports REPETITION_SIMILARITY_THRESHOLD as a number', () => {
+        expect(typeof REPETITION_SIMILARITY_THRESHOLD).toBe('number');
+        expect(REPETITION_SIMILARITY_THRESHOLD).toBeGreaterThan(0);
+        expect(REPETITION_SIMILARITY_THRESHOLD).toBeLessThan(1);
     });
 });

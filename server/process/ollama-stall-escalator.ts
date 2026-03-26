@@ -68,6 +68,8 @@ interface SessionStallState {
     consecutiveStalledTurns: number;
     /** True once this session has been escalated (prevents re-escalation). */
     escalated: boolean;
+    /** True once a pre-escalation warning has been emitted. */
+    warned: boolean;
     /** Cached provider for this session's agent ('ollama' | other). */
     providerType: string | null;
     /** Whether this is confirmed to be an Ollama session. */
@@ -146,6 +148,13 @@ export class OllamaStallEscalator {
     }
 
     /**
+     * Returns true if a pre-escalation warning has been emitted for this session.
+     */
+    isWarned(sessionId: string): boolean {
+        return this.sessionState.get(sessionId)?.warned ?? false;
+    }
+
+    /**
      * Detach from the event source. Call during shutdown to prevent leaks.
      */
     destroy(eventSource: IEventSubscribable): void {
@@ -162,6 +171,7 @@ export class OllamaStallEscalator {
                 currentTurnEvents: [],
                 consecutiveStalledTurns: 0,
                 escalated: false,
+                warned: false,
                 providerType: null,
                 isOllamaSession: false,
             };
@@ -234,6 +244,41 @@ export class OllamaStallEscalator {
                     threshold: this.threshold,
                 });
 
+                // Graduated response: warn one turn before escalation
+                if (
+                    !state.warned
+                    && this.threshold > 1
+                    && state.consecutiveStalledTurns >= this.threshold - 1
+                    && state.consecutiveStalledTurns < this.threshold
+                ) {
+                    state.warned = true;
+                    log.warn('Pre-escalation warning — Ollama session approaching stall threshold', {
+                        sessionId,
+                        consecutiveStalledTurns: state.consecutiveStalledTurns,
+                        threshold: this.threshold,
+                    });
+                    // Notify at 'info' level so it's visible but not alarming
+                    const agentId = this.resolveAgentId(sessionId);
+                    if (agentId) {
+                        this.notificationService
+                            .notify({
+                                agentId,
+                                sessionId,
+                                title: 'Session stall warning',
+                                message:
+                                    `The Ollama session has had ${state.consecutiveStalledTurns} consecutive unproductive turn(s). ` +
+                                    `One more stall will trigger escalation to the task queue.`,
+                                level: 'info',
+                            })
+                            .catch((err) => {
+                                log.error('Failed to send stall warning notification', {
+                                    sessionId,
+                                    error: err instanceof Error ? err.message : String(err),
+                                });
+                            });
+                    }
+                }
+
                 if (state.consecutiveStalledTurns >= this.threshold) {
                     this.triggerEscalation(sessionId, state);
                 }
@@ -244,6 +289,19 @@ export class OllamaStallEscalator {
 
             // Reset turn accumulator
             state.currentTurnEvents = [];
+        }
+    }
+
+    /**
+     * Resolve the agentId for a session from the DB (used for notifications
+     * outside of triggerEscalation which already fetches the session).
+     */
+    private resolveAgentId(sessionId: string): string | null {
+        try {
+            const session = this._getSession(this.db, sessionId);
+            return session?.agentId ?? null;
+        } catch {
+            return null;
         }
     }
 

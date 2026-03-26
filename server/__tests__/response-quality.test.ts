@@ -4,8 +4,10 @@ import {
     countVacuousToolCalls,
     ResponseQualityTracker,
     RepetitiveToolCallDetector,
+    RepetitionTracker,
     buildQualityNudge,
     buildLoopNudge,
+    buildRepetitionNudge,
     type ToolCallQualityInput,
 } from '../lib/response-quality';
 
@@ -337,6 +339,75 @@ describe('ResponseQualityTracker nudge exhaustion', () => {
     });
 });
 
+// ── RepetitionTracker ────────────────────────────────────────────────────
+
+describe('RepetitionTracker', () => {
+    test('returns null for first response', () => {
+        const tracker = new RepetitionTracker();
+        expect(tracker.recordResponse('I will investigate the login bug in the auth module.')).toBeNull();
+    });
+
+    test('returns null for distinct responses', () => {
+        const tracker = new RepetitionTracker();
+        tracker.recordResponse('I will investigate the login bug in the auth module.');
+        expect(tracker.recordResponse('The error is in server/lib/crypto.ts on line 42. Here is the fix.')).toBeNull();
+    });
+
+    test('returns nudge for rephrased responses', () => {
+        const tracker = new RepetitionTracker();
+        tracker.recordResponse('I will look into the login bug and investigate the authentication module to find the root cause.');
+        const action = tracker.recordResponse('Let me investigate the login bug in the authentication module and look into the root cause of the issue.');
+        expect(action).toBe('nudge');
+    });
+
+    test('returns break after 3 consecutive repetitions', () => {
+        const tracker = new RepetitionTracker(3, 3);
+        const base = 'I will investigate the login bug and find the root cause in the authentication system.';
+        tracker.recordResponse(base);
+        expect(tracker.recordResponse('Let me investigate the login bug and find the root cause in the authentication system.')).toBe('nudge');
+        expect(tracker.recordResponse('I am investigating the login bug to find the root cause in the authentication system.')).toBe('nudge');
+        expect(tracker.recordResponse('Looking into the login bug, investigating the root cause in the authentication system.')).toBe('break');
+    });
+
+    test('resets consecutive count on novel response', () => {
+        const tracker = new RepetitionTracker();
+        tracker.recordResponse('I will investigate the login bug and find the root cause.');
+        tracker.recordResponse('Let me investigate the login bug and find the root cause of the issue.');
+        // Now a genuinely different response
+        tracker.recordResponse('Here is the fix:\n```ts\nfunction hashPassword(pass: string) { return sha256(pass); }\n```');
+        // Next repetition should be back to nudge, not break
+        tracker.recordResponse('I will investigate the login bug and find the root cause of the issue.');
+        expect(tracker.getMetrics().consecutiveRepetitions).toBe(1);
+    });
+
+    test('ignores very short responses', () => {
+        const tracker = new RepetitionTracker();
+        tracker.recordResponse('ok');
+        expect(tracker.recordResponse('ok')).toBeNull();
+    });
+
+    test('tracks total repetitions across resets', () => {
+        const tracker = new RepetitionTracker();
+        tracker.recordResponse('I will investigate the login bug and find the root cause in the authentication system.');
+        tracker.recordResponse('Let me investigate the login bug and find the root cause in the authentication system.');
+        // Reset with novel response
+        tracker.recordResponse('Here is the fix in server/lib/auth.ts:\n```ts\nconst token = generateSecureToken();\n```');
+        // Another repetition
+        tracker.recordResponse('Let me investigate the login bug and find the root cause in the authentication system.');
+        expect(tracker.getMetrics().totalRepetitions).toBe(2);
+    });
+});
+
+// ── buildRepetitionNudge ─────────────────────────────────────────────────
+
+describe('buildRepetitionNudge', () => {
+    test('returns a non-empty corrective message about repetition', () => {
+        const nudge = buildRepetitionNudge();
+        expect(nudge.length).toBeGreaterThan(0);
+        expect(nudge).toContain('repeating');
+    });
+});
+
 // ── buildSessionMetrics integration ──────────────────────────────────────
 
 describe('buildSessionMetrics with quality metrics', () => {
@@ -367,6 +438,26 @@ describe('buildSessionMetrics with quality metrics', () => {
         expect(m.totalLowQualityResponses).toBe(3);
         expect(m.totalVacuousToolCalls).toBe(2);
         expect(m.qualityNudgeCount).toBe(1);
+    });
+
+    test('detects stall_repetitive as stallDetected', () => {
+        const m = buildSessionMetrics({
+            model: 'qwen3:14b',
+            tier: 'standard',
+            iteration: 8,
+            toolCallCount: 0,
+            maxChainDepth: 0,
+            nudgeCount: 0,
+            midChainNudgeCount: 0,
+            totalExplorationDrifts: 0,
+            stallType: 'repetitive',
+            terminationReason: 'stall_repetitive',
+            loopDurationMs: 30000,
+            needsSummary: true,
+        });
+        expect(m.stallDetected).toBe(true);
+        expect(m.stallType).toBe('repetitive');
+        expect(m.terminationReason).toBe('stall_repetitive');
     });
 
     test('defaults quality metrics to 0 when not provided', () => {
