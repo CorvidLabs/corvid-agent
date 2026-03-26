@@ -1,0 +1,132 @@
+import { describe, test, expect } from 'bun:test';
+import {
+    detectModelFamily,
+    getToolInstructionPrompt,
+    getCodingToolPrompt,
+    getCodebaseContextPrompt,
+} from '../providers/ollama/tool-prompt-templates';
+
+describe('getCodebaseContextPrompt', () => {
+    test('returns codebase context with project structure', () => {
+        const result = getCodebaseContextPrompt();
+        expect(result).toContain('## Codebase Context');
+        expect(result).toContain('CorvidAgent');
+        expect(result).toContain('server/');
+        expect(result).toContain('dashboard/');
+        expect(result).toContain('Bun');
+        expect(result).toContain('bun x tsc');
+    });
+});
+
+describe('getCodingToolPrompt', () => {
+    test('returns coding guidelines with tool references', () => {
+        const result = getCodingToolPrompt();
+        expect(result).toContain('## Coding Tool Guidelines');
+        expect(result).toContain('read_file');
+        expect(result).toContain('list_files');
+        expect(result).toContain('edit_file');
+    });
+});
+
+describe('getToolInstructionPrompt', () => {
+    test('includes worked example with list_files and read_file', () => {
+        const result = getToolInstructionPrompt('llama', ['list_files', 'read_file']);
+        expect(result).toContain('Worked Example');
+        expect(result).toContain('list_files');
+        expect(result).toContain('read_file');
+        expect(result).toContain('server/index.ts');
+    });
+
+    test('includes run_command worked example when only run_command available', () => {
+        const result = getToolInstructionPrompt('llama', ['run_command']);
+        expect(result).toContain('Worked Example');
+        expect(result).toContain('run_command');
+        expect(result).toContain('tsc');
+    });
+
+    test('includes fallback worked example when no coding tools', () => {
+        const result = getToolInstructionPrompt('llama', ['corvid_send_message']);
+        expect(result).toContain('Worked Example');
+        expect(result).toContain('What tools do I have');
+    });
+
+    test('includes family-specific guidance for each model family', () => {
+        const toolNames = ['list_files', 'read_file'];
+
+        const qwen3 = getToolInstructionPrompt('qwen3', toolNames);
+        expect(qwen3).toContain('Qwen3');
+        expect(qwen3).toContain('JSON array');
+
+        const deepseek = getToolInstructionPrompt('deepseek', toolNames);
+        expect(deepseek).toContain('DeepSeek');
+
+        const phi = getToolInstructionPrompt('phi', toolNames);
+        expect(phi).toContain('Phi');
+
+        const gemma = getToolInstructionPrompt('gemma', toolNames);
+        expect(gemma).toContain('Gemma');
+
+        const minimax = getToolInstructionPrompt('minimax', toolNames);
+        expect(minimax).toContain('MiniMax');
+
+        const mistral = getToolInstructionPrompt('mistral', toolNames);
+        expect(mistral).toContain('Mistral');
+
+        const commandr = getToolInstructionPrompt('command-r', toolNames);
+        expect(commandr).toContain('Command-R');
+
+        const hermes = getToolInstructionPrompt('hermes', toolNames);
+        expect(hermes).toContain('Hermes');
+
+        const nemotron = getToolInstructionPrompt('nemotron', toolNames);
+        expect(nemotron).toContain('Nemotron');
+
+        const llama = getToolInstructionPrompt('llama', toolNames);
+        expect(llama).toContain('Llama');
+    });
+
+    test('includes multi-step example for text-based families with list_files+read_file', () => {
+        const toolNames = ['list_files', 'read_file'];
+
+        const qwen3 = getToolInstructionPrompt('qwen3', toolNames);
+        expect(qwen3).toContain('multi-step interaction');
+
+        const deepseek = getToolInstructionPrompt('deepseek', toolNames);
+        expect(deepseek).toContain('multi-step interaction');
+
+        const nemotron = getToolInstructionPrompt('nemotron', toolNames);
+        expect(nemotron).toContain('multi-step interaction');
+    });
+
+    test('includes tool schemas for text-based families when toolDefs provided', () => {
+        const toolDefs = [
+            { name: 'list_files', description: 'List files in dir', parameters: { type: 'object' as const, properties: { path: { type: 'string', description: 'Directory path' } }, required: ['path'] } },
+        ];
+        const result = getToolInstructionPrompt('qwen3', ['list_files'], toolDefs);
+        expect(result).toContain('Tool Schemas');
+        expect(result).toContain('list_files');
+    });
+});
+
+describe('detectModelFamily', () => {
+    test('detects qwen3 before qwen2', () => {
+        expect(detectModelFamily('qwen3:32b')).toBe('qwen3');
+        expect(detectModelFamily('qwen-3-coder:latest')).toBe('qwen3');
+    });
+
+    test('detects qwen2', () => {
+        expect(detectModelFamily('qwen2.5:72b')).toBe('qwen2');
+    });
+
+    test('detects devstral', () => {
+        expect(detectModelFamily('devstral:latest')).toBe('devstral');
+    });
+
+    test('detects gemini', () => {
+        expect(detectModelFamily('gemini-2.5-pro')).toBe('gemini');
+    });
+
+    test('returns unknown for unrecognized model', () => {
+        expect(detectModelFamily('some-random-model')).toBe('unknown');
+    });
+});
