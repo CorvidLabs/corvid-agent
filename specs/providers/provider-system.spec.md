@@ -44,7 +44,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 | Type | Description |
 |------|-------------|
 | `ModelTier` | Enum: `OPUS = 'opus'`, `SONNET = 'sonnet'`, `HAIKU = 'haiku'` — maps semantic task categories to Claude model families per council decision 2026-03-13 |
-| `LlmProviderType` | Union: `'anthropic' \| 'openai' \| 'ollama'` |
+| `LlmProviderType` | Union: `'anthropic' \| 'openai' \| 'ollama' \| 'openrouter' \| 'cursor'` |
 | `ExecutionMode` | Union: `'managed' \| 'direct'` |
 | `JsonSchemaProperty` | JSON Schema property descriptor with type, description, enum, items, default |
 | `JsonSchemaObject` | JSON Schema object with properties, required, and index signature for tool parameter schemas |
@@ -125,7 +125,8 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 8. `FallbackManager.completeWithFallback()` throws `ExternalServiceError` only when all models in the chain fail.
 9. Cooldown-expired providers are automatically marked healthy again on the next availability check.
 10. `MODEL_PRICING` is the single source of truth for model capabilities and cost; the router and cost functions derive all decisions from it.
-11. `hasClaudeAccess()` caches CLI detection on first call and reuses the cached value thereafter.
+11. **Provider isolation**: Default fallback chains contain only models from a single provider. No cross-provider fallback — if the designated provider fails, the error surfaces rather than silently switching to a different provider. OpenRouter and OpenAI remain registered providers for explicit use but are not in default fallback chains.
+12. `hasClaudeAccess()` caches CLI detection on first call and reuses the cached value thereafter.
 
 ## Behavioral Examples
 
@@ -144,10 +145,10 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 - **When** a provider is registered
 - **Then** only Ollama-type providers are accepted; cloud providers are skipped
 
-### Scenario: Fallback chain handles provider failure
-- **Given** a fallback chain with `[anthropic/claude-sonnet-4-6, openai/gpt-4.1]`
-- **When** the Anthropic provider throws a rate limit error
-- **Then** the failure is recorded, the provider enters cooldown tracking, and the request is retried with OpenAI
+### Scenario: Fallback chain handles model failure within same provider
+- **Given** a fallback chain with `[anthropic/claude-opus-4-6, anthropic/claude-sonnet-4-6]`
+- **When** claude-opus-4-6 throws a rate limit error
+- **Then** the failure is recorded, and the request is retried with claude-sonnet-4-6 (same provider)
 
 ### Scenario: All providers in chain fail
 - **Given** a fallback chain where every provider throws an error

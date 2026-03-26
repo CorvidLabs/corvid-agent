@@ -32,44 +32,34 @@ export interface FallbackChain {
  * Default fallback chains for common scenarios.
  *
  * Council decision 2026-03-13: Claude-First dispatch.
- *   - Production chains use Claude (Anthropic) exclusively.
- *   - OpenAI is retained as a secondary fallback for resilience.
- *   - Ollama entries are removed from production paths; they only appear in the
- *     'local' and 'local-experimental' chains, which are only reachable when
- *     OLLAMA_LOCAL_EXPERIMENTAL=true.
+ * Updated 2026-03-25: Provider isolation — no cross-provider fallback.
+ *   - Each chain contains only models from a single provider.
+ *   - If a provider fails, the error surfaces — no silent switching to a
+ *     different provider (prevents surprise charges on OpenRouter/OpenAI).
+ *   - OpenRouter and OpenAI remain registered providers for explicit use,
+ *     but are NOT in default fallback chains.
+ *   - Ollama entries only appear in 'local' and 'cloud' chains.
  *   - Fallback = task queue (TaskQueueService), NOT model degradation.
  */
 export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
-    /** High-capability chain: council sessions, architecture decisions. */
+    /** High-capability chain: council sessions, architecture decisions. Anthropic-only. */
     'high-capability': {
         chain: [
             { provider: 'anthropic', model: 'claude-opus-4-6' },
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-            { provider: 'openai', model: 'gpt-4.1' },
-            { provider: 'openai', model: 'o3' },
-            { provider: 'openrouter', model: 'google/gemini-2.5-pro' },
-            { provider: 'openrouter', model: 'openai/gpt-4.1' },
         ],
     },
-    /** Balanced chain: work tasks, code generation, specialist agents. */
+    /** Balanced chain: work tasks, code generation, specialist agents. Anthropic-only. */
     'balanced': {
         chain: [
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-            { provider: 'openai', model: 'gpt-4.1' },
-            { provider: 'openai', model: 'gpt-4.1-mini' },
-            { provider: 'openrouter', model: 'deepseek/deepseek-chat-v3' },
-            { provider: 'openrouter', model: 'mistralai/mistral-large' },
         ],
     },
-    /** Cost-optimized chain: routing, triage, lightweight classification. */
+    /** Cost-optimized chain: routing, triage, lightweight classification. Anthropic-only. */
     'cost-optimized': {
         chain: [
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-            { provider: 'openai', model: 'gpt-4.1-nano' },
-            { provider: 'openai', model: 'gpt-4o-mini' },
-            { provider: 'openrouter', model: 'google/gemini-2.5-flash' },
-            { provider: 'openrouter', model: 'qwen/qwen-2.5-coder-32b-instruct' },
         ],
     },
     /**
