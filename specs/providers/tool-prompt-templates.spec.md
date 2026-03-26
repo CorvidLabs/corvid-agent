@@ -32,13 +32,15 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 | `getCodingToolPrompt` | `()` | `string` | File operation guidelines |
 | `getCodebaseContextPrompt` | `()` | `string` | Project structure and orientation context for agents |
 | `getMessagingSafetyPrompt` | `()` | `string` | Prevent script-based message sending |
-| `getCodebaseContextPrompt` | `()` | `string` | Basic orientation about CorvidAgent project structure for agents |
 | `getWorktreeIsolationPrompt` | `()` | `string` | Git branch isolation rules for worktree sessions |
+| `getCompactToolInstructionPrompt` | `(family, toolNames, toolDefs?)` | `string` | Reduced-token tool instructions for cloud-proxied models |
+| `getCompactResponseRoutingPrompt` | `()` | `string` | Compact response routing rules for cloud-proxied models |
+| `getCompactCodingToolPrompt` | `()` | `string` | Compact coding tool guidelines for cloud-proxied models |
 
 ## Invariants
 
 1. **All families get common tool instructions**: Every model, regardless of family, receives the common tool instructions block (available tools list, 8 rules for tool calls)
-2. **Text-based families get full schemas in prompt**: Families in `TEXT_BASED_FAMILIES` (currently qwen3) receive formatted parameter schemas so models know exact argument names
+2. **Text-based families get full schemas in prompt**: Families in `TEXT_BASED_FAMILIES` (currently qwen3, kimi, minimax, gemini, glm, devstral, nemotron) receive formatted parameter schemas so models know exact argument names
 3. **Qwen3 gets JSON array format instructions**: Qwen3's family-specific prompt specifies `[{"name":"...","arguments":{...}}]` format, warns against code fences, and instructs one-tool-at-a-time calling
 4. **Qwen3 anti-hallucination instructions**: Qwen3 prompt explicitly warns: no code fences around JSON, no prose before tool calls, no inventing tool names, never generate fake tool results
 5. **Response routing only when corvid_send_message present**: `getResponseRoutingPrompt()` is only appended when `corvid_send_message` is in the tool names list
@@ -48,6 +50,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
 10. **Worktree isolation always appended**: `getWorktreeIsolationPrompt()` is unconditionally appended to both SDK and direct process system prompts, instructing the agent to stay on its own branch and not interact with other sessions' branches
 11. **Codebase context appended for Ollama agents**: `getCodebaseContextPrompt()` is appended in `direct-process.ts` to give Ollama-backed agents basic orientation about project structure, runtime, and common commands
+12. **Cloud models use compact prompts**: Cloud-proxied models (detected by `OllamaProvider.isCloudModel()`) receive compact prompt variants (`getCompactToolInstructionPrompt`, `getCompactResponseRoutingPrompt`, `getCompactCodingToolPrompt`) that preserve essential rules while reducing token count to stay within cloud proxy server-side timeouts (~90s). Messaging safety is folded into compact tool instructions rule #5. `getCodebaseContextPrompt()` is skipped for cloud models
 
 ## Behavioral Examples
 
@@ -87,7 +90,7 @@ None (standalone module).
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
+| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getCompactToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCompactResponseRoutingPrompt`, `getCodingToolPrompt`, `getCompactCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
 | `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt` |
 
 ## Change Log
