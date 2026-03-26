@@ -30,6 +30,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 | `getToolInstructionPrompt` | `(family, toolNames, toolDefs?)` | `string` | Full tool instructions for system prompt |
 | `getResponseRoutingPrompt` | `()` | `string` | When to use corvid_send_message vs text |
 | `getCodingToolPrompt` | `()` | `string` | File operation guidelines |
+| `getCodebaseContextPrompt` | `()` | `string` | Project structure and orientation context for agents |
 | `getMessagingSafetyPrompt` | `()` | `string` | Prevent script-based message sending |
 | `getWorktreeIsolationPrompt` | `()` | `string` | Git branch isolation rules for worktree sessions |
 
@@ -40,7 +41,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 3. **Qwen3 gets JSON array format instructions**: Qwen3's family-specific prompt specifies `[{"name":"...","arguments":{...}}]` format, warns against code fences, and instructs one-tool-at-a-time calling
 4. **Qwen3 anti-hallucination instructions**: Qwen3 prompt explicitly warns: no code fences around JSON, no prose before tool calls, no inventing tool names, never generate fake tool results
 5. **Response routing only when corvid_send_message present**: `getResponseRoutingPrompt()` is only appended when `corvid_send_message` is in the tool names list
-6. **Coding guidance only when read_file present**: `getCodingToolPrompt()` is only appended when `read_file` is in the tool names list
+6. **Coding guidance only when read_file present**: `getCodingToolPrompt()` and `getCodebaseContextPrompt()` are only appended when `read_file` is in the tool names list
 7. **Messaging safety always appended**: `getMessagingSafetyPrompt()` is always appended when tools are available (in `direct-process.ts`) or unconditionally to append content (in `sdk-process.ts`), preventing agents from writing scripts to send messages outside of MCP tools. This is an always-on guard -- unlike response routing (conditional on `corvid_send_message`) or coding guidance (conditional on `read_file`), messaging safety is never gated on specific tool presence
 8. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
 9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
@@ -84,7 +85,7 @@ None (standalone module).
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
+| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
 | `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt` |
 
 ## Change Log
