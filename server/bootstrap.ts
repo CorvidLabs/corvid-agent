@@ -195,43 +195,41 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const providerRegistry = LlmProviderRegistry.getInstance();
     providerRegistry.register(new AnthropicProvider());
     providerRegistry.register(new OpenRouterProvider());
+    // Ollama readiness probe — only register if the daemon is reachable (#1525)
     const ollamaProvider = new OllamaProvider();
-    providerRegistry.register(ollamaProvider);
+    const ollamaReady = await ollamaProvider.isAvailable();
+    if (ollamaReady) {
+        providerRegistry.register(ollamaProvider);
 
-    // Cursor Agent CLI detection — not an LLM provider, but a CLI process
-    // spawned by ProcessManager when agent.provider === 'cursor'.
-    if (hasCursorAccess()) {
-        log.info(`Cursor Agent CLI available at ${getCursorBinPath()}`);
-    }
-
-    // Ollama startup validation — health-check when Ollama is the only enabled provider
-    const isOllamaOnly = !providerRegistry.get('anthropic') && !providerRegistry.get('openai');
-    if (isOllamaOnly) {
+        // Check if models are pulled (useful when Ollama is the only provider)
         const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
         try {
-            const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(5_000) });
+            const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
             if (tagsResponse.ok) {
                 const tagsData = (await tagsResponse.json()) as { models?: Array<{ name: string }> };
                 const modelCount = tagsData.models?.length ?? 0;
                 if (modelCount === 0) {
                     log.warn('Ollama is running but no models are pulled. Suggested: ollama pull qwen3:8b');
                 } else {
-                    log.info(`Ollama health check OK — ${modelCount} model(s) available`);
+                    log.info(`Ollama registered — ${modelCount} model(s) available`);
                 }
-            } else {
-                log.error(`Ollama health check failed (HTTP ${tagsResponse.status}). Is Ollama running at ${ollamaHost}?`);
             }
-        } catch (err) {
-            log.error('Ollama is unreachable — install from https://ollama.com and run: ollama serve', {
-                host: ollamaHost,
-                error: err instanceof Error ? err.message : String(err),
-            });
+        } catch {
+            // Already confirmed reachable via isAvailable(); race condition — ignore
         }
+        ollamaProvider.refreshModels().catch((err) => {
+            log.warn('Ollama model refresh failed', { error: err instanceof Error ? err.message : String(err) });
+        });
+    } else {
+        const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+        log.warn(`Ollama unreachable at ${ollamaHost} — skipping provider registration. Start Ollama and restart to enable.`);
     }
 
-    ollamaProvider.refreshModels().catch((err) => {
-        log.warn('Ollama not available on startup', { error: err instanceof Error ? err.message : String(err) });
-    });
+    // Cursor Agent CLI detection — not an LLM provider, but a CLI process
+    // spawned by ProcessManager when agent.provider === 'cursor'.
+    if (hasCursorAccess()) {
+        log.info(`Cursor Agent CLI available at ${getCursorBinPath()}`);
+    }
 
     // Ensure a project exists for the server's own codebase
     {
