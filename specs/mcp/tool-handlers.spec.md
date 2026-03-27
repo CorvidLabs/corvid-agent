@@ -27,6 +27,7 @@ files:
   - server/mcp/tool-handlers/observations.ts
   - server/mcp/tool-handlers/browser.ts
   - server/mcp/tool-handlers/discord.ts
+  - server/mcp/tool-handlers/library.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
