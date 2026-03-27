@@ -27,6 +27,7 @@ files:
   - server/mcp/tool-handlers/observations.ts
   - server/mcp/tool-handlers/browser.ts
   - server/mcp/tool-handlers/discord.ts
+  - server/mcp/tool-handlers/library.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -122,6 +123,10 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleDiscordSendMessage` | `(ctx, { channel_id, message, reply_to? })` | `Promise<CallToolResult>` | Send a text message to a Discord channel by ID |
 | `handleDiscordSendImage` | `(ctx, { channel_id, image_base64, filename?, content_type?, message? })` | `Promise<CallToolResult>` | Send an image (base64) to a Discord channel, optionally with a text message |
 | `handleBrowser` | `(ctx, { action, tab_id?, url?, query?, selector?, code?, text?, key?, value?, direction?, amount?, x?, y?, full_page?, max_length?, ms? })` | `Promise<CallToolResult>` | Browser automation via Playwright: tab management, navigation, reading, interaction, screenshots, JS execution |
+| `handleLibraryWrite` | `(ctx, { key, content, category?, tags? })` | `Promise<CallToolResult>` | Create or update a shared library entry. Saves to SQLite and mints/updates a CRVLIB ASA on localnet |
+| `handleLibraryRead` | `(ctx, { key?, query?, category?, tag?, limit? })` | `Promise<CallToolResult>` | Read a library entry by key, or search/list entries with optional filters |
+| `handleLibraryListOnChain` | `(ctx, { category?, tag?, limit? })` | `Promise<CallToolResult>` | List all on-chain CRVLIB entries by reading the blockchain directly |
+| `handleLibraryDelete` | `(ctx, { key, mode? })` | `Promise<CallToolResult>` | Delete a shared library entry. Mode is 'soft' (default) or 'hard' |
 
 ## Invariants
 
@@ -220,3 +225,4 @@ Internal constants (not env-configurable):
 | 2026-03-20 | corvid-agent | Added handleBrowser and browser.ts |
 | 2026-03-23 | corvid-agent | Added Discord messaging tools: handleDiscordSendMessage, handleDiscordSendImage (#1422) |
 | 2026-03-27 | corvid-agent | Added agent identity signature to GitHub write operations (#1555) |
+| 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |

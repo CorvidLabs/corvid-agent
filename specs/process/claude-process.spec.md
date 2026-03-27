@@ -46,6 +46,13 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `isContextUsageEvent` | `e: ClaudeStreamEvent` | `e is ContextUsageEvent` | Type guard: returns `true` if the event is a `context_usage` event. |
 | `isContextWarningEvent` | `e: ClaudeStreamEvent` | `e is ContextWarningEvent` | Type guard: returns `true` if the event is a `context_warning` event. |
 
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `CURSOR_EXIT_CODE_MAP` | `Record<number, { category: CursorErrorCategory; transient: boolean; message: string }>` | Maps cursor-agent exit codes to error classifications. Exit 0 = success, 2 = invalid args (permanent), 126/127 = binary issues (permanent), 130 = SIGINT (permanent), 137/143 = SIGKILL/SIGTERM (transient). Used by `classifyCursorError()`. |
+| `STREAM_IDLE_TIMEOUT_MS` | `number` (120,000) | Stream idle timeout in milliseconds. If no stdout events arrive from a cursor-agent process within this window, the process is killed with a transient classification. |
+
 ### Exported Types
 
 | Type | Description |
@@ -195,3 +202,4 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-27 | corvid-agent | Document cursor-process exports: `buildArgs`, `readStream`, `describeCursorToolCall`, `extractCursorCostAndTurns`, `isDirectProcessMetricsShape`, `mapCursorResultToTurnMetrics` |
 | 2026-03-20 | corvid-agent | Documented `extractContentImageUrls` export |
+| 2026-03-27 | corvid-agent | Documented `CURSOR_EXIT_CODE_MAP` and `STREAM_IDLE_TIMEOUT_MS` constants |
