@@ -148,7 +148,9 @@ export class CIRetryService {
     ): Promise<void> {
         const repoName = repo.split('/')[1];
         const workDir = `/tmp/${repoName}-pr-${prNumber}`;
-        const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
+        const homeRepo = process.env.GITHUB_OWNER && process.env.GITHUB_REPO
+            ? `${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}` : '';
+        const isHomeRepo = homeRepo !== '' && repo === homeRepo;
 
         const cloneStep = isHomeRepo
             ? `1. Use \`corvid_create_work_task\` is NOT appropriate here — you need to fix an existing PR branch.\n   Clone the repo: \`gh repo clone ${repo} ${workDir} && cd ${workDir} && gh pr checkout ${prNumber}\``

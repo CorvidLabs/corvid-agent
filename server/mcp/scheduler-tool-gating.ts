@@ -43,20 +43,21 @@ export const SCHEDULER_MAX_PR_COMMENTS_PER_SESSION = 5;
 /** Max messages a single scheduler session may send (rate limiting). */
 export const SCHEDULER_MAX_MESSAGES_PER_SESSION = 3;
 
-/**
- * Parse allowed orgs from the GITHUB_ALLOWED_ORGS env var.
- * Called lazily so tests can set the var before first use.
- */
-function parseAllowedOrgs(): ReadonlySet<string> {
+/** Parse GITHUB_ALLOWED_ORGS env var into a Set (evaluated at call time so tests can set env). */
+export function getSchedulerAllowedOrgs(): ReadonlySet<string> {
     return new Set(
         (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
     );
 }
 
-/** Orgs that scheduled sessions are allowed to create issues/PRs in. */
+/**
+ * Orgs that scheduled sessions are allowed to create issues/PRs in.
+ * Backed by a lazy Proxy so tests can set GITHUB_ALLOWED_ORGS before first use.
+ * @deprecated Use `getSchedulerAllowedOrgs()` for runtime-correct values.
+ */
 export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Proxy(new Set<string>() as ReadonlySet<string>, {
     get(_target, prop, _receiver) {
-        const real = parseAllowedOrgs();
+        const real = getSchedulerAllowedOrgs();
         const val = Reflect.get(real, prop, real);
         return typeof val === 'function' ? val.bind(real) : val;
     },
@@ -94,7 +95,7 @@ export function isToolBlockedForScheduler(
  */
 export function isRepoAllowedForScheduler(repo: string): boolean {
     const owner = repo.split('/')[0];
-    return SCHEDULER_ALLOWED_ORGS.has(owner);
+    return getSchedulerAllowedOrgs().has(owner);
 }
 
 /** Per-tool rate limits for scheduler sessions. */

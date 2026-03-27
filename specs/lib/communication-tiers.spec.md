@@ -1,43 +1,40 @@
 ---
 module: communication-tiers
 version: 1
-status: draft
+status: active
 files:
   - server/lib/communication-tiers.ts
 db_tables: []
-depends_on:
-  - specs/lib/infra.spec.md
+depends_on: []
 ---
 
 # Communication Tiers
 
 ## Purpose
 
-Role-based communication hierarchy that controls which agents can message which other agents. Separate from model capability tiers — an agent could run on a powerful model but still be junior in the org hierarchy. Messages flow downward: top can message anyone, mid can message same tier or below, bottom can message same tier only.
+Role-based communication hierarchy that controls which agents can message which other agents. Separate from model capability tiers — an agent could run on a powerful model but still be junior in the org hierarchy. Messages flow downward: top-tier agents can message anyone, mid-tier can message same or below, bottom-tier can only message same tier.
 
 ## Public API
 
-### Exported Functions
-
-#### communication-tiers.ts
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `getCommunicationTier` | `agentName: string` | `CommunicationTier` | Returns the communication tier for an agent by name (lowercase lookup). Unknown agents default to `'bottom'` (conservative). |
-| `checkCommunicationTier` | `fromAgentName: string, toAgentName: string` | `string \| null` | Returns `null` if the sender can message the target, or an error message string if blocked by the tier hierarchy. |
-| `getTierMessageLimits` | `tier: CommunicationTier` | `{ maxMessagesPerSession: number; maxUniqueTargetsPerSession: number }` | Returns rate-limit overrides appropriate for a communication tier. Higher tiers get more messaging capacity. |
-
 ### Exported Types
 
-#### communication-tiers.ts
-| Type | Kind | Description |
-|------|------|-------------|
-| `CommunicationTier` | type | `'top' \| 'mid' \| 'bottom'` — the three hierarchy levels. |
+| Type | Description |
+|------|-------------|
+| `CommunicationTier` | `'top' \| 'mid' \| 'bottom'` — the three hierarchy levels |
+
+### Exported Functions
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `getCommunicationTier` | `(agentName: string)` | `CommunicationTier` | Get the communication tier for an agent by name. Returns `'bottom'` for unknown agents |
+| `checkCommunicationTier` | `(fromAgentName: string, toAgentName: string)` | `string \| null` | Check whether an agent is allowed to message another. Returns `null` if allowed, or an error message if blocked |
+| `getTierMessageLimits` | `(tier: CommunicationTier)` | `{ maxMessagesPerSession: number; maxUniqueTargetsPerSession: number }` | Get rate limit overrides appropriate for a communication tier. Higher tiers get more capacity |
 
 ## Invariants
 
-- Tier hierarchy is strictly `top` (rank 3) > `mid` (rank 2) > `bottom` (rank 1).
-- An agent can always message agents at the same rank or below, never above.
-- Unknown agents always resolve to `'bottom'` tier.
+- Unknown agents always default to `'bottom'` tier (conservative).
+- Top-tier agents can message any tier. Mid-tier can message mid or bottom. Bottom can only message bottom.
+- Agent name lookup is case-insensitive.
 - Rate limits increase monotonically with tier rank.
 
 ## Behavioral Examples
@@ -49,14 +46,14 @@ Role-based communication hierarchy that controls which agents can message which 
 
 ## Error Cases
 
-- `checkCommunicationTier` returns an error string (not null) when a lower-tier agent attempts to message a higher-tier agent. The string includes both agent names and their tiers.
+- `checkCommunicationTier` returns a descriptive error string when a lower-tier agent attempts to message a higher-tier agent. The error includes both agent names and their tiers.
 
 ## Dependencies
 
-- `server/lib/logger.ts` — createLogger for warning on tier violations.
+None.
 
 ## Change Log
 
-| Date | Change |
-|------|--------|
-| 2026-03-27 | Initial spec |
+| Version | Date | Description |
+|---------|------|-------------|
+| 1 | 2026-03-27 | Initial spec |
