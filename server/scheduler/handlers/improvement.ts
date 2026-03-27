@@ -5,6 +5,7 @@ import type { AgentSchedule, ScheduleAction } from '../../../shared/types';
 import { updateExecutionStatus } from '../../db/schedules';
 import { getAgent } from '../../db/agents';
 import type { HandlerContext } from './types';
+import { resolveProjectId } from './utils';
 
 export async function execImprovementLoop(
     ctx: HandlerContext,
@@ -24,7 +25,7 @@ export async function execImprovementLoop(
         return;
     }
 
-    const projectId = action.projectId ?? agent.defaultProjectId;
+    const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
     if (!projectId) {
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: 'No project configured for agent' });
         return;

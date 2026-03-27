@@ -6,6 +6,7 @@ import { updateExecutionStatus } from '../../db/schedules';
 import { getAgent } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import type { HandlerContext } from './types';
+import { resolveProjectId } from './utils';
 
 export async function execCodebaseReview(
     ctx: HandlerContext,
@@ -20,7 +21,7 @@ export async function execCodebaseReview(
         return;
     }
 
-    const projectId = action.projectId ?? agent.defaultProjectId;
+    const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
     if (!projectId) {
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: 'No project configured for agent' });
         return;
@@ -68,7 +69,7 @@ export async function execDependencyAudit(
         return;
     }
 
-    const projectId = action.projectId ?? agent.defaultProjectId;
+    const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
     if (!projectId) {
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: 'No project configured for agent' });
         return;

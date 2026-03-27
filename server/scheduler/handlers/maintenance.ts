@@ -8,6 +8,7 @@ import { getAgent } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import { summarizeOldMemories } from '../../memory/summarizer';
 import type { HandlerContext } from './types';
+import { resolveProjectId } from './utils';
 
 /** SHA-256 hash of the daily review summary for on-chain attestation. */
 async function hashSummary(text: string): Promise<string> {
@@ -197,7 +198,7 @@ export async function execCustom(
         return;
     }
 
-    const projectId = action.projectId ?? agent.defaultProjectId;
+    const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
     if (!projectId) {
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: 'No project configured for agent' });
         return;

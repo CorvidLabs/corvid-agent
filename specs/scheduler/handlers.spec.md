@@ -4,6 +4,7 @@ version: 2
 status: active
 files:
   - server/scheduler/handlers/types.ts
+  - server/scheduler/handlers/utils.ts
   - server/scheduler/handlers/index.ts
   - server/scheduler/handlers/council.ts
   - server/scheduler/handlers/github.ts
@@ -36,6 +37,12 @@ Individual action handler functions for each schedule action type. Each handler 
 | Type | Description |
 |------|-------------|
 | `HandlerContext` | Interface providing shared dependencies to all handlers: `db`, `processManager`, `workTaskService`, `agentMessenger`, `improvementLoopService`, `reputationScorer`, `reputationAttestation`, `outcomeTrackerService`, `dailyReviewService`, `systemStateDetector`, `runningExecutions`, `resolveScheduleTenantId` |
+
+#### utils.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolveProjectId` | `(db: Database, tenantId: string, agent: Agent, actionProjectId?: string \| null)` | `string \| null` | Three-tier project resolution: `actionProjectId` → `agent.defaultProjectId` → first project for tenant (fallback). Returns `null` only if no projects exist for the tenant. Logs a warning when the tenant fallback is used. |
 
 ### Exported Functions
 
@@ -111,7 +118,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 
 1. Every handler updates the execution status to either `completed` or `failed` before returning (or on error).
 2. Handlers that require an agent (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`, `execStatusCheckin`) fail with "Agent not found" if `getAgent` returns null.
-3. Handlers that create sessions (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`) require a project ID (from action or agent default) and fail with "No project configured" if unavailable.
+3. Handlers that create sessions (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`, `execImprovementLoop`) resolve the project ID via `resolveProjectId` (three-tier: action → agent default → first tenant project) and fail with "No project configured for agent" only if no projects exist at all for the tenant.
 4. Session-based handlers set execution status to `running` with a `sessionId` before starting the process, then immediately mark `completed` (the session runs asynchronously — "early completion" pattern). All sessions are started with `{ schedulerMode: true, schedulerActionType: action.type }`.
 5. `execWorkTask` requires `ctx.workTaskService` to be non-null; fails with "Work task service not available" otherwise.
 6. `execImprovementLoop` requires `ctx.improvementLoopService` to be non-null; fails with "Improvement loop service not configured" otherwise.
