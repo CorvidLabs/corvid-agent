@@ -563,7 +563,9 @@ export class MentionPollingService {
         const isAssignment = mention.type === 'assignment';
         const isPullRequestReview = mention.type === 'pull_request';
         // corvid_create_work_task only works for the platform's own repo
-        const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
+        const homeRepo = process.env.GITHUB_OWNER && process.env.GITHUB_REPO
+            ? `${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}` : '';
+        const isHomeRepo = homeRepo !== '' && repo === homeRepo;
 
         const triggerLabel = isAssignment ? 'assigned to you'
             : isPullRequestReview ? 'review requested'

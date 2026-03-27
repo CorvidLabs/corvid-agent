@@ -27,7 +27,7 @@ export function friendlyModelName(model: string): string {
 export function formatAgentSignature(agent: { name: string; model: string } | null | undefined): string {
     if (!agent) return '';
     const modelDisplay = friendlyModelName(agent.model);
-    return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay} \u00B7 CorvidLabs Team Alpha`;
+    return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay}`;
 }
 
 /** Build an agent identity signature footer by looking up the agent from the DB. */

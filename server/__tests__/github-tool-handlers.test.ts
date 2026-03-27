@@ -33,6 +33,9 @@ mock.module('../github/operations', () => ({
     isGitHubConfigured: () => true,
 }));
 
+// Set env vars before importing handlers so scheduler-tool-gating reads the correct allowed orgs
+process.env.GITHUB_ALLOWED_ORGS = 'CorvidLabs,corvid-agent';
+
 // Import handlers AFTER the mock is set up
 const {
     handleGitHubStarRepo,
@@ -793,7 +796,7 @@ describe('friendlyModelName', () => {
 // ── formatAgentSignature (#1555) ─────────────────────────────────────────
 
 describe('formatAgentSignature (#1555)', () => {
-    const SIGNATURE_PATTERN = /\n\n---\n.*CorvidLabs Team Alpha$/;
+    const SIGNATURE_PATTERN = /\n\n---\n.+/;
 
     test('formats signature with agent name and model', () => {
         const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' });
