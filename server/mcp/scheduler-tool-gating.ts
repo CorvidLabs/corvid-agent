@@ -43,10 +43,18 @@ export const SCHEDULER_MAX_PR_COMMENTS_PER_SESSION = 5;
 /** Max messages a single scheduler session may send (rate limiting). */
 export const SCHEDULER_MAX_MESSAGES_PER_SESSION = 3;
 
-/** Orgs that scheduled sessions are allowed to create issues/PRs in. */
-export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Set(
-    (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
-);
+/** Parse GITHUB_ALLOWED_ORGS env var into a Set (evaluated at call time so tests can set env). */
+export function getSchedulerAllowedOrgs(): ReadonlySet<string> {
+    return new Set(
+        (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    );
+}
+
+/**
+ * Orgs that scheduled sessions are allowed to create issues/PRs in.
+ * @deprecated Use `getSchedulerAllowedOrgs()` for runtime-correct values.
+ */
+export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = getSchedulerAllowedOrgs();
 
 /** Label automatically applied to issues created by scheduled sessions. */
 export const SCHEDULER_ESCALATION_LABEL = 'agent-escalation';
@@ -80,7 +88,7 @@ export function isToolBlockedForScheduler(
  */
 export function isRepoAllowedForScheduler(repo: string): boolean {
     const owner = repo.split('/')[0];
-    return SCHEDULER_ALLOWED_ORGS.has(owner);
+    return getSchedulerAllowedOrgs().has(owner);
 }
 
 /** Per-tool rate limits for scheduler sessions. */
