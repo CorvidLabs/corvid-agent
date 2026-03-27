@@ -234,12 +234,8 @@ export interface GitHubIntegrationConfig {
     token?: string;
     /** Webhook secret for HMAC SHA-256 validation. */
     webhookSecret?: string;
-    /** Repository for GitHub notification routing (e.g. 'MyOrg/my-agent'). */
+    /** Repository for GitHub notification routing (e.g. 'CorvidLabs/corvid-agent'). */
     notificationRepo?: string;
-    /** GitHub owner/org name for platform operations (e.g. 'MyOrg'). */
-    owner?: string;
-    /** GitHub repo name for platform operations (e.g. 'my-agent'). */
-    repo?: string;
     /** Comma-separated org names allowed for scheduler operations. */
     allowedOrgs?: string[];
 }
