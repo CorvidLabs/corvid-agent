@@ -4,6 +4,7 @@ version: 1
 status: draft
 files:
   - server/memory/arc69-library.ts
+  - server/memory/library-sync.ts
   - server/db/migrations/106_agent_library.ts
   - server/db/schema/library.ts
   - server/db/agent-library.ts
@@ -43,10 +44,12 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `updateLibraryEntry` | `(ctx: LibraryContext, asaId: number, params: UpdateLibraryParams, existing: LibraryEntry)` | `Promise<{ txid: string }>` | acfg txn to update note |
 | `readLibraryEntry` | `(ctx: LibraryContext, asaId: number)` | `Promise<LibraryEntry \| null>` | Fetch latest acfg note, parse plaintext JSON |
 | `deleteLibraryEntry` | `(ctx: LibraryContext, asaId: number, mode: 'soft' \| 'hard')` | `Promise<{ txid: string }>` | Soft (empty note) or hard (destroy ASA) |
-| `listLibraryEntries` | `(ctx: LibraryContext, filters?: LibraryFilters)` | `Promise<LibraryEntry[]>` | Query indexer with optional filters |
-| `readBook` | `(ctx: LibraryContext, bookKey: string)` | `Promise<LibraryEntry[]>` | Fetch all pages of a book in order |
-| `appendPage` | `(ctx: LibraryContext, bookKey: string, params: AppendPageParams)` | `Promise<{ asaId: number; txid: string }>` | Mint new page ASA and wire into book chain |
+| `listLibraryEntries` | `(ctx: LibraryContext, filters?: LibraryFilters)` | `Promise<LibraryEntry[]>` | Query indexer for ALL CRVLIB ASAs via unit name filter; optional authorAddress, category, tag filters |
+| `readBook` | `(ctx: LibraryContext, bookKey: string)` | `Promise<LibraryEntry[]>` | Fetch all pages of a book in order; page 1 found via DB `book=bookKey, page=1` lookup |
+| `appendPage` | `(ctx: LibraryContext, bookKey: string, params: AppendPageParams)` | `Promise<{ asaId: number; txid: string }>` | Mint new page ASA and wire into book chain; page 1 must exist with key `{bookKey}/page-1` |
 | `resolveLibraryAsa` | `(db: Database, key: string)` | `number \| null` | DB lookup for key → ASA ID |
+| `buildNotePayload` | `(key, authorId, authorName, category, tags, content, bookMeta?)` | `Uint8Array` | Build ARC-69 JSON note bytes |
+| `parseNotePayload` | `(noteBytes: Uint8Array)` | `LibraryNotePayload \| null` | Parse ARC-69 note bytes; returns null on failure or CRVMEM notes |
 
 ### Exported Functions — `server/db/agent-library.ts`
 
@@ -111,8 +114,10 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 4. **Localnet only.** CRVLIB is gated on `network === 'localnet'`.
 5. **Note field limit.** The ARC-69 note is limited to 1024 bytes. Content exceeding the available space (approximately 700 bytes after JSON overhead) will be rejected — use book chaining instead.
 6. **SQLite is the index.** The `agent_library` table is a local cache. The on-chain ASA is authoritative.
-7. **Key is globally unique.** The `key` column has a UNIQUE constraint — one key maps to at most one ASA.
+7. **Key is globally unique.** The `key` column has a UNIQUE constraint — one key maps to at most one ASA. The `asa_id` column also has a UNIQUE constraint to prevent duplicate rows during sync.
 8. **Book chaining integrity.** Page 1 always carries `total` = number of pages. Each page carries `prev`/`next` ASA IDs linking the chain.
+9. **Book key convention.** All pages use `{bookKey}/page-{n}` suffix (e.g., `arch-guide/page-1`, `arch-guide/page-2`). `readBook` finds page 1 by querying `book=bookKey AND page=1` in the local DB — not by key prefix.
+10. **Library discovery.** `listLibraryEntries` uses `searchForAssets().unit('CRVLIB')` to find ALL library ASAs from any agent. Optional `authorAddress` filter scopes to a specific creator. This is how agents discover each other's published content.
 
 ## Behavioral Examples
 
@@ -141,9 +146,9 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 ### Scenario: Create a multi-page book
 
 - **Given** agent Condor wants to publish a long guide
-- **When** page 1 is created with `book: "arch-guide"` and then `appendPage("arch-guide", ...)` is called
-- **Then** page 2 ASA is minted, page 1's `next` pointer is updated, and page 1's `total` becomes 2
-- **And** `readBook("arch-guide")` returns both pages in order
+- **When** page 1 is created with key `"arch-guide/page-1"`, `book: "arch-guide"`, `page: 1`, then `appendPage("arch-guide", ...)` is called
+- **Then** page 2 ASA is minted with key `"arch-guide/page-2"`, page 1's `next` pointer is updated, and page 1's `total` becomes 2
+- **And** `readBook("arch-guide")` returns both pages in order by following the chain from `book=arch-guide, page=1` in the DB
 
 ### Scenario: Delete a library entry
 
@@ -163,7 +168,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 | Indexer unavailable | Fall back to SQLite cached content |
 | Invalid ARC-69 JSON in note | Log warning, skip during sync |
 | `readBook` on nonexistent book | Return empty array |
-| `appendPage` on nonexistent book | Throw error: create page 1 first |
+| `appendPage` on nonexistent book | Throw error: create page 1 with key `{bookKey}/page-1` first |
 
 ## Dependencies
 
@@ -191,7 +196,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | TEXT | PRIMARY KEY | Row UUID |
-| asa_id | INTEGER | DEFAULT NULL | On-chain ASA ID |
+| asa_id | INTEGER | DEFAULT NULL, UNIQUE | On-chain ASA ID — UNIQUE prevents duplicate sync rows |
 | key | TEXT | NOT NULL, UNIQUE | Unique entry identifier |
 | author_id | TEXT | NOT NULL, FK→agents.id | Agent that created the entry |
 | author_name | TEXT | NOT NULL | Author display name |
@@ -225,3 +230,4 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-26 | corvid-agent | Initial spec — shared plaintext library with book chaining |
+| 2026-03-26 | corvid-agent | v1.1: localnet gate, searchForAssets for all-agent discovery, /page-N key convention, asa_id UNIQUE, LibrarySyncService, exported buildNotePayload/parseNotePayload |

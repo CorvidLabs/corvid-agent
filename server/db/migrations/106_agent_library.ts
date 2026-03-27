@@ -8,10 +8,10 @@ import type { Database } from 'bun:sqlite';
  * CRVLIB entries are readable by any agent.
  */
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS agent_library (
             id TEXT PRIMARY KEY,
-            asa_id INTEGER DEFAULT NULL,
+            asa_id INTEGER DEFAULT NULL UNIQUE,
             key TEXT NOT NULL UNIQUE,
             author_id TEXT NOT NULL,
             author_name TEXT NOT NULL,
@@ -28,16 +28,16 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_key ON agent_library(key)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_category ON agent_library(category) WHERE archived = 0`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_book_page ON agent_library(book, page) WHERE book IS NOT NULL`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_author ON agent_library(author_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_key ON agent_library(key)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_category ON agent_library(category) WHERE archived = 0`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_book_page ON agent_library(book, page) WHERE book IS NOT NULL`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_library_author ON agent_library(author_id)`);
 }
 
 export function down(db: Database): void {
-    db.exec('DROP INDEX IF EXISTS idx_agent_library_author');
-    db.exec('DROP INDEX IF EXISTS idx_agent_library_book_page');
-    db.exec('DROP INDEX IF EXISTS idx_agent_library_category');
-    db.exec('DROP INDEX IF EXISTS idx_agent_library_key');
-    db.exec('DROP TABLE IF EXISTS agent_library');
+  db.exec('DROP INDEX IF EXISTS idx_agent_library_author');
+  db.exec('DROP INDEX IF EXISTS idx_agent_library_book_page');
+  db.exec('DROP INDEX IF EXISTS idx_agent_library_category');
+  db.exec('DROP INDEX IF EXISTS idx_agent_library_key');
+  db.exec('DROP TABLE IF EXISTS agent_library');
 }
