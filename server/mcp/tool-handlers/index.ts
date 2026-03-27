@@ -95,3 +95,6 @@ export {
     handleDismissObservation,
     handleObservationStats,
 } from './observations';
+
+// ─── Shared library (CRVLIB) ──────────────────────────────────────────────
+export { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './library';

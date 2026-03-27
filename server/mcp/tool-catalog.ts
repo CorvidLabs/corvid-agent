@@ -44,6 +44,12 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     { name: 'corvid_read_on_chain_memories', description: 'Read memories directly from Algorand blockchain', category: 'communication' },
     { name: 'corvid_sync_on_chain_memories', description: 'Sync on-chain memories back to local SQLite cache', category: 'communication' },
 
+    // ── Shared Library (CRVLIB) ───────────────────────────────────────────
+    { name: 'corvid_library_write', description: 'Publish or update a shared library entry readable by all agents', category: 'communication' },
+    { name: 'corvid_library_read', description: 'Read shared library entries by key, query, category, or tag', category: 'communication' },
+    { name: 'corvid_library_list', description: 'List all shared library entries directly from on-chain', category: 'communication' },
+    { name: 'corvid_library_delete', description: 'Delete a shared library entry (soft or hard)', category: 'communication' },
+
     // ── Discord Messaging ─────────────────────────────────────────────────
     { name: 'corvid_discord_send_message', description: 'Send a message to a Discord channel', category: 'communication' },
     { name: 'corvid_discord_send_image', description: 'Send an image to a Discord channel', category: 'communication' },
