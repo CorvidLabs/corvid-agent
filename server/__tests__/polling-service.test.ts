@@ -37,12 +37,18 @@ beforeEach(() => {
     const project = createProject(db, { name: 'PollProject', workingDir: '/tmp/poll-test' });
     projectId = project.id;
 
+    // Set env vars so isHomeRepo resolves correctly for CorvidLabs/corvid-agent
+    process.env.GITHUB_OWNER = 'CorvidLabs';
+    process.env.GITHUB_REPO = 'corvid-agent';
+
     // Reset mocks
     (mockProcessManager.startProcess as ReturnType<typeof mock>).mockReset();
 });
 
 afterEach(() => {
     db.close();
+    delete process.env.GITHUB_OWNER;
+    delete process.env.GITHUB_REPO;
 });
 
 function createTestConfig(overrides?: Record<string, unknown>) {

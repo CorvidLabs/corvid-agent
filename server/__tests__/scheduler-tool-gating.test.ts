@@ -1,5 +1,9 @@
 import { describe, test, expect } from 'bun:test';
-import {
+
+// Set env vars before importing the module so SCHEDULER_ALLOWED_ORGS is populated at load time
+process.env.GITHUB_ALLOWED_ORGS = 'CorvidLabs,corvid-agent';
+
+const {
     isToolBlockedForScheduler,
     isRepoAllowedForScheduler,
     checkSchedulerRateLimit,
@@ -10,7 +14,7 @@ import {
     SCHEDULER_MAX_PRS_PER_SESSION,
     SCHEDULER_MAX_PR_COMMENTS_PER_SESSION,
     SCHEDULER_MAX_MESSAGES_PER_SESSION,
-} from '../mcp/scheduler-tool-gating';
+} = await import('../mcp/scheduler-tool-gating');
 
 describe('isToolBlockedForScheduler', () => {
     test('allows corvid_send_message for send_message action', () => {

@@ -1,5 +1,20 @@
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { getCodebaseContextPrompt, getCodingToolPrompt, getToolInstructionPrompt } from '../providers/ollama/tool-prompt-templates';
+
+let savedGithubOwner: string | undefined;
+
+beforeAll(() => {
+    savedGithubOwner = process.env.GITHUB_OWNER;
+    process.env.GITHUB_OWNER = 'CorvidLabs';
+});
+
+afterAll(() => {
+    if (savedGithubOwner !== undefined) {
+        process.env.GITHUB_OWNER = savedGithubOwner;
+    } else {
+        delete process.env.GITHUB_OWNER;
+    }
+});
 
 describe('getCodebaseContextPrompt', () => {
     test('returns a non-empty string', () => {
@@ -17,7 +32,7 @@ describe('getCodebaseContextPrompt', () => {
         const result = getCodebaseContextPrompt();
         expect(result).toContain('### Project Structure');
         expect(result).toContain('server/');
-        expect(result).toContain('dashboard/');
+        expect(result).toContain('client/');
     });
 
     test('includes key technologies', () => {
