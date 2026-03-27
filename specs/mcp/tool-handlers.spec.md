@@ -60,7 +60,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `friendlyModelName` | `(model: string)` | `string` | Map a raw model ID (e.g. `claude-opus-4-6`) to a human-friendly name (e.g. `Opus 4.6`) |
-| `buildAgentSignature` | `(ctx: McpToolContext)` | `string` | Build an identity footer for GitHub write ops; returns empty string on failure |
+| `formatAgentSignature` | `(agent: { name, model } \| null \| undefined)` | `string` | Format an identity footer from an agent object; returns empty string for null/undefined |
+| `buildAgentSignature` | `(ctx: McpToolContext)` | `string` | Look up agent from DB and build identity footer; returns empty string on failure |
 
 ### Exported Functions
 

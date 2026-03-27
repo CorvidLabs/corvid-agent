@@ -23,13 +23,18 @@ export function friendlyModelName(model: string): string {
     return model;
 }
 
-/** Build an agent identity signature footer for GitHub write operations (#1555). */
+/** Format an agent identity signature footer for GitHub write operations (#1555). */
+export function formatAgentSignature(agent: { name: string; model: string } | null | undefined): string {
+    if (!agent) return '';
+    const modelDisplay = friendlyModelName(agent.model);
+    return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay} \u00B7 CorvidLabs Team Alpha`;
+}
+
+/** Build an agent identity signature footer by looking up the agent from the DB. */
 export function buildAgentSignature(ctx: McpToolContext): string {
     try {
         const agent = getAgent(ctx.db, ctx.agentId);
-        if (!agent) return '';
-        const modelDisplay = friendlyModelName(agent.model);
-        return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay} \u00B7 CorvidLabs Team Alpha`;
+        return formatAgentSignature(agent);
     } catch {
         return '';
     }
