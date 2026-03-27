@@ -65,6 +65,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 | `MODEL_PRICING` | `ModelPricing[]` | Full pricing table for all supported models across Anthropic, OpenAI, and Ollama (local + cloud) |
 | `DEFAULT_FALLBACK_CHAINS` | `Record<string, FallbackChain>` | Pre-defined fallback chains: `'high-capability'`, `'balanced'`, `'cost-optimized'`, `'local'`, `'cloud'` |
 | `CLAUDE_TIER_MODELS` | `Record<ModelTier, string>` | Maps each ModelTier to its canonical Claude model ID (e.g. OPUS → `'claude-opus-4-6'`) |
+| `OLLAMA_DEFAULT_LOCAL_MODEL` | `string` | Default local Ollama model name. Reads from `OLLAMA_DEFAULT_MODEL` env var, falling back to `'qwen3:14b'`. |
 
 ### Exported Classes
 
@@ -197,4 +198,5 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-27 | rook | Document `OLLAMA_DEFAULT_LOCAL_MODEL` constant (closes #1573) |
 | 2026-03-04 | corvid-agent | Initial spec |
