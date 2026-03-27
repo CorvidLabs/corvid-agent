@@ -48,6 +48,7 @@ async function buildLibraryContext(ctx: McpToolContext): Promise<LibraryContext 
       algodClient: service.algodClient,
       indexerClient: service.indexerClient,
       chatAccount: chatAccountResult.account,
+      network: ctx.network,
     };
   } catch {
     return null;
