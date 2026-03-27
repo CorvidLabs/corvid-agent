@@ -64,6 +64,20 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `resolveLibraryAsaId` | `(db: Database, key: string)` | `number \| null` | Look up ASA ID for a key |
 | `upsertLibraryEntryFromChain` | `(db: Database, params)` | `void` | Restore from on-chain sync |
 
+### Exported Functions — `server/db/migrations/106_agent_library.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `agent_library` table and indexes |
+| `down` | `(db: Database)` | `void` | Drops `agent_library` table and indexes |
+
+### Exported Constants — `server/db/schema/library.ts`
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `tables` | `string[]` | SQL CREATE TABLE statements for `agent_library` |
+| `indexes` | `string[]` | SQL CREATE INDEX statements for `agent_library` |
+
 ### Exported Types
 
 | Type | Description |
@@ -72,6 +86,7 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `LibraryEntry` | Full entry with asaId, key, author, category, tags, content, book/page metadata, txid |
 | `LibraryNotePayload` | ARC-69 JSON structure stored in transaction note |
 | `LibraryCategory` | `'guide' \| 'reference' \| 'decision' \| 'standard' \| 'runbook'` |
+| `ListLibraryOptions` | Options for `listLibraryEntries`: category, authorId, tag, book, limit, includeArchived |
 | `CreateLibraryParams` | Parameters for createLibraryEntry |
 | `UpdateLibraryParams` | Parameters for updateLibraryEntry |
 | `AppendPageParams` | Parameters for appendPage |
@@ -178,11 +193,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 ### Consumed By
 
-| Module | What is used |
-|--------|-------------|
-| `server/mcp/tool-handlers/library.ts` | All library operations (governance-protected — see note) |
-
-> **Note:** `server/mcp/tool-handlers/library.ts` is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process.
+> **Note:** The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are planned but not yet created. `server/mcp/tool-handlers/library.ts` is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation.
 
 ## Database Tables
 
