@@ -178,7 +178,18 @@ export function handleAgentRoutes(
         const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
         if (denied) return denied;
         return handleUpdate(req, db, id, context).then(res => {
-            if (res.ok) onAgentChange?.();
+            if (res.ok) {
+                onAgentChange?.();
+                // Auto-create wallet if agent has AlgoChat enabled but no wallet
+                if (agentWalletService) {
+                    const updated = getAgent(db, id, context.tenantId);
+                    if (updated && updated.algochatEnabled && !updated.walletAddress) {
+                        agentWalletService.ensureWallet(id).catch(() => {
+                            // Fire and forget — wallet creation failure is non-blocking
+                        });
+                    }
+                }
+            }
             return res;
         });
     }

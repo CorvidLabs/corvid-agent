@@ -87,6 +87,32 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `resolveLibraryAsaId` | `(db: Database, key: string)` | `number \| null` | Look up ASA ID for a key |
 | `upsertLibraryEntryFromChain` | `(db: Database, params)` | `void` | Restore from on-chain sync |
 
+### Exported Type — `server/db/agent-library.ts`
+
+| Type | Description |
+|------|-------------|
+| `ListLibraryOptions` | Options for listing library entries (category, author, tag filters) |
+
+### Exported Class — `server/memory/library-sync.ts`
+
+| Class | Description |
+|-------|-------------|
+| `LibrarySyncService` | Periodically indexes all CRVLIB ASAs from localnet into local `agent_library` table |
+
+### Exported Functions — `server/db/migrations/106_agent_library.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Create agent_library table and indexes |
+| `down` | `(db: Database)` | `void` | Drop agent_library table |
+
+### Exported Constants — `server/db/schema/library.ts`
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `tables` | `string[]` | DDL statements for agent_library table |
+| `indexes` | `string[]` | DDL statements for agent_library indexes |
+
 ### Exported Types
 
 | Type | Description |

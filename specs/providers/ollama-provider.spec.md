@@ -56,6 +56,7 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 | `getActivePulls` | `()` | `ModelPullStatus[]` | Get all active pull operations |
 | `getPullStatus` | `(model)` | `ModelPullStatus \| undefined` | Get pull status for specific model |
 | `isAvailable` | `()` | `Promise<boolean>` | Check if Ollama is reachable |
+| `isCloudModel` (static) | `(model)` | `boolean` | Check if model name indicates cloud-proxied inference |
 
 ## Invariants
 
@@ -72,6 +73,7 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 11. **Request timeout (30 min)**: Combined abort signal uses both external signal and 30-minute timeout. Configurable via `OLLAMA_REQUEST_TIMEOUT`
 12. **Retry on transient errors**: Retryable errors (connection reset, 503, 429, OOM) are retried up to 3 times with exponential backoff (1s, 2s, 4s) + jitter. Permanent errors (model not found, invalid request) fail immediately
 13. **Pull status cleanup**: Terminal pull statuses are removed from the map after 60 seconds
+14. **Cloud model optimizations**: Cloud-proxied models (detected by `isCloudModel()`) skip local-only options (`num_gpu`, `num_batch`) and cap `num_predict` at 1024 to stay within the cloud proxy's server-side timeout (~90s). System prompts use compact variants that preserve essential rules while reducing token count
 
 ## Behavioral Examples
 
