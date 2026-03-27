@@ -211,6 +211,9 @@ export function configFromEnv(): AgentDeploymentConfig {
                 token: env.GH_TOKEN,
                 webhookSecret: env.GITHUB_WEBHOOK_SECRET,
                 notificationRepo: env.NOTIFICATION_GITHUB_REPO,
+                owner: env.GITHUB_OWNER,
+                repo: env.GITHUB_REPO,
+                allowedOrgs: csvList('GITHUB_ALLOWED_ORGS'),
             },
         },
 

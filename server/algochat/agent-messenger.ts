@@ -392,12 +392,33 @@ export class AgentMessenger {
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
+            // SDK-style assistant events (Claude SDK provider)
             if (event.type === 'assistant' && event.message?.content) {
                 responseBuffer += extractContentText(event.message.content);
             }
 
-            // Each 'result' marks end of a turn — save and reset
-            if (event.type === 'result') {
+            // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
+            if (event.type === 'content_block_delta') {
+                const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
+                if (delta && typeof delta.text === 'string') {
+                    responseBuffer += delta.text;
+                }
+            }
+
+            // Cursor-style assistant_message / text events (not in ClaudeStreamEvent union)
+            {
+                const rawType = (event as unknown as Record<string, unknown>).type as string;
+                if (rawType === 'assistant_message' || rawType === 'text') {
+                    const raw = event as unknown as Record<string, unknown>;
+                    const text = raw.content ?? raw.text;
+                    if (typeof text === 'string') {
+                        responseBuffer += text;
+                    }
+                }
+            }
+
+            // Each 'result' or 'message_stop' marks end of a turn — save and reset
+            if (event.type === 'result' || event.type === 'message_stop') {
                 lastTurnResponse = responseBuffer;
                 responseBuffer = '';
             }
@@ -475,12 +496,33 @@ export class AgentMessenger {
             const callback = (sid: string, event: ClaudeStreamEvent) => {
                 if (sid !== sessionId || settled) return;
 
+                // SDK-style assistant events (Claude SDK provider)
                 if (event.type === 'assistant' && event.message?.content) {
                     responseBuffer += extractContentText(event.message.content);
                 }
 
-                // Each 'result' marks end of a turn — save and reset
-                if (event.type === 'result') {
+                // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
+                if (event.type === 'content_block_delta') {
+                    const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
+                    if (delta && typeof delta.text === 'string') {
+                        responseBuffer += delta.text;
+                    }
+                }
+
+                // Cursor-style assistant_message / text events (not in ClaudeStreamEvent union)
+                {
+                    const rawType = (event as unknown as Record<string, unknown>).type as string;
+                    if (rawType === 'assistant_message' || rawType === 'text') {
+                        const raw = event as unknown as Record<string, unknown>;
+                        const text = raw.content ?? raw.text;
+                        if (typeof text === 'string') {
+                            responseBuffer += text;
+                        }
+                    }
+                }
+
+                // Each 'result' or 'message_stop' marks end of a turn — save and reset
+                if (event.type === 'result' || event.type === 'message_stop') {
                     lastTurnResponse = responseBuffer;
                     responseBuffer = '';
                 }

@@ -26,6 +26,8 @@ export interface LibraryContext {
   algodClient: import('algosdk').default.Algodv2;
   indexerClient: import('algosdk').default.Indexer;
   chatAccount: ChatAccount;
+  /** Network from MCP context — used instead of env var for accurate network detection. */
+  network?: string;
 }
 
 export interface LibraryEntry {
@@ -106,8 +108,8 @@ export interface LibraryFilters {
  * Throw if not running on localnet.
  * CRVLIB is localnet-only — the shared library depends on free, fast transactions.
  */
-function assertLocalnet(): void {
-  const network = process.env.ALGORAND_NETWORK ?? 'localnet';
+function assertLocalnet(ctxNetwork?: string): void {
+  const network = ctxNetwork ?? process.env.ALGORAND_NETWORK ?? 'localnet';
   if (network !== 'localnet') {
     throw new Error(
       `CRVLIB operations are localnet-only (ALGORAND_NETWORK=${network}). ` +
@@ -233,7 +235,7 @@ export async function createLibraryEntry(
   ctx: LibraryContext,
   params: CreateLibraryParams,
 ): Promise<{ asaId: number; txid: string }> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   const algosdk = (await import('algosdk')).default;
   const category = params.category ?? 'reference';
   const tags = params.tags ?? [];
@@ -290,7 +292,7 @@ export async function updateLibraryEntry(
   params: UpdateLibraryParams,
   existing: LibraryEntry,
 ): Promise<{ txid: string }> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   const algosdk = (await import('algosdk')).default;
 
   const category = params.category ?? existing.category;
@@ -344,7 +346,7 @@ export async function deleteLibraryEntry(
   asaId: number,
   mode: 'soft' | 'hard' = 'soft',
 ): Promise<{ txid: string }> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   const algosdk = (await import('algosdk')).default;
   const txParams = await ctx.algodClient.getTransactionParams().do();
 
@@ -380,7 +382,7 @@ export async function deleteLibraryEntry(
  * Returns null if the ASA has no readable note (soft-deleted or missing).
  */
 export async function readLibraryEntry(ctx: LibraryContext, asaId: number): Promise<LibraryEntry | null> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   try {
     const response = await ctx.indexerClient.searchForTransactions().assetID(asaId).txType('acfg').do();
 
@@ -405,7 +407,7 @@ export async function readLibraryEntry(ctx: LibraryContext, asaId: number): Prom
  * Optionally filter by creator address (authorAddress), category, or tags.
  */
 export async function listLibraryEntries(ctx: LibraryContext, filters: LibraryFilters = {}): Promise<LibraryEntry[]> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   const entries: LibraryEntry[] = [];
 
   try {
@@ -454,7 +456,7 @@ export async function listLibraryEntries(ctx: LibraryContext, filters: LibraryFi
  * Page key convention: all pages use `{bookKey}/page-{n}` suffix (page 1 = `{bookKey}/page-1`).
  */
 export async function readBook(ctx: LibraryContext, bookKey: string): Promise<LibraryEntry[]> {
-  assertLocalnet();
+  assertLocalnet(ctx.network);
   const { getBookPages } = await import('../db/agent-library');
 
   // Find page 1 by searching for book=bookKey, page=1 in the local DB.

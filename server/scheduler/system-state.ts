@@ -34,8 +34,8 @@ export interface SystemStateConfig {
 }
 
 const DEFAULT_CONFIG: SystemStateConfig = {
-    owner: 'CorvidLabs',
-    repo: 'corvid-agent',
+    owner: process.env.GITHUB_OWNER ?? '',
+    repo: process.env.GITHUB_REPO ?? '',
     diskPressureThreshold: 0.90,
     p0Labels: ['priority:p0', 'critical', 'P0'],
     cacheTtlMs: 60_000,

@@ -365,6 +365,8 @@ export class OllamaProvider extends BaseLlmProvider {
         if (msg.includes('out of memory') || msg.includes('oom')) return true;
         // Stream idle timeout (model may recover)
         if (msg.includes('stream idle')) return true;
+        // NVIDIA cloud proxy timeout — their backend killed the request, retry may succeed
+        if (msg.includes('cloud proxy timeout')) return true;
         return false;
     }
 
@@ -518,12 +520,14 @@ export class OllamaProvider extends BaseLlmProvider {
         // Build Ollama options for optimal performance.
         const isCloud = OllamaProvider.isCloudModel(params.model);
         const defaultCtx = parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
+        // Cloud-proxied models have tight server-side timeouts (~90s on NVIDIA).
+        // Reduce context window to speed up prompt evaluation on the remote side.
+        const effectiveCtx = isCloud ? Math.min(defaultCtx, 4096) : defaultCtx;
         const localMaxOutput = parseInt(process.env.OLLAMA_NUM_PREDICT ?? '2048', 10);
-        // Cloud-proxied models have tight server-side timeouts (~90s).
-        // Cap output tokens lower to stay within the window.
+        // Cap output tokens lower to stay within the cloud timeout window.
         const maxOutput = isCloud ? Math.min(localMaxOutput, 1024) : localMaxOutput;
         const options: Record<string, unknown> = {
-            num_ctx: defaultCtx,
+            num_ctx: effectiveCtx,
             // Cap output tokens to prevent runaway generation (14B models can get stuck)
             num_predict: maxOutput,
         };
@@ -595,7 +599,10 @@ export class OllamaProvider extends BaseLlmProvider {
         let streamedToolCalls: OllamaChatMessage['tool_calls'] = [];
         let lastActivitySignal = 0;
         const ACTIVITY_INTERVAL = 10_000; // Signal activity every 10s
-        const STREAM_IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 min — abort if no data arrives
+        // Cloud-proxied models have a ~90s server-side timeout (NVIDIA).
+        // Use a shorter idle timeout (100s) so we detect failure quickly and retry,
+        // rather than waiting the full 2 minutes for local models.
+        const STREAM_IDLE_TIMEOUT_MS = isCloud ? 100_000 : 2 * 60 * 1000;
 
         try {
             while (true) {
@@ -682,6 +689,20 @@ export class OllamaProvider extends BaseLlmProvider {
                 name: tc.function.name,
                 arguments: tc.function.arguments,
             }));
+        }
+
+        // Detect NVIDIA cloud proxy errors embedded in stream content.
+        // When NVIDIA's backend times out, it returns error text like
+        // "Function process_single_item_agent timed out after 90.0 seconds"
+        // or "API request returned None" as the model's "response".
+        if (isCloud && content) {
+            const lower = content.toLowerCase();
+            if ((lower.includes('timed out') && lower.includes('process_single_item'))
+                || lower.includes('api request returned none')
+                || (lower.includes('timed out after') && lower.includes('seconds'))) {
+                log.warn(`NVIDIA cloud proxy error detected in response for ${params.model}: ${content.slice(0, 200)}`);
+                throw new Error(`Cloud proxy timeout: ${content.slice(0, 150)}`);
+            }
         }
 
         // Resolve content — some models (Qwen3) may put output in `thinking`

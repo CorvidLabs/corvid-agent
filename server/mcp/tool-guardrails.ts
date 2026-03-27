@@ -61,26 +61,30 @@ export interface ToolAccessConfig {
 }
 
 /**
- * Determine the default tool access policy for a session based on source and model.
+ * Determine the default tool access policy for a session based on source.
  *
- * - Web sessions → 'full' (operator is directly controlling)
- * - Agent-to-agent sessions → 'restricted' (prevent recursive networking)
- * - External chat sources with small models → 'standard' (hide networking tools)
- * - External chat sources with large models → 'standard'
+ * - Agent-to-agent sessions → 'restricted' (prevent recursive networking loops)
+ * - All other sources → 'full' (networking tools available; directional
+ *   enforcement happens at the handler level via communication tiers)
+ *
+ * Previously, Discord/Telegram/AlgoChat sources got 'standard' which hid
+ * networking tools entirely. This was too blunt — it prevented capable agents
+ * from communicating with their team. The communication tier system
+ * (server/lib/communication-tiers.ts) now enforces directional messaging,
+ * and per-session rate limiters bound abuse from any source.
  */
 export function resolveToolAccessPolicy(
     source: string | undefined,
     _agentModel?: string,
 ): ToolAccessPolicy {
-    // Web sessions are always fully privileged
-    if (source === 'web') return 'full';
-
     // Agent-to-agent sessions should never re-invoke networking tools
+    // (prevents recursive invocation loops)
     if (source === 'agent') return 'restricted';
 
-    // All other sources (discord, telegram, slack, algochat) get standard policy
-    // which hides expensive networking tools unless explicitly allowed
-    return 'standard';
+    // All other sources (web, discord, telegram, slack, algochat) get full
+    // access. Directional messaging rules are enforced in handleSendMessage()
+    // via checkCommunicationTier(), and rate limiters cap message volume.
+    return 'full';
 }
 
 /**

@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.55.0] - 2026-03-27
+
+### Added
+- **Cursor: first-class provider** — CursorProvider promoted to production-quality LlmProvider with exit code classification, transient/permanent error detection, 120s idle timeout, and 41 tests (#1545, #1531)
+- **Agent signatures** — agent identity signatures on all GitHub write operations with model-based regex mapping and fail-open safety (#1555)
+- **Memory browser** — full CRUD UI with search, filter, pagination, and signal-based service for on-chain ARC-69 memories (#1552)
+- **Agent comms visualization** — real-time WebSocket timeline of all agent-to-agent messages with history and dedup handling (#1551)
+- **Cron editor** — extracted `CronHumanPipe`, inline validation, preset chips, and human-readable preview for schedule management (#1553)
+- **Shared agent library (CRVLIB)** — ARC-69 shared agent library for reusable on-chain agent components (#1537)
+- **Ollama: cloud intern models** — GPT-OSS, DeepSeek V3.1, Qwen3 Coder as cloud intern model options (#1524)
+- **Ollama: cloud optimizations** — compact prompts and timeout caps for cloud model families (#1522)
+- **Work: intern PR guard** — prevent intern-tier models from creating production PRs (#1546)
+
+### Fixed
+- **Flock: inner transaction fees** — fix AVM fee-pooling bug with extraFee for inner transactions, plus 45 e2e tests (#1550)
+- **Ollama: readiness probe** — check Ollama readiness before provider registration (#1544)
+- **Ollama: nemotron** — add nemotron to TEXT_BASED_TOOL_FAMILIES (#1521)
+- **Health collector** — fix grep --include flag ordering (#1543)
+- **MCP: tool permissions** — empty tool permissions no longer blocks all tools (#1523)
+- **Scheduler** — resolve project ID via tenant fallback (#1540)
+
+### Docs
+- **Provider parity plan** — Ollama + Cursor checklist and test plan (#1534)
+- **TypeScript 6.0 evaluation** — upgrade evaluation document (#1541)
+- **CRVLIB spec** — add missing exports and fix consumed-by section (#1538)
+
 ## [0.54.0] - 2026-03-26
 
 ### Added

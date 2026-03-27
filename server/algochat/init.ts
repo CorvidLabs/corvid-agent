@@ -21,6 +21,7 @@ import type { PermissionBroker } from '../permissions/broker';
 import type { ShutdownCoordinator } from '../lib/shutdown-coordinator';
 import type { MemorySyncService } from '../db/memory-sync';
 import type { MemoryGraduationService } from '../memory/graduation-service';
+import type { LibrarySyncService } from '../memory/library-sync';
 import type { ResponsePollingService } from '../notifications/response-poller';
 import type { UsageMeter } from '../billing/meter';
 import type { HealthMonitorService } from '../health/monitor';
@@ -42,8 +43,6 @@ import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import { createKeyProvider, assertProductionReady, detectPlaintextKeyConfig } from '../lib/key-provider';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
-import { seedConversationalAgents } from '../conversational/seed';
-import { seedDefaultBuddyPairings } from '../buddy/seed';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -67,6 +66,7 @@ export interface AlgoChatInitDeps {
     shutdownCoordinator: ShutdownCoordinator;
     memorySyncService: MemorySyncService;
     graduationService: MemoryGraduationService;
+    librarySyncService: LibrarySyncService;
     responsePollingService: ResponsePollingService;
     usageMeter: UsageMeter;
     healthMonitorService: HealthMonitorService;
@@ -348,6 +348,12 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
             deps.graduationService.setWalletService(algochatState.walletService);
         }
         deps.graduationService.start();
+
+        // Start library sync service (CRVLIB — shared plaintext knowledge base)
+        if (algochatState.walletService) {
+            deps.librarySyncService.setServices(algochatState.walletService, algochatConfig.network);
+            deps.librarySyncService.start();
+        }
     }
 
     // Start the scheduler now that all services are available
@@ -366,17 +372,4 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
     usageMeter.start();
     healthMonitorService.start();
 
-    // Seed conversational agent presets (#1185) — fire-and-forget, non-blocking
-    seedConversationalAgents({
-        db: deps.db,
-        walletService: algochatState.walletService,
-        flockDirectoryService: deps.flockDirectoryService,
-    }).then(() => {
-        // Seed default buddy pairings after conversational agents exist
-        seedDefaultBuddyPairings({ db: deps.db });
-    }).catch((err) => {
-        log.warn('Conversational agent seeding failed (non-blocking)', {
-            error: err instanceof Error ? err.message : String(err),
-        });
-    });
 }

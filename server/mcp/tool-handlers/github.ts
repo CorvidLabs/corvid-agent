@@ -7,6 +7,39 @@ import { isRepoAllowedForScheduler, checkSchedulerRateLimit, SCHEDULER_ESCALATIO
 import { getAgent } from '../../db/agents';
 import { checkInternPrGuard } from '../../work/intern-guard';
 
+/** Map a raw model ID to a human-friendly name for GitHub signatures. */
+export function friendlyModelName(model: string): string {
+    // claude-opus-4-6 → Opus 4.6
+    // claude-sonnet-4-6 → Sonnet 4.6
+    // claude-haiku-4-5-20251001 → Haiku 4.5
+    // claude-sonnet-4-20250514 → Sonnet 4
+    const m = model.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-\d{8,})?$/i);
+    if (m) {
+        const family = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+        const major = m[2];
+        const minor = m[3];
+        return minor ? `${family} ${major}.${minor}` : `${family} ${major}`;
+    }
+    return model;
+}
+
+/** Format an agent identity signature footer for GitHub write operations (#1555). */
+export function formatAgentSignature(agent: { name: string; model: string } | null | undefined): string {
+    if (!agent) return '';
+    const modelDisplay = friendlyModelName(agent.model);
+    return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay}`;
+}
+
+/** Build an agent identity signature footer by looking up the agent from the DB. */
+export function buildAgentSignature(ctx: McpToolContext): string {
+    try {
+        const agent = getAgent(ctx.db, ctx.agentId);
+        return formatAgentSignature(agent);
+    } catch {
+        return '';
+    }
+}
+
 /** Enforce scheduler org restriction + rate limit for a gated tool. Returns error result or null. */
 function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: string): CallToolResult | null {
     if (!ctx.schedulerMode) return null;
@@ -102,7 +135,8 @@ export async function handleGitHubCreatePr(
         } catch {
             // Fail open: if the agent lookup fails, allow the operation to proceed.
         }
-        const result = await github.createPr(args.repo, args.title, args.body, args.head, args.base ?? 'main');
+        const bodyWithSig = args.body + buildAgentSignature(ctx);
+        const result = await github.createPr(args.repo, args.title, bodyWithSig, args.head, args.base ?? 'main');
         if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
         return textResult(`PR created: ${result.prUrl ?? 'success'}`);
     } catch (err) {
@@ -112,7 +146,7 @@ export async function handleGitHubCreatePr(
 }
 
 export async function handleGitHubReviewPr(
-    _ctx: McpToolContext,
+    ctx: McpToolContext,
     args: { repo: string; pr_number: number; event: string; body: string },
 ): Promise<CallToolResult> {
     try {
@@ -121,7 +155,8 @@ export async function handleGitHubReviewPr(
         if (!['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event)) {
             return errorResult(`Invalid review event: ${args.event}. Use APPROVE, REQUEST_CHANGES, or COMMENT.`);
         }
-        const result = await github.addPrReview(args.repo, args.pr_number, event, args.body);
+        const bodyWithSig = args.body + buildAgentSignature(ctx);
+        const result = await github.addPrReview(args.repo, args.pr_number, event, bodyWithSig);
         if (!result.ok) return errorResult(result.error ?? 'Failed to review PR');
         return textResult(`PR #${args.pr_number} reviewed with ${event}.`);
     } catch (err) {
@@ -146,7 +181,8 @@ export async function handleGitHubCreateIssue(
                 effectiveLabels.push(SCHEDULER_ESCALATION_LABEL);
             }
         }
-        const result = await github.createIssue(args.repo, args.title, args.body, effectiveLabels);
+        const bodyWithSig = args.body + buildAgentSignature(ctx);
+        const result = await github.createIssue(args.repo, args.title, bodyWithSig, effectiveLabels);
         if (!result.ok) return errorResult(result.error ?? 'Failed to create issue');
         return textResult(`Issue created: ${result.issueUrl ?? 'success'}`);
     } catch (err) {
@@ -213,7 +249,8 @@ export async function handleGitHubCommentOnPr(
         assertRepoAllowed(args.repo);
         const guard = enforceSchedulerGuards(ctx, 'corvid_github_comment_on_pr', args.repo);
         if (guard) return guard;
-        const result = await github.addPrComment(args.repo, args.pr_number, args.body);
+        const bodyWithSig = args.body + buildAgentSignature(ctx);
+        const result = await github.addPrComment(args.repo, args.pr_number, bodyWithSig);
         if (!result.ok) return errorResult(result.error ?? 'Failed to comment on PR');
         return textResult(`Comment added to PR #${args.pr_number} in ${args.repo}.`);
     } catch (err) {

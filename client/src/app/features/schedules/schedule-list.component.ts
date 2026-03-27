@@ -7,6 +7,9 @@ import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
+import { CronHumanPipe, cronToHuman, validateCron } from '../../shared/pipes/cron-human.pipe';
+import { CronEditorComponent } from '../../shared/components/cron-editor.component';
+import type { CronEditorResult } from '../../shared/components/cron-editor.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -14,7 +17,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 @Component({
     selector: 'app-schedule-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, DurationPipe, CronHumanPipe, CronEditorComponent, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="schedules">
             <div class="schedules__header">
@@ -102,11 +105,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                 <button class="type-btn" [class.type-btn--active]="formScheduleType() === 'interval'" (click)="formScheduleType.set('interval')">Interval</button>
                             </div>
                         </div>
-                        <div class="form-field">
+                        <div class="form-field" [class.span-2]="formScheduleType() === 'cron'">
                             @if (formScheduleType() === 'cron') {
-                                <label>Cron Expression</label>
-                                <input [(ngModel)]="formCron" class="form-input mono" placeholder="0 9 * * 1-5" />
-                                <span class="form-hint" [class.form-hint--active]="cronPreview()">{{ cronPreview() || 'min hour dom mon dow (e.g. 0 9 * * 1-5 = weekdays at 9am)' }}</span>
+                                <app-cron-editor
+                                    [initialValue]="formCron"
+                                    (valueChange)="formCron = $event" />
                             } @else {
                                 <label>Interval (minutes)</label>
                                 <input type="number" [(ngModel)]="formIntervalMin" class="form-input" min="1" placeholder="60" />
@@ -173,8 +176,16 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                         </div>
                     }
                     <button class="add-action-btn" (click)="addTriggerEvent()">+ Add Trigger Event</button>
+                    @if (formValidationErrors().length > 0) {
+                        <div class="validation-errors" role="alert">
+                            @for (err of formValidationErrors(); track err) {
+                                <div class="validation-error">{{ err }}</div>
+                            }
+                        </div>
+                    }
                     <div class="form-buttons">
-                        <button class="save-btn" [disabled]="creating()" (click)="create()">{{ creating() ? 'Creating...' : 'Create Schedule' }}</button>
+                        <button class="save-btn" [disabled]="creating() || formValidationErrors().length > 0" (click)="create()">{{ creating() ? 'Creating...' : 'Create Schedule' }}</button>
+                        <button class="action-btn" (click)="showCreateForm.set(false)">Cancel</button>
                     </div>
                 </div>
             }
@@ -233,18 +244,22 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                             }
                                             @if (schedule.description) { <p class="schedule-desc">{{ schedule.description }}</p> }
                                             @if (editingCronId() === schedule.id) {
-                                                <div class="cron-editor" (click)="$event.stopPropagation()">
-                                                    <div class="cron-editor__row">
-                                                        <input [(ngModel)]="editCronValue" class="form-input mono cron-editor__input" placeholder="0 9 * * 1-5" />
-                                                        <button class="action-btn action-btn--run" (click)="saveCron(schedule)">Save</button>
+                                                <div class="cron-edit-panel" (click)="$event.stopPropagation()">
+                                                    <app-cron-editor
+                                                        label="Edit Schedule Timing"
+                                                        [initialValue]="editCronValue"
+                                                        (valueChange)="editCronValue = $event"
+                                                        (save)="saveCronFromEditor(schedule, $event)"
+                                                        (cancel)="editingCronId.set(null)" />
+                                                    <div class="cron-edit-panel__actions">
+                                                        <button class="action-btn action-btn--run" [disabled]="!isEditCronValid()" (click)="saveCron(schedule)">Save</button>
                                                         <button class="action-btn" (click)="editingCronId.set(null)">Cancel</button>
                                                     </div>
-                                                    <span class="form-hint form-hint--active">{{ cronToHuman(editCronValue) || 'min hour dom mon dow' }}</span>
                                                 </div>
                                             }
                                             <div class="schedule-meta">
                                                 <div class="meta-item"><span class="meta-label">Agent</span><span class="meta-value">{{ getAgentName(schedule.agentId) }}</span></div>
-                                                <div class="meta-item"><span class="meta-label">Timing</span><span class="meta-value mono">{{ cronToHuman(schedule.cronExpression) || (schedule.intervalMs ? 'Every ' + (schedule.intervalMs / 60000) + 'min' : 'N/A') }}</span></div>
+                                                <div class="meta-item"><span class="meta-label">Timing</span><span class="meta-value mono">{{ (schedule.cronExpression | cronHuman) || (schedule.intervalMs ? 'Every ' + (schedule.intervalMs / 60000) + 'min' : 'N/A') }}</span></div>
                                                 <div class="meta-item"><span class="meta-label">Executions</span><span class="meta-value">{{ schedule.executionCount }}{{ schedule.maxExecutions ? ' / ' + schedule.maxExecutions : '' }}</span></div>
                                                 <div class="meta-item"><span class="meta-label">Approval</span><span class="meta-value approval-badge" [attr.data-policy]="schedule.approvalPolicy">{{ schedule.approvalPolicy }}</span></div>
                                                 @if (schedule.nextRunAt) { <div class="meta-item"><span class="meta-label">Next Run</span><span class="meta-value">{{ schedule.nextRunAt | relativeTime }}</span></div> }
@@ -355,7 +370,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .last-result[data-status="completed"]{border-left-color:var(--accent-green)}.last-result[data-status="failed"]{border-left-color:var(--accent-red)}
 .last-result__status{font-size:.55rem;font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:var(--radius-sm)}.last-result__status[data-status="completed"]{color:var(--accent-green);background:var(--accent-green-dim)}.last-result__status[data-status="failed"]{color:var(--accent-red);background:var(--accent-red-dim)}
 .last-result__text{font-size:.65rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cron-editor{padding:.5rem;margin-bottom:.5rem;background:var(--bg-raised);border-radius:var(--radius);border:1px solid var(--accent-amber);animation:expandReveal .2s ease-out}.cron-editor__row{display:flex;gap:.35rem;align-items:center}.cron-editor__input{flex:1;max-width:200px}
+.cron-edit-panel{padding:.75rem;margin-bottom:.5rem;background:var(--bg-raised);border-radius:var(--radius-lg);border:1px solid var(--accent-amber);animation:expandReveal .2s ease-out}
+.cron-edit-panel__actions{display:flex;gap:.35rem;margin-top:.5rem;justify-content:flex-end}
+.validation-errors{margin-top:.75rem;padding:.5rem .75rem;background:var(--accent-red-dim);border:1px solid var(--accent-red);border-radius:var(--radius);animation:expandReveal .2s ease-out}
+.validation-error{font-size:.7rem;color:var(--accent-red);font-weight:600;padding:.15rem 0}
+.validation-error::before{content:'\x26A0  '}
 .schedule-desc{margin:0 0 .5rem;font-size:.75rem;color:var(--text-secondary)}.schedule-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:.5rem}.meta-item{display:flex;flex-direction:column;gap:.1rem}.meta-label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase}.meta-value{font-size:.75rem;color:var(--text-primary);font-weight:600}
 .approval-badge[data-policy="auto"]{color:var(--accent-green)}.approval-badge[data-policy="owner_approve"]{color:var(--accent-cyan)}.schedule-actions-list{display:flex;gap:.35rem;flex-wrap:wrap}
 .action-tag{font-size:.6rem;padding:2px 6px;border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border)}.action-tag[data-type="star_repo"]{color:var(--accent-amber);border-color:var(--accent-amber)}.action-tag[data-type="review_prs"]{color:var(--accent-cyan);border-color:var(--accent-cyan)}.action-tag[data-type="work_task"]{color:var(--accent-green);border-color:var(--accent-green)}
@@ -366,8 +385,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .expand-indicator{font-size:.55rem;color:var(--text-tertiary);margin-left:.25rem}.exec-row--clickable{cursor:pointer}.exec-row--clickable:hover{background:var(--bg-hover)}
 .schedule-execs{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem;animation:expandReveal .3s ease-out}.execs-heading{margin:0 0 .5rem;color:var(--text-secondary);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}.loading-execs,.no-execs{font-size:.7rem;color:var(--text-tertiary);margin:0}
 .exec-detail{padding:.5rem;background:var(--bg-base);border-radius:var(--radius);margin-top:.25rem;margin-bottom:.35rem}.exec-detail__result{margin:0;font-size:.7rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
-@media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.action-row{flex-direction:column}.schedule-meta{flex-direction:column;gap:.5rem}.schedules__header{flex-direction:column;align-items:flex-start;gap:.75rem}.exec-stats{gap:.75rem}.schedule-card__header{flex-direction:column;gap:.5rem}.schedule-card__actions{flex-wrap:wrap}}
-@media(max-width:480px){.schedules{padding:1rem}.exec-stats__item{min-width:0}.exec-stats__bar{min-width:80px;flex-basis:100%}.approval-card{flex-direction:column;gap:.5rem;align-items:flex-start}}`,
+@media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.action-row{flex-direction:column}.schedule-meta{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}.schedules__header{flex-direction:column;align-items:flex-start;gap:.75rem}.exec-stats{gap:.75rem}.schedule-card__header{flex-direction:column;gap:.5rem}.schedule-card__actions{flex-wrap:wrap;width:100%}.schedule-card__actions .action-btn{flex:1;text-align:center}.cron-edit-panel__actions{flex-wrap:wrap}.cron-edit-panel__actions .action-btn{flex:1}}
+@media(max-width:480px){.schedules{padding:.75rem}.exec-stats__item{min-width:0}.exec-stats__bar{min-width:80px;flex-basis:100%}.approval-card{flex-direction:column;gap:.5rem;align-items:flex-start}.schedule-meta{grid-template-columns:1fr}.create-btn{width:100%;text-align:center}.form-buttons{display:flex;gap:.5rem}.form-buttons .save-btn,.form-buttons .action-btn{flex:1}.exec-row{flex-wrap:wrap;gap:.25rem}}`,
 })
 export class ScheduleListComponent implements OnInit, OnDestroy {
     protected readonly scheduleService = inject(ScheduleService);
@@ -400,7 +419,36 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         { value: 'codebase_review', label: 'Codebase Review' }, { value: 'dependency_audit', label: 'Dependency Audit' }, { value: 'improvement_loop', label: 'Improvement Loop' },
         { value: 'memory_maintenance', label: 'Memory Maintenance' }, { value: 'reputation_attestation', label: 'Reputation Attestation' }, { value: 'custom', label: 'Custom (Prompt)' },
     ];
-    readonly cronPreview = computed(() => this.cronToHuman(this.formCron));
+    readonly cronPreview = computed(() => cronToHuman(this.formCron));
+    readonly formValidationErrors = computed(() => {
+        const errors: string[] = [];
+        if (!this.formAgentId) errors.push('Agent is required');
+        if (!this.formName.trim()) errors.push('Schedule name is required');
+        if (this.formActions().length === 0) errors.push('At least one action is required');
+        if (this.formScheduleType() === 'cron') {
+            const cronErr = validateCron(this.formCron);
+            if (cronErr) errors.push(`Cron: ${cronErr}`);
+        } else {
+            if (!this.formIntervalMin || this.formIntervalMin < 1) errors.push('Interval must be at least 1 minute');
+        }
+        if (this.formMaxExec !== null && this.formMaxExec < 1) errors.push('Max executions must be at least 1');
+        // Validate actions have required fields
+        for (const [i, action] of this.formActions().entries()) {
+            if ((action.type === 'star_repo' || action.type === 'fork_repo' || action.type === 'review_prs') && !action.reposStr?.trim()) {
+                errors.push(`Action ${i + 1} (${action.type}): repos are required`);
+            }
+            if (action.type === 'council_launch' && !action.councilId?.trim()) {
+                errors.push(`Action ${i + 1} (council_launch): council ID is required`);
+            }
+            if (action.type === 'send_message' && !action.toAgentId?.trim()) {
+                errors.push(`Action ${i + 1} (send_message): target agent ID is required`);
+            }
+            if (action.type === 'custom' && !action.prompt?.trim()) {
+                errors.push(`Action ${i + 1} (custom): prompt is required`);
+            }
+        }
+        return errors;
+    });
     private agentNameMap: Record<string, string> = {};
     readonly execStats = computed(() => {
         const execs = this.scheduleService.executions();
@@ -448,46 +496,28 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     }
     protected toggleGroup(status: string): void { this.collapsedGroups.update((g) => ({ ...g, [status]: !g[status] })); }
     protected startEditCron(schedule: AgentSchedule): void { this.editingCronId.set(schedule.id); this.editCronValue = schedule.cronExpression ?? ''; }
+    protected isEditCronValid(): boolean {
+        return this.editCronValue.trim().length > 0 && !validateCron(this.editCronValue);
+    }
     protected async saveCron(schedule: AgentSchedule): Promise<void> {
         const value = this.editCronValue.trim();
         if (!value) return;
-        try { await this.scheduleService.updateSchedule(schedule.id, { cronExpression: value }); this.notifications.success('Schedule timing updated'); this.editingCronId.set(null); }
+        const err = validateCron(value);
+        if (err) { this.notifications.error(`Invalid cron: ${err}`); return; }
+        try { await this.scheduleService.updateSchedule(schedule.id, { cronExpression: value }); this.notifications.success(`Timing updated: ${cronToHuman(value)}`); this.editingCronId.set(null); }
         catch { this.notifications.error('Failed to update schedule'); }
     }
-    protected cronToHuman(expr: string | null | undefined): string {
-        if (!expr) return '';
-        const parts = expr.trim().split(/\s+/);
-        if (parts.length !== 5) return expr;
-        const [min, hour, dom, mon, dow] = parts;
-        const dowNames: Record<string, string> = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat', '7': 'Sun' };
-        const monNames: Record<string, string> = { '1': 'Jan', '2': 'Feb', '3': 'Mar', '4': 'Apr', '5': 'May', '6': 'Jun', '7': 'Jul', '8': 'Aug', '9': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
-        const formatTime = (h: string, m: string): string => {
-            if (h === '*' && m === '*') return 'every minute';
-            if (h === '*') return `every hour at :${m.padStart(2, '0')}`;
-            if (m === '*') return `every minute of hour ${h}`;
-            const hr = parseInt(h, 10); const mn = parseInt(m, 10);
-            if (!Number.isFinite(hr) || !Number.isFinite(mn)) return `${h} ${m}`;
-            const ampm = hr >= 12 ? 'PM' : 'AM'; const h12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
-            return `${h12}:${m.padStart(2, '0')} ${ampm}`;
-        };
-        const formatDow = (d: string): string => {
-            if (d === '*') return '';
-            if (d.includes('-')) { const [a, b] = d.split('-'); return (dowNames[a] ?? a) + '\u2013' + (dowNames[b] ?? b); }
-            if (d.includes(',')) return d.split(',').map((v) => dowNames[v] ?? v).join(', ');
-            return dowNames[d] ?? d;
-        };
-        const time = formatTime(hour, min); const dayOfWeek = formatDow(dow);
-        const dayOfMonth = dom !== '*' ? `day ${dom}` : '';
-        const month = mon !== '*' ? (monNames[mon] ?? `month ${mon}`) : '';
-        const pieces = [time]; if (dayOfWeek) pieces.push(dayOfWeek); if (dayOfMonth) pieces.push(dayOfMonth); if (month) pieces.push(`in ${month}`);
-        return pieces.join(', ');
+    protected saveCronFromEditor(schedule: AgentSchedule, result: CronEditorResult): void {
+        this.editCronValue = result.expression;
+        this.saveCron(schedule);
     }
     addAction(): void { this.formActions.update((actions) => [...actions, { type: 'review_prs' as ScheduleActionType }]); }
     removeAction(index: number): void { this.formActions.update((actions) => actions.filter((_, i) => i !== index)); }
     addTriggerEvent(): void { this.formTriggerEvents.update((events) => [...events, { source: 'github_webhook' as const, event: '' }]); }
     removeTriggerEvent(index: number): void { this.formTriggerEvents.update((events) => events.filter((_, i) => i !== index)); }
     async create(): Promise<void> {
-        if (!this.formAgentId || !this.formName || this.formActions().length === 0) { this.notifications.error('Please fill in agent, name, and at least one action'); return; }
+        const errors = this.formValidationErrors();
+        if (errors.length > 0) { this.notifications.error(errors[0]); return; }
         this.creating.set(true);
         try {
             const actions: ScheduleAction[] = this.formActions().map((a) => ({ type: a.type, repos: a.reposStr?.split(',').map((r) => r.trim()).filter(Boolean), description: a.description, toAgentId: a.toAgentId, message: a.message, projectId: a.projectId || undefined, councilId: a.councilId || undefined, maxPrs: a.maxPrs || undefined, autoCreatePr: a.autoCreatePr || undefined, prompt: a.prompt || undefined, maxImprovementTasks: a.maxImprovementTasks || undefined, focusArea: a.focusArea || undefined }));

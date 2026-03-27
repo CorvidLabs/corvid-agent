@@ -65,10 +65,12 @@ const TABS: NavTab[] = [
         route: '/observe',
         matchRoutes: ['/observe'],
         children: [
-            { label: 'Live Feed', icon: 'activity', route: '/observe/feed' },
+            { label: 'Live Feed', icon: 'activity', route: '/observe' },
+            { label: 'Agent Comms', icon: 'message-circle', route: '/observe/agent-comms' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
             { label: 'Logs', icon: 'terminal', route: '/observe/logs' },
             { label: 'Brain Viewer', icon: 'zap', route: '/observe/brain-viewer' },
+            { label: 'Memory Browser', icon: 'database', route: '/observe/memory-browser' },
             { label: 'Reputation', icon: 'star', route: '/observe/reputation' },
         ],
     },

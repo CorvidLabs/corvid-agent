@@ -5,6 +5,7 @@ import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMe
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { handleDiscordSendMessage, handleDiscordSendImage } from './tool-handlers/discord';
+import { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './tool-handlers/library';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { getAgent } from '../db/agents';
@@ -84,6 +85,56 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 mode: z.enum(['soft', 'hard']).optional().describe('Delete mode: "soft" (default, archives) or "hard" (destroys ASA)'),
             },
             async (args) => handleDeleteMemory(ctx, args),
+        ),
+        // ── Shared Library (CRVLIB) ──────────────────────────────────────────
+        tool(
+            'corvid_library_write',
+            'Publish or update an entry in the shared agent library (CRVLIB). ' +
+            'Library entries are plaintext ARC-69 ASAs on localnet — readable by ALL agents. ' +
+            'Use this for shared knowledge: guides, standards, decisions, runbooks, and reference docs. ' +
+            'Unlike private memories (corvid_save_memory), library entries are a shared commons.',
+            {
+                key: z.string().describe('Unique key for this entry (e.g. "coding-standards", "deploy-runbook")'),
+                content: z.string().describe('The content to publish (plaintext, max ~700 chars for on-chain)'),
+                category: z.enum(['guide', 'reference', 'decision', 'standard', 'runbook']).optional().describe('Entry category (default: reference)'),
+                tags: z.array(z.string()).optional().describe('Tags for discovery (e.g. ["typescript", "testing"])'),
+            },
+            async (args) => handleLibraryWrite(ctx, args),
+        ),
+        tool(
+            'corvid_library_read',
+            'Read entries from the shared agent library. ' +
+            'Provide a key for exact lookup, or use query/category/tag to search. ' +
+            'Reads from local SQLite cache (synced from on-chain every 2 minutes).',
+            {
+                key: z.string().optional().describe('Exact key to look up'),
+                query: z.string().optional().describe('Search term to filter by key or content'),
+                category: z.enum(['guide', 'reference', 'decision', 'standard', 'runbook']).optional().describe('Filter by category'),
+                tag: z.string().optional().describe('Filter by tag'),
+                limit: z.number().optional().describe('Max entries to return (default: 20)'),
+            },
+            async (args) => handleLibraryRead(ctx, args),
+        ),
+        tool(
+            'corvid_library_list',
+            'List all shared library entries directly from the Algorand blockchain. ' +
+            'Unlike corvid_library_read (which reads local cache), this queries on-chain CRVLIB ASAs. ' +
+            'Useful for verifying on-chain state or discovering entries from other agents.',
+            {
+                category: z.enum(['guide', 'reference', 'decision', 'standard', 'runbook']).optional().describe('Filter by category'),
+                tag: z.string().optional().describe('Filter by tag'),
+                limit: z.number().optional().describe('Max entries to return (default: 50)'),
+            },
+            async (args) => handleLibraryListOnChain(ctx, args),
+        ),
+        tool(
+            'corvid_library_delete',
+            'Delete a shared library entry. Soft delete (default) archives it; hard delete destroys the ASA.',
+            {
+                key: z.string().describe('Library entry key to delete'),
+                mode: z.enum(['soft', 'hard']).optional().describe('Delete mode: "soft" (default) or "hard" (destroys ASA)'),
+            },
+            async (args) => handleLibraryDelete(ctx, args),
         ),
         tool(
             'corvid_list_agents',

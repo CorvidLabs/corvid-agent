@@ -13,6 +13,7 @@ import { SessionCheerleadingDetector } from './process/session-cheerleading-dete
 import { OllamaStallEscalator } from './process/ollama-stall-escalator';
 import { MemorySyncService } from './db/memory-sync';
 import { MemoryGraduationService } from './memory/graduation-service';
+import { LibrarySyncService } from './memory/library-sync';
 import { loadAlgoChatConfig } from './algochat/config';
 import type { AlgoChatBridge } from './algochat/bridge';
 import type { AgentWalletService } from './algochat/agent-wallet';
@@ -57,6 +58,7 @@ import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { OpenRouterProvider } from './providers/openrouter/provider';
+import { CursorProvider } from './providers/cursor/provider';
 import { hasCursorAccess, getCursorBinPath } from './process/cursor-process';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
@@ -103,6 +105,7 @@ export interface ServiceContainer {
     algochatState: AlgoChatState;
     memorySyncService: MemorySyncService;
     graduationService: MemoryGraduationService;
+    librarySyncService: LibrarySyncService;
 
     // Work orchestration
     selfTestService: SelfTestService;
@@ -238,10 +241,14 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         log.warn(`Ollama unreachable at ${ollamaHost} — skipping provider registration. Start Ollama and restart to enable.`);
     }
 
-    // Cursor Agent CLI detection — not an LLM provider, but a CLI process
-    // spawned by ProcessManager when agent.provider === 'cursor'.
-    if (hasCursorAccess()) {
-        log.info(`Cursor Agent CLI available at ${getCursorBinPath()}`);
+    // Cursor Agent CLI — readiness probe before provider registration (#1529)
+    const cursorProvider = new CursorProvider();
+    const cursorReady = await cursorProvider.isAvailable();
+    if (cursorReady) {
+        providerRegistry.register(cursorProvider);
+        log.info(`CursorProvider registered — binary at ${getCursorBinPath()}`);
+    } else if (hasCursorAccess()) {
+        log.warn(`Cursor binary found at ${getCursorBinPath()} but version check failed — skipping provider registration`);
     }
 
     // Ensure a project exists for the server's own codebase
@@ -259,6 +266,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const cheerleadingDetector = new SessionCheerleadingDetector(processManager);
     const memorySyncService = new MemorySyncService(db);
     const graduationService = new MemoryGraduationService(db);
+    const librarySyncService = new LibrarySyncService(db);
 
     // ── AlgoChat state (initialized later by initAlgoChat) ───────────────
     const algochatConfig = loadAlgoChatConfig();
@@ -497,6 +505,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     });
     shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
     shutdownCoordinator.registerService('MemoryGraduationService', graduationService, 11);
+    shutdownCoordinator.registerService('LibrarySyncService', librarySyncService, 12);
     if (sandboxLifecycleAdapter) {
         shutdownCoordinator.register({ name: 'SandboxLifecycleAdapter', priority: 14, handler: () => sandboxLifecycleAdapter!.stop() });
     }
@@ -522,6 +531,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         algochatState,
         memorySyncService,
         graduationService,
+        librarySyncService,
         selfTestService,
         workTaskService,
         buddyService,

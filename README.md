@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.54.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.55.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
@@ -122,7 +122,7 @@ skills/
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 50 MCP tools, ~380 API endpoints, 10,500+ test files, 193 E2E spec files.
+Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, ~380 API endpoints, 10,500+ test files, 196 module specs.
 
 **[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
 
