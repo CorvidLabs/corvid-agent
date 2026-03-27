@@ -4,7 +4,7 @@ import type { ClaudeStreamEvent, DirectProcessMetrics } from './types';
 import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { startDirectProcess, summarizeConversation } from './direct-process';
-import { hasCursorAccess as hasCursorCli } from './cursor-process';
+import { spawnCursorProcess, hasCursorAccess as hasCursorCli } from './cursor-process';
 import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
@@ -337,9 +337,11 @@ export class ProcessManager {
             statusMessage: `Provider: ${routingDecision.provider}${routingDecision.fallback ? ` (fallback: ${routingDecision.reason})` : ''}`,
         } as ClaudeStreamEvent);
 
-        // Route: direct providers (cursor, ollama) go through startDirectProcessWrapped;
-        // cursor no longer has a special case — it flows through the standard path.
-        if (provider && provider.executionMode === 'direct') {
+        // Route: use cursor only if explicitly configured AND binary is available
+        const useCursor = providerType === 'cursor' && hasCursorCli();
+        if (useCursor) {
+            this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
+        } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
             this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -377,8 +379,12 @@ export class ProcessManager {
             this.ephemeralDirs.set(session.id, resolved);
         }
 
-        // Route: direct providers (cursor, ollama) go through startDirectProcessWrapped
-        if (provider && provider.executionMode === 'direct') {
+        const effectiveProviderType = effectiveAgent?.provider as LlmProviderType | undefined;
+        // Use cursor only if explicitly configured AND binary is available (same fallback as startProcess)
+        const useCursorHere = effectiveProviderType === 'cursor' && hasCursorCli();
+        if (useCursorHere) {
+            this.startCursorProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt);
+        } else if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
             this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
@@ -609,6 +615,72 @@ export class ProcessManager {
         );
     }
 
+    private startCursorProcessWrapped(
+        session: Session,
+        project: import('../../shared/types').Project,
+        agent: import('../../shared/types').Agent | null,
+        prompt: string,
+    ): void {
+        if (!hasCursorCli()) {
+            const message = 'cursor-agent CLI not found. Install it or set CURSOR_AGENT_BIN env var.';
+            log.error(message, { sessionId: session.id });
+            this.startingSession.delete(session.id);
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        const effectiveProject = session.workDir
+            ? { ...project, workingDir: session.workDir }
+            : project;
+
+        let sp: SdkProcess;
+        try {
+            sp = spawnCursorProcess({
+                session,
+                project: effectiveProject,
+                agent,
+                prompt,
+                onEvent: (event) => this.handleEvent(session.id, event),
+                onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(`Failed to start cursor process for session ${session.id}`, { error: message });
+            updateSessionStatus(this.db, session.id, 'error');
+            this.startingSession.delete(session.id);
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message: `Failed to start cursor process: ${message}`, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message: `Failed to start cursor process: ${message}`,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        this.registerProcess(session, sp);
+    }
+
     private registerProcess(session: Session, process: SdkProcess): void {
         this.startingSession.delete(session.id);
         this.processes.set(session.id, process);
@@ -773,6 +845,8 @@ export class ProcessManager {
             }
         }
 
+        const useCursorOnResume = providerType === 'cursor' && hasCursorCli();
+
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         // Detect tool tier for Discord /message sessions by name convention:
@@ -791,7 +865,16 @@ export class ProcessManager {
 
         let sp: SdkProcess;
         try {
-            if (providerInstance && providerInstance.executionMode === 'direct') {
+            if (useCursorOnResume) {
+                sp = spawnCursorProcess({
+                    session,
+                    project: effectiveProject,
+                    agent: effectiveAgent,
+                    prompt: resumePrompt ?? '',
+                    onEvent: (event) => this.handleEvent(session.id, event),
+                    onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
+                });
+            } else if (providerInstance && providerInstance.executionMode === 'direct') {
                 // For restricted /message sessions, override permissions to only expose memory tools
                 const effectivePermissions = resumeMcpToolAllowList ?? resumeConfig.resolvedToolPermissions;
                 const mcpToolContext = session.agentId
