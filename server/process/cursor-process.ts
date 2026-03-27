@@ -50,6 +50,144 @@ export function getCursorBinPath(): string {
   return CURSOR_BIN;
 }
 
+// ── Exit code classification (issue #1531) ──────────────────────────────────
+
+/**
+ * Result of classifying a cursor-agent exit code + stderr output.
+ *
+ * `transient` signals whether the caller should retry (e.g. via FallbackManager)
+ * or surface the error immediately.
+ */
+export interface CursorErrorClassification {
+  /** True if the error is likely temporary and the request should be retried. */
+  transient: boolean;
+  /** Human-readable error description for logging / surfacing. */
+  message: string;
+  /** Machine-readable error category. */
+  category: CursorErrorCategory;
+}
+
+export type CursorErrorCategory =
+  | 'success'
+  | 'invalid_args'
+  | 'auth_failure'
+  | 'invalid_model'
+  | 'config_error'
+  | 'network_timeout'
+  | 'rate_limit'
+  | 'network_error'
+  | 'stream_idle_timeout'
+  | 'general_error'
+  | 'unknown';
+
+/**
+ * Exit-code-to-category mapping for known cursor-agent exit codes.
+ *
+ * Exit code 0 = success, 2 = invalid arguments (permanent).
+ * Exit code 1 is ambiguous — stderr is examined to disambiguate.
+ */
+export const CURSOR_EXIT_CODE_MAP: Record<number, { category: CursorErrorCategory; transient: boolean; message: string }> = {
+  0:   { category: 'success',       transient: false, message: 'Success' },
+  2:   { category: 'invalid_args',  transient: false, message: 'Invalid arguments — check CLI flags' },
+  126: { category: 'config_error',  transient: false, message: 'Binary not executable — check permissions' },
+  127: { category: 'config_error',  transient: false, message: 'Binary not found — check CURSOR_AGENT_BIN' },
+  130: { category: 'general_error', transient: false, message: 'Process interrupted (SIGINT)' },
+  137: { category: 'general_error', transient: true,  message: 'Process killed (SIGKILL) — possible OOM or timeout' },
+  143: { category: 'general_error', transient: true,  message: 'Process terminated (SIGTERM)' },
+};
+
+/** Stderr patterns that indicate transient (retryable) failures. */
+const TRANSIENT_STDERR_PATTERNS: Array<{ pattern: RegExp; category: CursorErrorCategory; message: string }> = [
+  { pattern: /ECONNRESET/i,              category: 'network_error',   message: 'Connection reset — transient network failure' },
+  { pattern: /ETIMEDOUT/i,               category: 'network_timeout', message: 'Connection timed out — transient network failure' },
+  { pattern: /ECONNREFUSED/i,            category: 'network_error',   message: 'Connection refused — service may be starting up' },
+  { pattern: /EPIPE/i,                   category: 'network_error',   message: 'Broken pipe — transient network failure' },
+  { pattern: /rate.?limit/i,             category: 'rate_limit',      message: 'Rate limited — back off and retry' },
+  { pattern: /429/,                      category: 'rate_limit',      message: 'Rate limited (HTTP 429) — back off and retry' },
+  { pattern: /503/,                      category: 'network_error',   message: 'Service unavailable (HTTP 503) — transient' },
+  { pattern: /502/,                      category: 'network_error',   message: 'Bad gateway (HTTP 502) — transient' },
+  { pattern: /timeout/i,                 category: 'network_timeout', message: 'Request timed out — transient' },
+  { pattern: /overloaded/i,              category: 'rate_limit',      message: 'Server overloaded — transient' },
+  { pattern: /fetch.?failed/i,           category: 'network_error',   message: 'Network fetch failed — transient' },
+  { pattern: /network.?error/i,          category: 'network_error',   message: 'Network error — transient' },
+];
+
+/** Stderr patterns that indicate permanent (non-retryable) failures. */
+const PERMANENT_STDERR_PATTERNS: Array<{ pattern: RegExp; category: CursorErrorCategory; message: string }> = [
+  { pattern: /auth(entication|orization)?.?(fail|error|denied|invalid)/i, category: 'auth_failure',   message: 'Authentication failed — check credentials' },
+  { pattern: /invalid.?api.?key/i,       category: 'auth_failure',   message: 'Invalid API key' },
+  { pattern: /unauthorized/i,            category: 'auth_failure',   message: 'Unauthorized — check API key or token' },
+  { pattern: /forbidden/i,              category: 'auth_failure',   message: 'Forbidden — insufficient permissions' },
+  { pattern: /invalid.?model/i,          category: 'invalid_model',  message: 'Invalid model — model not available' },
+  { pattern: /model.?not.?found/i,       category: 'invalid_model',  message: 'Model not found' },
+  { pattern: /unknown.?model/i,          category: 'invalid_model',  message: 'Unknown model identifier' },
+  { pattern: /invalid.?config/i,         category: 'config_error',   message: 'Invalid configuration' },
+];
+
+/**
+ * Classify a cursor-agent exit code and stderr output into transient/permanent.
+ *
+ * The FallbackManager uses the `transient` flag to decide whether to retry
+ * with the next provider in the chain or surface the error immediately.
+ *
+ * Classification priority:
+ * 1. Known exit codes with unambiguous meaning (2, 126, 127)
+ * 2. Permanent stderr patterns (auth, model, config errors)
+ * 3. Transient stderr patterns (network, rate limit, timeout)
+ * 4. Exit code 1 with no matching patterns → general_error (non-transient)
+ * 5. Null exit code → process crashed, treated as transient
+ */
+export function classifyCursorError(exitCode: number | null, stderr: string = ''): CursorErrorClassification {
+  // Exit code 0 is success
+  if (exitCode === 0) {
+    return { transient: false, message: 'Success', category: 'success' };
+  }
+
+  // Known exit codes with unambiguous meaning
+  if (exitCode !== null && exitCode !== 1 && CURSOR_EXIT_CODE_MAP[exitCode]) {
+    return CURSOR_EXIT_CODE_MAP[exitCode];
+  }
+
+  // Check permanent stderr patterns first (more specific → fail fast)
+  for (const { pattern, category, message } of PERMANENT_STDERR_PATTERNS) {
+    if (pattern.test(stderr)) {
+      return { transient: false, message, category };
+    }
+  }
+
+  // Check transient stderr patterns
+  for (const { pattern, category, message } of TRANSIENT_STDERR_PATTERNS) {
+    if (pattern.test(stderr)) {
+      return { transient: true, message, category };
+    }
+  }
+
+  // Null exit code → process didn't exit normally (crashed/killed externally)
+  if (exitCode === null) {
+    return { transient: true, message: 'Process exited abnormally — possible crash', category: 'unknown' };
+  }
+
+  // Exit code 1 with no matching stderr → ambiguous, default non-transient
+  if (exitCode === 1) {
+    const stderrSnippet = stderr.trim().slice(0, 200);
+    return {
+      transient: false,
+      message: stderrSnippet ? `cursor-agent error: ${stderrSnippet}` : 'cursor-agent exited with error code 1',
+      category: 'general_error',
+    };
+  }
+
+  // Unknown non-zero exit code
+  return {
+    transient: false,
+    message: `cursor-agent exited with code ${exitCode}`,
+    category: 'unknown',
+  };
+}
+
+/** Stream idle timeout (120s) — kills process if no output for this duration. */
+export const STREAM_IDLE_TIMEOUT_MS = 120_000;
+
 export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   const { session, project, agent, prompt, onEvent, onExit, worktree, worktreeBase } = options;
 
@@ -84,8 +222,30 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   let killed = false;
   /** Tool calls started in the current cursor-agent turn (for metrics parity). */
   let turnToolCallCount = 0;
+  /** Collected stderr output for error classification (#1531). */
+  let stderrBuffer = '';
+  /** Stream idle timeout handle — kills process if no stdout for STREAM_IDLE_TIMEOUT_MS. */
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function resetIdleTimer(): void {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (!killed) {
+        log.warn(`Stream idle timeout (${STREAM_IDLE_TIMEOUT_MS}ms) for session ${session.id} — killing process`);
+        killed = true;
+        try { currentProc.kill(); } catch { /* already exited */ }
+        const classification = classifyCursorError(null, 'stream idle timeout');
+        onExit(null, `[cursor:${classification.category}:transient] ${classification.message}`);
+      }
+    }, STREAM_IDLE_TIMEOUT_MS);
+  }
+
+  resetIdleTimer();
 
   function forwardCursorStdoutEvent(event: ClaudeStreamEvent): void {
+    // Reset idle timer on any stdout activity (#1531)
+    resetIdleTimer();
+
     // Capture the cursor-agent session ID from the init event for --resume
     if (event.type === 'system' && 'session_id' in event && typeof event.session_id === 'string') {
       cursorSessionId = event.session_id as string;
@@ -133,20 +293,34 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
 
   readStream(currentProc.stderr, (event) => {
     const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
+    if (typeof message === 'string') {
+      stderrBuffer += message + '\n';
+    }
     log.debug(`cursor-agent stderr: ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
   });
 
   currentProc.exited
     .then((code) => {
+      if (idleTimer) clearTimeout(idleTimer);
       if (!killed) {
-        onExit(code);
+        if (code !== 0) {
+          const classification = classifyCursorError(code, stderrBuffer);
+          const tag = classification.transient ? 'transient' : 'permanent';
+          log.warn(`cursor-agent exit classified`, { exitCode: code, category: classification.category, transient: classification.transient });
+          onExit(code, `[cursor:${classification.category}:${tag}] ${classification.message}`);
+        } else {
+          onExit(code);
+        }
       }
     })
     .catch((err) => {
+      if (idleTimer) clearTimeout(idleTimer);
       const errorMsg = err instanceof Error ? err.message : String(err);
       log.error(`Cursor process exit rejected for session ${session.id}`, { error: errorMsg });
       if (!killed) {
-        onExit(1, errorMsg);
+        const classification = classifyCursorError(1, errorMsg);
+        const tag = classification.transient ? 'transient' : 'permanent';
+        onExit(1, `[cursor:${classification.category}:${tag}] ${classification.message}`);
       }
     });
 
@@ -188,22 +362,39 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       },
     });
 
+    // Reset stderr buffer and idle timer for the new process
+    stderrBuffer = '';
+    resetIdleTimer();
+
     readStream(currentProc.stdout, forwardCursorStdoutEvent);
     readStream(currentProc.stderr, (event) => {
       const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
+      if (typeof message === 'string') {
+        stderrBuffer += message + '\n';
+      }
       log.debug(`cursor-agent stderr (resume): ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
     });
 
     currentProc.exited
       .then((code) => {
+        if (idleTimer) clearTimeout(idleTimer);
         if (!killed) {
-          onExit(code);
+          if (code !== 0) {
+            const classification = classifyCursorError(code, stderrBuffer);
+            const tag = classification.transient ? 'transient' : 'permanent';
+            onExit(code, `[cursor:${classification.category}:${tag}] ${classification.message}`);
+          } else {
+            onExit(code);
+          }
         }
       })
       .catch((err) => {
+        if (idleTimer) clearTimeout(idleTimer);
         const errorMsg = err instanceof Error ? err.message : String(err);
         if (!killed) {
-          onExit(1, errorMsg);
+          const classification = classifyCursorError(1, errorMsg);
+          const tag = classification.transient ? 'transient' : 'permanent';
+          onExit(1, `[cursor:${classification.category}:${tag}] ${classification.message}`);
         }
       });
 
@@ -212,6 +403,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
 
   function kill(): void {
     killed = true;
+    if (idleTimer) clearTimeout(idleTimer);
     try {
       currentProc.kill();
     } catch {

@@ -30,7 +30,8 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `extractContentImageUrls` | `content: string \| ContentBlock[] \| undefined` | `string[]` | Extracts image URLs from content blocks (blocks with `type: 'image'` and a `source.url`). Returns `[]` for strings or undefined. |
 | `hasCursorAccess` | `()` | `boolean` | Returns whether the `cursor-agent` binary is available for spawning cursor sessions. |
 | `getCursorBinPath` | `()` | `string` | Returns the resolved path used for the `cursor-agent` binary. |
-| `spawnCursorProcess` | `options: CursorProcessOptions` | `SdkProcess` | Spawns a `cursor-agent` process with stream-json output and supports follow-up messages via `--resume <sessionId>`. |
+| `spawnCursorProcess` | `options: CursorProcessOptions` | `SdkProcess` | Spawns a `cursor-agent` process with stream-json output and supports follow-up messages via `--resume <sessionId>`. Includes stream idle timeout and exit code classification (#1531). |
+| `classifyCursorError` | `(exitCode: number \| null, stderr?: string)` | `CursorErrorClassification` | Classify a cursor-agent exit code + stderr into transient (retry) vs permanent (fail-fast). Used by FallbackManager (#1531). |
 | `buildArgs` | `(project: Project, agent: Agent \| null, worktree?: string, worktreeBase?: string)` | `string[]` | Builds the CLI argument array for `cursor-agent` — includes `--print`, `--output-format stream-json`, `--trust`, workspace, worktree, model, and custom agent flags. |
 | `readStream` | `(stream: ReadableStream<Uint8Array> \| null, onEvent: (event: ClaudeStreamEvent) => void)` | `Promise<void>` | Reads a readable stream line-by-line, parses each JSON line as a `ClaudeStreamEvent`, and calls `onEvent`. Non-JSON lines are silently skipped. |
 | `describeCursorToolCall` | `(event: any)` | `string \| null` | Extracts a human-readable description from a cursor-agent `tool_call` event (e.g. "Reading package.json", "Running: git status"). Returns `null` if the event shape is unrecognized. |
@@ -81,6 +82,8 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `ClaudeProcessOptions` | Interface for `spawnClaudeProcess` options: `session`, `project`, `agent`, `resume`, `prompt`, `mcpEnabled`, `onEvent`, `onExit`. |
 | `ClaudeProcess` | Interface for the returned process handle: `proc`, `pid`, `sendMessage`, `kill`. |
 | `CursorProcessOptions` | Interface for `spawnCursorProcess` options: session/project/agent/prompt callbacks, optional worktree settings. |
+| `CursorErrorClassification` | Result of `classifyCursorError()`: `{ transient: boolean; message: string; category: CursorErrorCategory }`. |
+| `CursorErrorCategory` | String union of error categories: `'success' \| 'invalid_args' \| 'auth_failure' \| 'invalid_model' \| 'config_error' \| 'network_timeout' \| 'rate_limit' \| 'network_error' \| 'stream_idle_timeout' \| 'general_error' \| 'unknown'`. |
 | `DirectProcessMetrics` | Interface for metrics collected during a direct-process run: `model`, `tier`, iteration counts, tool-call counts, nudge counts, stall info, `terminationReason`, `durationMs`, `needsSummary`. |
 | `EscalationInfo` | Interface for escalation metadata attached to result events when a session terminates abnormally. Contains `canEscalate`, `reason`, `originalPrompt`, `completedSteps`, `remainingWork`, `currentTier`, `suggestedTier`. |
 | `ISessionEventBus` | Interface contract for the session event bus, defining subscribe/unsubscribe/emit/cleanup methods. |
@@ -116,6 +119,8 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 6. `BaseStreamEvent` common fields (`total_cost_usd`, `num_turns`, `duration_ms`, `session_id`, `subtype`) are optional on all event variants; narrowing to `ResultEvent` makes `total_cost_usd` required.
 7. `extractContentText` always returns a string (never `undefined` or `null`).
 8. Type guard functions (`isResultEvent`, etc.) use TypeScript type predicates for safe narrowing.
+9. `classifyCursorError()` checks permanent stderr patterns before transient ones — auth/model/config errors are never retried even if stderr also contains transient keywords.
+10. `spawnCursorProcess` includes a 120s stream idle timeout; if no stdout events arrive within the window, the process is killed and `onExit` is called with a transient classification.
 
 ## Behavioral Examples
 
