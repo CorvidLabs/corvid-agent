@@ -2,11 +2,13 @@ import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import { getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
 import { getProject } from '../db/projects';
+import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { recordAudit } from '../db/audit';
 import { runValidation } from './validation';
 import { removeWorktree } from '../lib/worktree';
 import { createLogger } from '../lib/logger';
+import { checkInternPrGuard } from './intern-guard';
 
 const log = createLogger('WorkTaskService');
 
@@ -132,6 +134,18 @@ export async function finalizeTask(
 export async function createPrFallback(db: Database, taskId: string, sessionOutput: string): Promise<string | null> {
     const task = getWorkTask(db, taskId);
     if (!task?.branchName || !task.worktreeDir) return null;
+
+    // Intern model guard — block push/PR for low-capability models (#1542)
+    if (task.agentId) {
+        const agent = getAgent(db, task.agentId);
+        if (agent) {
+            const guard = checkInternPrGuard(agent.model, taskId);
+            if (guard.blocked) {
+                log.warn('createPrFallback blocked by intern guard', { taskId, model: agent.model });
+                return null;
+            }
+        }
+    }
 
     const cwd = task.worktreeDir;
 
