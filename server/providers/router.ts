@@ -151,6 +151,8 @@ export const CLAUDE_TIER_MODELS: Record<ModelTier, string> = {
     [ModelTier.OPUS]:   'claude-opus-4-6',
     [ModelTier.SONNET]: 'claude-sonnet-4-6',
     [ModelTier.HAIKU]:  'claude-haiku-4-5-20251001',
+    // INTERN maps to Haiku for any fallback escalation path; push/PR is blocked at guard level.
+    [ModelTier.INTERN]: 'claude-haiku-4-5-20251001',
 };
 
 /**
