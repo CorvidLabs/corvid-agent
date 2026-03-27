@@ -55,6 +55,13 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `textResult` | `(text: string)` | `CallToolResult` | Wrap text in standard MCP `CallToolResult` format |
 | `errorResult` | `(text: string)` | `CallToolResult` | Wrap error message in MCP `CallToolResult` error format |
 
+### Exported Helpers (from github.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `friendlyModelName` | `(model: string)` | `string` | Map a raw model ID (e.g. `claude-opus-4-6`) to a human-friendly name (e.g. `Opus 4.6`) |
+| `buildAgentSignature` | `(ctx: McpToolContext)` | `string` | Build an identity footer for GitHub write ops; returns empty string on failure |
+
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
@@ -125,6 +132,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 6. **All handlers return `CallToolResult`**: Every handler returns `{ content: [{ type: 'text', text }] }` via `textResult()` or `errorResult()` helpers
 7. **Service availability checks**: Handlers check for optional services (e.g. `ctx.workTaskService`, `ctx.schedulerService`) before use and return error results if missing
 8. **Status emission**: Long-running handlers call `ctx.emitStatus?.()` to provide progress updates to the UI
+9. **Agent identity signature**: GitHub write operations (`handleGitHubCreatePr`, `handleGitHubCreateIssue`, `handleGitHubCommentOnPr`, `handleGitHubReviewPr`) append an agent identity footer to the body via `buildAgentSignature()`. If the agent cannot be resolved, no signature is appended (fail-open)
 
 ## Behavioral Examples
 
@@ -210,3 +218,4 @@ Internal constants (not env-configurable):
 | 2026-03-19 | corvid-agent | Documented observation tool handlers |
 | 2026-03-20 | corvid-agent | Added handleBrowser and browser.ts |
 | 2026-03-23 | corvid-agent | Added Discord messaging tools: handleDiscordSendMessage, handleDiscordSendImage (#1422) |
+| 2026-03-27 | corvid-agent | Added agent identity signature to GitHub write operations (#1555) |

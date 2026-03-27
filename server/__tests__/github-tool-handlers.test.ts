@@ -17,6 +17,25 @@ const mockGetPrDiff = mock(() => Promise.resolve({ ok: true, diff: 'diff --git a
 const mockAddPrComment = mock(() => Promise.resolve({ ok: true, error: undefined as string | undefined }));
 const mockFollowUser = mock(() => Promise.resolve({ ok: true, message: 'Followed testuser', error: undefined as string | undefined }));
 
+const mockGetAgent = mock(() => null as null | { name: string; model: string });
+
+mock.module('../db/agents', () => ({
+    getAgent: mockGetAgent,
+    listAgents: () => [],
+    getAgentByWalletAddress: () => null,
+    createAgent: () => ({}),
+    updateAgent: () => null,
+    deleteAgent: () => false,
+    setAgentWallet: () => {},
+    getAgentWalletMnemonic: () => null,
+    addAgentFunding: () => {},
+    getAlgochatEnabledAgents: () => [],
+}));
+
+mock.module('../work/intern-guard', () => ({
+    checkInternPrGuard: () => ({ blocked: false }),
+}));
+
 mock.module('../github/operations', () => ({
     starRepo: mockStarRepo,
     unstarRepo: mockUnstarRepo,
@@ -48,6 +67,8 @@ const {
     handleGitHubCommentOnPr,
     handleGitHubFollowUser,
 } = await import('../mcp/tool-handlers');
+
+const { friendlyModelName } = await import('../mcp/tool-handlers/github');
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -82,6 +103,7 @@ beforeEach(() => {
     mockGetPrDiff.mockReset().mockResolvedValue({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined });
     mockAddPrComment.mockReset().mockResolvedValue({ ok: true, error: undefined });
     mockFollowUser.mockReset().mockResolvedValue({ ok: true, message: 'Followed testuser', error: undefined });
+    mockGetAgent.mockReset().mockReturnValue(null);
 });
 
 // ── Star / Unstar ────────────────────────────────────────────────────────
@@ -761,5 +783,107 @@ describe('scheduler tool gating', () => {
             });
             expect(result.isError).toBeUndefined();
         });
+    });
+});
+
+// ── friendlyModelName ────────────────────────────────────────────────────
+
+describe('friendlyModelName', () => {
+    test('maps claude-opus-4-6 to Opus 4.6', () => {
+        expect(friendlyModelName('claude-opus-4-6')).toBe('Opus 4.6');
+    });
+
+    test('maps claude-sonnet-4-6 to Sonnet 4.6', () => {
+        expect(friendlyModelName('claude-sonnet-4-6')).toBe('Sonnet 4.6');
+    });
+
+    test('maps claude-haiku-4-5-20251001 to Haiku 4.5', () => {
+        expect(friendlyModelName('claude-haiku-4-5-20251001')).toBe('Haiku 4.5');
+    });
+
+    test('maps claude-sonnet-4-20250514 to Sonnet 4', () => {
+        expect(friendlyModelName('claude-sonnet-4-20250514')).toBe('Sonnet 4');
+    });
+
+    test('returns raw string for unknown models', () => {
+        expect(friendlyModelName('gpt-4o')).toBe('gpt-4o');
+    });
+});
+
+// ── Agent signature on GitHub write operations (#1555) ───────────────────
+
+describe('agent identity signature (#1555)', () => {
+    const SIGNATURE_PATTERN = /\n\n---\n.*CorvidLabs Team Alpha$/;
+
+    test('handleGitHubCreatePr appends signature when agent is resolved', async () => {
+        mockGetAgent.mockReturnValue({ name: 'Rook', model: 'claude-opus-4-6' } as ReturnType<typeof mockGetAgent>);
+        const ctx = makeCtx();
+        await handleGitHubCreatePr(ctx, {
+            repo: 'test/repo', title: 'PR', body: 'Original body', head: 'feat',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockCreatePr.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toMatch(SIGNATURE_PATTERN);
+        expect(passedBody).toContain('**Rook**');
+        expect(passedBody).toContain('Opus 4.6');
+    });
+
+    test('handleGitHubCreateIssue appends signature when agent is resolved', async () => {
+        mockGetAgent.mockReturnValue({ name: 'Bishop', model: 'claude-sonnet-4-6' } as ReturnType<typeof mockGetAgent>);
+        const ctx = makeCtx();
+        await handleGitHubCreateIssue(ctx, {
+            repo: 'test/repo', title: 'Issue', body: 'Bug report',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockCreateIssue.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toMatch(SIGNATURE_PATTERN);
+        expect(passedBody).toContain('**Bishop**');
+        expect(passedBody).toContain('Sonnet 4.6');
+    });
+
+    test('handleGitHubCommentOnPr appends signature when agent is resolved', async () => {
+        mockGetAgent.mockReturnValue({ name: 'Rook', model: 'claude-opus-4-6' } as ReturnType<typeof mockGetAgent>);
+        const ctx = makeCtx();
+        await handleGitHubCommentOnPr(ctx, {
+            repo: 'test/repo', pr_number: 42, body: 'Nice work!',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockAddPrComment.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toMatch(SIGNATURE_PATTERN);
+        expect(passedBody).toContain('**Rook**');
+    });
+
+    test('handleGitHubReviewPr appends signature when agent is resolved', async () => {
+        mockGetAgent.mockReturnValue({ name: 'Rook', model: 'claude-haiku-4-5-20251001' } as ReturnType<typeof mockGetAgent>);
+        const ctx = makeCtx();
+        await handleGitHubReviewPr(ctx, {
+            repo: 'test/repo', pr_number: 42, event: 'APPROVE', body: 'LGTM!',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockAddPrReview.mock.calls as any[][])[0][3] as string;
+        expect(passedBody).toMatch(SIGNATURE_PATTERN);
+        expect(passedBody).toContain('Haiku 4.5');
+    });
+
+    test('no signature appended when agent cannot be resolved', async () => {
+        mockGetAgent.mockReturnValue(null);
+        const ctx = makeCtx();
+        await handleGitHubCreatePr(ctx, {
+            repo: 'test/repo', title: 'PR', body: 'Original body', head: 'feat',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockCreatePr.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toBe('Original body');
+    });
+
+    test('no signature when getAgent throws', async () => {
+        mockGetAgent.mockImplementation(() => { throw new Error('DB error'); });
+        const ctx = makeCtx();
+        await handleGitHubCreateIssue(ctx, {
+            repo: 'test/repo', title: 'Issue', body: 'Body text',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockCreateIssue.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toBe('Body text');
     });
 });
