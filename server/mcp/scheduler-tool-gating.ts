@@ -43,10 +43,24 @@ export const SCHEDULER_MAX_PR_COMMENTS_PER_SESSION = 5;
 /** Max messages a single scheduler session may send (rate limiting). */
 export const SCHEDULER_MAX_MESSAGES_PER_SESSION = 3;
 
+/**
+ * Parse allowed orgs from the GITHUB_ALLOWED_ORGS env var.
+ * Called lazily so tests can set the var before first use.
+ */
+function parseAllowedOrgs(): ReadonlySet<string> {
+    return new Set(
+        (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    );
+}
+
 /** Orgs that scheduled sessions are allowed to create issues/PRs in. */
-export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Set(
-    (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
-);
+export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Proxy(new Set<string>() as ReadonlySet<string>, {
+    get(_target, prop, _receiver) {
+        const real = parseAllowedOrgs();
+        const val = Reflect.get(real, prop, real);
+        return typeof val === 'function' ? val.bind(real) : val;
+    },
+});
 
 /** Label automatically applied to issues created by scheduled sessions. */
 export const SCHEDULER_ESCALATION_LABEL = 'agent-escalation';
