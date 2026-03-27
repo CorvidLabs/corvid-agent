@@ -32,6 +32,12 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `getCursorBinPath` | `()` | `string` | Returns the resolved path used for the `cursor-agent` binary. |
 | `spawnCursorProcess` | `options: CursorProcessOptions` | `SdkProcess` | Spawns a `cursor-agent` process with stream-json output and supports follow-up messages via `--resume <sessionId>`. Includes stream idle timeout and exit code classification (#1531). |
 | `classifyCursorError` | `(exitCode: number \| null, stderr?: string)` | `CursorErrorClassification` | Classify a cursor-agent exit code + stderr into transient (retry) vs permanent (fail-fast). Used by FallbackManager (#1531). |
+| `buildArgs` | `(project: Project, agent: Agent \| null, worktree?: string, worktreeBase?: string)` | `string[]` | Builds the CLI argument array for `cursor-agent` — includes `--print`, `--output-format stream-json`, `--trust`, workspace, worktree, model, and custom agent flags. |
+| `readStream` | `(stream: ReadableStream<Uint8Array> \| null, onEvent: (event: ClaudeStreamEvent) => void)` | `Promise<void>` | Reads a readable stream line-by-line, parses each JSON line as a `ClaudeStreamEvent`, and calls `onEvent`. Non-JSON lines are silently skipped. |
+| `describeCursorToolCall` | `(event: any)` | `string \| null` | Extracts a human-readable description from a cursor-agent `tool_call` event (e.g. "Reading package.json", "Running: git status"). Returns `null` if the event shape is unrecognized. |
+| `extractCursorCostAndTurns` | `(raw: Record<string, unknown>)` | `Pick<SessionTurnMetricsEvent, 'total_cost_usd' \| 'num_turns'>` | Extracts `total_cost_usd` and `num_turns` from a cursor-agent result event payload, if present. |
+| `isDirectProcessMetricsShape` | `(v: unknown)` | `v is DirectProcessMetrics` | Type guard: returns `true` if the value matches the `DirectProcessMetrics` shape (has `model`, `tier`, `totalIterations`). |
+| `mapCursorResultToTurnMetrics` | `(raw: Record<string, unknown>, agent: Agent \| null, turnToolCallCount: number)` | `DirectProcessMetrics` | Maps a cursor-agent result event to a `DirectProcessMetrics` object. Uses nested metrics if present, otherwise constructs a default from available fields. |
 | `isResultEvent` | `e: ClaudeStreamEvent` | `e is ResultEvent` | Type guard: returns `true` if the event is a `result` event. |
 | `isErrorEvent` | `e: ClaudeStreamEvent` | `e is ErrorEvent` | Type guard: returns `true` if the event is an `error` event. |
 | `isApprovalEvent` | `e: ClaudeStreamEvent` | `e is ApprovalRequestEvent` | Type guard: returns `true` if the event is an `approval_request` event. |
@@ -180,10 +186,12 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `algochat/bridge` | Global event subscription via `subscribeAll` |
 | `discord/bridge` | Global event subscription via `subscribeAll` |
 | `telegram/bridge` | Global event subscription via `subscribeAll` |
+| `providers/cursor/provider` | `buildArgs`, `readStream`, `describeCursorToolCall`, `hasCursorAccess`, `getCursorBinPath` |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-27 | corvid-agent | Document cursor-process exports: `buildArgs`, `readStream`, `describeCursorToolCall`, `extractCursorCostAndTurns`, `isDirectProcessMetricsShape`, `mapCursorResultToTurnMetrics` |
 | 2026-03-20 | corvid-agent | Documented `extractContentImageUrls` export |

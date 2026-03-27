@@ -38,9 +38,11 @@ const SESSIONS_TABS: SubTab[] = [
 
 const OBSERVE_TABS: SubTab[] = [
     { label: 'Live Feed', path: './', exact: true },
+    { label: 'Agent Comms', path: 'agent-comms' },
     { label: 'Analytics', path: 'analytics' },
     { label: 'Logs', path: 'logs' },
     { label: 'Brain Viewer', path: 'brain-viewer' },
+    { label: 'Memory Browser', path: 'memory-browser' },
     { label: 'Reputation', path: 'reputation' },
 ];
 
@@ -200,6 +202,11 @@ export const routes: Routes = [
                     import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
             },
             {
+                path: 'agent-comms',
+                loadComponent: () =>
+                    import('./features/agent-comms/agent-comms.component').then((m) => m.AgentCommsComponent),
+            },
+            {
                 path: 'analytics',
                 loadComponent: () =>
                     import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent),
@@ -213,6 +220,11 @@ export const routes: Routes = [
                 path: 'brain-viewer',
                 loadComponent: () =>
                     import('./features/brain-viewer/brain-viewer.component').then((m) => m.BrainViewerComponent),
+            },
+            {
+                path: 'memory-browser',
+                loadComponent: () =>
+                    import('./features/memory-browser/memory-browser.component').then((m) => m.MemoryBrowserComponent),
             },
             {
                 path: 'reputation',
@@ -321,6 +333,7 @@ export const routes: Routes = [
     { path: 'logs', redirectTo: 'observe/logs', pathMatch: 'full' },
     { path: 'brain-viewer', redirectTo: 'observe/brain-viewer', pathMatch: 'full' },
     { path: 'reputation', redirectTo: 'observe/reputation', pathMatch: 'full' },
+    { path: 'memory-browser', redirectTo: 'observe/memory-browser', pathMatch: 'full' },
 
     // Old automate paths -> settings/*
     { path: 'automate', redirectTo: 'settings/schedules', pathMatch: 'full' },

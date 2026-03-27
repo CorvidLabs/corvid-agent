@@ -414,7 +414,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   return { pid, sendMessage, kill };
 }
 
-function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {
+export function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {
   const args: string[] = ['--print', '--output-format', 'stream-json', '--trust'];
 
   if (project.workingDir) {
@@ -456,7 +456,7 @@ function buildArgs(project: Project, agent: Agent | null, worktree?: string, wor
  * Returns e.g. "Reading package.json" or "Running: git status"
  */
 // biome-ignore lint/suspicious/noExplicitAny: cursor-agent tool_call shape is dynamic
-function describeCursorToolCall(event: any): string | null {
+export function describeCursorToolCall(event: any): string | null {
   const tc = event.tool_call;
   if (!tc || typeof tc !== 'object') return null;
 
@@ -493,20 +493,20 @@ function basename(p: string): string {
   return idx >= 0 ? p.slice(idx + 1) : p;
 }
 
-function extractCursorCostAndTurns(raw: Record<string, unknown>): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
+export function extractCursorCostAndTurns(raw: Record<string, unknown>): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
   const out: Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> = {};
   if (typeof raw.total_cost_usd === 'number') out.total_cost_usd = raw.total_cost_usd;
   if (typeof raw.num_turns === 'number') out.num_turns = raw.num_turns;
   return out;
 }
 
-function isDirectProcessMetricsShape(v: unknown): v is DirectProcessMetrics {
+export function isDirectProcessMetricsShape(v: unknown): v is DirectProcessMetrics {
   if (!v || typeof v !== 'object') return false;
   const m = v as Record<string, unknown>;
   return typeof m.model === 'string' && typeof m.tier === 'string' && typeof m.totalIterations === 'number';
 }
 
-function mapCursorResultToTurnMetrics(
+export function mapCursorResultToTurnMetrics(
   raw: Record<string, unknown>,
   agent: Agent | null,
   turnToolCallCount: number,
@@ -541,7 +541,7 @@ function mapCursorResultToTurnMetrics(
   };
 }
 
-async function readStream(
+export async function readStream(
   stream: ReadableStream<Uint8Array> | null,
   onEvent: (event: ClaudeStreamEvent) => void,
 ): Promise<void> {
