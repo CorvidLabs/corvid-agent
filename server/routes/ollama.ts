@@ -286,6 +286,30 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
             capabilities: ['tools', 'chat', 'cloud', 'thinking'],
             pullCommand: 'kimi-k2.5:cloud',
         },
+        {
+            name: 'gpt-oss:120b-cloud',
+            description: 'GPT-OSS 120B — open-source GPT variant, strong general reasoning',
+            category: 'cloud',
+            parameterSize: '120B',
+            capabilities: ['tools', 'chat', 'cloud'],
+            pullCommand: 'gpt-oss:120b-cloud',
+        },
+        {
+            name: 'deepseek-v3.1:671b-cloud',
+            description: 'DeepSeek V3.1 671B — massive reasoning model with tool use',
+            category: 'cloud',
+            parameterSize: '671B',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'deepseek-v3.1:671b-cloud',
+        },
+        {
+            name: 'qwen3-coder:480b-cloud',
+            description: 'Qwen 3 Coder 480B — large-scale code generation and tool use',
+            category: 'cloud',
+            parameterSize: '480B',
+            capabilities: ['tools', 'chat', 'cloud', 'code', 'thinking'],
+            pullCommand: 'qwen3-coder:480b-cloud',
+        },
         // ── Local recommended models ──
         {
             name: 'qwen3:8b',
