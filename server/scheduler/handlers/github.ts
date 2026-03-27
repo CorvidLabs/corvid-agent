@@ -7,6 +7,7 @@ import { getAgent } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import * as github from '../../github/operations';
 import type { HandlerContext } from './types';
+import { resolveProjectId } from './utils';
 
 export async function execStarRepos(
     ctx: HandlerContext,
@@ -100,7 +101,7 @@ export async function execReviewPrs(
             `4. Leave ONE concise review comment. Do not leave multiple comments on the same PR.\n` +
             `5. Summarize your review findings at the end.`;
 
-        const projectId = action.projectId ?? agent.defaultProjectId;
+        const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
         if (!projectId) {
             results.push(`${repo}: No project configured for agent`);
             continue;
@@ -143,7 +144,7 @@ export async function execGithubSuggest(
         return;
     }
 
-    const projectId = action.projectId ?? agent.defaultProjectId;
+    const projectId = resolveProjectId(ctx.db, tenantId, agent, action.projectId);
     if (!projectId) {
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: 'No project configured for agent' });
         return;
