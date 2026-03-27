@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { DEFAULT_FALLBACK_CHAINS } from '../providers/fallback';
+import { DEFAULT_FALLBACK_CHAINS, OLLAMA_DEFAULT_LOCAL_MODEL } from '../providers/fallback';
 import { isLocalOnly, hasClaudeAccess, _resetClaudeCliCache } from '../providers/router';
 import { LlmProviderRegistry } from '../providers/registry';
 import {
@@ -50,9 +50,16 @@ describe('Fallback chains', () => {
         }
     });
 
-    it('local chain includes single qwen3:14b model', () => {
+    it('local chain includes single default model', () => {
         const models = DEFAULT_FALLBACK_CHAINS['local'].chain.map((e) => e.model);
-        expect(models).toEqual(['qwen3:14b']);
+        expect(models).toEqual([OLLAMA_DEFAULT_LOCAL_MODEL]);
+    });
+
+    it('OLLAMA_DEFAULT_LOCAL_MODEL defaults to qwen3:14b when env var unset', () => {
+        // When OLLAMA_DEFAULT_MODEL is not set in the environment, the constant
+        // should fall back to the canonical default.
+        const expected = process.env.OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b';
+        expect(OLLAMA_DEFAULT_LOCAL_MODEL).toBe(expected);
     });
 
     it('existing chains are unchanged', () => {
