@@ -4,6 +4,7 @@ import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
 import { createPersona, assignPersona } from '../db/personas';
 import { createBundle, assignBundle } from '../db/skill-bundles';
+import { saveMemory } from '../db/agent-memories';
 import { resolveSessionPrompts, resolveToolPermissions, resolveSessionConfig } from '../process/session-config-resolver';
 
 /**
@@ -74,6 +75,56 @@ describe('session-config-resolver', () => {
             const result = resolveSessionPrompts(db, agent, null);
             // resolveAgentPromptAdditions returns empty string when no bundles
             expect(result.skillPrompt).toBeUndefined();
+        });
+
+        it('injects team context when agent has team-humans memory', () => {
+            const agent = createAgent(db, { name: 'TeamAgent' });
+            saveMemory(db, { agentId: agent.id, key: 'team-humans', content: 'Leif — project lead' });
+
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toContain('## Team Knowledge');
+            expect(result.personaPrompt).toContain('### Humans');
+            expect(result.personaPrompt).toContain('Leif — project lead');
+        });
+
+        it('injects team context when agent has team-alpha-roster memory', () => {
+            const agent = createAgent(db, { name: 'RosterAgent' });
+            saveMemory(db, { agentId: agent.id, key: 'team-alpha-roster', content: 'Rook — security' });
+
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toContain('## Team Knowledge');
+            expect(result.personaPrompt).toContain('### Agents');
+            expect(result.personaPrompt).toContain('Rook — security');
+        });
+
+        it('falls back to team-agents-alpha when team-alpha-roster is missing', () => {
+            const agent = createAgent(db, { name: 'FallbackAgent' });
+            saveMemory(db, { agentId: agent.id, key: 'team-agents-alpha', content: 'Magpie — scout' });
+
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toContain('### Agents');
+            expect(result.personaPrompt).toContain('Magpie — scout');
+        });
+
+        it('returns no team context when agent has no team memories', () => {
+            const agent = createAgent(db, { name: 'NoTeamAgent' });
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toBeUndefined();
+        });
+
+        it('appends team context to existing persona prompt', () => {
+            const agent = createAgent(db, { name: 'PersonaTeamAgent' });
+            const persona = createPersona(db, {
+                name: 'Friendly',
+                archetype: 'friendly',
+                traits: ['warm'],
+            });
+            assignPersona(db, agent.id, persona.id);
+            saveMemory(db, { agentId: agent.id, key: 'team-humans', content: 'Leif — lead' });
+
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toContain('Persona');
+            expect(result.personaPrompt).toContain('## Team Knowledge');
         });
     });
 
