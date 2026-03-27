@@ -203,15 +203,28 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
 
         // Check if models are pulled (useful when Ollama is the only provider)
         const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+        const ollamaDefaultModel = process.env.OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b';
         try {
             const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
             if (tagsResponse.ok) {
                 const tagsData = (await tagsResponse.json()) as { models?: Array<{ name: string }> };
-                const modelCount = tagsData.models?.length ?? 0;
+                const pulledModels = tagsData.models?.map((m) => m.name) ?? [];
+                const modelCount = pulledModels.length;
                 if (modelCount === 0) {
-                    log.warn('Ollama is running but no models are pulled. Suggested: ollama pull qwen3:8b');
+                    log.warn(`Ollama is running but no models are pulled. Run: ollama pull ${ollamaDefaultModel}`);
                 } else {
                     log.info(`Ollama registered — ${modelCount} model(s) available`);
+                    // Warn if the configured default model is not available
+                    const defaultPulled = pulledModels.some(
+                        (m) => m === ollamaDefaultModel || m.startsWith(`${ollamaDefaultModel}:`),
+                    );
+                    if (!defaultPulled) {
+                        log.warn(
+                            `Default Ollama model '${ollamaDefaultModel}' is not pulled. ` +
+                            `Run: ollama pull ${ollamaDefaultModel} ` +
+                            `(or set OLLAMA_DEFAULT_MODEL to a pulled model: ${pulledModels.slice(0, 3).join(', ')})`,
+                        );
+                    }
                 }
             }
         } catch {

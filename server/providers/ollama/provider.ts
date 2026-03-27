@@ -152,12 +152,14 @@ export class OllamaProvider extends BaseLlmProvider {
     }
 
     getInfo(): LlmProviderInfo {
+        const configuredDefault = process.env.OLLAMA_DEFAULT_MODEL;
+        const defaultModel = configuredDefault ?? this.cachedModels[0] ?? 'qwen3:14b';
         return {
             type: this.type,
             name: 'Ollama',
             executionMode: this.executionMode,
             models: this.cachedModels,
-            defaultModel: this.cachedModels[0] ?? 'qwen3',
+            defaultModel,
             supportsTools: true,
             supportsStreaming: false,
         };

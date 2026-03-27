@@ -390,9 +390,11 @@ describe('OllamaProvider', () => {
         expect(info.supportsTools).toBe(true);
     });
 
-    test('getInfo defaultModel falls back to qwen3 when no models cached', () => {
+    test('getInfo defaultModel falls back to OLLAMA_DEFAULT_MODEL (or qwen3:14b) when no models cached', () => {
         const info = provider.getInfo();
-        expect(info.defaultModel).toBe('qwen3');
+        // When no models are cached, defaultModel is OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b'
+        const expected = process.env.OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b';
+        expect(info.defaultModel).toBe(expected);
     });
 
     test('refreshModels returns empty array when Ollama is unreachable', async () => {

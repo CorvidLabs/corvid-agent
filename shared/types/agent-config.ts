@@ -72,6 +72,8 @@ export interface AnthropicProviderConfig {
 export interface OllamaProviderConfig {
     /** Ollama API host URL. */
     host: string;
+    /** Default model to use when none is specified. Defaults to 'qwen3:14b'. */
+    defaultModel?: string;
     /** Maximum concurrent Ollama requests. */
     maxParallel?: number;
     /** Context window size per request. */

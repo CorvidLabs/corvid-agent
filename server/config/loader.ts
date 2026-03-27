@@ -130,6 +130,7 @@ export function configFromEnv(): AgentDeploymentConfig {
             anthropic: env.ANTHROPIC_API_KEY ? { apiKey: env.ANTHROPIC_API_KEY } : undefined,
             ollama: {
                 host: env.OLLAMA_HOST ?? 'http://localhost:11434',
+                defaultModel: env.OLLAMA_DEFAULT_MODEL,
                 maxParallel: env.OLLAMA_MAX_PARALLEL ? parseInt(env.OLLAMA_MAX_PARALLEL, 10) : undefined,
                 numCtx: env.OLLAMA_NUM_CTX ? parseInt(env.OLLAMA_NUM_CTX, 10) : undefined,
                 numPredict: env.OLLAMA_NUM_PREDICT ? parseInt(env.OLLAMA_NUM_PREDICT, 10) : undefined,
