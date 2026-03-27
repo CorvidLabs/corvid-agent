@@ -49,6 +49,8 @@ const {
     handleGitHubFollowUser,
 } = await import('../mcp/tool-handlers');
 
+const { friendlyModelName, formatAgentSignature } = await import('../mcp/tool-handlers/github');
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function makeCtx(overrides?: Partial<McpToolContext>): McpToolContext {
@@ -761,5 +763,74 @@ describe('scheduler tool gating', () => {
             });
             expect(result.isError).toBeUndefined();
         });
+    });
+});
+
+// ── friendlyModelName ────────────────────────────────────────────────────
+
+describe('friendlyModelName', () => {
+    test('maps claude-opus-4-6 to Opus 4.6', () => {
+        expect(friendlyModelName('claude-opus-4-6')).toBe('Opus 4.6');
+    });
+
+    test('maps claude-sonnet-4-6 to Sonnet 4.6', () => {
+        expect(friendlyModelName('claude-sonnet-4-6')).toBe('Sonnet 4.6');
+    });
+
+    test('maps claude-haiku-4-5-20251001 to Haiku 4.5', () => {
+        expect(friendlyModelName('claude-haiku-4-5-20251001')).toBe('Haiku 4.5');
+    });
+
+    test('maps claude-sonnet-4-20250514 to Sonnet 4', () => {
+        expect(friendlyModelName('claude-sonnet-4-20250514')).toBe('Sonnet 4');
+    });
+
+    test('returns raw string for unknown models', () => {
+        expect(friendlyModelName('gpt-4o')).toBe('gpt-4o');
+    });
+});
+
+// ── formatAgentSignature (#1555) ─────────────────────────────────────────
+
+describe('formatAgentSignature (#1555)', () => {
+    const SIGNATURE_PATTERN = /\n\n---\n.*CorvidLabs Team Alpha$/;
+
+    test('formats signature with agent name and model', () => {
+        const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' });
+        expect(sig).toMatch(SIGNATURE_PATTERN);
+        expect(sig).toContain('**Rook**');
+        expect(sig).toContain('Opus 4.6');
+    });
+
+    test('formats signature with different agent and model', () => {
+        const sig = formatAgentSignature({ name: 'Bishop', model: 'claude-sonnet-4-6' });
+        expect(sig).toMatch(SIGNATURE_PATTERN);
+        expect(sig).toContain('**Bishop**');
+        expect(sig).toContain('Sonnet 4.6');
+    });
+
+    test('formats signature with haiku model', () => {
+        const sig = formatAgentSignature({ name: 'Rook', model: 'claude-haiku-4-5-20251001' });
+        expect(sig).toMatch(SIGNATURE_PATTERN);
+        expect(sig).toContain('Haiku 4.5');
+    });
+
+    test('returns empty string for null agent', () => {
+        expect(formatAgentSignature(null)).toBe('');
+    });
+
+    test('returns empty string for undefined agent', () => {
+        expect(formatAgentSignature(undefined)).toBe('');
+    });
+
+    test('handlers pass body without signature when agent lookup fails', async () => {
+        // With a mock db, getAgent will throw → buildAgentSignature returns ''
+        const ctx = makeCtx();
+        await handleGitHubCreatePr(ctx, {
+            repo: 'test/repo', title: 'PR', body: 'Original body', head: 'feat',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const passedBody = (mockCreatePr.mock.calls as any[][])[0][2] as string;
+        expect(passedBody).toBe('Original body');
     });
 });
