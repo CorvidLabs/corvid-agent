@@ -27,24 +27,24 @@ describe('resolveToolAccessPolicy', () => {
         expect(resolveToolAccessPolicy('agent')).toBe('restricted');
     });
 
-    it('returns "standard" for discord sessions', () => {
-        expect(resolveToolAccessPolicy('discord')).toBe('standard');
+    it('returns "full" for discord sessions (networking tools available, tier enforcement in handler)', () => {
+        expect(resolveToolAccessPolicy('discord')).toBe('full');
     });
 
-    it('returns "standard" for telegram sessions', () => {
-        expect(resolveToolAccessPolicy('telegram')).toBe('standard');
+    it('returns "full" for telegram sessions', () => {
+        expect(resolveToolAccessPolicy('telegram')).toBe('full');
     });
 
-    it('returns "standard" for slack sessions', () => {
-        expect(resolveToolAccessPolicy('slack')).toBe('standard');
+    it('returns "full" for slack sessions', () => {
+        expect(resolveToolAccessPolicy('slack')).toBe('full');
     });
 
-    it('returns "standard" for algochat sessions', () => {
-        expect(resolveToolAccessPolicy('algochat')).toBe('standard');
+    it('returns "full" for algochat sessions', () => {
+        expect(resolveToolAccessPolicy('algochat')).toBe('full');
     });
 
-    it('returns "standard" for undefined source', () => {
-        expect(resolveToolAccessPolicy(undefined)).toBe('standard');
+    it('returns "full" for undefined source', () => {
+        expect(resolveToolAccessPolicy(undefined)).toBe('full');
     });
 });
 
