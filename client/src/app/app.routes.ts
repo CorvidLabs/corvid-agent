@@ -38,6 +38,7 @@ const SESSIONS_TABS: SubTab[] = [
 
 const OBSERVE_TABS: SubTab[] = [
     { label: 'Live Feed', path: './', exact: true },
+    { label: 'Agent Comms', path: 'agent-comms' },
     { label: 'Analytics', path: 'analytics' },
     { label: 'Logs', path: 'logs' },
     { label: 'Brain Viewer', path: 'brain-viewer' },
@@ -199,6 +200,11 @@ export const routes: Routes = [
                 path: '',
                 loadComponent: () =>
                     import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
+            },
+            {
+                path: 'agent-comms',
+                loadComponent: () =>
+                    import('./features/agent-comms/agent-comms.component').then((m) => m.AgentCommsComponent),
             },
             {
                 path: 'analytics',
