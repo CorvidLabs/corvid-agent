@@ -51,6 +51,26 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `buildNotePayload` | `(key, authorId, authorName, category, tags, content, bookMeta?)` | `Uint8Array` | Build ARC-69 JSON note bytes |
 | `parseNotePayload` | `(noteBytes: Uint8Array)` | `LibraryNotePayload \| null` | Parse ARC-69 note bytes; returns null on failure or CRVMEM notes |
 
+### Exported Class — `server/memory/library-sync.ts`
+
+| Export | Description |
+|--------|-------------|
+| `LibrarySyncService` | Periodically indexes all CRVLIB ASAs from localnet into `agent_library`; follows the MemorySyncService pattern |
+
+### Exported Functions — `server/db/migrations/106_agent_library.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Create `agent_library` table and indexes |
+| `down` | `(db: Database)` | `void` | Drop indexes and table |
+
+### Exported Constants — `server/db/schema/library.ts`
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `tables` | `string[]` | DDL statements for the `agent_library` table |
+| `indexes` | `string[]` | DDL statements for library indexes |
+
 ### Exported Functions — `server/db/agent-library.ts`
 
 | Function | Parameters | Returns | Description |
@@ -104,7 +124,8 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `CreateLibraryParams` | Parameters for createLibraryEntry |
 | `UpdateLibraryParams` | Parameters for updateLibraryEntry |
 | `AppendPageParams` | Parameters for appendPage |
-| `LibraryFilters` | Filters for listLibraryEntries |
+| `ListLibraryOptions` | Options for DB-level `listLibraryEntries` (category, authorId, tag, book, limit, includeArchived) |
+| `LibraryFilters` | Filters for on-chain listLibraryEntries |
 
 ### ARC-69 Note Schema
 
@@ -209,7 +230,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 ### Consumed By
 
-> **Note:** `server/mcp/tool-handlers/library.ts` is planned but classified as Layer 1 (Structural) under governance, requiring a supermajority council vote + human approval before creation. No consumers exist yet.
+> **Note:** `server/mcp/tool-handlers/library.ts` does not exist yet. It is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process. Until then, no consumer references exist.
 
 ## Database Tables
 
