@@ -5,9 +5,15 @@
  * a normalized LlmCompletionResult. Supports concurrency limiting via
  * acquireSlot/releaseSlot.
  *
- * Issue: #1529
+ * Routes through the standard direct-process path — no special-case in manager.ts.
+ * The direct-process agentic loop calls doComplete() which runs cursor-agent to
+ * completion (cursor handles its own tool loop internally), then returns the final
+ * text. Since no toolCalls are returned, the direct-process loop exits naturally.
+ *
+ * Issue: #1529, #1547
  */
 
+import type { Agent, Project } from '../../../shared/types';
 import { BaseLlmProvider } from '../base';
 import type {
     LlmProviderType,
@@ -17,7 +23,14 @@ import type {
     LlmProviderInfo,
 } from '../types';
 import { getModelsForProvider } from '../cost-table';
-import { hasCursorAccess, getCursorBinPath } from '../../process/cursor-process';
+import {
+    hasCursorAccess,
+    getCursorBinPath,
+    buildArgs,
+    readStream,
+    describeCursorToolCall,
+} from '../../process/cursor-process';
+import type { ClaudeStreamEvent } from '../../process/types';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('CursorProvider');
@@ -33,6 +46,15 @@ interface SlotWaiter {
     signal?: AbortSignal;
 }
 
+/** Options passed via providerOptions from the direct-process. */
+interface CursorProviderOptions {
+    sessionId?: string;
+    agent?: Agent | null;
+    project?: Project;
+    worktree?: string;
+    worktreeBase?: string;
+}
+
 export class CursorProvider extends BaseLlmProvider {
     readonly type: LlmProviderType = 'cursor';
     readonly executionMode: ExecutionMode = 'direct';
@@ -40,6 +62,9 @@ export class CursorProvider extends BaseLlmProvider {
     private activeSlots = 0;
     private readonly maxSlots = MAX_PARALLEL;
     private readonly waitQueue: SlotWaiter[] = [];
+
+    /** Track cursor session IDs for --resume on follow-up calls. */
+    private cursorSessionIds = new Map<string, string>();
 
     getInfo(): LlmProviderInfo {
         const models = getModelsForProvider('cursor').map((m) => m.model);
@@ -102,6 +127,9 @@ export class CursorProvider extends BaseLlmProvider {
     releaseSlot(_model: string): void {
         this.activeSlots = Math.max(0, this.activeSlots - 1);
 
+        // Clean up any stored cursor session ID for this slot
+        // (session cleanup is handled by the caller via providerOptions.sessionId)
+
         // Wake the next waiter
         while (this.waitQueue.length > 0) {
             const waiter = this.waitQueue.shift()!;
@@ -112,46 +140,72 @@ export class CursorProvider extends BaseLlmProvider {
         }
     }
 
+    /** Clean up stored cursor session ID when a session ends. */
+    cleanupSession(sessionId: string): void {
+        this.cursorSessionIds.delete(sessionId);
+    }
+
     protected async doComplete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
         const binPath = getCursorBinPath();
+        const opts = (params.providerOptions ?? {}) as CursorProviderOptions;
+        const { sessionId, agent, project, worktree, worktreeBase } = opts;
 
         // Build the prompt from the last user message
         const lastUserMsg = [...params.messages].reverse().find((m) => m.role === 'user');
         const prompt = lastUserMsg?.content ?? '';
 
-        const args = [
-            '--print',
-            '--output-format', 'stream-json',
-            '--trust',
-            '--model', params.model || 'auto',
-            '--yolo',
-            '--approve-mcps',
-        ];
+        // Use buildArgs from cursor-process for proper workspace, agent flags, env vars
+        const effectiveProject: Project = project ?? {
+            id: 'provider-default',
+            name: 'Default',
+            description: '',
+            workingDir: process.cwd(),
+            claudeMd: '',
+            envVars: {},
+            gitUrl: null,
+            dirStrategy: 'persistent',
+            baseClonePath: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
 
-        if (params.systemPrompt) {
-            args.push('--system-prompt', params.systemPrompt);
+        const args = buildArgs(effectiveProject, agent ?? null, worktree, worktreeBase);
+
+        // Check if this is a follow-up (resume) call
+        const storedCursorSessionId = sessionId ? this.cursorSessionIds.get(sessionId) : undefined;
+        if (storedCursorSessionId) {
+            args.push('--resume', storedCursorSessionId);
         }
 
         // Prompt goes as the last positional argument
-        args.push(prompt);
+        if (prompt) {
+            args.push(prompt);
+        }
 
         log.info('Starting cursor-agent completion', {
             model: params.model,
             promptLength: prompt.length,
+            resume: !!storedCursorSessionId,
+            sessionId,
         });
 
         const startTime = Date.now();
 
         const proc = Bun.spawn([binPath, ...args], {
-            cwd: process.cwd(),
+            cwd: effectiveProject.workingDir,
+            stdin: 'pipe',
             stdout: 'pipe',
             stderr: 'pipe',
-            env: { ...process.env },
+            env: {
+                ...process.env,
+                ...effectiveProject.envVars,
+            },
         });
 
         // Collect output from stream-json events
         let content = '';
         let model = params.model || 'auto';
+        let turnToolCallCount = 0;
 
         const abortHandler = () => {
             try { proc.kill(); } catch { /* already exited */ }
@@ -165,38 +219,76 @@ export class CursorProvider extends BaseLlmProvider {
         }, COMPLETION_TIMEOUT_MS);
 
         try {
-            // Parse stream-json events from stdout
-            const stdout = proc.stdout;
-            if (stdout) {
-                const reader = stdout.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
+            // Forward stream-json events from stdout
+            if (proc.stdout) {
+                await readStream(proc.stdout, (event: ClaudeStreamEvent) => {
+                    const raw = event as unknown as Record<string, unknown>;
+                    const type = raw.type as string;
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                    // Capture cursor session ID for --resume on follow-up calls
+                    if (type === 'system' && typeof raw.session_id === 'string') {
+                        if (sessionId) {
+                            this.cursorSessionIds.set(sessionId, raw.session_id as string);
+                        }
+                        log.debug(`Captured cursor session ID: ${raw.session_id}`);
+                    }
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() ?? '';
+                    // Text content from content_block_delta events
+                    if (type === 'content_block_delta') {
+                        const delta = raw.delta as Record<string, unknown> | undefined;
+                        if (delta && typeof delta.text === 'string') {
+                            content += delta.text;
+                            params.onStream?.(delta.text);
+                            params.onActivity?.();
+                        }
+                        return;
+                    }
 
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed) continue;
+                    // Text content from assistant_message or text events
+                    if (type === 'assistant_message' || type === 'text') {
+                        const text = raw.content ?? raw.text;
+                        if (typeof text === 'string') {
+                            content += text;
+                            params.onStream?.(text);
+                            params.onActivity?.();
+                        }
+                        return;
+                    }
 
-                        try {
-                            const event = JSON.parse(trimmed) as Record<string, unknown>;
-                            this.processEvent(event, params, (text) => { content += text; });
+                    // Tool call activity — count for metrics and signal activity
+                    if (type === 'tool_call' && (raw as { subtype?: string }).subtype === 'started') {
+                        turnToolCallCount++;
+                        params.onActivity?.();
+                        const toolStatus = describeCursorToolCall(raw);
+                        if (toolStatus) {
+                            params.onStatus?.(toolStatus);
+                        }
+                        return;
+                    }
 
-                            // Extract model from result event
-                            if (event.type === 'result' && typeof event.model === 'string') {
-                                model = event.model;
-                            }
-                        } catch {
-                            // Non-JSON output — skip
+                    if (type === 'content_block_start' || type === 'tool_call') {
+                        params.onActivity?.();
+                    }
+
+                    // Result event — extract model and final content
+                    if (type === 'result') {
+                        if (typeof raw.model === 'string') {
+                            model = raw.model as string;
+                        }
+                        const resultContent = raw.result;
+                        if (typeof resultContent === 'string' && resultContent.length > 0) {
+                            content += resultContent;
                         }
                     }
-                }
+                });
+            }
+
+            // Read stderr for diagnostics
+            if (proc.stderr) {
+                readStream(proc.stderr, (event) => {
+                    const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
+                    log.debug(`cursor-agent stderr: ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
+                });
             }
 
             const exitCode = await proc.exited;
@@ -206,7 +298,13 @@ export class CursorProvider extends BaseLlmProvider {
                 log.warn('cursor-agent exited with non-zero code', { exitCode, model, durationMs });
             }
 
-            log.info('Cursor completion finished', { model, durationMs, contentLength: content.length });
+            log.info('Cursor completion finished', {
+                model,
+                durationMs,
+                contentLength: content.length,
+                toolCalls: turnToolCallCount,
+                sessionId,
+            });
 
             return {
                 content,
@@ -215,52 +313,6 @@ export class CursorProvider extends BaseLlmProvider {
         } finally {
             clearTimeout(timeoutId);
             params.signal?.removeEventListener('abort', abortHandler);
-        }
-    }
-
-    /**
-     * Process a single stream-json event, extracting text content.
-     */
-    private processEvent(
-        event: Record<string, unknown>,
-        params: LlmCompletionParams,
-        appendContent: (text: string) => void,
-    ): void {
-        const type = event.type as string;
-
-        // Text content from content_block_delta events
-        if (type === 'content_block_delta') {
-            const delta = event.delta as Record<string, unknown> | undefined;
-            if (delta && typeof delta.text === 'string') {
-                appendContent(delta.text);
-                params.onStream?.(delta.text);
-                params.onActivity?.();
-            }
-            return;
-        }
-
-        // Text content from assistant_message or text events
-        if (type === 'assistant_message' || type === 'text') {
-            const text = event.content ?? event.text;
-            if (typeof text === 'string') {
-                appendContent(text);
-                params.onStream?.(text);
-                params.onActivity?.();
-            }
-            return;
-        }
-
-        // Activity signals for tool calls
-        if (type === 'tool_call' || type === 'content_block_start') {
-            params.onActivity?.();
-        }
-
-        // Result event — may contain final content
-        if (type === 'result') {
-            const resultContent = event.result as string | undefined;
-            if (typeof resultContent === 'string' && resultContent.length > 0) {
-                appendContent(resultContent);
-            }
         }
     }
 }

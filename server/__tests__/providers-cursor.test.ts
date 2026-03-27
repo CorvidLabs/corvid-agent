@@ -590,4 +590,39 @@ describe('CursorProvider', () => {
             expect(result.model).toBe('composer-2');
         });
     });
+
+    // ── Session cleanup ──────────────────────────────────────────────────
+
+    test('cleanupSession removes stored cursor session ID', () => {
+        // Access internal map for verification
+        const internal = provider as unknown as { cursorSessionIds: Map<string, string> };
+        internal.cursorSessionIds.set('test-session', 'cursor-session-123');
+        expect(internal.cursorSessionIds.has('test-session')).toBe(true);
+
+        provider.cleanupSession('test-session');
+        expect(internal.cursorSessionIds.has('test-session')).toBe(false);
+    });
+
+    test('cleanupSession is a no-op for unknown sessions', () => {
+        // Should not throw
+        provider.cleanupSession('nonexistent-session');
+    });
+
+    // ── Provider options ─────────────────────────────────────────────────
+
+    test('providerOptions is accepted in LlmCompletionParams', () => {
+        // Verify the type accepts providerOptions (compile-time check)
+        const params: LlmCompletionParams = {
+            model: 'auto',
+            systemPrompt: 'test',
+            messages: [{ role: 'user', content: 'hello' }],
+            providerOptions: {
+                sessionId: 'test-session',
+                agent: null,
+                project: null,
+            },
+        };
+        expect(params.providerOptions).toBeDefined();
+        expect(params.providerOptions?.sessionId).toBe('test-session');
+    });
 });

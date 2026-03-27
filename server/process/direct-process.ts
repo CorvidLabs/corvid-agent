@@ -149,6 +149,13 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
 
+    // Provider options for CLI-based providers (cursor-agent, etc.)
+    const providerOptions: Record<string, unknown> = {
+        sessionId: session.id,
+        agent,
+        project,
+    };
+
     // Tier-based limits for this agent's model
     const tierConfig = getAgentTierConfig(model);
     const sessionLimiter = new AgentSessionLimiter(session.id, model);
@@ -362,6 +369,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         type: 'content_block_delta',
                         delta: { text },
                     } as ClaudeStreamEvent),
+                    providerOptions,
                 });
             } catch (err) {
                 clearInterval(heartbeat);
@@ -387,6 +395,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                             type: 'content_block_delta',
                             delta: { text },
                         } as ClaudeStreamEvent),
+                        providerOptions,
                     });
                 } else {
                     throw err;

@@ -60,6 +60,11 @@ export interface LlmCompletionParams {
     onStatus?: (message: string) => void;
     /** Called with each text token as it arrives during streaming. */
     onStream?: (text: string) => void;
+    /**
+     * Provider-specific options bag. CLI-based providers (cursor, etc.) use this
+     * to receive agent/project context without coupling the generic interface.
+     */
+    providerOptions?: Record<string, unknown>;
 }
 
 export interface LlmCompletionResult {
