@@ -13,6 +13,7 @@ import { SessionCheerleadingDetector } from './process/session-cheerleading-dete
 import { OllamaStallEscalator } from './process/ollama-stall-escalator';
 import { MemorySyncService } from './db/memory-sync';
 import { MemoryGraduationService } from './memory/graduation-service';
+import { LibrarySyncService } from './memory/library-sync';
 import { loadAlgoChatConfig } from './algochat/config';
 import type { AlgoChatBridge } from './algochat/bridge';
 import type { AgentWalletService } from './algochat/agent-wallet';
@@ -104,6 +105,7 @@ export interface ServiceContainer {
     algochatState: AlgoChatState;
     memorySyncService: MemorySyncService;
     graduationService: MemoryGraduationService;
+    librarySyncService: LibrarySyncService;
 
     // Work orchestration
     selfTestService: SelfTestService;
@@ -251,6 +253,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const cheerleadingDetector = new SessionCheerleadingDetector(processManager);
     const memorySyncService = new MemorySyncService(db);
     const graduationService = new MemoryGraduationService(db);
+    const librarySyncService = new LibrarySyncService(db);
 
     // ── AlgoChat state (initialized later by initAlgoChat) ───────────────
     const algochatConfig = loadAlgoChatConfig();
@@ -489,6 +492,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     });
     shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
     shutdownCoordinator.registerService('MemoryGraduationService', graduationService, 11);
+    shutdownCoordinator.registerService('LibrarySyncService', librarySyncService, 12);
     if (sandboxLifecycleAdapter) {
         shutdownCoordinator.register({ name: 'SandboxLifecycleAdapter', priority: 14, handler: () => sandboxLifecycleAdapter!.stop() });
     }
@@ -514,6 +518,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         algochatState,
         memorySyncService,
         graduationService,
+        librarySyncService,
         selfTestService,
         workTaskService,
         buddyService,

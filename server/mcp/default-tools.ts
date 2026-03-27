@@ -14,6 +14,12 @@ export const DEFAULT_CORE_TOOLS: readonly string[] = [
     'corvid_read_on_chain_memories',
     'corvid_sync_on_chain_memories',
 
+    // ── Shared Library (CRVLIB) ─────────────────────────────────────────────
+    'corvid_library_write',
+    'corvid_library_read',
+    'corvid_library_list',
+    'corvid_library_delete',
+
     // ── Agent management ────────────────────────────────────────────────────
     'corvid_list_agents',
     'corvid_discover_agent',

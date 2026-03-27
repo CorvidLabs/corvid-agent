@@ -21,6 +21,7 @@ import type { PermissionBroker } from '../permissions/broker';
 import type { ShutdownCoordinator } from '../lib/shutdown-coordinator';
 import type { MemorySyncService } from '../db/memory-sync';
 import type { MemoryGraduationService } from '../memory/graduation-service';
+import type { LibrarySyncService } from '../memory/library-sync';
 import type { ResponsePollingService } from '../notifications/response-poller';
 import type { UsageMeter } from '../billing/meter';
 import type { HealthMonitorService } from '../health/monitor';
@@ -65,6 +66,7 @@ export interface AlgoChatInitDeps {
     shutdownCoordinator: ShutdownCoordinator;
     memorySyncService: MemorySyncService;
     graduationService: MemoryGraduationService;
+    librarySyncService: LibrarySyncService;
     responsePollingService: ResponsePollingService;
     usageMeter: UsageMeter;
     healthMonitorService: HealthMonitorService;
@@ -346,6 +348,12 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
             deps.graduationService.setWalletService(algochatState.walletService);
         }
         deps.graduationService.start();
+
+        // Start library sync service (CRVLIB — shared plaintext knowledge base)
+        if (algochatState.walletService) {
+            deps.librarySyncService.setServices(algochatState.walletService, algochatConfig.network);
+            deps.librarySyncService.start();
+        }
     }
 
     // Start the scheduler now that all services are available

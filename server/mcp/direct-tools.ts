@@ -45,6 +45,7 @@ import {
     handleCurrentProject,
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
+import { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './tool-handlers/library';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
@@ -66,6 +67,10 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_delete_memory',
     'corvid_read_on_chain_memories',
     'corvid_sync_on_chain_memories',
+    'corvid_library_write',
+    'corvid_library_read',
+    'corvid_library_list',
+    'corvid_library_delete',
     'corvid_list_agents',
     'corvid_extend_timeout',
     'corvid_check_credits',
@@ -223,6 +228,71 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 required: ['key'],
             },
             handler: async (args) => unwrapResult(await handleDeleteMemory(ctx, args as { key: string; mode?: string })),
+        },
+        // ── Shared Library (CRVLIB) ──────────────────────────────────────
+        {
+            name: 'corvid_library_write',
+            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    key: { type: 'string', description: 'Unique key for this entry' },
+                    content: { type: 'string', description: 'Content to publish' },
+                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Entry category (default: reference)' },
+                    tags: { type: 'array', items: { type: 'string' }, description: 'Tags for discovery' },
+                },
+                required: ['key', 'content'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_library_write', args, ['key', 'content']);
+                if (err) return err;
+                return unwrapResult(await handleLibraryWrite(ctx, args as { key: string; content: string; category?: string; tags?: string[] }));
+            },
+        },
+        {
+            name: 'corvid_library_read',
+            description: 'Read shared library entries by key, query, category, or tag.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    key: { type: 'string', description: 'Exact key to look up' },
+                    query: { type: 'string', description: 'Search term to filter entries' },
+                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Filter by category' },
+                    tag: { type: 'string', description: 'Filter by tag' },
+                    limit: { type: 'number', description: 'Max entries (default: 20)' },
+                },
+            },
+            handler: async (args) => unwrapResult(await handleLibraryRead(ctx, args as { key?: string; query?: string; category?: string; tag?: string; limit?: number })),
+        },
+        {
+            name: 'corvid_library_list',
+            description: 'List all shared library entries directly from on-chain CRVLIB ASAs.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Filter by category' },
+                    tag: { type: 'string', description: 'Filter by tag' },
+                    limit: { type: 'number', description: 'Max entries (default: 50)' },
+                },
+            },
+            handler: async (args) => unwrapResult(await handleLibraryListOnChain(ctx, args as { category?: string; tag?: string; limit?: number })),
+        },
+        {
+            name: 'corvid_library_delete',
+            description: 'Delete a shared library entry. Soft (default) archives; hard destroys ASA.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    key: { type: 'string', description: 'Library entry key to delete' },
+                    mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
+                },
+                required: ['key'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_library_delete', args, ['key']);
+                if (err) return err;
+                return unwrapResult(await handleLibraryDelete(ctx, args as { key: string; mode?: string }));
+            },
         },
         {
             name: 'corvid_list_agents',
