@@ -45,6 +45,7 @@ export const CHAIN_CONTINUATION_THRESHOLD = parseInt(
  */
 export function escalateTier(tier: ModelTier): ModelTier | null {
     switch (tier) {
+        case ModelTier.INTERN: return ModelTier.HAIKU;
         case ModelTier.HAIKU:  return ModelTier.SONNET;
         case ModelTier.SONNET: return ModelTier.OPUS;
         case ModelTier.OPUS:   return null;

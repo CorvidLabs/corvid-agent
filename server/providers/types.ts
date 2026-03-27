@@ -10,11 +10,14 @@ export type ExecutionMode = 'managed' | 'direct';
  *   OPUS   — council sessions, architecture decisions, complex reasoning
  *   SONNET — work tasks, code generation, specialist agents
  *   HAIKU  — routing decisions, triage, lightweight classification
+ *   INTERN — low-capability local/external models; restricted from git push
+ *            and PR creation (issue #1542)
  */
 export enum ModelTier {
     OPUS   = 'opus',   // claude-opus-4-6
     SONNET = 'sonnet', // claude-sonnet-4-6
     HAIKU  = 'haiku',  // claude-haiku-4-5-20251001
+    INTERN = 'intern', // local/external models — no push/PR access
 }
 
 export interface JsonSchemaProperty {

@@ -4,6 +4,8 @@ import { textResult, errorResult } from './types';
 import * as github from '../../github/operations';
 import { assertRepoAllowed } from '../../github/off-limits';
 import { isRepoAllowedForScheduler, checkSchedulerRateLimit, SCHEDULER_ESCALATION_LABEL } from '../scheduler-tool-gating';
+import { getAgent } from '../../db/agents';
+import { checkInternPrGuard } from '../../work/intern-guard';
 
 /** Enforce scheduler org restriction + rate limit for a gated tool. Returns error result or null. */
 function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: string): CallToolResult | null {
@@ -88,6 +90,18 @@ export async function handleGitHubCreatePr(
         assertRepoAllowed(args.repo);
         const guard = enforceSchedulerGuards(ctx, 'corvid_github_create_pr', args.repo);
         if (guard) return guard;
+        // Intern model guard — block PR creation for low-capability models (#1542)
+        try {
+            const agent = getAgent(ctx.db, ctx.agentId);
+            if (agent) {
+                const internGuard = checkInternPrGuard(agent.model, ctx.sessionId);
+                if (internGuard.blocked) {
+                    return errorResult(internGuard.reason ?? 'Intern-tier models cannot create PRs (issue #1542).');
+                }
+            }
+        } catch {
+            // Fail open: if the agent lookup fails, allow the operation to proceed.
+        }
         const result = await github.createPr(args.repo, args.title, args.body, args.head, args.base ?? 'main');
         if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
         return textResult(`PR created: ${result.prUrl ?? 'success'}`);
