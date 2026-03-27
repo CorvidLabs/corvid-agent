@@ -67,6 +67,32 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `resolveLibraryAsaId` | `(db: Database, key: string)` | `number \| null` | Look up ASA ID for a key |
 | `upsertLibraryEntryFromChain` | `(db: Database, params)` | `void` | Restore from on-chain sync |
 
+### Exported Type — `server/db/agent-library.ts`
+
+| Type | Description |
+|------|-------------|
+| `ListLibraryOptions` | Options for listing library entries (category, author, tag filters) |
+
+### Exported Class — `server/memory/library-sync.ts`
+
+| Class | Description |
+|-------|-------------|
+| `LibrarySyncService` | Periodically indexes all CRVLIB ASAs from localnet into local `agent_library` table |
+
+### Exported Functions — `server/db/migrations/106_agent_library.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Create agent_library table and indexes |
+| `down` | `(db: Database)` | `void` | Drop agent_library table |
+
+### Exported Constants — `server/db/schema/library.ts`
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `tables` | `string[]` | DDL statements for agent_library table |
+| `indexes` | `string[]` | DDL statements for agent_library indexes |
+
 ### Exported Types
 
 | Type | Description |
@@ -183,11 +209,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 ### Consumed By
 
-| Module | What is used |
-|--------|-------------|
-| `server/mcp/tool-handlers/library.ts` | All library operations (governance-protected — see note) |
-
-> **Note:** `server/mcp/tool-handlers/library.ts` is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process.
+> **Note:** `server/mcp/tool-handlers/library.ts` is planned but classified as Layer 1 (Structural) under governance, requiring a supermajority council vote + human approval before creation. No consumers exist yet.
 
 ## Database Tables
 
