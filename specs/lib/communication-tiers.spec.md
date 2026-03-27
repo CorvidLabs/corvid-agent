@@ -35,13 +35,14 @@ Role-based communication hierarchy that controls which agents can message which 
 - Unknown agents always default to `'bottom'` tier (conservative).
 - Top-tier agents can message any tier. Mid-tier can message mid or bottom. Bottom can only message bottom.
 - Agent name lookup is case-insensitive.
+- Rate limits increase monotonically with tier rank.
 
 ## Behavioral Examples
 
-- CorvidAgent (top) → Rook (mid): allowed (top can message anyone).
-- Magpie (bottom) → Rook (mid): blocked — bottom cannot message mid.
-- Jackdaw (mid) → Magpie (bottom): allowed (mid can message below).
-- Unknown agent → anyone: treated as bottom tier.
+- `checkCommunicationTier('corvidagent', 'magpie')` → `null` (top → bottom: allowed)
+- `checkCommunicationTier('magpie', 'corvidagent')` → error string (bottom → top: blocked)
+- `checkCommunicationTier('rook', 'jackdaw')` → `null` (mid → mid: allowed)
+- `getCommunicationTier('unknown-agent')` → `'bottom'`
 
 ## Error Cases
 

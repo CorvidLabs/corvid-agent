@@ -52,9 +52,16 @@ export function getSchedulerAllowedOrgs(): ReadonlySet<string> {
 
 /**
  * Orgs that scheduled sessions are allowed to create issues/PRs in.
+ * Backed by a lazy Proxy so tests can set GITHUB_ALLOWED_ORGS before first use.
  * @deprecated Use `getSchedulerAllowedOrgs()` for runtime-correct values.
  */
-export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = getSchedulerAllowedOrgs();
+export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Proxy(new Set<string>() as ReadonlySet<string>, {
+    get(_target, prop, _receiver) {
+        const real = getSchedulerAllowedOrgs();
+        const val = Reflect.get(real, prop, real);
+        return typeof val === 'function' ? val.bind(real) : val;
+    },
+});
 
 /** Label automatically applied to issues created by scheduled sessions. */
 export const SCHEDULER_ESCALATION_LABEL = 'agent-escalation';

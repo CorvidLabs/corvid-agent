@@ -225,3 +225,4 @@ Internal constants (not env-configurable):
 | 2026-03-20 | corvid-agent | Added handleBrowser and browser.ts |
 | 2026-03-23 | corvid-agent | Added Discord messaging tools: handleDiscordSendMessage, handleDiscordSendImage (#1422) |
 | 2026-03-27 | corvid-agent | Added agent identity signature to GitHub write operations (#1555) |
+| 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |
