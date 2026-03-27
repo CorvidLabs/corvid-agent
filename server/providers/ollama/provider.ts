@@ -125,13 +125,18 @@ export class OllamaProvider extends BaseLlmProvider {
         return process.env.OLLAMA_HOST || 'http://localhost:11434';
     }
 
+    /** Check whether a model name indicates cloud-proxied inference. */
+    static isCloudModel(model: string): boolean {
+        return model.includes('-cloud') || model.endsWith(':cloud');
+    }
+
     /**
      * Get the host for a specific model. Cloud models (suffix "-cloud" or ":cloud")
      * require the local Ollama instance because cloud proxying uses locally-stored auth.
      * If OLLAMA_HOST points to a non-local address, cloud models fall back to localhost.
      */
     private hostForModel(model: string): string {
-        if (model.includes('-cloud') || model.endsWith(':cloud')) {
+        if (OllamaProvider.isCloudModel(model)) {
             const configuredHost = this.host;
             // If host is already localhost, use it directly
             if (configuredHost.includes('localhost') || configuredHost.includes('127.0.0.1')) {
@@ -509,18 +514,25 @@ export class OllamaProvider extends BaseLlmProvider {
         };
 
         // Build Ollama options for optimal performance.
+        const isCloud = OllamaProvider.isCloudModel(params.model);
         const defaultCtx = parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
-        const maxOutput = parseInt(process.env.OLLAMA_NUM_PREDICT ?? '2048', 10);
+        const localMaxOutput = parseInt(process.env.OLLAMA_NUM_PREDICT ?? '2048', 10);
+        // Cloud-proxied models have tight server-side timeouts (~90s).
+        // Cap output tokens lower to stay within the window.
+        const maxOutput = isCloud ? Math.min(localMaxOutput, 1024) : localMaxOutput;
         const options: Record<string, unknown> = {
             num_ctx: defaultCtx,
             // Cap output tokens to prevent runaway generation (14B models can get stuck)
             num_predict: maxOutput,
-            // Force all layers to GPU — critical for Apple Silicon performance.
-            // Without this, Ollama may partially offload to CPU, causing 50x slowdown.
-            num_gpu: parseInt(process.env.OLLAMA_NUM_GPU ?? '-1', 10),
-            // Larger batch size speeds up prompt evaluation significantly.
-            num_batch: parseInt(process.env.OLLAMA_NUM_BATCH ?? '512', 10),
         };
+        if (!isCloud) {
+            // Local-only tuning — meaningless for cloud-proxied inference and
+            // may confuse the proxy or cause unexpected behaviour.
+            // Force all layers to GPU — critical for Apple Silicon performance.
+            options.num_gpu = parseInt(process.env.OLLAMA_NUM_GPU ?? '-1', 10);
+            // Larger batch size speeds up prompt evaluation significantly.
+            options.num_batch = parseInt(process.env.OLLAMA_NUM_BATCH ?? '512', 10);
+        }
         if (params.temperature !== undefined) {
             options.temperature = params.temperature;
         }

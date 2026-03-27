@@ -82,7 +82,7 @@ export function getToolInstructionPrompt(
 
 /** Families that use text-based tool calling and need full schemas in prompt. */
 const TEXT_BASED_FAMILIES = new Set<ModelFamily>([
-    'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral',
+    'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron',
 ]);
 
 /** Format tool definitions as a compact reference for the system prompt. */
@@ -101,6 +101,63 @@ function formatToolSchemas(toolDefs: ToolSchema[]): string {
         }
     }
     return lines.join('\n');
+}
+
+/**
+ * Get a compact tool instruction prompt for cloud-proxied models.
+ * Cloud proxies impose tight server-side timeouts (~90s), so we strip
+ * the worked examples and verbose guidance to reduce prompt tokens.
+ */
+export function getCompactToolInstructionPrompt(
+    family: ModelFamily,
+    toolNames: string[],
+    toolDefs?: ToolSchema[],
+): string {
+    const parts: string[] = [];
+    const toolList = toolNames.length > 0
+        ? `Available tools: ${toolNames.join(', ')}`
+        : '';
+
+    parts.push(`## Tool Usage
+${toolList}
+
+Rules:
+1. Either respond with text OR make a tool call, not both.
+2. Complete ALL steps. After each tool result, immediately continue.
+3. Pass arguments as proper JSON with correct parameter names.
+4. Only use tools from the available list.
+5. NEVER write scripts to send messages — only use MCP tools.`);
+
+    // Text-based families need schemas and JSON format example
+    if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
+        parts.push(formatToolSchemas(toolDefs));
+    }
+
+    // Minimal format guidance for text-based families
+    if (TEXT_BASED_FAMILIES.has(family)) {
+        const exampleTool = toolNames[0] ?? 'tool_name';
+        parts.push(`To call a tool, output ONLY a JSON array:
+[{"name": "${exampleTool}", "arguments": {"path": "server/"}}]
+No code blocks, no surrounding text.`);
+    }
+
+    return parts.join('\n\n');
+}
+
+/**
+ * Compact versions of supplemental prompts for cloud-proxied models.
+ * These preserve the essential rules while cutting prompt length.
+ */
+export function getCompactResponseRoutingPrompt(): string {
+    return `## Response Routing
+Reply with text directly — do NOT use corvid_send_message to reply to the sender.
+Use corvid_send_message ONLY to reach a DIFFERENT agent proactively.
+Always respond via the same channel the message came from.`;
+}
+
+export function getCompactCodingToolPrompt(): string {
+    return `## Coding Tools
+Read files before editing. Use edit_file for targeted changes, write_file for new files. Verify changes after.`;
 }
 
 /**

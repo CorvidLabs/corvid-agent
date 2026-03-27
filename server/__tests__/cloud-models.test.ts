@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { parseModelSizeB } from '../exam/runner';
 import { isCloudModel } from '../lib/agent-tiers';
+import { OllamaProvider } from '../providers/ollama/provider';
 
 // ── parseModelSizeB ─────────────────────────────────────────────────────────
 
@@ -68,6 +69,33 @@ describe('isCloudModel', () => {
     it('returns false for model with "cloud" in name but no hyphen prefix', () => {
         // isCloudModel checks for ':cloud' or '-cloud', not just 'cloud'
         expect(isCloudModel('cloudbert:7b')).toBe(false);
+    });
+});
+
+// ── OllamaProvider.isCloudModel (static) ────────────────────────────────────
+
+describe('OllamaProvider.isCloudModel', () => {
+    it('detects -cloud suffix', () => {
+        expect(OllamaProvider.isCloudModel('qwen3-coder:480b-cloud')).toBe(true);
+    });
+
+    it('detects :cloud tag', () => {
+        expect(OllamaProvider.isCloudModel('qwen3:cloud')).toBe(true);
+    });
+
+    it('returns false for local models', () => {
+        expect(OllamaProvider.isCloudModel('qwen3:14b')).toBe(false);
+    });
+
+    it('returns false for model with cloud in name but no delimiter', () => {
+        expect(OllamaProvider.isCloudModel('cloudbert:7b')).toBe(false);
+    });
+
+    it('agrees with agent-tiers isCloudModel', () => {
+        const models = ['qwen3:cloud', 'deepseek-v3.1:671b-cloud', 'qwen3:14b', 'llama:8b'];
+        for (const m of models) {
+            expect(OllamaProvider.isCloudModel(m)).toBe(isCloudModel(m));
+        }
     });
 });
 
