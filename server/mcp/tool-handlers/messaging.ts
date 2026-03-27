@@ -3,6 +3,8 @@ import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
 import { DedupService } from '../../lib/dedup';
+import { getAgent } from '../../db/agents';
+import { checkCommunicationTier } from '../../lib/communication-tiers';
 
 const log = createLogger('McpToolHandlers');
 
@@ -61,6 +63,16 @@ export async function handleSendMessage(
 
         if (match.agentId === ctx.agentId) {
             return errorResult('Cannot send a message to yourself.');
+        }
+
+        // Communication tier enforcement: messages flow downward in the hierarchy.
+        // Top → anyone, Mid → mid + bottom, Bottom → bottom only.
+        const senderAgent = getAgent(ctx.db, ctx.agentId);
+        if (senderAgent) {
+            const tierErr = checkCommunicationTier(senderAgent.name, match.agentName);
+            if (tierErr) {
+                return errorResult(tierErr);
+            }
         }
 
         // Dedup: reject duplicate sends within the time window
