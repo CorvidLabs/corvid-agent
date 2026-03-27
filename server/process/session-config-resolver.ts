@@ -12,6 +12,7 @@ import type { Agent } from '../../shared/types';
 import { getAgentPersonas, composePersonaPrompt } from '../db/personas';
 import { resolveAgentPromptAdditions, resolveProjectPromptAdditions, resolveAgentTools, resolveProjectTools } from '../db/skill-bundles';
 import { getAgent } from '../db/agents';
+import { recallMemory } from '../db/agent-memories';
 
 export interface SessionPrompts {
     personaPrompt: string | undefined;
@@ -22,6 +23,35 @@ export interface ResolvedSessionConfig {
     personaPrompt: string | undefined;
     skillPrompt: string | undefined;
     resolvedToolPermissions: string[] | null;
+}
+
+/**
+ * Load team context from agent_memories and format a brief block.
+ * Looks for team-humans and team-alpha-roster (falling back to team-agents-alpha).
+ * Returns an empty string if no relevant memories are found.
+ */
+function resolveTeamContext(db: Database, agentId: string): string {
+    const humansMemory = recallMemory(db, agentId, 'team-humans');
+    const rosterMemory =
+        recallMemory(db, agentId, 'team-alpha-roster') ??
+        recallMemory(db, agentId, 'team-agents-alpha');
+
+    if (!humansMemory && !rosterMemory) return '';
+
+    const lines: string[] = [
+        '## Team Knowledge',
+        'You are part of Team Alpha at CorvidLabs. Here are the humans and agents you work with:',
+    ];
+
+    if (humansMemory) {
+        lines.push('', '### Humans', humansMemory.content);
+    }
+
+    if (rosterMemory) {
+        lines.push('', '### Agents', rosterMemory.content);
+    }
+
+    return lines.join('\n');
 }
 
 /**
@@ -39,6 +69,11 @@ export function resolveSessionPrompts(db: Database, agent: Agent | null, project
 
         const sp = resolveAgentPromptAdditions(db, agent.id);
         if (sp) skillPrompt = sp;
+
+        const teamContext = resolveTeamContext(db, agent.id);
+        if (teamContext) {
+            personaPrompt = personaPrompt ? `${personaPrompt}\n\n${teamContext}` : teamContext;
+        }
     }
 
     if (projectId) {
