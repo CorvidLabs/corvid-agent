@@ -1,23 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": ".",
-    "declaration": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "paths": {
-      "@shared/*": ["./shared/*"]
-    }
+    "noEmit": true,
+    "skipLibCheck": true
   },
-  "include": ["shared/**/*.ts", "server/**/*.ts", "cli/**/*.ts"],
-  "exclude": ["node_modules", "dist", "client"]
+  "include": ["src/**/*", "*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }
