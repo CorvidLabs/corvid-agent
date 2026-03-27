@@ -253,11 +253,17 @@ export class OnChainFlockClient {
 
     /**
      * Deregister an agent and return its stake.
+     *
+     * The contract issues an inner payment transaction to return the stake.
+     * Per the AVM fee-pooling model, the outer transaction must cover both
+     * the outer and inner transaction fees (extraFee = 1 × minFee = 1000).
      */
     async deregister(senderAddress: string, sk: Uint8Array): Promise<string> {
         const { client } = await this.buildTypedClient(senderAddress, sk);
+        const { AlgoAmount } = await import('@algorandfoundation/algokit-utils/types/amount');
         const result = await client.send.deregister({
             args: [],
+            extraFee: AlgoAmount.MicroAlgo(1000),
         });
         const txId = result.transaction.txID();
         log.info('Deregistered agent on-chain', { address: senderAddress, txId });
@@ -472,6 +478,10 @@ export class OnChainFlockClient {
 
     /**
      * Admin remove an agent (returns stake, admin only).
+     *
+     * The contract issues an inner payment transaction to return the stake.
+     * Per the AVM fee-pooling model, the outer transaction must cover both
+     * the outer and inner transaction fees (extraFee = 1 × minFee = 1000).
      */
     async adminRemoveAgent(
         adminAddress: string,
@@ -479,8 +489,10 @@ export class OnChainFlockClient {
         agentAddress: string,
     ): Promise<string> {
         const { client } = await this.buildTypedClient(adminAddress, sk);
+        const { AlgoAmount } = await import('@algorandfoundation/algokit-utils/types/amount');
         const result = await client.send.adminRemoveAgent({
             args: { agentAddress },
+            extraFee: AlgoAmount.MicroAlgo(1000),
         });
         return result.transaction.txID();
     }
