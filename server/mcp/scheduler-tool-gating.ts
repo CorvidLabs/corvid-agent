@@ -44,7 +44,9 @@ export const SCHEDULER_MAX_PR_COMMENTS_PER_SESSION = 5;
 export const SCHEDULER_MAX_MESSAGES_PER_SESSION = 3;
 
 /** Orgs that scheduled sessions are allowed to create issues/PRs in. */
-export const SCHEDULER_ALLOWED_ORGS = new Set(['CorvidLabs', 'corvid-agent']);
+export const SCHEDULER_ALLOWED_ORGS: ReadonlySet<string> = new Set(
+    (process.env.GITHUB_ALLOWED_ORGS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+);
 
 /** Label automatically applied to issues created by scheduled sessions. */
 export const SCHEDULER_ESCALATION_LABEL = 'agent-escalation';
