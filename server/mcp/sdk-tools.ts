@@ -694,7 +694,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         const permissions = ctx.resolvedToolPermissions !== undefined
             ? ctx.resolvedToolPermissions
             : getAgent(ctx.db, ctx.agentId)?.mcpToolPermissions ?? null;
-        const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
+        const allowedSet = permissions && permissions.length > 0 ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
         filteredTools = tools.filter((t) => allowedSet.has(t.name));
     }
 
