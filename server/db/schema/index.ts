@@ -28,12 +28,13 @@ import * as webhooks from './webhooks';
 import * as buddy from './buddy';
 import * as work from './work';
 import * as workflows from './workflows';
+import * as library from './library';
 
 // ── Domain modules (order: tables first, then indexes) ──────────────
 
 const domains = [
     agents, algochat, auth, buddy, contacts, councils, credits, discord, flock,
-    marketplace, memory, modelExams, monitoring, notifications, projects,
+    library, marketplace, memory, modelExams, monitoring, notifications, projects,
     reputation, schedules, sessions, webhooks, work, workflows,
 ] as const;
 
@@ -47,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 105;
+const SCHEMA_VERSION = 106;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -152,6 +153,11 @@ const MIGRATIONS: Record<number, string[]> = {
         // Session restart recovery flag
         `ALTER TABLE sessions ADD COLUMN restart_pending INTEGER NOT NULL DEFAULT 0`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
+    ],
+    106: [
+        // CRVLIB: shared agent knowledge library (plaintext ARC-69 ASAs)
+        ...library.tables,
+        ...library.indexes,
     ],
 };
 
