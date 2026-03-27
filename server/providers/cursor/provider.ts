@@ -171,6 +171,16 @@ export class CursorProvider extends BaseLlmProvider {
 
         const args = buildArgs(effectiveProject, agent ?? null, worktree, worktreeBase);
 
+        // Add model flag if not already provided by buildArgs (no agent or agent has no model)
+        if (!agent?.model && params.model) {
+            args.push('--model', params.model);
+        }
+
+        // Add system prompt if provided
+        if (params.systemPrompt) {
+            args.push('--system-prompt', params.systemPrompt);
+        }
+
         // Check if this is a follow-up (resume) call
         const storedCursorSessionId = sessionId ? this.cursorSessionIds.get(sessionId) : undefined;
         if (storedCursorSessionId) {

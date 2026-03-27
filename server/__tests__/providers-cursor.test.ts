@@ -7,9 +7,38 @@ import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from 'bun:
 import type { LlmCompletionParams } from '../providers/types';
 
 // ── Mock cursor-process before importing provider ────────────────────────
+async function mockReadStream(stream: ReadableStream, callback: (event: unknown) => void) {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try { callback(JSON.parse(trimmed)); } catch { /* skip non-JSON */ }
+        }
+    }
+    if (buffer.trim()) {
+        try { callback(JSON.parse(buffer.trim())); } catch { /* skip */ }
+    }
+}
+
 mock.module('../process/cursor-process', () => ({
     hasCursorAccess: () => true,
     getCursorBinPath: () => '/usr/local/bin/cursor-agent',
+    buildArgs: (_project: unknown, _agent: unknown) => ['--print', '--output-format', 'stream-json', '--trust', '--workspace', process.cwd()],
+    readStream: mockReadStream,
+    describeCursorToolCall: (event: unknown) => {
+        if (typeof event === 'object' && event !== null && (event as any).type === 'tool_call') {
+            return `Tool: ${(event as any).name ?? 'unknown'}`;
+        }
+        return null;
+    },
 }));
 
 // Import after mock.module so the provider picks up the mocked functions
