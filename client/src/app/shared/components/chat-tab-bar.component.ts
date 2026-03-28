@@ -76,7 +76,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             height: 36px;
             padding: 0 0.25rem;
             gap: 0.25rem;
-            overflow: hidden;
+            min-width: 0;
         }
         .tab-bar--collapsed {
             height: 24px;
@@ -116,11 +116,15 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         .tab-bar__tabs {
             display: flex;
             flex: 1;
+            min-width: 0;
             gap: 2px;
             overflow-x: auto;
-            scrollbar-width: none;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border, #2a2a3e) transparent;
         }
-        .tab-bar__tabs::-webkit-scrollbar { display: none; }
+        .tab-bar__tabs::-webkit-scrollbar { height: 3px; }
+        .tab-bar__tabs::-webkit-scrollbar-track { background: transparent; }
+        .tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--border, #2a2a3e); border-radius: 3px; }
         .tab {
             display: flex;
             align-items: center;

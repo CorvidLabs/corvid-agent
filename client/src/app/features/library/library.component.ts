@@ -145,7 +145,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
     `,
     styles: `
         .library {
-            padding: 1rem;
+            padding: 1.5rem;
             max-width: 1200px;
             margin: 0 auto;
         }

@@ -153,7 +153,7 @@ export interface Breadcrumb {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 0.5rem 1.5rem 1.5rem;
+            padding: 1rem 2rem 2rem;
         }
 
         @media (max-width: 767px) {
@@ -167,7 +167,7 @@ export interface Breadcrumb {
                 padding: 0 1rem;
             }
             .page-shell__content {
-                padding: 0.5rem 1rem 1rem;
+                padding: 0.75rem 1.25rem 1.25rem;
             }
             .page-shell__title {
                 font-size: 1rem;
