@@ -192,6 +192,93 @@ export function copySkills(cwd: string): void {
     }
 }
 
+// ─── Post-Init Health Summary ────────────────────────────────────────────────
+
+interface HealthItem {
+    label: string;
+    ok: boolean;
+    detail?: string;
+}
+
+async function printPostInitSummary(projectRoot: string): Promise<void> {
+    const items: HealthItem[] = [];
+
+    // Check .env exists
+    const envPath = join(projectRoot, '.env');
+    items.push({
+        label: 'Environment config',
+        ok: existsSync(envPath),
+        detail: existsSync(envPath) ? '.env configured' : 'Run corvid-agent init to create .env',
+    });
+
+    // Check AI provider
+    const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+    let hasOllamaRunning = false;
+    try {
+        const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2_000) });
+        hasOllamaRunning = res.ok;
+    } catch { /* not running */ }
+    let hasClaude = false;
+    try {
+        const proc = Bun.spawn(['claude', '--version'], { stdout: 'pipe', stderr: 'pipe' });
+        await proc.exited;
+        hasClaude = proc.exitCode === 0;
+    } catch { /* not installed */ }
+
+    const hasProvider = hasAnthropicKey || hasOllamaRunning || hasClaude;
+    items.push({
+        label: 'AI provider',
+        ok: hasProvider,
+        detail: hasProvider
+            ? [hasAnthropicKey && 'Anthropic API', hasClaude && 'Claude CLI', hasOllamaRunning && 'Ollama'].filter(Boolean).join(', ')
+            : 'No provider detected — see docs/quickstart.md',
+    });
+
+    // Check node_modules
+    items.push({
+        label: 'Dependencies',
+        ok: existsSync(join(projectRoot, 'node_modules')),
+        detail: existsSync(join(projectRoot, 'node_modules')) ? 'Installed' : 'Run bun install',
+    });
+
+    // Check GH_TOKEN
+    const hasGhToken = !!(process.env.GH_TOKEN || process.env.GITHUB_TOKEN);
+    items.push({
+        label: 'GitHub token',
+        ok: hasGhToken,
+        detail: hasGhToken ? 'Configured' : 'Optional — needed for work tasks and PRs',
+    });
+
+    // Check Docker (for localnet)
+    let hasDocker = false;
+    try {
+        const proc = Bun.spawn(['docker', 'info'], { stdout: 'pipe', stderr: 'pipe' });
+        await proc.exited;
+        hasDocker = proc.exitCode === 0;
+    } catch { /* not running */ }
+    items.push({
+        label: 'Docker',
+        ok: hasDocker,
+        detail: hasDocker ? 'Running' : 'Optional — needed for AlgoChat localnet',
+    });
+
+    // Print summary
+    printHeader('Setup Health Check');
+    for (const item of items) {
+        const icon = item.ok ? c.green('✓') : c.yellow('○');
+        const detail = item.detail ? c.gray(` — ${item.detail}`) : '';
+        console.log(`  ${icon} ${item.label}${detail}`);
+    }
+
+    const readyCount = items.filter(i => i.ok).length;
+    const requiredReady = items.slice(0, 3).filter(i => i.ok).length; // env, provider, deps
+    if (requiredReady === 3) {
+        console.log(`\n  ${c.green('Ready to go!')} ${c.gray(`(${readyCount}/${items.length} checks passed)`)}`);
+    } else {
+        console.log(`\n  ${c.yellow('Almost there!')} ${c.gray(`(${readyCount}/${items.length} checks passed — fix the items above to get started)`)}`);
+    }
+}
+
 // ─── MCP Config Writer ──────────────────────────────────────────────────────
 
 function writeMcpConfig(filePath: string, mcpConfig: Record<string, unknown>): void {
@@ -510,6 +597,9 @@ ${c.bold}Setting up your AI developer...${c.reset}
         installSpinner.stop();
         printWarning('Could not install dependencies — try running `bun install` manually');
     }
+
+    // ── Health summary ──
+    await printPostInitSummary(projectRoot);
 
     // ── Done — show welcome ──
     console.log(`
@@ -863,6 +953,9 @@ async function runRemainingSteps(
             serverProc.kill();
         }
     }
+
+    // ── Health summary ──
+    await printPostInitSummary(projectRoot);
 
     // ── Done ──
     console.log(`
