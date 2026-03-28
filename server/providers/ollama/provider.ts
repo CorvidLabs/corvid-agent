@@ -16,6 +16,7 @@ import {
 } from './tool-parser';
 import { createLogger } from '../../lib/logger';
 import { ExternalServiceError } from '../../lib/errors';
+import { sanitizeModelOutput } from './response-sanitizer';
 
 const log = createLogger('OllamaProvider');
 
@@ -762,6 +763,10 @@ export class OllamaProvider extends BaseLlmProvider {
         if (tokensPerSecond > 0 && tokensPerSecond < 5) {
             log.warn(`Very slow inference: ${tokensPerSecond.toFixed(1)} tok/s. On Apple Silicon this should be 30-60 tok/s. Check: (1) Ollama running natively (not in Docker), (2) num_gpu=-1, (3) sufficient memory for model + KV cache.`);
         }
+
+        // Sanitize output — strip leaked thinking tags, context summaries,
+        // system prompt fragments that less-capable models sometimes echo.
+        content = sanitizeModelOutput(content, params.model);
 
         return {
             content,
