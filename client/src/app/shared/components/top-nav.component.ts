@@ -63,11 +63,11 @@ const TABS: NavTab[] = [
         label: 'Observe',
         icon: 'eye',
         route: '/observe',
-        matchRoutes: ['/observe'],
+        matchRoutes: ['/observe', '/library'],
         children: [
             { label: 'Comms', icon: 'activity', route: '/observe' },
             { label: 'Memory', icon: 'database', route: '/observe/memory' },
-            { label: 'Library', icon: 'book-open', route: '/observe/library' },
+            { label: 'Library', icon: 'book-open', route: '/library' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
             { label: 'Logs', icon: 'terminal', route: '/observe/logs' },
             { label: 'Reputation', icon: 'star', route: '/observe/reputation' },
@@ -259,7 +259,7 @@ const TABS: NavTab[] = [
         .topnav__tabs {
             display: flex;
             align-items: center;
-            gap: 0;
+            gap: 0.25rem;
         }
         .topnav__tab-wrapper {
             position: relative;
@@ -268,7 +268,7 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: 0.5rem 0.9rem;
+            padding: 0.5rem 1rem;
             background: none;
             border: none;
             color: var(--text-secondary);
@@ -587,10 +587,14 @@ export class TopNavComponent implements OnInit, OnDestroy {
         event.stopPropagation();
         if (this.openDropdown() === tab.key) {
             this.closeDropdown();
-        } else if (tab.children.length > 1) {
-            this.openDropdown.set(tab.key);
+            return;
         }
-        // Always navigate to the tab's default route on click
+        if (tab.children.length > 1) {
+            this.openDropdown.set(tab.key);
+            // Don't navigate when opening dropdown — let user pick a sub-item
+            return;
+        }
+        // Only navigate for tabs without children (Home, Dashboard)
         this.router.navigate([tab.route]);
     }
 
