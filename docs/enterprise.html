@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise — CorvidAgent</title>
+  <meta name="description" content="Security, compliance, and scale for production deployments of CorvidAgent — multi-tenant architecture, RBAC, on-chain audit trails, and Kubernetes-ready infrastructure.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="Enterprise — CorvidAgent">
+  <meta property="og:description" content="Security, compliance, and scale for production deployments — multi-tenant, RBAC, on-chain audit trails.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/enterprise.html">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/enterprise.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="nav" aria-label="Main navigation">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="why-corvidagent.html" class="nav__link">Why</a>
+        <a href="business-guide.html" class="nav__link">Business</a>
+        <a href="enterprise.html" class="nav__link nav__link--active">Enterprise</a>
+        <a href="architecture.html" class="nav__link">API</a>
+        <a href="self-hosting.html" class="nav__link">Deploy</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content">
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <header class="page-hero">
+    <div class="container">
+      <h1 class="page-hero__title"><span class="accent-magenta">Enterprise</span></h1>
+      <p class="page-hero__tagline">Security, compliance, and scale for production deployments.</p>
+    </div>
+    <div class="hero__scanline"></div>
+  </header>
+
+  <!-- ═══════════════════ WHY ENTERPRISE ═══════════════════ -->
+  <section class="section" id="why">
+    <div class="container">
+      <h2 class="section__title">Why Enterprise Teams Choose CorvidAgent</h2>
+      <div class="grid grid--3">
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F3E2;</div>
+          <h3 class="card__title">Self-Hosted</h3>
+          <p>Runs on your infrastructure. Your code never leaves your network. Full control over data residency and compliance.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F465;</div>
+          <h3 class="card__title">Multi-Tenant</h3>
+          <p>Isolated environments for different teams, projects, or clients. Tenant-scoped data, API keys, and RBAC roles.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F4DC;</div>
+          <h3 class="card__title">Audit Trail</h3>
+          <p>Every action logged. Optionally recorded on-chain via Algorand &mdash; verifiable by anyone, deletable by no one.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F4E6;</div>
+          <h3 class="card__title">Container Sandboxing</h3>
+          <p>Agent code execution in isolated Docker containers. No host access, no breakouts, no surprises.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F310;</div>
+          <h3 class="card__title">API-First</h3>
+          <p>~300 REST endpoints, OpenAPI spec, Swagger UI, WebSocket streaming, and A2A protocol interoperability.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x2699;</div>
+          <h3 class="card__title">Deployment Flexibility</h3>
+          <p>Docker, Kubernetes (Helm + raw manifests), systemd, or macOS LaunchAgent. Your infrastructure, your choice.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ ARCHITECTURE ═══════════════════ -->
+  <section class="section section--alt" id="architecture">
+    <div class="container">
+      <h2 class="section__title">Architecture Overview</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">system architecture</span>
+        </div>
+        <pre class="terminal__body"><code>                    <span class="accent-cyan">+--------------------------+</span>
+                    <span class="accent-cyan">|   Angular 21 Dashboard   |</span>
+                    <span class="accent-cyan">+------------+-------------+</span>
+                                 |
+                            <span class="t-comment">HTTP / WebSocket</span>
+                                 |
+<span class="accent-magenta">+--------------------------------+--------------------------------+</span>
+<span class="accent-magenta">|</span>                     <span class="accent-green">Bun Server (port 3000)</span>                      <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>                                                                 <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  Process Manager | Council Engine | Scheduler | Work Tasks      <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  Telegram Bridge | Discord Bridge | Slack     | Voice (TTS/STT) <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  Workflow Engine | A2A Protocol   | MCP Tools | Sandbox         <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>                                                                 <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  <span class="accent-cyan">+-----------------------------------------------------------+</span>  <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  <span class="accent-cyan">|</span>                    <span class="accent-green">SQLite (WAL mode)</span>                       <span class="accent-cyan">|</span>  <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  <span class="accent-cyan">|</span>  16 migrations | FTS5 search | 90+ tables | foreign keys  <span class="accent-cyan">|</span>  <span class="accent-magenta">|</span>
+<span class="accent-magenta">|</span>  <span class="accent-cyan">+-----------------------------------------------------------+</span>  <span class="accent-magenta">|</span>
+<span class="accent-magenta">+----------------------------------------------------------------+</span>
+
+<span class="t-comment">Single binary, single database file, no external dependencies beyond the AI provider.</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MULTI-TENANT ═══════════════════ -->
+  <section class="section" id="multi-tenant">
+    <div class="container">
+      <h2 class="section__title">Multi-Tenant Setup</h2>
+
+      <div class="terminal" style="margin-bottom: 2rem;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">.env</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-comment"># Enable tenant isolation</span>
+<span class="accent-cyan">MULTI_TENANT</span>=true
+<span class="accent-cyan">API_KEY</span>=your-admin-api-key
+<span class="accent-cyan">ANTHROPIC_API_KEY</span>=sk-ant-...</code></pre>
+      </div>
+
+      <div class="terminal" style="margin-bottom: 2rem;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">register tenant</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-prompt">$</span> curl -X POST https://corvid.yourcompany.com/api/tenants/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Frontend Team",
+    "slug": "frontend",
+    "ownerEmail": "lead@yourcompany.com",
+    "plan": "pro"
+  }'
+
+<span class="accent-green">&#x2713;</span> Returns a tenant-specific API key
+<span class="t-comment"># All subsequent requests are scoped to that tenant's data</span></code></pre>
+      </div>
+
+      <h3 class="section__subtitle" style="margin-top: 2rem; margin-bottom: 1rem; color: var(--cyan);">What&rsquo;s Isolated Per Tenant</h3>
+      <div class="grid grid--2">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Data</h3>
+          <p>Agents, sessions, projects, work tasks, memory, and conversation history &mdash; fully isolated per tenant.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Configuration</h3>
+          <p>Schedules, workflow executions, API keys, and RBAC roles &mdash; scoped and enforced at the database layer.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PLANS & RBAC ═══════════════════ -->
+  <section class="section section--alt" id="rbac">
+    <div class="container">
+      <h2 class="section__title">Plans &amp; RBAC</h2>
+
+      <h3 class="section__subtitle" style="margin-bottom: 1rem; color: var(--cyan);">Tenant Plans</h3>
+      <div class="grid grid--2" style="margin-bottom: 2.5rem;">
+        <div class="card card--cyan">
+          <h3 class="card__title">Free</h3>
+          <p>2 agents, 1 concurrent session. Basic tools &mdash; perfect for evaluation.</p>
+        </div>
+        <div class="card card--magenta">
+          <h3 class="card__title">Starter</h3>
+          <p>5 agents, 3 concurrent sessions. Adds GitHub integration and schedules.</p>
+        </div>
+        <div class="card card--green">
+          <h3 class="card__title">Pro</h3>
+          <p>20 agents, 10 concurrent sessions. Councils, workflows, and voice.</p>
+        </div>
+        <div class="card card--cyan">
+          <h3 class="card__title">Enterprise</h3>
+          <p>Unlimited agents and sessions. Custom limits, priority support, SLA.</p>
+        </div>
+      </div>
+
+      <h3 class="section__subtitle" style="margin-bottom: 1rem; color: var(--magenta);">Role-Based Access Control</h3>
+      <div class="grid grid--3">
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Owner</h3>
+          <p>Full access. Manage members, billing, tenant settings, and all operational controls.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Operator</h3>
+          <p>Create and manage agents, sessions, schedules, and work tasks. Day-to-day operations.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">Viewer</h3>
+          <p>Read-only access to dashboards, logs, and session history. Ideal for stakeholders.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECURITY ═══════════════════ -->
+  <section class="section" id="security">
+    <div class="container">
+      <h2 class="section__title">Security Features</h2>
+      <div class="grid grid--3">
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F511;</div>
+          <h3 class="card__title">Authentication</h3>
+          <p>API key auth with timing-safe comparison. Admin keys for elevated operations. Zero-downtime key rotation with 24-hour grace period.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F512;</div>
+          <h3 class="card__title">Encryption</h3>
+          <p>Wallet keys encrypted at rest with AES-256-GCM. Mnemonics never logged or exposed via API. Protected file enforcement.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F6E1;</div>
+          <h3 class="card__title">Input Validation</h3>
+          <p>Zod schemas on all API inputs. Parameterized SQL queries. Six-category prompt injection scanner. Bash command validation.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F6A7;</div>
+          <h3 class="card__title">Rate Limiting</h3>
+          <p>Sliding-window per IP and per endpoint. Auth-tier-based multipliers. HTTP 429 with <code>Retry-After</code> headers.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F310;</div>
+          <h3 class="card__title">Network Security</h3>
+          <p>Explicit CORS origin allowlists. TLS via reverse proxy (Nginx/Caddy configs included). Non-root Docker execution.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x2699;</div>
+          <h3 class="card__title">Operational Modes</h3>
+          <p><code>autonomous</code>, <code>supervised</code> (queue for approval), or <code>paused</code>. Protected paths require explicit approval. Daily spending caps.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ DEPLOYMENT ═══════════════════ -->
+  <section class="section section--alt" id="deployment">
+    <div class="container">
+      <h2 class="section__title">Deployment Options</h2>
+
+      <div class="grid grid--2" style="margin-bottom: 2rem;">
+        <div>
+          <h3 style="color: var(--cyan); margin-bottom: 1rem;">Docker (recommended)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">docker</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> docker compose -f deploy/docker-compose.yml up -d
+
+<span class="accent-green">&#x2713;</span> Multi-stage build
+<span class="accent-green">&#x2713;</span> Non-root user
+<span class="accent-green">&#x2713;</span> Health checks included
+<span class="accent-green">&#x2713;</span> Database persisted via named volume</code></pre>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--magenta); margin-bottom: 1rem;">Kubernetes (Helm)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">helm</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> helm install corvid-agent \
+  deploy/helm/corvid-agent \
+  --set env.ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  --set env.API_KEY=$API_KEY \
+  --set env.MULTI_TENANT=true
+
+<span class="accent-green">&#x2713;</span> Production-ready Helm chart</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid--2">
+        <div>
+          <h3 style="color: var(--green); margin-bottom: 1rem;">Kubernetes (raw manifests)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">kubectl</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> kubectl apply -f deploy/k8s/</code></pre>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--cyan); margin-bottom: 1rem;">systemd (bare metal)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">systemd</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> sudo cp deploy/corvid-agent.service \
+  /etc/systemd/system/
+<span class="t-prompt">$</span> sudo systemctl enable --now corvid-agent</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MONITORING ═══════════════════ -->
+  <section class="section" id="monitoring">
+    <div class="container">
+      <h2 class="section__title">Monitoring &amp; Health</h2>
+
+      <div class="grid grid--2" style="margin-bottom: 2rem;">
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--amber"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__label">health checks</span>
+          </div>
+          <pre class="terminal__body"><code><span class="t-comment"># Liveness (is the process running?)</span>
+<span class="t-prompt">$</span> curl /health/live
+<span class="accent-green">{"status": "ok"}</span>
+
+<span class="t-comment"># Readiness (can it handle requests?)</span>
+<span class="t-prompt">$</span> curl /health/ready
+<span class="accent-green">{"status": "ok"}</span>
+
+<span class="t-comment"># Self-test (full diagnostics)</span>
+<span class="t-prompt">$</span> curl -X POST /api/selftest/run \
+  -H "Authorization: Bearer $API_KEY"
+<span class="accent-green">{"passed": true, "checks": 42}</span></code></pre>
+        </div>
+
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--amber"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__label">OpenTelemetry</span>
+          </div>
+          <pre class="terminal__body"><code><span class="t-comment"># .env &mdash; connect to any OTLP backend</span>
+<span class="accent-cyan">OTEL_EXPORTER_OTLP_ENDPOINT</span>=\
+  https://otel-collector:4318
+<span class="accent-cyan">OTEL_SERVICE_NAME</span>=corvid-agent-prod
+
+<span class="t-comment"># Compatible backends:</span>
+<span class="accent-magenta">&#x25CF;</span> Jaeger
+<span class="accent-magenta">&#x25CF;</span> Grafana Tempo
+<span class="accent-magenta">&#x25CF;</span> Datadog
+<span class="accent-magenta">&#x25CF;</span> Any OTLP-compatible collector</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ IMAGE VERIFICATION ═══════════════════ -->
+  <section class="section section--alt" id="verification">
+    <div class="container">
+      <h2 class="section__title">Image Verification &amp; SBOM</h2>
+      <p style="margin-bottom: 1.5rem; color: var(--text-dim);">Docker images are signed with Cosign (keyless, Sigstore/Fulcio) and include SPDX SBOM attestations.</p>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">cosign verify</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-comment"># Verify image signature</span>
+<span class="t-prompt">$</span> cosign verify \
+  --certificate-identity-regexp \
+    "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer \
+    "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest
+
+<span class="accent-green">&#x2713;</span> Signature verified
+
+<span class="t-comment"># Verify and extract SBOM</span>
+<span class="t-prompt">$</span> cosign verify-attestation \
+  --type spdxjson \
+  --certificate-identity-regexp \
+    "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer \
+    "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest
+
+<span class="accent-green">&#x2713;</span> SBOM attestation verified</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ DATABASE ═══════════════════ -->
+  <section class="section" id="database">
+    <div class="container">
+      <h2 class="section__title">Database Management</h2>
+      <div class="grid grid--2">
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--amber"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__label">backups</span>
+          </div>
+          <pre class="terminal__body"><code><span class="t-comment"># Manual backup</span>
+<span class="t-prompt">$</span> curl -X POST /api/backup \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+
+<span class="t-comment"># Automated (cron, every 6 hours)</span>
+0 */6 * * * curl -s -X POST \
+  http://localhost:3000/api/backup \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+
+<span class="t-comment"># Configurable retention</span>
+<span class="accent-cyan">BACKUP_MAX_KEEP</span>=10</code></pre>
+        </div>
+
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--amber"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__label">migrations</span>
+          </div>
+          <pre class="terminal__body"><code><span class="t-comment"># Migrations run automatically on startup</span>
+<span class="t-comment"># Manual commands available:</span>
+
+<span class="t-prompt">$</span> bun run migrate:status
+<span class="accent-green">&#x2713;</span> 16 migrations applied
+
+<span class="t-prompt">$</span> bun run migrate:up
+<span class="accent-green">&#x2713;</span> Applied pending migrations
+
+<span class="t-prompt">$</span> bun run migrate:down
+<span class="accent-magenta">&#x21A9;</span> Rolled back last migration</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ ON-CHAIN AUDIT ═══════════════════ -->
+  <section class="section section--alt" id="on-chain">
+    <div class="container">
+      <h2 class="section__title">On-Chain Audit Trail</h2>
+      <div class="callout callout--cyan">
+        <h3 class="callout__title accent-cyan">Immutable, Tamper-Proof Records</h3>
+        <p>For organizations that need verifiable compliance records, CorvidAgent can record agent decisions, council deliberations, and inter-agent messages as Algorand transactions &mdash; verifiable by anyone, deletable by no one.</p>
+      </div>
+      <div class="terminal" style="margin-top: 1.5rem;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">.env</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-comment"># Enable on-chain audit trail</span>
+<span class="accent-cyan">ALGOCHAT_MNEMONIC</span>=your 25 word mnemonic
+<span class="accent-cyan">ALGORAND_NETWORK</span>=mainnet
+
+<span class="t-comment"># What gets recorded on-chain:</span>
+<span class="accent-magenta">&#x25CF;</span> Agent decisions and actions
+<span class="accent-magenta">&#x25CF;</span> Council deliberations and votes
+<span class="accent-magenta">&#x25CF;</span> Inter-agent messages (AlgoChat)
+<span class="accent-magenta">&#x25CF;</span> Governance-annotated file changes</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ QUICK START ═══════════════════ -->
+  <section class="section" id="quickstart">
+    <div class="container">
+      <h2 class="section__title">Quick Evaluation</h2>
+      <div class="grid grid--2">
+        <div>
+          <h3 style="color: var(--cyan); margin-bottom: 1rem;">Try Locally (5 minutes)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">install</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/\
+CorvidLabs/corvid-agent/main/scripts/install.sh \
+| bash
+
+<span class="accent-green">&#x2713;</span> Zero configuration required
+<span class="t-comment"># Explore the dashboard, create an agent, run a session</span></code></pre>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--magenta); margin-bottom: 1rem;">Production (30 minutes)</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">deploy</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> git clone https://github.com/\
+CorvidLabs/corvid-agent.git
+<span class="t-prompt">$</span> cd corvid-agent
+<span class="t-prompt">$</span> cp .env.example .env
+<span class="t-comment"># Configure .env with your keys</span>
+<span class="t-prompt">$</span> docker compose \
+  -f deploy/docker-compose.yml up -d
+
+<span class="accent-green">&#x2713;</span> Production-ready in 30 minutes</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ RELATED ═══════════════════ -->
+  <section class="section section--alt" id="related">
+    <div class="container">
+      <h2 class="section__title">Related Docs</h2>
+      <div class="grid grid--3">
+        <a href="self-hosting.html" class="card card--outline card--link">
+          <h3 class="card__title accent-cyan">Self-Hosting Guide &rarr;</h3>
+          <p>Detailed deployment instructions, reverse proxy, and infrastructure setup.</p>
+        </a>
+        <a href="security.html" class="card card--outline card--link">
+          <h3 class="card__title accent-magenta">Security Model &rarr;</h3>
+          <p>Defense-in-depth security, threat model, and injection detection.</p>
+        </a>
+        <a href="architecture.html" class="card card--outline card--link">
+          <h3 class="card__title accent-green">API Reference &rarr;</h3>
+          <p>~300 REST endpoints, WebSocket protocol, and OpenAPI spec.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="why-corvidagent.html">Why CorvidAgent</a>
+        <a href="business-guide.html">Business</a>
+        <a href="enterprise.html">Enterprise</a>
+        <a href="architecture.html">API</a>
+        <a href="security.html">Security</a>
+        <a href="self-hosting.html">Deploy</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>

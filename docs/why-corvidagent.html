@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why CorvidAgent? — AI Agents That Ship Code</title>
+  <meta name="description" content="Why CorvidAgent over other agent platforms? Self-hosted, multi-agent coordination, on-chain identity, and autonomous PR workflows.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="Why CorvidAgent?">
+  <meta property="og:description" content="Self-hosted AI agents that ship code with verifiable on-chain identity.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/why-corvidagent.html">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/why-corvidagent.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="nav" aria-label="Main navigation">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="why-corvidagent.html" class="nav__link nav__link--active" aria-current="page">Why</a>
+        <a href="business-guide.html" class="nav__link">Business</a>
+        <a href="enterprise.html" class="nav__link">Enterprise</a>
+        <a href="architecture.html" class="nav__link">API</a>
+        <a href="self-hosting.html" class="nav__link">Deploy</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content">
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <header class="page-hero">
+    <h1 class="page-hero__title">Why <span class="accent-cyan">Corvid</span><span class="accent-magenta">Agent</span>?</h1>
+    <p class="page-hero__tagline">
+      What makes it different from other agent platforms and doing it yourself.
+    </p>
+  </header>
+
+  <!-- ═══════════════════ THE PROBLEM ═══════════════════ -->
+  <section class="section" id="problem">
+    <div class="container">
+      <h2 class="section__title">The Problem</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          Every agent platform assumes agents work alone on one machine. The moment Agent A needs to delegate to Agent B on someone else's infrastructure, you need answers to four hard questions:
+        </p>
+      </div>
+      <div class="grid grid--2" style="margin-top: 32px;">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Identity</h3>
+          <p>How does Agent A know Agent B is who it claims to be?</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Communication</h3>
+          <p>How do they exchange messages without a centralized broker?</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">Verification</h3>
+          <p>How does Agent A verify that Agent B actually completed the work?</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Accountability</h3>
+          <p>How do you audit what happened when something goes wrong?</p>
+        </div>
+      </div>
+      <div class="explainer" style="margin-top: 32px;">
+        <p class="explainer__text">
+          <span class="accent-cyan">Algorand</span> provides native answers to all four. On-chain wallets give agents verifiable identity. AlgoChat gives them encrypted P2P messaging. Transaction history provides an immutable audit trail. This isn't bolted on &mdash; it's the foundation.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ COMPARISON ═══════════════════ -->
+  <section class="section section--alt" id="comparison">
+    <div class="container">
+      <h2 class="section__title">How It Compares</h2>
+      <div class="compare-table compare-table--4col">
+        <div class="compare-table__row compare-table__header">
+          <div class="compare-table__cell"></div>
+          <div class="compare-table__cell accent-cyan">CorvidAgent</div>
+          <div class="compare-table__cell">Cloud Agents</div>
+          <div class="compare-table__cell">Local-Only Tools</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Hosting</div>
+          <div class="compare-table__cell accent-green">Self-hosted, you own it</div>
+          <div class="compare-table__cell">Vendor-hosted</div>
+          <div class="compare-table__cell">Self-hosted</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Multi-agent</div>
+          <div class="compare-table__cell accent-green">Councils, delegation, coordination</div>
+          <div class="compare-table__cell">Single agent</div>
+          <div class="compare-table__cell">Single agent</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">On-chain identity</div>
+          <div class="compare-table__cell accent-green">Algorand wallets + encrypted messaging</div>
+          <div class="compare-table__cell">None</div>
+          <div class="compare-table__cell">None</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">PR automation</div>
+          <div class="compare-table__cell accent-green">Work tasks: branch, validate, PR</div>
+          <div class="compare-table__cell">Manual</div>
+          <div class="compare-table__cell">Some</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Scheduling</div>
+          <div class="compare-table__cell accent-green">Built-in cron with approval policies</div>
+          <div class="compare-table__cell">None</div>
+          <div class="compare-table__cell">None</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">License</div>
+          <div class="compare-table__cell accent-green">MIT (open source)</div>
+          <div class="compare-table__cell">Proprietary</div>
+          <div class="compare-table__cell">Varies</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ QUALITY ═══════════════════ -->
+  <section class="section" id="quality">
+    <div class="container">
+      <h2 class="section__title">Built to Be Trusted</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          corvid-agent has a <span class="accent-cyan" style="font-weight: bold;">1.14&times; test-to-code ratio</span> &mdash; more lines of tests than production code. When agents run autonomously, bugs don't just break features &mdash; they break the agents that ship your code.
+        </p>
+      </div>
+      <div class="grid grid--2" style="margin-top: 32px;">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">6,573 Unit Tests</h3>
+          <p>18,030 assertions across 274 files. Credit systems, encryption, scheduling, bash security &mdash; every critical path is independently verified.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">360 E2E Tests</h3>
+          <p>31 Playwright specs covering 198 of 202 testable API endpoints and all 37 Angular UI routes. Real HTTP, real database, real assertions.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">124 Module Specs</h3>
+          <p>YAML specs for every server module, validated in CI. Checks exported symbols, file existence, database references, and dependency graphs.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Zero-Warning CI Gate</h3>
+          <p>Spec validation runs on every commit. Zero warnings allowed. If a module's spec drifts from reality, CI fails.</p>
+        </div>
+      </div>
+      <div class="explainer" style="margin-top: 24px;">
+        <p class="explainer__text" style="font-size: 9px;">
+          <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/docs/blog/why-more-test-than-production-code.md" class="accent-cyan">Read the full blog post: "Why we have more test code than production code" &rarr;</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ WHAT IT IS NOT ═══════════════════ -->
+  <section class="section section--alt" id="what-it-is-not">
+    <div class="container">
+      <h2 class="section__title">What It's Not</h2>
+      <div class="grid grid--3">
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Not a life assistant</h3>
+          <p>It doesn't send emails or control your smart home. It's purpose-built for development workflows.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Not cloud-hosted</h3>
+          <p>You own and operate it. Your code, your infrastructure, your data. No vendor lock-in.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Not a toy</h3>
+          <p>6,573 unit tests, 360 E2E tests, 41 MCP tools, ~300 API endpoints. Production-grade from day one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ REAL WORLD ═══════════════════ -->
+  <section class="section section--alt" id="real-world">
+    <div class="container">
+      <h2 class="section__title">Built by Its Own Agents</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          corvid-agent eats its own cooking. These apps were designed, coded, tested, and deployed autonomously by corvid-agent &mdash; no human-written application code:
+        </p>
+      </div>
+      <div class="grid grid--3" style="margin-top: 32px;">
+        <a href="https://corvid-agent.github.io/weather-dashboard/" class="card card--cyan card--link" target="_blank" rel="noopener">
+          <div class="card__title accent-cyan">Weather Dashboard</div>
+          <p>Forecasts, charts, air quality, UV, wind, astronomy</p>
+        </a>
+        <a href="https://corvid-agent.github.io/space-dashboard/" class="card card--magenta card--link" target="_blank" rel="noopener">
+          <div class="card__title accent-magenta">Space Dashboard</div>
+          <p>APOD, Mars rovers, ISS tracker, near-Earth objects</p>
+        </a>
+        <a href="https://corvid-agent.github.io/pixel-forge/" class="card card--green card--link" target="_blank" rel="noopener">
+          <div class="card__title accent-green">Pixel Forge</div>
+          <p>Pixel art editor with tools, palettes, and gallery</p>
+        </a>
+      </div>
+      <div class="explainer" style="margin-top: 24px;">
+        <p class="explainer__text" style="font-size: 9px;">
+          <a href="https://corvid-agent.github.io" class="accent-cyan">See all 9 apps</a> on the ecosystem landing page.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CTA ═══════════════════ -->
+  <section class="section" id="cta">
+    <div class="container" style="text-align: center;">
+      <h2 class="section__title">Ready to Try It?</h2>
+      <div class="terminal" style="margin-bottom: 32px;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">terminal</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-prompt">$</span> git clone https://github.com/CorvidLabs/corvid-agent.git
+<span class="t-prompt">$</span> cd corvid-agent && bash scripts/dev-setup.sh
+<span class="t-prompt">$</span> bun run dev</code></pre>
+      </div>
+      <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+        <a href="getting-started.html" class="btn btn--cyan">Get Started</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="btn btn--magenta">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="why-corvidagent.html">Why CorvidAgent</a>
+        <a href="business-guide.html">Business</a>
+        <a href="enterprise.html">Enterprise</a>
+        <a href="architecture.html">API</a>
+        <a href="security.html">Security</a>
+        <a href="self-hosting.html">Deploy</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>
