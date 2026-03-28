@@ -33,6 +33,9 @@ mock.module('../github/operations', () => ({
     isGitHubConfigured: () => true,
 }));
 
+// Set env vars before importing handlers so scheduler-tool-gating reads the correct allowed orgs
+process.env.GITHUB_ALLOWED_ORGS = 'CorvidLabs,corvid-agent';
+
 // Import handlers AFTER the mock is set up
 const {
     handleGitHubStarRepo,
@@ -49,7 +52,7 @@ const {
     handleGitHubFollowUser,
 } = await import('../mcp/tool-handlers');
 
-const { friendlyModelName, formatAgentSignature } = await import('../mcp/tool-handlers/github');
+const { friendlyModelName, formatAgentSignature, formatCoAuthoredBy } = await import('../mcp/tool-handlers/github');
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -790,29 +793,40 @@ describe('friendlyModelName', () => {
     });
 });
 
-// ── formatAgentSignature (#1555) ─────────────────────────────────────────
+// ── formatAgentSignature (#1555, #1576) ──────────────────────────────────
 
-describe('formatAgentSignature (#1555)', () => {
-    const SIGNATURE_PATTERN = /\n\n---\n.*CorvidLabs Team Alpha$/;
+describe('formatAgentSignature (#1555, #1576)', () => {
+    const SIGNATURE_PATTERN = /\n\n---\n.+/;
 
     test('formats signature with agent name and model', () => {
         const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' });
         expect(sig).toMatch(SIGNATURE_PATTERN);
-        expect(sig).toContain('**Rook**');
-        expect(sig).toContain('Opus 4.6');
+        expect(sig).toContain('Agent: Rook');
+        expect(sig).toContain('Model: Opus 4.6');
     });
 
     test('formats signature with different agent and model', () => {
         const sig = formatAgentSignature({ name: 'Bishop', model: 'claude-sonnet-4-6' });
         expect(sig).toMatch(SIGNATURE_PATTERN);
-        expect(sig).toContain('**Bishop**');
-        expect(sig).toContain('Sonnet 4.6');
+        expect(sig).toContain('Agent: Bishop');
+        expect(sig).toContain('Model: Sonnet 4.6');
     });
 
     test('formats signature with haiku model', () => {
         const sig = formatAgentSignature({ name: 'Rook', model: 'claude-haiku-4-5-20251001' });
         expect(sig).toMatch(SIGNATURE_PATTERN);
-        expect(sig).toContain('Haiku 4.5');
+        expect(sig).toContain('Model: Haiku 4.5');
+    });
+
+    test('includes task ID when provided', () => {
+        const sig = formatAgentSignature({ name: 'Rook', model: 'claude-sonnet-4-6' }, 'work-task-123');
+        expect(sig).toContain('Task: work-task-123');
+        expect(sig).toContain('Agent: Rook | Model: Sonnet 4.6 | Task: work-task-123');
+    });
+
+    test('omits task ID when not provided', () => {
+        const sig = formatAgentSignature({ name: 'Rook', model: 'claude-sonnet-4-6' });
+        expect(sig).not.toContain('Task:');
     });
 
     test('returns empty string for null agent', () => {
@@ -832,5 +846,27 @@ describe('formatAgentSignature (#1555)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const passedBody = (mockCreatePr.mock.calls as any[][])[0][2] as string;
         expect(passedBody).toBe('Original body');
+    });
+});
+
+// ── formatCoAuthoredBy (#1576) ───────────────────────────────────────────
+
+describe('formatCoAuthoredBy (#1576)', () => {
+    test('formats Co-Authored-By with agent name and friendly model', () => {
+        expect(formatCoAuthoredBy({ name: 'Rook', model: 'claude-sonnet-4-6' }))
+            .toBe('Co-Authored-By: Rook (Sonnet 4.6)');
+    });
+
+    test('formats Co-Authored-By with non-Claude model', () => {
+        expect(formatCoAuthoredBy({ name: 'Condor', model: 'nemotron' }))
+            .toBe('Co-Authored-By: Condor (nemotron)');
+    });
+
+    test('returns empty string for null agent', () => {
+        expect(formatCoAuthoredBy(null)).toBe('');
+    });
+
+    test('returns empty string for undefined agent', () => {
+        expect(formatCoAuthoredBy(undefined)).toBe('');
     });
 });

@@ -884,6 +884,15 @@ export class ProcessManager {
         const messages = getSessionMessages(this.db, session.id);
         const meta = this.sessionMeta.get(session.id);
 
+        // Check for a pending server-restart confirmation and clear it
+        const restartRow = this.db.query(
+            'SELECT server_restart_initiated_at FROM sessions WHERE id = ?'
+        ).get(session.id) as { server_restart_initiated_at: string | null } | null;
+        const restartInitiatedAt = restartRow?.server_restart_initiated_at ?? null;
+        if (restartInitiatedAt) {
+            this.db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
+        }
+
         if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
         const recent = messages.slice(-20);
@@ -918,6 +927,19 @@ export class ProcessManager {
             ...historyLines,
             '</conversation_history>',
         );
+
+        // If a server restart was initiated from this session, inject a completion note
+        // so the agent does not re-trigger the restart on resume (fixes #1570).
+        if (restartInitiatedAt) {
+            parts.push(
+                '',
+                '<server_restart_completed>',
+                `The server was restarted during this session (initiated at ${restartInitiatedAt}).`,
+                'The restart completed successfully — the server is now running with updated code.',
+                'Do NOT restart the server again. Continue with the next task in your plan.',
+                '</server_restart_completed>',
+            );
+        }
 
         if (newPrompt) {
             parts.push('', newPrompt);

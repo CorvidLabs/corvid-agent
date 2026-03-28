@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation — corvid-agent</title>
+  <meta name="description" content="Documentation hub for corvid-agent. Guides, references, and resources for self-hosted AI agents on Algorand.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F426;&#x200D;&#x2B1B;</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --bg: #0a0a12;
+      --bg-card: #161822;
+      --bg-card-hover: #1a1c2e;
+      --border: #1e2035;
+      --border-glow: #00e5ff;
+      --text: #e0e0ec;
+      --text-dim: #a8abbd;
+      --text-bright: #ffffff;
+      --accent: #00e5ff;
+      --accent-2: #ff66c4;
+      --accent-3: #00ff88;
+      --green: #00ff88;
+      --orange: #ffaa00;
+      --red: #ff3355;
+      --gradient: linear-gradient(135deg, #00e5ff 0%, #ff66c4 100%);
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'JetBrains Mono', monospace;
+    }
+
+    /* Skip Navigation (WCAG AAA) */
+    .skip-nav {
+      position: absolute;
+      top: -100%;
+      left: 16px;
+      z-index: 200;
+      padding: 12px 24px;
+      background: var(--bg);
+      color: var(--accent);
+      border: 2px solid var(--accent);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .skip-nav:focus {
+      top: 12px;
+      outline: none;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+    }
+
+    /* Focus Styles (WCAG AAA) */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Reduced Motion (WCAG AAA) */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--text-bright); }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1rem 2rem;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10, 10, 15, 0.8);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 18px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-bright);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-links a.active {
+      color: var(--accent);
+    }
+
+    .nav-cta {
+      padding: 0.5rem 1.2rem !important;
+      background: var(--gradient);
+      border-radius: 4px !important;
+      color: white !important;
+      font-weight: 600 !important;
+    }
+
+    .nav-cta:hover {
+      opacity: 0.9;
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* ── HERO / HEADER ── */
+    .docs-hero {
+      text-align: center;
+      padding: 120px 24px 48px;
+      position: relative;
+    }
+
+    .docs-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 1px;
+      background: var(--gradient);
+    }
+
+    .docs-hero h1 {
+      font-family: var(--mono);
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+    }
+
+    .docs-hero h1 span {
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .docs-hero p {
+      color: var(--text-dim);
+      font-size: 16px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── SEARCH ── */
+    .search-container {
+      max-width: 480px;
+      margin: 32px auto 0;
+      position: relative;
+    }
+
+    .search-container svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    #doc-search {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-card);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    #doc-search::placeholder { color: var(--text-dim); }
+    #doc-search:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
+    }
+
+    .search-hint {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 8px;
+      opacity: 0.7;
+    }
+
+    /* ── MAIN CONTENT ── */
+    .docs-content {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      flex: 1;
+    }
+
+    /* ── SECTION ── */
+    .doc-section {
+      margin-bottom: 56px;
+    }
+
+    .doc-section:last-child { margin-bottom: 0; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .section-icon--cyan  { background: rgba(0, 229, 255, 0.1); }
+    .section-icon--pink  { background: rgba(255, 102, 196, 0.1); }
+    .section-icon--green { background: rgba(0, 255, 136, 0.1); }
+    .section-icon--amber { background: rgba(255, 187, 51, 0.1); }
+    .section-icon--gray  { background: rgba(168, 171, 189, 0.1); }
+
+    .section-header h2 {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+
+    /* ── CARDS GRID ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .doc-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 18px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      cursor: pointer;
+      color: inherit;
+      text-decoration: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .doc-card:hover {
+      border-color: rgba(0, 229, 255, 0.3);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+      color: inherit;
+    }
+
+    .doc-card:hover .card-title { color: var(--accent); }
+
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 18px;
+      background: rgba(0, 229, 255, 0.06);
+    }
+
+    .card-body { flex: 1; min-width: 0; }
+
+    .card-title {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+      transition: color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-title .ext-arrow {
+      font-size: 12px;
+      opacity: 0.5;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .doc-card:hover .ext-arrow {
+      opacity: 1;
+      transform: translate(1px, -1px);
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    .card-file {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.6;
+      margin-top: 6px;
+    }
+
+    /* ── NO RESULTS ── */
+    .no-results {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-dim);
+      display: none;
+    }
+
+    .no-results.visible { display: block; }
+    .no-results p { font-size: 14px; margin-top: 8px; }
+
+    /* ── FOOTER ── */
+    footer { padding: 4rem 2rem 2rem; border-top: 1px solid var(--border); }
+    .footer-inner { max-width: 1200px; margin: 0 auto; text-align: center; }
+    .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .footer-links a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--text-bright); }
+    .footer-meta { display: flex; justify-content: center; align-items: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .footer-wallet { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 4px; font-family: var(--mono); font-size: 0.875rem; color: var(--accent); text-decoration: none; transition: all 0.2s; }
+    .footer-wallet:hover { border-color: var(--accent); background: rgba(0, 229, 255, 0.15); }
+    .footer-copy { color: var(--text-dim); font-size: 0.875rem; }
+    .footer-copy a { color: var(--accent); text-decoration: none; }
+
+    /* ── SLIDE-OUT PANEL ── */
+    .panel-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 200;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .panel-backdrop.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .doc-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 60%;
+      max-width: 900px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      z-index: 201;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-backdrop.open .doc-panel {
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg-card);
+    }
+
+    .panel-header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .panel-github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 4px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .panel-github-link:hover {
+      border-color: var(--accent);
+      background: rgba(0, 229, 255, 0.08);
+      color: var(--accent);
+    }
+
+    .panel-close {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-dim);
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-family: var(--mono);
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .panel-close:hover {
+      color: var(--text-bright);
+      border-color: var(--text-dim);
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2rem 2.5rem;
+    }
+
+    .panel-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    .panel-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .panel-error {
+      padding: 2rem;
+      text-align: center;
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    /* ── MARKDOWN RENDERED CONTENT ── */
+    .md-content h1 {
+      font-family: var(--mono);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .md-content h2 {
+      font-family: var(--mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .md-content h3 {
+      font-family: var(--mono);
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .md-content h4, .md-content h5, .md-content h6 {
+      font-family: var(--mono);
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-top: 1.25rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .md-content p {
+      margin-bottom: 1rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .md-content a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .md-content a:hover {
+      color: var(--text-bright);
+    }
+
+    .md-content ul, .md-content ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    .md-content li {
+      margin-bottom: 0.4rem;
+      line-height: 1.6;
+    }
+
+    .md-content code {
+      font-family: var(--mono);
+      font-size: 0.85em;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: var(--accent);
+    }
+
+    .md-content pre {
+      background: #08080f;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .md-content pre code {
+      background: none;
+      padding: 0;
+      border-radius: 0;
+      color: var(--text);
+      font-size: inherit;
+    }
+
+    .md-content blockquote {
+      border-left: 3px solid var(--accent-2);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      background: rgba(255, 102, 196, 0.04);
+      color: var(--text-dim);
+    }
+
+    .md-content blockquote p {
+      margin-bottom: 0.5rem;
+    }
+
+    .md-content blockquote p:last-child {
+      margin-bottom: 0;
+    }
+
+    .md-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .md-content th, .md-content td {
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .md-content th {
+      background: var(--bg-card);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    .md-content td {
+      color: var(--text);
+    }
+
+    .md-content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    .md-content img {
+      max-width: 100%;
+      border-radius: 6px;
+    }
+
+    .md-content strong {
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    /* ── MOBILE NAV OVERLAY ── */
+    .mobile-nav-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 15, 0.97);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 99;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    .mobile-nav-overlay.open {
+      display: flex;
+    }
+
+    .mobile-nav-overlay a {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 0.75rem 1.5rem;
+      transition: color 0.2s;
+    }
+
+    .mobile-nav-overlay a:hover, .mobile-nav-overlay a.active {
+      color: var(--accent);
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      .hamburger {
+        display: flex;
+      }
+
+      .nav-links {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(10, 10, 15, 0.97);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        z-index: 99;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+      }
+
+      .nav-links.open {
+        display: flex;
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .nav-links a {
+        opacity: 0;
+        transform: translateY(-8px);
+        transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s;
+      }
+
+      .nav-links.open a {
+        opacity: 1;
+        transform: translateY(0);
+        font-size: 1.1rem;
+        padding: 0.75rem 1.5rem;
+      }
+
+      .nav-links.open a:nth-child(1) { transition-delay: 0.05s; }
+      .nav-links.open a:nth-child(2) { transition-delay: 0.1s; }
+      .nav-links.open a:nth-child(3) { transition-delay: 0.15s; }
+      .nav-links.open a:nth-child(4) { transition-delay: 0.2s; }
+      .nav-links.open a:nth-child(5) { transition-delay: 0.25s; }
+      .nav-links.open a:nth-child(6) { transition-delay: 0.3s; }
+      .nav-links.open a:nth-child(7) { transition-delay: 0.35s; }
+      .nav-links.open a:nth-child(8) { transition-delay: 0.4s; }
+
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .docs-hero {
+        padding: 100px 24px 40px;
+      }
+
+      .doc-panel {
+        width: 100%;
+      }
+
+      .panel-body {
+        padding: 1.5rem 1rem;
+      }
+    }
+
+    /* ── HIDDEN (for search) ── */
+    .doc-card.hidden { display: none; }
+    .doc-section.hidden { display: none; }
+
+    /* ── BODY SCROLLBAR ── */
+    body.panel-open {
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Skip Nav -->
+  <a class="skip-nav" href="#main-content">Skip to main content</a>
+
+  <!-- ═══ NAV ═══ -->
+  <nav aria-label="Main navigation">
+    <a href="/" class="nav-logo">corvid-agent</a>
+    <div class="nav-links" id="nav-links">
+      <a href="/#who-is-this-for">Who Is This For?</a>
+      <a href="/#showcase">Showcase</a>
+      <a href="/#features">Features</a>
+      <a href="/#ecosystem">Infrastructure</a>
+      <a href="/docs.html" class="active">Docs</a>
+      <a href="/blog.html">Blog</a>
+      <a href="/#run-your-own" class="nav-cta">Get Started</a>
+      <a href="https://github.com/CorvidLabs" class="nav-cta">GitHub</a>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- ═══ HERO ═══ -->
+  <header class="docs-hero">
+    <h1><span>Documentation</span></h1>
+    <p>Guides, references, and resources for running your own AI agent on Algorand.</p>
+
+    <div class="search-container">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" id="doc-search" placeholder="Filter docs..." autocomplete="off" spellcheck="false" aria-label="Filter documentation">
+    </div>
+    <p class="search-hint">Type to filter by title, description, or filename &mdash; press / to focus</p>
+  </header>
+
+  <!-- ═══ DOCS CONTENT ═══ -->
+  <main class="docs-content" id="main-content">
+
+    <!-- ── Getting Started ── -->
+    <section class="doc-section" data-section="getting-started">
+      <div class="section-header">
+        <div class="section-icon section-icon--cyan">&#x1F680;</div>
+        <h2>Getting Started</h2>
+      </div>
+      <div class="cards-grid">
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Quickstart documentation" data-title="quickstart" data-desc="get up and running in minutes" data-file="quickstart.md" data-path="docs/quickstart.md">
+          <div class="card-icon">&#x26A1;</div>
+          <div class="card-body">
+            <div class="card-title">Quickstart <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Get up and running in minutes. Install, configure, and launch your first agent.</div>
+            <div class="card-file">quickstart.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open How It Works documentation" data-title="how it works" data-desc="architecture overview agent lifecycle" data-file="how-it-works.md" data-path="docs/how-it-works.md">
+          <div class="card-icon">&#x1F9E0;</div>
+          <div class="card-body">
+            <div class="card-title">How It Works <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Understand the architecture, agent lifecycle, and how tasks flow from issue to PR.</div>
+            <div class="card-file">how-it-works.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open System Requirements documentation" data-title="system requirements" data-desc="hardware software prerequisites" data-file="system-requirements.md" data-path="docs/system-requirements.md">
+          <div class="card-icon">&#x1F4BB;</div>
+          <div class="card-body">
+            <div class="card-title">System Requirements <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Hardware, software, and OS prerequisites for running corvid-agent.</div>
+            <div class="card-file">system-requirements.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Configuration documentation" data-title="configuration" data-desc="environment variables settings options" data-file="configuration.md" data-path="docs/configuration.md">
+          <div class="card-icon">&#x2699;&#xFE0F;</div>
+          <div class="card-body">
+            <div class="card-title">Configuration <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Environment variables, config files, and all available settings.</div>
+            <div class="card-file">configuration.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Troubleshooting documentation" data-title="troubleshooting" data-desc="common issues debugging fixes" data-file="troubleshooting.md" data-path="docs/troubleshooting.md">
+          <div class="card-icon">&#x1F527;</div>
+          <div class="card-body">
+            <div class="card-title">Troubleshooting <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Common issues, debugging steps, and known fixes.</div>
+            <div class="card-file">troubleshooting.md</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Guides ── -->
+    <section class="doc-section" data-section="guides">
+      <div class="section-header">
+        <div class="section-icon section-icon--pink">&#x1F4D6;</div>
+        <h2>Guides</h2>
+      </div>
+      <div class="cards-grid">
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Use Cases documentation" data-title="use cases" data-desc="examples workflows scenarios" data-file="use-cases.md" data-path="docs/use-cases.md">
+          <div class="card-icon">&#x1F4A1;</div>
+          <div class="card-body">
+            <div class="card-title">Use Cases <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Real-world examples and workflows for different team sizes and project types.</div>
+            <div class="card-file">use-cases.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Business Guide documentation" data-title="business guide" data-desc="roi cost analysis stakeholders" data-file="business-guide.md" data-path="docs/business-guide.md">
+          <div class="card-icon">&#x1F4BC;</div>
+          <div class="card-body">
+            <div class="card-title">Business Guide <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">ROI analysis, cost breakdowns, and talking points for stakeholders.</div>
+            <div class="card-file">business-guide.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Enterprise Guide documentation" data-title="enterprise guide" data-desc="compliance governance scale teams" data-file="enterprise.md" data-path="docs/enterprise.md">
+          <div class="card-icon">&#x1F3E2;</div>
+          <div class="card-body">
+            <div class="card-title">Enterprise Guide <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Compliance, governance, and scaling corvid-agent across teams.</div>
+            <div class="card-file">enterprise.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Self-Hosting documentation" data-title="self-hosting deployment" data-desc="docker vps deploy production" data-file="self-hosting.md" data-path="docs/self-hosting.md">
+          <div class="card-icon">&#x1F5A5;&#xFE0F;</div>
+          <div class="card-body">
+            <div class="card-title">Self-Hosting / Deployment <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Deploy to your own infrastructure with Docker, VPS, or bare metal.</div>
+            <div class="card-file">self-hosting.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open MCP Setup documentation" data-title="mcp setup" data-desc="model context protocol tools integration" data-file="mcp-setup.md" data-path="docs/mcp-setup.md">
+          <div class="card-icon">&#x1F50C;</div>
+          <div class="card-body">
+            <div class="card-title">MCP Setup <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Connect corvid-agent as an MCP server for Claude Code, Cursor, and other tools.</div>
+            <div class="card-file">mcp-setup.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Algorand Testnet Onboarding documentation" data-title="testnet onboarding algorand" data-desc="algorand testnet wallet faucet" data-file="testnet-onboarding.md" data-path="docs/testnet-onboarding.md">
+          <div class="card-icon">&#x26D3;&#xFE0F;</div>
+          <div class="card-body">
+            <div class="card-title">Algorand Testnet Onboarding <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Set up a testnet wallet, fund it from the faucet, and connect to AlgoChat.</div>
+            <div class="card-file">testnet-onboarding.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Project Ideas documentation" data-title="project ideas" data-desc="inspiration starter projects build" data-file="project-ideas.md" data-path="docs/project-ideas.md">
+          <div class="card-icon">&#x1F4AD;</div>
+          <div class="card-body">
+            <div class="card-title">Project Ideas <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Starter projects and inspiration for what to build with your agent.</div>
+            <div class="card-file">project-ideas.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open VibeKit Integration documentation" data-title="vibekit integration" data-desc="vibekit plugin extend" data-file="vibekit-integration.md" data-path="docs/vibekit-integration.md">
+          <div class="card-icon">&#x1F3B5;</div>
+          <div class="card-body">
+            <div class="card-title">VibeKit Integration <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Integrate with VibeKit for extended agent capabilities and tooling.</div>
+            <div class="card-file">vibekit-integration.md</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Reference ── -->
+    <section class="doc-section" data-section="reference">
+      <div class="section-header">
+        <div class="section-icon section-icon--green">&#x1F4DA;</div>
+        <h2>Reference</h2>
+      </div>
+      <div class="cards-grid">
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open API Reference documentation" data-title="api reference" data-desc="rest endpoints http routes request response" data-file="api-reference.md" data-path="docs/api-reference.md">
+          <div class="card-icon">&#x1F310;</div>
+          <div class="card-body">
+            <div class="card-title">API Reference <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Complete REST API documentation with endpoints, parameters, and examples.</div>
+            <div class="card-file">api-reference.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open CLI Reference documentation" data-title="cli reference" data-desc="command line interface flags options" data-file="cli-reference.md" data-path="docs/cli-reference.md">
+          <div class="card-icon">&#x1F4DF;</div>
+          <div class="card-body">
+            <div class="card-title">CLI Reference <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">All CLI commands, flags, and usage patterns.</div>
+            <div class="card-file">cli-reference.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Technical Deep Dive documentation" data-title="technical deep dive" data-desc="internals implementation details advanced" data-file="deep-dive.md" data-path="docs/deep-dive.md">
+          <div class="card-icon">&#x1F52C;</div>
+          <div class="card-body">
+            <div class="card-title">Technical Deep Dive <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Internals, implementation details, and advanced architecture notes.</div>
+            <div class="card-file">deep-dive.md</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Security ── -->
+    <section class="doc-section" data-section="security">
+      <div class="section-header">
+        <div class="section-icon section-icon--amber">&#x1F6E1;&#xFE0F;</div>
+        <h2>Security</h2>
+      </div>
+      <div class="cards-grid">
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Hardening Guide documentation" data-title="hardening guide" data-desc="security best practices lockdown production" data-file="hardening-guide.md" data-path="docs/hardening-guide.md">
+          <div class="card-icon">&#x1F512;</div>
+          <div class="card-body">
+            <div class="card-title">Hardening Guide <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Security best practices for locking down your production deployment.</div>
+            <div class="card-file">hardening-guide.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Threat Model documentation" data-title="threat model" data-desc="attack surface risk assessment vulnerabilities" data-file="threat-model.md" data-path="docs/threat-model.md">
+          <div class="card-icon">&#x1F3AF;</div>
+          <div class="card-body">
+            <div class="card-title">Threat Model <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Attack surface analysis, risk assessment, and mitigation strategies.</div>
+            <div class="card-file">threat-model.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Incident Response documentation" data-title="incident response" data-desc="breach playbook recovery forensics" data-file="incident-response.md" data-path="docs/incident-response.md">
+          <div class="card-icon">&#x1F6A8;</div>
+          <div class="card-body">
+            <div class="card-title">Incident Response <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Playbooks for breach detection, containment, and recovery.</div>
+            <div class="card-file">incident-response.md</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Project ── -->
+    <section class="doc-section" data-section="project">
+      <div class="section-header">
+        <div class="section-icon section-icon--gray">&#x1F4C1;</div>
+        <h2>Project</h2>
+      </div>
+      <div class="cards-grid">
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Contributing Guide documentation" data-title="contributing guide" data-desc="how to contribute pull requests code style" data-file="CONTRIBUTING.md" data-path="CONTRIBUTING.md">
+          <div class="card-icon">&#x1F91D;</div>
+          <div class="card-body">
+            <div class="card-title">Contributing Guide <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">How to contribute: code style, PR process, and development setup.</div>
+            <div class="card-file">CONTRIBUTING.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Security Policy documentation" data-title="security policy" data-desc="vulnerability reporting disclosure responsible" data-file="SECURITY.md" data-path="SECURITY.md">
+          <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
+          <div class="card-body">
+            <div class="card-title">Security Policy <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">How to report vulnerabilities and our responsible disclosure process.</div>
+            <div class="card-file">SECURITY.md</div>
+          </div>
+        </div>
+
+        <div class="doc-card" role="button" tabindex="0" aria-label="Open Project Vision documentation" data-title="project vision roadmap" data-desc="goals direction future plans" data-file="VISION.md" data-path="VISION.md">
+          <div class="card-icon">&#x1F52D;</div>
+          <div class="card-body">
+            <div class="card-title">Project Vision &amp; Roadmap <span class="ext-arrow">&#x2197;</span></div>
+            <div class="card-desc">Long-term goals, project direction, and what's coming next.</div>
+            <div class="card-file">VISION.md</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── No Results ── -->
+    <div class="no-results" id="no-results" role="status">
+      <div style="font-size: 32px; margin-bottom: 8px;">&#x1F50D;</div>
+      <p>No docs match your search. Try a different term.</p>
+    </div>
+
+  </main>
+
+  <!-- ═══ SLIDE-OUT PANEL ═══ -->
+  <div class="panel-backdrop" id="panel-backdrop" aria-hidden="true">
+    <div class="doc-panel" id="doc-panel" role="dialog" aria-label="Document viewer">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <a class="panel-github-link" id="panel-github-link" href="#" target="_blank" rel="noopener" aria-label="View on GitHub">
+            View on GitHub &#x2197;
+          </a>
+        </div>
+        <button class="panel-close" id="panel-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div class="panel-body" id="panel-body">
+        <!-- Rendered markdown goes here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-links">
+        <a href="https://github.com/CorvidLabs/corvid-agent">Source</a>
+        <a href="https://github.com/CorvidLabs">GitHub</a>
+        <a href="/docs.html">Docs</a>
+        <a href="/blog.html">Blog</a>
+      </div>
+      <div class="footer-meta">
+        <a href="https://allo.info/account/WGSHC4TYKYBS6EX5V5E377BQDLKWIIPBCFOLZQZIXCKHFIEKRPBFOMW25A" class="footer-wallet" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          corvid.algo
+        </a>
+      </div>
+      <p class="footer-copy">Built autonomously by <a href="https://github.com/corvid-agent">corvid-agent</a> on Algorand.</p>
+    </div>
+  </footer>
+
+  <!-- ═══ MARKED.JS ═══ -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- ═══ JS ═══ -->
+  <script>
+    // ── Hamburger menu toggle ──
+    const hamburger = document.getElementById('hamburger');
+    const navLinks = document.getElementById('nav-links');
+
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        hamburger.classList.remove('open');
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // ── Search / filter ──
+    const searchInput = document.getElementById('doc-search');
+    const sections = document.querySelectorAll('.doc-section');
+    const noResults = document.getElementById('no-results');
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase().trim();
+      let totalVisible = 0;
+
+      sections.forEach(section => {
+        const cards = section.querySelectorAll('.doc-card');
+        let sectionVisible = 0;
+
+        cards.forEach(card => {
+          const title = (card.getAttribute('data-title') || '').toLowerCase();
+          const desc = (card.getAttribute('data-desc') || '').toLowerCase();
+          const file = (card.getAttribute('data-file') || '').toLowerCase();
+          const match = !q || title.includes(q) || desc.includes(q) || file.includes(q);
+
+          card.classList.toggle('hidden', !match);
+          if (match) sectionVisible++;
+        });
+
+        section.classList.toggle('hidden', sectionVisible === 0);
+        totalVisible += sectionVisible;
+      });
+
+      noResults.classList.toggle('visible', totalVisible === 0 && q.length > 0);
+    });
+
+    // ── Panel state ──
+    const panelBackdrop = document.getElementById('panel-backdrop');
+    const docPanel = document.getElementById('doc-panel');
+    const panelBody = document.getElementById('panel-body');
+    const panelClose = document.getElementById('panel-close');
+    const panelGithubLink = document.getElementById('panel-github-link');
+
+    // Cache fetched markdown
+    const mdCache = {};
+
+    function buildRawUrl(path) {
+      return 'https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/' + path;
+    }
+
+    function buildGithubUrl(path) {
+      return 'https://github.com/CorvidLabs/corvid-agent/blob/main/' + path;
+    }
+
+    function openPanel(path) {
+      panelGithubLink.href = buildGithubUrl(path);
+      panelBody.innerHTML = '<div class="panel-loading"><div class="panel-spinner"></div>Loading...</div>';
+      panelBackdrop.classList.add('open');
+      panelBackdrop.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('panel-open');
+
+      // Focus the close button for keyboard accessibility
+      setTimeout(() => panelClose.focus(), 100);
+
+      if (mdCache[path]) {
+        renderMarkdown(mdCache[path]);
+        return;
+      }
+
+      fetch(buildRawUrl(path))
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
+        })
+        .then(md => {
+          mdCache[path] = md;
+          renderMarkdown(md);
+        })
+        .catch(err => {
+          panelBody.innerHTML = '<div class="panel-error">Failed to load document.<br>' + err.message + '<br><br><a href="' + buildGithubUrl(path) + '" target="_blank" rel="noopener">View on GitHub instead &#x2197;</a></div>';
+        });
+    }
+
+    function renderMarkdown(md) {
+      const html = marked.parse(md);
+      panelBody.innerHTML = '<div class="md-content">' + html + '</div>';
+    }
+
+    function closePanel() {
+      panelBackdrop.classList.remove('open');
+      panelBackdrop.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('panel-open');
+    }
+
+    // Close button
+    panelClose.addEventListener('click', closePanel);
+
+    // Click on backdrop (outside panel) to close
+    panelBackdrop.addEventListener('click', (e) => {
+      if (e.target === panelBackdrop) {
+        closePanel();
+      }
+    });
+
+    // ── Doc card clicks ──
+    document.querySelectorAll('.doc-card').forEach(card => {
+      const path = card.getAttribute('data-path');
+      if (!path) return;
+
+      card.addEventListener('click', () => openPanel(path));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openPanel(path);
+        }
+      });
+    });
+
+    // ── Keyboard shortcuts ──
+    document.addEventListener('keydown', (e) => {
+      // Escape: close panel or clear search
+      if (e.key === 'Escape') {
+        if (panelBackdrop.classList.contains('open')) {
+          closePanel();
+          return;
+        }
+        if (document.activeElement === searchInput) {
+          searchInput.value = '';
+          searchInput.dispatchEvent(new Event('input'));
+          searchInput.blur();
+        }
+      }
+
+      // / to focus search (when panel is closed and not already in an input)
+      if (e.key === '/' && document.activeElement !== searchInput && !panelBackdrop.classList.contains('open')) {
+        e.preventDefault();
+        searchInput.focus();
+      }
+    });
+  </script>
+
+</body>
+</html>

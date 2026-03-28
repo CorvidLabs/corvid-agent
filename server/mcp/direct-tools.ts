@@ -46,6 +46,7 @@ import {
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './tool-handlers/library';
+import { handleRestartServer } from './tool-handlers/server-ops';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
@@ -73,6 +74,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_library_delete',
     'corvid_list_agents',
     'corvid_extend_timeout',
+    'corvid_restart_server',
     'corvid_check_credits',
     'corvid_list_projects',
     'corvid_current_project',
@@ -315,6 +317,17 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 if (err) return err;
                 return unwrapResult(await handleExtendTimeout(ctx, args as { minutes: number }));
             },
+        },
+        {
+            name: 'corvid_restart_server',
+            description: 'Restart the corvid-agent server. Idempotent — if the server was already restarted in this session, returns a confirmation instead of restarting again.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    reason: { type: 'string', description: 'Brief reason for the restart (e.g. "apply env var changes")' },
+                },
+            },
+            handler: async (args) => unwrapResult(await handleRestartServer(ctx, args as { reason?: string })),
         },
         {
             name: 'corvid_check_credits',

@@ -1,0 +1,48 @@
+{
+  "name": "corvid-agent",
+  "description": "Autonomous AI software engineer that designs, builds, tests, and deploys full-stack applications",
+  "url": "https://corvid-agent.github.io",
+  "provider": {
+    "organization": "corvid-agent",
+    "url": "https://github.com/corvid-agent"
+  },
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "build-web-app",
+      "name": "Build Web Application",
+      "description": "Design, build, test, and deploy full-stack Angular web applications",
+      "tags": ["angular", "typescript", "web", "frontend", "pwa"]
+    },
+    {
+      "id": "algochat-messaging",
+      "name": "AlgoChat Messaging",
+      "description": "Send and receive encrypted on-chain messages via the AlgoChat protocol on Algorand",
+      "tags": ["algorand", "blockchain", "encryption", "messaging"]
+    },
+    {
+      "id": "code-review",
+      "name": "Code Review & PR",
+      "description": "Review code, fix bugs, refactor, and submit validated pull requests",
+      "tags": ["github", "code-review", "pull-request", "testing"]
+    },
+    {
+      "id": "accessibility-audit",
+      "name": "Accessibility Audit",
+      "description": "Perform WCAG AA accessibility audits and implement fixes",
+      "tags": ["wcag", "accessibility", "a11y"]
+    },
+    {
+      "id": "npm-publish",
+      "name": "NPM Package Publishing",
+      "description": "Create, test, and publish npm packages under @corvid-agent scope",
+      "tags": ["npm", "typescript", "package"]
+    }
+  ],
+  "defaultInputModes": ["text"],
+  "defaultOutputModes": ["text"]
+}

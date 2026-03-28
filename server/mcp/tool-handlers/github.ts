@@ -23,11 +23,23 @@ export function friendlyModelName(model: string): string {
     return model;
 }
 
-/** Format an agent identity signature footer for GitHub write operations (#1555). */
-export function formatAgentSignature(agent: { name: string; model: string } | null | undefined): string {
+/** Format an agent identity signature footer for GitHub write operations (#1555, #1576). */
+export function formatAgentSignature(
+    agent: { name: string; model: string } | null | undefined,
+    taskId?: string,
+): string {
     if (!agent) return '';
     const modelDisplay = friendlyModelName(agent.model);
-    return `\n\n---\n\u{1F916} **${agent.name}** \u00B7 ${modelDisplay} \u00B7 CorvidLabs Team Alpha`;
+    const parts = [`Agent: ${agent.name}`, `Model: ${modelDisplay}`];
+    if (taskId) parts.push(`Task: ${taskId}`);
+    return `\n\n---\n\u{1F916} ${parts.join(' | ')}`;
+}
+
+/** Format a Co-Authored-By trailer for git commits (#1576). */
+export function formatCoAuthoredBy(agent: { name: string; model: string } | null | undefined): string {
+    if (!agent) return '';
+    const modelDisplay = friendlyModelName(agent.model);
+    return `Co-Authored-By: ${agent.name} (${modelDisplay})`;
 }
 
 /** Build an agent identity signature footer by looking up the agent from the DB. */

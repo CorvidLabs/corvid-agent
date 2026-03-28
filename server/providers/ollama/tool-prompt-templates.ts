@@ -201,29 +201,31 @@ export function getCodingToolPrompt(): string {
 
 /**
  * Get codebase context prompt. Gives agents basic orientation about the
- * CorvidAgent project so they're not dropped in blind.
+ * project so they're not dropped in blind. Uses GITHUB_OWNER env var
+ * if set, otherwise omits org-specific details.
  */
 export function getCodebaseContextPrompt(): string {
+    const owner = process.env.GITHUB_OWNER;
+    const ownerLine = owner ? `\n- **GitHub owner**: ${owner}` : '';
+
     return `## Codebase Context
 
-This is the **CorvidAgent** project — a multi-agent AI platform built with TypeScript and Bun.
+This is a multi-agent AI platform built with TypeScript and Bun.
 
 ### Project Structure
 - \`server/\` — Backend server code (API routes, providers, database, agent processes)
-- \`server/db/\` — SQLite database layer (corvid-agent.db)
+- \`server/db/\` — SQLite database layer
 - \`server/providers/ollama/\` — Ollama provider for local/cloud model integration
 - \`server/process/\` — Agent session management (direct-process for Ollama, sdk-process for Claude)
 - \`server/mcp/\` — MCP tool server and skill loader
 - \`server/routes/\` — API endpoints
-- \`dashboard/\` — Frontend dashboard (React)
+- \`client/\` — Frontend dashboard (Angular)
 - \`specs/\` — Project specifications
-- \`tests/\` — Test suites
 
 ### Key Technologies
 - **Runtime**: Bun (not Node.js) — use \`bun\` for all commands, e.g. \`bun x tsc\`, \`bun test\`
 - **Language**: TypeScript throughout
-- **Database**: SQLite via better-sqlite3
-- **GitHub owner**: CorvidLabs (not corvid-agent)
+- **Database**: SQLite via better-sqlite3${ownerLine}
 
 ### Common Tasks
 - Type checking: \`bun x tsc --noEmit\`

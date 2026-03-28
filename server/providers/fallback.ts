@@ -23,7 +23,11 @@ interface ProviderHealth {
 const DEFAULT_COOLDOWN_MS = 60_000; // 1 minute cooldown after failure
 const MAX_CONSECUTIVE_FAILURES = 3;
 
-/** Default local Ollama model name — reads from OLLAMA_DEFAULT_MODEL env var, falls back to qwen3:14b. */
+/**
+ * Default local Ollama model. Reads from OLLAMA_DEFAULT_MODEL env var,
+ * falling back to 'qwen3:14b'. Set this env var if your machine has a
+ * different model pulled (e.g. OLLAMA_DEFAULT_MODEL=llama3:8b).
+ */
 export const OLLAMA_DEFAULT_LOCAL_MODEL = process.env.OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b';
 
 export interface FallbackChain {
@@ -240,7 +244,9 @@ export class FallbackManager {
             lower.includes('timeout') ||
             lower.includes('econnrefused') ||
             lower.includes('fetch failed') ||
-            lower.includes('overloaded')
+            lower.includes('overloaded') ||
+            // Ollama HTTP 500: internal server error — transient, model may recover
+            lower.includes('(500)')
         );
     }
 }

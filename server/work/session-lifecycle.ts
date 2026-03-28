@@ -9,6 +9,7 @@ import { runValidation } from './validation';
 import { removeWorktree } from '../lib/worktree';
 import { createLogger } from '../lib/logger';
 import { checkInternPrGuard } from './intern-guard';
+import { formatAgentSignature, formatCoAuthoredBy } from '../mcp/tool-handlers/github';
 
 const log = createLogger('WorkTaskService');
 
@@ -149,6 +150,10 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
 
     const cwd = task.worktreeDir;
 
+    // Resolve agent info for commit trailer and PR signature (#1576)
+    const agent = task.agentId ? getAgent(db, task.agentId) : null;
+    const coAuthor = formatCoAuthoredBy(agent);
+
     try {
         // Ensure all changes are committed (agent may have left unstaged changes)
         const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
@@ -157,8 +162,11 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
             // There are uncommitted changes — commit them
             const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
             await addProc.exited;
+            const commitMsg = coAuthor
+                ? `Work task: ${task.description.slice(0, 60)}\n\n${coAuthor}`
+                : `Work task: ${task.description.slice(0, 60)}`;
             const commitProc = Bun.spawn(
-                ['git', 'commit', '-m', `Work task: ${task.description.slice(0, 60)}`],
+                ['git', 'commit', '-m', commitMsg],
                 { cwd, stdout: 'pipe', stderr: 'pipe' },
             );
             await commitProc.exited;
@@ -180,7 +188,8 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
 
         // Create PR via gh CLI
         const title = `[Agent] ${task.description.slice(0, 60)}`;
-        const body = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sessionOutput.slice(-300).trim()}`;
+        const baseBody = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sessionOutput.slice(-300).trim()}`;
+        const body = baseBody + formatAgentSignature(agent, taskId);
         log.info('Fallback: creating PR', { taskId, branch: task.branchName });
 
         const prProc = Bun.spawn(
