@@ -5,6 +5,8 @@ import {
     signal,
     computed,
     OnInit,
+    OnDestroy,
+    HostListener,
 } from '@angular/core';
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { ViewModeService } from '../../core/services/view-mode.service';
@@ -113,6 +115,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             } @else {
                 <app-library-3d
                     [entries]="allEntries()"
+                    [paused]="!!selectedEntry()"
                     (entrySelect)="onEntrySelect($event)"
                     (bookPageSelect)="onBookPageSelect($event)" />
                 @if (selectedEntry()) {
@@ -444,7 +447,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
         }
     `,
 })
-export class LibraryComponent implements OnInit {
+export class LibraryComponent implements OnInit, OnDestroy {
     private readonly libraryService = inject(LibraryService);
     private readonly viewModeService = inject(ViewModeService);
 
@@ -475,11 +478,24 @@ export class LibraryComponent implements OnInit {
                     e.content.toLowerCase().includes(q),
             );
         }
-        return entries;
+        // Most recent first
+        return [...entries].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     });
+
+    private onEscKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && this.selectedEntry()) {
+            e.preventDefault();
+            this.clearSelection();
+        }
+    };
 
     ngOnInit(): void {
         this.libraryService.load({ limit: 200 });
+        window.addEventListener('keydown', this.onEscKey);
+    }
+
+    ngOnDestroy(): void {
+        window.removeEventListener('keydown', this.onEscKey);
     }
 
     protected setViewMode(mode: ViewMode): void {
