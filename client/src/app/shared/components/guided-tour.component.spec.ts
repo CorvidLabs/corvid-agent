@@ -49,7 +49,7 @@ describe('GuidedTourComponent', () => {
         const title = (fixture.nativeElement as HTMLElement).querySelector('.tour-tooltip__title');
         const content = (fixture.nativeElement as HTMLElement).querySelector('.tour-tooltip__content');
         expect(title).toBeTruthy();
-        expect(title!.textContent).toContain('Meet your agent');
+        expect(title!.textContent).toContain('Welcome to CorvidAgent');
         expect(content).toBeTruthy();
     });
 
@@ -181,7 +181,7 @@ describe('GuidedTourComponent', () => {
         tourService.startTour();
         fixture.detectChanges();
         let title = (fixture.nativeElement as HTMLElement).querySelector('.tour-tooltip__title');
-        expect(title!.textContent).toContain('Meet your agent');
+        expect(title!.textContent).toContain('Welcome to CorvidAgent');
 
         tourService.next();
         fixture.detectChanges();

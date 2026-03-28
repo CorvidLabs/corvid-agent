@@ -65,11 +65,11 @@ describe('KeyboardShortcutsService', () => {
             expect(spy).toHaveBeenCalledWith(['/sessions/new']);
         });
 
-        it('should navigate to /dashboard on g then d', async () => {
+        it('should navigate to /chat on g then h', async () => {
             const spy = vi.spyOn(router, 'navigate');
             pressKey('g');
-            pressKey('d');
-            expect(spy).toHaveBeenCalledWith(['/dashboard']);
+            pressKey('h');
+            expect(spy).toHaveBeenCalledWith(['/chat']);
         });
 
         it('should navigate to /agents on g then a', () => {
@@ -154,7 +154,7 @@ describe('KeyboardShortcutsService', () => {
         it('should expose all shortcut entries', () => {
             expect(service.shortcuts.length).toBeGreaterThanOrEqual(7);
             expect(service.shortcuts.some((s) => s.keys === '?')).toBe(true);
-            expect(service.shortcuts.some((s) => s.keys === 'g d')).toBe(true);
+            expect(service.shortcuts.some((s) => s.keys === 'g h')).toBe(true);
         });
     });
 });

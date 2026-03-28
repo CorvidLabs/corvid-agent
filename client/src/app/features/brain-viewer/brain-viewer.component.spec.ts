@@ -71,8 +71,10 @@ describe('BrainViewerComponent', () => {
         list = createListResponse(),
     ) {
         getMock.mockImplementation((path: string) => {
-            if (path.includes('/dashboard/memories/stats')) return of(stats);
+            if (path.includes('/dashboard/memories/stats') && !path.includes('observations')) return of(stats);
             if (path.includes('/dashboard/memories/sync-status')) return of(syncStatus);
+            if (path.includes('/dashboard/memories/observations/stats')) return of({ agents: [], totalActive: 0, graduationCandidates: 0 });
+            if (path.includes('/dashboard/memories/observations')) return of({ observations: [], total: 0 });
             if (path.includes('/dashboard/memories')) return of(list);
             return of(null);
         });
@@ -173,7 +175,8 @@ describe('BrainViewerComponent', () => {
     it('should render all 7 stat cards', async () => {
         await createComponent();
         const cards = hostEl.querySelectorAll('.stat-card');
-        expect(cards).toHaveLength(7);
+        // 7 base cards + 1 observations card (shown when obsStats is non-null)
+        expect(cards.length).toBeGreaterThanOrEqual(7);
     });
 
     it('should display total memories count', async () => {

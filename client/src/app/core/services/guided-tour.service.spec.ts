@@ -33,7 +33,7 @@ describe('GuidedTourService', () => {
     it('currentStep returns first step when not active', () => {
         const step = service.currentStep();
         expect(step).toBeTruthy();
-        expect(step!.id).toBe('agent-card');
+        expect(step!.id).toBe('welcome');
     });
 
     describe('startTour', () => {
@@ -135,7 +135,7 @@ describe('GuidedTourService', () => {
             service.currentStepIndex.set(1);
             const step = service.currentStep();
             expect(step).toBeTruthy();
-            expect(step!.id).toBe('start-session');
+            expect(step!.id).toBe('chat-home');
         });
     });
 });

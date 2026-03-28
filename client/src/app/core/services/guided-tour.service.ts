@@ -113,9 +113,8 @@ export class GuidedTourService {
     async next(): Promise<void> {
         const idx = this.currentStepIndex();
         if (idx < this.steps().length - 1) {
-            const nextStep = this.steps()[idx + 1];
-            await this.navigateToStep(nextStep);
             this.currentStepIndex.set(idx + 1);
+            await this.navigateToStep(this.steps()[idx + 1]);
         } else {
             this.complete();
         }
@@ -124,9 +123,8 @@ export class GuidedTourService {
     async prev(): Promise<void> {
         const idx = this.currentStepIndex();
         if (idx > 0) {
-            const prevStep = this.steps()[idx - 1];
-            await this.navigateToStep(prevStep);
             this.currentStepIndex.set(idx - 1);
+            await this.navigateToStep(this.steps()[idx - 1]);
         }
     }
 
