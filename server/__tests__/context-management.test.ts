@@ -77,7 +77,7 @@ describe('getContextBudget', () => {
     it('returns model context window from cost table', () => {
         delete process.env.OLLAMA_NUM_CTX;
         // Claude Opus 4 has 200K context
-        const budget = getContextBudget('claude-opus-4-20250514');
+        const budget = getContextBudget('claude-opus-4-6');
         expect(budget).toBe(200_000);
     });
 
@@ -88,7 +88,7 @@ describe('getContextBudget', () => {
 
     it('prefers model pricing over env var', () => {
         process.env.OLLAMA_NUM_CTX = '4096';
-        const budget = getContextBudget('claude-opus-4-20250514');
+        const budget = getContextBudget('claude-opus-4-6');
         expect(budget).toBe(200_000);
     });
 });
