@@ -186,7 +186,7 @@ interface SessionGroup {
         }
         .show-more:hover { background: var(--accent-cyan-dim); }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
 

@@ -707,7 +707,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-mini-fill[data-color="orange"] { background: var(--accent-orange, #ff9100); }
         .compare-mini-val { font-size: 0.7rem; color: var(--text-primary); text-align: right; }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .card-grid { grid-template-columns: 1fr; }
             .agent-card__body { flex-direction: column; align-items: center; }
             .component-bars { width: 100%; }

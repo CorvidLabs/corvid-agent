@@ -62,6 +62,48 @@ export function formatDuration(ms: number): string {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
+/** Exported for testing. Maps an error type to a user-facing embed title, description, and color. */
+export function sessionErrorEmbed(errorType: string, fallbackMessage?: string): { title: string; description: string; color: number } {
+    switch (errorType) {
+        case 'context_exhausted':
+            return {
+                title: 'Context Limit Reached',
+                description: 'The conversation ran out of context space. Send a message to continue with fresh context — the agent will pick up where it left off.',
+                color: 0xf0b232,
+            };
+        case 'credits_exhausted':
+            return {
+                title: 'Credits Exhausted',
+                description: 'Session paused — credits have been used up. Top up credits in Settings > Spending, then send a message to resume.',
+                color: 0xf0b232,
+            };
+        case 'timeout':
+            return {
+                title: 'Session Timed Out',
+                description: 'The session exceeded its time limit. Send a message to restart — try breaking your request into smaller steps.',
+                color: 0xf0b232,
+            };
+        case 'crash':
+            return {
+                title: 'Session Crashed',
+                description: 'The agent session crashed unexpectedly. Press Resume to restart, or send a new message. If this keeps happening, check the dashboard for details.',
+                color: 0xff3355,
+            };
+        case 'spawn_error':
+            return {
+                title: 'Failed to Start',
+                description: 'The agent session could not be started. Check that the agent\'s provider (API key, model) is configured correctly in the dashboard.',
+                color: 0xff3355,
+            };
+        default:
+            return {
+                title: 'Session Error',
+                description: (fallbackMessage || 'An unexpected error occurred.').slice(0, 4096),
+                color: 0xff3355,
+            };
+    }
+}
+
 export interface ThreadSessionInfo {
     sessionId: string;
     agentName: string;
@@ -124,8 +166,39 @@ export function subscribeForResponseWithEmbed(
     const STATUS_DEBOUNCE_MS = 3000;
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
+    const ACK_DELAY_MS = 5000; // send acknowledgment if no content within 5s
+    const PROGRESS_INTERVAL_MS = 60_000; // periodic progress every 60s
     let receivedAnyActivity = false; // tracks any activity (content OR tool use)
     let sentErrorMessage = false; // dedup: prevent repeated error messages for same session
+    const startTime = Date.now();
+
+    // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a brief status embed
+    const ackTimer = setTimeout(() => {
+        if (!receivedAnyContent && !sentErrorMessage) {
+            sendEmbed(delivery, botToken, threadId, {
+                description: 'Received — working on it...',
+                color: 0x95a5a6,
+                author,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'thinking' }) },
+            }).catch((err) => {
+                log.debug('Ack embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+    }, ACK_DELAY_MS);
+
+    // Periodic progress for long-running operations
+    const progressInterval = setInterval(() => {
+        if (receivedAnyContent || sentErrorMessage) return;
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        sendEmbed(delivery, botToken, threadId, {
+            description: `Still working (${elapsed}s elapsed)...`,
+            color: 0x95a5a6,
+            author,
+            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+        }).catch((err) => {
+            log.debug('Progress embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+        });
+    }, PROGRESS_INTERVAL_MS);
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -173,6 +246,8 @@ export function subscribeForResponseWithEmbed(
     const clearTyping = () => {
         clearInterval(typingInterval);
         clearTimeout(typingSafetyTimeout);
+        clearTimeout(ackTimer);
+        clearInterval(progressInterval);
     };
 
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
@@ -225,6 +300,11 @@ export function subscribeForResponseWithEmbed(
             const content = collapseCodeBlocks(extractContentText(contentBlocks)).trim();
 
             if (content) {
+                if (!receivedAnyContent) {
+                    // Cancel ack + progress now that real content is arriving
+                    clearTimeout(ackTimer);
+                    clearInterval(progressInterval);
+                }
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
                 buffer += content;
@@ -412,36 +492,7 @@ export function subscribeForResponseWithEmbed(
             const errorType = errEvent.error?.errorType || 'unknown';
 
             // Differentiated messages per error type
-            let description: string;
-            let title: string;
-            let color: number;
-            switch (errorType) {
-                case 'context_exhausted':
-                    title = 'Context Limit Reached';
-                    description = 'The conversation ran out of context space. The session will restart with fresh context — send a message to continue.';
-                    color = 0xf0b232; // yellow/warning
-                    break;
-                case 'credits_exhausted':
-                    title = 'Credits Exhausted';
-                    description = 'Session paused — credits have been used up. Add credits to resume.';
-                    color = 0xf0b232;
-                    break;
-                case 'crash':
-                    title = 'Session Crashed';
-                    description = 'The agent session crashed unexpectedly. Send a message or press Resume to restart.';
-                    color = 0xff3355;
-                    break;
-                case 'spawn_error':
-                    title = 'Failed to Start';
-                    description = 'The agent session could not be started. This may be a configuration issue.';
-                    color = 0xff3355;
-                    break;
-                default:
-                    title = 'Session Error';
-                    description = (errEvent.error?.message || 'An unexpected error occurred.').slice(0, 4096);
-                    color = 0xff3355;
-                    break;
-            }
+            const { title, description, color } = sessionErrorEmbed(errorType, errEvent.error?.message);
 
             sendEmbedWithButtons(delivery, botToken, threadId, {
                 title,
@@ -495,9 +546,23 @@ export function subscribeForInlineResponse(
     let receivedAnyContent = false;
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
+    const ACK_DELAY_MS = 5000;
     let receivedAnyActivity = false; // tracks any activity (content OR tool use)
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
     const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
+
+    // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a brief status
+    const ackTimer = setTimeout(() => {
+        if (!receivedAnyContent) {
+            sendEmbed(delivery, botToken, channelId, {
+                description: 'Received — working on it...',
+                color: 0x95a5a6,
+                author,
+            }).catch((err) => {
+                log.debug('Ack embed failed (inline)', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+    }, ACK_DELAY_MS);
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -537,6 +602,7 @@ export function subscribeForInlineResponse(
     const clearTyping = () => {
         clearInterval(typingInterval);
         clearTimeout(typingSafetyTimeout);
+        clearTimeout(ackTimer);
     };
 
     // Import sendReplyEmbed inline to avoid circular dependency
@@ -598,6 +664,8 @@ export function subscribeForInlineResponse(
 
         if (event.type === 'session_error' || event.type === 'session_exited') {
             clearTyping();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            flush();
             processManager.unsubscribe(sessionId, inlineCallback);
         }
     };

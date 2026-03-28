@@ -539,7 +539,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             overflow-y: auto;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .tasks { padding: 1rem; }
             .tasks__header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
             .create-form__row { flex-direction: column; }

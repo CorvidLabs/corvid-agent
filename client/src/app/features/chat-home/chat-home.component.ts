@@ -34,6 +34,9 @@ import { OnboardingComponent } from './onboarding.component';
                     <div class="chat-home__logo-mark" aria-hidden="true">C</div>
                     <h1 class="chat-home__title">CorvidAgent</h1>
                     <p class="chat-home__subtitle">What would you like to work on?</p>
+                    <p class="chat-home__shortcut-hint">
+                        <kbd>Ctrl</kbd>+<kbd>K</kbd> command palette
+                    </p>
 
                     <div class="chat-home__input-card">
                         <textarea
@@ -216,7 +219,24 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home__subtitle {
             color: var(--text-secondary);
             font-size: 0.9rem;
-            margin: 0 0 2rem;
+            margin: 0 0 0.75rem;
+        }
+        .chat-home__shortcut-hint {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            margin: 0 0 1.5rem;
+            opacity: 0.7;
+        }
+        .chat-home__shortcut-hint kbd {
+            padding: 1px 5px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--bg-raised);
+            font-family: inherit;
+            font-size: 0.6rem;
         }
         .chat-home__input-card {
             width: 100%;
@@ -347,6 +367,11 @@ import { OnboardingComponent } from './onboarding.component';
             gap: 0.6rem;
             margin-top: 1.5rem;
             width: 100%;
+        }
+        @media (min-width: 580px) {
+            .chat-home__templates {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
         .chat-home__template {
             display: flex;
@@ -492,6 +517,7 @@ import { OnboardingComponent } from './onboarding.component';
             .chat-home__agent-picker { justify-content: space-between; }
             .chat-home__bg-glow { width: 300px; height: 300px; }
             .chat-home__templates { grid-template-columns: 1fr; }
+            .chat-home__shortcut-hint { display: none; }
         }
     `,
 })
@@ -542,6 +568,18 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
             label: 'Build a feature',
             desc: 'Implement something new end-to-end',
             prompt: 'Build a new feature',
+        },
+        {
+            icon: '\u{1F6E1}',
+            label: 'Security audit',
+            desc: 'Scan for vulnerabilities and bad patterns',
+            prompt: 'Run a security audit on this codebase and flag any issues',
+        },
+        {
+            icon: '\u{1F4CA}',
+            label: 'Refactor',
+            desc: 'Clean up code and improve structure',
+            prompt: 'Identify areas that need refactoring and improve them',
         },
     ];
 

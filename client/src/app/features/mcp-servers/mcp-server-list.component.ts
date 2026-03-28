@@ -544,7 +544,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .btn--secondary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .form-grid { grid-template-columns: 1fr; }
             .span-2 { grid-column: span 1; }
         }

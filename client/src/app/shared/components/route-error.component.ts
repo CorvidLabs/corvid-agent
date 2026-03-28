@@ -184,7 +184,7 @@ import { Router, RouterLink } from '@angular/router';
             .route-error__btn:hover { transform: none; }
             .route-error__btn:active { transform: none; }
         }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             :host { padding: 1.5rem; }
             .route-error { padding: 2rem 1.5rem; }
         }
