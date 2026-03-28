@@ -676,13 +676,13 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
             timestamp: timestamp ?? new Date(),
             ...partial,
         };
-        this.rawEntries.update((list) => [...list, entry]);
+        this.rawEntries.update((list) => [entry, ...list]);
         this.totalMessages.update((n) => n + 1);
 
         if (this.autoScroll()) {
             requestAnimationFrame(() => {
                 const el = this.timelineEl()?.nativeElement;
-                if (el) el.scrollTop = el.scrollHeight;
+                if (el) el.scrollTop = 0;
             });
         }
     }
@@ -729,7 +729,7 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
                 this.seenMessageKeys.add(`${m.id}:${m.status}`);
             }
 
-            newEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            newEntries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
             this.nextId = 0;
             for (const entry of newEntries) {
                 entry.id = this.nextId++;

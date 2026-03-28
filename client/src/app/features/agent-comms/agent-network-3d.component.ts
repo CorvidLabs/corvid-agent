@@ -344,19 +344,17 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
     private static readonly PARTICLE_GEOMETRY = new THREE.SphereGeometry(0.12, 6, 6);
 
-    /* ── Pointer lock state ─────────────────────────────── */
-    private isPointerLocked = false;
+    /* ── Drag state ───────────────────────────────────────── */
     private dragStartX = 0;
     private dragStartY = 0;
     private dragMoved = false;
+    private capturedPointerId = -1;
 
     /* ── Event handlers bound once ──────────────────────── */
-    private onMouseDown = (e: MouseEvent) => this.handleMouseDown(e);
-    private onMouseMove = (e: MouseEvent) => this.handleMouseMove(e);
-    private onMouseUp = (e: MouseEvent) => this.handleMouseUp(e);
+    private onPointerDown = (e: PointerEvent) => this.handlePointerDown(e);
+    private onPointerMove = (e: PointerEvent) => this.handlePointerMove(e);
+    private onPointerUp = (e: PointerEvent) => this.handlePointerUp(e);
     private onWheel = (e: WheelEvent) => this.handleWheel(e);
-    private onMouseLeave = () => { /* no-op with pointer lock */ };
-    private onPointerLockChange = () => this.handlePointerLockChange();
 
     constructor() {
         afterNextRender(() => {
@@ -375,15 +373,13 @@ export class AgentNetwork3DComponent implements OnDestroy {
     ngOnDestroy(): void {
         cancelAnimationFrame(this.animId);
         this.resizeObserver?.disconnect();
-        if (this.isPointerLocked) document.exitPointerLock();
-        document.removeEventListener('pointerlockchange', this.onPointerLockChange);
         const canvas = this.canvasRef()?.nativeElement;
         if (canvas) {
-            canvas.removeEventListener('mousedown', this.onMouseDown);
-            canvas.removeEventListener('mousemove', this.onMouseMove);
-            canvas.removeEventListener('mouseup', this.onMouseUp);
+            if (this.capturedPointerId >= 0) canvas.releasePointerCapture(this.capturedPointerId);
+            canvas.removeEventListener('pointerdown', this.onPointerDown);
+            canvas.removeEventListener('pointermove', this.onPointerMove);
+            canvas.removeEventListener('pointerup', this.onPointerUp);
             canvas.removeEventListener('wheel', this.onWheel);
-            canvas.removeEventListener('mouseleave', this.onMouseLeave);
         }
         // Dispose Three.js resources
         this.agentNodes.forEach((n) => {
@@ -457,14 +453,12 @@ export class AgentNetwork3DComponent implements OnDestroy {
         // Starfield
         this.createStarfield();
 
-        // Events
+        // Events — use pointer capture instead of pointer lock for orbit dragging
         canvas.style.cursor = 'crosshair';
-        canvas.addEventListener('mousedown', this.onMouseDown);
-        canvas.addEventListener('mousemove', this.onMouseMove);
-        canvas.addEventListener('mouseup', this.onMouseUp);
+        canvas.addEventListener('pointerdown', this.onPointerDown);
+        canvas.addEventListener('pointermove', this.onPointerMove);
+        canvas.addEventListener('pointerup', this.onPointerUp);
         canvas.addEventListener('wheel', this.onWheel, { passive: false });
-        canvas.addEventListener('mouseleave', this.onMouseLeave);
-        document.addEventListener('pointerlockchange', this.onPointerLockChange);
 
         // Touch events for mobile
         canvas.addEventListener('touchstart', (e) => {
@@ -866,30 +860,24 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
     /* ── Event handlers ─────────────────────────────────── */
 
-    private handleMouseDown(e: MouseEvent): void {
+    private handlePointerDown(e: PointerEvent): void {
+        if (e.button !== 0) return;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
         this.dragMoved = false;
 
-        // Request pointer lock for orbit dragging
+        // Capture pointer so cursor can't escape the canvas during drag
         const canvas = this.canvasRef().nativeElement;
-        if (!this.isPointerLocked) {
-            canvas.requestPointerLock();
-        }
+        canvas.setPointerCapture(e.pointerId);
+        this.capturedPointerId = e.pointerId;
         this.isDragging = true;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
+        canvas.style.cursor = 'grabbing';
     }
 
-    private handleMouseMove(e: MouseEvent): void {
-        if (this.isPointerLocked && this.isDragging) {
-            // Use movementX/Y for pointer-locked orbit
-            const dx = e.movementX;
-            const dy = e.movementY;
-            if (Math.abs(dx) > 0 || Math.abs(dy) > 0) this.dragMoved = true;
-            this.targetTheta -= dx * 0.003;
-            this.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, this.targetPhi - dy * 0.003));
-        } else if (this.isDragging) {
+    private handlePointerMove(e: PointerEvent): void {
+        if (this.isDragging) {
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
             if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.dragMoved = true;
@@ -897,42 +885,40 @@ export class AgentNetwork3DComponent implements OnDestroy {
             this.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, this.targetPhi - dy * 0.005));
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
+            return;
         }
 
-        // Raycasting for hover (only when not pointer-locked)
-        if (!this.isPointerLocked) {
-            const canvas = this.canvasRef().nativeElement;
-            const rect = canvas.getBoundingClientRect();
-            this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        // Raycasting for hover
+        const canvas = this.canvasRef().nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-            this.raycaster.setFromCamera(this.mouse, this.camera!);
-            const meshes = this.agentNodes.map((n) => n.mesh);
-            const intersects = this.raycaster.intersectObjects(meshes);
+        this.raycaster.setFromCamera(this.mouse, this.camera!);
+        const meshes = this.agentNodes.map((n) => n.mesh);
+        const intersects = this.raycaster.intersectObjects(meshes);
 
-            if (intersects.length > 0) {
-                this.hoveredNodeId = intersects[0].object.userData['agentId'] as string;
-                canvas.style.cursor = 'pointer';
-            } else {
-                this.hoveredNodeId = null;
-                canvas.style.cursor = 'crosshair';
-            }
+        if (intersects.length > 0) {
+            this.hoveredNodeId = intersects[0].object.userData['agentId'] as string;
+            canvas.style.cursor = 'pointer';
+        } else {
+            this.hoveredNodeId = null;
+            canvas.style.cursor = 'crosshair';
         }
     }
 
-    private handleMouseUp(e: MouseEvent): void {
+    private handlePointerUp(e: PointerEvent): void {
         this.isDragging = false;
-
-        // Exit pointer lock
-        if (this.isPointerLocked) {
-            document.exitPointerLock();
+        const canvas = this.canvasRef().nativeElement;
+        if (this.capturedPointerId >= 0) {
+            canvas.releasePointerCapture(this.capturedPointerId);
+            this.capturedPointerId = -1;
         }
+        canvas.style.cursor = 'crosshair';
 
         // If didn't drag much, treat as click
         if (!this.dragMoved && this.camera) {
-            const canvas = this.canvasRef().nativeElement;
             const rect = canvas.getBoundingClientRect();
-            // Use original drag start position for click detection
             this.mouse.x = ((this.dragStartX - rect.left) / rect.width) * 2 - 1;
             this.mouse.y = -((this.dragStartY - rect.top) / rect.height) * 2 + 1;
 
@@ -953,15 +939,6 @@ export class AgentNetwork3DComponent implements OnDestroy {
             } else {
                 this.clearSelection();
             }
-        }
-    }
-
-    private handlePointerLockChange(): void {
-        const canvas = this.canvasRef()?.nativeElement;
-        this.isPointerLocked = document.pointerLockElement === canvas;
-        if (!this.isPointerLocked) {
-            this.isDragging = false;
-            if (canvas) canvas.style.cursor = 'crosshair';
         }
     }
 

@@ -679,7 +679,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             }
 
             // Sort all entries by timestamp so agent and algochat messages interleave correctly
-            newEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            newEntries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
             // Re-assign IDs after sort
             this.nextId = 0;
             for (const entry of newEntries) {
@@ -698,13 +698,13 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             timestamp: timestamp ?? new Date(),
             ...partial,
         };
-        this.rawEntries.update((list) => [...list, entry]);
+        this.rawEntries.update((list) => [entry, ...list]);
 
         if (this.autoScroll()) {
             requestAnimationFrame(() => {
                 const el = this.feedList()?.nativeElement;
                 if (el) {
-                    el.scrollTop = el.scrollHeight;
+                    el.scrollTop = 0;
                 }
             });
         }

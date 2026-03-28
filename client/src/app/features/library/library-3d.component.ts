@@ -220,6 +220,7 @@ interface BookNode3D {
 })
 export class Library3DComponent implements OnDestroy {
     readonly entries = input.required<LibraryEntry[]>();
+    readonly paused = input(false);
     readonly entrySelect = output<LibraryEntry>();
     readonly bookPageSelect = output<{ entry: LibraryEntry; pages: LibraryEntry[] }>();
 
@@ -310,6 +311,14 @@ export class Library3DComponent implements OnDestroy {
             const entries = this.entries();
             if (this.scene) {
                 this.rebuildBooks(entries);
+            }
+        });
+
+        // Exit pointer lock and clear keys when paused (reading a book)
+        effect(() => {
+            if (this.paused()) {
+                if (document.pointerLockElement) document.exitPointerLock();
+                this.keys.clear();
             }
         });
     }
@@ -632,6 +641,7 @@ export class Library3DComponent implements OnDestroy {
     }
 
     private processMovement(): void {
+        if (this.paused()) return;
         const speed = 0.5;
         const forward = new THREE.Vector3(
             -Math.sin(this.cameraYaw),
@@ -783,6 +793,7 @@ export class Library3DComponent implements OnDestroy {
     }
 
     private handleKeyDown(e: KeyboardEvent): void {
+        if (this.paused()) return;
         this.keys.add(e.key.toLowerCase());
     }
 
@@ -800,6 +811,7 @@ export class Library3DComponent implements OnDestroy {
     }
 
     private handleMouseDown(e: MouseEvent): void {
+        if (this.paused()) return;
         if (e.button === 0) {
             const container = this.containerRef()?.nativeElement;
             if (container && !this.pointerLocked()) {
@@ -814,6 +826,7 @@ export class Library3DComponent implements OnDestroy {
     }
 
     private handleMouseMove(e: MouseEvent): void {
+        if (this.paused()) return;
         if (this.pointerLocked()) {
             // Use movementX/Y for FPS-style look (fix direction: -= for natural feel)
             const dx = e.movementX ?? 0;
