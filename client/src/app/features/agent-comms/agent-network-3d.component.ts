@@ -740,7 +740,6 @@ export class AgentNetwork3DComponent implements OnDestroy {
                 this.clearSelection();
             } else {
                 this.selectedNodeId = agentId;
-                const node = this.nodeMap.get(agentId)!;
                 const agent = this.agents().find((a) => a.id === agentId);
                 this.selectedAgent.set(agent ?? null);
                 this.agentSelected.emit(agentId);
