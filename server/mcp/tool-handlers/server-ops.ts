@@ -1,9 +1,9 @@
 /**
  * Server operations tool handlers.
  *
- * Provides `corvid_restart_server` — a safe, idempotent server restart tool
- * that prevents agent restart loops by tracking whether a restart has already
- * been performed in the current session.
+ * Provides `corvid_restart_server` — a safe, idempotent server restart tool that
+ * prevents agent restart loops by tracking whether a restart has already been
+ * performed in the current session.
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';

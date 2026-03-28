@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 107: Add server_restart_initiated_at flag to sessions.

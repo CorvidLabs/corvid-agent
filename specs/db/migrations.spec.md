@@ -36,6 +36,8 @@ files:
   - server/db/migrations/103_discord_muted_users.ts
   - server/db/migrations/104_buddy_mode.ts
   - server/db/migrations/105_session_restart_pending.ts
+  - server/db/migrations/106_agent_library.ts
+  - server/db/migrations/107_session_restart_initiated.ts
 db_tables:
   - schema_version
 depends_on: []

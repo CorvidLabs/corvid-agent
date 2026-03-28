@@ -46,6 +46,13 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `isContextUsageEvent` | `e: ClaudeStreamEvent` | `e is ContextUsageEvent` | Type guard: returns `true` if the event is a `context_usage` event. |
 | `isContextWarningEvent` | `e: ClaudeStreamEvent` | `e is ContextWarningEvent` | Type guard: returns `true` if the event is a `context_warning` event. |
 
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `CURSOR_EXIT_CODE_MAP` | `Record<number, { category, transient, message }>` | Maps cursor-agent exit codes to error classifications for retry/fail-fast decisions |
+| `STREAM_IDLE_TIMEOUT_MS` | `number` | Stream idle timeout (120s) — kills cursor process if no stdout received within this duration |
+
 ### Exported Types
 
 | Type | Description |
