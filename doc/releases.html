@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.55.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --bg-card: rgba(255,255,255,0.03);
+    --bg-card-hover: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.08);
+    --text: #e4e4e7;
+    --text-muted: #71717a;
+    --text-dim: #52525b;
+    --accent: #a78bfa;
+    --accent-glow: rgba(167,139,250,0.15);
+    --green: #4ade80;
+    --blue: #60a5fa;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+    --red: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Animated gradient background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167,139,250,0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 50%, rgba(96,165,250,0.06), transparent),
+      radial-gradient(ellipse 60% 40% at 20% 80%, rgba(244,114,182,0.06), transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 80px 0 60px;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 100px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(167,139,250,0.2);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+  }
+
+  .hero-version-range {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--text-dim);
+  }
+
+  .hero-version-range .version {
+    padding: 8px 20px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .hero-version-range .arrow {
+    color: var(--text-dim);
+    font-size: 1.5rem;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin: 48px 0 64px;
+  }
+
+  .stat-card {
+    text-align: center;
+    padding: 24px 16px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+
+  .stat-card:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(167,139,250,0.2);
+    transform: translateY(-2px);
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  /* Timeline */
+  .timeline-section {
+    margin-bottom: 80px;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .section-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+  }
+
+  /* Era blocks */
+  .era {
+    margin-bottom: 56px;
+  }
+
+  .era-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .era-icon {
+    font-size: 1.6rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .era-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .era-date {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .era-versions {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .era-body {
+    display: grid;
+    gap: 12px;
+  }
+
+  /* Release card */
+  .release-card {
+    padding: 20px 24px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .release-card:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(167,139,250,0.15);
+  }
+
+  .release-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .release-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--accent);
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: var(--accent-glow);
+  }
+
+  .release-date {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .release-highlights {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .release-highlights li {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .release-highlights li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+
+  .release-highlights li strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .tag-feat { background: rgba(74,222,128,0.12); color: var(--green); }
+  .tag-sec { background: rgba(248,113,113,0.12); color: var(--red); }
+  .tag-fix { background: rgba(251,146,60,0.12); color: var(--orange); }
+  .tag-test { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .tag-docs { background: rgba(34,211,238,0.12); color: var(--cyan); }
+
+  /* Milestones */
+  .milestones {
+    margin: 64px 0;
+  }
+
+  .milestone-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .milestone-card {
+    padding: 24px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+
+  .milestone-card:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(167,139,250,0.2);
+    transform: translateY(-2px);
+  }
+
+  .milestone-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .milestone-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .milestone-detail {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Growth chart */
+  .growth-section {
+    margin: 64px 0;
+  }
+
+  .growth-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 200px;
+    padding: 0 4px;
+  }
+
+  .growth-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .growth-bar {
+    width: 100%;
+    max-width: 24px;
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, var(--accent), rgba(167,139,250,0.3));
+    transition: all 0.3s;
+    min-height: 4px;
+  }
+
+  .growth-bar:hover {
+    background: linear-gradient(180deg, var(--pink), var(--accent));
+    transform: scaleY(1.05);
+  }
+
+  .growth-label {
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 6px;
+    transform: rotate(-45deg);
+    transform-origin: center;
+    white-space: nowrap;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 64px 0 48px;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+
+  .footer-logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .footer p {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .hero { padding: 48px 0 40px; }
+    .era-header { flex-wrap: wrap; }
+    .era-versions { margin-left: 0; margin-top: 4px; }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">50 days · 55 releases · 997 commits</div>
+    <h1>CorvidAgent<br>Release Retrospective</h1>
+    <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
+    <div class="hero-version-range">
+      <span class="version">v0.1.0</span>
+      <span class="arrow">→</span>
+      <span class="version">v0.55.0</span>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-number">55</div>
+      <div class="stat-label">Releases</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">997</div>
+      <div class="stat-label">Commits</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">10,500+</div>
+      <div class="stat-label">Unit Tests</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">405</div>
+      <div class="stat-label">E2E Tests</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">65</div>
+      <div class="stat-label">MCP Tools</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">~380</div>
+      <div class="stat-label">API Endpoints</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">90</div>
+      <div class="stat-label">DB Tables</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">29</div>
+      <div class="stat-label">Agent Skills</div>
+    </div>
+  </section>
+
+  <!-- Test Growth Visualization -->
+  <section class="growth-section">
+    <h2 class="section-title">Test Growth Over Time</h2>
+    <p class="section-subtitle">Unit test count at each major release milestone</p>
+    <div class="growth-bars">
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 12%" title="v0.7.0: 850 tests"></div>
+        <div class="growth-label">0.7</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 25%" title="v0.8.0: 1,757 tests"></div>
+        <div class="growth-label">0.8</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 38%" title="v0.11.0: ~2,800 tests"></div>
+        <div class="growth-label">0.11</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 52%" title="v0.16.0: 3,731 tests"></div>
+        <div class="growth-label">0.16</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 60%" title="v0.17.0: 5,040 tests"></div>
+        <div class="growth-label">0.17</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 65%" title="v0.18.0: 5,192 tests"></div>
+        <div class="growth-label">0.18</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 68%" title="v0.19.0: 5,427 tests"></div>
+        <div class="growth-label">0.19</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 72%" title="v0.20.0: 5,704 tests"></div>
+        <div class="growth-label">0.20</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 76%" title="v0.21.0: 5,838 tests"></div>
+        <div class="growth-label">0.21</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 80%" title="v0.22.0: 6,215 tests"></div>
+        <div class="growth-label">0.22</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 84%" title="v0.24.0: 6,347 tests"></div>
+        <div class="growth-label">0.24</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 89%" title="v0.26.0: 6,655 tests"></div>
+        <div class="growth-label">0.26</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 95%" title="v0.29.0: 6,982 tests"></div>
+        <div class="growth-label">0.29</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 100%; background: linear-gradient(180deg, var(--green), var(--accent));" title="v0.41.0: 7,000+ tests"></div>
+        <div class="growth-label">0.41</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Milestones -->
+  <section class="milestones">
+    <h2 class="section-title">Key Milestones</h2>
+    <p class="section-subtitle">Defining moments in the project's evolution</p>
+    <div class="milestone-grid">
+      <div class="milestone-card">
+        <div class="milestone-label">v0.7.0 · Feb 15</div>
+        <div class="milestone-value">The Foundation</div>
+        <div class="milestone-detail">Workflow orchestration, OpenTelemetry, A2A protocol, GitHub webhooks, and Tree-sitter AST parsing. 850 tests.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.8.0 · Feb 17</div>
+        <div class="milestone-value">Bridges & Personas</div>
+        <div class="milestone-detail">Discord + Telegram bridges, character/persona system, skill bundles, voice TTS/STT, CLI mode. 1,757 tests.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.11.0 · Feb 23</div>
+        <div class="milestone-value">Full-Stack Agent Platform</div>
+        <div class="milestone-detail">Slack bridge, middleware pipeline, circuit breakers, complete UI audit, marketplace, reputation system. 348 E2E tests.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.16.0 · Mar 4</div>
+        <div class="milestone-value">Enterprise Security</div>
+        <div class="milestone-detail">RBAC on all routes, multi-tenant isolation, SBOM + Cosign signing, SSRF blocking, CSP headers, WebSocket auth.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.22.0 · Mar 10</div>
+        <div class="milestone-value">Marketplace Ecosystem</div>
+        <div class="milestone-detail">Tiered pricing, credit billing, verification badges, Flock Directory on-chain registry, governance voting UI.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.26.0 · Mar 13</div>
+        <div class="milestone-value">Security Hardening</div>
+        <div class="milestone-detail">Agent tier permissions, ephemeral HMAC keys, plaintext key removal, git worktree isolation, 100% spec coverage.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.35.0 · Mar 17</div>
+        <div class="milestone-value">On-Chain Memory</div>
+        <div class="milestone-detail">Two-tier memory architecture with ARC-69 ASAs on localnet AlgoChat, external MCP servers, proactive context compression.</div>
+      </div>
+      <div class="milestone-card">
+        <div class="milestone-label">v0.41.0 · Mar 20</div>
+        <div class="milestone-value">Chat-First UI</div>
+        <div class="milestone-detail">Glassmorphism redesign, browser automation tool, 29 agent skills, Discord image support, and simplified chat interface.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Release Timeline -->
+  <section class="timeline-section">
+    <h2 class="section-title">Full Release Timeline</h2>
+    <p class="section-subtitle">Every release, grouped by era</p>
+
+    <!-- Era 1: Genesis -->
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">🌱</div>
+        <div>
+          <div class="era-title">Genesis — The Prototype</div>
+          <div class="era-date">Feb 6 – Feb 15, 2026</div>
+        </div>
+        <div class="era-versions">v0.1.0 – v0.7.0</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.1.0 – v0.6.0</span>
+            <span class="release-date">Feb 6 – Feb 14</span>
+          </div>
+          <ul class="release-highlights">
+            <li><strong>Initial project scaffolding</strong> — Bun + Hono server, SQLite database, Angular dashboard client</li>
+            <li><strong>Core agent loop</strong> — Claude SDK integration, session management, tool handler framework</li>
+            <li><strong>AlgoChat bridge</strong> — on-chain messaging between agents via Algorand localnet</li>
+            <li><strong>GitHub integration</strong> — PR creation, issue management, mention polling</li>
+            <li><strong>Council system</strong> — multi-agent discussion rounds with chairman synthesis</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.7.0</span>
+            <span class="release-date">Feb 15</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Graph-based workflow orchestration</strong> with suspend/resume</li>
+            <li><span class="tag tag-feat">feat</span> <strong>OpenTelemetry + Prometheus</strong> tracing and metrics</li>
+            <li><span class="tag tag-feat">feat</span> <strong>A2A protocol</strong> for Google Agent-to-Agent interoperability</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Vector memory</strong> with embeddings and FTS5 search</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Tree-sitter AST parser</strong> for code understanding</li>
+            <li><span class="tag tag-test">test</span> 850 tests across 34 files</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Era 2: Bridges -->
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">🌉</div>
+        <div>
+          <div class="era-title">Bridges — Reaching the World</div>
+          <div class="era-date">Feb 17 – Feb 23, 2026</div>
+        </div>
+        <div class="era-versions">v0.8.0 – v0.11.1</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.8.0</span>
+            <span class="release-date">Feb 17</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Telegram bridge</strong> — voice notes with STT, per-user sessions</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord bridge</strong> — raw WebSocket gateway (no discord.js), auto-reconnect</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Persona system</strong> — archetypes, traits, voice guidelines for agent personality</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Skill bundles</strong> — composable tool+prompt packages (Code Reviewer, DevOps, etc.)</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Voice TTS/STT</strong> — OpenAI TTS with 6 presets, Whisper transcription</li>
+            <li><span class="tag tag-feat">feat</span> <strong>CLI mode</strong> — <code>npx corvid-agent chat</code> with device auth</li>
+            <li><span class="tag tag-test">test</span> 1,757 tests, 47 DB migrations</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.9.0 – v0.11.1</span>
+            <span class="release-date">Feb 20 – Feb 23</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Slack bridge</strong> — bidirectional channel-based interaction</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Rich polling activity feed</strong> with stampede throttling</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Model library refresh</strong> — Claude Sonnet 4.6, GPT-4.1, Qwen 3, Ollama cloud models</li>
+            <li><span class="tag tag-feat">feat</span> <strong>AST code navigation</strong> — <code>corvid_code_symbols</code> and <code>corvid_find_references</code></li>
+            <li><span class="tag tag-feat">feat</span> <strong>Middleware pipeline</strong> — Koa-style composable request processing</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Circuit breaker + rate limiting</strong> per agent</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Complete UI audit</strong> — 9 phases of dashboard rework</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Reputation auto-compute</strong> with SVG score rings and trust badges</li>
+            <li><span class="tag tag-test">test</span> 348 E2E tests covering 198/202 endpoints</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Era 3: Enterprise -->
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">🏢</div>
+        <div>
+          <div class="era-title">Enterprise — Production Ready</div>
+          <div class="era-date">Feb 25 – Mar 6, 2026</div>
+        </div>
+        <div class="era-versions">v0.13.0 – v0.19.0</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.13.0</span>
+            <span class="release-date">Feb 25</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Centralized DedupService</strong> with TTL, LRU, and SQLite persistence</li>
+            <li><span class="tag tag-sec">sec</span> <strong>SQL injection prevention</strong> — parameterized queries across entire DB layer</li>
+            <li><span class="tag tag-feat">feat</span> Tool handler and AlgoChatBridge decomposition for maintainability</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.14.0</span>
+            <span class="release-date">Feb 28</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Slack notifications</strong> for schedule approvals and work task results</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Health-gated scheduling</strong> — suppress non-critical work when degraded</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Auto-merge + CI retry</strong> polling services</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Performance metrics</strong> with trend detection and regression alerts</li>
+            <li><span class="tag tag-feat">feat</span> <strong>PR outcome feedback loop</strong> for schedule effectiveness learning</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.15.0 – v0.16.0</span>
+            <span class="release-date">Mar 4</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-sec">sec</span> <strong>RBAC on all 75+ write endpoints</strong> across 17 route files</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Multi-tenant isolation</strong> on all 14 previously unscoped handlers</li>
+            <li><span class="tag tag-sec">sec</span> <strong>SBOM generation + Cosign</strong> Docker image signing</li>
+            <li><span class="tag tag-sec">sec</span> <strong>SSRF private IP blocking</strong> and CSP/Permissions-Policy headers</li>
+            <li><span class="tag tag-feat">feat</span> <strong>EntityStore signal pattern</strong> for Angular services</li>
+            <li><span class="tag tag-feat">feat</span> <strong>WebSocket heartbeat</strong> and auth improvements</li>
+            <li><span class="tag tag-test">test</span> 15 new test suites covering DB modules and polling</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.17.0 – v0.19.0</span>
+            <span class="release-date">Mar 6</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Repo blocklist</strong> with auto-block on PR rejection</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Permission broker</strong> — capability-based security layer</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Governance tier architecture</strong> with vote types and structured voting</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Dashboard polish</strong> — empty states, skeletons, tooltips, analytics</li>
+            <li><span class="tag tag-sec">sec</span> <strong>232 security tests</strong> across 3 dedicated suites</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Dependency audit</strong> — 0 HIGH/CRITICAL CVEs in direct deps</li>
+            <li><span class="tag tag-docs">docs</span> SECURITY.md expanded from 90 to 324 lines with threat model</li>
+            <li><span class="tag tag-test">test</span> 5,427 tests across 212 files</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Era 4: Scale -->
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">🚀</div>
+        <div>
+          <div class="era-title">Scale — Multi-Agent Orchestration</div>
+          <div class="era-date">Mar 7 – Mar 13, 2026</div>
+        </div>
+        <div class="era-versions">v0.20.0 – v0.28.0</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.20.0</span>
+            <span class="release-date">Mar 7</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Discord slash commands</strong> — <code>/ask</code>, <code>/status</code>, <code>/help</code> with threading</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Telegram work-intake mode</strong> — submit work from phone</li>
+            <li><span class="tag tag-feat">feat</span> <strong>One-line install script</strong> — <code>curl | bash</code> onboarding</li>
+            <li><span class="tag tag-feat">feat</span> <strong>WCAG AA accessibility</strong> across the chat client</li>
+            <li><span class="tag tag-sec">sec</span> CodeQL alert remediation, CVE fixes</li>
+            <li><span class="tag tag-test">test</span> 52 PRs merged across 4 repos in one week</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.21.0</span>
+            <span class="release-date">Mar 8</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Work pipeline v2</strong> — parallel execution, task dependencies, retry</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Governance v2</strong> — weighted voting, quorum rules, proposal lifecycle</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Encryption at rest</strong> — AES-256-GCM for env_vars</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Container sandboxing</strong> with resource limits and network isolation</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Security Overview dashboard</strong> — live security posture view</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Real-time session status</strong> with silent death prevention</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.22.0 – v0.24.2</span>
+            <span class="release-date">Mar 10</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Marketplace ecosystem</strong> — tiered pricing, credit billing, verification badges, free trials</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Flock Directory</strong> — on-chain agent registry with ARC56 contract</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Governance v2 frontend</strong> with real-time WebSocket voting</li>
+            <li><span class="tag tag-feat">feat</span> <strong>MCP expansion</strong> — standalone package, Cursor/Copilot/OpenCode support</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord <code>/admin</code> commands</strong> — channels, users, roles, mode, show</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord <code>/work</code> command</strong> — fire-and-forget tasks from Discord</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord public channel mode</strong> with role-based access control</li>
+            <li><span class="tag tag-test">test</span> 6,347 tests, 115 module specs, 41 MCP tools</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.25.0 – v0.28.0</span>
+            <span class="release-date">Mar 11 – Mar 14</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-sec">sec</span> <strong>KMS migration enforcement</strong> — encrypted key cache, audit logging</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Agent security hardening</strong> — 4 trust tiers, per-agent session limits</li>
+            <li><span class="tag tag-sec">sec</span> <strong>Ephemeral HMAC key</strong> replaces hardcoded fallback</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Git worktree session isolation</strong> for Discord and AlgoChat</li>
+            <li><span class="tag tag-feat">feat</span> <strong>100% spec coverage</strong> — all 368 server files covered</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Tiered model dispatch</strong> — Opus/Sonnet/Haiku routing by complexity</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Cross-platform contact identity</strong> mapping across all bridges</li>
+            <li><span class="tag tag-test">test</span> +209 new tests, 6,982 total across 293 files</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Era 5: Intelligence -->
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">🧠</div>
+        <div>
+          <div class="era-title">Intelligence — On-Chain Memory & Autonomy</div>
+          <div class="era-date">Mar 15 – Mar 20, 2026</div>
+        </div>
+        <div class="era-versions">v0.29.0 – v0.41.0</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.29.0 – v0.32.0</span>
+            <span class="release-date">Mar 15 – Mar 16</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>MCP delegation tools</strong> — subtask dispatch with automatic tier routing</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Multi-tool chain continuation</strong> for limited-tier models</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Flock Directory search</strong> with reputation-based sorting</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Session stats in Discord</strong> — tokens, tool calls, duration in embeds</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Resume Discord sessions by reply</strong></li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.33.0 – v0.35.1</span>
+            <span class="release-date">Mar 16 – Mar 17</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Exam system overhaul</strong> — 28 test cases for model capability assessment</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord reactions → reputation</strong> — user feedback scores agents</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Two-tier memory architecture</strong> — localnet long-term + SQLite short-term</li>
+            <li><span class="tag tag-feat">feat</span> <strong>External MCP servers</strong> — 15-server gallery</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Proactive context compression</strong> before crash</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Auto-link Discord users</strong> to cross-platform contacts</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.36.0 – v0.38.0</span>
+            <span class="release-date">Mar 17 – Mar 18</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>On-chain memory reader & sync</strong> from localnet AlgoChat</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Multi-agent dashboard UX</strong> — onboarding, flock browser, analytics</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Bot verification challenges</strong> for flock identity proofs</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Cheerleading detection</strong> — flag low-quality responses</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Release tarball CI</strong> and install.sh tarball path</li>
+            <li><span class="tag tag-feat">feat</span> <strong>SpecSync migration</strong> from TypeScript to Rust binary</li>
+            <li><span class="tag tag-sec">sec</span> Tiered <code>corvid_send_message</code> access for scheduler sessions</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.39.0 – v0.41.0</span>
+            <span class="release-date">Mar 19 – Mar 20</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>ARC-69 on-chain memory</strong> — agent memories stored as ASAs on localnet</li>
+            <li><span class="tag tag-feat">feat</span> <strong>MCP over Streamable HTTP</strong> at <code>/mcp</code></li>
+            <li><span class="tag tag-feat">feat</span> <strong>Brain viewer</strong> with storage types and memory observations</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Audience-aware dashboard</strong> with drag-and-drop widgets</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Chat-first UI</strong> — glassmorphism redesign, activity rail, chat home</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Browser automation tool</strong> — <code>corvid_browser</code> MCP tool</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord image sending</strong> and file attachment support</li>
+            <li><span class="tag tag-feat">feat</span> <strong>29 agent skills</strong> with Biome linter integration</li>
+            <li><span class="tag tag-sec">sec</span> Rate-limit bypass fix, SSRF fix in ReputationVerifier</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Era 6: Scale -->
+  <section class="timeline-section">
+    <div class="container">
+    <div class="era">
+      <div class="era-header">
+        <div class="era-icon">&#x1F680;</div>
+        <div>
+          <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
+          <div class="era-date">Mar 21 – Mar 27, 2026</div>
+        </div>
+        <div class="era-versions">v0.42.0 – v0.55.0</div>
+      </div>
+      <div class="era-body">
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.42.0 – v0.50.0</span>
+            <span class="release-date">Mar 21 – Mar 24</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Buddy mode</strong> — visible review rounds, default pairings, memory tools for review quality</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Flock: A2A HTTP transport</strong> replacing AlgoChat transport for agent communication</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Scheduler: on-chain attestation</strong> — daily activity attestation published on-chain</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord: tiered /message access</strong> with role-based tool gating</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Conversational agent presets</strong> and seed modules via AlgoChat</li>
+            <li><span class="tag tag-sec">sec</span> Zod input validation on all permission endpoints, CodeQL alert resolution</li>
+          </ul>
+        </div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-version">v0.51.0 – v0.54.0</span>
+            <span class="release-date">Mar 24 – Mar 26</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Frictionless onboarding</strong> — Docker Compose, <code>bun run setup</code> wizard, one-line installer</li>
+            <li><span class="tag tag-feat">feat</span> <strong>CLI: settings + plugin system</strong> — manage config and install plugins from CLI</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Ollama: cloud models</strong> — GPT-OSS, DeepSeek V3.1, Qwen3 Coder with compact prompts</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Cursor routing parity</strong> — fallback chains, diagnostics, full test coverage</li>
+            <li><span class="tag tag-sec">sec</span> YAML CVE fix (GHSA-48c2-rrv3-qjmp), SQL injection remediation in tests</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.55.0</span>
+            <span class="release-date">Mar 27</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Cursor: first-class provider</strong> — exit code classification, transient/permanent error detection, 120s idle timeout</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Agent identity signatures</strong> — all GitHub write operations signed with model-aware agent identity</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Memory browser</strong> — full CRUD UI for on-chain ARC-69 memories with search, filter, pagination</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Agent comms visualization</strong> — real-time WebSocket timeline of agent-to-agent messages</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Cron editor</strong> — extracted pipe, presets, inline validation, human-readable schedule preview</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
+            <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
+            <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-logo">CorvidAgent</div>
+    <p>Built by <a href="https://github.com/CorvidLabs">CorvidLabs</a> · Feb 6 – Mar 27, 2026</p>
+    <p style="margin-top: 8px;">50 days from zero to a full autonomous AI agent platform.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>
