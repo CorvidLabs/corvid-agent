@@ -175,6 +175,13 @@ export const routes: Routes = [
         ],
     },
 
+    // ── Library (CRVLIB knowledge base) ────────────────────────────
+    {
+        path: 'library',
+        loadComponent: () =>
+            import('./features/library/library.component').then((m) => m.LibraryComponent),
+    },
+
     // ── Observe (monitoring & analytics) ─────────────────────────────
     {
         path: 'observe',

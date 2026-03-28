@@ -106,6 +106,7 @@ import { handleToolCatalogRoutes } from './tool-catalog';
 import { handleUsageRoutes } from './usage';
 import { handleVariantRoutes } from './variants';
 import { handleWebhookRoutes } from './webhooks';
+import { handleLibraryRoutes } from './library';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleWorkflowRoutes } from './workflows';
 
@@ -405,6 +406,10 @@ async function handleRoutes(
   // Contact identity routes (cross-platform identity mapping)
   const contactResponse = handleContactRoutes(req, url, db, context);
   if (contactResponse) return contactResponse;
+
+  // Library routes (CRVLIB — on-chain ARC-69 library entries)
+  const libraryResponse = handleLibraryRoutes(req, url, db, context);
+  if (libraryResponse) return libraryResponse;
 
   const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
   if (securityOverviewResponse) return securityOverviewResponse;
