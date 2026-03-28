@@ -50,7 +50,10 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
             <div class="app-layout__body">
                 <main class="app-layout__content" role="main" id="main-content" #mainContent (scroll)="onScroll($event)">
-                    <div class="router-outlet-host" [@pageRoute]="routeAnimationKey()">
+                    <div
+                        class="router-outlet-host"
+                        [@.disabled]="reduceMotion()"
+                        [@pageRoute]="routeAnimationKey()">
                         <router-outlet />
                     </div>
                 </main>
@@ -97,6 +100,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         .router-outlet-host {
             display: block;
             min-height: 100%;
+            min-width: 0;
             position: relative;
         }
         .app-layout__banner {
@@ -176,12 +180,23 @@ export class App implements OnInit, OnDestroy {
     protected readonly isSessionView = signal(false);
     /** Drives route enter animation; updates on each navigation. */
     protected readonly routeAnimationKey = signal(this.router.url);
+    /** Disables route transition when prefers-reduced-motion is set. */
+    protected readonly reduceMotion = signal(false);
     private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
     private routerSub: Subscription | null = null;
+    private motionQuery: MediaQueryList | null = null;
+    private onMotionChange: ((e: MediaQueryListEvent) => void) | null = null;
 
     ngOnInit(): void {
         this.wsService.connect();
         this.sessionService.init();
+
+        if (typeof globalThis.matchMedia !== 'undefined') {
+            this.motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
+            this.reduceMotion.set(this.motionQuery.matches);
+            this.onMotionChange = (e: MediaQueryListEvent) => this.reduceMotion.set(e.matches);
+            this.motionQuery.addEventListener('change', this.onMotionChange);
+        }
 
         // Track whether we're viewing a session (hides bottom nav on mobile)
         this.isSessionView.set(this.router.url.startsWith('/sessions/'));
@@ -194,6 +209,9 @@ export class App implements OnInit, OnDestroy {
     }
 
     ngOnDestroy(): void {
+        if (this.motionQuery && this.onMotionChange) {
+            this.motionQuery.removeEventListener('change', this.onMotionChange);
+        }
         this.sessionService.destroy();
         this.wsService.disconnect();
         this.routerSub?.unsubscribe();

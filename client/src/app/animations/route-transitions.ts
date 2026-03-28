@@ -1,6 +1,6 @@
 import { animate, query, style, transition, trigger } from '@angular/animations';
 
-/** Subtle enter-only transition on primary route outlet (transform + opacity). */
+/** Subtle enter-only transition on primary route outlet (transform + opacity). Duration matches `:root --motion-route-ms`. */
 export const pageRouteAnimation = trigger('pageRoute', [
     transition('* => *', [
         query(':enter', [

@@ -382,7 +382,11 @@ select:focus-visible {
     font-family: inherit;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: background var(--transition-base), box-shadow var(--transition-base);
+    transition:
+        background var(--transition-base),
+        box-shadow var(--transition-base),
+        border-color var(--transition-base),
+        transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
 .btn--primary:hover:not(:disabled) {
@@ -390,23 +394,38 @@ select:focus-visible {
     box-shadow: var(--glow-cyan);
     transform: translateY(-1px);
 }
+.btn--primary:active:not(:disabled) {
+    transform: translateY(0);
+}
 .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
 .btn--secondary:hover:not(:disabled) {
     background: var(--bg-hover);
+    border-color: var(--border-bright);
     transform: translateY(-1px);
+}
+.btn--secondary:active:not(:disabled) {
+    transform: translateY(0);
 }
 .btn--sm { padding: 0.3rem 0.6rem; font-size: var(--text-xs); }
 
 /* ── Micro-interactions ── */
 
 .card-hover {
-    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+    transition:
+        transform var(--transition-base) cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow var(--transition-base),
+        border-color var(--transition-base);
+    transform: translateZ(0);
 }
 .card-hover:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-bright);
     border-color: var(--border-bright);
+}
+.card-hover:active {
+    transform: translate3d(0, -1px, 0);
+    transition-duration: 0.08s;
 }
 
 button:active:not(:disabled) {
@@ -551,14 +570,19 @@ button:active:not(:disabled) {
 
 /* ── Interactive card with lift + glow ── */
 .card-interactive {
-    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+    transition:
+        transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.25s ease,
+        border-color 0.25s ease,
+        background 0.25s ease;
+    transform: translateZ(0);
 }
 .card-interactive:hover {
-    transform: translateY(-3px);
+    transform: translate3d(0, -3px, 0);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 24px rgba(0, 229, 255, 0.08);
 }
 .card-interactive:active {
-    transform: translateY(-1px);
+    transform: translate3d(0, -1px, 0);
     transition-duration: 0.1s;
 }
 
@@ -820,9 +844,27 @@ button[type="submit"]:hover::after {
 .skeleton .skeleton__item:nth-child(10) {
     animation-delay: calc(var(--motion-skeleton-stagger) * 9);
 }
+.skeleton .skeleton__item:nth-child(11) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 10);
+}
+.skeleton .skeleton__item:nth-child(12) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 11);
+}
+.skeleton .skeleton__item:nth-child(13) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 12);
+}
+.skeleton .skeleton__item:nth-child(14) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 13);
+}
+.skeleton .skeleton__item:nth-child(15) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 14);
+}
+.skeleton .skeleton__item:nth-child(16) {
+    animation-delay: calc(var(--motion-skeleton-stagger) * 15);
+}
 
 .skeleton--enter {
-    animation: skeletonFadeIn 0.22s ease-out;
+    animation: skeletonFadeIn var(--motion-route-ms, 220ms) ease-out;
 }
 
 /* ── Toast progress bar ── */
@@ -972,7 +1014,7 @@ select:focus {
 
 .skeleton-page {
     padding: 1.5rem;
-    animation: skeletonFadeIn 0.2s ease-out;
+    animation: skeletonFadeIn var(--motion-route-ms, 220ms) ease-out;
 }
 .skeleton-page__header {
     display: flex;
@@ -980,9 +1022,25 @@ select:focus {
     align-items: center;
     margin-bottom: 1.25rem;
 }
+.skeleton-page__title,
+.skeleton-page__action,
+.skeleton-page__chip {
+    background: linear-gradient(
+        90deg,
+        var(--bg-raised) 0%,
+        var(--bg-raised) 25%,
+        rgba(0, 229, 255, 0.06) 50%,
+        var(--bg-raised) 75%,
+        var(--bg-raised) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeletonWave 1.75s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}
 .skeleton-page__title {
     width: 180px;
     height: 1.8rem;
+    border-radius: var(--radius);
 }
 .skeleton-page__action {
     width: 120px;
@@ -1018,7 +1076,9 @@ select:focus {
 @media (prefers-reduced-motion: reduce) {
     .scroll-to-top { transition: none; }
     .row-highlight::before { transition: none; }
-    .card-lift:hover { transform: none; }
+    .card-lift:hover,
+    .card-hover:hover,
+    .card-interactive:hover { transform: none; }
     .app-layout__content { scroll-behavior: auto; }
 }
 
@@ -1240,7 +1300,7 @@ select:focus {
 /* ── Phase 6: Accordion / collapsible section ── */
 .section-collapse {
     overflow: hidden;
-    animation: collapseReveal 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: collapseReveal var(--motion-collapse-ms, 320ms) cubic-bezier(0.22, 1, 0.36, 1);
     transform: translateZ(0);
 }
 
@@ -1307,7 +1367,7 @@ select:focus {
 
 /* ── Phase 6: Expand/collapse card sections ── */
 .expand-section {
-    animation: expandReveal 0.3s ease-out;
+    animation: expandReveal var(--motion-collapse-ms, 320ms) cubic-bezier(0.22, 1, 0.36, 1);
     overflow: hidden;
 }
 
@@ -1409,6 +1469,8 @@ select:focus {
     .dirty-badge-pulse { animation: none; }
     .flow-arrow-animated { animation: none; }
     .card-lift:hover,
+    .card-hover:hover,
+    .card-interactive:hover,
     .row-lift:hover,
     .node-chip-interactive:hover { transform: none; }
 }
