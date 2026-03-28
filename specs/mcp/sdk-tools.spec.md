@@ -5,6 +5,7 @@ status: active
 files:
   - server/mcp/sdk-tools.ts
   - server/mcp/scheduler-tool-gating.ts
+  - server/mcp/schemas/memory-tools.ts
 db_tables: []
 depends_on:
   - specs/mcp/tool-handlers.spec.md
@@ -40,6 +41,22 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 | `SCHEDULER_MAX_MESSAGES_PER_SESSION` | `number` | Max messages a single scheduler session may send (3) |
 | `SCHEDULER_ALLOWED_ORGS` | `ReadonlySet<string>` | **(Deprecated)** Snapshot of allowed orgs at module load time. Use `getSchedulerAllowedOrgs()` for runtime-correct values |
 | `SCHEDULER_ESCALATION_LABEL` | `string` | Label automatically applied to issues created by scheduled sessions: `'agent-escalation'` |
+
+### Exported Constants (memory-tools.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `MEMORY_TOOL_DESCRIPTIONS` | `Record<string, string>` | Canonical descriptions for all 5 memory tools (save, recall, read_on_chain, sync, delete) |
+| `SaveMemoryParams` | Zod schema | Input schema for `corvid_save_memory` (key, content, book?) |
+| `RecallMemoryParams` | Zod schema | Input schema for `corvid_recall_memory` (key?, query?, book?) |
+| `ReadOnChainMemoriesParams` | Zod schema | Input schema for `corvid_read_on_chain_memories` (search?, limit?) |
+| `SyncOnChainMemoriesParams` | Zod schema | Input schema for `corvid_sync_on_chain_memories` (limit?) |
+| `DeleteMemoryParams` | Zod schema | Input schema for `corvid_delete_memory` (key, mode?) |
+| `SAVE_MEMORY_JSON_SCHEMA` | JSON Schema object | JSON Schema equivalent of `SaveMemoryParams` for direct-tools transport |
+| `RECALL_MEMORY_JSON_SCHEMA` | JSON Schema object | JSON Schema equivalent of `RecallMemoryParams` for direct-tools transport |
+| `READ_ON_CHAIN_MEMORIES_JSON_SCHEMA` | JSON Schema object | JSON Schema equivalent of `ReadOnChainMemoriesParams` |
+| `SYNC_ON_CHAIN_MEMORIES_JSON_SCHEMA` | JSON Schema object | JSON Schema equivalent of `SyncOnChainMemoriesParams` |
+| `DELETE_MEMORY_JSON_SCHEMA` | JSON Schema object | JSON Schema equivalent of `DeleteMemoryParams` |
 
 ## Invariants
 
