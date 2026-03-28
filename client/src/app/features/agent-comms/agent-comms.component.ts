@@ -12,6 +12,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { AgentNetworkVisComponent } from './agent-network-vis.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ApiService } from '../../core/services/api.service';
@@ -40,16 +41,30 @@ interface CommEntry {
 @Component({
     selector: 'app-agent-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent],
     template: `
         <div class="page">
             <div class="page__header">
                 <h2>Agent Communications</h2>
                 <div class="page__actions">
                     <span class="comms__count">{{ totalMessages() }} messages</span>
-                    <button class="btn btn--secondary" (click)="toggleAutoScroll()">
-                        Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
-                    </button>
+                    <div class="comms__view-toggle">
+                        <button
+                            class="ch-chip"
+                            [class.ch-chip--active]="viewMode() === 'list'"
+                            (click)="setViewMode('list')"
+                        >List</button>
+                        <button
+                            class="ch-chip"
+                            [class.ch-chip--active]="viewMode() === 'network'"
+                            (click)="setViewMode('network')"
+                        >Network</button>
+                    </div>
+                    @if (viewMode() === 'list') {
+                        <button class="btn btn--secondary" (click)="toggleAutoScroll()">
+                            Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
+                        </button>
+                    }
                     <span class="comms__status" [attr.data-status]="wsConnected() ? 'on' : 'off'">
                         {{ wsConnected() ? 'LIVE' : 'OFFLINE' }}
                     </span>
@@ -97,7 +112,13 @@ interface CommEntry {
                 </div>
             </div>
 
-            @if (loading()) {
+            @if (viewMode() === 'network') {
+                <app-agent-network-vis
+                    [agents]="visAgents()"
+                    [messages]="visMessages()"
+                    (agentSelected)="onNetworkAgentSelected($event)"
+                />
+            } @else if (loading()) {
                 <app-skeleton variant="table" [count]="6" />
             } @else if (entries().length === 0) {
                 <app-empty-state
@@ -176,6 +197,7 @@ interface CommEntry {
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__actions { display: flex; align-items: center; gap: 0.75rem; }
         .comms__count { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .comms__view-toggle { display: flex; gap: 2px; }
 
         .comms__status {
             font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
@@ -355,6 +377,7 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
     protected readonly totalMessages = signal(0);
     protected readonly agents = signal<Agent[]>([]);
     protected readonly wsConnected = this.wsService.connected;
+    protected readonly viewMode = signal<'list' | 'network'>('list');
 
     protected readonly channelFilters = [
         { value: 'all', label: 'All' },
@@ -391,6 +414,24 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
 
     protected readonly hasActiveFilters = computed(
         () => this.agentFilter() !== '' || this.channelFilter() !== 'all' || this.statusFilter() !== 'all',
+    );
+
+    protected readonly visAgents = computed(() =>
+        this.agents().map((a, i) => ({
+            id: a.id,
+            name: a.name,
+            color: a.displayColor || AgentCommsComponent.AGENT_COLORS[i % AgentCommsComponent.AGENT_COLORS.length],
+        })),
+    );
+
+    protected readonly visMessages = computed(() =>
+        this.rawEntries().map((e) => ({
+            fromAgentId: e.fromAgentId,
+            toAgentId: e.toAgentId,
+            status: e.status,
+            timestamp: e.timestamp.getTime(),
+            channel: e.channel,
+        })),
     );
 
     private static readonly AGENT_COLORS = [
@@ -587,6 +628,14 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
 
     protected setStatusFilter(value: string): void {
         this.statusFilter.set(value);
+    }
+
+    protected setViewMode(mode: 'list' | 'network'): void {
+        this.viewMode.set(mode);
+    }
+
+    protected onNetworkAgentSelected(agentId: string): void {
+        this.agentFilter.set(agentId);
     }
 
     private colorIndexForAgent(agentName: string): number {
