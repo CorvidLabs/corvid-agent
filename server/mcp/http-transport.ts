@@ -262,10 +262,12 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
     server.tool('corvid_create_work_task', 'Create a work task that spawns a new agent session on a dedicated branch.', {
         description: z.string().describe('Description of the work'),
         project_id: z.string().optional().describe('Project ID (uses default if omitted)'),
-    }, async ({ description, project_id }) => {
+        agent_id: z.string().optional().describe('Agent ID to execute and be credited for this task. Defaults to the calling agent.'),
+    }, async ({ description, project_id, agent_id }) => {
         try {
             const body: Record<string, unknown> = { description };
             if (project_id) body.projectId = project_id;
+            if (agent_id) body.agentId = agent_id;
             const res = await fetch(`${baseUrl}/api/work-tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

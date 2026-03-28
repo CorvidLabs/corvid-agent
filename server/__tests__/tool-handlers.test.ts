@@ -569,6 +569,52 @@ describe('handleCreateWorkTask', () => {
         expect(result.isError).toBe(true);
         expect((result.content[0] as { text: string }).text).toContain('Rate limit');
     });
+
+    test('delegates to valid agent_id', async () => {
+        const delegateAgent = createAgent(db, { name: 'DelegateAgent', model: 'haiku' });
+        const mockCreate = mock(() => Promise.resolve({ id: 'wt-delegated', status: 'pending', branch: 'fix/delegated' }));
+        const ctx = createMockContext({
+            workTaskService: {
+                create: mockCreate,
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'delegated task',
+            agent_id: delegateAgent.id,
+        });
+        expect(result.isError).toBeUndefined();
+        expect(mockCreate).toHaveBeenCalledTimes(1);
+        // Verify the task was created with the delegate agent's ID, not the caller's
+        const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
+        expect(createArgs[0].agentId).toBe(delegateAgent.id);
+    });
+
+    test('returns error for invalid agent_id', async () => {
+        const ctx = createMockContext({
+            workTaskService: {
+                create: mock(() => Promise.resolve({ id: 'wt-x', status: 'pending' })),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'bad delegation',
+            agent_id: 'nonexistent-agent-id',
+        });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('Agent not found');
+    });
+
+    test('uses calling agent when agent_id omitted', async () => {
+        const mockCreate = mock(() => Promise.resolve({ id: 'wt-self', status: 'pending', branch: 'fix/self' }));
+        const ctx = createMockContext({
+            workTaskService: {
+                create: mockCreate,
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCreateWorkTask(ctx, { description: 'self task' });
+        expect(result.isError).toBeUndefined();
+        const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
+        expect(createArgs[0].agentId).toBe(agentId);
+    });
 });
 
 // ─── Check Work Status ───────────────────────────────────────────────────────

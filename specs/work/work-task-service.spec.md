@@ -103,7 +103,7 @@ Three MCP tools expose the work task system to agents:
 
 | Tool | Description |
 |------|-------------|
-| `corvid_create_work_task` | Create a work task with optional `model_tier` (light/standard/heavy) for cost-aware delegation |
+| `corvid_create_work_task` | Create a work task with optional `model_tier` (light/standard/heavy) for cost-aware delegation and optional `agent_id` for delegating to a specific agent |
 | `corvid_check_work_status` | Poll a work task by ID — returns status, branch, PR URL, errors |
 | `corvid_list_work_tasks` | List work tasks for the calling agent, optionally filtered by status |
 
@@ -119,6 +119,13 @@ The `model_tier` parameter on `corvid_create_work_task` maps to `ModelTier`:
 | _(omitted)_ | _(auto)_ | _(complexity-based)_ | Router analyzes description to select |
 
 When `modelTier` is set on `CreateWorkTaskInput`, the `WorkTaskService` passes it through to `ProcessManager.startProcess()` to select the appropriate model for the spawned session.
+
+### Agent Delegation Parameter
+
+The optional `agent_id` parameter on `corvid_create_work_task` allows the calling agent to delegate task execution and attribution to a specific agent. When provided:
+- The target agent's identity is used for the work task session (branch naming, PR signatures, co-authored-by trailers)
+- The target agent must exist in the database (validated before task creation)
+- If omitted, the calling agent's own identity is used (default behavior)
 
 ## Invariants
 
@@ -275,3 +282,4 @@ When `modelTier` is set on `CreateWorkTaskInput`, the `WorkTaskService` passes i
 | 2026-03-08 | corvid-agent | Documented repo-map.ts exports: constants, `generateRepoMap`, `extractRelevantSymbols`, `tokenizeDescription`, `filePathPriority` |
 | 2026-03-13 | corvid-agent | Added verification.ts: PR test plan verification tasks — parseTestPlanItems, createVerificationTasks, handleVerificationComplete, and helpers |
 | 2026-03-14 | corvid-agent | Added MCP Tool Interface section: corvid_check_work_status, corvid_list_work_tasks tools; model_tier parameter on corvid_create_work_task for tiered dispatch |
+| 2026-03-28 | corvid-agent | Added agent_id parameter to corvid_create_work_task for delegating task execution and PR attribution to a specific agent |
