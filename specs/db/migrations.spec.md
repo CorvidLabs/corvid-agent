@@ -36,6 +36,7 @@ files:
   - server/db/migrations/103_discord_muted_users.ts
   - server/db/migrations/104_buddy_mode.ts
   - server/db/migrations/105_session_restart_pending.ts
+  - server/db/migrations/107_session_restart_initiated.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -514,10 +515,22 @@ Adds `restart_pending` flag to `sessions` table. When the server shuts down or r
 | `up` | `(db: Database)` | `void` | Adds `restart_pending` INTEGER DEFAULT 0 column to `sessions` and creates partial index `idx_sessions_restart_pending` |
 | `down` | `(db: Database)` | `void` | Drops the index and `restart_pending` column |
 
+### 107_session_restart_initiated.ts
+
+Adds `server_restart_initiated_at` column to `sessions` table. Records the timestamp when a session triggers a server restart via the `corvid_restart_server` tool. On next startup, `buildResumePrompt` checks this flag to inject a "restart completed" note, preventing the agent from re-triggering the restart in a loop.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `server_restart_initiated_at` TEXT DEFAULT NULL column to `sessions` (idempotent — checks column existence first via `hasColumn` helper) |
+| `down` | `(db: Database)` | `void` | Drops `server_restart_initiated_at` column from `sessions` |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-27 | corvid-agent | Add migration 107 to spec coverage |
 | 2026-03-25 | corvid-agent | Add migration 105 to spec coverage |
 | 2026-03-24 | corvid-agent | Add migration 104 to spec coverage |
 | 2026-03-23 | corvid-agent | Add migrations 102, 103 to spec coverage |
