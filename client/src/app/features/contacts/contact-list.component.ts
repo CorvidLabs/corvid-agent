@@ -383,7 +383,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 
         /* ── Responsive ── */
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .contact-layout { grid-template-columns: 1fr; }
         }
     `,

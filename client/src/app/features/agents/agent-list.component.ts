@@ -311,7 +311,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         }
         .agent-card__start-btn:hover { background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 229, 255, 0.1)); box-shadow: 0 0 16px rgba(0, 229, 255, 0.12); }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .agent-grid { grid-template-columns: 1fr; }
             .filters { flex-direction: column; align-items: stretch; }
             .sort-group { margin-left: 0; }

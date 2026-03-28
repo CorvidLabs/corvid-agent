@@ -227,7 +227,7 @@ interface DiffFile {
         }
         .diff-line__content { padding: 0 0.5rem; white-space: pre-wrap; word-break: break-all; }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .log-controls { flex-direction: column; }
             .log-search { min-width: 100%; }
             .diff-line { grid-template-columns: 2.5rem 2.5rem 1fr; }

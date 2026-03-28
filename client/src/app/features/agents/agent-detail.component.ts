@@ -542,7 +542,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 
         code { background: var(--bg-raised); color: var(--accent-magenta); padding: 2px 6px; border-radius: var(--radius-sm); font-size: 0.8rem; border: 1px solid var(--border); }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .stats-row { grid-template-columns: repeat(2, 1fr); }
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }

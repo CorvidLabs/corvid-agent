@@ -26,6 +26,9 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                     <div class="session-view__info">
                         <h2>{{ s.name || s.id.slice(0, 8) }}</h2>
                         <app-status-badge [status]="s.status" />
+                        @if (s.status === 'running' || s.status === 'thinking' || s.status === 'tool_use') {
+                            <span class="session-view__live-dot" title="Session is active"></span>
+                        }
                     </div>
                     <div class="session-view__meta">
                         <span class="meta-item"><span class="meta-label">Agent</span> {{ agentName() }}</span>
@@ -136,8 +139,18 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
         }
-        .session-view__info { display: flex; align-items: center; gap: 0.75rem; }
-        .session-view__info h2 { margin: 0; font-size: 1rem; color: var(--text-primary); }
+        .session-view__info { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+        .session-view__info h2 { margin: 0; font-size: 1rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .session-view__live-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+            background: var(--accent-green);
+            box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+            animation: livePulse 1.5s ease-in-out infinite;
+        }
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(0, 255, 136, 0.5); }
+            50% { opacity: 0.5; box-shadow: 0 0 12px rgba(0, 255, 136, 0.3); }
+        }
         .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
         .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.05em; margin-right: 0.2rem; }

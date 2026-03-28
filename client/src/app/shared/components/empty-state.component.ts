@@ -121,7 +121,7 @@ import { RouterLink } from '@angular/router';
             .empty-state__action:hover { transform: none; }
             .empty-state__action:active { transform: none; }
         }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .empty-state {
                 padding: 2.5rem 1.5rem;
                 min-height: 200px;

@@ -221,7 +221,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .bundle-card__details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .bundle-card__tools-list { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; }
         .bundle-card__prompt pre { font-size: 0.8rem; color: var(--accent-green); white-space: pre-wrap; margin: 0.25rem 0; }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .form-grid { grid-template-columns: 1fr; }
             .span-2 { grid-column: span 1; }
         }

@@ -506,7 +506,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .wizard__footer a:hover { text-decoration: underline; }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .wizard { padding: 1rem; }
             .wizard__logo { font-size: 0.25rem; }
             .wizard__step { padding: 1rem; }

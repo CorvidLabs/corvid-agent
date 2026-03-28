@@ -337,7 +337,7 @@ interface CommEntry {
         .comms__msg-content--response { border-color: rgba(0, 255, 136, 0.15); }
 
         /* ── Mobile-first responsive ──────────────────────────────── */
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .page { padding: 0.75rem; }
             .page__header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
             .page__actions { width: 100%; justify-content: space-between; }

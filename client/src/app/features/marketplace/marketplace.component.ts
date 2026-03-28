@@ -394,7 +394,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .form-grid { grid-template-columns: 1fr; }
             .span-2 { grid-column: span 1; }
             .listing-grid { grid-template-columns: 1fr; }

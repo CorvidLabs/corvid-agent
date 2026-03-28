@@ -80,6 +80,26 @@ interface ActivityEvent {
                     <span class="sandbox-banner__text"><strong>Sandbox Mode</strong> — data won't persist. Restart <code>bun run try</code> to reset.</span>
                 </div>
             }
+            <!-- System alerts -->
+            @if (systemAlerts().length > 0 && !alertsDismissed()) {
+                <div class="system-alerts">
+                    @for (alert of systemAlerts(); track alert.message) {
+                        <div class="system-alert" [attr.data-level]="alert.level">
+                            <span class="system-alert__icon" aria-hidden="true">
+                                @if (alert.level === 'error') { &#x26A0; }
+                                @else if (alert.level === 'warn') { &#x26A0; }
+                                @else { &#x2139; }
+                            </span>
+                            <span class="system-alert__msg">{{ alert.message }}</span>
+                            @if (alert.link) {
+                                <a class="system-alert__link" [routerLink]="alert.link">Fix &rarr;</a>
+                            }
+                        </div>
+                    }
+                    <button class="system-alerts__dismiss" (click)="alertsDismissed.set(true)">Dismiss</button>
+                </div>
+            }
+
             <!-- Top bar: view mode + customize toggle -->
             <div class="dash-toolbar">
                 <div class="dash-toolbar__left">
@@ -498,6 +518,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.agentService.agents().length === 0 && !this.wizardDismissed(),
     );
     private readonly wizardDismissed = signal(false);
+    protected readonly alertsDismissed = signal(false);
     protected readonly runningSessions = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running'),
     );
@@ -554,6 +575,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly activeScheduleCount = computed(() =>
         this.scheduleService.schedules().filter((s) => s.status === 'active').length,
     );
+
+    /** System alerts — surfaces issues that need attention */
+    protected readonly systemAlerts = computed<Array<{ level: 'warn' | 'error' | 'info'; message: string; link?: string }>>(() => {
+        const alerts: Array<{ level: 'warn' | 'error' | 'info'; message: string; link?: string }> = [];
+        const status = this.algochatStatus();
+        if (status && !status.enabled) {
+            alerts.push({ level: 'warn', message: 'AlgoChat disconnected — on-chain messaging unavailable', link: '/settings' });
+        }
+        if (status && status.balance < 500000 && status.address !== 'local') {
+            alerts.push({ level: 'warn', message: `Low ALGO balance (${(status.balance / 1000000).toFixed(2)} ALGO)`, link: '/settings/wallets' });
+        }
+        const errorSessions = this.sessionService.sessions().filter((s) => s.status === 'error');
+        if (errorSessions.length > 0) {
+            alerts.push({ level: 'error', message: `${errorSessions.length} session${errorSessions.length > 1 ? 's' : ''} in error state`, link: '/sessions' });
+        }
+        if (!this.wsService.connected()) {
+            alerts.push({ level: 'error', message: 'WebSocket disconnected — real-time updates unavailable' });
+        }
+        return alerts;
+    });
 
     protected readonly activityFeed = computed<ActivityEvent[]>(() => {
         const sessions = this.sessionService.sessions();

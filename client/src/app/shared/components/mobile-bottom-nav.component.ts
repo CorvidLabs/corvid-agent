@@ -1,18 +1,20 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { IconComponent } from './icon.component';
+import { SessionService } from '../../core/services/session.service';
 
 interface BottomNavItem {
     label: string;
     icon: string;
     route: string;
     exact: boolean;
+    badgeKey?: 'sessions';
 }
 
 const NAV_ITEMS: BottomNavItem[] = [
     { label: 'Home', icon: 'home', route: '/chat', exact: true },
     { label: 'Dashboard', icon: 'dashboard', route: '/dashboard', exact: true },
-    { label: 'Sessions', icon: 'sessions', route: '/sessions', exact: false },
+    { label: 'Sessions', icon: 'sessions', route: '/sessions', exact: false, badgeKey: 'sessions' },
     { label: 'Observe', icon: 'eye', route: '/observe', exact: false },
     { label: 'Agents', icon: 'agents', route: '/agents', exact: false },
 ];
@@ -31,7 +33,12 @@ const NAV_ITEMS: BottomNavItem[] = [
                     routerLinkActive="bottom-nav__item--active"
                     [routerLinkActiveOptions]="{ exact: item.exact }"
                     [attr.aria-label]="item.label">
-                    <app-icon [name]="item.icon" [size]="20" />
+                    <span class="bottom-nav__icon-wrapper">
+                        <app-icon [name]="item.icon" [size]="20" />
+                        @if (item.badgeKey === 'sessions' && activeSessionCount() > 0) {
+                            <span class="bottom-nav__badge" [attr.aria-label]="activeSessionCount() + ' active sessions'">{{ activeSessionCount() > 9 ? '9+' : activeSessionCount() }}</span>
+                        }
+                    </span>
                     <span class="bottom-nav__label">{{ item.label }}</span>
                 </a>
             }
@@ -104,8 +111,34 @@ const NAV_ITEMS: BottomNavItem[] = [
             letter-spacing: 0.03em;
             text-transform: uppercase;
         }
+        .bottom-nav__icon-wrapper {
+            position: relative;
+            display: inline-flex;
+        }
+        .bottom-nav__badge {
+            position: absolute;
+            top: -4px;
+            right: -8px;
+            min-width: 14px;
+            height: 14px;
+            padding: 0 3px;
+            border-radius: 7px;
+            background: var(--accent-cyan);
+            color: var(--bg-deep);
+            font-size: 0.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+        }
     `,
 })
 export class MobileBottomNavComponent {
+    private readonly sessionService = inject(SessionService);
     protected readonly items = NAV_ITEMS;
+    protected readonly activeSessionCount = computed(() =>
+        this.sessionService.sessions().filter((s) => s.status === 'running' || s.status === 'thinking' || s.status === 'tool_use').length,
+    );
 }

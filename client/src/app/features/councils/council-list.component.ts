@@ -250,7 +250,7 @@ interface CouncilCard {
         }
         .council-card__time { margin-left: auto; }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .council-grid { grid-template-columns: 1fr; }
             .filters { flex-direction: column; align-items: stretch; }
             .sort-group { margin-left: 0; }

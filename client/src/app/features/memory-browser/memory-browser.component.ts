@@ -462,7 +462,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         }
 
         /* ── Responsive (mobile-first) ── */
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .page { padding: 1rem; }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }

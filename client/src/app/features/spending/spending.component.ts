@@ -195,7 +195,7 @@ interface CreditTransaction {
         .loading { color: var(--text-secondary); }
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .spending__table { min-width: 500px; }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
             .spending { padding: 0.75rem; }
             .info-grid { grid-template-columns: repeat(2, 1fr); }
             .modal { min-width: auto; width: calc(100vw - 2rem); max-width: 400px; }

@@ -627,6 +627,101 @@ interface PSKContact {
                     }
                 </div>
 
+                <!-- Notification Preferences -->
+                <div class="settings__section">
+                    <h3 class="section-toggle" (click)="toggleSection('notifications')">
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('notifications')">&#9654;</span>
+                        Notifications
+                    </h3>
+                    @if (!collapsedSections().has('notifications')) {
+                        <div class="notification-prefs section-collapse">
+                            <div class="notif-row">
+                                <div class="notif-info">
+                                    <span class="notif-name">Session Completed</span>
+                                    <span class="notif-desc">Notify when a session finishes successfully</span>
+                                </div>
+                                <label class="notif-toggle">
+                                    <input type="checkbox" [checked]="notifSessionComplete()" (change)="notifSessionComplete.set($any($event.target).checked); saveNotifPrefs()" />
+                                    <span class="notif-toggle__track"><span class="notif-toggle__thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="notif-row">
+                                <div class="notif-info">
+                                    <span class="notif-name">Session Errors</span>
+                                    <span class="notif-desc">Notify when a session encounters an error</span>
+                                </div>
+                                <label class="notif-toggle">
+                                    <input type="checkbox" [checked]="notifSessionError()" (change)="notifSessionError.set($any($event.target).checked); saveNotifPrefs()" />
+                                    <span class="notif-toggle__track"><span class="notif-toggle__thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="notif-row">
+                                <div class="notif-info">
+                                    <span class="notif-name">Approval Requests</span>
+                                    <span class="notif-desc">Notify when an agent needs tool approval</span>
+                                </div>
+                                <label class="notif-toggle">
+                                    <input type="checkbox" [checked]="notifApproval()" (change)="notifApproval.set($any($event.target).checked); saveNotifPrefs()" />
+                                    <span class="notif-toggle__track"><span class="notif-toggle__thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="notif-row">
+                                <div class="notif-info">
+                                    <span class="notif-name">Work Task Updates</span>
+                                    <span class="notif-desc">Notify on PR creation, merge, or failure</span>
+                                </div>
+                                <label class="notif-toggle">
+                                    <input type="checkbox" [checked]="notifWorkTask()" (change)="notifWorkTask.set($any($event.target).checked); saveNotifPrefs()" />
+                                    <span class="notif-toggle__track"><span class="notif-toggle__thumb"></span></span>
+                                </label>
+                            </div>
+                            <div class="notif-row">
+                                <div class="notif-info">
+                                    <span class="notif-name">Agent Messages</span>
+                                    <span class="notif-desc">Notify when an agent sends you a message</span>
+                                </div>
+                                <label class="notif-toggle">
+                                    <input type="checkbox" [checked]="notifAgentMessage()" (change)="notifAgentMessage.set($any($event.target).checked); saveNotifPrefs()" />
+                                    <span class="notif-toggle__track"><span class="notif-toggle__thumb"></span></span>
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Environment Info -->
+                <div class="settings__section">
+                    <h3 class="section-toggle" (click)="toggleSection('environment')">
+                        <span class="section-chevron" [class.section-chevron--open]="!collapsedSections().has('environment')">&#9654;</span>
+                        Environment
+                    </h3>
+                    @if (!collapsedSections().has('environment')) {
+                        <div class="env-grid section-collapse">
+                            <div class="env-item">
+                                <span class="env-key">ANTHROPIC_API_KEY</span>
+                                <span class="env-value env-value--set">Configured</span>
+                            </div>
+                            <div class="env-item">
+                                <span class="env-key">OPENROUTER_API_KEY</span>
+                                <span class="env-value" [class.env-value--set]="openrouterStatus()?.status === 'available'" [class.env-value--unset]="openrouterStatus()?.status !== 'available'">
+                                    {{ openrouterStatus()?.status === 'available' ? 'Configured' : 'Not set' }}
+                                </span>
+                            </div>
+                            <div class="env-item">
+                                <span class="env-key">DISCORD_TOKEN</span>
+                                <span class="env-value" [class.env-value--set]="!!discordConfig()" [class.env-value--unset]="!discordConfig()">
+                                    {{ discordConfig() ? 'Configured' : 'Not set' }}
+                                </span>
+                            </div>
+                            <div class="env-item">
+                                <span class="env-key">GITHUB_TOKEN</span>
+                                <span class="env-value env-value--set">Configured</span>
+                            </div>
+                        </div>
+                        <p class="env-hint">Environment variables are set in your <code>.env</code> file or system environment. Restart the server after changes.</p>
+                    }
+                </div>
+
                 <!-- Database Backup -->
                 <div class="settings__section">
                     <h3 class="section-toggle" (click)="toggleSection('database')">
@@ -1023,6 +1118,63 @@ interface PSKContact {
             color: var(--accent-green);
             margin-top: 0.5rem;
         }
+
+        /* Notification preferences */
+        .notification-prefs { display: flex; flex-direction: column; gap: 0.35rem; }
+        .notif-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.55rem 0.65rem; background: var(--bg-raised);
+            border-radius: var(--radius); gap: 1rem;
+        }
+        .notif-info { display: flex; flex-direction: column; gap: 0.1rem; }
+        .notif-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
+        .notif-desc { font-size: 0.6rem; color: var(--text-tertiary); }
+        .notif-toggle { position: relative; display: inline-flex; cursor: pointer; }
+        .notif-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .notif-toggle__track {
+            width: 36px; height: 20px; border-radius: 10px;
+            background: var(--border-bright); transition: background 0.2s;
+            position: relative; flex-shrink: 0;
+        }
+        .notif-toggle input:checked + .notif-toggle__track { background: var(--accent-cyan); }
+        .notif-toggle__thumb {
+            position: absolute; top: 2px; left: 2px;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--text-primary); transition: transform 0.2s;
+        }
+        .notif-toggle input:checked + .notif-toggle__track .notif-toggle__thumb {
+            transform: translateX(16px);
+            background: var(--bg-deep);
+        }
+
+        /* Environment info */
+        .env-grid { display: flex; flex-direction: column; gap: 0.35rem; }
+        .env-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.45rem 0.65rem; background: var(--bg-raised); border-radius: var(--radius);
+        }
+        .env-key {
+            font-size: 0.7rem; font-weight: 600; color: var(--text-primary);
+            font-family: var(--font-mono, monospace);
+        }
+        .env-value { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .env-value--set { color: var(--accent-green); }
+        .env-value--unset { color: var(--text-tertiary); }
+        .env-hint { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 0.5rem; }
+        .env-hint code {
+            background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
+            font-size: 0.6rem; border: 1px solid var(--border);
+        }
+
+        @media (max-width: 600px) {
+            .settings { padding: 1rem; }
+            .discord-grid { grid-template-columns: 1fr; }
+            .credit-grid { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+            .mode-selector { flex-wrap: wrap; }
+            .notif-row { flex-direction: column; align-items: stretch; gap: 0.35rem; }
+            .notif-toggle { align-self: flex-end; }
+        }
     `,
 })
 export class SettingsComponent implements OnInit {
@@ -1067,6 +1219,13 @@ export class SettingsComponent implements OnInit {
     readonly openrouterStatus = signal<{ status: string; configuredModels?: number } | null>(null);
     readonly openrouterModels = signal<Array<{ model: string; displayName: string; inputPricePerMillion: number; outputPricePerMillion: number }>>([]);
 
+    // Notification preferences
+    readonly notifSessionComplete = signal(true);
+    readonly notifSessionError = signal(true);
+    readonly notifApproval = signal(true);
+    readonly notifWorkTask = signal(true);
+    readonly notifAgentMessage = signal(false);
+
     // Collapsible sections
     readonly collapsedSections = signal<Set<string>>(new Set());
 
@@ -1100,6 +1259,32 @@ export class SettingsComponent implements OnInit {
         this.settingsRouter.navigate(['/dashboard']).then(() => {
             setTimeout(() => this.tourService.startTour(), 400);
         });
+    }
+
+    saveNotifPrefs(): void {
+        const prefs = {
+            sessionComplete: this.notifSessionComplete(),
+            sessionError: this.notifSessionError(),
+            approval: this.notifApproval(),
+            workTask: this.notifWorkTask(),
+            agentMessage: this.notifAgentMessage(),
+        };
+        localStorage.setItem('corvid_notif_prefs', JSON.stringify(prefs));
+        this.notifications.success('Notification preferences saved');
+    }
+
+    private loadNotifPrefs(): void {
+        try {
+            const raw = localStorage.getItem('corvid_notif_prefs');
+            if (raw) {
+                const prefs = JSON.parse(raw);
+                if (typeof prefs.sessionComplete === 'boolean') this.notifSessionComplete.set(prefs.sessionComplete);
+                if (typeof prefs.sessionError === 'boolean') this.notifSessionError.set(prefs.sessionError);
+                if (typeof prefs.approval === 'boolean') this.notifApproval.set(prefs.approval);
+                if (typeof prefs.workTask === 'boolean') this.notifWorkTask.set(prefs.workTask);
+                if (typeof prefs.agentMessage === 'boolean') this.notifAgentMessage.set(prefs.agentMessage);
+            }
+        } catch { /* ignore corrupt localStorage */ }
     }
 
     toggleSection(section: string): void {
@@ -1519,6 +1704,7 @@ export class SettingsComponent implements OnInit {
 
     private async loadAll(): Promise<void> {
         this.loading.set(true);
+        this.loadNotifPrefs();
         try {
             const [settings, mode] = await Promise.all([
                 firstValueFrom(this.api.get<SettingsData>('/settings')),
