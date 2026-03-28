@@ -59,6 +59,7 @@ interface ActivityEvent {
     status?: string;
 }
 
+
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -181,6 +182,7 @@ interface ActivityEvent {
                                         <span class="metric-card__label">API Cost (Today)</span>
                                     </div>
                                     <span class="metric-card__value metric-card__value--usd">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</span>
+                                    <a class="metric-card__link" routerLink="/observe/analytics">Analytics</a>
                                 </div>
                                 @if (algochatStatus(); as status) {
                                     @if (status.enabled && status.address !== 'local') {
@@ -351,7 +353,10 @@ interface ActivityEvent {
                             <div class="section section--feed">
                                 <div class="section__header">
                                     <h3><app-icon name="clock" [size]="14" /> Recent Activity</h3>
-                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['activity']" (click)="refreshWidget('activity')" title="Refresh">&#x21bb;</button>
+                                    <div class="section__header-actions">
+                                        <a class="section__link" routerLink="/observe/analytics">View Analytics</a>
+                                        <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['activity']" (click)="refreshWidget('activity')" title="Refresh">&#x21bb;</button>
+                                    </div>
                                 </div>
                                 @if (activityFeed().length === 0) {
                                     <div class="empty-state">
@@ -654,6 +659,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
     }
 
+
     @HostListener('document:keydown', ['$event'])
     handleKeyboard(event: KeyboardEvent): void {
         // Ignore if typing in an input/textarea
@@ -866,6 +872,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             // Analytics may not be available
         }
     }
+
 
     private async loadAgentSummaries(): Promise<void> {
         const agents = this.agentService.agents();

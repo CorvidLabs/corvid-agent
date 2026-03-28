@@ -16,6 +16,9 @@ export interface WidgetConfig {
 
 const STORAGE_KEY = 'corvid_widget_layout';
 
+/** Widget IDs removed in dashboard streamline — strip from stored layouts */
+const REMOVED_WIDGETS: Set<string> = new Set(['spending-chart', 'session-chart', 'agent-usage-chart']);
+
 const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'metrics', label: 'Metrics', visible: true },
     { id: 'agents', label: 'Agent Activity', visible: true },
@@ -82,8 +85,8 @@ export class WidgetLayoutService {
             if (!parsed.every((w: unknown) =>
                 typeof w === 'object' && w !== null && 'id' in w && 'label' in w && 'visible' in w,
             )) return null;
-            // Filter out removed widgets from old layouts
-            const filtered = (parsed as WidgetConfig[]).filter((w) => VALID_IDS.has(w.id));
+            // Strip removed widgets and filter to valid IDs only
+            const filtered = (parsed as WidgetConfig[]).filter((w) => VALID_IDS.has(w.id) && !REMOVED_WIDGETS.has(w.id));
             // Add any new widgets that weren't in the stored layout
             for (const def of DEFAULT_WIDGETS) {
                 if (!filtered.some((w) => w.id === def.id)) {
