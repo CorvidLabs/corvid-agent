@@ -24,6 +24,7 @@ import {
     agentColor,
     hexColorToInt,
     buildFooterText,
+    buildAgentAuthor,
 } from '../embeds';
 
 const log = createLogger('DiscordCommands');
@@ -150,6 +151,8 @@ export async function handleSessionCommand(
         topic,
         projectName: project.name,
         displayColor: agent.displayColor,
+        displayIcon: agent.displayIcon,
+        avatarUrl: agent.avatarUrl,
         creatorPermLevel: permLevel,
         buddyConfig: buddyAgent ? {
             buddyAgentId: buddyAgent.id,
@@ -160,13 +163,14 @@ export async function handleSessionCommand(
     ctx.threadLastActivity.set(threadId, Date.now());
 
     ctx.processManager.startProcess(session, topic);
-    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name, agent.displayColor);
+    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name, agent.displayColor, agent.displayIcon, agent.avatarUrl);
 
     // Post a welcome embed with Stop button in the thread
     const buddyLabel = buddyAgent ? `\nBuddy: **${buddyAgent.name}** (reviews at end-of-session)` : '';
     sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
         description: `**${agent.name}** is working on: ${topic}${buddyLabel}`,
         color: hexColorToInt(agent.displayColor) ?? agentColor(agent.name),
+        author: buildAgentAuthor({ agentName: agent.name, displayIcon: agent.displayIcon, avatarUrl: agent.avatarUrl }),
         footer: { text: buildFooterText({ agentName: agent.name, agentModel: agent.model || 'unknown', sessionId: session.id, projectName: project.name }) },
     }, [
         buildActionRow(

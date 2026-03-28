@@ -92,6 +92,8 @@ export interface MentionSessionInfo {
     agentModel: string;
     projectName?: string;
     displayColor?: string | null;
+    displayIcon?: string | null;
+    avatarUrl?: string | null;
     channelId?: string;
     /** When true, this session uses pure conversation mode (no tools). */
     conversationOnly?: boolean;
@@ -530,14 +532,16 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
     const agentDisplayColor = agent.displayColor;
+    const agentDisplayIcon = agent.displayIcon;
+    const agentAvatarUrl = agent.avatarUrl;
     const projectNameForFooter = project.name;
     subscribeForAdaptiveInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter, displayColor: agentDisplayColor, channelId });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter, displayColor: agentDisplayColor, displayIcon: agentDisplayIcon, avatarUrl: agentAvatarUrl, channelId });
         },
-        projectNameForFooter, agentDisplayColor,
+        projectNameForFooter, agentDisplayColor, agentDisplayIcon, agentAvatarUrl,
     );
 }
 
@@ -558,7 +562,7 @@ async function handleMentionReplyResume(
     const hasAttachments = (attachments?.length ?? 0) > 0;
     if (!cleanText && !hasAttachments) return;
 
-    const { sessionId, agentName, agentModel, projectName, displayColor, conversationOnly } = sessionInfo;
+    const { sessionId, agentName, agentModel, projectName, displayColor, displayIcon, avatarUrl, conversationOnly } = sessionInfo;
     const minResponderPermLevel = sessionInfo.minResponderPermLevel ?? PermissionLevel.BASIC;
     if (userPermLevel < minResponderPermLevel) {
         log.warn('Blocked reply to protected Discord session', {
@@ -605,9 +609,9 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor, channelId, conversationOnly });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor, displayIcon, avatarUrl, channelId, conversationOnly });
         },
-        projectName, displayColor,
+        projectName, displayColor, displayIcon, avatarUrl,
     );
 }
 
@@ -662,6 +666,8 @@ async function resumeExpiredThreadSession(
         topic: previousInfo.topic,
         projectName: project.name,
         displayColor: agent.displayColor,
+        displayIcon: agent.displayIcon,
+        avatarUrl: agent.avatarUrl,
         creatorPermLevel: previousInfo.creatorPermLevel,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
@@ -674,7 +680,7 @@ async function resumeExpiredThreadSession(
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         ctx.db, ctx.threadCallbacks, newSession.id, threadId, agent.name, agent.model || 'unknown',
-        project.name, agent.displayColor,
+        project.name, agent.displayColor, agent.displayIcon, agent.avatarUrl,
     );
 
     // Brief non-blocking notification
@@ -728,7 +734,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         return;
     }
 
-    const { sessionId, agentName, agentModel, projectName, displayColor } = threadInfo;
+    const { sessionId, agentName, agentModel, projectName, displayColor, displayIcon, avatarUrl } = threadInfo;
 
     const session = getSession(ctx.db, sessionId);
     if (!session) {
@@ -758,7 +764,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
             ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
-            projectName, displayColor,
+            projectName, displayColor, displayIcon, avatarUrl,
         );
         return;
     }
@@ -766,6 +772,6 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
-        projectName, displayColor,
+        projectName, displayColor, displayIcon, avatarUrl,
     );
 }

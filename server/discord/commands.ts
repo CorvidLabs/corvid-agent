@@ -547,6 +547,8 @@ export interface InteractionContext {
     agentModel: string,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
   ) => void;
   sendTaskResult: (
     channelId: string,
@@ -567,6 +569,8 @@ export interface InteractionContext {
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
   ) => void;
   /** Cached guild roles/channels/info from Discord API. */
   guildCache: GuildCache;
