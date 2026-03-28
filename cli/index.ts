@@ -12,6 +12,7 @@ import { interactiveCommand } from './commands/interactive';
 import { initCommand } from './commands/init';
 import { demoCommand } from './commands/demo';
 import { provisionCommand, listRoles } from './commands/provision';
+import { doctorCommand } from './commands/doctor';
 import { c, printError } from './render';
 
 // ─── Argument Parsing ───────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan('init --advanced')}                  Full setup wizard with all options
   ${c.cyan('init --full')}                      Advanced + dashboard build
   ${c.cyan('demo')}                             Run a self-contained demo
+  ${c.cyan('doctor')}                           Check system health and readiness
   ${c.cyan('status')}                           Check server health
   ${c.cyan('chat')} <prompt>                     Send a message to an agent
   ${c.cyan('session')} list|get|stop|resume      Manage sessions
@@ -389,6 +391,29 @@ ${c.bold}Plugin Development:${c.reset}
 `);
 }
 
+function printDoctorHelp(): void {
+    console.log(`
+${c.bold}corvid-agent doctor${c.reset} — Check system health and readiness
+
+${c.bold}Usage:${c.reset}
+  corvid-agent doctor
+
+Runs a checklist of health checks and prints ${c.green('✓')}/${c.red('✗')} for each item,
+with actionable fix suggestions for any failures.
+
+${c.bold}Checks:${c.reset}
+  Runtime    Bun >= 1.0, Node available
+  Database   SQLite DB exists, is accessible, and not corrupted
+  Providers  AI provider API keys are present (ANTHROPIC_API_KEY, etc.)
+  Server     Default port is available or server is already running
+  AlgoChat   Localnet reachable, agent wallet mnemonic set
+  GitHub     GITHUB_TOKEN is set and has repo scope
+
+${c.bold}Examples:${c.reset}
+  corvid-agent doctor                ${c.gray('# run all health checks')}
+`);
+}
+
 function printConfigHelp(): void {
     console.log(`
 ${c.bold}corvid-agent config${c.reset} — Manage CLI configuration
@@ -457,6 +482,11 @@ async function main(): Promise<void> {
         case 'demo':
             if (hasHelpFlag()) { printDemoHelp(); return; }
             await demoCommand();
+            break;
+
+        case 'doctor':
+            if (hasHelpFlag()) { printDoctorHelp(); return; }
+            await doctorCommand();
             break;
 
         case 'status':
