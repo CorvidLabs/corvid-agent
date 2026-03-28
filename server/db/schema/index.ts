@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 106;
+const SCHEMA_VERSION = 107;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -158,6 +158,10 @@ const MIGRATIONS: Record<number, string[]> = {
         // CRVLIB: shared agent knowledge library (plaintext ARC-69 ASAs)
         ...library.tables,
         ...library.indexes,
+    ],
+    107: [
+        // Session server-restart tracking (prevents agent restart loops, issue #1570)
+        `ALTER TABLE sessions ADD COLUMN server_restart_initiated_at TEXT DEFAULT NULL`,
     ],
 };
 
