@@ -449,6 +449,9 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
             status: e.status,
             timestamp: e.timestamp.getTime(),
             channel: e.channel,
+            fromAgent: e.fromAgent,
+            toAgent: e.toAgent,
+            content: e.content,
         })),
     );
 
