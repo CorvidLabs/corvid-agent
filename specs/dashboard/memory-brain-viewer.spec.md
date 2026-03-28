@@ -27,6 +27,12 @@ Replaces the former `/observe/brain-viewer` and `/observe/memory-browser` routes
 |----------|-----------|---------|-------------|
 | `handleDashboardRoutes` | `(req: Request, url: URL, db: Database, context?: RequestContext)` | `Response \| null` | Route handler for `/api/dashboard/summary` aggregated endpoint |
 
+### Exported Components
+
+| Component | Selector | Description |
+|-----------|----------|-------------|
+| `UnifiedMemoryComponent` | `app-unified-memory` | Angular component providing the consolidated memory view with Overview, Browse, and 3D modes |
+
 ### API Endpoints
 
 | Endpoint | Method | Parameters | Returns | Description |
