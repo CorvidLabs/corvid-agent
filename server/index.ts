@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildAgentCard } from './a2a/agent-card';
 import {
@@ -519,38 +519,44 @@ const server = Bun.serve<WsData>({
         return instrumentResponse(apiResponse, route);
       }
 
-      // Serve Angular static files
-      if (existsSync(CLIENT_DIST)) {
+      // Serve Angular static files (use try/catch to avoid TOCTOU race)
+      {
         const filePath = join(CLIENT_DIST, url.pathname);
-
-        // Check if path exists as a file
-        if (existsSync(filePath) && !filePath.endsWith('/')) {
-          const headers: Record<string, string> = {};
-          const basename = url.pathname.split('/').pop() ?? '';
-          // Angular outputHashing:"all" produces files like main.abc1234f.js
-          if (/\.[a-f0-9]{8,}\.\w+$/.test(basename)) {
-            headers['Cache-Control'] = 'public, max-age=31536000, immutable';
-          } else if (basename === 'index.html') {
-            headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-          } else {
-            headers['Cache-Control'] = 'public, max-age=3600';
-          }
-          return instrumentResponse(new Response(Bun.file(filePath), { headers }), '/static');
+        if (!filePath.endsWith('/')) {
+          try {
+            const stat = statSync(filePath);
+            if (stat.isFile()) {
+              const headers: Record<string, string> = {};
+              const basename = url.pathname.split('/').pop() ?? '';
+              // Angular outputHashing:"all" produces files like main.abc1234f.js
+              if (/\.[a-f0-9]{8,}\.\w+$/.test(basename)) {
+                headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+              } else if (basename === 'index.html') {
+                headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+              } else {
+                headers['Cache-Control'] = 'public, max-age=3600';
+              }
+              return instrumentResponse(new Response(Bun.file(filePath), { headers }), '/static');
+            }
+          } catch { /* file not found, fall through */ }
         }
 
         // SPA fallback - serve index.html for unmatched routes
-        const indexPath = join(CLIENT_DIST, 'index.html');
-        if (existsSync(indexPath)) {
-          return instrumentResponse(
-            new Response(Bun.file(indexPath), {
-              headers: {
-                'Content-Type': 'text/html',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-              },
-            }),
-            '/static',
-          );
-        }
+        try {
+          const indexPath = join(CLIENT_DIST, 'index.html');
+          const indexFile = Bun.file(indexPath);
+          if (indexFile.size > 0) {
+            return instrumentResponse(
+              new Response(indexFile, {
+                headers: {
+                  'Content-Type': 'text/html',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                },
+              }),
+              '/static',
+            );
+          }
+        } catch { /* no index.html, fall through */ }
       }
 
       return instrumentResponse(new Response('Not Found', { status: 404 }), '/not-found');

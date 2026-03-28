@@ -100,15 +100,20 @@ export async function provisionCommand(options: ProvisionOptions): Promise<void>
     mkdirSync(outputDir, { recursive: true });
 
     const envPath = join(outputDir, '.env');
-    let fd: number;
     try {
-        fd = openSync(envPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
-    } catch {
-        printError(`${envPath} already exists. Use --out-dir to specify a different directory.`);
-        process.exit(1);
+        const fd = openSync(envPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+        try {
+            writeFileSync(fd, envContent);
+        } finally {
+            closeSync(fd);
+        }
+    } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'EEXIST') {
+            printError(`${envPath} already exists. Use --out-dir to specify a different directory.`);
+            process.exit(1);
+        }
+        throw err;
     }
-    writeFileSync(fd, envContent);
-    closeSync(fd);
     printSuccess(`Config written to ${envPath}`);
 
     // Step 6: Write identity card (non-secret metadata for sharing)
