@@ -102,17 +102,46 @@ export function handlePersonaRoutes(
         return json({ ok: true });
     }
 
-    // ─── Backward Compatibility ────────────────────────────────────────────
+    // ─── Singular /persona endpoint (upsert + assign for agent) ────────────
 
-    // GET /api/agents/:id/persona (singular — returns first persona or null)
-    const legacyGet = path.match(/^\/api\/agents\/([^/]+)\/persona$/);
-    if (legacyGet && method === 'GET') {
-        const agentId = legacyGet[1];
-        const agent = getAgent(db, agentId, tenantId);
-        if (!agent) return json({ error: 'Agent not found' }, 404);
+    const singularMatch = path.match(/^\/api\/agents\/([^/]+)\/persona$/);
+    if (singularMatch) {
+        const agentId = singularMatch[1];
 
-        const personas = getAgentPersonas(db, agentId);
-        return json(personas[0] ?? null);
+        // GET /api/agents/:id/persona — returns first persona or null
+        if (method === 'GET') {
+            const agent = getAgent(db, agentId, tenantId);
+            if (!agent) return json({ error: 'Agent not found' }, 404);
+
+            const personas = getAgentPersonas(db, agentId);
+            return json(personas[0] ?? null);
+        }
+
+        // PUT /api/agents/:id/persona — upsert persona and assign to agent
+        if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
+            return handleUpsertAgentPersona(req, db, agentId, tenantId);
+        }
+
+        // DELETE /api/agents/:id/persona — unassign all personas from agent
+        if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
+            const agent = getAgent(db, agentId, tenantId);
+            if (!agent) return json({ error: 'Agent not found' }, 404);
+
+            const personas = getAgentPersonas(db, agentId);
+            for (const p of personas) {
+                unassignPersona(db, agentId, p.id);
+                deletePersona(db, p.id);
+            }
+            return json({ ok: true });
+        }
     }
 
     return null;
@@ -160,6 +189,43 @@ async function handleAssignPersona(req: Request, db: Database, agentId: string, 
         const assigned = assignPersona(db, agentId, data.personaId, data.sortOrder ?? 0);
         if (!assigned) return json({ error: 'Persona not found' }, 404);
         return json({ ok: true }, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
+    }
+}
+
+async function handleUpsertAgentPersona(req: Request, db: Database, agentId: string, tenantId: string): Promise<Response> {
+    try {
+        const agent = getAgent(db, agentId, tenantId);
+        if (!agent) return json({ error: 'Agent not found' }, 404);
+
+        const data = await parseBodyOrThrow(req, UpdatePersonaSchema);
+        const textToScan = [data.voiceGuidelines, data.background, ...(data.exampleMessages ?? [])].filter(Boolean).join(' ');
+        if (textToScan) {
+            const injectionDenied = checkInjection(db, textToScan, 'persona_upsert', req);
+            if (injectionDenied) return injectionDenied;
+        }
+
+        // Check if agent already has a persona assigned
+        const existing = getAgentPersonas(db, agentId);
+        if (existing.length > 0) {
+            // Update the existing persona
+            const updated = updatePersona(db, existing[0].id, data);
+            return json(updated);
+        }
+
+        // Create a new persona and assign it
+        const persona = createPersona(db, {
+            name: `${agent.name} Persona`,
+            archetype: data.archetype,
+            traits: data.traits,
+            voiceGuidelines: data.voiceGuidelines,
+            background: data.background,
+            exampleMessages: data.exampleMessages,
+        });
+        assignPersona(db, agentId, persona.id);
+        return json(persona, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;

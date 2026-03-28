@@ -661,15 +661,23 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         this.launching.set(true);
 
         try {
-            // Use selected project, or create a sandboxed temp project
+            // Use selected project, or reuse/create the shared Sandbox project
             let projectId = this.selectedProjectId() || undefined;
             if (!projectId) {
-                const project = await this.projectService.createProject({
-                    name: 'Sandbox',
-                    description: 'Temporary sandbox workspace',
-                    workingDir: '/tmp/corvid-sandbox',
-                });
-                projectId = project.id;
+                // Look for an existing Sandbox project first
+                const existing = this.projects().find(
+                    (p) => p.name.toLowerCase() === 'sandbox',
+                );
+                if (existing) {
+                    projectId = existing.id;
+                } else {
+                    const project = await this.projectService.createProject({
+                        name: 'Sandbox',
+                        description: 'Temporary sandbox workspace',
+                        workingDir: '/tmp/corvid-sandbox',
+                    });
+                    projectId = project.id;
+                }
             }
 
             const session = await this.sessionService.createSession({
