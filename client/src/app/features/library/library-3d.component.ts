@@ -85,7 +85,16 @@ interface BookNode3D {
                 </div>
             }
 
-            <div class="lib3d__hint">WASD / Arrows to move · Mouse to look · Scroll to zoom · Click book to view</div>
+            @if (!pointerLocked()) {
+                <div class="lib3d__lock-prompt">Click to enter — mouse look enabled</div>
+            }
+            <div class="lib3d__hint">
+                @if (pointerLocked()) {
+                    WASD to move · Mouse to look · Scroll to zoom · Click book to view · ESC to exit
+                } @else {
+                    Click anywhere to enter · WASD to move
+                }
+            </div>
         </div>
     `,
     styles: `
@@ -175,6 +184,23 @@ interface BookNode3D {
             text-transform: uppercase;
             color: var(--text-secondary, #888);
         }
+        .lib3d__lock-prompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent-cyan, #00e5ff);
+            pointer-events: none;
+            text-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+            animation: pulse-prompt 2s ease-in-out infinite;
+            z-index: 15;
+        }
+        @keyframes pulse-prompt {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
         .lib3d__hint {
             position: absolute;
             bottom: 12px;
@@ -195,10 +221,12 @@ interface BookNode3D {
 export class Library3DComponent implements OnDestroy {
     readonly entries = input.required<LibraryEntry[]>();
     readonly entrySelect = output<LibraryEntry>();
+    readonly bookPageSelect = output<{ entry: LibraryEntry; pages: LibraryEntry[] }>();
 
     protected readonly hoveredEntry = signal<LibraryEntry | null>(null);
     protected readonly tooltipX = signal(0);
     protected readonly tooltipY = signal(0);
+    protected readonly pointerLocked = signal(false);
 
     private readonly containerRef = viewChild.required<ElementRef<HTMLDivElement>>('container');
     private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
@@ -218,10 +246,10 @@ export class Library3DComponent implements OnDestroy {
     private shelfGroups: THREE.Group[] = [];
 
     // Camera control
-    private cameraTarget = new THREE.Vector3(0, 8, 0);
-    private cameraPosition = new THREE.Vector3(0, 15, 55);
+    private cameraTarget = new THREE.Vector3(0, 5, 0);
+    private cameraPosition = new THREE.Vector3(0, 5, 55);
     private cameraYaw = 0;
-    private cameraPitch = -0.15;
+    private cameraPitch = -0.05;
     private cameraDistance = 55;
 
     // Input state
@@ -255,6 +283,9 @@ export class Library3DComponent implements OnDestroy {
         };
     });
 
+    // Book grouping: maps book name → list of pages
+    private bookGroups = new Map<string, LibraryEntry[]>();
+
     // Bound event handlers for cleanup
     private onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
     private onKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
@@ -266,6 +297,7 @@ export class Library3DComponent implements OnDestroy {
     private onTouchStart = (e: TouchEvent) => this.handleTouchStart(e);
     private onTouchMove = (e: TouchEvent) => this.handleTouchMove(e);
     private onTouchEnd = () => this.handleTouchEnd();
+    private onPointerLockChange = () => this.handlePointerLockChange();
 
     constructor() {
         this.reducedMotion =
@@ -439,43 +471,78 @@ export class Library3DComponent implements OnDestroy {
         }
         this.bookNodes = [];
 
-        // Group by category
-        const grouped = new Map<LibraryCategory, LibraryEntry[]>();
-        for (const cat of ALL_CATEGORIES) grouped.set(cat, []);
+        // Build book groups (entries sharing same 'book' name)
+        this.bookGroups.clear();
         for (const entry of entries) {
-            const list = grouped.get(entry.category);
-            if (list) list.push(entry);
+            if (entry.book) {
+                const pages = this.bookGroups.get(entry.book) ?? [];
+                pages.push(entry);
+                this.bookGroups.set(entry.book, pages);
+            }
+        }
+        // Sort pages within each book
+        for (const [, pages] of this.bookGroups) {
+            pages.sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+        }
+
+        // Deduplicate: for entries that belong to a multi-page book, only show 1 mesh per book
+        const seen = new Set<string>();
+        const dedupedEntries: { entry: LibraryEntry; pageCount: number }[] = [];
+        for (const entry of entries) {
+            if (entry.book && this.bookGroups.has(entry.book)) {
+                const pages = this.bookGroups.get(entry.book)!;
+                if (pages.length > 1) {
+                    if (seen.has(entry.book)) continue;
+                    seen.add(entry.book);
+                    // Use first page as representative entry
+                    dedupedEntries.push({ entry: pages[0], pageCount: pages.length });
+                    continue;
+                }
+            }
+            dedupedEntries.push({ entry, pageCount: 1 });
+        }
+
+        // Group by category
+        const grouped = new Map<LibraryCategory, { entry: LibraryEntry; pageCount: number }[]>();
+        for (const cat of ALL_CATEGORIES) grouped.set(cat, []);
+        for (const item of dedupedEntries) {
+            const list = grouped.get(item.entry.category);
+            if (list) list.push(item);
         }
 
         const now = Date.now();
 
         for (const zone of this.categoryZones) {
-            const zoneEntries = grouped.get(zone.category) ?? [];
-            const count = zoneEntries.length;
+            const zoneItems = grouped.get(zone.category) ?? [];
+            const count = zoneItems.length;
 
             for (let i = 0; i < count; i++) {
-                const entry = zoneEntries[i];
+                const { entry, pageCount } = zoneItems[i];
                 // Spiral layout within zone
                 const t = count > 1 ? i / (count - 1) : 0;
                 const spiralAngle = zone.angle + (t - 0.5) * 2.5;
                 const spiralR = BOOK_SPREAD * (0.3 + t * 0.6);
                 const x = zone.position.x + Math.cos(spiralAngle) * spiralR;
                 const z = zone.position.z + Math.sin(spiralAngle) * spiralR;
-                const y = 2 + Math.sin(i * 0.8) * 1.5;
+                const y = 1.2 + Math.sin(i * 0.8) * 0.8;
 
                 // Age-based glow: recently updated items glow brighter
                 const age = now - new Date(entry.updatedAt).getTime();
                 const hoursSinceUpdate = age / (1000 * 60 * 60);
                 const recentGlow = Math.max(0, 1 - hoursSinceUpdate / 168); // Fade over 7 days
 
-                // Book mesh (upright rectangular prism)
-                const bookGeo = new THREE.BoxGeometry(1.2, 1.8, 0.3);
+                // Notes are thin flat pages, books are thick volumes
+                const isBook = pageCount > 1;
+                const thickness = isBook ? 0.3 + Math.min(pageCount * 0.12, 1.2) : 0.08;
+                const height = isBook ? 1.8 : 1.4;
+
+                const bookGeo = new THREE.BoxGeometry(isBook ? 1.2 : 1.0, height, thickness);
                 const bookMat = new THREE.MeshStandardMaterial({
                     color: zone.color,
                     emissive: new THREE.Color(zone.color),
-                    emissiveIntensity: 0.2 + recentGlow * 0.5,
-                    roughness: 0.6,
-                    metalness: 0.3,
+                    emissiveIntensity: isBook ? 0.3 + recentGlow * 0.5 : 0.15 + recentGlow * 0.3,
+                    roughness: isBook ? 0.6 : 0.8,
+                    metalness: isBook ? 0.3 : 0.1,
                 });
                 const bookMesh = new THREE.Mesh(bookGeo, bookMat);
                 bookMesh.position.set(x, y, z);
@@ -494,11 +561,15 @@ export class Library3DComponent implements OnDestroy {
                 glowMesh.position.copy(bookMesh.position);
                 this.scene!.add(glowMesh);
 
-                // Label
-                const labelText = entry.key.length > 18 ? `${entry.key.slice(0, 16)}...` : entry.key;
-                const label = this.createTextSprite(labelText, 0xffffff, 256, 32, 16);
+                // Label — show book name with page count for multi-page
+                const displayName = entry.book && pageCount > 1
+                    ? entry.book
+                    : entry.key;
+                const labelBase = displayName.length > 18 ? `${displayName.slice(0, 16)}...` : displayName;
+                const labelText = pageCount > 1 ? `${labelBase} (${pageCount}p)` : labelBase;
+                const label = this.createTextSprite(labelText, 0xffffff, 320, 32, 15);
                 label.position.set(x, y + 1.5, z);
-                label.scale.set(4, 0.5, 1);
+                label.scale.set(5, 0.5, 1);
                 this.scene!.add(label);
 
                 this.bookNodes.push({
@@ -669,11 +740,11 @@ export class Library3DComponent implements OnDestroy {
         const offset = 20;
         this.cameraPosition.set(
             zone.position.x + Math.cos(zone.angle + Math.PI) * offset,
-            15,
+            5,
             zone.position.z + Math.sin(zone.angle + Math.PI) * offset,
         );
         this.cameraYaw = zone.angle;
-        this.cameraPitch = -0.15;
+        this.cameraPitch = -0.05;
     }
 
     /* ── Event handlers ────────────────────────────────── */
@@ -688,6 +759,7 @@ export class Library3DComponent implements OnDestroy {
         container.addEventListener('touchstart', this.onTouchStart, { passive: false });
         container.addEventListener('touchmove', this.onTouchMove, { passive: false });
         container.addEventListener('touchend', this.onTouchEnd);
+        document.addEventListener('pointerlockchange', this.onPointerLockChange);
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
     }
@@ -705,6 +777,7 @@ export class Library3DComponent implements OnDestroy {
             container.removeEventListener('touchmove', this.onTouchMove);
             container.removeEventListener('touchend', this.onTouchEnd);
         }
+        document.removeEventListener('pointerlockchange', this.onPointerLockChange);
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
     }
@@ -717,8 +790,23 @@ export class Library3DComponent implements OnDestroy {
         this.keys.delete(e.key.toLowerCase());
     }
 
+    private handlePointerLockChange(): void {
+        const container = this.containerRef()?.nativeElement;
+        const locked = document.pointerLockElement === container;
+        this.pointerLocked.set(locked);
+        if (!locked) {
+            this.isDragging = false;
+        }
+    }
+
     private handleMouseDown(e: MouseEvent): void {
         if (e.button === 0) {
+            const container = this.containerRef()?.nativeElement;
+            if (container && !this.pointerLocked()) {
+                // Request pointer lock on click
+                container.requestPointerLock();
+                return;
+            }
             this.isDragging = true;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
@@ -726,18 +814,26 @@ export class Library3DComponent implements OnDestroy {
     }
 
     private handleMouseMove(e: MouseEvent): void {
-        if (this.isDragging) {
+        if (this.pointerLocked()) {
+            // Use movementX/Y for FPS-style look (fix direction: -= for natural feel)
+            const dx = e.movementX ?? 0;
+            const dy = e.movementY ?? 0;
+            this.cameraYaw -= dx * 0.002;
+            this.cameraPitch = Math.max(-1, Math.min(0.8, this.cameraPitch - dy * 0.002));
+        } else if (this.isDragging) {
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
-            this.cameraYaw += dx * 0.003;
-            this.cameraPitch = Math.max(-1, Math.min(0.8, this.cameraPitch + dy * 0.003));
+            this.cameraYaw -= dx * 0.003;
+            this.cameraPitch = Math.max(-1, Math.min(0.8, this.cameraPitch - dy * 0.003));
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
         }
 
-        // Raycast for hover
-        this.updateMousePosition(e);
-        this.performHoverRaycast();
+        // Raycast for hover (only when not pointer locked, otherwise use center)
+        if (!this.pointerLocked()) {
+            this.updateMousePosition(e);
+            this.performHoverRaycast();
+        }
     }
 
     private handleMouseUp(): void {
@@ -746,12 +842,18 @@ export class Library3DComponent implements OnDestroy {
 
     private handleWheel(e: WheelEvent): void {
         e.preventDefault();
-        this.cameraPosition.y = Math.max(3, Math.min(40, this.cameraPosition.y + e.deltaY * 0.03));
+        this.cameraPosition.y = Math.max(2, Math.min(20, this.cameraPosition.y + e.deltaY * 0.03));
     }
 
     private handleClick(e: MouseEvent): void {
         if (!this.camera || !this.scene) return;
-        this.updateMousePosition(e);
+
+        // When pointer locked, raycast from screen center; otherwise from mouse position
+        if (this.pointerLocked()) {
+            this.mouse.set(0, 0);
+        } else {
+            this.updateMousePosition(e);
+        }
         this.raycaster.setFromCamera(this.mouse, this.camera);
 
         const meshes = this.bookNodes.map((n) => n.mesh);
@@ -760,6 +862,15 @@ export class Library3DComponent implements OnDestroy {
             const key = intersects[0].object.userData['entryKey'];
             const node = this.bookNodes.find((n) => n.entry.key === key);
             if (node) {
+                // Check if this book has multiple pages
+                const bookName = node.entry.book;
+                if (bookName && this.bookGroups.has(bookName)) {
+                    const pages = this.bookGroups.get(bookName)!;
+                    if (pages.length > 1) {
+                        this.bookPageSelect.emit({ entry: node.entry, pages });
+                        return;
+                    }
+                }
                 this.entrySelect.emit(node.entry);
             }
         }
@@ -780,8 +891,8 @@ export class Library3DComponent implements OnDestroy {
             e.preventDefault();
             const dx = e.touches[0].clientX - this.lastMouseX;
             const dy = e.touches[0].clientY - this.lastMouseY;
-            this.cameraYaw += dx * 0.003;
-            this.cameraPitch = Math.max(-1, Math.min(0.8, this.cameraPitch + dy * 0.003));
+            this.cameraYaw -= dx * 0.003;
+            this.cameraPitch = Math.max(-1, Math.min(0.8, this.cameraPitch - dy * 0.003));
             this.lastMouseX = e.touches[0].clientX;
             this.lastMouseY = e.touches[0].clientY;
         }
@@ -831,6 +942,7 @@ export class Library3DComponent implements OnDestroy {
 
     private cleanup(): void {
         if (this.animationId) cancelAnimationFrame(this.animationId);
+        if (document.pointerLockElement) document.exitPointerLock();
         this.removeEventListeners();
         this.resizeObserver?.disconnect();
 

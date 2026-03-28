@@ -113,7 +113,8 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             } @else {
                 <app-library-3d
                     [entries]="allEntries()"
-                    (entrySelect)="onEntrySelect($event)" />
+                    (entrySelect)="onEntrySelect($event)"
+                    (bookPageSelect)="onBookPageSelect($event)" />
                 @if (selectedEntry()) {
                     <div class="library__overlay" (click)="clearSelection()">
                         <div class="library__overlay-content" (click)="$event.stopPropagation()">
@@ -124,6 +125,13 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                     {{ selectedEntry()!.category }}
                                 </span>
                                 <span class="library__overlay-title">{{ selectedEntry()!.key }}</span>
+                                @if (bookPages().length > 1) {
+                                    <span class="library__overlay-page-info">
+                                        Page {{ currentPageIndex() + 1 }} of {{ bookPages().length }}
+                                    </span>
+                                } @else {
+                                    <span class="library__overlay-type">Note</span>
+                                }
                                 <button class="library__overlay-close" (click)="clearSelection()">✕</button>
                             </div>
                             <div class="library__overlay-meta">
@@ -137,6 +145,25 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                 </div>
                             }
                             <pre class="library__card-pre library__overlay-pre">{{ selectedEntry()!.content }}</pre>
+                            @if (bookPages().length > 1) {
+                                <div class="library__overlay-nav">
+                                    <button
+                                        class="library__overlay-nav-btn"
+                                        [disabled]="currentPageIndex() === 0"
+                                        (click)="prevPage()">
+                                        ← Prev
+                                    </button>
+                                    <span class="library__overlay-nav-label">
+                                        {{ selectedEntry()!.key }}
+                                    </span>
+                                    <button
+                                        class="library__overlay-nav-btn"
+                                        [disabled]="currentPageIndex() === bookPages().length - 1"
+                                        (click)="nextPage()">
+                                        Next →
+                                    </button>
+                                </div>
+                            }
                         </div>
                     </div>
                 }
@@ -359,6 +386,57 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
         .library__overlay-pre {
             max-height: 50vh;
         }
+        .library__overlay-type {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: var(--text-secondary, #888);
+            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .library__overlay-page-info {
+            font-size: 0.65rem;
+            color: var(--accent-cyan, #00e5ff);
+            font-weight: 600;
+        }
+        .library__overlay-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-subtle, #1a1a2e);
+        }
+        .library__overlay-nav-btn {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
+            border: 1px solid var(--border-bright, #2a2a3e);
+            border-radius: 6px;
+            color: var(--accent-cyan, #00e5ff);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .library__overlay-nav-btn:hover:not(:disabled) {
+            background: rgba(0, 229, 255, 0.08);
+            border-color: var(--accent-cyan, #00e5ff);
+        }
+        .library__overlay-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: default;
+        }
+        .library__overlay-nav-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary, #888);
+            text-align: center;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
         @media (max-width: 600px) {
             .library { padding: 0.5rem; }
@@ -375,6 +453,8 @@ export class LibraryComponent implements OnInit {
     protected readonly searchQuery = signal('');
     protected readonly expandedKey = signal<string | null>(null);
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
+    protected readonly bookPages = signal<LibraryEntry[]>([]);
+    protected readonly currentPageIndex = signal(0);
 
     protected readonly viewMode = this.viewModeService.getMode('library');
     protected readonly loading = this.libraryService.loading;
@@ -420,10 +500,37 @@ export class LibraryComponent implements OnInit {
 
     protected onEntrySelect(entry: LibraryEntry): void {
         this.selectedEntry.set(entry);
+        this.bookPages.set([]);
+        this.currentPageIndex.set(0);
+    }
+
+    protected onBookPageSelect(event: { entry: LibraryEntry; pages: LibraryEntry[] }): void {
+        this.bookPages.set(event.pages);
+        this.currentPageIndex.set(0);
+        this.selectedEntry.set(event.pages[0]);
     }
 
     protected clearSelection(): void {
         this.selectedEntry.set(null);
+        this.bookPages.set([]);
+        this.currentPageIndex.set(0);
+    }
+
+    protected prevPage(): void {
+        const idx = this.currentPageIndex();
+        if (idx > 0) {
+            this.currentPageIndex.set(idx - 1);
+            this.selectedEntry.set(this.bookPages()[idx - 1]);
+        }
+    }
+
+    protected nextPage(): void {
+        const idx = this.currentPageIndex();
+        const pages = this.bookPages();
+        if (idx < pages.length - 1) {
+            this.currentPageIndex.set(idx + 1);
+            this.selectedEntry.set(pages[idx + 1]);
+        }
     }
 
     protected getCategoryColor(category: LibraryCategory): string {
