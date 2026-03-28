@@ -2,9 +2,12 @@ import {
     Component,
     ChangeDetectionStrategy,
     inject,
+    signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
+
+const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
 
 @Component({
     selector: 'app-chat-tab-bar',
@@ -12,43 +15,55 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
     imports: [RouterLink],
     template: `
         @if (tabsService.tabs().length > 0) {
-            <div class="tab-bar">
-                <div class="tab-bar__tabs">
-                    @for (tab of tabsService.tabs(); track tab.sessionId; let i = $index) {
-                        <a
-                            class="tab"
-                            [class.tab--active]="tabsService.activeSessionId() === tab.sessionId"
-                            [class.tab--running]="tab.status === 'running' || tab.status === 'thinking' || tab.status === 'tool_use'"
-                            [class.tab--error]="tab.status === 'error'"
-                            [routerLink]="['/sessions', tab.sessionId]"
-                            [title]="(tab.agentName ? tab.agentName + ' — ' : '') + tab.label">
-                            <span class="tab__index">{{ i < 9 ? i + 1 : '' }}</span>
-                            <span class="tab__status">
-                                @switch (tab.status) {
-                                    @case ('running') { <span class="tab__pulse"></span> }
-                                    @case ('thinking') { <span class="tab__pulse"></span> }
-                                    @case ('tool_use') { <span class="tab__pulse"></span> }
-                                    @case ('error') { ! }
-                                    @default { }
-                                }
-                            </span>
-                            @if (tab.agentName) {
-                                <span class="tab__agent">{{ tab.agentName }}</span>
-                            }
-                            <span class="tab__label">{{ tab.label }}</span>
-                            <button
-                                class="tab__close"
-                                (click)="closeTab(tab.sessionId, $event)"
-                                title="Close tab (Cmd+W)"
-                                type="button">&times;</button>
-                        </a>
-                    }
-                </div>
+            <div class="tab-bar" [class.tab-bar--collapsed]="collapsed()">
                 <button
-                    class="tab-bar__new"
-                    (click)="newChat()"
-                    title="New conversation (Cmd+T)"
-                    type="button">+</button>
+                    class="tab-bar__collapse"
+                    (click)="toggleCollapse()"
+                    [title]="collapsed() ? 'Show tabs (' + tabsService.tabs().length + ' open)' : 'Hide tabs'"
+                    type="button">
+                    <span class="tab-bar__collapse-chevron" [class.tab-bar__collapse-chevron--down]="collapsed()">&#x25BE;</span>
+                    @if (collapsed()) {
+                        <span class="tab-bar__collapse-count">{{ tabsService.tabs().length }}</span>
+                    }
+                </button>
+                @if (!collapsed()) {
+                    <div class="tab-bar__tabs">
+                        @for (tab of tabsService.tabs(); track tab.sessionId; let i = $index) {
+                            <a
+                                class="tab"
+                                [class.tab--active]="tabsService.activeSessionId() === tab.sessionId"
+                                [class.tab--running]="tab.status === 'running' || tab.status === 'thinking' || tab.status === 'tool_use'"
+                                [class.tab--error]="tab.status === 'error'"
+                                [routerLink]="['/sessions', tab.sessionId]"
+                                [title]="(tab.agentName ? tab.agentName + ' — ' : '') + tab.label">
+                                <span class="tab__index">{{ i < 9 ? i + 1 : '' }}</span>
+                                <span class="tab__status">
+                                    @switch (tab.status) {
+                                        @case ('running') { <span class="tab__pulse"></span> }
+                                        @case ('thinking') { <span class="tab__pulse"></span> }
+                                        @case ('tool_use') { <span class="tab__pulse"></span> }
+                                        @case ('error') { ! }
+                                        @default { }
+                                    }
+                                </span>
+                                @if (tab.agentName) {
+                                    <span class="tab__agent">{{ tab.agentName }}</span>
+                                }
+                                <span class="tab__label">{{ tab.label }}</span>
+                                <button
+                                    class="tab__close"
+                                    (click)="closeTab(tab.sessionId, $event)"
+                                    title="Close tab (Cmd+W)"
+                                    type="button">&times;</button>
+                            </a>
+                        }
+                    </div>
+                    <button
+                        class="tab-bar__new"
+                        (click)="newChat()"
+                        title="New conversation (Cmd+T)"
+                        type="button">+</button>
+                }
             </div>
         }
     `,
@@ -62,6 +77,41 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             padding: 0 0.25rem;
             gap: 0.25rem;
             overflow: hidden;
+        }
+        .tab-bar--collapsed {
+            height: 24px;
+        }
+        .tab-bar__collapse {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: none;
+            border: none;
+            color: var(--text-tertiary, #666);
+            font-family: inherit;
+            font-size: 0.6rem;
+            cursor: pointer;
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .tab-bar__collapse:hover {
+            color: var(--accent-cyan, #0ef);
+            background: var(--bg-hover, #252538);
+        }
+        .tab-bar__collapse-chevron {
+            font-size: 0.55rem;
+            transition: transform 150ms ease;
+            transform: rotate(-90deg);
+        }
+        .tab-bar__collapse-chevron--down {
+            transform: rotate(0deg);
+        }
+        .tab-bar__collapse-count {
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: var(--accent-cyan, #0ef);
         }
         .tab-bar__tabs {
             display: flex;
@@ -189,6 +239,13 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
 export class ChatTabBarComponent {
     protected readonly tabsService = inject(ChatTabsService);
     private readonly router = inject(Router);
+    protected readonly collapsed = signal(localStorage.getItem(COLLAPSED_KEY) === 'true');
+
+    protected toggleCollapse(): void {
+        const next = !this.collapsed();
+        this.collapsed.set(next);
+        localStorage.setItem(COLLAPSED_KEY, String(next));
+    }
 
     protected closeTab(sessionId: string, event: Event): void {
         event.preventDefault();

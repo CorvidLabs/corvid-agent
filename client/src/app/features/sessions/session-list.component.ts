@@ -27,7 +27,7 @@ interface SessionGroup {
         <app-page-shell
             title="Conversations"
             icon="sessions"
-            [breadcrumbs]="[{ label: 'Sessions', route: '/sessions' }, { label: 'Conversations' }]">
+            [breadcrumbs]="[]">
             <a actions class="btn btn--primary" routerLink="/sessions/new">+ New Conversation</a>
 
             <!-- Search + Filters (sticky) -->

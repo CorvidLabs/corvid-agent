@@ -589,9 +589,9 @@ export class TopNavComponent implements OnInit, OnDestroy {
             this.closeDropdown();
         } else if (tab.children.length > 1) {
             this.openDropdown.set(tab.key);
-        } else {
-            this.router.navigate([tab.route]);
         }
+        // Always navigate to the tab's default route on click
+        this.router.navigate([tab.route]);
     }
 
     protected closeDropdown(): void {

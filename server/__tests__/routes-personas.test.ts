@@ -139,7 +139,7 @@ describe('Agent-Persona Assignment Routes', () => {
     });
 });
 
-describe('Legacy Backward Compatibility', () => {
+describe('Singular /persona endpoint', () => {
     test('GET /api/agents/:id/persona returns first persona', async () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const persona = createPersona(db, { name: 'Legacy', archetype: 'professional' });
@@ -149,7 +149,7 @@ describe('Legacy Backward Compatibility', () => {
             personaId: persona.id,
         });
 
-        // Read via legacy endpoint
+        // Read via singular endpoint
         const res = await call('GET', `/api/agents/${agent.id}/persona`);
         expect(res).not.toBeNull();
         const body = await res!.json();
@@ -162,6 +162,85 @@ describe('Legacy Backward Compatibility', () => {
         expect(res).not.toBeNull();
         const body = await res!.json();
         expect(body).toBeNull();
+    });
+
+    test('GET /api/agents/:id/persona returns 404 for non-existent agent', async () => {
+        const res = await call('GET', '/api/agents/nonexistent/persona');
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(404);
+    });
+
+    test('PUT /api/agents/:id/persona creates persona when none exists', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const res = await call('PUT', `/api/agents/${agent.id}/persona`, {
+            archetype: 'professional',
+            traits: ['analytical'],
+            voiceGuidelines: 'Be concise',
+        });
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(201);
+        const body = await res!.json();
+        expect(body.archetype).toBe('professional');
+        expect(body.name).toBe('TestAgent Persona');
+
+        // Verify it's now retrievable via GET
+        const getRes = await call('GET', `/api/agents/${agent.id}/persona`);
+        const getBody = await getRes!.json();
+        expect(getBody.archetype).toBe('professional');
+    });
+
+    test('PUT /api/agents/:id/persona updates existing persona', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+
+        // Create initial persona
+        await call('PUT', `/api/agents/${agent.id}/persona`, {
+            archetype: 'professional',
+            traits: ['analytical'],
+        });
+
+        // Update it
+        const res = await call('PUT', `/api/agents/${agent.id}/persona`, {
+            archetype: 'friendly',
+            traits: ['warm'],
+        });
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const body = await res!.json();
+        expect(body.archetype).toBe('friendly');
+    });
+
+    test('PUT /api/agents/:id/persona returns 404 for non-existent agent', async () => {
+        const res = await call('PUT', '/api/agents/nonexistent/persona', {
+            archetype: 'professional',
+        });
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(404);
+    });
+
+    test('DELETE /api/agents/:id/persona removes all personas', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+
+        // Create a persona first
+        await call('PUT', `/api/agents/${agent.id}/persona`, {
+            archetype: 'professional',
+            traits: ['analytical'],
+        });
+
+        // Delete it
+        const res = await call('DELETE', `/api/agents/${agent.id}/persona`);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+
+        // Verify it's gone
+        const getRes = await call('GET', `/api/agents/${agent.id}/persona`);
+        const body = await getRes!.json();
+        expect(body).toBeNull();
+    });
+
+    test('DELETE /api/agents/:id/persona returns 404 for non-existent agent', async () => {
+        const res = await call('DELETE', '/api/agents/nonexistent/persona');
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(404);
     });
 });
 
