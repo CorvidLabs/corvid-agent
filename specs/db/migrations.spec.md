@@ -37,6 +37,7 @@ files:
   - server/db/migrations/104_buddy_mode.ts
   - server/db/migrations/105_session_restart_pending.ts
   - server/db/migrations/107_session_restart_initiated.ts
+  - server/db/migrations/108_memory_book_pages.ts
 db_tables:
   - schema_version
 depends_on: []
