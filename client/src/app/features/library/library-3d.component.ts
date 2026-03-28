@@ -213,7 +213,8 @@ export class Library3DComponent implements OnDestroy {
 
     private bookNodes: BookNode3D[] = [];
     private stars: THREE.Points | null = null;
-    private zoneRings: THREE.LineLoop[] = [];
+    private zoneRings: THREE.Mesh[] = [];
+    private zoneLabels: THREE.Sprite[] = [];
     private shelfGroups: THREE.Group[] = [];
 
     // Camera control
@@ -386,6 +387,7 @@ export class Library3DComponent implements OnDestroy {
             ring.position.copy(zone.position);
             ring.position.y = 0.05;
             this.scene!.add(ring);
+            this.zoneRings.push(ring);
 
             // Zone label
             const labelSprite = this.createTextSprite(zone.label, zone.color, 256, 48, 24);
@@ -393,6 +395,7 @@ export class Library3DComponent implements OnDestroy {
             labelSprite.position.y = 0.5;
             labelSprite.scale.set(8, 1.5, 1);
             this.scene!.add(labelSprite);
+            this.zoneLabels.push(labelSprite);
 
             // Shelf structure (3 arched stands)
             const shelfGroup = new THREE.Group();
@@ -429,6 +432,9 @@ export class Library3DComponent implements OnDestroy {
             (node.mesh.material as THREE.Material).dispose();
             node.glowMesh.geometry.dispose();
             (node.glowMesh.material as THREE.Material).dispose();
+            if (node.label.material instanceof THREE.SpriteMaterial && node.label.material.map) {
+                node.label.material.map.dispose();
+            }
             node.label.material.dispose();
         }
         this.bookNodes = [];
@@ -846,10 +852,16 @@ export class Library3DComponent implements OnDestroy {
             (this.stars.material as THREE.Material).dispose();
         }
 
-        // Dispose zone rings and shelves
+        // Dispose zone rings and labels
         for (const ring of this.zoneRings) {
             ring.geometry.dispose();
             (ring.material as THREE.Material).dispose();
+        }
+        for (const label of this.zoneLabels) {
+            if (label.material instanceof THREE.SpriteMaterial && label.material.map) {
+                label.material.map.dispose();
+            }
+            label.material.dispose();
         }
         for (const group of this.shelfGroups) {
             group.traverse((obj) => {
