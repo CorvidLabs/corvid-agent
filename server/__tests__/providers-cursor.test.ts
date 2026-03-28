@@ -435,8 +435,13 @@ describe('CursorProvider', () => {
                 messages: [{ role: 'user', content: 'hi' }],
             });
 
-            expect(capturedArgs).toContain('--system-prompt');
-            expect(capturedArgs).toContain('You are helpful');
+            expect(capturedArgs).not.toContain('--system-prompt');
+            const lastArg = capturedArgs[capturedArgs.length - 1];
+            expect(lastArg).toContain('<system>');
+            expect(lastArg).toContain('You are helpful');
+            expect(lastArg).toContain('</system>');
+            expect(lastArg).toContain('hi');
+            // other args still valid:
             expect(capturedArgs).toContain('--model');
             expect(capturedArgs).toContain('auto');
             expect(capturedArgs).toContain('--print');
@@ -461,8 +466,10 @@ describe('CursorProvider', () => {
                 ],
             });
 
-            // Last positional arg should be the last user message
-            expect(capturedArgs[capturedArgs.length - 1]).toBe('second message');
+            // Last arg now has system prefix + message
+            const lastArg = capturedArgs[capturedArgs.length - 1];
+            expect(lastArg).toContain('second message');
+            expect(lastArg).toContain('<system>');
         });
 
         test('omits --system-prompt flag when systemPrompt is empty', async () => {

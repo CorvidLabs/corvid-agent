@@ -176,25 +176,30 @@ export class CursorProvider extends BaseLlmProvider {
             args.push('--model', params.model);
         }
 
-        // Add system prompt if provided
-        if (params.systemPrompt) {
-            args.push('--system-prompt', params.systemPrompt);
-        }
-
         // Check if this is a follow-up (resume) call
         const storedCursorSessionId = sessionId ? this.cursorSessionIds.get(sessionId) : undefined;
         if (storedCursorSessionId) {
             args.push('--resume', storedCursorSessionId);
         }
 
+        // Prepend system prompt as XML tags to the user message
+        // cursor-agent treats --system-prompt as a file path, so we wrap it in the prompt instead
+        let finalPrompt = prompt;
+        if (params.systemPrompt && prompt) {
+            finalPrompt = `<system>\n${params.systemPrompt}\n</system>\n\n${prompt}`;
+        } else if (params.systemPrompt) {
+            // If no user message, use just the system prompt
+            finalPrompt = `<system>\n${params.systemPrompt}\n</system>`;
+        }
+
         // Prompt goes as the last positional argument
-        if (prompt) {
-            args.push(prompt);
+        if (finalPrompt) {
+            args.push(finalPrompt);
         }
 
         log.info('Starting cursor-agent completion', {
             model: params.model,
-            promptLength: prompt.length,
+            promptLength: finalPrompt.length,
             resume: !!storedCursorSessionId,
             sessionId,
         });
