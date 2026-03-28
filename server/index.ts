@@ -39,6 +39,7 @@ import { handlePermissionRoutes } from './routes/permissions';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
 import { createWebSocketHandler } from './ws/handler';
+import { printFirstRunBanner } from './lib/first-run-banner';
 
 const log = createLogger('Server');
 
@@ -620,6 +621,9 @@ if (pendingIds.length > 0) {
 }
 
 log.info(`Server running at http://${BIND_HOST}:${PORT}`);
+
+// Show first-run welcome banner for fresh installations
+printFirstRunBanner(db, BIND_HOST, PORT);
 
 // ─── Deferred Discord connection ────────────────────────────────────────────
 // Discord gateway is connected AFTER the HTTP server binds successfully.

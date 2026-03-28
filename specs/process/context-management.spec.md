@@ -27,14 +27,15 @@ Context management helpers for direct-process sessions. Handles token estimation
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `estimateTokens` | `(text: string)` | `number` | Content-aware token estimation: ~0.33 tokens/char for code-heavy, ~0.25 for prose |
-| `getContextBudget` | `()` | `number` | Get the configured context window size from `OLLAMA_NUM_CTX` env var (default 8192) |
+| `getContextBudget` | `(model?: string)` | `number` | Get the context window size: checks model pricing table first, falls back to `OLLAMA_NUM_CTX` env var, then DEFAULT_CONTEXT_WINDOW (128000) |
+| `isContextOverflowError` | `(errorMsg: string)` | `boolean` | Detect whether an error message indicates a context overflow from any provider (Anthropic, OpenAI, Ollama, OpenRouter) |
 | `calculateMaxToolResultChars` | `(messages: Array<{role, content}>, systemPrompt: string)` | `number` | Max tool result size in chars: capped at 30% of context window, scales down under pressure. Min 1000 chars |
 | `truncateCouncilContext` | `(messages: ConversationMessage[], systemPrompt: string)` | `void` | Truncate council synthesis messages if they exceed 70% of context window. Keeps first user message + last 4 messages |
 | `compressToolResults` | `(messages: ConversationMessage[], maxAge: number, maxChars: number)` | `number` | Compress tool result messages in-place by truncating content older than `maxAge` positions to at most `maxChars`. Returns count of compressed messages |
 | `summarizeConversation` | `(messages: Array<{role, content}>)` | `string` | Generate a brief plain-text summary of conversation key points. Used for Tier 4 compression and context reset |
 | `truncateOldToolResults` | `(messages: ConversationMessage[], ageThreshold: number, maxChars: number)` | `number` | Post-trim pass that truncates tool results older than `ageThreshold` positions to at most `maxChars`. Returns count of truncated messages |
 | `trimMessages` | `(messages: ConversationMessage[], systemPrompt?: string)` | `void` | Trim conversation history using progressive compression tiers based on context usage and message count |
-| `computeContextUsage` | `(msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean)` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state |
+| `computeContextUsage` | `(msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean, model?: string)` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state |
 | `determineWarningLevel` | `(usagePercent: number)` | `{level, message} \| null` | Determine warning level and message for a given usage percent. Returns null below 50% |
 
 ## Invariants

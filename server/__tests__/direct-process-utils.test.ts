@@ -1,5 +1,19 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { buildSystemPrompt, computeContextUsage, determineWarningLevel, compressToolResults, summarizeConversation, truncateOldToolResults, type ToolDef } from '../process/direct-process';
+
+// Pin OLLAMA_NUM_CTX so the numeric expectations (based on 8192) stay valid.
+let savedOllamaNumCtx: string | undefined;
+beforeEach(() => {
+    savedOllamaNumCtx = process.env.OLLAMA_NUM_CTX;
+    process.env.OLLAMA_NUM_CTX = '8192';
+});
+afterEach(() => {
+    if (savedOllamaNumCtx !== undefined) {
+        process.env.OLLAMA_NUM_CTX = savedOllamaNumCtx;
+    } else {
+        delete process.env.OLLAMA_NUM_CTX;
+    }
+});
 
 /**
  * Tests for utility functions from direct-process.ts.
