@@ -9,6 +9,7 @@ files:
   - server/db/migrations/106_agent_library.ts
   - server/db/schema/library.ts
   - server/db/agent-library.ts
+  - server/routes/library.ts
 db_tables:
   - agent_library
 depends_on:
@@ -119,6 +120,12 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 |----------|------|-------------|
 | `tables` | `string[]` | DDL statements for agent_library table |
 | `indexes` | `string[]` | DDL statements for agent_library indexes |
+
+### Exported Functions — `server/routes/library.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleLibraryRoutes` | `(req: Request, url: URL, db: Database, _context: RequestContext)` | `Response \| null` | REST handler for `GET /api/library` (list with filters) and `GET /api/library/:key` (single entry with book pages) |
 
 ### Exported Types
 
@@ -237,6 +244,10 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 ### Consumed By
 
+| Module | What is used |
+|--------|-------------|
+| `server/routes/library.ts` | `listLibraryEntries`, `getLibraryEntry`, `getBookPages` from `server/db/agent-library.ts` |
+
 > **Note:** `server/mcp/tool-handlers/library.ts` does not exist yet. It is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process. Until then, no consumer references exist.
 
 ## Database Tables
@@ -351,3 +362,4 @@ Owner writes bypass the librarian check entirely (owner is determined by checkin
 | 2026-03-26 | corvid-agent | Initial spec — shared plaintext library with book chaining |
 | 2026-03-26 | corvid-agent | v1.1: localnet gate, searchForAssets for all-agent discovery, /page-N key convention, asa_id UNIQUE, LibrarySyncService, exported buildNotePayload/parseNotePayload |
 | 2026-03-27 | CorvidAgent | v2.0: boot-time library loader (loadSharedLibrary, ServiceContainer.sharedLibraryContext), librarian permission model for corvid_library_write |
+| 2026-03-28 | CorvidAgent | v2.1: add REST route handler (handleLibraryRoutes) for GET /api/library and GET /api/library/:key |

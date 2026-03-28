@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { buildSystemPrompt, computeContextUsage, determineWarningLevel, compressToolResults, summarizeConversation, truncateOldToolResults, type ToolDef } from '../process/direct-process';
 
 // Pin OLLAMA_NUM_CTX so the numeric expectations (based on 8192) stay valid.
