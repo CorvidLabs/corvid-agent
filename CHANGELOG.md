@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.57.0] - 2026-03-28
+
+### Added
+- **3D library visualization** — Three.js immersive 3D library browser with FPS mouse look, book grouping, and reading mode (#1630, #1636)
+- **3D comms visualization** — persistent trails, message log panel, and pointer lock orbit for agent communication view (#1637)
+- **3D network visualization** — Three.js agent network constellation with dual-mode toggle (#1626, #1591)
+- **CLI doctor command** — `corvid-agent doctor` health check with first-run welcome banner (#1486, #1627)
+- **UI animations & micro-interactions** — dashboard polish with streamlined layout and Discord progress feedback (#1612, #1607)
+- **Work delegation attribution** — agent ID parameter for delegation tracking (#1606)
+- **Library boot-time loader** — pre-load library at startup with librarian permission spec (#1589)
+- **Discord agent personalization** — avatars and icons in embeds (#1592)
+
+### Fixed
+- **Cursor provider: stream idle timeout** — prevent hung sessions with idle timeout detection (#1639)
+- **Client: cursor/pointer capture** — fix book reading freeze, newest-first lists (#1638)
+- **Client: nav/layout** — fix dropdowns, session overflow, layout spacing, library 3D access (#1635, #1633)
+- **Model-aware context budgets** — overflow error recovery for different model sizes (#1629)
+- **Ollama output sanitizer** — strip leaked prompt artifacts (#1609)
+- **Discord rate limiting** — apply rate limiting to slash command interactions (#1593)
+- **Work: agent signature injection** — inject agent signature into work task PR prompt (#1590)
+
+### Security
+- **path-to-regexp ReDoS** — update to patch regex denial-of-service vulnerability (#1602)
+- **CodeQL alerts** — fix TOCTOU race, fd leak, schema consolidation (#1608)
+
+### Docs & Tests
+- **Hero stats accuracy** — update landing page stats (#1622)
+- **Version/routes spec** — fix version mismatch and update routes spec (#1605)
+- **Ollama council smoke tests** — council participation tests (#1594)
+- **Dead-end embed test** — stabilize for CI (#1631)
+
 ## [0.56.0] - 2026-03-27
 
 ### Added
