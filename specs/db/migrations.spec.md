@@ -517,13 +517,13 @@ Adds `restart_pending` flag to `sessions` table. When the server shuts down or r
 
 ### 107_session_restart_initiated.ts
 
-Adds `server_restart_initiated_at` timestamp column to `sessions` table. Tracks when a server restart was initiated from a session via the `corvid_restart_server` tool. On the next startup, `buildResumePrompt` uses this flag to inject a "restart completed" note, preventing the agent from re-triggering the restart.
+Adds `server_restart_initiated_at` column to `sessions` table. Records the timestamp when a session triggers a server restart via the `corvid_restart_server` tool. On next startup, `buildResumePrompt` checks this flag to inject a "restart completed" note, preventing the agent from re-triggering the restart in a loop.
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Adds `server_restart_initiated_at` TEXT DEFAULT NULL column to `sessions` (idempotent — checks column existence first) |
+| `up` | `(db: Database)` | `void` | Adds `server_restart_initiated_at` TEXT DEFAULT NULL column to `sessions` (idempotent — checks column existence first via `hasColumn` helper) |
 | `down` | `(db: Database)` | `void` | Drops `server_restart_initiated_at` column from `sessions` |
 
 ## Change Log
