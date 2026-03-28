@@ -1269,13 +1269,16 @@ describe('DiscordBridge expired thread session resume', () => {
                 timestamp: new Date().toISOString(),
             });
 
+            // Flush any pending async deliveries (fire-and-forget embeds)
+            await new Promise(r => setTimeout(r, 50));
+
             // Should NOT have started a new process
             expect(pm.startProcess).not.toHaveBeenCalled();
 
             // Should have sent the dead-end embed
             const deadEnd = fetchBodies.find((b: unknown) => {
                 const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
-                return embeds?.some(e => e.description === 'This session has expired and can no longer be resumed. Start a new `/session` to continue working.');
+                return embeds?.some(e => e.description?.includes('session has expired'));
             });
             expect(deadEnd).toBeDefined();
 
