@@ -28,6 +28,7 @@ import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { isRepoOffLimits } from '../github/off-limits';
 import { searchOpenPrsForIssue } from '../github/operations';
+import { friendlyModelName } from '../mcp/tool-handlers/github';
 import { runBunInstall } from './validation';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { FlockConflictResolver } from '../flock-directory/conflict-resolver';
@@ -716,7 +717,7 @@ export class WorkTaskService {
      * Execute a pending work task: create worktree, install deps, start session.
      * Shared by both `create` (new tasks) and `recoverStaleTasks` (retried tasks).
      */
-    async executeTask(task: WorkTask, agent: { id: string; name: string }, project: { id: string; workingDir: string }): Promise<WorkTask> {
+    async executeTask(task: WorkTask, agent: { id: string; name: string; model: string }, project: { id: string; workingDir: string }): Promise<WorkTask> {
         // Generate branch name
         const agentSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const taskSlug = task.description.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -802,7 +803,7 @@ export class WorkTaskService {
         }
 
         // Build work prompt (includes governance warnings for Layer 1 paths)
-        const prompt = this.buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined, governanceImpact);
+        const prompt = this.buildWorkPrompt(branchName, task.description, agent, repoMap ?? undefined, relevantSymbols ?? undefined, governanceImpact);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
@@ -1207,7 +1208,7 @@ export class WorkTaskService {
         return assessImpact(referencedPaths);
     }
 
-    private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string, governanceImpact?: GovernanceImpact | null): string {
+    private buildWorkPrompt(branchName: string, description: string, agent: { name: string; model: string }, repoMap?: string, relevantSymbols?: string, governanceImpact?: GovernanceImpact | null): string {
         const repoMapSection = repoMap
             ? `\n## Repository Map\nTop-level exported symbols per file (with line ranges):\n\`\`\`\n${repoMap}\`\`\`\n`
             : '';
@@ -1239,8 +1240,11 @@ ${repoMapSection}${relevantSymbolsSection}${governanceSection}
    bun x tsc --noEmit --skipLibCheck
    bun test
    Fix any issues before creating the PR.
-5. When done, create a PR:
-   gh pr create --title "<concise title>" --body "<summary of changes>"
+5. When done, create a PR. The body MUST end with the agent signature footer:
+   gh pr create --title "<concise title>" --body "<summary of changes>
+
+---
+🤖 Agent: ${agent.name} | Model: ${friendlyModelName(agent.model)}"
 6. Output the PR URL as the final line of your response.
 
 Important: You MUST create a PR when finished. The PR URL will be captured to report back to the requester.`;
