@@ -232,6 +232,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     constructor() {
         afterNextRender(() => {
             this.initScene();
+            this.rebuildGraph(this.agents(), this.messages());
             this.startAnimation();
         });
 

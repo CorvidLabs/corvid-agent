@@ -78,6 +78,7 @@ import { handleFeedbackRoutes } from './feedback';
 import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleFlockTestingRoutes } from './flock-testing';
 import { handleGitHubAllowlistRoutes } from './github-allowlist';
+import { handleLibraryRoutes } from './library';
 import { handleGitHubPRDiffRoutes } from './github-pr-diff';
 import { handleMarketplaceRoutes } from './marketplace';
 import { handleMarketplaceAnalyticsRoutes } from './marketplace-analytics';
@@ -427,6 +428,9 @@ async function handleRoutes(
   const brainViewerResponse = handleBrainViewerRoutes(req, url, db, context, graduationService);
   if (brainViewerResponse)
     return brainViewerResponse instanceof Promise ? await brainViewerResponse : brainViewerResponse;
+
+  const libraryResponse = handleLibraryRoutes(req, url, db, context);
+  if (libraryResponse) return libraryResponse;
 
   const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
   if (analyticsResponse) return analyticsResponse;

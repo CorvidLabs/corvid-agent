@@ -28,6 +28,7 @@ const SESSIONS_TABS: SubTab[] = [
 const OBSERVE_TABS: SubTab[] = [
     { label: 'Comms', path: './', exact: true },
     { label: 'Memory', path: 'memory' },
+    { label: 'Library', path: 'library' },
     { label: 'Analytics', path: 'analytics' },
     { label: 'Logs', path: 'logs' },
     { label: 'Reputation', path: 'reputation' },
@@ -197,6 +198,11 @@ export const routes: Routes = [
                 path: 'memory',
                 loadComponent: () =>
                     import('./features/memory/unified-memory.component').then((m) => m.UnifiedMemoryComponent),
+            },
+            {
+                path: 'library',
+                loadComponent: () =>
+                    import('./features/library/library-browser.component').then((m) => m.LibraryBrowserComponent),
             },
             {
                 path: 'analytics',

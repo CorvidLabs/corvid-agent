@@ -189,7 +189,12 @@ interface SessionGroup {
         @media (max-width: 767px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
-
+            .filter-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0.15rem; }
+            .filter-tabs::-webkit-scrollbar { display: none; }
+            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: 0.65rem; padding: 0.3rem 0.5rem; }
+            .filter-tabs__spacer { display: none; }
+            .source-select { flex-shrink: 0; font-size: 0.65rem; }
+            .search-input { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
         }
     `,
 })
