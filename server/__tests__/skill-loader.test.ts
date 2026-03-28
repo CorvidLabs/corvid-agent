@@ -102,7 +102,7 @@ describe('discoverSkills', () => {
 
     test('discovers skills in subdirectories with SKILL.md', () => {
         const skillsDir = join(tmpBase, 'discover-sub');
-        mkdirSync(join(skillsDir, 'coding'), { recursive: true });
+        mkdirSync(join(skillsDir, 'coding'), { recursive: true, mode: 0o700 });
         writeFileSync(join(skillsDir, 'coding', 'SKILL.md'), `---
 name: coding
 description: File operations and code execution
@@ -110,7 +110,7 @@ description: File operations and code execution
 # Coding Skill
 `, { mode: 0o600 });
 
-        mkdirSync(join(skillsDir, 'search'), { recursive: true });
+        mkdirSync(join(skillsDir, 'search'), { recursive: true, mode: 0o700 });
         writeFileSync(join(skillsDir, 'search', 'SKILL.md'), `---
 name: search
 description: Web search and deep research
@@ -125,7 +125,7 @@ description: Web search and deep research
 
     test('discovers top-level markdown files as skills', () => {
         const skillsDir = join(tmpBase, 'discover-flat');
-        mkdirSync(skillsDir, { recursive: true });
+        mkdirSync(skillsDir, { recursive: true, mode: 0o700 });
         writeFileSync(join(skillsDir, 'git.md'), `---
 name: git
 description: Git workflows and branching
@@ -140,7 +140,7 @@ description: Git workflows and branching
 
     test('skips README.md', () => {
         const skillsDir = join(tmpBase, 'discover-readme');
-        mkdirSync(skillsDir, { recursive: true });
+        mkdirSync(skillsDir, { recursive: true, mode: 0o700 });
         writeFileSync(join(skillsDir, 'README.md'), `---
 name: readme
 description: should be skipped
@@ -154,7 +154,7 @@ Not a skill.
 
     test('skips files with invalid frontmatter', () => {
         const skillsDir = join(tmpBase, 'discover-invalid');
-        mkdirSync(skillsDir, { recursive: true });
+        mkdirSync(skillsDir, { recursive: true, mode: 0o700 });
         writeFileSync(join(skillsDir, 'bad.md'), 'No frontmatter here', { mode: 0o600 });
 
         const entries = discoverSkills(skillsDir);
@@ -177,7 +177,7 @@ describe('loadSkillBody', () => {
 
     test('loads full skill body from disk', () => {
         const dir = join(tmpBase, 'load-body');
-        mkdirSync(dir, { recursive: true });
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
         const filePath = join(dir, 'SKILL.md');
         writeFileSync(filePath, `---
 name: test-skill
