@@ -107,7 +107,6 @@ import { handleToolCatalogRoutes } from './tool-catalog';
 import { handleUsageRoutes } from './usage';
 import { handleVariantRoutes } from './variants';
 import { handleWebhookRoutes } from './webhooks';
-import { handleLibraryRoutes } from './library';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleWorkflowRoutes } from './workflows';
 
@@ -428,9 +427,6 @@ async function handleRoutes(
   const brainViewerResponse = handleBrainViewerRoutes(req, url, db, context, graduationService);
   if (brainViewerResponse)
     return brainViewerResponse instanceof Promise ? await brainViewerResponse : brainViewerResponse;
-
-  const libraryResponse = handleLibraryRoutes(req, url, db, context);
-  if (libraryResponse) return libraryResponse;
 
   const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
   if (analyticsResponse) return analyticsResponse;
