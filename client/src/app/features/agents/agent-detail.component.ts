@@ -19,7 +19,7 @@ import type { AgentMessage } from '../../core/models/agent-message.model';
 import type { Session } from '../../core/models/session.model';
 import type { WorkTask } from '../../core/models/work-task.model';
 import type { ServerWsMessage } from '@shared/ws-protocol';
-import type { AgentPersona } from '../../core/models/persona.model';
+import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.model';
 import type { AgentSkillAssignment } from '../../core/models/skill-bundle.model';
 import type { FlockAgent } from '@shared/types/flock-directory';
 import { firstValueFrom } from 'rxjs';
@@ -332,37 +332,98 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                     }
                 }
 
-                <!-- Persona Tab -->
+                <!-- Persona Tab (inline editor) -->
                 @if (activeTab() === 'persona') {
-                    @if (persona(); as p) {
+                    @if (!persona() && !personaEditing()) {
+                        <div class="persona-empty-state">
+                            <p class="detail__empty">No persona configured.</p>
+                            <button class="btn btn--primary btn--sm" (click)="personaEditing.set(true)">Configure Persona</button>
+                        </div>
+                    } @else if (!personaEditing()) {
                         <div class="persona-info">
                             <dl>
                                 <dt>Archetype</dt>
-                                <dd>{{ p.archetype }}</dd>
+                                <dd>{{ persona()!.archetype }}</dd>
                                 <dt>Traits</dt>
-                                <dd>{{ p.traits.join(', ') || 'None' }}</dd>
+                                <dd>{{ persona()!.traits.join(', ') || 'None' }}</dd>
                             </dl>
-                            @if (p.voiceGuidelines) {
-                                <p class="persona-info__text"><strong>Voice:</strong> {{ p.voiceGuidelines }}</p>
+                            @if (persona()!.voiceGuidelines) {
+                                <p class="persona-info__text"><strong>Voice:</strong> {{ persona()!.voiceGuidelines }}</p>
                             }
-                            @if (p.background) {
-                                <p class="persona-info__text"><strong>Background:</strong> {{ p.background }}</p>
+                            @if (persona()!.background) {
+                                <p class="persona-info__text"><strong>Background:</strong> {{ persona()!.background }}</p>
                             }
                         </div>
-                        <button class="btn btn--secondary btn--sm" routerLink="/agents/personas">Edit Persona</button>
+                        <div class="persona-actions">
+                            <button class="btn btn--secondary btn--sm" (click)="startPersonaEdit()">Edit</button>
+                            <button class="btn btn--danger btn--sm" [disabled]="personaSaving()" (click)="onDeletePersona()">Delete</button>
+                        </div>
                     } @else {
-                        <p class="detail__empty">No persona configured. <a routerLink="/agents/personas">Configure one</a></p>
+                        <div class="persona-form">
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label>Archetype</label>
+                                    <select [(ngModel)]="personaFormArchetype" class="form-select">
+                                        <option value="custom">Custom</option>
+                                        <option value="professional">Professional</option>
+                                        <option value="friendly">Friendly</option>
+                                        <option value="technical">Technical</option>
+                                        <option value="creative">Creative</option>
+                                        <option value="formal">Formal</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label>Traits (comma-separated)</label>
+                                    <input [(ngModel)]="personaFormTraits" class="form-input" placeholder="helpful, concise, thorough" />
+                                </div>
+                                <div class="form-field span-2">
+                                    <label>Voice Guidelines</label>
+                                    <textarea [(ngModel)]="personaFormVoice" class="form-textarea" rows="3" placeholder="How the agent should communicate..."></textarea>
+                                </div>
+                                <div class="form-field span-2">
+                                    <label>Background</label>
+                                    <textarea [(ngModel)]="personaFormBackground" class="form-textarea" rows="3" placeholder="Agent background context..."></textarea>
+                                </div>
+                                <div class="form-field span-2">
+                                    <label>Example Messages (one per line)</label>
+                                    <textarea [(ngModel)]="personaFormExamples" class="form-textarea" rows="4" placeholder="Example response 1\nExample response 2"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn--primary" [disabled]="personaSaving()" (click)="onSavePersona()">
+                                    {{ personaSaving() ? 'Saving...' : 'Save Persona' }}
+                                </button>
+                                <button class="btn btn--secondary" (click)="personaEditing.set(false)">Cancel</button>
+                            </div>
+                        </div>
                     }
                 }
 
-                <!-- Skills Tab -->
+                <!-- Skills Tab (inline assignment) -->
                 @if (activeTab() === 'skills') {
+                    <div class="skills-assign">
+                        <select class="form-select" [(ngModel)]="skillAssignBundleId" aria-label="Select bundle to assign">
+                            <option value="" disabled>Add a skill bundle...</option>
+                            @for (bundle of availableBundles(); track bundle.id) {
+                                <option [value]="bundle.id">{{ bundle.name }}</option>
+                            }
+                        </select>
+                        <button
+                            class="btn btn--primary btn--sm"
+                            [disabled]="!skillAssignBundleId || assigningSkill()"
+                            (click)="onAssignBundle()">
+                            {{ assigningSkill() ? 'Adding...' : 'Add' }}
+                        </button>
+                    </div>
                     @if (agentBundles().length === 0) {
-                        <p class="detail__empty">No skill bundles assigned. <a routerLink="/agents/skill-bundles">Manage bundles</a></p>
+                        <p class="detail__empty">No skill bundles assigned yet.</p>
                     } @else {
                         <div class="skills-list">
                             @for (ab of agentBundles(); track ab.bundleId) {
-                                <span class="skill-tag">{{ getBundleName(ab.bundleId) }}</span>
+                                <span class="skill-tag">
+                                    {{ getBundleName(ab.bundleId) }}
+                                    <button class="skill-tag__remove" (click)="onRemoveBundle(ab.bundleId)" title="Remove">&times;</button>
+                                </span>
                             }
                         </div>
                     }
@@ -506,8 +567,25 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .persona-info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
         .persona-info dd { margin: 0; color: var(--text-primary); }
         .persona-info__text { font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0; }
+        .persona-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .persona-empty-state { text-align: center; padding: 2rem 1rem; }
+        .persona-form { margin-top: 0.5rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+        .form-textarea { resize: vertical; min-height: 4em; line-height: 1.5; }
+        .span-2 { grid-column: span 2; }
+        .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .skills-assign { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+        .skills-assign .form-select { flex: 1; max-width: 300px; }
         .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .skill-tag { font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .skill-tag { font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); display: inline-flex; align-items: center; gap: 0.35rem; }
+        .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.1s; }
+        .skill-tag__remove:hover { opacity: 1; color: var(--accent-red); }
 
         /* Flock Profile */
         .flock-profile { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -548,6 +626,8 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
             .tabs { gap: 0; }
             .tab { padding: 0.4rem 0.6rem; font-size: 0.7rem; }
+            .form-grid { grid-template-columns: 1fr; }
+            .span-2 { grid-column: span 1; }
         }
     `,
 })
@@ -581,6 +661,25 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly testCooldownUntil = signal<string | null>(null);
     protected readonly lastTestScore = signal<number | null>(null);
     protected readonly activeTab = signal<Tab>('overview');
+
+    // Persona inline editing
+    protected readonly personaEditing = signal(false);
+    protected readonly personaSaving = signal(false);
+    protected personaFormArchetype: PersonaArchetype = 'custom';
+    protected personaFormTraits = '';
+    protected personaFormVoice = '';
+    protected personaFormBackground = '';
+    protected personaFormExamples = '';
+
+    // Skill bundle assignment
+    protected readonly assigningSkill = signal(false);
+    protected skillAssignBundleId = '';
+
+    /** Bundles not yet assigned to this agent */
+    protected readonly availableBundles = computed(() => {
+        const assigned = new Set(this.agentBundles().map((ab) => ab.bundleId));
+        return this.skillBundleService.bundles().filter((b) => !assigned.has(b.id));
+    });
 
     protected invokeTargetId = '';
     protected invokeContent = '';
@@ -869,5 +968,93 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         } catch {
             this.notify.error('Failed to invoke agent');
         } finally { this.invoking.set(false); }
+    }
+
+    // ── Persona inline editing ────────────────────────────────────────
+
+    startPersonaEdit(): void {
+        const p = this.persona();
+        if (p) {
+            this.personaFormArchetype = p.archetype;
+            this.personaFormTraits = p.traits.join(', ');
+            this.personaFormVoice = p.voiceGuidelines;
+            this.personaFormBackground = p.background;
+            this.personaFormExamples = p.exampleMessages.join('\n');
+        } else {
+            this.personaFormArchetype = 'custom';
+            this.personaFormTraits = '';
+            this.personaFormVoice = '';
+            this.personaFormBackground = '';
+            this.personaFormExamples = '';
+        }
+        this.personaEditing.set(true);
+    }
+
+    async onSavePersona(): Promise<void> {
+        const a = this.agent();
+        if (!a) return;
+        this.personaSaving.set(true);
+        try {
+            const saved = await this.personaService.savePersona(a.id, {
+                archetype: this.personaFormArchetype,
+                traits: this.personaFormTraits.split(',').map((t) => t.trim()).filter(Boolean),
+                voiceGuidelines: this.personaFormVoice,
+                background: this.personaFormBackground,
+                exampleMessages: this.personaFormExamples.split('\n').filter(Boolean),
+            });
+            this.persona.set(saved);
+            this.personaEditing.set(false);
+            this.notify.success('Persona saved');
+        } catch {
+            this.notify.error('Failed to save persona');
+        } finally {
+            this.personaSaving.set(false);
+        }
+    }
+
+    async onDeletePersona(): Promise<void> {
+        const a = this.agent();
+        if (!a) return;
+        this.personaSaving.set(true);
+        try {
+            await this.personaService.deletePersona(a.id);
+            this.persona.set(null);
+            this.personaEditing.set(false);
+            this.notify.success('Persona deleted');
+        } catch {
+            this.notify.error('Failed to delete persona');
+        } finally {
+            this.personaSaving.set(false);
+        }
+    }
+
+    // ── Skill bundle assignment ───────────────────────────────────────
+
+    async onAssignBundle(): Promise<void> {
+        const a = this.agent();
+        if (!a || !this.skillAssignBundleId) return;
+        this.assigningSkill.set(true);
+        try {
+            const assignment = await this.skillBundleService.assignToAgent(a.id, this.skillAssignBundleId);
+            this.agentBundles.update((list) => [...list, assignment]);
+            this.skillAssignBundleId = '';
+            this.notify.success('Bundle assigned');
+        } catch {
+            this.notify.error('Failed to assign bundle');
+        } finally {
+            this.assigningSkill.set(false);
+        }
+    }
+
+    async onRemoveBundle(bundleId: string): Promise<void> {
+        const a = this.agent();
+        if (!a) return;
+        try {
+            await this.skillBundleService.removeFromAgent(a.id, bundleId);
+            this.agentBundles.update((list) => list.filter((ab) => ab.bundleId !== bundleId));
+            this.notify.success('Bundle removed');
+        } catch {
+            this.notify.error('Failed to remove bundle');
+        }
     }
 }

@@ -65,12 +65,10 @@ const TABS: NavTab[] = [
         route: '/observe',
         matchRoutes: ['/observe'],
         children: [
-            { label: 'Live Feed', icon: 'activity', route: '/observe' },
-            { label: 'Agent Comms', icon: 'message-circle', route: '/observe/agent-comms' },
+            { label: 'Comms', icon: 'activity', route: '/observe' },
+            { label: 'Memory', icon: 'database', route: '/observe/memory' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
             { label: 'Logs', icon: 'terminal', route: '/observe/logs' },
-            { label: 'Brain Viewer', icon: 'zap', route: '/observe/brain-viewer' },
-            { label: 'Memory Browser', icon: 'database', route: '/observe/memory-browser' },
             { label: 'Reputation', icon: 'star', route: '/observe/reputation' },
         ],
     },
@@ -85,8 +83,6 @@ const TABS: NavTab[] = [
             { label: 'Flock Directory', icon: 'globe', route: '/agents/flock-directory' },
             { label: 'Projects', icon: 'code', route: '/agents/projects' },
             { label: 'Models', icon: 'zap', route: '/agents/models' },
-            { label: 'Personas', icon: 'users', route: '/agents/personas' },
-            { label: 'Skill Bundles', icon: 'server', route: '/agents/skill-bundles' },
         ],
     },
     {

@@ -89,17 +89,9 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/models/models.component').then((m) => m.ModelsComponent),
             },
-            // Personas & Skill Bundles remain accessible at old paths but removed from tabs
-            {
-                path: 'personas',
-                loadComponent: () =>
-                    import('./features/personas/persona-manager.component').then((m) => m.PersonaManagerComponent),
-            },
-            {
-                path: 'skill-bundles',
-                loadComponent: () =>
-                    import('./features/skill-bundles/skill-bundle-list.component').then((m) => m.SkillBundleListComponent),
-            },
+            // Personas & Skill Bundles consolidated into agent detail tabs
+            { path: 'personas', redirectTo: '/agents', pathMatch: 'full' },
+            { path: 'skill-bundles', redirectTo: '/agents', pathMatch: 'full' },
             {
                 path: 'new',
                 loadComponent: () =>
@@ -267,8 +259,8 @@ export const routes: Routes = [
     { path: 'projects/new', redirectTo: 'agents/projects/new', pathMatch: 'full' },
     { path: 'projects/:id', redirectTo: 'agents/projects/:id' },
     { path: 'models', redirectTo: 'agents/models', pathMatch: 'full' },
-    { path: 'personas', redirectTo: 'agents/personas', pathMatch: 'full' },
-    { path: 'skill-bundles', redirectTo: 'agents/skill-bundles', pathMatch: 'full' },
+    { path: 'personas', redirectTo: 'agents', pathMatch: 'full' },
+    { path: 'skill-bundles', redirectTo: 'agents', pathMatch: 'full' },
     { path: 'flock-directory', redirectTo: 'agents/flock-directory', pathMatch: 'full' },
     { path: 'work-tasks', redirectTo: 'sessions/work-tasks', pathMatch: 'full' },
     { path: 'councils', redirectTo: 'sessions/councils', pathMatch: 'full' },
