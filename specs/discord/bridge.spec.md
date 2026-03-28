@@ -243,6 +243,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `resolveDefaultAgent` | `(db, config)` | `Agent \| null` | Resolve the default agent from config or first available |
 | `normalizeTimestamp` | `(ts: string)` | `string` | Append 'Z' to SQLite UTC timestamps lacking timezone indicator |
 | `formatDuration` | `(ms: number)` | `string` | Format milliseconds as human-readable "Xm Ys" or "Xs" string |
+| `sessionErrorEmbed` | `(errorType: string, fallbackMessage?: string)` | `{ title: string; description: string; color: number }` | Map an error type to a user-facing embed title, description, and color |
 
 ### Exported Functions (from message-formatter.ts)
 

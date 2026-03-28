@@ -45,6 +45,8 @@ const TABLES = [
         txid       TEXT DEFAULT NULL,
         status     TEXT DEFAULT 'confirmed',
         archived   INTEGER NOT NULL DEFAULT 0,
+        book       TEXT DEFAULT NULL,
+        page       INTEGER DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         book       TEXT DEFAULT NULL,
