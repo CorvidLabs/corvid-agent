@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 107;
+const SCHEMA_VERSION = 108;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -162,6 +162,12 @@ const MIGRATIONS: Record<number, string[]> = {
     107: [
         // Session server-restart tracking (prevents agent restart loops)
         `ALTER TABLE sessions ADD COLUMN server_restart_initiated_at TEXT DEFAULT NULL`,
+    ],
+    108: [
+        // Memory book/page columns for structured library-style memories
+        `ALTER TABLE agent_memories ADD COLUMN book TEXT DEFAULT NULL`,
+        `ALTER TABLE agent_memories ADD COLUMN page INTEGER DEFAULT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
     ],
 };
 
