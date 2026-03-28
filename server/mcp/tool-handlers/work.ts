@@ -5,6 +5,7 @@ import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
 import { queryCount } from '../../db/types';
 import { getProjectByName, listProjects } from '../../db/projects';
+import { getAgent } from '../../db/agents';
 
 const log = createLogger('McpToolHandlers');
 
@@ -27,13 +28,24 @@ function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
 
 export async function handleCreateWorkTask(
     ctx: McpToolContext,
-    args: { description: string; project_id?: string; project_name?: string; model_tier?: string },
+    args: { description: string; project_id?: string; project_name?: string; model_tier?: string; agent_id?: string },
 ): Promise<CallToolResult> {
     if (!ctx.workTaskService) {
         return errorResult('Work task service is not available.');
     }
 
-    if (!checkWorkTaskRateLimit(ctx.db, ctx.agentId)) {
+    // Resolve target agent: use explicit agent_id if provided, otherwise the calling agent
+    const targetAgentId = args.agent_id ?? ctx.agentId;
+
+    // Validate that the target agent exists (especially important when delegating)
+    if (args.agent_id) {
+        const targetAgent = getAgent(ctx.db, args.agent_id);
+        if (!targetAgent) {
+            return errorResult(`Agent not found: "${args.agent_id}". Use corvid_list_agents to discover available agents.`);
+        }
+    }
+
+    if (!checkWorkTaskRateLimit(ctx.db, targetAgentId)) {
         return errorResult(`Rate limit exceeded: maximum ${WORK_TASK_MAX_PER_DAY} work tasks per day.`);
     }
 
@@ -63,7 +75,7 @@ export async function handleCreateWorkTask(
         ctx.emitStatus?.('Creating work task...');
 
         const task = await ctx.workTaskService.create({
-            agentId: ctx.agentId,
+            agentId: targetAgentId,
             description: args.description,
             projectId,
             source: 'agent',
@@ -71,7 +83,8 @@ export async function handleCreateWorkTask(
         });
 
         log.info('MCP create_work_task succeeded', {
-            agentId: ctx.agentId,
+            agentId: targetAgentId,
+            delegatedBy: args.agent_id ? ctx.agentId : undefined,
             taskId: task.id,
             status: task.status,
             modelTier: args.model_tier ?? 'auto',

@@ -219,6 +219,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                     project_id: z.string().optional().describe('Project ID to work on. Omit to use the agent default project.'),
                     project_name: z.string().optional().describe('Project name (alternative to project_id). Use corvid_list_projects to discover names.'),
                     model_tier: z.string().optional().describe('Model tier: "light" (Haiku, trivial tasks), "standard" (Sonnet, normal work), "heavy" (Opus, complex architecture). Omit for auto-select.'),
+                    agent_id: z.string().optional().describe('Agent ID to execute and be credited for this task. Defaults to the calling agent. Use corvid_list_agents to discover agent IDs.'),
                 },
                 async (args) => handleCreateWorkTask(ctx, args),
             ),

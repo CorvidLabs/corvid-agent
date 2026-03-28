@@ -400,13 +400,14 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                     project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
                     project_name: { type: 'string', description: 'Project name (alternative to project_id). Use corvid_list_projects to discover names.' },
                     model_tier: { type: 'string', description: 'Model tier: "light" (Haiku), "standard" (Sonnet), "heavy" (Opus). Omit for auto-select.' },
+                    agent_id: { type: 'string', description: 'Agent ID to execute and be credited for this task. Defaults to the calling agent.' },
                 },
                 required: ['description'],
             },
             handler: async (args) => {
                 const err = validateRequired('corvid_create_work_task', args, ['description']);
                 if (err) return err;
-                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string; model_tier?: string }));
+                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string; model_tier?: string; agent_id?: string }));
             },
         });
         tools.push({
