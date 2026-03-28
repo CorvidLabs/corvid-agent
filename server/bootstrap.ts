@@ -14,6 +14,7 @@ import { OllamaStallEscalator } from './process/ollama-stall-escalator';
 import { MemorySyncService } from './db/memory-sync';
 import { MemoryGraduationService } from './memory/graduation-service';
 import { LibrarySyncService } from './memory/library-sync';
+import { loadSharedLibrary } from './memory/library-boot';
 import { loadAlgoChatConfig } from './algochat/config';
 import type { AlgoChatBridge } from './algochat/bridge';
 import type { AgentWalletService } from './algochat/agent-wallet';
@@ -106,6 +107,7 @@ export interface ServiceContainer {
     memorySyncService: MemorySyncService;
     graduationService: MemoryGraduationService;
     librarySyncService: LibrarySyncService;
+    sharedLibraryContext: string;
 
     // Work orchestration
     selfTestService: SelfTestService;
@@ -267,6 +269,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const memorySyncService = new MemorySyncService(db);
     const graduationService = new MemoryGraduationService(db);
     const librarySyncService = new LibrarySyncService(db);
+    const sharedLibraryContext = loadSharedLibrary(db);
 
     // ── AlgoChat state (initialized later by initAlgoChat) ───────────────
     const algochatConfig = loadAlgoChatConfig();
@@ -532,6 +535,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         memorySyncService,
         graduationService,
         librarySyncService,
+        sharedLibraryContext,
         selfTestService,
         workTaskService,
         buddyService,

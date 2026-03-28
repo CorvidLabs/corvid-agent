@@ -1,10 +1,11 @@
 ---
 module: arc69-library
-version: 1
+version: 2
 status: draft
 files:
   - server/memory/arc69-library.ts
   - server/memory/library-sync.ts
+  - server/memory/library-boot.ts
   - server/db/migrations/106_agent_library.ts
   - server/db/schema/library.ts
   - server/db/agent-library.ts
@@ -56,6 +57,12 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | Export | Description |
 |--------|-------------|
 | `LibrarySyncService` | Periodically indexes all CRVLIB ASAs from localnet into `agent_library`; follows the MemorySyncService pattern |
+
+### Exported Functions — `server/memory/library-boot.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `loadSharedLibrary` | `(db: Database)` | `string` | Read all non-archived library entries from SQLite at boot and return a formatted context string grouped by category |
 
 ### Exported Functions — `server/db/migrations/106_agent_library.ts`
 
@@ -262,6 +269,75 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 | idx_agent_library_book_page | (book, page) WHERE book IS NOT NULL | Book page traversal |
 | idx_agent_library_author | (author_id) | List by author |
 
+## Boot-Time Library Loading
+
+On agent startup, after `LibrarySyncService` is instantiated, `loadSharedLibrary(db)` is called to read all non-archived entries from the `agent_library` SQLite cache and format them as a context string. The result is stored on `ServiceContainer` as `sharedLibraryContext: string`.
+
+### Format
+
+Entries are grouped by category in this order: **standards → references → guides → decisions → runbooks**. Each entry is rendered as:
+
+```
+### Standards
+
+**key** [tag1, tag2] — by AuthorName
+
+<content>
+```
+
+### Bootstrap Integration
+
+- `loadSharedLibrary` is called synchronously during `bootstrapServices`.
+- The result is available immediately on `ServiceContainer.sharedLibraryContext`.
+- Agent session initializers (e.g. `server/mcp/tool-handlers/`) may inject `sharedLibraryContext` into the system prompt so agents start with shared knowledge without additional tool calls.
+- The context string is empty if the library table has no entries yet (first-run or before any sync).
+
+### Invariants
+
+11. **Boot snapshot.** `loadSharedLibrary` reads the DB at startup; it does not subscribe to updates. Sessions started after a new entry is written will not see it until the next server restart. The `corvid_library_read` tool remains available for on-demand lookups.
+12. **Limit.** `loadSharedLibrary` fetches at most 500 entries ordered by `updated_at DESC`. If the library grows beyond 500 entries, the oldest entries may be omitted from boot context.
+
+## Librarian Permission Model
+
+Write access to the shared library (`corvid_library_write` MCP tool) is restricted to agents with the **librarian** role to prevent accidental or malicious corruption of shared knowledge.
+
+### Rules
+
+| Caller | Write access |
+|--------|-------------|
+| CorvidAgent (`90cf34fa-1478-454c-a789-1c87cbb0d552`) | **Allowed** — default librarian |
+| Owner (Leif) | **Allowed** — project owner override |
+| All other agents | **Denied** — returns error |
+
+### Error Response
+
+When an unauthorized agent attempts to write:
+
+```
+Only agents with librarian role can write to the shared library
+```
+
+### Librarians Config
+
+The set of librarian agent IDs is maintained as a constant in `server/mcp/tool-handlers/library.ts`:
+
+```typescript
+const LIBRARIAN_AGENT_IDS: ReadonlySet<string> = new Set([
+    '90cf34fa-1478-454c-a789-1c87cbb0d552', // CorvidAgent — default librarian
+]);
+```
+
+Owner writes bypass the librarian check entirely (owner is determined by checking against the configured owner agent/wallet).
+
+> **Governance note:** `server/mcp/tool-handlers/library.ts` is a Layer 1 (Structural) file — modifications require a supermajority council vote + human approval. The librarian permission check described here documents the intended implementation pending that approval.
+
+### Behavioral Scenario: Unauthorized write
+
+- **Given** agent Magpie (not a librarian) calls `corvid_library_write`
+- **When** the tool handler checks `LIBRARIAN_AGENT_IDS`
+- **Then** returns error: "Only agents with librarian role can write to the shared library"
+- **And** no entry is created or updated
+
 ## Configuration
 
 | Env Var | Default | Description |
@@ -274,3 +350,4 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 |------|--------|--------|
 | 2026-03-26 | corvid-agent | Initial spec — shared plaintext library with book chaining |
 | 2026-03-26 | corvid-agent | v1.1: localnet gate, searchForAssets for all-agent discovery, /page-N key convention, asa_id UNIQUE, LibrarySyncService, exported buildNotePayload/parseNotePayload |
+| 2026-03-27 | CorvidAgent | v2.0: boot-time library loader (loadSharedLibrary, ServiceContainer.sharedLibraryContext), librarian permission model for corvid_library_write |
