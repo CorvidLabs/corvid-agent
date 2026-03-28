@@ -1,0 +1,43 @@
+name: Spec Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "specs/**"
+      - "server/**"
+      - "client/**"
+      - "shared/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "specs/**"
+      - "server/**"
+      - "client/**"
+      - "shared/**"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spec-check:
+    name: Spec Validation
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/setup-workspace
+        with:
+          install-client: "false"
+
+      - name: Spec validation (strict + 100% coverage)
+        uses: CorvidLabs/spec-sync@v2.1.0
+        with:
+          strict: 'true'
+          require-coverage: '100'
+
+      - name: Spec check (local)
+        run: bun run spec:check
