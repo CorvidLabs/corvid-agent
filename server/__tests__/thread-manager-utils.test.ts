@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { normalizeTimestamp, formatDuration } from '../discord/thread-manager';
+import { normalizeTimestamp, formatDuration, sessionErrorEmbed } from '../discord/thread-manager';
 
 describe('normalizeTimestamp', () => {
     test('appends Z to bare SQLite timestamp', () => {
@@ -53,5 +53,60 @@ describe('formatDuration', () => {
 
     test('exactly one minute', () => {
         expect(formatDuration(60000)).toBe('1m 0s');
+    });
+});
+
+describe('sessionErrorEmbed', () => {
+    test('context_exhausted returns warning color and recovery hint', () => {
+        const result = sessionErrorEmbed('context_exhausted');
+        expect(result.title).toBe('Context Limit Reached');
+        expect(result.description).toContain('pick up where it left off');
+        expect(result.color).toBe(0xf0b232);
+    });
+
+    test('credits_exhausted directs to Settings > Spending', () => {
+        const result = sessionErrorEmbed('credits_exhausted');
+        expect(result.title).toBe('Credits Exhausted');
+        expect(result.description).toContain('Settings > Spending');
+        expect(result.color).toBe(0xf0b232);
+    });
+
+    test('timeout suggests smaller steps', () => {
+        const result = sessionErrorEmbed('timeout');
+        expect(result.title).toBe('Session Timed Out');
+        expect(result.description).toContain('smaller steps');
+        expect(result.color).toBe(0xf0b232);
+    });
+
+    test('crash returns red color with dashboard hint', () => {
+        const result = sessionErrorEmbed('crash');
+        expect(result.title).toBe('Session Crashed');
+        expect(result.description).toContain('check the dashboard');
+        expect(result.color).toBe(0xff3355);
+    });
+
+    test('spawn_error suggests checking provider config', () => {
+        const result = sessionErrorEmbed('spawn_error');
+        expect(result.title).toBe('Failed to Start');
+        expect(result.description).toContain('provider');
+        expect(result.color).toBe(0xff3355);
+    });
+
+    test('unknown error type uses fallback message', () => {
+        const result = sessionErrorEmbed('unknown', 'Something weird happened');
+        expect(result.title).toBe('Session Error');
+        expect(result.description).toBe('Something weird happened');
+        expect(result.color).toBe(0xff3355);
+    });
+
+    test('unknown error type without fallback uses default message', () => {
+        const result = sessionErrorEmbed('something_else');
+        expect(result.description).toBe('An unexpected error occurred.');
+    });
+
+    test('fallback message is truncated to 4096 chars', () => {
+        const longMsg = 'x'.repeat(5000);
+        const result = sessionErrorEmbed('unknown', longMsg);
+        expect(result.description.length).toBe(4096);
     });
 });
