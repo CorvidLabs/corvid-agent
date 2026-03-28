@@ -523,6 +523,8 @@ describe('handleComponentInteraction', () => {
       'test-model',
       undefined,
       undefined,
+      undefined,
+      undefined,
     );
   });
 

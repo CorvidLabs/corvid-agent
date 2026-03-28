@@ -194,6 +194,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `removeReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Remove a reaction from a message (best-effort) |
 | `editEmbed` | `(delivery, botToken, channelId, messageId, embed)` | `Promise<void>` | Edit an existing embed message in-place via PATCH |
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
+| `buildAgentAuthor` | `(identity: AgentIdentity)` | `DiscordEmbedAuthor` | Build a Discord embed author block from agent identity (icon emoji + avatar URL) |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a clean footer: `agentName` or `agentName · status` |
 | `buildFooterWithStats` | `(ctx: FooterContext, stats?: FooterStats)` | `string` | Build footer with session context AND run stats (files, turns, tools, commits) |
 | `ensureDiscordEmbedRenderable` | `(embed)` | `DiscordEmbed` | Clamp embed fields/description to Discord size limits so the API never rejects |
@@ -230,10 +231,10 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, db, threadCallbacks, sessionId, threadId, agentName, agentModel, projectName?, displayColor?)` | `void` | Subscribe to agent events and stream responses as embeds |
+| `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, db, threadCallbacks, sessionId, threadId, agentName, agentModel, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Subscribe to agent events and stream responses as embeds |
 | `subscribeForInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, displayColor?)` | `void` | Subscribe for inline reply responses (one-off @mention) |
-| `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
-| `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
+| `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
+| `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
@@ -323,13 +324,15 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Type | Source | Description |
 |------|--------|-------------|
 | `InteractionContext` | `commands.ts` | Context object for interaction handler delegation |
-| `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer, timestamp, image?, thumbnail?) |
+| `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer, author?, timestamp, image?, thumbnail?) |
+| `DiscordEmbedAuthor` | `embeds.ts` | Embed author block (name, url?, icon_url?) |
+| `AgentIdentity` | `embeds.ts` | Agent identity for building personalized embed authors (agentName, displayIcon?, avatarUrl?) |
 | `FooterContext` | `embeds.ts` | Metadata for building rich embed footers (agentName, agentModel?, status?) |
 | `FooterStats` | `embeds.ts` | Optional run statistics for embed footers (filesChanged?, turns?, tools?, commits?) |
 | `DiscordFileAttachment` | `embeds.ts` | File attachment for Discord uploads (name, data, contentType?) |
 | `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
-| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?) |
-| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?) |
+| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayIcon?, avatarUrl?) |
+| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?, displayIcon?, avatarUrl?) |
 | `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
 | `ReactionHandlerContext` | `reaction-handler.ts` | Context object for reaction handler (db, botUserId, scorer, mentionSessions, threadSessions) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
