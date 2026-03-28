@@ -28,6 +28,7 @@ import {
     collapseCodeBlocks,
     buildFooterText,
     buildFooterWithStats,
+    buildAgentAuthor,
     type DiscordFileAttachment,
 } from './embeds';
 
@@ -69,6 +70,8 @@ export interface ThreadSessionInfo {
     topic?: string;
     projectName?: string;
     displayColor?: string | null;
+    displayIcon?: string | null;
+    avatarUrl?: string | null;
     /**
      * Permission level of the user who created this thread.
      * Used to enforce per-tier access: BASIC users cannot interact with
@@ -104,6 +107,8 @@ export function subscribeForResponseWithEmbed(
     agentModel: string,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
 ): void {
     // Unsubscribe the previous callback for this thread to prevent duplicates
     const prev = threadCallbacks.get(threadId);
@@ -133,6 +138,7 @@ export function subscribeForResponseWithEmbed(
                 sendEmbedWithButtons(delivery, botToken, threadId, {
                     description: 'The agent session ended unexpectedly. Send a message to resume.',
                     color: 0xff3355,
+                    author,
                     footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
                 }, [
                     buildActionRow(
@@ -170,6 +176,7 @@ export function subscribeForResponseWithEmbed(
     };
 
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
+    const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
 
     const flush = async () => {
         if (!buffer) return;
@@ -181,6 +188,7 @@ export function subscribeForResponseWithEmbed(
             await sendEmbed(delivery, botToken, threadId, {
                 description: part,
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             });
         }
@@ -202,6 +210,7 @@ export function subscribeForResponseWithEmbed(
             await sendEmbedWithFiles(delivery, botToken, threadId, {
                 image: { url: `attachment://${filename}` },
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             }, [attachment]);
         } catch (err) {
@@ -250,6 +259,7 @@ export function subscribeForResponseWithEmbed(
                     sendEmbed(delivery, botToken, threadId, {
                         description: `⏳ ${statusText}`,
                         color: 0x95a5a6,
+                        author,
                         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
                     }).catch((err) => {
                         log.debug('Tool status embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
@@ -270,6 +280,7 @@ export function subscribeForResponseWithEmbed(
                 sendEmbed(delivery, botToken, threadId, {
                     description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
                     color: 0xf0b232, // yellow/warning
+                    author,
                     footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'context warning' }) },
                 }).catch((err) => {
                     log.debug('Context warning embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
@@ -378,6 +389,7 @@ export function subscribeForResponseWithEmbed(
                 await sendEmbedWithButtons(delivery, botToken, threadId, {
                     description: 'Session complete. Send a message to continue the conversation.',
                     color: 0x57f287,
+                    author,
                     ...(fields.length > 0 ? { fields } : {}),
                     footer: { text: buildFooterWithStats(footerCtx, footerStats) },
                 }, [
@@ -435,6 +447,7 @@ export function subscribeForResponseWithEmbed(
                 title,
                 description,
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
             }, [
                 buildActionRow(
@@ -474,6 +487,8 @@ export function subscribeForInlineResponse(
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -482,6 +497,7 @@ export function subscribeForInlineResponse(
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
     let receivedAnyActivity = false; // tracks any activity (content OR tool use)
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
+    const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -537,6 +553,7 @@ export function subscribeForInlineResponse(
             const embedPayload = {
                 description: parts[i],
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             };
             if (i === 0) {
@@ -607,6 +624,8 @@ export function subscribeForAdaptiveInlineResponse(
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -617,6 +636,7 @@ export function subscribeForAdaptiveInlineResponse(
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
     let receivedAnyActivity = false;
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
+    const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
 
     // Progress embed state — only created when tool use is detected
     let progressMessageId: string | null = null;
@@ -671,6 +691,7 @@ export function subscribeForAdaptiveInlineResponse(
             const embedPayload = {
                 description: parts[i],
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             };
             if (i === 0) {
@@ -696,6 +717,7 @@ export function subscribeForAdaptiveInlineResponse(
         sendEmbed(delivery, botToken, channelId, {
             description: 'Working on your request...',
             color: 0x5865f2,
+            author,
             footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
         }).then((msgId) => {
             progressMessageId = msgId;
@@ -720,6 +742,7 @@ export function subscribeForAdaptiveInlineResponse(
             await sendEmbedWithFiles(delivery, botToken, channelId, {
                 image: { url: `attachment://${filename}` },
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             }, [attachment]);
         } catch (err) {
@@ -761,6 +784,7 @@ export function subscribeForAdaptiveInlineResponse(
                     editEmbed(delivery, botToken, channelId, progressMessageId, {
                         description: `\u23f3 ${statusText}`,
                         color: 0x5865f2,
+                        author,
                         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
                     }).catch((err) => {
                         log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -778,6 +802,7 @@ export function subscribeForAdaptiveInlineResponse(
                     editEmbed(delivery, botToken, channelId, progressMessageId, {
                         description: '\u2705 Done',
                         color: 0x57f287,
+                        author,
                         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
                     }).catch((err) => {
                         log.debug('Final progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -830,6 +855,7 @@ export function subscribeForAdaptiveInlineResponse(
                     title,
                     description,
                     color: errColor,
+                    author,
                     footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
                 }).catch((err) => {
                     log.debug('Error embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -839,6 +865,7 @@ export function subscribeForAdaptiveInlineResponse(
                     title,
                     description,
                     color: errColor,
+                    author,
                     footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
                 }).catch((err) => {
                     log.debug('Error embed send failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -876,6 +903,8 @@ export function subscribeForInlineProgressResponse(
     onBotMessage?: (botMessageId: string) => void,
     projectName?: string,
     displayColor?: string | null,
+    displayIcon?: string | null,
+    avatarUrl?: string | null,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -886,12 +915,14 @@ export function subscribeForInlineProgressResponse(
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
     let receivedAnyActivity = false;
     const color = hexColorToInt(displayColor) ?? agentColor(agentName);
+    const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
     let progressMessageId: string | null = null;
 
     // Post the initial progress embed immediately
     sendEmbed(delivery, botToken, channelId, {
         description: 'Working on your request...',
         color: 0x5865f2, // blurple
+        author,
         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
     }).then((msgId) => {
         progressMessageId = msgId;
@@ -949,6 +980,7 @@ export function subscribeForInlineProgressResponse(
             const embedPayload = {
                 description: parts[i],
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             };
             if (i === 0) {
@@ -983,6 +1015,7 @@ export function subscribeForInlineProgressResponse(
             await sendEmbedWithFiles(delivery, botToken, channelId, {
                 image: { url: `attachment://${filename}` },
                 color,
+                author,
                 footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             }, [attachment]);
         } catch (err) {
@@ -1022,6 +1055,7 @@ export function subscribeForInlineProgressResponse(
                     editEmbed(delivery, botToken, channelId, progressMessageId, {
                         description: `\u23f3 ${statusText}`,
                         color: 0x5865f2,
+                        author,
                         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
                     }).catch((err) => {
                         log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -1039,6 +1073,7 @@ export function subscribeForInlineProgressResponse(
                     editEmbed(delivery, botToken, channelId, progressMessageId, {
                         description: '\u2705 Done',
                         color: 0x57f287, // green
+                        author,
                         footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
                     }).catch((err) => {
                         log.debug('Final progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
@@ -1070,13 +1105,13 @@ export function tryRecoverThread(
 ): ThreadSessionInfo | null {
     try {
         const row = db.query(
-            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, a.display_color, p.name as project_name
+            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, a.display_color, a.display_icon, a.avatar_url, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
              LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.name = ? AND s.source = 'discord'
              ORDER BY s.created_at DESC LIMIT 1`,
-        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; display_color: string | null; project_name: string | null } | null;
+        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; display_color: string | null; display_icon: string | null; avatar_url: string | null; project_name: string | null } | null;
 
         if (!row) return null;
 
@@ -1088,6 +1123,8 @@ export function tryRecoverThread(
             topic: row.initial_prompt || undefined,
             projectName: row.project_name || undefined,
             displayColor: row.display_color ?? undefined,
+            displayIcon: row.display_icon ?? undefined,
+            avatarUrl: row.avatar_url ?? undefined,
         };
         threadSessions.set(threadId, info);
         log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
@@ -1111,13 +1148,13 @@ export function recoverActiveThreadSubscriptions(
 ): void {
     try {
         const rows = db.query(
-            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model, a.display_color, p.name as project_name
+            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model, a.display_color, a.display_icon, a.avatar_url, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
              LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.source = 'discord' AND s.status = 'running'
                AND s.name LIKE 'Discord thread:%'`,
-        ).all() as { id: string; name: string; agent_name: string; agent_model: string; display_color: string | null; project_name: string | null }[];
+        ).all() as { id: string; name: string; agent_name: string; agent_model: string; display_color: string | null; display_icon: string | null; avatar_url: string | null; project_name: string | null }[];
 
         let recovered = 0;
         for (const row of rows) {
@@ -1132,6 +1169,8 @@ export function recoverActiveThreadSubscriptions(
                     ownerUserId: '',
                     projectName: row.project_name || undefined,
                     displayColor: row.display_color ?? undefined,
+                    displayIcon: row.display_icon ?? undefined,
+                    avatarUrl: row.avatar_url ?? undefined,
                 });
             }
 
@@ -1139,7 +1178,7 @@ export function recoverActiveThreadSubscriptions(
                 processManager, delivery, botToken, db, threadCallbacks,
                 row.id, threadId, row.agent_name || 'Agent', row.agent_model || 'unknown',
                 row.project_name || undefined,
-                row.display_color,
+                row.display_color, row.display_icon, row.avatar_url,
             );
             recovered++;
         }

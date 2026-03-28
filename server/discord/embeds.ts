@@ -184,12 +184,19 @@ export function assertInteractionToken(value: string): void {
     }
 }
 
+export interface DiscordEmbedAuthor {
+    name: string;
+    url?: string;
+    icon_url?: string;
+}
+
 export interface DiscordEmbed {
     title?: string;
     description?: string;
     color?: number;
     fields?: Array<{ name: string; value: string; inline?: boolean }>;
     footer?: { text: string };
+    author?: DiscordEmbedAuthor;
     timestamp?: string;
     image?: { url: string };
     thumbnail?: { url: string };
@@ -793,6 +800,28 @@ export function agentColor(name: string): number {
     return (Math.round((r + m) * 255) << 16)
          | (Math.round((g + m) * 255) << 8)
          | Math.round((b + m) * 255);
+}
+
+/** Agent identity info for building personalized embed authors. */
+export interface AgentIdentity {
+    agentName: string;
+    displayIcon?: string | null;
+    avatarUrl?: string | null;
+}
+
+/**
+ * Build a Discord embed `author` block from agent identity.
+ * Shows the agent's avatar as a small icon next to their name.
+ * If displayIcon (emoji) is set, it's prepended to the name.
+ */
+export function buildAgentAuthor(identity: AgentIdentity): DiscordEmbedAuthor {
+    const name = identity.displayIcon
+        ? `${identity.displayIcon} ${identity.agentName}`
+        : identity.agentName;
+    return {
+        name,
+        ...(identity.avatarUrl ? { icon_url: identity.avatarUrl } : {}),
+    };
 }
 
 export async function editEmbed(

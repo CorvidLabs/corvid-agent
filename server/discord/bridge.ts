@@ -234,8 +234,10 @@ export class DiscordBridge {
                 projectName = projectRow?.name;
             }
             const displayColor = agent?.displayColor;
-            this.threadSessions.set(threadId, { sessionId, agentName, agentModel, ownerUserId: '', projectName, displayColor });
-            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel, projectName, displayColor);
+            const displayIcon = agent?.displayIcon;
+            const avatarUrl = agent?.avatarUrl;
+            this.threadSessions.set(threadId, { sessionId, agentName, agentModel, ownerUserId: '', projectName, displayColor, displayIcon, avatarUrl });
+            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel, projectName, displayColor, displayIcon, avatarUrl);
             log.info('Auto-subscribed Discord thread for resumed session', { threadId, sessionId });
         };
         this.processManager.subscribeAll(this.globalEventCallback);
@@ -373,15 +375,15 @@ export class DiscordBridge {
             guildCache: this.guildCache,
             createStandaloneThread: (channelId, name) =>
                 createStandaloneThreadImpl(this.config.botToken, channelId, name),
-            subscribeForResponseWithEmbed: (sid, tid, an, am, pn, dc) =>
-                this.subscribeForResponseWithEmbed(sid, tid, an, am, pn, dc),
+            subscribeForResponseWithEmbed: (sid, tid, an, am, pn, dc, di, au) =>
+                this.subscribeForResponseWithEmbed(sid, tid, an, am, pn, dc, di, au),
             sendTaskResult: (cid, task, uid) =>
                 this.sendTaskResult(cid, task, uid),
             muteUser: (uid) => this.muteUser(uid),
             unmuteUser: (uid) => this.unmuteUser(uid),
             mentionSessions: this.mentionSessions,
-            subscribeForInlineResponse: (sid, cid, rid, an, am, onBot, pn, dc) =>
-                subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc),
+            subscribeForInlineResponse: (sid, cid, rid, an, am, onBot, pn, dc, di, au) =>
+                subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc, di, au),
             syncGuildData: () => this.syncGuildDataAsync(),
             buddyService: this.buddyService,
         };
@@ -411,11 +413,11 @@ export class DiscordBridge {
         await handleMessageImpl(ctx, data);
     }
 
-    private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string, projectName?: string, displayColor?: string | null): void {
+    private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string, projectName?: string, displayColor?: string | null, displayIcon?: string | null, avatarUrl?: string | null): void {
         subscribeImpl(
             this.processManager, this.delivery, this.config.botToken,
             this.db, this.threadCallbacks, sessionId, threadId, agentName, agentModel,
-            projectName, displayColor,
+            projectName, displayColor, displayIcon, avatarUrl,
         );
     }
 

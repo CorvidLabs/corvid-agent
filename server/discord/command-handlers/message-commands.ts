@@ -256,6 +256,8 @@ export async function handleMessageCommand(
 
   const agentModel = agent.model || 'unknown';
   const agentDisplayColor = agent.displayColor;
+  const agentDisplayIcon = agent.displayIcon;
+  const agentAvatarUrl = agent.avatarUrl;
   const projectNameForFooter = project.name;
 
   ctx.subscribeForInlineResponse(
@@ -271,6 +273,8 @@ export async function handleMessageCommand(
         agentModel,
         projectName: projectNameForFooter,
         displayColor: agentDisplayColor,
+        displayIcon: agentDisplayIcon,
+        avatarUrl: agentAvatarUrl,
         channelId,
         conversationOnly: true,
         minResponderPermLevel: toolPolicy.accessLabel === 'full' ? PermissionLevel.STANDARD : PermissionLevel.BASIC,
@@ -287,6 +291,8 @@ export async function handleMessageCommand(
     },
     projectNameForFooter,
     agentDisplayColor,
+    agentDisplayIcon,
+    agentAvatarUrl,
   );
 
   log.info('Message command session started', {
