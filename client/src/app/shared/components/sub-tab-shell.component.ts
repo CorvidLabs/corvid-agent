@@ -69,11 +69,18 @@ export interface SubTab {
             letter-spacing: 0.03em;
             white-space: nowrap;
             border-bottom: 2px solid transparent;
-            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            transition:
+                color 0.15s ease,
+                border-color 0.15s ease,
+                background 0.15s ease,
+transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .tab-shell__tab:hover {
-            color: var(--text-primary);
-            background: var(--border-subtle);
+        @media (hover: hover) {
+            .tab-shell__tab:hover {
+                color: var(--text-primary);
+                background: var(--border-subtle);
+                transform: translateY(-1px);
+            }
         }
         .tab-shell__tab--active {
             color: var(--accent-cyan);

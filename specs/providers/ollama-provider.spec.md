@@ -5,6 +5,7 @@ status: active
 files:
   - server/providers/ollama/provider.ts
   - server/providers/ollama/tool-parser.ts
+  - server/providers/ollama/response-sanitizer.ts
 db_tables: []
 depends_on:
   - specs/providers/model-capabilities.spec.md
@@ -35,6 +36,12 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 | `stripJsonToolCallArrays` | `(content)` | `string` | Strip JSON tool call arrays from content using balanced brackets |
 | `fuzzyMatchToolName` | `(name, args, tools)` | `string \| undefined` | Fuzzy-match hallucinated tool name to real tool |
 | `normalizeToolArgs` | `(args, toolDef)` | `Record<string, unknown>` | Map aliased argument keys to schema parameter names |
+
+### Exported Functions (response-sanitizer.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `sanitizeModelOutput` | `(content: string, model?: string)` | `string` | Strip leaked internal context (thinking tags, system prompts, metadata) from model output |
 
 ### Exported Classes
 
