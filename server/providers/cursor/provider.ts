@@ -41,6 +41,9 @@ const MAX_PARALLEL = Number(process.env.CURSOR_MAX_PARALLEL) || 2;
 /** Timeout for a single cursor-agent completion (ms). */
 const COMPLETION_TIMEOUT_MS = 10 * 60_000; // 10 minutes
 
+/** Kill process if no stdout data received within this window (ms). */
+const STREAM_IDLE_TIMEOUT_MS = 60_000; // 60 seconds
+
 interface SlotWaiter {
     resolve: (acquired: boolean) => void;
     signal?: AbortSignal;
@@ -212,26 +215,55 @@ export class CursorProvider extends BaseLlmProvider {
             },
         });
 
+        // Close stdin immediately — cursor-agent reads the prompt from CLI args, not stdin.
+        // Leaving it open can cause the process to hang in edge cases.
+        try { proc.stdin?.end(); } catch { /* ignore */ }
+
         // Collect output from stream-json events
         let content = '';
         let model = params.model || 'auto';
         let turnToolCallCount = 0;
+        let killed = false;
 
-        const abortHandler = () => {
+        const killProc = () => {
+            if (killed) return;
+            killed = true;
             try { proc.kill(); } catch { /* already exited */ }
         };
+
+        const abortHandler = () => killProc();
         params.signal?.addEventListener('abort', abortHandler, { once: true });
+
+        // Stream idle timeout — kill process if no stdout data for STREAM_IDLE_TIMEOUT_MS.
+        // This catches cases where cursor-agent spawns but never produces output
+        // (e.g. expired auth, API unavailable).
+        let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
+        let stderrBuffer = '';
+        const resetStreamIdleTimer = () => {
+            if (streamIdleTimer) clearTimeout(streamIdleTimer);
+            streamIdleTimer = setTimeout(() => {
+                log.warn('Cursor stream idle timeout — no stdout data', {
+                    model,
+                    timeoutMs: STREAM_IDLE_TIMEOUT_MS,
+                    sessionId,
+                    stderr: stderrBuffer.slice(0, 500),
+                });
+                killProc();
+            }, STREAM_IDLE_TIMEOUT_MS);
+        };
+        resetStreamIdleTimer();
 
         // Set up completion timeout
         const timeoutId = setTimeout(() => {
             log.warn('Cursor completion timed out', { model, durationMs: COMPLETION_TIMEOUT_MS });
-            try { proc.kill(); } catch { /* already exited */ }
+            killProc();
         }, COMPLETION_TIMEOUT_MS);
 
         try {
             // Forward stream-json events from stdout
             if (proc.stdout) {
                 await readStream(proc.stdout, (event: ClaudeStreamEvent) => {
+                    resetStreamIdleTimer();
                     const raw = event as unknown as Record<string, unknown>;
                     const type = raw.type as string;
 
@@ -293,19 +325,21 @@ export class CursorProvider extends BaseLlmProvider {
                 });
             }
 
-            // Read stderr for diagnostics
+            // Read stderr for diagnostics (fire-and-forget — not awaited)
             if (proc.stderr) {
                 readStream(proc.stderr, (event) => {
                     const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
+                    if (typeof message === 'string') stderrBuffer += message + '\n';
                     log.debug(`cursor-agent stderr: ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
                 });
             }
 
             const exitCode = await proc.exited;
+            if (streamIdleTimer) clearTimeout(streamIdleTimer);
             const durationMs = Date.now() - startTime;
 
             if (exitCode !== 0 && !params.signal?.aborted) {
-                log.warn('cursor-agent exited with non-zero code', { exitCode, model, durationMs });
+                log.warn('cursor-agent exited with non-zero code', { exitCode, model, durationMs, stderr: stderrBuffer.slice(0, 500) });
             }
 
             log.info('Cursor completion finished', {
@@ -322,6 +356,7 @@ export class CursorProvider extends BaseLlmProvider {
             };
         } finally {
             clearTimeout(timeoutId);
+            if (streamIdleTimer) clearTimeout(streamIdleTimer);
             params.signal?.removeEventListener('abort', abortHandler);
         }
     }

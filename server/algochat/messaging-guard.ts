@@ -59,7 +59,7 @@ export function loadMessagingGuardConfig(): MessagingGuardConfig {
         rateLimitWindowMs: 60_000,
         driftDetectionEnabled: true,
         driftMinMessages: 5,
-        driftTargetSpikeThreshold: 3,
+        driftTargetSpikeThreshold: parseInt(process.env.AGENT_DRIFT_TARGET_THRESHOLD ?? '8', 10),
         driftWindowMs: 5 * 60_000,
     };
 }

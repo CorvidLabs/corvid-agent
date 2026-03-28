@@ -173,7 +173,7 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: 'Dogica Pixel', 'Dogica', monospace;
-    font-size: 10px;
+    font-size: 16px;
     line-height: 1.8;
     color: var(--text-primary);
     background: var(--bg-deep);
@@ -192,14 +192,14 @@ html, body {
     html { scroll-behavior: auto; }
 }
 
-/* Large displays (4K / high-res): bump to 12px for comfort */
+/* Large displays (4K / high-res) */
 @media (min-height: 1200px) and (min-width: 1600px) {
-    html { font-size: 12px; }
+    html { font-size: 18px; }
 }
 
-/* Mobile: ensure readable base */
+/* Mobile: slightly smaller base */
 @media (max-width: 480px) {
-    html { font-size: 10px; }
+    html { font-size: 12px; }
 }
 
 a {
