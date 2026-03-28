@@ -26,6 +26,9 @@ interface VisMessage {
     status: string;
     timestamp: number;
     channel: string;
+    fromAgent?: string;
+    toAgent?: string;
+    content?: string;
 }
 
 /* ── Internal 3D types ──────────────────────────────────── */
@@ -62,6 +65,23 @@ interface Particle3D {
     opacity: number;
 }
 
+interface Trail3D {
+    fromId: string;
+    toId: string;
+    mesh: THREE.Mesh;
+    createdAt: number;
+    maxAge: number; // seconds
+}
+
+interface LogEntry {
+    fromAgent: string;
+    toAgent: string;
+    content: string;
+    channel: string;
+    timestamp: number;
+    color: string;
+}
+
 @Component({
     selector: 'app-agent-network-3d',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,7 +95,28 @@ interface Particle3D {
                     <button class="network-3d__clear" (click)="clearSelection()">x</button>
                 </div>
             }
-            <div class="network-3d__hint">Drag to orbit &middot; Scroll to zoom</div>
+            @if (logEntries().length > 0) {
+                <div class="network-3d__log" #logPanel>
+                    <div class="network-3d__log-header">
+                        <span>Message Log</span>
+                        <span class="network-3d__log-count">{{ logEntries().length }}</span>
+                    </div>
+                    <div class="network-3d__log-list">
+                        @for (entry of logEntries(); track $index) {
+                            <div class="network-3d__log-item">
+                                <span class="network-3d__log-time">{{ formatTime(entry.timestamp) }}</span>
+                                <span class="network-3d__log-flow">
+                                    <span [style.color]="entry.color">{{ entry.fromAgent }}</span>
+                                    <span class="network-3d__log-arrow">&rarr;</span>
+                                    {{ entry.toAgent }}
+                                </span>
+                                <span class="network-3d__log-preview">{{ entry.content }}</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            <div class="network-3d__hint">Click &amp; drag to orbit &middot; Scroll to zoom &middot; Click agent to select</div>
         </div>
     `,
     styles: `
@@ -88,9 +129,8 @@ interface Particle3D {
             border-radius: var(--radius, 6px);
             border: 1px solid var(--border, #1a1a2e);
             overflow: hidden;
-            cursor: grab;
+            cursor: crosshair;
         }
-        .network-3d:active { cursor: grabbing; }
         canvas {
             display: block;
             width: 100%;
@@ -145,6 +185,85 @@ interface Particle3D {
             z-index: 10;
         }
 
+        .network-3d__log {
+            position: absolute;
+            bottom: 32px;
+            right: 12px;
+            width: 280px;
+            max-height: 240px;
+            background: rgba(5, 5, 10, 0.88);
+            border: 1px solid var(--border-bright, #2a2a3e);
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.65rem;
+        }
+        .network-3d__log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border, #1a1a2e);
+            color: var(--text-secondary, #aaa);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.6rem;
+        }
+        .network-3d__log-count {
+            background: var(--surface-alt, #1a1a2e);
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 0.55rem;
+            color: var(--text-tertiary, #666);
+        }
+        .network-3d__log-list {
+            overflow-y: auto;
+            flex: 1;
+            padding: 4px 0;
+        }
+        .network-3d__log-item {
+            padding: 3px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .network-3d__log-item:last-child { border-bottom: none; }
+        .network-3d__log-time {
+            color: var(--text-tertiary, #555);
+            font-size: 0.55rem;
+            font-family: monospace;
+        }
+        .network-3d__log-flow {
+            color: var(--text-secondary, #aaa);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .network-3d__log-arrow {
+            color: var(--text-tertiary, #555);
+            margin: 0 3px;
+        }
+        .network-3d__log-preview {
+            color: var(--text-tertiary, #666);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.58rem;
+        }
+        @media (max-width: 600px) {
+            .network-3d__log {
+                width: 200px;
+                max-height: 160px;
+                bottom: 28px;
+                right: 8px;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             canvas { display: none; }
             .network-3d::after {
@@ -171,6 +290,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
     /* ── State ───────────────────────────────────────────── */
     protected readonly selectedAgent = signal<VisAgent | null>(null);
+    protected readonly logEntries = signal<LogEntry[]>([]);
 
     /* ── Three.js core ──────────────────────────────────── */
     private renderer: THREE.WebGLRenderer | null = null;
@@ -186,6 +306,9 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private edgeMap = new Map<string, Edge3D>();
     private particles: Particle3D[] = [];
     private starField: THREE.Points | null = null;
+    private trails: Trail3D[] = [];
+    private static readonly MAX_LOG_ENTRIES = 50;
+    private static readonly TRAIL_MAX_AGE = 45; // seconds
 
     /* ── Orbit control state ────────────────────────────── */
     private isDragging = false;
@@ -221,13 +344,19 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
     private static readonly PARTICLE_GEOMETRY = new THREE.SphereGeometry(0.12, 6, 6);
 
+    /* ── Pointer lock state ─────────────────────────────── */
+    private isPointerLocked = false;
+    private dragStartX = 0;
+    private dragStartY = 0;
+    private dragMoved = false;
+
     /* ── Event handlers bound once ──────────────────────── */
     private onMouseDown = (e: MouseEvent) => this.handleMouseDown(e);
     private onMouseMove = (e: MouseEvent) => this.handleMouseMove(e);
-    private onMouseUp = () => this.handleMouseUp();
+    private onMouseUp = (e: MouseEvent) => this.handleMouseUp(e);
     private onWheel = (e: WheelEvent) => this.handleWheel(e);
-    private onClick = (e: MouseEvent) => this.handleClick(e);
-    private onMouseLeave = () => { this.isDragging = false; };
+    private onMouseLeave = () => { /* no-op with pointer lock */ };
+    private onPointerLockChange = () => this.handlePointerLockChange();
 
     constructor() {
         afterNextRender(() => {
@@ -246,13 +375,14 @@ export class AgentNetwork3DComponent implements OnDestroy {
     ngOnDestroy(): void {
         cancelAnimationFrame(this.animId);
         this.resizeObserver?.disconnect();
+        if (this.isPointerLocked) document.exitPointerLock();
+        document.removeEventListener('pointerlockchange', this.onPointerLockChange);
         const canvas = this.canvasRef()?.nativeElement;
         if (canvas) {
             canvas.removeEventListener('mousedown', this.onMouseDown);
             canvas.removeEventListener('mousemove', this.onMouseMove);
             canvas.removeEventListener('mouseup', this.onMouseUp);
             canvas.removeEventListener('wheel', this.onWheel);
-            canvas.removeEventListener('click', this.onClick);
             canvas.removeEventListener('mouseleave', this.onMouseLeave);
         }
         // Dispose Three.js resources
@@ -268,6 +398,9 @@ export class AgentNetwork3DComponent implements OnDestroy {
         this.particles.forEach((p) => {
             (p.mesh.material as THREE.Material).dispose();
         });
+        this.trails.forEach((t) => {
+            (t.mesh.material as THREE.Material).dispose();
+        });
         this.starField?.geometry.dispose();
         (this.starField?.material as THREE.Material)?.dispose();
         this.renderer?.dispose();
@@ -277,6 +410,11 @@ export class AgentNetwork3DComponent implements OnDestroy {
         this.selectedNodeId = null;
         this.selectedAgent.set(null);
         this.agentSelected.emit('');
+    }
+
+    protected formatTime(ts: number): string {
+        const d = new Date(ts);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
 
     /* ── Scene initialization ───────────────────────────── */
@@ -320,12 +458,13 @@ export class AgentNetwork3DComponent implements OnDestroy {
         this.createStarfield();
 
         // Events
+        canvas.style.cursor = 'crosshair';
         canvas.addEventListener('mousedown', this.onMouseDown);
         canvas.addEventListener('mousemove', this.onMouseMove);
         canvas.addEventListener('mouseup', this.onMouseUp);
         canvas.addEventListener('wheel', this.onWheel, { passive: false });
-        canvas.addEventListener('click', this.onClick);
         canvas.addEventListener('mouseleave', this.onMouseLeave);
+        document.addEventListener('pointerlockchange', this.onPointerLockChange);
 
         // Touch events for mobile
         canvas.addEventListener('touchstart', (e) => {
@@ -476,6 +615,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
         // Process new messages since last count
         const newMessages = messages.slice(this.lastProcessedMsgCount);
         this.lastProcessedMsgCount = messages.length;
+        const newLogEntries: LogEntry[] = [];
 
         for (const msg of newMessages) {
             const from = this.nodeMap.get(msg.fromAgentId);
@@ -515,6 +655,28 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
             // Spawn particle
             this.spawnParticle(from, to);
+
+            // Add to message log
+            const content = msg.content
+                ? msg.content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+                : '';
+            const preview = content.length > 60 ? content.slice(0, 60) + '...' : content;
+            const logEntry: LogEntry = {
+                fromAgent: msg.fromAgent ?? from.name,
+                toAgent: msg.toAgent ?? to.name,
+                content: preview,
+                channel: msg.channel,
+                timestamp: msg.timestamp,
+                color: from.color.getStyle(),
+            };
+            newLogEntries.push(logEntry);
+        }
+
+        if (newLogEntries.length > 0) {
+            this.logEntries.update((existing) => {
+                const updated = [...newLogEntries, ...existing];
+                return updated.slice(0, AgentNetwork3DComponent.MAX_LOG_ENTRIES);
+            });
         }
     }
 
@@ -630,9 +792,17 @@ export class AgentNetwork3DComponent implements OnDestroy {
                 p.progress += p.speed;
 
                 if (p.progress >= 1) {
-                    // Remove completed particle
-                    this.scene!.remove(p.mesh);
-                    (p.mesh.material as THREE.Material).dispose();
+                    // Convert to fading trail instead of removing
+                    const trailMat = p.mesh.material as THREE.MeshBasicMaterial;
+                    trailMat.opacity = 0.6;
+                    p.mesh.scale.setScalar(0.8);
+                    this.trails.push({
+                        fromId: p.fromId,
+                        toId: p.toId,
+                        mesh: p.mesh,
+                        createdAt: performance.now() / 1000,
+                        maxAge: AgentNetwork3DComponent.TRAIL_MAX_AGE,
+                    });
                     this.particles.splice(i, 1);
                     continue;
                 }
@@ -652,6 +822,23 @@ export class AgentNetwork3DComponent implements OnDestroy {
                 // Fade out near end
                 const pMat = p.mesh.material as THREE.MeshBasicMaterial;
                 pMat.opacity = p.progress > 0.7 ? (1 - p.progress) / 0.3 * 0.9 : 0.9;
+            }
+
+            // Animate trails (fade over time)
+            const nowSec = performance.now() / 1000;
+            for (let i = this.trails.length - 1; i >= 0; i--) {
+                const trail = this.trails[i];
+                const age = nowSec - trail.createdAt;
+                if (age >= trail.maxAge) {
+                    this.scene!.remove(trail.mesh);
+                    (trail.mesh.material as THREE.Material).dispose();
+                    this.trails.splice(i, 1);
+                    continue;
+                }
+                const remaining = 1 - age / trail.maxAge;
+                const trailMat = trail.mesh.material as THREE.MeshBasicMaterial;
+                trailMat.opacity = remaining * 0.5;
+                trail.mesh.scale.setScalar(0.5 + remaining * 0.3);
             }
 
             // Rotate starfield slowly
@@ -680,73 +867,106 @@ export class AgentNetwork3DComponent implements OnDestroy {
     /* ── Event handlers ─────────────────────────────────── */
 
     private handleMouseDown(e: MouseEvent): void {
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        this.dragMoved = false;
+
+        // Request pointer lock for orbit dragging
+        const canvas = this.canvasRef().nativeElement;
+        if (!this.isPointerLocked) {
+            canvas.requestPointerLock();
+        }
         this.isDragging = true;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
     }
 
     private handleMouseMove(e: MouseEvent): void {
-        if (this.isDragging) {
+        if (this.isPointerLocked && this.isDragging) {
+            // Use movementX/Y for pointer-locked orbit
+            const dx = e.movementX;
+            const dy = e.movementY;
+            if (Math.abs(dx) > 0 || Math.abs(dy) > 0) this.dragMoved = true;
+            this.targetTheta -= dx * 0.003;
+            this.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, this.targetPhi - dy * 0.003));
+        } else if (this.isDragging) {
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.dragMoved = true;
             this.targetTheta -= dx * 0.005;
             this.targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, this.targetPhi - dy * 0.005));
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
         }
 
-        // Raycasting for hover
-        const canvas = this.canvasRef().nativeElement;
-        const rect = canvas.getBoundingClientRect();
-        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        // Raycasting for hover (only when not pointer-locked)
+        if (!this.isPointerLocked) {
+            const canvas = this.canvasRef().nativeElement;
+            const rect = canvas.getBoundingClientRect();
+            this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-        this.raycaster.setFromCamera(this.mouse, this.camera!);
-        const meshes = this.agentNodes.map((n) => n.mesh);
-        const intersects = this.raycaster.intersectObjects(meshes);
+            this.raycaster.setFromCamera(this.mouse, this.camera!);
+            const meshes = this.agentNodes.map((n) => n.mesh);
+            const intersects = this.raycaster.intersectObjects(meshes);
 
-        if (intersects.length > 0) {
-            this.hoveredNodeId = intersects[0].object.userData['agentId'] as string;
-            canvas.style.cursor = 'pointer';
-        } else {
-            this.hoveredNodeId = null;
-            canvas.style.cursor = this.isDragging ? 'grabbing' : 'grab';
+            if (intersects.length > 0) {
+                this.hoveredNodeId = intersects[0].object.userData['agentId'] as string;
+                canvas.style.cursor = 'pointer';
+            } else {
+                this.hoveredNodeId = null;
+                canvas.style.cursor = 'crosshair';
+            }
         }
     }
 
-    private handleMouseUp(): void {
+    private handleMouseUp(e: MouseEvent): void {
         this.isDragging = false;
+
+        // Exit pointer lock
+        if (this.isPointerLocked) {
+            document.exitPointerLock();
+        }
+
+        // If didn't drag much, treat as click
+        if (!this.dragMoved && this.camera) {
+            const canvas = this.canvasRef().nativeElement;
+            const rect = canvas.getBoundingClientRect();
+            // Use original drag start position for click detection
+            this.mouse.x = ((this.dragStartX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -((this.dragStartY - rect.top) / rect.height) * 2 + 1;
+
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const meshes = this.agentNodes.map((n) => n.mesh);
+            const intersects = this.raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const agentId = intersects[0].object.userData['agentId'] as string;
+                if (this.selectedNodeId === agentId) {
+                    this.clearSelection();
+                } else {
+                    this.selectedNodeId = agentId;
+                    const agent = this.agents().find((a) => a.id === agentId);
+                    this.selectedAgent.set(agent ?? null);
+                    this.agentSelected.emit(agentId);
+                }
+            } else {
+                this.clearSelection();
+            }
+        }
+    }
+
+    private handlePointerLockChange(): void {
+        const canvas = this.canvasRef()?.nativeElement;
+        this.isPointerLocked = document.pointerLockElement === canvas;
+        if (!this.isPointerLocked) {
+            this.isDragging = false;
+            if (canvas) canvas.style.cursor = 'crosshair';
+        }
     }
 
     private handleWheel(e: WheelEvent): void {
         e.preventDefault();
         this.targetRadius = Math.max(10, Math.min(80, this.targetRadius + e.deltaY * 0.03));
-    }
-
-    private handleClick(e: MouseEvent): void {
-        if (!this.camera) return;
-
-        const canvas = this.canvasRef().nativeElement;
-        const rect = canvas.getBoundingClientRect();
-        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        const meshes = this.agentNodes.map((n) => n.mesh);
-        const intersects = this.raycaster.intersectObjects(meshes);
-
-        if (intersects.length > 0) {
-            const agentId = intersects[0].object.userData['agentId'] as string;
-            if (this.selectedNodeId === agentId) {
-                this.clearSelection();
-            } else {
-                this.selectedNodeId = agentId;
-                const agent = this.agents().find((a) => a.id === agentId);
-                this.selectedAgent.set(agent ?? null);
-                this.agentSelected.emit(agentId);
-            }
-        } else {
-            this.clearSelection();
-        }
     }
 }
