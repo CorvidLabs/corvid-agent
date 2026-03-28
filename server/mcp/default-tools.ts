@@ -30,6 +30,7 @@ export const DEFAULT_CORE_TOOLS: readonly string[] = [
 
     // ── Session & work ──────────────────────────────────────────────────────
     'corvid_extend_timeout',
+    'corvid_restart_server',
     'corvid_check_credits',
     'corvid_list_projects',
     'corvid_current_project',

@@ -12,6 +12,7 @@ export const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_library_delete',
     'corvid_list_agents',
     'corvid_extend_timeout',
+    'corvid_restart_server',
     'corvid_check_credits',
     'corvid_list_projects',
     'corvid_current_project',

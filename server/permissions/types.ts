@@ -66,6 +66,7 @@ export const TOOL_ACTION_MAP: Record<string, PermissionAction> = {
     corvid_save_memory: 'agent:memory',
     corvid_recall_memory: 'agent:memory',
     corvid_extend_timeout: 'agent:extend',
+    corvid_restart_server: 'server:restart',
     // File system (coding tools)
     corvid_code_symbols: 'fs:read',
     corvid_find_references: 'fs:read',

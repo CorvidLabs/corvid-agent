@@ -98,3 +98,6 @@ export {
 
 // ─── Shared library (CRVLIB) ──────────────────────────────────────────────
 export { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './library';
+
+// ─── Server operations ────────────────────────────────────────────────────
+export { handleRestartServer } from './server-ops';
