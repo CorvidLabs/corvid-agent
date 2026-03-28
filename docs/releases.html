@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.55.0</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.56.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -454,24 +454,24 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">50 days · 55 releases · 997 commits</div>
+    <div class="hero-badge">51 days · 56 releases · 1012 commits</div>
     <h1>CorvidAgent<br>Release Retrospective</h1>
     <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
     <div class="hero-version-range">
       <span class="version">v0.1.0</span>
       <span class="arrow">→</span>
-      <span class="version">v0.55.0</span>
+      <span class="version">v0.56.0</span>
     </div>
   </section>
 
   <!-- Stats bar -->
   <section class="stats-bar">
     <div class="stat-card">
-      <div class="stat-number">55</div>
+      <div class="stat-number">56</div>
       <div class="stat-label">Releases</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">997</div>
+      <div class="stat-number">1012</div>
       <div class="stat-label">Commits</div>
     </div>
     <div class="stat-card">
@@ -931,7 +931,7 @@
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
           <div class="era-date">Mar 21 – Mar 27, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.55.0</div>
+        <div class="era-versions">v0.42.0 – v0.56.0</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -975,6 +975,22 @@
             <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
             <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.56.0</span>
+            <span class="release-date">Mar 27</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>CRVLIB bootstrap</strong> — wire shared agent library MCP tools + sync service into server bootstrap</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Role-based comms tiers</strong> — directional agent messaging with communication tier system</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Agent signature standardization</strong> — unified signature format on commits, PRs, issues, comments</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Ollama: configurable default model</strong> — OLLAMA_DEFAULT_MODEL / OLLAMA_DEFAULT_LOCAL_MODEL env vars</li>
+            <li><span class="tag tag-fix">fix</span> <strong>Restart loop prevention</strong> — corvid_restart_server tool no longer triggers infinite restart cycles</li>
+            <li><span class="tag tag-fix">fix</span> <strong>Ollama: HTTP 500 classification</strong> — classify 500 as transient, verify 404/400 as permanent errors</li>
+            <li><span class="tag tag-fix">fix</span> Env-driven config, library tools permissions, Cursor CLI event types, Nemotron timeout handling</li>
+            <li><span class="tag tag-chore">chore</span> Merge doc/ into docs/ for GitHub Pages compatibility, remove tmp/ from tracking</li>
           </ul>
         </div>
       </div>

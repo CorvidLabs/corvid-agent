@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.56.0] - 2026-03-27
+
+### Added
+- **CRVLIB bootstrap** — wire shared agent library MCP tools + sync service into server bootstrap (#1564)
+- **Role-based communication tiers** — directional agent messaging with tier system for structured cross-agent comms (#1567)
+- **Agent signature standardization** — unified signature format on commits, PRs, issues, and comments (#1577)
+- **Ollama: configurable default model** — `OLLAMA_DEFAULT_MODEL` and `OLLAMA_DEFAULT_LOCAL_MODEL` env vars for flexible model selection (#1573, #1575)
+
+### Fixed
+- **Server: restart loop prevention** — `corvid_restart_server` tool no longer triggers infinite restart cycles (#1582)
+- **Ollama: HTTP 500 error classification** — classify HTTP 500 as transient, verify 404/400 as permanent errors with tests (#1574)
+- **Comms: Cursor CLI event types** — capture Cursor CLI event types in agent response subscribers (#1572)
+- **Config: env-driven references** — replace hardcoded CorvidLabs references with env-driven config (#1571)
+- **Library: tool permissions** — add library tools to DEFAULT_ALLOWED_TOOLS for non-web sessions (#1569)
+- **Library: localnet detection** — use MCP context network instead of env var for localnet detection (#1566)
+- **Ollama: Nemotron timeout** — improve Nemotron cloud proxy timeout handling (#1565)
+
+### Chore
+- Merge `doc/` into `docs/` for GitHub Pages compatibility (#1587)
+- Remove `tmp/` from git tracking and add to `.gitignore`
+
 ## [0.55.0] - 2026-03-27
 
 ### Added
