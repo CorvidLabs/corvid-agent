@@ -1,20 +1,23 @@
 ---
 module: memory-brain-viewer
-version: 1
-status: draft
+version: 2
+status: active
 files:
   - server/routes/dashboard.ts
+  - client/src/app/features/memory/unified-memory.component.ts
 db_tables:
   - agent_memories
 depends_on:
   - specs/memory/memory.spec.md
 ---
 
-# Memory Brain Viewer
+# Unified Memory View
 
 ## Purpose
 
-Dashboard panel that gives humans full visibility into an agent's "brain" — all stored memories across both tiers (long-term localnet/on-chain and short-term SQLite cache). Shows sync status, storage tier, encryption state, and memory health metrics so operators can understand what an agent knows, where it's stored, and whether the two tiers are in sync.
+Consolidated memory view at `/observe/memory` that merges the former Brain Viewer and Memory Browser into a single interface. Gives humans full visibility into an agent's "brain" — all stored memories across both tiers (long-term localnet/on-chain and short-term SQLite cache). Three view modes: **Overview** (stats, sync health, tier breakdown), **Browse** (searchable memory list with filtering), and **3D** (spatial graph visualization of memories and their relationships). Shows sync status, storage tier, encryption state, and memory health metrics so operators can understand what an agent knows, where it's stored, and whether the two tiers are in sync.
+
+Replaces the former `/observe/brain-viewer` and `/observe/memory-browser` routes (both redirect here).
 
 ## Public API
 
@@ -194,3 +197,4 @@ interface MemorySyncStatus {
 |------|--------|--------|
 | 2026-03-17 | corvid-agent | Initial draft spec for memory brain viewer |
 | 2026-03-18 | corvid-agent | Document exported functions, remove files already covered by memory/agent-memories/on-chain specs (#591) |
+| 2026-03-27 | corvid-agent | Consolidated Brain Viewer + Memory Browser into unified Memory view with Overview/Browse/3D modes (#1595) |
