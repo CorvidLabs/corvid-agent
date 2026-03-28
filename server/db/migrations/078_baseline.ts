@@ -1163,6 +1163,7 @@ const INDEXES = [
     `CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,

@@ -73,7 +73,7 @@ export interface SubTab {
                 color 0.15s ease,
                 border-color 0.15s ease,
                 background 0.15s ease,
-                transform 0.12s ease;
+transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
         }
         @media (hover: hover) {
             .tab-shell__tab:hover {

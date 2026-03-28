@@ -9,6 +9,7 @@ import {
     ElementRef,
 } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { pageRouteAnimation } from './animations/route-transitions';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { TopNavComponent } from './shared/components/top-nav.component';
@@ -27,6 +28,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    animations: [pageRouteAnimation],
     imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent],
     template: `
         <div class="app-layout" [class.app-layout--session]="isSessionView()">
@@ -48,7 +50,12 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
             <div class="app-layout__body">
                 <main class="app-layout__content" role="main" id="main-content" #mainContent (scroll)="onScroll($event)">
-                    <router-outlet />
+                    <div
+                        class="router-outlet-host"
+                        [@.disabled]="reduceMotion()"
+                        [@pageRoute]="routeAnimationKey()">
+                        <router-outlet />
+                    </div>
                 </main>
                 <app-activity-rail />
             </div>
@@ -89,6 +96,12 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             overflow-y: auto;
             scroll-behavior: smooth;
             container-type: inline-size;
+        }
+        .router-outlet-host {
+            display: block;
+            min-height: 100%;
+            min-width: 0;
+            position: relative;
         }
         .app-layout__banner {
             padding: 0.375rem 1rem;
@@ -165,21 +178,40 @@ export class App implements OnInit, OnDestroy {
 
     protected readonly showScrollTop = signal(false);
     protected readonly isSessionView = signal(false);
+    /** Drives route enter animation; updates on each navigation. */
+    protected readonly routeAnimationKey = signal(this.router.url);
+    /** Disables route transition when prefers-reduced-motion is set. */
+    protected readonly reduceMotion = signal(false);
     private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
     private routerSub: Subscription | null = null;
+    private motionQuery: MediaQueryList | null = null;
+    private onMotionChange: ((e: MediaQueryListEvent) => void) | null = null;
 
     ngOnInit(): void {
         this.wsService.connect();
         this.sessionService.init();
 
+        if (typeof globalThis.matchMedia !== 'undefined') {
+            this.motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
+            this.reduceMotion.set(this.motionQuery.matches);
+            this.onMotionChange = (e: MediaQueryListEvent) => this.reduceMotion.set(e.matches);
+            this.motionQuery.addEventListener('change', this.onMotionChange);
+        }
+
         // Track whether we're viewing a session (hides bottom nav on mobile)
         this.isSessionView.set(this.router.url.startsWith('/sessions/'));
         this.routerSub = this.router.events
             .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-            .subscribe((e) => this.isSessionView.set(e.urlAfterRedirects.startsWith('/sessions/')));
+            .subscribe((e) => {
+                this.isSessionView.set(e.urlAfterRedirects.startsWith('/sessions/'));
+                this.routeAnimationKey.set(e.urlAfterRedirects);
+            });
     }
 
     ngOnDestroy(): void {
+        if (this.motionQuery && this.onMotionChange) {
+            this.motionQuery.removeEventListener('change', this.onMotionChange);
+        }
         this.sessionService.destroy();
         this.wsService.disconnect();
         this.routerSub?.unsubscribe();
