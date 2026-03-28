@@ -6,11 +6,13 @@
  */
 
 import { createLogger } from '../lib/logger';
+import { getModelPricing } from '../providers/cost-table';
 
 const log = createLogger('DirectProcess');
 
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
+const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 /**
  * Content-aware token estimation.
@@ -30,9 +32,37 @@ export function estimateTokens(text: string): number {
     return Math.ceil(text.length / charsPerToken);
 }
 
-/** Get the configured context window size in tokens. */
-export function getContextBudget(): number {
-    return parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
+/**
+ * Get the configured context window size in tokens, model-aware.
+ * Uses the cost table to look up the correct context window for the model.
+ * Falls back to OLLAMA_NUM_CTX env var, then to DEFAULT_CONTEXT_WINDOW.
+ */
+export function getContextBudget(model?: string): number {
+    if (model) {
+        const pricing = getModelPricing(model);
+        if (pricing) return pricing.maxContextTokens;
+    }
+    if (process.env.OLLAMA_NUM_CTX) return parseInt(process.env.OLLAMA_NUM_CTX, 10);
+    return DEFAULT_CONTEXT_WINDOW;
+}
+
+/**
+ * Detect whether an error message indicates a context overflow from any provider.
+ * Covers Anthropic, OpenAI, Ollama, and OpenRouter error patterns.
+ */
+export function isContextOverflowError(errorMsg: string): boolean {
+    const lower = errorMsg.toLowerCase();
+    return (
+        lower.includes('prompt is too long') ||
+        lower.includes('context_length_exceeded') ||
+        lower.includes('context length exceeded') ||
+        lower.includes('request too large') ||
+        lower.includes('maximum context length') ||
+        lower.includes('token limit') ||
+        lower.includes('input is too long') ||
+        lower.includes('too many tokens') ||
+        (lower.includes('exceed') && lower.includes('context'))
+    );
 }
 
 /**
@@ -45,8 +75,9 @@ export function getContextBudget(): number {
 export function calculateMaxToolResultChars(
     messages: Array<{ role: string; content: string }>,
     systemPrompt: string,
+    model?: string,
 ): number {
-    const ctxSize = getContextBudget();
+    const ctxSize = getContextBudget(model);
     // Absolute max: 30% of context window for a single result
     const absoluteMax = Math.floor(ctxSize * 0.3) * 4; // tokens → chars
     // Absolute min: always allow at least 1K chars for errors etc.
@@ -70,8 +101,9 @@ export function calculateMaxToolResultChars(
 export function truncateCouncilContext(
     messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
     systemPrompt: string,
+    model?: string,
 ): void {
-    const ctxSize = parseInt(process.env.OLLAMA_NUM_CTX ?? '16384', 10);
+    const ctxSize = getContextBudget(model);
     const threshold = Math.floor(ctxSize * 0.7);
 
     const systemTokens = estimateTokens(systemPrompt);
@@ -145,8 +177,13 @@ export function compressToolResults(
  */
 export function summarizeConversation(
     messages: Array<{ role: string; content: string }>,
+    projectContext?: { name: string; workingDir: string },
 ): string {
     const points: string[] = [];
+
+    if (projectContext) {
+        points.push(`Active project: ${projectContext.name} (${projectContext.workingDir})`);
+    }
 
     // Extract key user requests
     const userMessages = messages.filter(m => m.role === 'user');
@@ -261,8 +298,9 @@ function trimMessagesTier2(
 export function trimMessages(
     messages: ConversationMessage[],
     systemPrompt?: string,
+    model?: string,
 ): void {
-    const ctxSize = getContextBudget();
+    const ctxSize = getContextBudget(model);
     const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
     const messageTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
     const totalTokens = systemTokens + messageTokens;
@@ -351,8 +389,9 @@ export function computeContextUsage(
     msgs: Array<{ role: string; content: string }>,
     sysPrompt: string,
     trimmed: boolean,
+    model?: string,
 ): { estimatedTokens: number; contextWindow: number; usagePercent: number; messagesCount: number; trimmed: boolean } {
-    const contextWindow = getContextBudget();
+    const contextWindow = getContextBudget(model);
     const estimatedTokens = estimateTokens(sysPrompt) +
         msgs.reduce((sum, m) => sum + estimateTokens(m.content), 0);
     const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);

@@ -45,6 +45,7 @@ import {
     trimMessages,
     computeContextUsage,
     determineWarningLevel,
+    isContextOverflowError,
 } from './context-management';
 
 export {
@@ -214,7 +215,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         // Council synthesis prompts can be very long — truncate if needed
         if (session.councilRole === 'chairman') {
-            truncateCouncilContext(messages, systemPrompt);
+            truncateCouncilContext(messages, systemPrompt, model);
         }
 
         // Signal that the agent is working
@@ -305,7 +306,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             msgs: Array<{ role: string; content: string }>,
             sysPrompt: string,
         ): void {
-            const usage = computeContextUsage(msgs, sysPrompt, hasTrimmed);
+            const usage = computeContextUsage(msgs, sysPrompt, hasTrimmed, model);
 
             onEvent({
                 type: 'context_usage',
@@ -353,7 +354,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             let result;
             try {
                 const countBefore = messages.length;
-                trimMessages(messages, systemPrompt);
+                trimMessages(messages, systemPrompt, model);
                 if (messages.length < countBefore) hasTrimmed = true;
                 // Post-trim pass: truncate old tool results for additional savings
                 truncateOldToolResults(messages, 3, 500);
@@ -375,12 +376,45 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 clearInterval(heartbeat);
                 // Tool fallback: if the model doesn't support tools, retry without them
                 const errorMsg = err instanceof Error ? err.message : String(err);
-                if (!toolsDisabled && providerTools && isToolUnsupportedError(errorMsg)) {
+                if (isContextOverflowError(errorMsg)) {
+                    log.warn(`Context overflow for session ${session.id} (model: ${model}) — applying emergency compression and retrying`);
+                    const projectContext = project ? { name: project.name, workingDir: project.workingDir } : undefined;
+                    const summary = summarizeConversation(messages, projectContext);
+                    const keepLast = Math.min(4, messages.length);
+                    const recent = messages.slice(-keepLast);
+                    messages.length = 0;
+                    messages.push({ role: 'user', content: summary });
+                    messages.push(...recent);
+                    hasTrimmed = true;
+
+                    onEvent({
+                        type: 'context_warning',
+                        session_id: session.id,
+                        level: 'critical',
+                        usagePercent: 100,
+                        message: 'Context limit reached — conversation history was compressed to continue. Some earlier details may be summarized.',
+                    } as ClaudeStreamEvent);
+
+                    emitContextUsage(messages, systemPrompt);
+                    result = await provider.complete({
+                        model,
+                        systemPrompt,
+                        messages,
+                        tools: (!toolsDisabled && directTools.length > 0) ? toProviderTools(directTools) : undefined,
+                        signal: abortController.signal,
+                        onActivity: activityCallback,
+                        onStream: (text) => onEvent({
+                            type: 'content_block_delta',
+                            delta: { text },
+                        } as ClaudeStreamEvent),
+                        providerOptions,
+                    });
+                } else if (!toolsDisabled && providerTools && isToolUnsupportedError(errorMsg)) {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
                     const countBefore2 = messages.length;
-                    trimMessages(messages, systemPrompt);
+                    trimMessages(messages, systemPrompt, model);
                     if (messages.length < countBefore2) hasTrimmed = true;
                     // Post-trim pass: truncate old tool results
                     truncateOldToolResults(messages, 3, 500);
@@ -524,10 +558,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
                     try {
                         const toolResult = await toolDef.handler(toolCall.arguments);
-                        const maxChars = calculateMaxToolResultChars(messages, systemPrompt);
+                        const maxChars = calculateMaxToolResultChars(messages, systemPrompt, model);
                         let resultText = toolResult.text;
                         if (resultText.length > maxChars) {
-                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, maxChars, contextBudget: getContextBudget() });
+                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, maxChars, contextBudget: getContextBudget(model) });
                             // For structured data (JSON), try to keep head + tail
                             if (resultText.startsWith('{') || resultText.startsWith('[')) {
                                 const headSize = Math.floor(maxChars * 0.7);

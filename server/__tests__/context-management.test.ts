@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import {
     estimateTokens,
     getContextBudget,
@@ -10,8 +10,24 @@ import {
     trimMessages,
     computeContextUsage,
     determineWarningLevel,
+    isContextOverflowError,
     type ConversationMessage,
 } from '../process/context-management';
+
+// Many tests below were written against the old 8192 default.
+// Pin OLLAMA_NUM_CTX so the numeric expectations stay valid.
+let savedOllamaNumCtx: string | undefined;
+beforeEach(() => {
+    savedOllamaNumCtx = process.env.OLLAMA_NUM_CTX;
+    process.env.OLLAMA_NUM_CTX = '8192';
+});
+afterEach(() => {
+    if (savedOllamaNumCtx !== undefined) {
+        process.env.OLLAMA_NUM_CTX = savedOllamaNumCtx;
+    } else {
+        delete process.env.OLLAMA_NUM_CTX;
+    }
+});
 
 // ── estimateTokens ─────────────────────────────────────────────────────────
 
@@ -48,11 +64,62 @@ describe('estimateTokens', () => {
 // ── getContextBudget ───────────────────────────────────────────────────────
 
 describe('getContextBudget', () => {
-    it('returns default 8192 when env not set', () => {
-        const original = process.env.OLLAMA_NUM_CTX;
+    it('returns OLLAMA_NUM_CTX when set', () => {
+        process.env.OLLAMA_NUM_CTX = '16384';
+        expect(getContextBudget()).toBe(16384);
+    });
+
+    it('returns default 128000 when env not set and no model', () => {
         delete process.env.OLLAMA_NUM_CTX;
-        expect(getContextBudget()).toBe(8192);
-        if (original !== undefined) process.env.OLLAMA_NUM_CTX = original;
+        expect(getContextBudget()).toBe(128_000);
+    });
+
+    it('returns model context window from cost table', () => {
+        delete process.env.OLLAMA_NUM_CTX;
+        // Claude Opus 4 has 200K context
+        const budget = getContextBudget('claude-opus-4-6');
+        expect(budget).toBe(200_000);
+    });
+
+    it('falls back to default for unknown model', () => {
+        delete process.env.OLLAMA_NUM_CTX;
+        expect(getContextBudget('unknown-model-xyz')).toBe(128_000);
+    });
+
+    it('prefers model pricing over env var', () => {
+        process.env.OLLAMA_NUM_CTX = '4096';
+        const budget = getContextBudget('claude-opus-4-6');
+        expect(budget).toBe(200_000);
+    });
+});
+
+// ── isContextOverflowError ──────────────────────────────────────────────────
+
+describe('isContextOverflowError', () => {
+    it('detects Anthropic overflow error', () => {
+        expect(isContextOverflowError('prompt is too long: 250000 tokens > 200000 maximum')).toBe(true);
+    });
+
+    it('detects OpenAI overflow error', () => {
+        expect(isContextOverflowError("This model's maximum context length is 128000 tokens")).toBe(true);
+    });
+
+    it('detects Ollama overflow error', () => {
+        expect(isContextOverflowError('input is too long for context window')).toBe(true);
+    });
+
+    it('detects generic token limit error', () => {
+        expect(isContextOverflowError('Request has too many tokens')).toBe(true);
+    });
+
+    it('detects context_length_exceeded error code', () => {
+        expect(isContextOverflowError('context_length_exceeded')).toBe(true);
+    });
+
+    it('returns false for unrelated errors', () => {
+        expect(isContextOverflowError('network timeout')).toBe(false);
+        expect(isContextOverflowError('rate limit exceeded')).toBe(false);
+        expect(isContextOverflowError('invalid api key')).toBe(false);
     });
 });
 
@@ -258,6 +325,16 @@ describe('summarizeConversation', () => {
 
     it('handles empty messages', () => {
         expect(summarizeConversation([])).toContain('[Context Summary]');
+    });
+
+    it('includes project context when provided', () => {
+        const messages = [
+            { role: 'user', content: 'Fix the bug' },
+            { role: 'assistant', content: 'Done' },
+        ];
+        const summary = summarizeConversation(messages, { name: 'corvid-agent', workingDir: '/home/corvid' });
+        expect(summary).toContain('Active project: corvid-agent');
+        expect(summary).toContain('/home/corvid');
     });
 
     it('summarizes many follow-ups concisely', () => {

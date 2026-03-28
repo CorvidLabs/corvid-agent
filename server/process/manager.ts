@@ -679,7 +679,9 @@ export class ProcessManager {
                 try {
                     const existingMessages = getSessionMessages(this.db, session.id);
                     if (existingMessages.length > 0) {
-                        const summary = summarizeConversation(existingMessages);
+                        const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
+                        const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
+                        const summary = summarizeConversation(existingMessages, projectContext);
                         meta.contextSummary = summary;
                         log.info(`Generated context summary for session ${session.id} (${summary.length} chars)`);
                     }
