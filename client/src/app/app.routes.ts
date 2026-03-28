@@ -7,18 +7,9 @@ import type { SubTab } from './shared/components/sub-tab-shell.component';
 const SETTINGS_TABS: SubTab[] = [
     { label: 'General', path: './', exact: true },
     { label: 'Security', path: 'security' },
-    { label: 'Wallets', path: 'wallets' },
-    { label: 'Spending', path: 'spending' },
-    { label: 'Allowlist', path: 'allowlist' },
-    { label: 'GH Allowlist', path: 'github-allowlist' },
-    { label: 'Repo Blocklist', path: 'repo-blocklist' },
-    { label: 'Marketplace', path: 'marketplace' },
-    { label: 'Schedules', path: 'schedules' },
-    { label: 'Workflows', path: 'workflows' },
-    { label: 'Webhooks', path: 'webhooks' },
-    { label: 'Polling', path: 'mention-polling' },
-    { label: 'MCP Servers', path: 'mcp-servers' },
-    { label: 'Contacts', path: 'contacts' },
+    { label: 'Access Control', path: 'access-control' },
+    { label: 'Automation', path: 'automation' },
+    { label: 'Integrations', path: 'integrations' },
 ];
 
 const AGENTS_TABS: SubTab[] = [
@@ -26,8 +17,6 @@ const AGENTS_TABS: SubTab[] = [
     { label: 'Flock Directory', path: 'flock-directory' },
     { label: 'Projects', path: 'projects' },
     { label: 'Models', path: 'models' },
-    { label: 'Personas', path: 'personas' },
-    { label: 'Skill Bundles', path: 'skill-bundles' },
 ];
 
 const SESSIONS_TABS: SubTab[] = [
@@ -37,12 +26,10 @@ const SESSIONS_TABS: SubTab[] = [
 ];
 
 const OBSERVE_TABS: SubTab[] = [
-    { label: 'Live Feed', path: './', exact: true },
-    { label: 'Agent Comms', path: 'agent-comms' },
+    { label: 'Comms', path: './', exact: true },
+    { label: 'Memory', path: 'memory' },
     { label: 'Analytics', path: 'analytics' },
     { label: 'Logs', path: 'logs' },
-    { label: 'Brain Viewer', path: 'brain-viewer' },
-    { label: 'Memory Browser', path: 'memory-browser' },
     { label: 'Reputation', path: 'reputation' },
 ];
 
@@ -102,6 +89,7 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/models/models.component').then((m) => m.ModelsComponent),
             },
+            // Personas & Skill Bundles remain accessible at old paths but removed from tabs
             {
                 path: 'personas',
                 loadComponent: () =>
@@ -141,11 +129,8 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import('./features/sessions/session-list.component').then((m) => m.SessionListComponent),
             },
-            {
-                path: 'new',
-                loadComponent: () =>
-                    import('./features/sessions/session-launcher.component').then((m) => m.SessionLauncherComponent),
-            },
+            // /sessions/new redirects to /chat (consolidated)
+            { path: 'new', redirectTo: '/chat', pathMatch: 'full' },
             {
                 path: 'work-tasks',
                 loadComponent: () =>
@@ -180,7 +165,7 @@ export const routes: Routes = [
             { path: 'feed', redirectTo: '/observe', pathMatch: 'full' },
             { path: 'analytics', redirectTo: '/observe/analytics', pathMatch: 'full' },
             { path: 'logs', redirectTo: '/observe/logs', pathMatch: 'full' },
-            { path: 'brain-viewer', redirectTo: '/observe/brain-viewer', pathMatch: 'full' },
+            { path: 'brain-viewer', redirectTo: '/observe/memory', pathMatch: 'full' },
             { path: 'reputation', redirectTo: '/observe/reputation', pathMatch: 'full' },
             {
                 path: ':id',
@@ -199,12 +184,12 @@ export const routes: Routes = [
             {
                 path: '',
                 loadComponent: () =>
-                    import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
+                    import('./features/comms/unified-comms.component').then((m) => m.UnifiedCommsComponent),
             },
             {
-                path: 'agent-comms',
+                path: 'memory',
                 loadComponent: () =>
-                    import('./features/agent-comms/agent-comms.component').then((m) => m.AgentCommsComponent),
+                    import('./features/memory/unified-memory.component').then((m) => m.UnifiedMemoryComponent),
             },
             {
                 path: 'analytics',
@@ -217,24 +202,19 @@ export const routes: Routes = [
                     import('./features/logs/system-logs.component').then((m) => m.SystemLogsComponent),
             },
             {
-                path: 'brain-viewer',
-                loadComponent: () =>
-                    import('./features/brain-viewer/brain-viewer.component').then((m) => m.BrainViewerComponent),
-            },
-            {
-                path: 'memory-browser',
-                loadComponent: () =>
-                    import('./features/memory-browser/memory-browser.component').then((m) => m.MemoryBrowserComponent),
-            },
-            {
                 path: 'reputation',
                 loadComponent: () =>
                     import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
             },
+            // Backwards-compat redirects for old observe paths
+            { path: 'live-feed', redirectTo: '/observe', pathMatch: 'full' },
+            { path: 'agent-comms', redirectTo: '/observe', pathMatch: 'full' },
+            { path: 'brain-viewer', redirectTo: '/observe/memory', pathMatch: 'full' },
+            { path: 'memory-browser', redirectTo: '/observe/memory', pathMatch: 'full' },
         ],
     },
 
-    // ── Settings (consolidated — now includes Automate views) ────────────
+    // ── Settings (consolidated — 5 tabs) ─────────────────────────────
     {
         path: 'settings',
         component: SubTabShellComponent,
@@ -248,69 +228,36 @@ export const routes: Routes = [
             {
                 path: 'security',
                 loadComponent: () =>
-                    import('./features/security-overview/security-overview.component').then((m) => m.SecurityOverviewComponent),
+                    import('./features/settings-security/settings-security.component').then((m) => m.SettingsSecurityComponent),
             },
             {
-                path: 'wallets',
+                path: 'access-control',
                 loadComponent: () =>
-                    import('./features/wallets/wallet-viewer.component').then((m) => m.WalletViewerComponent),
+                    import('./features/settings-access/settings-access.component').then((m) => m.SettingsAccessComponent),
             },
             {
-                path: 'spending',
+                path: 'automation',
                 loadComponent: () =>
-                    import('./features/spending/spending.component').then((m) => m.SpendingComponent),
+                    import('./features/settings-automation/settings-automation.component').then((m) => m.SettingsAutomationComponent),
             },
             {
-                path: 'allowlist',
+                path: 'integrations',
                 loadComponent: () =>
-                    import('./features/allowlist/allowlist.component').then((m) => m.AllowlistComponent),
+                    import('./features/settings-integrations/settings-integrations.component').then((m) => m.SettingsIntegrationsComponent),
             },
-            {
-                path: 'github-allowlist',
-                loadComponent: () =>
-                    import('./features/github-allowlist/github-allowlist.component').then((m) => m.GitHubAllowlistComponent),
-            },
-            {
-                path: 'repo-blocklist',
-                loadComponent: () =>
-                    import('./features/repo-blocklist/repo-blocklist.component').then((m) => m.RepoBlocklistComponent),
-            },
-            {
-                path: 'marketplace',
-                loadComponent: () =>
-                    import('./features/marketplace/marketplace.component').then((m) => m.MarketplaceComponent),
-            },
-            // Automate views (moved from /automate/* to /settings/*)
-            {
-                path: 'schedules',
-                loadComponent: () =>
-                    import('./features/schedules/schedule-list.component').then((m) => m.ScheduleListComponent),
-            },
-            {
-                path: 'workflows',
-                loadComponent: () =>
-                    import('./features/workflows/workflow-list.component').then((m) => m.WorkflowListComponent),
-            },
-            {
-                path: 'webhooks',
-                loadComponent: () =>
-                    import('./features/webhooks/webhook-list.component').then((m) => m.WebhookListComponent),
-            },
-            {
-                path: 'mention-polling',
-                loadComponent: () =>
-                    import('./features/mention-polling/mention-polling-list.component').then((m) => m.MentionPollingListComponent),
-            },
-            {
-                path: 'mcp-servers',
-                loadComponent: () =>
-                    import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
-            },
-            {
-                path: 'contacts',
-                loadComponent: () =>
-                    import('./features/contacts/contact-list.component').then((m) => m.ContactListComponent),
-            },
+            // Backwards-compat: old flat settings paths → consolidated tabs
+            { path: 'wallets', redirectTo: '/settings/security', pathMatch: 'full' },
+            { path: 'spending', redirectTo: '/settings/security', pathMatch: 'full' },
+            { path: 'allowlist', redirectTo: '/settings/access-control', pathMatch: 'full' },
+            { path: 'github-allowlist', redirectTo: '/settings/access-control', pathMatch: 'full' },
+            { path: 'repo-blocklist', redirectTo: '/settings/access-control', pathMatch: 'full' },
+            { path: 'schedules', redirectTo: '/settings/automation', pathMatch: 'full' },
+            { path: 'workflows', redirectTo: '/settings/automation', pathMatch: 'full' },
+            { path: 'webhooks', redirectTo: '/settings/automation', pathMatch: 'full' },
+            { path: 'mention-polling', redirectTo: '/settings/automation', pathMatch: 'full' },
+            { path: 'mcp-servers', redirectTo: '/settings/integrations', pathMatch: 'full' },
+            { path: 'contacts', redirectTo: '/settings/integrations', pathMatch: 'full' },
+            { path: 'marketplace', redirectTo: '/settings/integrations', pathMatch: 'full' },
         ],
     },
 
@@ -331,30 +278,31 @@ export const routes: Routes = [
     { path: 'feed', redirectTo: 'observe', pathMatch: 'full' },
     { path: 'analytics', redirectTo: 'observe/analytics', pathMatch: 'full' },
     { path: 'logs', redirectTo: 'observe/logs', pathMatch: 'full' },
-    { path: 'brain-viewer', redirectTo: 'observe/brain-viewer', pathMatch: 'full' },
+    { path: 'brain-viewer', redirectTo: 'observe/memory', pathMatch: 'full' },
     { path: 'reputation', redirectTo: 'observe/reputation', pathMatch: 'full' },
-    { path: 'memory-browser', redirectTo: 'observe/memory-browser', pathMatch: 'full' },
+    { path: 'memory-browser', redirectTo: 'observe/memory', pathMatch: 'full' },
+    { path: 'agent-comms', redirectTo: 'observe', pathMatch: 'full' },
 
     // Old automate paths -> settings/*
-    { path: 'automate', redirectTo: 'settings/schedules', pathMatch: 'full' },
-    { path: 'automate/workflows', redirectTo: 'settings/workflows', pathMatch: 'full' },
-    { path: 'automate/webhooks', redirectTo: 'settings/webhooks', pathMatch: 'full' },
-    { path: 'automate/mention-polling', redirectTo: 'settings/mention-polling', pathMatch: 'full' },
-    { path: 'automate/mcp-servers', redirectTo: 'settings/mcp-servers', pathMatch: 'full' },
-    { path: 'schedules', redirectTo: 'settings/schedules', pathMatch: 'full' },
-    { path: 'workflows', redirectTo: 'settings/workflows', pathMatch: 'full' },
-    { path: 'webhooks', redirectTo: 'settings/webhooks', pathMatch: 'full' },
-    { path: 'mention-polling', redirectTo: 'settings/mention-polling', pathMatch: 'full' },
-    { path: 'mcp-servers', redirectTo: 'settings/mcp-servers', pathMatch: 'full' },
+    { path: 'automate', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'automate/workflows', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'automate/webhooks', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'automate/mention-polling', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'automate/mcp-servers', redirectTo: 'settings/integrations', pathMatch: 'full' },
+    { path: 'schedules', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'workflows', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'webhooks', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'mention-polling', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'mcp-servers', redirectTo: 'settings/integrations', pathMatch: 'full' },
 
     // Old flat settings paths
     { path: 'security', redirectTo: 'settings/security', pathMatch: 'full' },
-    { path: 'wallets', redirectTo: 'settings/wallets', pathMatch: 'full' },
-    { path: 'spending', redirectTo: 'settings/spending', pathMatch: 'full' },
-    { path: 'allowlist', redirectTo: 'settings/allowlist', pathMatch: 'full' },
-    { path: 'github-allowlist', redirectTo: 'settings/github-allowlist', pathMatch: 'full' },
-    { path: 'repo-blocklist', redirectTo: 'settings/repo-blocklist', pathMatch: 'full' },
-    { path: 'marketplace', redirectTo: 'settings/marketplace', pathMatch: 'full' },
+    { path: 'wallets', redirectTo: 'settings/security', pathMatch: 'full' },
+    { path: 'spending', redirectTo: 'settings/security', pathMatch: 'full' },
+    { path: 'allowlist', redirectTo: 'settings/access-control', pathMatch: 'full' },
+    { path: 'github-allowlist', redirectTo: 'settings/access-control', pathMatch: 'full' },
+    { path: 'repo-blocklist', redirectTo: 'settings/access-control', pathMatch: 'full' },
+    { path: 'marketplace', redirectTo: 'settings/integrations', pathMatch: 'full' },
 
     {
         path: '**',

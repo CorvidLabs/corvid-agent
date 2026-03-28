@@ -22,7 +22,6 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { FlockAgent } from '@shared/types/flock-directory';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
-import type { Session } from '../../core/models/session.model';
 import { firstValueFrom } from 'rxjs';
 
 interface OverviewData {
@@ -60,12 +59,6 @@ interface ActivityEvent {
     status?: string;
 }
 
-interface SpendingDay { date: string; algo_micro: number; api_cost_usd: number; }
-interface SessionCostDay { date: string; session_count: number; cost_usd: number; turns: number; }
-interface SpendingData { spending: SpendingDay[]; sessionCosts: SessionCostDay[]; days: number; }
-interface AgentSessionStat { agent_id: string; agent_name: string; session_count: number; total_cost: number; total_turns: number; }
-interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string; count: number }[]; byStatus: { status: string; count: number }[]; }
-
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -99,21 +92,9 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                     }
                 </div>
                 <div class="dash-toolbar__right">
-                    <div class="view-toggle">
-                        <button class="view-toggle__btn"
-                                [class.view-toggle__btn--active]="layoutService.viewMode() === 'simple'"
-                                (click)="layoutService.setViewMode('simple')"
-                                title="Simplified view for everyday use">Simple</button>
-                        <button class="view-toggle__btn"
-                                [class.view-toggle__btn--active]="layoutService.viewMode() === 'developer'"
-                                (click)="layoutService.setViewMode('developer')"
-                                title="Full dashboard with metrics, charts, and developer tools">Developer</button>
-                    </div>
-                    @if (layoutService.viewMode() === 'developer') {
-                        <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
-                            {{ layoutService.customizing() ? 'Done' : 'Customize' }}
-                        </button>
-                    }
+                    <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
+                        {{ layoutService.customizing() ? 'Done' : 'Customize' }}
+                    </button>
                 </div>
             </div>
 
@@ -144,18 +125,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 </button>
                             </div>
                         }
-                    </div>
-                </div>
-            }
-
-            <!-- Simple mode hero prompt -->
-            @if (layoutService.viewMode() === 'simple') {
-                <div class="simple-prompt">
-                    <h2 class="simple-prompt__title">What would you like to build?</h2>
-                    <p class="simple-prompt__desc">Start a conversation with your agent to build something new, or check on active sessions below.</p>
-                    <div class="simple-prompt__actions">
-                        <button class="simple-prompt__btn simple-prompt__btn--primary" (click)="navigateTo('/sessions/new')">Start a Conversation</button>
-                        <button class="simple-prompt__btn" (click)="navigateTo('/chat')">Open Chat</button>
                     </div>
                 </div>
             }
@@ -369,179 +338,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             </div>
                         }
 
-                        <!-- spending-chart -->
-                        @if (widget.id === 'spending-chart') {
-                            @if (widgetErrors()['spending-chart']) {
-                                <div class="widget-error">
-                                    <span class="widget-error__icon">!</span>
-                                    <span class="widget-error__msg">{{ widgetErrors()['spending-chart'] }}</span>
-                                    <button class="widget-error__retry" (click)="refreshWidget('spending-chart')">Retry</button>
-                                </div>
-                            } @else {
-                            <div class="section">
-                                <div class="section__header">
-                                    <h3><app-icon name="bar-chart" [size]="14" /> Spending Trend</h3>
-                                    <div class="section__header-actions">
-                                        <div class="chart-controls">
-                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 7" (click)="loadSpending(7)">7d</button>
-                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 14" (click)="loadSpending(14)">14d</button>
-                                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 30" (click)="loadSpending(30)">30d</button>
-                                        </div>
-                                        <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['spending-chart']" (click)="refreshWidget('spending-chart')" title="Refresh">&#x21bb;</button>
-                                    </div>
-                                </div>
-                                @if (spendingBars().length > 0) {
-                                    <div class="spending-summary">
-                                        <span class="spending-summary__total">\${{ spendingTotal().toFixed(2) }}</span>
-                                        <span class="spending-summary__label">total over {{ spendingDays() }}d</span>
-                                        <span class="spending-summary__avg">\${{ spendingDailyAvg().toFixed(4) }}/day avg</span>
-                                    </div>
-                                    <div class="bar-chart">
-                                        <div class="bar-chart__bars">
-                                            @for (bar of spendingBars(); track bar.date) {
-                                                <div class="bar-chart__col bar-chart__col--hoverable"
-                                                     (mouseenter)="hoveredBar.set(bar)"
-                                                     (mouseleave)="hoveredBar.set(null)">
-                                                    <div class="bar-chart__tooltip" [class.bar-chart__tooltip--visible]="hoveredBar() === bar">
-                                                        <span class="bar-chart__tooltip-date">{{ bar.date }}</span>
-                                                        <span class="bar-chart__tooltip-val">\${{ bar.value.toFixed(4) }}</span>
-                                                        <span class="bar-chart__tooltip-cum">cumulative: \${{ bar.cumulative.toFixed(2) }}</span>
-                                                    </div>
-                                                    <div class="bar-chart__bar bar-chart__bar--spending" [style.height.%]="bar.pct"></div>
-                                                    <span class="bar-chart__label">{{ bar.dateShort }}</span>
-                                                </div>
-                                            }
-                                        </div>
-                                    </div>
-                                } @else {
-                                    <div class="empty-state">
-                                        <p class="empty-state__title">No spending data yet</p>
-                                        <p class="empty-state__hint">Spending will appear here once your agents start running sessions.</p>
-                                        <a class="empty-state__link" routerLink="/sessions/new">Start a conversation</a>
-                                    </div>
-                                }
-                            </div>
-                            }
-                        }
-
-                        <!-- session-chart -->
-                        @if (widget.id === 'session-chart') {
-                            @if (widgetErrors()['session-chart']) {
-                                <div class="widget-error">
-                                    <span class="widget-error__icon">!</span>
-                                    <span class="widget-error__msg">{{ widgetErrors()['session-chart'] }}</span>
-                                    <button class="widget-error__retry" (click)="refreshWidget('session-chart')">Retry</button>
-                                </div>
-                            } @else {
-                            <div class="section">
-                                <div class="section__header">
-                                    <h3><app-icon name="sessions" [size]="14" /> Sessions Breakdown</h3>
-                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['session-chart']" (click)="refreshWidget('session-chart')" title="Refresh">&#x21bb;</button>
-                                </div>
-                                @if (sessionStats()) {
-                                    <div class="chart-duo">
-                                        <!-- Sessions by status: donut-style ring -->
-                                        <div class="ring-chart">
-                                            <div class="ring-chart__visual">
-                                                <svg viewBox="0 0 36 36" class="ring-chart__svg">
-                                                    @for (seg of statusSegments(); track seg.status; let i = $index) {
-                                                        <circle class="ring-chart__segment"
-                                                            [attr.data-status]="seg.status"
-                                                            cx="18" cy="18" r="15.9"
-                                                            fill="none"
-                                                            stroke-width="3"
-                                                            [attr.stroke-dasharray]="seg.dashArray"
-                                                            [attr.stroke-dashoffset]="seg.dashOffset"
-                                                            (mouseenter)="hoveredSegment.set(seg)"
-                                                            (mouseleave)="hoveredSegment.set(null)"
-                                                        />
-                                                    }
-                                                </svg>
-                                                @if (hoveredSegment()) {
-                                                    <span class="ring-chart__tooltip">{{ hoveredSegment()!.status }}: {{ hoveredSegment()!.count }}</span>
-                                                } @else {
-                                                    <span class="ring-chart__center">{{ totalSessionCount() }}</span>
-                                                }
-                                            </div>
-                                            <div class="ring-chart__legend">
-                                                @for (seg of statusSegments(); track seg.status) {
-                                                    <div class="ring-chart__legend-item">
-                                                        <span class="ring-chart__dot" [attr.data-status]="seg.status"></span>
-                                                        <span class="ring-chart__legend-label">{{ seg.status }}</span>
-                                                        <span class="ring-chart__legend-val">{{ seg.count }}</span>
-                                                    </div>
-                                                }
-                                            </div>
-                                        </div>
-                                        <!-- Sessions by source: horizontal bars -->
-                                        <div class="source-bars">
-                                            <h4 class="source-bars__title">By Source</h4>
-                                            @for (entry of sessionStats()!.bySource; track entry.source) {
-                                                <div class="source-bar-row">
-                                                    <span class="source-bar-row__label" [attr.data-source]="entry.source">{{ entry.source }}</span>
-                                                    <div class="source-bar-row__track">
-                                                        <div class="source-bar-row__fill" [attr.data-source]="entry.source" [style.width.%]="sourceBarPct(entry.count)"></div>
-                                                    </div>
-                                                    <span class="source-bar-row__val">{{ entry.count }}</span>
-                                                </div>
-                                            }
-                                        </div>
-                                    </div>
-                                } @else {
-                                    <div class="empty-state">
-                                        <p class="empty-state__title">No session data yet</p>
-                                        <p class="empty-state__hint">Session breakdowns will appear after your first conversation.</p>
-                                        <a class="empty-state__link" routerLink="/sessions/new">Start a conversation</a>
-                                    </div>
-                                }
-                            </div>
-                            }
-                        }
-
-                        <!-- agent-usage-chart -->
-                        @if (widget.id === 'agent-usage-chart') {
-                            @if (widgetErrors()['agent-usage-chart']) {
-                                <div class="widget-error">
-                                    <span class="widget-error__icon">!</span>
-                                    <span class="widget-error__msg">{{ widgetErrors()['agent-usage-chart'] }}</span>
-                                    <button class="widget-error__retry" (click)="refreshWidget('agent-usage-chart')">Retry</button>
-                                </div>
-                            } @else {
-                            <div class="section">
-                                <div class="section__header">
-                                    <h3><app-icon name="agents" [size]="14" /> Agent Usage</h3>
-                                    <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['agent-usage-chart']" (click)="refreshWidget('agent-usage-chart')" title="Refresh">&#x21bb;</button>
-                                </div>
-                                @if (sessionStats() && sessionStats()!.byAgent.length > 0) {
-                                    <div class="usage-chart">
-                                        @for (agent of sessionStats()!.byAgent.slice(0, 6); track agent.agent_id) {
-                                            <div class="usage-row">
-                                                <span class="usage-row__name">{{ agent.agent_name || 'Unknown' }}</span>
-                                                <div class="usage-row__bar-wrap">
-                                                    <div class="usage-row__sessions" [style.width.%]="agentBarPct(agent.session_count, 'sessions')"></div>
-                                                    <div class="usage-row__cost" [style.width.%]="agentBarPct(agent.total_cost, 'cost')"></div>
-                                                </div>
-                                                <div class="usage-row__vals">
-                                                    <span class="usage-row__val usage-row__val--sessions">{{ agent.session_count }}s</span>
-                                                    <span class="usage-row__val usage-row__val--cost">\${{ agent.total_cost | number:'1.2-2' }}</span>
-                                                </div>
-                                            </div>
-                                        }
-                                        <div class="usage-legend">
-                                            <span class="usage-legend__item usage-legend__item--sessions">Sessions</span>
-                                            <span class="usage-legend__item usage-legend__item--cost">Cost</span>
-                                        </div>
-                                    </div>
-                                } @else {
-                                    <div class="empty-state">
-                                        <p class="empty-state__title">No agent usage data yet</p>
-                                        <p class="empty-state__hint">Usage breakdown by agent will appear after sessions run.</p>
-                                        <a class="empty-state__link" routerLink="/agents">View agents</a>
-                                    </div>
-                                }
-                            </div>
-                            }
-                        }
 
                         <!-- activity -->
                         @if (widget.id === 'activity') {
@@ -669,90 +465,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             }
                         }
 
-                        <!-- flock -->
-                        @if (widget.id === 'flock') {
-                            @if (flockAgents().length > 0) {
-                                <div class="section">
-                                    <div class="section__header">
-                                        <h3><app-icon name="users" [size]="14" /> Flock Directory</h3>
-                                        <div class="section__header-actions">
-                                            @if (flockStats(); as stats) {
-                                                <span class="flock-stats">{{ stats.active }} active agents</span>
-                                            }
-                                            <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['flock']" (click)="refreshWidget('flock')" title="Refresh">&#x21bb;</button>
-                                        </div>
-                                    </div>
-                                    <div class="flock-grid">
-                                        @for (agent of flockAgents(); track agent.id) {
-                                            <div class="flock-card">
-                                                <div class="flock-card__top">
-                                                    <span class="flock-card__name">{{ agent.name }}</span>
-                                                    <span class="flock-card__score" [attr.data-level]="agent.reputationScore >= 70 ? 'high' : agent.reputationScore >= 30 ? 'mid' : 'low'">
-                                                        {{ agent.reputationScore }}
-                                                    </span>
-                                                </div>
-                                                @if (agent.description) {
-                                                    <p class="flock-card__desc">{{ agent.description.length > 60 ? agent.description.slice(0, 60) + '...' : agent.description }}</p>
-                                                }
-                                                <div class="flock-card__caps">
-                                                    @for (cap of agent.capabilities.slice(0, 2); track cap) {
-                                                        <span class="flock-card__cap">{{ cap }}</span>
-                                                    }
-                                                </div>
-                                                <div class="flock-card__footer">
-                                                    <span class="flock-card__status" [attr.data-status]="agent.status">{{ agent.status }}</span>
-                                                    <button class="flock-card__connect-btn" (click)="navigateTo('/agents')">Connect</button>
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                        }
-
-                        <!-- comparison -->
-                        @if (widget.id === 'comparison') {
-                            @if (agentSummaries().length >= 2) {
-                                <div class="section">
-                                    <div class="section__header">
-                                    <h3><app-icon name="list" [size]="14" /> Agent Comparison</h3>
-                                        <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['comparison']" (click)="refreshWidget('comparison')" title="Refresh">&#x21bb;</button>
-                                    </div>
-                                    <div class="comparison-table">
-                                        <div class="comparison-table__header">
-                                            <span>Agent</span>
-                                            <span>Reputation</span>
-                                            <span>Sessions</span>
-                                            <span>Balance</span>
-                                            <span>Status</span>
-                                        </div>
-                                        @for (summary of agentSummaries(); track summary.agent.id) {
-                                            <a class="comparison-table__row" [routerLink]="['/agents', summary.agent.id]">
-                                                <span class="comparison-table__name">{{ summary.agent.name }}</span>
-                                                <span class="comparison-table__rep">
-                                                    @if (summary.reputationScore !== null) {
-                                                        <span class="comparison-table__rep-bar">
-                                                            <span class="comparison-table__rep-fill" [style.width.%]="summary.reputationScore" [attr.data-level]="summary.reputationScore >= 70 ? 'high' : summary.reputationScore >= 30 ? 'mid' : 'low'"></span>
-                                                        </span>
-                                                        <span class="comparison-table__rep-val">{{ summary.reputationScore }}</span>
-                                                    } @else {
-                                                        <span class="comparison-table__na">--</span>
-                                                    }
-                                                </span>
-                                                <span class="comparison-table__sessions">
-                                                    <span class="comparison-table__sessions-val">{{ summary.runningSessions }}</span>
-                                                    <span class="comparison-table__sessions-label">active</span>
-                                                </span>
-                                                <span class="comparison-table__balance">{{ (summary.balance / 1000000) | number:'1.2-4' }}</span>
-                                                <span class="comparison-table__status" [attr.data-status]="summary.runningSessions > 0 ? 'busy' : 'idle'">
-                                                    {{ summary.runningSessions > 0 ? 'Busy' : 'Idle' }}
-                                                </span>
-                                            </a>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                        }
                     </div>
                 }
             </div>
@@ -792,22 +504,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly loading = signal(true);
     protected readonly serverVersion = signal<string | null>(null);
     protected readonly tryMode = signal(false);
-    protected readonly flockAgents = signal<FlockAgent[]>([]);
-    protected readonly flockStats = signal<{ total: number; active: number } | null>(null);
     protected readonly agentMessages = signal<AgentMessage[]>([]);
-
-    // Analytics data
-    protected readonly spendingData = signal<SpendingData | null>(null);
-    protected readonly sessionStats = signal<SessionStats | null>(null);
-    protected readonly spendingDays = signal(14);
 
     // Per-widget error + refresh state
     protected readonly widgetErrors = signal<Record<string, string>>({});
     protected readonly widgetRefreshing = signal<Record<string, boolean>>({});
-
-    // Chart hover tooltips
-    protected readonly hoveredBar = signal<{ date: string; dateShort: string; value: number; pct: number; cumulative: number } | null>(null);
-    protected readonly hoveredSegment = signal<{ status: string; count: number } | null>(null);
 
     // Last refresh timestamp
     protected readonly lastRefresh = signal<string | null>(null);
@@ -848,71 +549,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly activeScheduleCount = computed(() =>
         this.scheduleService.schedules().filter((s) => s.status === 'active').length,
     );
-
-    // Spending chart bars (vertical) with cumulative totals
-    protected readonly spendingBars = computed(() => {
-        const data = this.spendingData();
-        if (!data) return [];
-        const dateMap = new Map<string, number>();
-        for (const d of data.spending) dateMap.set(d.date, (dateMap.get(d.date) ?? 0) + d.api_cost_usd);
-        for (const d of data.sessionCosts) dateMap.set(d.date, (dateMap.get(d.date) ?? 0) + d.cost_usd);
-        const entries = Array.from(dateMap.entries()).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
-        const max = Math.max(...entries.map((e) => e.value), 0.001);
-        let cumulative = 0;
-        return entries.map((e) => {
-            cumulative += e.value;
-            return {
-                date: e.date,
-                dateShort: e.date.slice(5),
-                value: e.value,
-                pct: (e.value / max) * 100,
-                cumulative,
-            };
-        });
-    });
-
-    protected readonly spendingTotal = computed(() =>
-        this.spendingBars().reduce((sum, b) => sum + b.value, 0),
-    );
-
-    protected readonly spendingDailyAvg = computed(() => {
-        const bars = this.spendingBars();
-        return bars.length > 0 ? this.spendingTotal() / bars.length : 0;
-    });
-
-    // Session status ring chart segments
-    protected readonly statusSegments = computed(() => {
-        const stats = this.sessionStats();
-        if (!stats) return [];
-        const total = stats.byStatus.reduce((sum, e) => sum + e.count, 0);
-        if (total === 0) return [];
-        const circumference = 100;
-        let offset = 0;
-        return stats.byStatus.map((entry) => {
-            const pct = (entry.count / total) * circumference;
-            const seg = {
-                status: entry.status,
-                count: entry.count,
-                dashArray: `${pct} ${circumference - pct}`,
-                dashOffset: `${-offset}`,
-            };
-            offset += pct;
-            return seg;
-        });
-    });
-
-    protected readonly totalSessionCount = computed(() => {
-        const stats = this.sessionStats();
-        if (!stats) return 0;
-        return stats.byStatus.reduce((sum, e) => sum + e.count, 0);
-    });
-
-    // Max source count for bar scaling
-    private readonly maxSourceCount = computed(() => {
-        const stats = this.sessionStats();
-        if (!stats) return 1;
-        return Math.max(...stats.bySource.map((e) => e.count), 1);
-    });
 
     protected readonly activityFeed = computed<ActivityEvent[]>(() => {
         const sessions = this.sessionService.sessions();
@@ -987,7 +623,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     /** Which widgets should span full width */
     protected isFullWidth(id: WidgetId): boolean {
-        return id === 'metrics' || id === 'agents' || id === 'active-sessions' || id === 'flock' || id === 'comparison';
+        return id === 'metrics' || id === 'agents' || id === 'active-sessions';
     }
 
     /** Returns 'green' (active now), 'yellow' (active within 24h), 'red' (inactive >24h) */
@@ -1018,42 +654,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
     }
 
-    protected sourceBarPct(count: number): number {
-        return (count / this.maxSourceCount()) * 100;
-    }
-
-    protected agentBarPct(value: number, type: 'sessions' | 'cost'): number {
-        const stats = this.sessionStats();
-        if (!stats || stats.byAgent.length === 0) return 0;
-        const max = type === 'sessions'
-            ? Math.max(...stats.byAgent.map((a) => a.session_count), 1)
-            : Math.max(...stats.byAgent.map((a) => a.total_cost), 0.001);
-        return (value / max) * 100;
-    }
-
     @HostListener('document:keydown', ['$event'])
     handleKeyboard(event: KeyboardEvent): void {
         // Ignore if typing in an input/textarea
         const tag = (event.target as HTMLElement)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-        switch (event.key.toLowerCase()) {
-            case 'r':
-                if (!event.ctrlKey && !event.metaKey) {
-                    event.preventDefault();
-                    this.refreshAll();
-                }
-                break;
-            case '1':
-                if (!event.ctrlKey && !event.metaKey) {
-                    this.layoutService.setViewMode('simple');
-                }
-                break;
-            case '2':
-                if (!event.ctrlKey && !event.metaKey) {
-                    this.layoutService.setViewMode('developer');
-                }
-                break;
+        if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey) {
+            event.preventDefault();
+            this.refreshAll();
         }
     }
 
@@ -1064,11 +673,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.agentService.loadAgents().then(() => this.loadAgentSummaries()),
             this.sessionService.loadSessions(),
             this.sessionService.loadAlgoChatStatus(),
-            this.loadSpendingData(),
-            this.loadSessionStats(),
             this.loadActiveCouncilLaunches(),
             this.loadServerVersion(),
-            this.loadFlockDirectory(),
             this.loadAgentMessages(),
         ];
         await Promise.allSettled(loads);
@@ -1087,10 +693,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.loadActiveCouncilLaunches(),
             this.loadOverview(),
             this.loadServerVersion(),
-            this.loadFlockDirectory(),
             this.agentService.loadAgents().then(() => this.loadAgentMessages()),
-            this.loadSpendingData(),
-            this.loadSessionStats(),
         ];
         Promise.allSettled(loads).then(() => {
             this.loading.set(false);
@@ -1243,24 +846,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 case 'metrics': await this.loadOverview(); break;
                 case 'agents': await this.agentService.loadAgents().then(() => this.loadAgentSummaries()); break;
                 case 'active-sessions': await this.sessionService.loadSessions(); break;
-                case 'spending-chart': await this.loadSpendingData(); break;
-                case 'session-chart': case 'agent-usage-chart': await this.loadSessionStats(); break;
                 case 'activity': await Promise.all([this.sessionService.loadSessions(), this.workTaskService.loadTasks(), this.loadAgentMessages()]); break;
                 case 'system-status': await Promise.all([this.loadServerVersion(), this.loadActiveCouncilLaunches()]); break;
-                case 'flock': await this.loadFlockDirectory(); break;
-                case 'comparison': await this.agentService.loadAgents().then(() => this.loadAgentSummaries()); break;
             }
         } catch (err) {
             this.widgetErrors.update((e) => ({ ...e, [widgetId]: 'Failed to load data' }));
         } finally {
             this.widgetRefreshing.update((r) => ({ ...r, [widgetId]: false }));
         }
-    }
-
-    // Spending chart day range switcher
-    protected loadSpending(days: number): void {
-        this.spendingDays.set(days);
-        this.loadSpendingData();
     }
 
     private async loadOverview(): Promise<void> {
@@ -1271,28 +864,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.overview.set(overview);
         } catch {
             // Analytics may not be available
-        }
-    }
-
-    private async loadSpendingData(): Promise<void> {
-        try {
-            const data = await firstValueFrom(
-                this.apiService.get<SpendingData>(`/analytics/spending?days=${this.spendingDays()}`),
-            );
-            this.spendingData.set(data);
-        } catch {
-            // Non-critical
-        }
-    }
-
-    private async loadSessionStats(): Promise<void> {
-        try {
-            const stats = await firstValueFrom(
-                this.apiService.get<SessionStats>('/analytics/sessions'),
-            );
-            this.sessionStats.set(stats);
-        } catch {
-            // Non-critical
         }
     }
 
@@ -1373,19 +944,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
             );
         } catch {
             // Non-critical
-        }
-    }
-
-    private async loadFlockDirectory(): Promise<void> {
-        try {
-            const [agentsResult, stats] = await Promise.all([
-                firstValueFrom(this.apiService.get<{ agents: FlockAgent[]; total: number }>('/flock-directory/search?sortBy=reputation&sortOrder=desc&limit=6&status=active')),
-                firstValueFrom(this.apiService.get<{ total: number; active: number }>('/flock-directory/stats')),
-            ]);
-            this.flockAgents.set(agentsResult.agents);
-            this.flockStats.set(stats);
-        } catch {
-            // Flock directory may not be available
         }
     }
 

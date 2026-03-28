@@ -51,6 +51,12 @@ files:
   - server/routes/discord-image.ts
   - server/routes/cursor.ts
   - server/routes/variants.ts
+  - server/routes/brain-viewer.ts
+  - server/routes/buddy.ts
+  - server/routes/flock-testing.ts
+  - server/routes/github-pr-diff.ts
+  - server/routes/openrouter.ts
+  - server/routes/tool-catalog.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -61,7 +67,7 @@ depends_on:
 
 ## Purpose
 
-Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 44 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
+Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 50 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
 
 ## Public API
 
@@ -135,6 +141,12 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleDiscordImageRoutes` | discord-image.ts | Send images to Discord channels via `POST /api/discord/send-image` (base64, file path, or multipart) |
 | `handleCursorRoutes` | cursor.ts | Cursor CLI status and model discovery endpoints |
 | `handleVariantRoutes` | variants.ts | Agent variant profile CRUD and agent-variant assignment/removal |
+| `handleBrainViewerRoutes` | brain-viewer.ts | Brain Viewer dashboard endpoints for inspecting agent memory (longterm + shortterm tiers) |
+| `handleBuddyRoutes` | buddy.ts | Buddy pairing management and buddy session CRUD |
+| `handleFlockTestingRoutes` | flock-testing.ts | Flock Directory agent test results, stats, and on-demand test trigger |
+| `handleGitHubPRDiffRoutes` | github-pr-diff.ts | GitHub PR diff retrieval for agents |
+| `handleOpenRouterRoutes` | openrouter.ts | OpenRouter model discovery with pricing information |
+| `handleToolCatalogRoutes` | tool-catalog.ts | Discoverable MCP tool catalog listing (flat and grouped) |
 
 ### Exported Functions (projects.ts)
 
@@ -175,6 +187,12 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | Type | Description |
 |------|-------------|
 | `McpApiDeps` | Interface for MCP API route dependencies (bridge, messenger, etc.) |
+
+### Exported Types (flock-testing.ts)
+
+| Type | Description |
+|------|-------------|
+| `FlockTestingDeps` | Interface for Flock Testing route dependencies (`flockDirectory?: FlockDirectoryService | null`) |
 
 ### Exported Functions (webhooks.ts)
 

@@ -4,16 +4,9 @@ export type WidgetId =
     | 'metrics'
     | 'agents'
     | 'active-sessions'
-    | 'spending-chart'
-    | 'session-chart'
-    | 'agent-usage-chart'
     | 'activity'
     | 'quick-actions'
-    | 'system-status'
-    | 'flock'
-    | 'comparison';
-
-export type ViewMode = 'simple' | 'developer';
+    | 'system-status';
 
 export interface WidgetConfig {
     id: WidgetId;
@@ -22,63 +15,31 @@ export interface WidgetConfig {
 }
 
 const STORAGE_KEY = 'corvid_widget_layout';
-const VIEW_MODE_KEY = 'corvid_view_mode';
-
-/** Widgets visible in simple mode — focused on what non-technical users need */
-const SIMPLE_WIDGETS: Set<WidgetId> = new Set([
-    'agents',
-    'active-sessions',
-    'activity',
-    'quick-actions',
-    'system-status',
-]);
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'metrics', label: 'Metrics', visible: true },
     { id: 'agents', label: 'Agent Activity', visible: true },
     { id: 'active-sessions', label: 'Active Sessions', visible: true },
-    { id: 'spending-chart', label: 'Spending Trend', visible: true },
-    { id: 'session-chart', label: 'Sessions Breakdown', visible: true },
-    { id: 'agent-usage-chart', label: 'Agent Usage', visible: true },
     { id: 'activity', label: 'Recent Activity', visible: true },
     { id: 'quick-actions', label: 'Quick Actions', visible: true },
     { id: 'system-status', label: 'System Status', visible: true },
-    { id: 'flock', label: 'Flock Directory', visible: true },
-    { id: 'comparison', label: 'Agent Comparison', visible: true },
 ];
+
+/** Valid widget IDs for migration from old layouts */
+const VALID_IDS = new Set<string>(DEFAULT_WIDGETS.map((w) => w.id));
 
 @Injectable({ providedIn: 'root' })
 export class WidgetLayoutService {
-    /** Current view mode */
-    readonly viewMode = signal<ViewMode>(this.loadViewMode());
-
     /** Current widget layout — order + visibility */
     readonly widgets = signal<WidgetConfig[]>(this.load());
 
-    /** Only visible widgets, in order (respects view mode) */
-    readonly visibleWidgets = computed(() => {
-        const mode = this.viewMode();
-        return this.widgets().filter((w) => {
-            if (!w.visible) return false;
-            if (mode === 'simple') return SIMPLE_WIDGETS.has(w.id);
-            return true;
-        });
-    });
+    /** Only visible widgets, in order */
+    readonly visibleWidgets = computed(() =>
+        this.widgets().filter((w) => w.visible),
+    );
 
     /** Whether the customize panel is open */
     readonly customizing = signal(false);
-
-    /** Switch between simple and developer modes */
-    setViewMode(mode: ViewMode): void {
-        this.viewMode.set(mode);
-        this.saveViewMode(mode);
-        if (mode === 'simple') this.customizing.set(false);
-    }
-
-    /** Toggle between modes */
-    toggleViewMode(): void {
-        this.setViewMode(this.viewMode() === 'simple' ? 'developer' : 'simple');
-    }
 
     /** Move a widget from one index to another */
     moveWidget(fromIndex: number, toIndex: number): void {
@@ -103,7 +64,6 @@ export class WidgetLayoutService {
         const defaults = DEFAULT_WIDGETS.map((w) => ({ ...w }));
         this.widgets.set(defaults);
         this.save(defaults);
-        this.setViewMode('developer');
     }
 
     private load(): WidgetConfig[] {
@@ -122,7 +82,15 @@ export class WidgetLayoutService {
             if (!parsed.every((w: unknown) =>
                 typeof w === 'object' && w !== null && 'id' in w && 'label' in w && 'visible' in w,
             )) return null;
-            return parsed as WidgetConfig[];
+            // Filter out removed widgets from old layouts
+            const filtered = (parsed as WidgetConfig[]).filter((w) => VALID_IDS.has(w.id));
+            // Add any new widgets that weren't in the stored layout
+            for (const def of DEFAULT_WIDGETS) {
+                if (!filtered.some((w) => w.id === def.id)) {
+                    filtered.push({ ...def });
+                }
+            }
+            return filtered.length > 0 ? filtered : null;
         } catch {
             return null;
         }
@@ -131,17 +99,5 @@ export class WidgetLayoutService {
     private save(widgets: WidgetConfig[]): void {
         if (typeof localStorage === 'undefined') return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
-    }
-
-    private loadViewMode(): ViewMode {
-        if (typeof localStorage === 'undefined') return 'simple';
-        const stored = localStorage.getItem(VIEW_MODE_KEY);
-        if (stored === 'simple' || stored === 'developer') return stored;
-        return 'simple';
-    }
-
-    private saveViewMode(mode: ViewMode): void {
-        if (typeof localStorage === 'undefined') return;
-        localStorage.setItem(VIEW_MODE_KEY, mode);
     }
 }

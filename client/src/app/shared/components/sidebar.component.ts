@@ -512,10 +512,6 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         return this.sectionStates()[sectionKey] ?? false;
     }
 
-    isDeveloperMode(): boolean {
-        return this.widgetLayout.viewMode() === 'developer';
-    }
-
     onResize(delta: number): void {
         const current = this.customWidth();
         const next = Math.max(140, Math.min(400, current + delta));
