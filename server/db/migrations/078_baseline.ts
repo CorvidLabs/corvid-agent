@@ -48,9 +48,7 @@ const TABLES = [
         book       TEXT DEFAULT NULL,
         page       INTEGER DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now')),
-        book       TEXT DEFAULT NULL,
-        page       INTEGER DEFAULT NULL
+        updated_at TEXT DEFAULT (datetime('now'))
     )`,
 
     // --- agent_messages ---
@@ -1141,22 +1139,6 @@ const TRIGGERS = [
         INSERT INTO agent_memories_fts(rowid, key, content)
         VALUES (new.rowid, new.key, new.content);
     END`,
-
-    `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_insert
-    BEFORE INSERT ON agent_memories
-    WHEN (NEW.book IS NOT NULL AND NEW.page IS NULL)
-       OR (NEW.book IS NULL AND NEW.page IS NOT NULL)
-    BEGIN
-        SELECT RAISE(ABORT, 'book and page must both be set or both be null');
-    END`,
-
-    `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_update
-    BEFORE UPDATE ON agent_memories
-    WHEN (NEW.book IS NOT NULL AND NEW.page IS NULL)
-       OR (NEW.book IS NULL AND NEW.page IS NOT NULL)
-    BEGIN
-        SELECT RAISE(ABORT, 'book and page must both be set or both be null');
-    END`,
 ];
 
 // ── Indexes (alphabetical) ─────────────────────────────────────────────────
@@ -1166,7 +1148,6 @@ const INDEXES = [
     `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
