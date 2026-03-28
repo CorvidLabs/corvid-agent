@@ -91,12 +91,12 @@
 
 | Behavior | Claude (baseline) | Ollama | Cursor | Gap? |
 |---|---|---|---|---|
-| Concurrency control | None (SDK manages) | ✅ Weight-based slot acquisition | ❌ No concurrency limit | **Cursor gap** |
+| Concurrency control | None (SDK manages) | ✅ Weight-based slot acquisition | ✅ Slot-based `acquireSlot`/`releaseSlot` (`CURSOR_MAX_CONCURRENT`, default 4) | OK |
 | GPU-aware scheduling | N/A | ✅ Model weight + GPU detection | N/A | OK |
-| Concurrent session handling | SDK handles | `acquireSlot()`/`releaseSlot()` | ❌ Unbounded parallel processes | **Cursor gap** |
+| Concurrent session handling | SDK handles | `acquireSlot()`/`releaseSlot()` | ✅ `acquireSlot()`/`releaseSlot()` with queue | OK |
 
 **Actions:**
-- [ ] [#cursor] Add process-level concurrency limit for cursor-agent spawning (max N parallel processes)
+- [x] [#1532] Add process-level concurrency limit for cursor-agent spawning — done (`CURSOR_MAX_CONCURRENT`, default 4)
 
 ---
 

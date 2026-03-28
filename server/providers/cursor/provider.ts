@@ -36,7 +36,7 @@ import { createLogger } from '../../lib/logger';
 const log = createLogger('CursorProvider');
 
 /** Maximum parallel cursor-agent processes (configurable via env). */
-const MAX_PARALLEL = Number(process.env.CURSOR_MAX_PARALLEL) || 2;
+const MAX_CONCURRENT = Number(process.env.CURSOR_MAX_CONCURRENT) || 4;
 
 /** Timeout for a single cursor-agent completion (ms). */
 const COMPLETION_TIMEOUT_MS = 10 * 60_000; // 10 minutes
@@ -60,8 +60,18 @@ export class CursorProvider extends BaseLlmProvider {
     readonly executionMode: ExecutionMode = 'direct';
 
     private activeSlots = 0;
-    private readonly maxSlots = MAX_PARALLEL;
+    private readonly maxSlots = MAX_CONCURRENT;
     private readonly waitQueue: SlotWaiter[] = [];
+
+    /** Current concurrency slot status for observability. */
+    getSlotStatus(): { active: number; max: number; queued: number } {
+        return { active: this.activeSlots, max: this.maxSlots, queued: this.waitQueue.length };
+    }
+
+    /** Maximum concurrent cursor-agent processes allowed. */
+    get maxConcurrent(): number {
+        return this.maxSlots;
+    }
 
     /** Track cursor session IDs for --resume on follow-up calls. */
     private cursorSessionIds = new Map<string, string>();
