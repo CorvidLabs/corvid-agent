@@ -1238,8 +1238,8 @@
         <div class="stat-label">Stars</div>
       </div>
       <div class="stat">
-        <div class="stat-value">0</div>
-        <div class="stat-label">Dependencies</div>
+        <div class="stat-value">30+</div>
+        <div class="stat-label">Skills</div>
       </div>
     </div>
   </section>
@@ -2001,18 +2001,27 @@
 
     async function fetchGitHubStats() {
       try {
-        // Paginate through all repos (corvid-agent has 100+ repos)
-        let allRepos = [];
-        let page = 1;
-        while (true) {
-          const res = await fetch('https://api.github.com/users/corvid-agent/repos?per_page=100&page=' + page);
-          if (!res.ok) break;
-          const data = await res.json();
-          if (!Array.isArray(data) || data.length === 0) break;
-          allRepos = allRepos.concat(data);
-          if (data.length < 100) break;
-          page++;
+        // Fetch repos from both corvid-agent (GitHub Pages) and CorvidLabs (main org)
+        async function fetchAllRepos(owner) {
+          let repos = [];
+          let page = 1;
+          while (true) {
+            const res = await fetch('https://api.github.com/users/' + owner + '/repos?per_page=100&page=' + page);
+            if (!res.ok) break;
+            const data = await res.json();
+            if (!Array.isArray(data) || data.length === 0) break;
+            repos = repos.concat(data);
+            if (data.length < 100) break;
+            page++;
+          }
+          return repos;
         }
+
+        const [corvidRepos, labsRepos] = await Promise.all([
+          fetchAllRepos('corvid-agent'),
+          fetchAllRepos('CorvidLabs')
+        ]);
+        const allRepos = corvidRepos.concat(labsRepos);
 
         let totalStars = 0;
         let repoCount = 0;
