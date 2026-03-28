@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser, handleRestartServer } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { handleDiscordSendMessage, handleDiscordSendImage } from './tool-handlers/discord';
@@ -152,6 +152,17 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 minutes: z.number().describe('Number of additional minutes to request (1-120)'),
             },
             async (args) => handleExtendTimeout(ctx, args),
+        ),
+        tool(
+            'corvid_restart_server',
+            'Restart the corvid-agent server. Use this when server-side changes require a restart ' +
+            '(e.g. new environment variables, updated dependencies, config changes). ' +
+            'This tool is idempotent — if the server was already restarted in this session, it returns ' +
+            'a confirmation instead of restarting again, preventing restart loops.',
+            {
+                reason: z.string().optional().describe('Brief reason for the restart (e.g. "apply env var changes")'),
+            },
+            async (args) => handleRestartServer(ctx, args),
         ),
         tool(
             'corvid_check_credits',

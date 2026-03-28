@@ -46,8 +46,9 @@ export const tables: string[] = [
         council_role      TEXT DEFAULT NULL,
         work_dir          TEXT DEFAULT NULL,
         credits_consumed  REAL DEFAULT 0,
-        restart_pending   INTEGER NOT NULL DEFAULT 0,
-        tenant_id         TEXT NOT NULL DEFAULT 'default',
+        restart_pending              INTEGER NOT NULL DEFAULT 0,
+        server_restart_initiated_at  TEXT DEFAULT NULL,
+        tenant_id                    TEXT NOT NULL DEFAULT 'default',
         created_at        TEXT DEFAULT (datetime('now')),
         updated_at        TEXT DEFAULT (datetime('now'))
     )`,

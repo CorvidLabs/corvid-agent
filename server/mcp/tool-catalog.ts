@@ -64,6 +64,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
 
     // ── Session & Work ───────────────────────────────────────────────────
     { name: 'corvid_extend_timeout', description: 'Request more time for your current session', category: 'work' },
+    { name: 'corvid_restart_server', description: 'Restart the corvid-agent server (idempotent, prevents restart loops)', category: 'work' },
     { name: 'corvid_check_credits', description: 'Check credit balance for a wallet address', category: 'work' },
     { name: 'corvid_grant_credits', description: 'Grant free credits to a wallet address', category: 'work', restricted: true },
     { name: 'corvid_credit_config', description: 'View or update credit system configuration', category: 'work', restricted: true },
