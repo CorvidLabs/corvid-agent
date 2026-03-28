@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 107;
+const SCHEMA_VERSION = 108;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -162,6 +162,13 @@ const MIGRATIONS: Record<number, string[]> = {
     107: [
         // Session server-restart tracking (prevents agent restart loops)
         `ALTER TABLE sessions ADD COLUMN server_restart_initiated_at TEXT DEFAULT NULL`,
+    ],
+    108: [
+        // Memory book/page: organize memories into named books with ordered pages
+        `ALTER TABLE agent_memories ADD COLUMN book TEXT DEFAULT NULL`,
+        `ALTER TABLE agent_memories ADD COLUMN page INTEGER DEFAULT NULL`,
+        ...memory.indexes.filter((s) => s.includes('book_page')),
+        ...memory.triggers.filter((s) => s.includes('book_page')),
     ],
 };
 
