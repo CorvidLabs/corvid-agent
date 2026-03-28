@@ -156,6 +156,9 @@
     --transition-fast: 0.1s ease;
     --transition-base: 0.15s ease;
     --transition-slow: 0.25s ease;
+    --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-page-duration: 0.38s;
+    --motion-collapse-duration: 0.28s;
 }
 
 *,
@@ -185,6 +188,12 @@ html, body {
         transition-duration: 0.01ms !important;
     }
     html { scroll-behavior: auto; }
+    @supports (view-transition-name: none) {
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation: none !important;
+        }
+    }
 }
 
 /* Large displays (4K / high-res): bump to 12px for comfort */
@@ -377,19 +386,33 @@ select:focus-visible {
     font-family: inherit;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: background var(--transition-base), box-shadow var(--transition-base);
+    transition:
+        background var(--transition-base),
+        box-shadow var(--transition-base),
+        border-color var(--transition-base),
+        transform var(--transition-fast);
 }
 .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-.btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+.btn--primary:hover:not(:disabled) {
+    background: var(--accent-cyan-dim);
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-1px);
+}
 .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-.btn--secondary:hover { background: var(--bg-hover); }
+.btn--secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+}
 .btn--sm { padding: 0.3rem 0.6rem; font-size: var(--text-xs); }
 
 /* ── Micro-interactions ── */
 
 .card-hover {
-    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+    transition:
+        transform var(--transition-base) var(--motion-ease-out),
+        box-shadow var(--transition-base) var(--motion-ease-out),
+        border-color var(--transition-base);
 }
 .card-hover:hover {
     transform: translateY(-2px);
@@ -403,7 +426,10 @@ button:active:not(:disabled) {
 
 /* Interactive card with glow on hover */
 .card-glow {
-    transition: transform var(--transition-base), box-shadow var(--transition-slow), border-color var(--transition-base);
+    transition:
+        transform var(--transition-base) var(--motion-ease-out),
+        box-shadow var(--transition-slow) var(--motion-ease-out),
+        border-color var(--transition-base);
 }
 .card-glow:hover {
     transform: translateY(-2px);
@@ -419,9 +445,56 @@ button:active:not(:disabled) {
     animation: fadeIn var(--transition-slow) ease-out;
 }
 
-/* Auto-apply entrance animation to .page containers */
+/* Auto-apply entrance animation to .page containers (see view-transition block when VT is supported) */
 .page {
-    animation: slideUp 0.3s ease-out;
+    animation: slideUp 0.3s var(--motion-ease-out) both;
+}
+
+/* Route-level transitions (Angular `withViewTransitions()`); avoid double motion with .page */
+@supports (view-transition-name: none) {
+    ::view-transition-old(root) {
+        animation: vt-route-out var(--motion-page-duration) var(--motion-ease-out) both;
+    }
+    ::view-transition-new(root) {
+        animation: vt-route-in var(--motion-page-duration) var(--motion-ease-out) both;
+    }
+    .page {
+        animation: none;
+    }
+}
+
+@keyframes vt-route-out {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes vt-route-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Smooth <details> expand/collapse where supported */
+@supports (interpolate-size: allow-keywords) {
+    details {
+        interpolate-size: allow-keywords;
+    }
+    details::details-content {
+        transition:
+            height var(--motion-collapse-duration) var(--motion-ease-out),
+            opacity calc(var(--motion-collapse-duration) * 0.85) var(--motion-ease-out);
+    }
 }
 
 @keyframes shimmer {
@@ -638,7 +711,9 @@ button:active:not(:disabled) {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
-    .card-hover:hover {
+    .card-hover:hover,
+    .card-glow:hover,
+    .card-interactive:hover {
         transform: none;
     }
     button:active:not(:disabled) {
@@ -919,7 +994,7 @@ select:focus {
 
 .skeleton-page {
     padding: 1.5rem;
-    animation: skeletonFadeIn 0.2s ease-out;
+    animation: skeletonFadeIn 0.28s var(--motion-ease-out) both;
 }
 .skeleton-page__header {
     display: flex;
@@ -965,8 +1040,17 @@ select:focus {
 @media (prefers-reduced-motion: reduce) {
     .scroll-to-top { transition: none; }
     .row-highlight::before { transition: none; }
-    .card-lift:hover { transform: none; }
+    .card-lift:hover,
+    .card-hover:hover,
+    .card-glow:hover,
+    .card-interactive:hover { transform: none; }
     .app-layout__content { scroll-behavior: auto; }
+    @supports (view-transition-name: none) {
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation: none !important;
+        }
+    }
 }
 
 /* ══════════════════════════════════════════════════════════

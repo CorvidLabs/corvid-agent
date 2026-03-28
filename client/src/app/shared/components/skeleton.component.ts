@@ -39,6 +39,21 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
         .skeleton[data-variant="line"] .skeleton__item { height: 1rem; width: 80%; }
         .skeleton[data-variant="line"] .skeleton__item:nth-child(even) { width: 60%; }
 
+        /* Stagger wave (pairs with global skeletonWave on .skeleton__item) */
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(1) { animation-delay: 0ms; }
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(2) { animation-delay: 45ms; }
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(3) { animation-delay: 90ms; }
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(4) { animation-delay: 135ms; }
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(5) { animation-delay: 180ms; }
+        .skeleton[data-variant="table"] .skeleton__item:nth-child(n + 6) { animation-delay: 220ms; }
+        .skeleton[data-variant="card"] .skeleton__item:nth-child(1) { animation-delay: 0ms; }
+        .skeleton[data-variant="card"] .skeleton__item:nth-child(2) { animation-delay: 55ms; }
+        .skeleton[data-variant="card"] .skeleton__item:nth-child(3) { animation-delay: 110ms; }
+        .skeleton[data-variant="card"] .skeleton__item:nth-child(4) { animation-delay: 165ms; }
+        .skeleton[data-variant="card"] .skeleton__item:nth-child(n + 5) { animation-delay: 220ms; }
+        .skeleton[data-variant="line"] .skeleton__item:nth-child(odd) { animation-delay: 0ms; }
+        .skeleton[data-variant="line"] .skeleton__item:nth-child(even) { animation-delay: 55ms; }
+
         @keyframes shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
