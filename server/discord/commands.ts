@@ -36,7 +36,7 @@ import { handleSessionCommand, handleWorkCommand } from './command-handlers/sess
 import { respondEphemeral, respondToInteraction } from './embeds';
 import type { GuildCache } from './guild-api';
 import type { MentionSessionInfo } from './message-handler';
-import { resolvePermissionLevel } from './permissions';
+import { checkRateLimit, resolvePermissionLevel } from './permissions';
 import type { ThreadCallbackInfo, ThreadSessionInfo } from './thread-manager';
 import type { DiscordBridgeConfig, DiscordInteractionData } from './types';
 import { InteractionType, PermissionLevel } from './types';
@@ -578,6 +578,12 @@ export interface InteractionContext {
   syncGuildData: () => void;
   /** Buddy service for post-response review (optional — may not be initialized). */
   buddyService?: BuddyService | null;
+  /** Shared per-user timestamp map for rate limiting (same map used by channel messages). */
+  userMessageTimestamps: Map<string, number[]>;
+  /** Rate limit window in milliseconds. */
+  rateLimitWindowMs: number;
+  /** Max messages allowed per window. */
+  rateLimitMaxMessages: number;
 }
 
 export async function handleInteraction(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
@@ -612,6 +618,12 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
   );
   if (permLevel <= PermissionLevel.BLOCKED) {
     await respondEphemeral(interaction, 'You do not have permission to use this bot.');
+    return;
+  }
+
+  // Rate-limit slash commands using the same per-user timestamps as channel messages
+  if (!checkRateLimit(ctx.config, ctx.userMessageTimestamps, userId, ctx.rateLimitWindowMs, ctx.rateLimitMaxMessages, permLevel)) {
+    await respondEphemeral(interaction, 'You are sending commands too quickly. Please wait before trying again.');
     return;
   }
 

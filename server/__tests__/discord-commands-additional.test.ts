@@ -64,6 +64,9 @@ function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionCo
         subscribeForInlineResponse: mock(() => {}),
         guildCache: { info: null, roles: [], channels: [] },
         syncGuildData: mock(() => {}),
+        userMessageTimestamps: new Map(),
+        rateLimitWindowMs: 60_000,
+        rateLimitMaxMessages: 10,
     };
 }
 

@@ -54,6 +54,9 @@ function makeCtx(): InteractionContext {
         muteUser: () => {},
         unmuteUser: () => {},
         subscribeForInlineResponse: () => {},
+        userMessageTimestamps: new Map(),
+        rateLimitWindowMs: 60_000,
+        rateLimitMaxMessages: 10,
     };
 }
 
