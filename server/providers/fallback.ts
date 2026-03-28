@@ -244,9 +244,7 @@ export class FallbackManager {
             lower.includes('timeout') ||
             lower.includes('econnrefused') ||
             lower.includes('fetch failed') ||
-            lower.includes('overloaded') ||
-            // Ollama HTTP 500: internal server error — transient, model may recover
-            lower.includes('(500)')
+            lower.includes('overloaded')
         );
     }
 }

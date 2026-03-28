@@ -194,25 +194,6 @@ describe('FallbackManager', () => {
             chain: [{ provider: 'ollama', model: 'qwen3:14b' }],
         };
 
-        test('Ollama HTTP 500 (internal error) is treated as transient — triggers cooldown after 3 failures', async () => {
-            // Ollama formats errors as: ExternalServiceError 'API error (500): internal server error'
-            const registry = mockRegistry({
-                ollama: mockProvider(new Error('API error (500): internal server error')),
-            });
-            const localFm = new FallbackManager(registry as any);
-
-            // First two failures: provider still available
-            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
-            expect(localFm.isProviderAvailable('ollama')).toBe(true);
-
-            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
-            expect(localFm.isProviderAvailable('ollama')).toBe(true);
-
-            // Third failure: cooldown activates
-            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
-            expect(localFm.isProviderAvailable('ollama')).toBe(false);
-        });
-
         test('Ollama HTTP 404 (model not found) is treated as permanent — does NOT trigger cooldown', async () => {
             const registry = mockRegistry({
                 ollama: mockProvider(new Error('API error (404): model "xyz:latest" not found, try pulling it first')),
