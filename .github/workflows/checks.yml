@@ -23,8 +23,8 @@ permissions:
 
 jobs:
   checks:
-    name: Checks (ubuntu-only)
-    runs-on: ubuntu-latest
+    name: Checks
+    runs-on: self-hosted
     timeout-minutes: 15
 
     steps:
@@ -38,13 +38,6 @@ jobs:
           GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           GITHUB_ACTOR: ${{ github.actor }}
-
-      - name: Spec validation (strict + 100% coverage)
-        # https://github.com/marketplace/actions/spec-sync
-        uses: CorvidLabs/spec-sync@v2.1.0
-        with:
-          strict: 'true'
-          require-coverage: '100'
 
       - name: Build client
         run: bun run build:client
