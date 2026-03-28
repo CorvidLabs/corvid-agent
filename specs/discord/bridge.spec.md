@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 19
+version: 20
 status: active
 files:
   - server/discord/bridge.ts
@@ -322,6 +322,29 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Type | Description |
 |------|-------------|
 | `ExtractedImages` | `{ blocks: ContentBlockParam[]; skipped: number }` — result of image extraction with skip count |
+
+### Exported Functions (from thread-lifecycle.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `archiveThread` | `(botToken: string, threadId: string)` | `Promise<void>` | Archive a single Discord thread via the REST API |
+| `createStandaloneThread` | `(botToken: string, channelId: string, name: string)` | `Promise<string \| null>` | Create a standalone Discord thread (not attached to a message). Returns the thread channel ID or null on failure |
+| `archiveStaleThreads` | `(processManager, delivery, botToken, threadLastActivity, threadSessions, threadCallbacks, staleThresholdMs)` | `Promise<void>` | Archive threads that have been inactive for the given threshold, sending a notification embed before archiving |
+
+### Exported Types (from thread-session-map.ts)
+
+| Type | Description |
+|------|-------------|
+| `ThreadSessionInfo` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayColor?, displayIcon?, avatarUrl?, creatorPermLevel?, buddyConfig?) |
+| `ThreadCallbackInfo` | Active subscription info per thread (sessionId, callback) |
+
+### Exported Functions (from thread-session-map.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `normalizeTimestamp` | `(ts: string)` | `string` | Normalize a SQLite UTC timestamp by appending 'Z' if missing timezone indicator |
+| `formatDuration` | `(ms: number)` | `string` | Format a duration in milliseconds as human-readable "Xm Ys" or "Xs" |
+| `tryRecoverThread` | `(db: Database, threadSessions: Map, threadId: string)` | `ThreadSessionInfo \| null` | Try to recover a thread-to-session mapping from the database after server restart |
 
 ### Exported Types (from extracted modules)
 

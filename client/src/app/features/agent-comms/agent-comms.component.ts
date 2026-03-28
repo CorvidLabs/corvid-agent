@@ -13,6 +13,9 @@ import { DatePipe } from '@angular/common';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { AgentNetworkVisComponent } from './agent-network-vis.component';
+import { AgentNetwork3DComponent } from './agent-network-3d.component';
+import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
+import { ViewModeService } from '../../core/services/view-mode.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ApiService } from '../../core/services/api.service';
@@ -41,7 +44,7 @@ interface CommEntry {
 @Component({
     selector: 'app-agent-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent],
+    imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent, AgentNetwork3DComponent, ViewModeToggleComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -60,6 +63,13 @@ interface CommEntry {
                             (click)="setViewMode('network')"
                         >Network</button>
                     </div>
+                    @if (viewMode() === 'network') {
+                        <app-view-mode-toggle
+                            [mode]="networkViewMode()"
+                            ariaLabel="Network visualization mode"
+                            (modeChange)="setNetworkViewMode($event)"
+                        />
+                    }
                     @if (viewMode() === 'list') {
                         <button class="btn btn--secondary" (click)="toggleAutoScroll()">
                             Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
@@ -112,8 +122,14 @@ interface CommEntry {
                 </div>
             </div>
 
-            @if (viewMode() === 'network') {
+            @if (viewMode() === 'network' && networkViewMode() === 'basic') {
                 <app-agent-network-vis
+                    [agents]="visAgents()"
+                    [messages]="visMessages()"
+                    (agentSelected)="onNetworkAgentSelected($event)"
+                />
+            } @else if (viewMode() === 'network' && networkViewMode() === '3d') {
+                <app-agent-network-3d
                     [agents]="visAgents()"
                     [messages]="visMessages()"
                     (agentSelected)="onNetworkAgentSelected($event)"
@@ -365,6 +381,7 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
     private readonly wsService = inject(WebSocketService);
     private readonly agentService = inject(AgentService);
     private readonly api = inject(ApiService);
+    private readonly viewModeService = inject(ViewModeService);
     private readonly timelineEl = viewChild<ElementRef<HTMLElement>>('timeline');
 
     protected readonly loading = signal(true);
@@ -378,6 +395,7 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
     protected readonly agents = signal<Agent[]>([]);
     protected readonly wsConnected = this.wsService.connected;
     protected readonly viewMode = signal<'list' | 'network'>('list');
+    protected readonly networkViewMode = this.viewModeService.getMode('comms-network');
 
     protected readonly channelFilters = [
         { value: 'all', label: 'All' },
@@ -632,6 +650,10 @@ export class AgentCommsComponent implements OnInit, OnDestroy {
 
     protected setViewMode(mode: 'list' | 'network'): void {
         this.viewMode.set(mode);
+    }
+
+    protected setNetworkViewMode(mode: ViewMode): void {
+        this.viewModeService.setMode('comms-network', mode);
     }
 
     protected onNetworkAgentSelected(agentId: string): void {
