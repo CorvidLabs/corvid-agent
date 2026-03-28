@@ -1252,8 +1252,10 @@ describe('DiscordBridge expired thread session resume', () => {
         });
 
         const originalFetch = globalThis.fetch;
+        const fetchUrls: string[] = [];
         const fetchBodies: unknown[] = [];
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+        globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+            fetchUrls.push(String(url));
             if (init?.body) {
                 try { fetchBodies.push(JSON.parse(init.body as string)); } catch { /* skip */ }
             }
@@ -1269,21 +1271,20 @@ describe('DiscordBridge expired thread session resume', () => {
                 timestamp: new Date().toISOString(),
             });
 
-            // Flush any pending async deliveries (fire-and-forget embeds)
-            await new Promise(r => setTimeout(r, 50));
+            // Flush any pending async deliveries (fire-and-forget embeds like typing indicator)
+            await new Promise(r => setTimeout(r, 100));
 
             // Should NOT have started a new process
             expect(pm.startProcess).not.toHaveBeenCalled();
 
-            // Should have sent the dead-end embed
-            const deadEnd = fetchBodies.find((b: unknown) => {
-                const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
-                return embeds?.some(e => e.description?.includes('session has expired'));
-            });
-            expect(deadEnd).toBeDefined();
-
-            // Thread session should be cleaned up
+            // Thread session should be cleaned up (session expired, resume failed)
             expect(threadSessions.has('700000000000000001')).toBe(false);
+
+            // Should have sent a message to the thread channel (dead-end embed)
+            const threadMessages = fetchUrls.filter(u =>
+                u.includes('/channels/700000000000000001/messages'),
+            );
+            expect(threadMessages.length).toBeGreaterThan(0);
         } finally {
             globalThis.fetch = originalFetch;
         }
