@@ -384,6 +384,9 @@ export class DiscordBridge {
                 subscribeForAdaptiveInlineResponse(this.processManager, this.delivery, this.config.botToken, sid, cid, rid, an, am, onBot, pn, dc),
             syncGuildData: () => this.syncGuildDataAsync(),
             buddyService: this.buddyService,
+            userMessageTimestamps: this.userMessageTimestamps,
+            rateLimitWindowMs: this.RATE_LIMIT_WINDOW_MS,
+            rateLimitMaxMessages: this.RATE_LIMIT_MAX_MESSAGES,
         };
         await handleInteractionImpl(ctx, interaction);
     }

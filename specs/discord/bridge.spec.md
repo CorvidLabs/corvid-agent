@@ -393,7 +393,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 ### Security & Rate Limiting
 
 21. **Role-based access control**: Permission levels (BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3). In legacy mode, `allowedUserIds` grants ADMIN level. In `publicMode`, permissions are resolved from Discord roles via `rolePermissions` config. Highest matching role wins. Muted users are always BLOCKED
-22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50)
+22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50). Rate limiting applies to **both channel messages and slash command interactions** — they share the same `userMessageTimestamps` map on `DiscordBridge`, so commands and messages count against the same per-user quota
 23. **Prompt injection scanning**: All incoming messages (channel @mentions and thread messages) are scanned via `scanForInjection()`. Blocked messages are audited and rejected
 24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute`, `/admin`, `/config` require ADMIN. `/agents`, `/status`, `/tasks`, `/schedule`, `/help` require BASIC
 25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions. Mutes are persisted in the `discord_muted_users` DB table and restored on bridge start
