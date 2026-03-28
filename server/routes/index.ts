@@ -78,6 +78,7 @@ import { handleFeedbackRoutes } from './feedback';
 import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleFlockTestingRoutes } from './flock-testing';
 import { handleGitHubAllowlistRoutes } from './github-allowlist';
+import { handleLibraryRoutes } from './library';
 import { handleGitHubPRDiffRoutes } from './github-pr-diff';
 import { handleMarketplaceRoutes } from './marketplace';
 import { handleMarketplaceAnalyticsRoutes } from './marketplace-analytics';
@@ -106,7 +107,6 @@ import { handleToolCatalogRoutes } from './tool-catalog';
 import { handleUsageRoutes } from './usage';
 import { handleVariantRoutes } from './variants';
 import { handleWebhookRoutes } from './webhooks';
-import { handleLibraryRoutes } from './library';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleWorkflowRoutes } from './workflows';
 

@@ -1,37 +1,4 @@
 import { Routes } from '@angular/router';
-import { SubTabShellComponent } from './shared/components/sub-tab-shell.component';
-import type { SubTab } from './shared/components/sub-tab-shell.component';
-
-// ── Sub-tab configurations ──────────────────────────────────────────────
-
-const SETTINGS_TABS: SubTab[] = [
-    { label: 'General', path: './', exact: true },
-    { label: 'Security', path: 'security' },
-    { label: 'Access Control', path: 'access-control' },
-    { label: 'Automation', path: 'automation' },
-    { label: 'Integrations', path: 'integrations' },
-];
-
-const AGENTS_TABS: SubTab[] = [
-    { label: 'All Agents', path: './', exact: true },
-    { label: 'Flock Directory', path: 'flock-directory' },
-    { label: 'Projects', path: 'projects' },
-    { label: 'Models', path: 'models' },
-];
-
-const SESSIONS_TABS: SubTab[] = [
-    { label: 'Conversations', path: './', exact: true },
-    { label: 'Work Tasks', path: 'work-tasks' },
-    { label: 'Councils', path: 'councils' },
-];
-
-const OBSERVE_TABS: SubTab[] = [
-    { label: 'Comms', path: './', exact: true },
-    { label: 'Memory', path: 'memory' },
-    { label: 'Analytics', path: 'analytics' },
-    { label: 'Logs', path: 'logs' },
-    { label: 'Reputation', path: 'reputation' },
-];
 
 // ── Route definitions ───────────────────────────────────────────────────
 
@@ -51,8 +18,6 @@ export const routes: Routes = [
     // ── Agents (consolidated) ───────────────────────────────────────────
     {
         path: 'agents',
-        component: SubTabShellComponent,
-        data: { tabs: AGENTS_TABS, groupLabel: 'Agents' },
         children: [
             {
                 path: '',
@@ -121,8 +86,6 @@ export const routes: Routes = [
     // ── Sessions ───────────────────────────────────────────────────────
     {
         path: 'sessions',
-        component: SubTabShellComponent,
-        data: { tabs: SESSIONS_TABS, groupLabel: 'Sessions' },
         children: [
             {
                 path: '',
@@ -185,8 +148,6 @@ export const routes: Routes = [
     // ── Observe (monitoring & analytics) ─────────────────────────────
     {
         path: 'observe',
-        component: SubTabShellComponent,
-        data: { tabs: OBSERVE_TABS, groupLabel: 'Observe' },
         children: [
             {
                 path: '',
@@ -197,6 +158,11 @@ export const routes: Routes = [
                 path: 'memory',
                 loadComponent: () =>
                     import('./features/memory/unified-memory.component').then((m) => m.UnifiedMemoryComponent),
+            },
+            {
+                path: 'library',
+                loadComponent: () =>
+                    import('./features/library/library-browser.component').then((m) => m.LibraryBrowserComponent),
             },
             {
                 path: 'analytics',
@@ -224,8 +190,6 @@ export const routes: Routes = [
     // ── Settings (consolidated — 5 tabs) ─────────────────────────────
     {
         path: 'settings',
-        component: SubTabShellComponent,
-        data: { tabs: SETTINGS_TABS, groupLabel: 'Settings' },
         children: [
             {
                 path: '',

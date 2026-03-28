@@ -109,7 +109,7 @@ export interface Breadcrumb {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.75rem 1.5rem 0.5rem;
+            padding: 0.5rem 1.5rem 0.25rem;
             gap: 1rem;
         }
         .page-shell__title-row {
@@ -153,7 +153,7 @@ export interface Breadcrumb {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 0.75rem 1.5rem 1.5rem;
+            padding: 0.5rem 1.5rem 1.5rem;
         }
 
         @media (max-width: 767px) {

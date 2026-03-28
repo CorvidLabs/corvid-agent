@@ -183,7 +183,7 @@ export class ActivityRailComponent implements OnInit, OnDestroy {
     private readonly sessionService = inject(SessionService);
 
     protected readonly open = signal(
-        typeof localStorage !== 'undefined' && localStorage.getItem('activity_rail_open') !== 'false',
+        typeof localStorage !== 'undefined' && localStorage.getItem('activity_rail_open') === 'true',
     );
 
     /** Custom width for open state — persisted */

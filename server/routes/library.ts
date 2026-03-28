@@ -5,7 +5,7 @@ import type { RequestContext } from '../middleware/guards';
 
 const VALID_CATEGORIES: LibraryCategory[] = ['guide', 'reference', 'decision', 'standard', 'runbook'];
 
-export function handleLibraryRoutes(req: Request, url: URL, db: Database, _context: RequestContext): Response | null {
+export function handleLibraryRoutes(req: Request, url: URL, db: Database, _context?: RequestContext): Response | null {
   const path = url.pathname;
   const method = req.method;
 

@@ -357,12 +357,24 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 
                 <!-- Skills Tab -->
                 @if (activeTab() === 'skills') {
+                    <div class="skills-assign">
+                        <select class="skills-assign__select" #bundleSelect>
+                            <option value="">Add a skill bundle...</option>
+                            @for (b of availableBundles(); track b.id) {
+                                <option [value]="b.id">{{ b.name }}</option>
+                            }
+                        </select>
+                        <button class="skills-assign__btn" (click)="assignBundle(bundleSelect.value); bundleSelect.value = ''" [disabled]="!bundleSelect.value">Add</button>
+                    </div>
                     @if (agentBundles().length === 0) {
                         <p class="detail__empty">No skill bundles assigned. <a routerLink="/agents/skill-bundles">Manage bundles</a></p>
                     } @else {
                         <div class="skills-list">
                             @for (ab of agentBundles(); track ab.bundleId) {
-                                <span class="skill-tag">{{ getBundleName(ab.bundleId) }}</span>
+                                <span class="skill-tag">
+                                    {{ getBundleName(ab.bundleId) }}
+                                    <button class="skill-tag__remove" (click)="unassignBundle(ab.bundleId)" title="Remove">&times;</button>
+                                </span>
                             }
                         </div>
                     }
@@ -506,8 +518,14 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .persona-info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
         .persona-info dd { margin: 0; color: var(--text-primary); }
         .persona-info__text { font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0; }
+        .skills-assign { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .skills-assign__select { flex: 1; padding: 0.4rem 0.5rem; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); font-size: 0.8rem; }
+        .skills-assign__btn { padding: 0.4rem 1rem; background: var(--accent-cyan); color: var(--bg-primary); border: none; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; }
+        .skills-assign__btn:disabled { opacity: 0.4; cursor: default; }
         .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .skill-tag { font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .skill-tag { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; opacity: 0.6; }
+        .skill-tag__remove:hover { opacity: 1; }
 
         /* Flock Profile */
         .flock-profile { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -833,6 +851,35 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     protected getBundleName(bundleId: string): string {
         return this.skillBundleService.bundles().find((b) => b.id === bundleId)?.name ?? bundleId.slice(0, 8);
+    }
+
+    protected availableBundles = computed(() => {
+        const assigned = new Set(this.agentBundles().map((ab) => ab.bundleId));
+        return this.skillBundleService.bundles().filter((b) => !assigned.has(b.id));
+    });
+
+    async assignBundle(bundleId: string): Promise<void> {
+        const a = this.agent();
+        if (!a || !bundleId) return;
+        try {
+            const assignment = await this.skillBundleService.assignToAgent(a.id, bundleId);
+            this.agentBundles.update((list) => [...list, assignment]);
+            this.notify.success('Skill bundle assigned');
+        } catch {
+            this.notify.error('Failed to assign skill bundle');
+        }
+    }
+
+    async unassignBundle(bundleId: string): Promise<void> {
+        const a = this.agent();
+        if (!a) return;
+        try {
+            await this.skillBundleService.removeFromAgent(a.id, bundleId);
+            this.agentBundles.update((list) => list.filter((ab) => ab.bundleId !== bundleId));
+            this.notify.success('Skill bundle removed');
+        } catch {
+            this.notify.error('Failed to remove skill bundle');
+        }
     }
 
     async onCreateWork(): Promise<void> {

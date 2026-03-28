@@ -40,7 +40,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         <app-page-shell
             title="Agents"
             icon="agents"
-            [breadcrumbs]="[{ label: 'Agents' }]">
+            [breadcrumbs]="[]">
             <a actions class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
 
             <!-- Search + Filters (sticky) -->
