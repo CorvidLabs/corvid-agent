@@ -1269,17 +1269,18 @@ describe('DiscordBridge expired thread session resume', () => {
                 timestamp: new Date().toISOString(),
             });
 
-            // Flush any pending async deliveries (fire-and-forget embeds)
-            await new Promise(r => setTimeout(r, 50));
-
             // Should NOT have started a new process
             expect(pm.startProcess).not.toHaveBeenCalled();
 
-            // Should have sent the dead-end embed
-            const deadEnd = fetchBodies.find((b: unknown) => {
-                const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
-                return embeds?.some(e => e.description?.includes('session has expired'));
-            });
+            // Wait for the dead-end embed to appear (async delivery may be in-flight)
+            let deadEnd: unknown;
+            for (let i = 0; i < 40 && !deadEnd; i++) {
+                await new Promise(r => setTimeout(r, 25));
+                deadEnd = fetchBodies.find((b: unknown) => {
+                    const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
+                    return embeds?.some(e => e.description?.includes('session has expired'));
+                });
+            }
             expect(deadEnd).toBeDefined();
 
             // Thread session should be cleaned up
