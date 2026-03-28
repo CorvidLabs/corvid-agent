@@ -188,6 +188,92 @@ describe('FallbackManager', () => {
         });
     });
 
+    describe('Ollama-specific HTTP error classification', () => {
+        /** Single-provider chain for Ollama to verify cooldown behaviour. */
+        const OLLAMA_CHAIN: FallbackChain = {
+            chain: [{ provider: 'ollama', model: 'qwen3:14b' }],
+        };
+
+        test('Ollama HTTP 500 (internal error) is treated as transient — triggers cooldown after 3 failures', async () => {
+            // Ollama formats errors as: ExternalServiceError 'API error (500): internal server error'
+            const registry = mockRegistry({
+                ollama: mockProvider(new Error('API error (500): internal server error')),
+            });
+            const localFm = new FallbackManager(registry as any);
+
+            // First two failures: provider still available
+            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
+            expect(localFm.isProviderAvailable('ollama')).toBe(true);
+
+            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
+            expect(localFm.isProviderAvailable('ollama')).toBe(true);
+
+            // Third failure: cooldown activates
+            try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
+            expect(localFm.isProviderAvailable('ollama')).toBe(false);
+        });
+
+        test('Ollama HTTP 404 (model not found) is treated as permanent — does NOT trigger cooldown', async () => {
+            const registry = mockRegistry({
+                ollama: mockProvider(new Error('API error (404): model "xyz:latest" not found, try pulling it first')),
+            });
+            const localFm = new FallbackManager(registry as any);
+
+            // Three calls with a 404 error — should NOT trigger cooldown
+            for (let i = 0; i < 3; i++) {
+                try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
+            }
+            // Provider should still be available (404 is permanent, not transient)
+            expect(localFm.isProviderAvailable('ollama')).toBe(true);
+        });
+
+        test('Ollama HTTP 400 (bad request) is treated as permanent — does NOT trigger cooldown', async () => {
+            const registry = mockRegistry({
+                ollama: mockProvider(new Error('API error (400): invalid model parameter')),
+            });
+            const localFm = new FallbackManager(registry as any);
+
+            for (let i = 0; i < 3; i++) {
+                try { await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_CHAIN); } catch {}
+            }
+            expect(localFm.isProviderAvailable('ollama')).toBe(true);
+        });
+
+        test('Ollama HTTP 500 in two-provider chain falls back to second provider', async () => {
+            const OLLAMA_OPENAI_CHAIN: FallbackChain = {
+                chain: [
+                    { provider: 'ollama', model: 'qwen3:14b' },
+                    { provider: 'openai', model: 'gpt-4.1' },
+                ],
+            };
+            const registry = mockRegistry({
+                ollama: mockProvider(new Error('API error (500): model load failure')),
+                openai: mockProvider({ content: 'fallback-ok', model: 'gpt-4.1' }),
+            });
+            const localFm = new FallbackManager(registry as any);
+            const result = await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_OPENAI_CHAIN);
+            expect(result.usedProvider).toBe('openai');
+            expect(result.content).toBe('fallback-ok');
+        });
+
+        test('Ollama HTTP 404 in two-provider chain still tries next provider (permanent but chain continues)', async () => {
+            const OLLAMA_OPENAI_CHAIN: FallbackChain = {
+                chain: [
+                    { provider: 'ollama', model: 'qwen3:14b' },
+                    { provider: 'openai', model: 'gpt-4.1' },
+                ],
+            };
+            const registry = mockRegistry({
+                ollama: mockProvider(new Error('API error (404): model "qwen3:14b" not found')),
+                openai: mockProvider({ content: 'fallback-ok', model: 'gpt-4.1' }),
+            });
+            const localFm = new FallbackManager(registry as any);
+            const result = await localFm.completeWithFallback({ messages: [] } as any, OLLAMA_OPENAI_CHAIN);
+            expect(result.usedProvider).toBe('openai');
+            expect(result.content).toBe('fallback-ok');
+        });
+    });
+
     describe('resetHealth', () => {
         test('clears all health records', async () => {
             const registry = mockRegistry({
