@@ -188,6 +188,12 @@ Each route module exports a handler function with the signature `(req, url, db, 
 |------|-------------|
 | `McpApiDeps` | Interface for MCP API route dependencies (bridge, messenger, etc.) |
 
+### Exported Types (flock-testing.ts)
+
+| Type | Description |
+|------|-------------|
+| `FlockTestingDeps` | Interface for Flock Testing route dependencies (`flockDirectory?: FlockDirectoryService | null`) |
+
 ### Exported Functions (webhooks.ts)
 
 | Function | Parameters | Returns | Description |
