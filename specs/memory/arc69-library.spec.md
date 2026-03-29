@@ -247,7 +247,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 | Module | What is used |
 |--------|-------------|
-| `server/routes/library.ts` | `listLibraryEntries`, `getLibraryEntry`, `getBookPages` from `server/db/agent-library.ts` |
+| `server/routes/library.ts` | `listLibraryEntries`, `listLibraryEntriesGrouped`, `getLibraryEntry`, `getBookPages` from `server/db/agent-library.ts` |
 
 > **Note:** `server/mcp/tool-handlers/library.ts` does not exist yet. It is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process. Until then, no consumer references exist.
 

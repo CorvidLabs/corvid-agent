@@ -126,13 +126,13 @@ const NAV_ITEMS: BottomNavItem[] = [
             position: absolute;
             top: -4px;
             right: -8px;
-            min-width: 14px;
-            height: 14px;
+            min-width: 16px;
+            height: 16px;
             padding: 0 3px;
-            border-radius: 7px;
+            border-radius: 8px;
             background: var(--accent-cyan);
             color: var(--bg-deep);
-            font-size: 0.5rem;
+            font-size: 0.6rem;
             font-weight: 700;
             display: flex;
             align-items: center;
