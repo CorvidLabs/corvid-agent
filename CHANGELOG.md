@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.59.0] - 2026-03-29
+
+### Added
+- **Library tag filtering & page navigation** — tag-based filtering, paginated browsing, and better display titles (#1684)
+- **Documentation expansion** — recipes, use-case gallery, and docs index for onboarding (#1675)
+- **Map-based command registry** — replaced switch dispatcher with extensible map-based command registry + migration 110 (#1682)
+
+### Fixed
+- **Library 3D book rendering** — use totalPages from grouped API, add title field, markdown rendering, sort/stats (#1681)
+- **Discord session resume** — create fresh session when old one can't restart (#1677)
+- **Discord autocomplete** — use static import for discordFetch in autocomplete handler (#1679)
+- **Discord conversation summary** — persist conversation summary across session resumes (#1680)
+- **Session death loop** — recover from zero-turn death loop instead of killing session permanently (#1683)
+- **Markdown rendering** — add marked dependency and fix implicit any types in markdown pipe
+
+### Refactored
+- **ThreadSessionManager** — extract session/mention state, add security startup checks (#1678)
+
 ## [0.58.0] - 2026-03-29
 
 ### Added
