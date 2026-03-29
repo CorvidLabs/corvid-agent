@@ -30,10 +30,9 @@ const PAGES: PageAudit[] = [
     { route: '/settings/integrations', name: 'settings-integrations', checks: ['.settings, .page-shell'] },
     { route: '/wallets', name: 'wallets', checks: ['.wallet, .page-shell'] },
     { route: '/spending', name: 'spending', checks: ['.spending, .page-shell'] },
-    { route: '/models', name: 'models', checks: ['.model, .page-shell'] },
-    { route: '/personas', name: 'personas', checks: ['.persona, .page-shell'] },
-    { route: '/skill-bundles', name: 'skill-bundles', checks: ['.skill-bundle, .page-shell'] },
-    { route: '/marketplace', name: 'marketplace', checks: ['.marketplace, .page-shell'] },
+    { route: '/agents/models', name: 'models', checks: ['.model, .page-shell'] },
+    { route: '/agents/personas', name: 'personas', checks: ['.persona, .page-shell'] },
+    { route: '/agents/skill-bundles', name: 'skill-bundles', checks: ['.skill-bundle, .page-shell'] },
 ];
 
 async function main() {
