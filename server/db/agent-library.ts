@@ -226,13 +226,24 @@ export function listLibraryEntriesGrouped(
   const rows = db.query(sql).all(...(params as Parameters<typeof db.query>)) as LibraryRow[];
   const entries = rows.map(rowToEntry);
 
-  // For each book entry, count total pages
+  // Batch-fetch page counts for all books in one query (avoids N+1)
+  const bookNames = [...new Set(entries.filter((e) => e.book).map((e) => e.book as string))];
+  const pageCounts = new Map<string, number>();
+  if (bookNames.length > 0) {
+    const placeholders = bookNames.map(() => '?').join(', ');
+    const countRows = db
+      .query(
+        `SELECT book, COUNT(*) as cnt FROM agent_library WHERE book IN (${placeholders}) AND archived = 0 GROUP BY book`,
+      )
+      .all(...bookNames) as { book: string; cnt: number }[];
+    for (const row of countRows) {
+      pageCounts.set(row.book, row.cnt);
+    }
+  }
+
   return entries.map((entry) => {
     if (entry.book) {
-      const countRow = db
-        .query('SELECT COUNT(*) as cnt FROM agent_library WHERE book = ? AND archived = 0')
-        .get(entry.book) as { cnt: number } | null;
-      return { ...entry, totalPages: countRow?.cnt ?? 1 };
+      return { ...entry, totalPages: pageCounts.get(entry.book) ?? 1 };
     }
     return entry;
   });
