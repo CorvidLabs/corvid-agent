@@ -12,6 +12,7 @@ import { listProjects } from '../../db/projects';
 import { listBundles } from '../../db/skill-bundles';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
+import { discordFetch } from '../embeds';
 import type { DiscordInteractionData, DiscordInteractionOption } from '../types';
 import { InteractionCallbackType } from '../types';
 
@@ -93,7 +94,6 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
       }));
   }
 
-  const { discordFetch } = await import('../embeds');
   const response = await discordFetch(
     `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
     {
