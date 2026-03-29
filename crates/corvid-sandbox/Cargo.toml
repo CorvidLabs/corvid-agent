@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 corvid-plugin-api = { path = "../corvid-plugin-api" }
-wasmtime = "14.0"
+wasmtime = "24"
 tokio = { version = "1.0", features = ["full", "time"] }
 thiserror = "1.0"
 
