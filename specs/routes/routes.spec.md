@@ -41,6 +41,7 @@ files:
   - server/routes/feedback.ts
   - server/routes/flock-directory.ts
   - server/routes/health.ts
+  - server/routes/library.ts
   - server/routes/marketplace-analytics.ts
   - server/routes/onboarding.ts
   - server/routes/permissions.ts
@@ -131,6 +132,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleFeedbackRoutes` | feedback.ts | PR outcome tracking and analysis |
 | `handleFlockDirectoryRoutes` | flock-directory.ts | Flock Directory agent registry CRUD and search |
 | `handleHealthRoutes` | health.ts | Health checks (liveness, readiness, history) |
+| `handleLibraryRoutes` | library.ts | Shared agent library entries (guide, reference, decision, standard, runbook) |
 | `handleMarketplaceAnalyticsRoutes` | marketplace-analytics.ts | Marketplace seller analytics and buyer usage |
 | `handleOnboardingRoutes` | onboarding.ts | Onboarding setup progress status |
 | `handlePermissionRoutes` | permissions.ts | Permission broker capability grants |
