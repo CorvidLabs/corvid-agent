@@ -13,6 +13,7 @@
  */
 
 import type { JsonSchemaObject } from '../types';
+import type { Project } from '../../../shared/types';
 
 export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'minimax' | 'glm' | 'kimi' | 'devstral' | 'gemini' | 'unknown';
 
@@ -269,6 +270,43 @@ You are running in an isolated git worktree with your own dedicated branch. To p
 - Do NOT run \`git branch -a\` or interact with other sessions' branches.
 - If you need to reference upstream changes, use \`main\` as your base branch.
 - Your worktree is fully isolated — changes you make here do not affect other sessions.`;
+}
+
+/**
+ * Injects a pinned project context note into the system prompt.
+ *
+ * When the conversation context window fills and gets compressed, models can
+ * lose track of which repository/project they're working on and fall back to
+ * their "home" repo (e.g. corvid-agent). This prompt anchors the active project
+ * in the system prompt — which is re-injected on every SDK turn — so it
+ * survives context compression.
+ *
+ * See: https://github.com/CorvidLabs/corvid-agent/issues/1628
+ */
+export function getProjectContextPrompt(project: Project): string {
+    const lines: string[] = [
+        '## Active Project Context',
+        '',
+        `You are working on project **${project.name}** in directory \`${project.workingDir}\`.`,
+    ];
+
+    if (project.gitUrl) {
+        lines.push(`Git remote: \`${project.gitUrl}\``);
+
+        // Extract GitHub owner/repo slug so the agent can use it directly
+        const githubMatch = project.gitUrl.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+        if (githubMatch) {
+            lines.push(`GitHub repo: \`${githubMatch[1]}\``);
+        }
+    }
+
+    lines.push(
+        '',
+        'When performing GitHub or git operations (listing issues, PRs, merging, reviewing, etc.), always use **this project** — not corvid-agent or any other repository.',
+        'Do NOT default to a different repo because it happens to be your home project.',
+    );
+
+    return lines.join('\n');
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────

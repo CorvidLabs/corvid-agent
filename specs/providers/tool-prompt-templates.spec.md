@@ -33,6 +33,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 | `getCodebaseContextPrompt` | `()` | `string` | Project structure and orientation context for agents |
 | `getMessagingSafetyPrompt` | `()` | `string` | Prevent script-based message sending |
 | `getWorktreeIsolationPrompt` | `()` | `string` | Git branch isolation rules for worktree sessions |
+| `getProjectContextPrompt` | `(project: Project)` | `string` | Active project anchor — pins project name, workingDir, gitUrl, and GitHub slug in system prompt to survive context compression |
 | `getCompactToolInstructionPrompt` | `(family, toolNames, toolDefs?)` | `string` | Reduced-token tool instructions for cloud-proxied models |
 | `getCompactResponseRoutingPrompt` | `()` | `string` | Compact response routing rules for cloud-proxied models |
 | `getCompactCodingToolPrompt` | `()` | `string` | Compact coding tool guidelines for cloud-proxied models |
@@ -49,6 +50,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 8. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
 9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
 10. **Worktree isolation always appended**: `getWorktreeIsolationPrompt()` is unconditionally appended to both SDK and direct process system prompts, instructing the agent to stay on its own branch and not interact with other sessions' branches
+13. **Project context always appended (SDK path)**: `getProjectContextPrompt(project)` is unconditionally appended to the SDK process system prompt, pinning the active project's name, working directory, git remote, and derived GitHub slug so the agent retains project identity after context compression (issue #1628). GitHub slug is extracted from GitHub HTTPS (`https://github.com/owner/repo`) and SSH (`git@github.com:owner/repo`) URL formats
 11. **Codebase context appended for Ollama agents**: `getCodebaseContextPrompt()` is appended in `direct-process.ts` to give Ollama-backed agents basic orientation about project structure, runtime, and common commands
 12. **Cloud models use compact prompts**: Cloud-proxied models (detected by `OllamaProvider.isCloudModel()`) receive compact prompt variants (`getCompactToolInstructionPrompt`, `getCompactResponseRoutingPrompt`, `getCompactCodingToolPrompt`) that preserve essential rules while reducing token count to stay within cloud proxy server-side timeouts (~90s). Messaging safety is folded into compact tool instructions rule #5. `getCodebaseContextPrompt()` is skipped for cloud models
 
@@ -91,7 +93,7 @@ None (standalone module).
 | Module | What is used |
 |--------|-------------|
 | `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getCompactToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCompactResponseRoutingPrompt`, `getCodingToolPrompt`, `getCompactCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
-| `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt` |
+| `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt`, `getProjectContextPrompt` |
 
 ## Change Log
 
