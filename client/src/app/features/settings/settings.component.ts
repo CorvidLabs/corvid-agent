@@ -911,8 +911,8 @@ interface PSKContact {
             text-transform: uppercase;
             font-size: 0.75rem;
         }
-        .network-badge[data-network="testnet"] { color: #4a90d9; }
-        .network-badge[data-network="mainnet"] { color: #50e3c2; }
+        .network-badge[data-network="testnet"] { color: var(--network-testnet); }
+        .network-badge[data-network="mainnet"] { color: var(--network-mainnet); }
         .network-badge[data-network="localnet"] { color: var(--accent-gold); }
         .algo-balance--low { color: var(--accent-red, #ff4d4f) !important; }
 

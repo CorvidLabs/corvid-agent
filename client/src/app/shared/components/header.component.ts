@@ -118,14 +118,14 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             cursor: not-allowed;
         }
         .network-btn--active.network-btn--testnet {
-            background: rgba(74, 144, 217, 0.15);
-            color: #4a90d9;
-            box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.2);
+            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
+            color: var(--network-testnet);
+            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-testnet) 20%, transparent);
         }
         .network-btn--active.network-btn--mainnet {
-            background: rgba(80, 227, 194, 0.15);
-            color: #50e3c2;
-            box-shadow: inset 0 0 8px rgba(80, 227, 194, 0.2);
+            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
+            color: var(--network-mainnet);
+            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-mainnet) 20%, transparent);
         }
         .header__status {
             display: flex;

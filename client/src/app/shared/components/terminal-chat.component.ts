@@ -146,9 +146,9 @@ interface AutocompleteItem {
         .terminal {
             display: flex;
             flex-direction: column;
-            border: 1px solid var(--border);
+            border: 1px solid var(--terminal-border);
             border-radius: var(--radius-lg);
-            background: #0d1117;
+            background: var(--terminal-bg);
             font-family: var(--font-mono);
             font-size: 0.85rem;
             line-height: 1.6;
@@ -206,30 +206,28 @@ interface AutocompleteItem {
         }
 
         .terminal__line--inbound .terminal__prompt { color: var(--accent-cyan); }
-        .terminal__line--outbound .terminal__prompt { color: #7ee787; }
-        .terminal__line--status .terminal__prompt { color: var(--accent-amber, #ffaa00); }
+        .terminal__line--outbound .terminal__prompt { color: var(--terminal-prompt-out); }
+        .terminal__line--status .terminal__prompt { color: var(--accent-amber); }
         .terminal__line--status { opacity: 0.7; font-style: italic; }
         .terminal__line--streaming { opacity: 0.9; }
         .terminal__prompt { font-weight: 700; user-select: none; flex-shrink: 0; }
         .terminal__text {
-            color: #c9d1d9;
+            color: var(--terminal-text);
             flex: 1;
             min-width: 0;
         }
-
-        /* ── Inline code + pre blocks ───────────────────── */
         .terminal__text :global(code) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.78rem;
-            color: #f0883e;
+            color: var(--terminal-code);
         }
         .terminal__text :global(pre) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 0.75rem;
             border-radius: var(--radius);
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
             overflow-x: auto;
             margin: 0.5rem 0;
             white-space: pre;
@@ -237,18 +235,18 @@ interface AutocompleteItem {
         .terminal__text :global(pre code) {
             background: none;
             padding: 0;
-            color: #c9d1d9;
+            color: var(--terminal-text);
         }
-        .terminal__text :global(strong) { color: #f0f6fc; font-weight: 600; }
-        .terminal__text :global(em) { color: #a8b5c8; font-style: italic; }
+        .terminal__text :global(strong) { color: var(--text-primary); font-weight: 600; }
+        .terminal__text :global(em) { color: var(--text-secondary); font-style: italic; }
         .terminal__text :global(h1),
         .terminal__text :global(h2),
         .terminal__text :global(h3) {
-            color: #f0f6fc;
+            color: var(--text-primary);
             font-size: 0.85rem;
             font-weight: 700;
             margin: 0.5rem 0 0.25rem;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--border);
             padding-bottom: 0.2rem;
         }
         .terminal__text :global(ul),
@@ -258,18 +256,18 @@ interface AutocompleteItem {
         }
         .terminal__text :global(li) { margin: 0.1rem 0; }
         .terminal__text :global(blockquote) {
-            border-left: 3px solid #30363d;
+            border-left: 3px solid var(--border-bright);
             padding-left: 0.75rem;
-            color: #8b949e;
+            color: var(--text-secondary);
             margin: 0.25rem 0;
         }
         .terminal__text :global(hr) {
             border: none;
-            border-top: 1px solid #21262d;
+            border-top: 1px solid var(--border);
             margin: 0.5rem 0;
         }
         .terminal__text :global(a) {
-            color: #58a6ff;
+            color: var(--accent-cyan);
             text-decoration: underline;
             text-underline-offset: 2px;
         }
@@ -278,26 +276,29 @@ interface AutocompleteItem {
         .terminal__text :global(.code-block) {
             margin: 0.5rem 0;
             border-radius: var(--radius);
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
             overflow: hidden;
         }
         .terminal__text :global(.code-block__bar) {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #161b22;
+            background: var(--bg-deep);
             padding: 0.3rem 0.75rem;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
         }
         .terminal__text :global(.code-block__lang) {
-            color: #8b949e;
+            color: var(--text-secondary);
             font-size: 0.68rem;
             text-transform: lowercase;
         }
-        .terminal__text :global(.code-block__copy-btn) {
+        .terminal__copy {
+            position: absolute;
+            top: 0;
+            right: 0;
             background: transparent;
-            border: 1px solid #30363d;
-            color: #484f58;
+            border: 1px solid var(--border);
+            color: var(--terminal-text-faint);
             font-family: inherit;
             font-size: 0.65rem;
             padding: 2px 8px;
@@ -360,7 +361,7 @@ interface AutocompleteItem {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
             transition: opacity 0.15s;
         }
@@ -368,7 +369,7 @@ interface AutocompleteItem {
         @media (hover: hover) {
             .terminal__copy { opacity: 0; }
             .terminal__line:hover .terminal__copy { opacity: 1; }
-            .terminal__copy:hover { color: #c9d1d9; border-color: #484f58; }
+            .terminal__copy:hover { color: var(--terminal-text); border-color: var(--terminal-text-faint); }
         }
         /* Touch devices: always subtly visible */
         @media (hover: none) {
@@ -386,7 +387,7 @@ interface AutocompleteItem {
             display: inline-block;
             width: 7px;
             height: 1em;
-            background: #7ee787;
+            background: var(--terminal-cursor);
             animation: blink 1s step-end infinite;
             vertical-align: text-bottom;
             margin-left: 1px;
@@ -398,22 +399,22 @@ interface AutocompleteItem {
         /* ── Tool events ────────────────────────────────── */
         .terminal__tool {
             margin: 0.25rem 0;
-            color: #8b949e;
+            color: var(--terminal-text-dim);
         }
         .terminal__tool-name {
             cursor: pointer;
             font-size: 0.75rem;
-            color: #f0883e;
+            color: var(--terminal-code);
             user-select: none;
         }
-        .terminal__tool-name:hover { color: #f0f6fc; }
+        .terminal__tool-name:hover { color: var(--text-primary); }
         .terminal__tool-input {
-            background: #161b22;
-            border: 1px solid #30363d;
+            background: var(--terminal-surface);
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 0.5rem;
             font-size: 0.75rem;
-            color: #8b949e;
+            color: var(--terminal-text-dim);
             overflow-x: auto;
             margin: 0.25rem 0 0;
         }
@@ -422,8 +423,8 @@ interface AutocompleteItem {
         .terminal__thinking {
             display: flex;
             align-items: center;
-            gap: 4px;
-            color: #8b949e;
+            gap: 0.5rem;
+            color: var(--terminal-text-dim);
             font-size: 0.75rem;
             padding: 0.25rem 0;
             margin-bottom: 0.5rem;
@@ -432,7 +433,7 @@ interface AutocompleteItem {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #7ee787;
+            background: var(--terminal-code);
             animation: typing-bounce 1.2s ease-in-out infinite;
             flex-shrink: 0;
         }
@@ -445,25 +446,25 @@ interface AutocompleteItem {
 
         /* ── Empty state ────────────────────────────────── */
         .terminal__empty {
-            color: #484f58;
+            color: var(--terminal-text-faint);
             margin: 0;
             font-style: italic;
         }
         .terminal__empty :global(code) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.78rem;
-            color: #f0883e;
+            color: var(--terminal-code);
         }
 
         /* ── Input area ─────────────────────────────────── */
         .terminal__input-area {
             display: flex;
             align-items: flex-start;
-            border-top: 1px solid #30363d;
+            border-top: 1px solid var(--border);
             padding: 0.75rem 1rem;
-            background: #0d1117;
+            background: var(--terminal-bg);
         }
         .terminal__input-prompt {
             color: var(--accent-cyan);
@@ -479,7 +480,7 @@ interface AutocompleteItem {
             width: 100%;
             background: transparent;
             border: none;
-            color: #c9d1d9;
+            color: var(--terminal-text);
             font-family: inherit;
             font-size: inherit;
             line-height: inherit;
@@ -488,12 +489,12 @@ interface AutocompleteItem {
             padding: 0 0 0 0.25rem;
             min-height: 1.6em;
         }
-        .terminal__input::placeholder { color: #484f58; }
+        .terminal__input::placeholder { color: var(--terminal-text-faint); }
         .terminal__input:disabled { opacity: 0.3; }
         .terminal__help-btn {
             background: transparent;
-            border: 1px solid #30363d;
-            color: #484f58;
+            border: 1px solid var(--border);
+            color: var(--terminal-text-faint);
             font-family: inherit;
             font-size: 0.75rem;
             font-weight: 700;
@@ -522,16 +523,16 @@ interface AutocompleteItem {
             right: 0;
             max-height: 220px;
             overflow-y: auto;
-            background: rgba(22, 27, 34, 0.95);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid #30363d;
-            border-radius: var(--radius, 6px);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(0,229,255,0.05);
             z-index: 10;
             margin-bottom: 4px;
             scrollbar-width: thin;
-            scrollbar-color: #30363d transparent;
+            scrollbar-color: var(--border) transparent;
             animation: acEnter 0.15s ease-out;
         }
         @keyframes acEnter {
@@ -548,26 +549,26 @@ interface AutocompleteItem {
         }
         .autocomplete__item:hover,
         .autocomplete__item--active {
-            background: #1c2128;
+            background: var(--bg-hover);
         }
         .autocomplete__item--active {
-            border-left: 2px solid var(--accent-cyan, #00e5ff);
-            background: rgba(0, 229, 255, 0.06);
+            border-left: 2px solid var(--accent-cyan);
+            background: var(--accent-cyan-subtle);
         }
         .autocomplete__label {
-            color: #f0f6fc;
+            color: var(--text-primary);
             font-weight: 600;
             font-size: 0.78rem;
             white-space: nowrap;
         }
         .autocomplete__item[data-kind="command"] .autocomplete__label {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
         }
         .autocomplete__item[data-kind="agent"] .autocomplete__label {
-            color: var(--accent-magenta, #ff00aa);
+            color: var(--accent-magenta);
         }
         .autocomplete__desc {
-            color: #8b949e;
+            color: var(--terminal-text-dim);
             font-size: 0.7rem;
             overflow: hidden;
             text-overflow: ellipsis;

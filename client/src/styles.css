@@ -153,9 +153,36 @@
     --border-subtle: rgba(34, 36, 56, 0.6);
     --border-faint: rgba(34, 36, 56, 0.35);
 
+    /* ── Terminal — deep-void surface for code/chat panels ── */
+    --terminal-bg: #0e0f18;
+    --terminal-surface: #151722;
+    --terminal-border: var(--border);
+    --terminal-text: var(--text-primary);
+    --terminal-text-dim: var(--text-secondary);
+    --terminal-text-faint: var(--text-tertiary);
+    --terminal-prompt-out: var(--accent-green);
+    --terminal-code: var(--accent-amber);
+    --terminal-cursor: var(--accent-green);
+
+    /* ── Provider colors — for model/provider badges ── */
+    --provider-anthropic: #d4a574;
+    --provider-openai: #74d4a5;
+    --provider-ollama: #a5a5ff;
+    --provider-cursor: var(--accent-amber);
+    --provider-google: #4a90d9;
+
+    /* ── Network colors — for blockchain network indicators ── */
+    --network-testnet: #4a90d9;
+    --network-testnet-dim: rgba(74, 144, 217, 0.15);
+    --network-testnet-glow: rgba(74, 144, 217, 0.2);
+    --network-mainnet: #50e3c2;
+    --network-mainnet-dim: rgba(80, 227, 194, 0.15);
+    --network-mainnet-glow: rgba(80, 227, 194, 0.2);
+
     /* ── Overlays — backdrop for modals, drawers, and popovers ── */
     --overlay: rgba(0, 0, 0, 0.5);
     --overlay-heavy: rgba(0, 0, 0, 0.75);
+    --overlay-surface: rgba(15, 16, 24, 0.85);  /* Semi-transparent deep surface */
 
     /* ── Glassmorphism ── */
     --glass-bg: rgba(18, 19, 28, 0.65);

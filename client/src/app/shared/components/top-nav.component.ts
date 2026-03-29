@@ -371,12 +371,12 @@ const TABS: NavTab[] = [
         }
         .network-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .network-btn--active.network-btn--testnet {
-            background: rgba(74, 144, 217, 0.15);
-            color: #4a90d9;
+            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
+            color: var(--network-testnet);
         }
         .network-btn--active.network-btn--mainnet {
-            background: rgba(80, 227, 194, 0.15);
-            color: #50e3c2;
+            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
+            color: var(--network-mainnet);
         }
         .topnav__status {
             display: flex;
