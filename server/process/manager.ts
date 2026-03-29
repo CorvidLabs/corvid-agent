@@ -14,7 +14,7 @@ import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
-import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession, updateSessionSummary } from '../db/sessions';
 import { saveMemory } from '../db/agent-memories';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
@@ -1407,6 +1407,10 @@ export class ProcessManager {
             this.saveSessionSummaryToMemory(sessionId);
         }
 
+        // Always persist conversation summary to session record (even on crash)
+        // so resumed sessions can pick up context from the previous conversation
+        this.persistConversationSummary(sessionId);
+
         if (code !== 0) {
             const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
             this.eventBus.emit(sessionId, {
@@ -1492,6 +1496,30 @@ export class ProcessManager {
             log.info('Session summary saved to memory', { sessionId, key });
         } catch (err) {
             log.warn('Failed to save session summary to memory', {
+                sessionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    /**
+     * Persist a conversation summary to the session record so that when a new
+     * session is created in the same thread, it can carry over context.
+     * Runs on every exit (including crashes) — fire-and-forget.
+     */
+    private persistConversationSummary(sessionId: string): void {
+        try {
+            const messages = getSessionMessages(this.db, sessionId);
+            const conversational = messages.filter(m => m.role === 'user' || m.role === 'assistant');
+            if (conversational.length === 0) return;
+
+            const summary = summarizeConversation(
+                conversational.map(m => ({ role: m.role, content: m.content })),
+            );
+            updateSessionSummary(this.db, sessionId, summary);
+            log.debug('Persisted conversation summary to session', { sessionId });
+        } catch (err) {
+            log.warn('Failed to persist conversation summary', {
                 sessionId,
                 error: err instanceof Error ? err.message : String(err),
             });
