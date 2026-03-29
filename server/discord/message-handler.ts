@@ -12,7 +12,7 @@ import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession } from '../db/discord-mention-sessions';
 import { listProjects } from '../db/projects';
-import { createSession, getSession } from '../db/sessions';
+import { createSession, getSession, getPreviousThreadSessionSummary } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
@@ -854,10 +854,16 @@ async function resumeExpiredThreadSession(
   });
   ctx.threadLastActivity.set(threadId, Date.now());
 
+  // Carry over context from the previous session in this thread (if any)
+  const previousSummary = getPreviousThreadSessionSummary(ctx.db, threadId);
+  const contextPrefix = previousSummary
+    ? `[Previous session context — the session was resumed, here is what was discussed before]\n${previousSummary}\n\n[New message from user]\n`
+    : '';
+
   // Start the process with the user's message (include attachment URLs in text so
   // the agent sees them even though startProcess only accepts strings).
   const textWithUrls = appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
-  ctx.processManager.startProcess(newSession, textWithUrls);
+  ctx.processManager.startProcess(newSession, contextPrefix + textWithUrls);
 
   subscribeForResponseWithEmbed(
     ctx.processManager,
@@ -876,8 +882,11 @@ async function resumeExpiredThreadSession(
   );
 
   // Brief non-blocking notification
+  const resumeDesc = previousSummary
+    ? `Session resumed with **${agent.name}** (previous context carried over).`
+    : `Session resumed with **${agent.name}**.`;
   sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
-    description: `Session resumed with **${agent.name}**.`,
+    description: resumeDesc,
     color: 0x57f287,
   }).catch((err) =>
     log.debug('Failed to send resume embed', { error: err instanceof Error ? err.message : String(err) }),
