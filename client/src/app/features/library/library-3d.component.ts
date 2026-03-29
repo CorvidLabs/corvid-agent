@@ -222,7 +222,6 @@ export class Library3DComponent implements OnDestroy {
     readonly entries = input.required<LibraryEntry[]>();
     readonly paused = input(false);
     readonly entrySelect = output<LibraryEntry>();
-    readonly bookPageSelect = output<{ entry: LibraryEntry; pages: LibraryEntry[] }>();
     readonly orbSearch = output<void>();
 
     protected readonly hoveredEntry = signal<LibraryEntry | null>(null);
@@ -296,8 +295,7 @@ export class Library3DComponent implements OnDestroy {
         };
     });
 
-    // Book grouping: maps book name → list of pages
-    private bookGroups = new Map<string, LibraryEntry[]>();
+    // (bookGroups removed — grouped API returns totalPages directly)
 
     // Bound event handlers for cleanup
     private onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e);
@@ -752,36 +750,12 @@ export class Library3DComponent implements OnDestroy {
         }
         this.bookNodes = [];
 
-        // Build book groups (entries sharing same 'book' name)
-        this.bookGroups.clear();
-        for (const entry of entries) {
-            if (entry.book) {
-                const pages = this.bookGroups.get(entry.book) ?? [];
-                pages.push(entry);
-                this.bookGroups.set(entry.book, pages);
-            }
-        }
-        // Sort pages within each book
-        for (const [, pages] of this.bookGroups) {
-            pages.sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
-        }
-
-        // Deduplicate: for entries that belong to a multi-page book, only show 1 mesh per book
-        const seen = new Set<string>();
-        const dedupedEntries: { entry: LibraryEntry; pageCount: number }[] = [];
-        for (const entry of entries) {
-            if (entry.book && this.bookGroups.has(entry.book)) {
-                const pages = this.bookGroups.get(entry.book)!;
-                if (pages.length > 1) {
-                    if (seen.has(entry.book)) continue;
-                    seen.add(entry.book);
-                    // Use first page as representative entry
-                    dedupedEntries.push({ entry: pages[0], pageCount: pages.length });
-                    continue;
-                }
-            }
-            dedupedEntries.push({ entry, pageCount: 1 });
-        }
+        // Use totalPages from the grouped API — no need to re-group locally.
+        // The API already returns one entry per book (page 1) with totalPages set.
+        const dedupedEntries: { entry: LibraryEntry; pageCount: number }[] = entries.map((entry) => ({
+            entry,
+            pageCount: entry.totalPages ?? 1,
+        }));
 
         // Group by category
         const grouped = new Map<LibraryCategory, { entry: LibraryEntry; pageCount: number }[]>();
@@ -1300,14 +1274,8 @@ export class Library3DComponent implements OnDestroy {
             const key = intersects[0].object.userData['entryKey'];
             const node = this.bookNodes.find((n) => n.entry.key === key);
             if (node) {
-                const bookName = node.entry.book;
-                if (bookName && this.bookGroups.has(bookName)) {
-                    const pages = this.bookGroups.get(bookName)!;
-                    if (pages.length > 1) {
-                        this.bookPageSelect.emit({ entry: node.entry, pages });
-                        return;
-                    }
-                }
+                // Always use entrySelect — the parent's openEntry handler
+                // fetches full book pages from the API when entry.book is set.
                 this.entrySelect.emit(node.entry);
             }
         }

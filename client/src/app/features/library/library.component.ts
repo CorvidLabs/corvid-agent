@@ -115,7 +115,6 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                     [entries]="allEntries()"
                     [paused]="!!selectedEntry() || showSearch()"
                     (entrySelect)="onEntrySelect($event)"
-                    (bookPageSelect)="onBookPageSelect($event)"
                     (orbSearch)="openSearch()" />
                 @if (showSearch()) {
                     <div class="library__overlay" (click)="closeSearch()">
@@ -703,12 +702,6 @@ export class LibraryComponent implements OnInit, OnDestroy {
 
     protected onEntrySelect(entry: LibraryEntry): void {
         this.openEntry(entry);
-    }
-
-    protected onBookPageSelect(event: { entry: LibraryEntry; pages: LibraryEntry[] }): void {
-        this.bookPages.set(event.pages);
-        this.currentPageIndex.set(0);
-        this.selectedEntry.set(event.pages[0]);
     }
 
     protected clearSelection(): void {
