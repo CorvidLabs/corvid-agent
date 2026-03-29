@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import {
     loadAuthConfig,
     validateStartupSecurity,
+    SecurityConfigError,
     checkHttpAuth,
     checkWsAuth,
     buildCorsHeaders,
@@ -92,13 +93,28 @@ describe('validateStartupSecurity', () => {
         expect(() => validateStartupSecurity(AUTH_DISABLED)).not.toThrow();
     });
 
-    it('does not throw for non-localhost with API_KEY', () => {
-        expect(() => validateStartupSecurity(AUTH_ENABLED)).not.toThrow();
+    it('does not throw for non-localhost with API_KEY and restricted origins', () => {
+        expect(() => validateStartupSecurity(AUTH_WITH_ORIGINS)).not.toThrow();
     });
 
-    // Note: testing process.exit(1) case requires mocking process.exit,
-    // which would complicate these unit tests. The behavior is verified
-    // by integration testing: start server with BIND_HOST=0.0.0.0 and no API_KEY.
+    it('throws SecurityConfigError when CORS allows all origins in remote mode', () => {
+        const remoteWildcard: AuthConfig = {
+            apiKey: 'test-secret-key-12345',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+        expect(() => validateStartupSecurity(remoteWildcard)).toThrow(SecurityConfigError);
+        expect(() => validateStartupSecurity(remoteWildcard)).toThrow(/CORS allows all origins/);
+    });
+
+    it('does not throw when CORS origins are explicitly set in remote mode', () => {
+        const remoteRestricted: AuthConfig = {
+            apiKey: 'test-secret-key-12345',
+            allowedOrigins: ['https://dashboard.example.com'],
+            bindHost: '0.0.0.0',
+        };
+        expect(() => validateStartupSecurity(remoteRestricted)).not.toThrow();
+    });
 });
 
 // --- checkHttpAuth ----------------------------------------------------------

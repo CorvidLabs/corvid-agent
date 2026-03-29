@@ -18,6 +18,14 @@ import { randomBytes } from 'node:crypto';
 
 const log = createLogger('Auth');
 
+/** Thrown by validateStartupSecurity when the configuration is unsafe to run. */
+export class SecurityConfigError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'SecurityConfigError';
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -173,7 +181,9 @@ export function validateStartupSecurity(config: AuthConfig): void {
     if (config.allowedOrigins.length > 0) {
         log.info(`CORS restricted to origins: ${config.allowedOrigins.join(', ')}`);
     } else if (!isLocalhost) {
-        log.warn('CORS allows all origins (Access-Control-Allow-Origin: *). Set ALLOWED_ORIGINS to restrict access in production.');
+        throw new SecurityConfigError(
+            'CORS allows all origins (Access-Control-Allow-Origin: *) in remote mode. Set ALLOWED_ORIGINS in your .env to restrict access.',
+        );
     }
 }
 
