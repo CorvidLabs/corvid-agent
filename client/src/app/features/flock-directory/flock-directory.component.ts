@@ -75,18 +75,18 @@ interface FlockStats {
                         spellcheck="false" />
                 </div>
                 <div class="flock-filters">
-                    <select class="flock-filter" [value]="statusFilter()" (change)="onStatusChange($event)">
+                    <select class="flock-filter" [value]="statusFilter()" (change)="onStatusChange($event)" aria-label="Filter by status">
                         <option value="">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <select class="flock-filter" [value]="capabilityFilter()" (change)="onCapabilityChange($event)">
+                    <select class="flock-filter" [value]="capabilityFilter()" (change)="onCapabilityChange($event)" aria-label="Filter by capability">
                         <option value="">All Capabilities</option>
                         @for (cap of allCapabilities(); track cap) {
                             <option [value]="cap">{{ cap }}</option>
                         }
                     </select>
-                    <select class="flock-filter" [value]="sortBy()" (change)="onSortByChange($event)">
+                    <select class="flock-filter" [value]="sortBy()" (change)="onSortByChange($event)" aria-label="Sort by">
                         <option value="reputation">Reputation</option>
                         <option value="name">Name</option>
                         <option value="uptime">Uptime</option>

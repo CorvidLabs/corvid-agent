@@ -44,10 +44,10 @@
     --border: #1e2035;
     --border-bright: #2a2d48;
 
-    /* Text — all pass WCAG AA (4.5:1) on --bg-deep #0a0a12 */
+    /* Text — all pass WCAG AA (4.5:1) on surfaces up to --bg-raised */
     --text-primary: #e0e0ec;
     --text-secondary: #8b8eaa;
-    --text-tertiary: #6b6e88;
+    --text-tertiary: #8284a0;
 
     /* Accents */
     --accent-cyan: #00e5ff;

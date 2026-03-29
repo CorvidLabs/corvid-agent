@@ -70,7 +70,7 @@ interface CouncilCard {
                         }
                     </div>
                     <div class="sort-group">
-                        <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event">
+                        <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event" aria-label="Sort councils by">
                             <option value="name">Sort: Name</option>
                             <option value="updated">Sort: Updated</option>
                             <option value="lastLaunch">Sort: Last Launch</option>
