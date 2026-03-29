@@ -280,9 +280,9 @@
     padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid;
     text-transform: uppercase; letter-spacing: .05em;
 }
-.agent-card__provider-badge[data-provider="anthropic"] { color: var(--provider-anthropic); border-color: color-mix(in srgb, var(--provider-anthropic) 40%, transparent); }
-.agent-card__provider-badge[data-provider="openai"] { color: var(--provider-openai); border-color: color-mix(in srgb, var(--provider-openai) 40%, transparent); }
-.agent-card__provider-badge[data-provider="ollama"] { color: var(--provider-ollama); border-color: color-mix(in srgb, var(--provider-ollama) 40%, transparent); }
+.agent-card__provider-badge[data-provider="anthropic"] { color: var(--provider-anthropic); border-color: var(--provider-anthropic-dim); }
+.agent-card__provider-badge[data-provider="openai"] { color: var(--provider-openai); border-color: var(--provider-openai-dim); }
+.agent-card__provider-badge[data-provider="ollama"] { color: var(--provider-ollama); border-color: var(--provider-ollama-dim); }
 .agent-card__status {
     font-size: .6rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm);
     text-transform: uppercase; letter-spacing: .06em; border: 1px solid;

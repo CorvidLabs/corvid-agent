@@ -166,8 +166,11 @@
 
     /* ── Provider colors — for model/provider badges ── */
     --provider-anthropic: #d4a574;
+    --provider-anthropic-dim: rgba(212, 165, 116, 0.4);
     --provider-openai: #74d4a5;
+    --provider-openai-dim: rgba(116, 212, 165, 0.4);
     --provider-ollama: #a5a5ff;
+    --provider-ollama-dim: rgba(165, 165, 255, 0.4);
     --provider-cursor: var(--accent-amber);
     --provider-google: #4a90d9;
 

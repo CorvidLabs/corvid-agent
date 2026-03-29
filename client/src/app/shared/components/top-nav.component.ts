@@ -371,11 +371,11 @@ const TABS: NavTab[] = [
         }
         .network-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .network-btn--active.network-btn--testnet {
-            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
+            background: var(--network-testnet-dim);
             color: var(--network-testnet);
         }
         .network-btn--active.network-btn--mainnet {
-            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
+            background: var(--network-mainnet-dim);
             color: var(--network-mainnet);
         }
         .topnav__status {
