@@ -199,7 +199,10 @@ export class LibraryBrowserComponent implements OnInit {
         const query = this.searchQuery.toLowerCase();
         if (query) {
             entries = entries.filter(
-                (e) => e.key.toLowerCase().includes(query) || e.content.toLowerCase().includes(query),
+                (e) =>
+                    (e.title ?? '').toLowerCase().includes(query) ||
+                    e.key.toLowerCase().includes(query) ||
+                    e.content.toLowerCase().includes(query),
             );
         }
         return entries;
@@ -245,11 +248,11 @@ export class LibraryBrowserComponent implements OnInit {
     }
 
     protected getDisplayTitle(entry: LibraryEntry): string {
-        if (entry.book) {
-            return entry.book
-                .replace(/[-_]/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase());
-        }
-        return entry.key;
+        if (entry.title) return entry.title;
+        const raw = entry.book ?? entry.key;
+        return raw
+            .replace(/^(ref|guide|std|dec|rb|runbook|decision|standard|reference)-/i, '')
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
     }
 }

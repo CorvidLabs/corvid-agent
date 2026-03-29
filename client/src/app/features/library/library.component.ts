@@ -93,6 +93,16 @@ type SortKey = 'date' | 'name' | 'author';
                     </div>
                 }
 
+                @if (activeTag()) {
+                    <div class="library__active-filter">
+                        <span class="library__filter-label">Tag:</span>
+                        <span class="library__filter-chip">
+                            {{ activeTag() }}
+                            <button class="library__filter-clear" (click)="clearTagFilter()">&#x2715;</button>
+                        </span>
+                    </div>
+                }
+
                 @if (loading()) {
                     <div class="library__loading">Loading library...</div>
                 } @else if (filteredEntries().length === 0) {
@@ -123,7 +133,9 @@ type SortKey = 'date' | 'name' | 'author';
                                 @if (entry.tags.length > 0) {
                                     <div class="library__card-tags">
                                         @for (tag of entry.tags; track tag) {
-                                            <span class="library__card-tag">{{ tag }}</span>
+                                            <span class="library__card-tag library__card-tag--clickable"
+                                                  [class.library__card-tag--active]="activeTag() === tag"
+                                                  (click)="filterByTag(tag, $event)">{{ tag }}</span>
                                         }
                                     </div>
                                 }
@@ -232,15 +244,21 @@ type SortKey = 'date' | 'name' | 'author';
                         @if (loadingBook()) {
                             <div class="library__loading">Loading book...</div>
                         } @else if (bookPages().length > 1) {
+                            <div class="library__page-nav">
+                                <button
+                                    class="library__page-btn"
+                                    [disabled]="currentPageIndex() === 0"
+                                    (click)="prevPage()">&#x25C0; Prev</button>
+                                <span class="library__page-indicator">
+                                    Page {{ currentPageIndex() + 1 }} of {{ bookPages().length }}
+                                </span>
+                                <button
+                                    class="library__page-btn"
+                                    [disabled]="currentPageIndex() >= bookPages().length - 1"
+                                    (click)="nextPage()">Next &#x25B6;</button>
+                            </div>
                             <div class="library__book-reader">
-                                @for (page of bookPages(); track page.id; let i = $index) {
-                                    @if (i > 0) {
-                                        <div class="library__page-divider">
-                                            <span class="library__page-divider-label">Page {{ i + 1 }}</span>
-                                        </div>
-                                    }
-                                    <div class="library__markdown-content" [innerHTML]="page.content | markdown"></div>
-                                }
+                                <div class="library__markdown-content" [innerHTML]="currentPage()!.content | markdown"></div>
                             </div>
                         } @else {
                             <div class="library__markdown-content" [innerHTML]="selectedEntry()!.content | markdown"></div>
@@ -574,6 +592,97 @@ type SortKey = 'date' | 'name' | 'author';
             font-weight: 600;
         }
 
+        /* Tag filtering */
+        .library__card-tag--clickable {
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .library__card-tag--clickable:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+        .library__card-tag--active {
+            background: rgba(167, 139, 250, 0.3);
+            border-color: var(--accent-purple, #a78bfa);
+        }
+        .library__active-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.72rem;
+        }
+        .library__filter-label {
+            color: var(--text-secondary, #888);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .library__filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: rgba(167, 139, 250, 0.15);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 10px;
+            color: var(--accent-purple, #a78bfa);
+            font-weight: 600;
+        }
+        .library__filter-clear {
+            background: transparent;
+            border: none;
+            color: var(--accent-purple, #a78bfa);
+            cursor: pointer;
+            font-size: 0.6rem;
+            padding: 0 2px;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .library__filter-clear:hover {
+            color: var(--text-primary, #e0e0e0);
+        }
+
+        /* Page navigation */
+        .library__page-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.6));
+            border-radius: 8px;
+        }
+        .library__page-btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            color: var(--accent-cyan, #00e5ff);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .library__page-btn:hover:not(:disabled) {
+            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+            border-color: var(--accent-cyan, #00e5ff);
+        }
+        .library__page-btn:disabled {
+            color: var(--text-tertiary, #555);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .library__page-indicator {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-secondary, #888);
+            min-width: 6rem;
+            text-align: center;
+        }
+
         /* Markdown content styling */
         .library__markdown-content {
             margin-top: 0.75rem;
@@ -767,6 +876,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
         { key: 'author', label: 'Author' },
     ];
     protected readonly activeCategory = signal<LibraryCategory | 'all'>('all');
+    protected readonly activeTag = signal<string | null>(null);
     protected readonly searchQuery = signal('');
     protected readonly sortKey = signal<SortKey>('date');
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
@@ -821,6 +931,10 @@ export class LibraryComponent implements OnInit, OnDestroy {
         const cat = this.activeCategory();
         if (cat !== 'all') {
             entries = entries.filter((e) => e.category === cat);
+        }
+        const tag = this.activeTag();
+        if (tag) {
+            entries = entries.filter((e) => e.tags.includes(tag));
         }
         const q = this.searchQuery().toLowerCase().trim();
         if (q) {
@@ -909,6 +1023,31 @@ export class LibraryComponent implements OnInit, OnDestroy {
         this.bookPages.set([]);
         this.currentPageIndex.set(0);
         this.loadingBook.set(false);
+    }
+
+    protected readonly currentPage = computed(() => {
+        const pages = this.bookPages();
+        const idx = this.currentPageIndex();
+        return pages[idx] ?? null;
+    });
+
+    protected prevPage(): void {
+        const idx = this.currentPageIndex();
+        if (idx > 0) this.currentPageIndex.set(idx - 1);
+    }
+
+    protected nextPage(): void {
+        const idx = this.currentPageIndex();
+        if (idx < this.bookPages().length - 1) this.currentPageIndex.set(idx + 1);
+    }
+
+    protected filterByTag(tag: string, event: Event): void {
+        event.stopPropagation();
+        this.activeTag.set(this.activeTag() === tag ? null : tag);
+    }
+
+    protected clearTagFilter(): void {
+        this.activeTag.set(null);
     }
 
     protected getDisplayTitle(entry: LibraryEntry): string {
