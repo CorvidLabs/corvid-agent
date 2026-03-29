@@ -55,7 +55,7 @@ interface SessionGroup {
                     Failed ({{ countByStatus('error') }})
                 </button>
                 <div class="filter-tabs__spacer"></div>
-                <select class="source-select" [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event">
+                <select class="source-select" [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event" aria-label="Filter by source">
                     <option value="">All Sources</option>
                     <option value="web">Web</option>
                     <option value="algochat">AlgoChat</option>
