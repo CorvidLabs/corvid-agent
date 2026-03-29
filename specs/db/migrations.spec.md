@@ -39,6 +39,7 @@ files:
   - server/db/migrations/107_session_restart_initiated.ts
   - server/db/migrations/108_memory_book_pages.ts
   - server/db/migrations/109_discord_processed_messages.ts
+  - server/db/migrations/110_session_conversation_summary.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -550,10 +551,22 @@ Persists processed Discord message IDs across server restarts. The in-memory ded
 | `up` | `(db: Database)` | `void` | Creates `discord_processed_messages` table (message_id TEXT PK, channel_id TEXT, created_at TEXT) and index on `created_at` |
 | `down` | `(db: Database)` | `void` | Drops `discord_processed_messages` table |
 
+### 110_session_conversation_summary.ts
+
+Adds a `conversation_summary` column to the sessions table. Used to carry conversation context across session resumes in Discord threads.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `conversation_summary TEXT DEFAULT NULL` column to `sessions` table |
+| `down` | `(db: Database)` | `void` | Drops `conversation_summary` column from `sessions` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-29 | corvid-agent | Add migration 110 to spec coverage |
 | 2026-03-28 | corvid-agent | Add migrations 108, 109 to spec coverage |
 | 2026-03-27 | corvid-agent | Add migration 107 to spec coverage |
 | 2026-03-25 | corvid-agent | Add migration 105 to spec coverage |
