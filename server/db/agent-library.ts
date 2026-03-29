@@ -62,7 +62,7 @@ function rowToEntry(row: LibraryRow): LibraryEntry {
     id: row.id,
     asaId: row.asa_id,
     key: row.key,
-    title: row.title,
+    title: row.title ?? null,
     authorId: row.author_id,
     authorName: row.author_name,
     category: row.category as LibraryCategory,

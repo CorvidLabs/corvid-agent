@@ -47,6 +47,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateConversationSession` | `(db: Database, id: string, sessionId: string)` | `void` | Link a conversation to a session |
 | `updateConversationAgent` | `(db: Database, id: string, agentId: string, sessionId: string)` | `void` | Update both agent and session for a conversation |
 | `listPollingActivity` | `(db: Database, repo: string, limit?: number)` | `Session[]` | List sessions related to a repo for polling activity display. Default limit 25 |
+| `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for a session |
+| `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session (for context carry-over) |
 | `getParticipantForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup: get wallet address for a session via conversations |
 
 ## Invariants

@@ -10,8 +10,8 @@ import {
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
-import { Library3DComponent } from './library-3d.component';
 import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
+import { Library3DComponent } from './library-3d.component';
 
 const CATEGORIES: { key: LibraryCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -44,6 +44,16 @@ type SortKey = 'date' | 'name' | 'author';
                     [mode]="viewMode()"
                     ariaLabel="Library view mode"
                     (modeChange)="setViewMode($event)" />
+            </div>
+
+            <!-- Stats bar -->
+            <div class="library__stats">
+                @for (stat of categoryStats(); track stat.key) {
+                    <span class="library__stat" [style.color]="stat.color">
+                        <span class="library__stat-count">{{ stat.count }}</span>
+                        <span class="library__stat-label">{{ stat.label }}</span>
+                    </span>
+                }
             </div>
 
             @if (viewMode() === 'basic') {
@@ -151,7 +161,6 @@ type SortKey = 'date' | 'name' | 'author';
                     [entries]="allEntries()"
                     [paused]="!!selectedEntry() || showSearch()"
                     (entrySelect)="onEntrySelect($event)"
-                    (bookPageSelect)="onBookPageSelect($event)"
                     (orbSearch)="openSearch()" />
                 @if (showSearch()) {
                     <div class="library__overlay" (click)="closeSearch()">
@@ -286,6 +295,29 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-primary, #e0e0e0);
             margin: 0;
         }
+
+        /* Stats bar */
+        .library__stats {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .library__stat {
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+        }
+        .library__stat-count {
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .library__stat-label {
+            opacity: 0.7;
+            text-transform: lowercase;
+        }
+
         .library__tabs {
             display: flex;
             gap: 0;
@@ -488,6 +520,87 @@ type SortKey = 'date' | 'name' | 'author';
             margin: 0;
             max-height: 400px;
             overflow-y: auto;
+        }
+
+        /* Markdown rendered content */
+        .library__markdown {
+            font-size: 0.82rem;
+            color: var(--text-primary, #e0e0e0);
+            line-height: 1.65;
+            word-break: break-word;
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-top: 0.75rem;
+        }
+        :host ::ng-deep .library__markdown > :first-child { margin-top: 0; }
+        :host ::ng-deep .library__markdown h1,
+        :host ::ng-deep .library__markdown h2,
+        :host ::ng-deep .library__markdown h3 {
+            color: var(--accent-cyan, #00e5ff);
+            margin: 1.25rem 0 0.5rem;
+            line-height: 1.3;
+        }
+        :host ::ng-deep .library__markdown h1 { font-size: 1.15rem; }
+        :host ::ng-deep .library__markdown h2 { font-size: 1rem; }
+        :host ::ng-deep .library__markdown h3 { font-size: 0.9rem; }
+        :host ::ng-deep .library__markdown p { margin: 0.5rem 0; }
+        :host ::ng-deep .library__markdown ul,
+        :host ::ng-deep .library__markdown ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        :host ::ng-deep .library__markdown li { margin: 0.25rem 0; }
+        :host ::ng-deep .library__markdown code {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.78rem;
+        }
+        :host ::ng-deep .library__markdown pre {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            padding: 0.75rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+        :host ::ng-deep .library__markdown pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.75rem;
+        }
+        :host ::ng-deep .library__markdown blockquote {
+            border-left: 3px solid var(--accent-cyan, #00e5ff);
+            margin: 0.75rem 0;
+            padding: 0.25rem 0.75rem;
+            color: var(--text-secondary, #888);
+        }
+        :host ::ng-deep .library__markdown a {
+            color: var(--accent-cyan, #00e5ff);
+            text-decoration: none;
+        }
+        :host ::ng-deep .library__markdown a:hover { text-decoration: underline; }
+        :host ::ng-deep .library__markdown table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.75rem 0;
+            font-size: 0.78rem;
+        }
+        :host ::ng-deep .library__markdown th,
+        :host ::ng-deep .library__markdown td {
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            padding: 0.35rem 0.6rem;
+            text-align: left;
+        }
+        :host ::ng-deep .library__markdown th {
+            background: rgba(255, 255, 255, 0.04);
+            font-weight: 600;
+        }
+        :host ::ng-deep .library__markdown hr {
+            border: none;
+            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            margin: 1rem 0;
         }
 
         /* 3D overlay */
@@ -868,7 +981,6 @@ type SortKey = 'date' | 'name' | 'author';
 export class LibraryComponent implements OnInit, OnDestroy {
     private readonly libraryService = inject(LibraryService);
     private readonly viewModeService = inject(ViewModeService);
-
     protected readonly categories = CATEGORIES;
     protected readonly sortOptions: { key: SortKey; label: string }[] = [
         { key: 'date', label: 'Date' },
@@ -897,14 +1009,17 @@ export class LibraryComponent implements OnInit, OnDestroy {
         for (const e of entries) {
             counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
         }
-        return CATEGORIES.filter((c) => c.key !== 'all')
-            .map((c) => ({
-                key: c.key as LibraryCategory,
-                label: c.label.toLowerCase(),
-                count: counts.get(c.key as LibraryCategory) ?? 0,
-                color: CATEGORY_COLORS[c.key as LibraryCategory],
-            }))
-            .filter((s) => s.count > 0);
+        return [
+            { key: 'total' as string, label: 'total', count: entries.length, color: 'var(--text-primary, #e0e0e0)' },
+            ...CATEGORIES.filter((c) => c.key !== 'all')
+                .map((c) => ({
+                    key: c.key as string,
+                    label: c.label.toLowerCase(),
+                    count: counts.get(c.key as LibraryCategory) ?? 0,
+                    color: CATEGORY_COLORS[c.key as LibraryCategory] ?? '#888',
+                }))
+                .filter((s) => s.count > 0),
+        ];
     });
 
     protected readonly searchResults = computed(() => {
@@ -919,6 +1034,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
                 (e) =>
                     (e.title ?? '').toLowerCase().includes(q) ||
                     e.key.toLowerCase().includes(q) ||
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
             );
@@ -942,6 +1058,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
                 (e) =>
                     (e.title ?? '').toLowerCase().includes(q) ||
                     e.key.toLowerCase().includes(q) ||
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
             );
@@ -952,7 +1069,8 @@ export class LibraryComponent implements OnInit, OnDestroy {
                 return this.getDisplayTitle(a).localeCompare(this.getDisplayTitle(b));
             }
             if (key === 'author') {
-                return a.authorName.localeCompare(b.authorName);
+                return a.authorName.localeCompare(b.authorName) ||
+                    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
             }
             return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         });
@@ -1010,12 +1128,6 @@ export class LibraryComponent implements OnInit, OnDestroy {
 
     protected onEntrySelect(entry: LibraryEntry): void {
         this.openEntry(entry);
-    }
-
-    protected onBookPageSelect(event: { entry: LibraryEntry; pages: LibraryEntry[] }): void {
-        this.bookPages.set(event.pages);
-        this.currentPageIndex.set(0);
-        this.selectedEntry.set(event.pages[0]);
     }
 
     protected clearSelection(): void {

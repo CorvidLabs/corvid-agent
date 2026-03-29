@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 110;
+const SCHEMA_VERSION = 111;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -176,8 +176,12 @@ const MIGRATIONS: Record<number, string[]> = {
         ...discord.indexes.filter((s) => s.includes('discord_processed_messages')),
     ],
     110: [
-        // Add conversation_summary column to sessions for cross-session context carry-over
+        // Conversation summary for Discord session context carry-over
         `ALTER TABLE sessions ADD COLUMN conversation_summary TEXT DEFAULT NULL`,
+    ],
+    111: [
+        // Library entry titles
+        `ALTER TABLE agent_library ADD COLUMN title TEXT DEFAULT NULL`,
     ],
 };
 
