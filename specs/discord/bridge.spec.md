@@ -339,6 +339,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `ThreadSessionInfo` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayColor?, displayIcon?, avatarUrl?, creatorPermLevel?, buddyConfig?) |
 | `ThreadCallbackInfo` | Active subscription info per thread (sessionId, callback) |
 
+### Exported Classes (from thread-session-manager.ts)
+
+| Class | Description |
+|-------|-------------|
+| `ThreadSessionManager` | Owns all thread/session/mention Maps and TTL-based cleanup for DiscordBridge (threadSessions, threadCallbacks, threadLastActivity, mentionSessions, processedMessageIds) |
+
 ### Exported Functions (from thread-session-map.ts)
 
 | Function | Parameters | Returns | Description |

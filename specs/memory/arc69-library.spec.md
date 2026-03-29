@@ -87,6 +87,7 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `getLibraryEntry` | `(db: Database, key: string)` | `LibraryEntry \| null` | Fetch non-archived entry by key |
 | `getLibraryEntryByAsaId` | `(db: Database, asaId: number)` | `LibraryEntry \| null` | Fetch entry by ASA ID |
 | `listLibraryEntries` | `(db: Database, options?)` | `LibraryEntry[]` | List with optional category/author/tag filters |
+| `listLibraryEntriesGrouped` | `(db: Database, options?)` | `(LibraryEntry & { totalPages?: number })[]` | List entries grouped by book (one row per book with totalPages) and standalone entries |
 | `getBookPages` | `(db: Database, book: string)` | `LibraryEntry[]` | Return all pages of a book sorted by page number |
 | `updateLibraryEntryTxid` | `(db: Database, key: string, txid: string)` | `void` | Set txid after on-chain sync |
 | `updateLibraryEntryAsaId` | `(db: Database, key: string, asaId: number)` | `void` | Store ASA ID after minting |
@@ -246,7 +247,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 
 | Module | What is used |
 |--------|-------------|
-| `server/routes/library.ts` | `listLibraryEntries`, `getLibraryEntry`, `getBookPages` from `server/db/agent-library.ts` |
+| `server/routes/library.ts` | `listLibraryEntries`, `listLibraryEntriesGrouped`, `getLibraryEntry`, `getBookPages` from `server/db/agent-library.ts` |
 
 > **Note:** `server/mcp/tool-handlers/library.ts` does not exist yet. It is classified as Layer 1 (Structural) under governance and requires a supermajority council vote + human approval before creation. The MCP tool handlers (`corvid_library_write`, `corvid_library_read`, `corvid_library_list`, `corvid_library_delete`) are documented in this spec but the handler file must be created through the governance process. Until then, no consumer references exist.
 
