@@ -52,7 +52,7 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 2. **Environment sandboxing**: Only allowlisted environment variables (`ENV_ALLOWLIST`: 24 safe vars like PATH, HOME, GIT_*, GITHUB_TOKEN) are passed to the subprocess. Secrets like `ALGOCHAT_MNEMONIC`, `WALLET_ENCRYPTION_KEY` are excluded. Project-specific env vars from `project.envVars` are always included
 3. **Permission mode mapping**: `full-auto` maps to SDK's `bypassPermissions`; `auto-edit` maps to `acceptEdits`. Other modes pass through as-is
 4. **Plan mode disabling**: In bypass permission modes, `EnterPlanMode` and `ExitPlanMode` are added to `disallowedTools` to prevent SDK-level errors (plan mode requires interactive approval)
-5. **System prompt composition**: Parts are appended in order: `agent.systemPrompt`, `agent.appendPrompt`, `personaPrompt`, `skillPrompt` (prefixed with `## Skill Instructions`), `getResponseRoutingPrompt()` (channel affinity). All combined with `\n\n` and set as `claude_code` preset append
+5. **System prompt composition**: Parts are appended in order: `agent.systemPrompt`, `agent.appendPrompt`, `personaPrompt`, `skillPrompt` (prefixed with `## Skill Instructions`), `getMessagingSafetyPrompt()`, `getResponseRoutingPrompt()` (channel affinity), `getWorktreeIsolationPrompt()` (if worktree), `getProjectContextPrompt(project)` (always). All combined with `\n\n` and set as `claude_code` preset append. The project context pin survives context compression by anchoring the active project name, workingDir, gitUrl, and GitHub slug in the re-injected system prompt (issue #1628)
 5b. **Channel affinity routing**: For AlgoChat, agent, and Discord-sourced sessions, `prependRoutingContext()` adds a routing hint to the user prompt instructing the model to reply directly instead of using corvid_send_message
 6. **API outage detection**: After `API_FAILURE_THRESHOLD` (3) consecutive API errors (network failures, 5xx, 429, overloaded), `onApiOutage` is called. Non-API errors reset the counter
 7. **Pseudo-PID assignment**: Each process gets a monotonically increasing pseudo-PID starting at 900,000 (not a real OS PID since SDK runs in-process)
@@ -105,7 +105,7 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 | Module | What is used |
 |--------|-------------|
 | `@anthropic-ai/claude-agent-sdk` | `query`, `Query`, `SDKMessage`, `PermissionResult`, `CanUseTool`, `McpSdkServerConfigWithInstance`, `McpServerConfig` |
-| `server/providers/ollama/tool-prompt-templates.ts` | `getResponseRoutingPrompt` — channel affinity system prompt guidance |
+| `server/providers/ollama/tool-prompt-templates.ts` | `getResponseRoutingPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `getProjectContextPrompt` — system prompt guidance |
 | `server/process/direct-process.ts` | `prependRoutingContext` — channel affinity per-message routing hints |
 | `server/process/protected-paths.ts` | `isProtectedPath`, `extractFilePathsFromInput`, `BASH_WRITE_OPERATORS` |
 | `server/process/approval-manager.ts` | `ApprovalManager` for tool approval workflow |
@@ -139,3 +139,4 @@ Internal constants (not env-configurable):
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Added realpathSync() symlink resolution to prevent protected-path bypass attacks. |
 | 2026-03-14 | corvid-agent | Added channel affinity routing: prependRoutingContext + getResponseRoutingPrompt for Claude/SDK path |
+| 2026-03-28 | corvid-agent | Added getProjectContextPrompt to system prompt append — pins active project to survive context compression (#1628) |
