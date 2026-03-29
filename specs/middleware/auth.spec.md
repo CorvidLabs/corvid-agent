@@ -38,6 +38,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | Type | Description |
 |------|-------------|
 | `AuthConfig` | `{ apiKey: string \| null; allowedOrigins: string[]; bindHost: string }` |
+| `SecurityConfigError` | Error subclass thrown by `validateStartupSecurity` when the configuration is unsafe to run |
 
 ## Invariants
 
