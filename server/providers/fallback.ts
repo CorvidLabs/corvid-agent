@@ -79,6 +79,17 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
         ],
     },
     /**
+     * Cursor chain: cursor-agent CLI models.
+     * Only used when Cursor is the designated provider.
+     * Falls back from auto-routed to composer-2-fast for lighter tasks.
+     */
+    'cursor': {
+        chain: [
+            { provider: 'cursor', model: 'auto' },
+            { provider: 'cursor', model: 'composer-2-fast' },
+        ],
+    },
+    /**
      * Cloud chain: Ollama cloud relay models.
      * Only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
      * Not on production dispatch path.

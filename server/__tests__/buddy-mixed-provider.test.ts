@@ -11,10 +11,12 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { FallbackManager } from '../providers/fallback';
 import { BuddyService } from '../buddy/service';
+import type { LlmCompletionParams } from '../providers/types';
 import {
     createProviderAgent,
     createMockRegistry,
     makeParams,
+    makeResult,
     makeChain,
     mockProviderResponse,
     mockProviderFailure,
@@ -320,6 +322,58 @@ describe('buddy mixed-provider smoke tests', () => {
 
             // Provider should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
             expect(manager.isProviderAvailable('ollama')).toBe(false);
+        });
+
+        it('Cursor marked unhealthy after 3 consecutive ECONNREFUSED failures', async () => {
+            const cursorFailing = createProviderAgent(
+                'cursor',
+                'auto',
+                mockProviderFailure('ECONNREFUSED: cursor-agent not reachable'),
+            );
+            const registry = createMockRegistry([cursorFailing]);
+            const manager = new FallbackManager(registry);
+
+            const chain = makeChain({ provider: 'cursor', model: 'auto' });
+
+            // Three consecutive transient failures trip the cooldown threshold
+            for (let i = 0; i < 3; i++) {
+                await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
+            }
+
+            // Cursor should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
+            expect(manager.isProviderAvailable('cursor')).toBe(false);
+        });
+
+        it('Cursor fallback chain: auto fails, composer-2-fast succeeds', async () => {
+            // The registry resolves providers by type, not model. A single cursor
+            // provider handles both chain entries — use a model-aware mock to
+            // simulate auto failing while composer-2-fast succeeds.
+            const completeCalls: string[] = [];
+            const modelAwareComplete = mock((params: LlmCompletionParams) => {
+                completeCalls.push(params.model);
+                if (params.model === 'auto') {
+                    return Promise.reject(new Error('timeout'));
+                }
+                return Promise.resolve(makeResult('Fallback complete.', params.model));
+            });
+            const cursorProvider = createProviderAgent('cursor', 'auto', modelAwareComplete);
+            const registry = createMockRegistry([cursorProvider]);
+            const manager = new FallbackManager(registry);
+
+            // DEFAULT_FALLBACK_CHAINS['cursor'] shape: auto → composer-2-fast
+            const chain = makeChain(
+                { provider: 'cursor', model: 'auto' },
+                { provider: 'cursor', model: 'composer-2-fast' },
+            );
+
+            const result = await manager.completeWithFallback(makeParams(), chain);
+
+            expect(result.usedProvider).toBe('cursor');
+            expect(result.usedModel).toBe('composer-2-fast');
+            expect(result.content).toBe('Fallback complete.');
+            // Both models were attempted
+            expect(completeCalls).toContain('auto');
+            expect(completeCalls).toContain('composer-2-fast');
         });
     });
 });
