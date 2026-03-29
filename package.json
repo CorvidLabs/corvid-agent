@@ -79,6 +79,7 @@
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "algosdk": "^3.5.2",
     "croner": "^10.0.1",
+    "marked": "^17.0.5",
     "tree-sitter-wasms": "^0.1.13",
     "web-tree-sitter": "0.25.10",
     "zod": "^4.3.6"

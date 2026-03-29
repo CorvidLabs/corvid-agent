@@ -8,6 +8,7 @@ export interface LibraryEntry {
   id: string;
   asaId: number | null;
   key: string;
+  title: string | null;
   authorId: string;
   authorName: string;
   category: LibraryCategory;
@@ -25,6 +26,7 @@ interface LibraryRow {
   id: string;
   asa_id: number | null;
   key: string;
+  title: string | null;
   author_id: string;
   author_name: string;
   category: string;
@@ -60,6 +62,7 @@ function rowToEntry(row: LibraryRow): LibraryEntry {
     id: row.id,
     asaId: row.asa_id,
     key: row.key,
+    title: row.title,
     authorId: row.author_id,
     authorName: row.author_name,
     category: row.category as LibraryCategory,
@@ -85,6 +88,7 @@ export function saveLibraryEntry(
     content: string;
     category?: LibraryCategory;
     tags?: string[];
+    title?: string | null;
     book?: string | null;
     page?: number | null;
   },
@@ -92,23 +96,25 @@ export function saveLibraryEntry(
   const id = crypto.randomUUID();
   const category = params.category ?? 'reference';
   const tags = JSON.stringify(params.tags ?? []);
+  const title = params.title ?? null;
   const book = params.book ?? null;
   const page = params.page ?? null;
 
   db.query(`
-        INSERT INTO agent_library (id, author_id, author_name, key, content, category, tags, book, page)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_library (id, author_id, author_name, key, title, content, category, tags, book, page)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET
             content = excluded.content,
             author_id = excluded.author_id,
             author_name = excluded.author_name,
+            title = excluded.title,
             category = excluded.category,
             tags = excluded.tags,
             book = excluded.book,
             page = excluded.page,
             txid = NULL,
             updated_at = datetime('now')
-    `).run(id, params.authorId, params.authorName, params.key, params.content, category, tags, book, page);
+    `).run(id, params.authorId, params.authorName, params.key, title, params.content, category, tags, book, page);
 
   const row = db.query('SELECT * FROM agent_library WHERE key = ?').get(params.key) as LibraryRow | null;
 
@@ -118,6 +124,7 @@ export function saveLibraryEntry(
     id,
     asa_id: null,
     key: params.key,
+    title,
     author_id: params.authorId,
     author_name: params.authorName,
     category,
@@ -279,6 +286,7 @@ export function upsertLibraryEntryFromChain(
   params: {
     asaId: number;
     key: string;
+    title?: string | null;
     authorId: string;
     authorName: string;
     category: LibraryCategory;
@@ -291,10 +299,11 @@ export function upsertLibraryEntryFromChain(
 ): void {
   const tags = JSON.stringify(params.tags ?? []);
   db.query(`
-        INSERT INTO agent_library (id, asa_id, key, author_id, author_name, category, tags, content, book, page, txid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_library (id, asa_id, key, title, author_id, author_name, category, tags, content, book, page, txid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET
             asa_id = excluded.asa_id,
+            title = excluded.title,
             author_id = excluded.author_id,
             author_name = excluded.author_name,
             category = excluded.category,
@@ -309,6 +318,7 @@ export function upsertLibraryEntryFromChain(
     crypto.randomUUID(),
     params.asaId,
     params.key,
+    params.title ?? null,
     params.authorId,
     params.authorName,
     params.category,

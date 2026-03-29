@@ -6,12 +6,12 @@ import {
     computed,
     OnInit,
     OnDestroy,
-    HostListener,
 } from '@angular/core';
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
 import { Library3DComponent } from './library-3d.component';
+import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 
 const CATEGORIES: { key: LibraryCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -30,10 +30,12 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
     runbook: '#f43f5e',
 };
 
+type SortKey = 'date' | 'name' | 'author';
+
 @Component({
     selector: 'app-library',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ViewModeToggleComponent, Library3DComponent],
+    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe],
     template: `
         <div class="library">
             <div class="library__header">
@@ -59,15 +61,47 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                     }
                 </div>
 
-                <!-- Search -->
-                <div class="library__search-row">
+                <!-- Search + Sort row -->
+                <div class="library__toolbar">
                     <input
                         class="library__search"
                         type="text"
-                        placeholder="Search by title or tags..."
+                        placeholder="Search by title, key, or tags..."
                         [value]="searchQuery()"
                         (input)="onSearch($event)" />
+                    <div class="library__sort-buttons">
+                        @for (s of sortOptions; track s.key) {
+                            <button
+                                class="library__sort-btn"
+                                [class.library__sort-btn--active]="sortKey() === s.key"
+                                (click)="sortKey.set(s.key)">
+                                {{ s.label }}
+                            </button>
+                        }
+                    </div>
                 </div>
+
+                <!-- Stats bar -->
+                @if (!loading() && allEntries().length > 0) {
+                    <div class="library__stats">
+                        <span class="library__stat library__stat--total">{{ allEntries().length }} total</span>
+                        @for (stat of categoryStats(); track stat.key) {
+                            <span class="library__stat" [style.color]="stat.color">
+                                {{ stat.count }} {{ stat.label }}
+                            </span>
+                        }
+                    </div>
+                }
+
+                @if (activeTag()) {
+                    <div class="library__active-filter">
+                        <span class="library__filter-label">Tag:</span>
+                        <span class="library__filter-chip">
+                            {{ activeTag() }}
+                            <button class="library__filter-clear" (click)="clearTagFilter()">&#x2715;</button>
+                        </span>
+                    </div>
+                }
 
                 @if (loading()) {
                     <div class="library__loading">Loading library...</div>
@@ -99,7 +133,9 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                 @if (entry.tags.length > 0) {
                                     <div class="library__card-tags">
                                         @for (tag of entry.tags; track tag) {
-                                            <span class="library__card-tag">{{ tag }}</span>
+                                            <span class="library__card-tag library__card-tag--clickable"
+                                                  [class.library__card-tag--active]="activeTag() === tag"
+                                                  (click)="filterByTag(tag, $event)">{{ tag }}</span>
                                         }
                                     </div>
                                 }
@@ -123,7 +159,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                             <div class="library__search-panel-header">
                                 <span class="library__search-panel-title">Search Library</span>
                                 <span class="library__search-panel-count">{{ searchResults().length }} entries</span>
-                                <button class="library__overlay-close" (click)="closeSearch()">✕</button>
+                                <button class="library__overlay-close" (click)="closeSearch()">&#x2715;</button>
                             </div>
                             <input
                                 class="library__search library__search--panel"
@@ -208,18 +244,24 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                         @if (loadingBook()) {
                             <div class="library__loading">Loading book...</div>
                         } @else if (bookPages().length > 1) {
+                            <div class="library__page-nav">
+                                <button
+                                    class="library__page-btn"
+                                    [disabled]="currentPageIndex() === 0"
+                                    (click)="prevPage()">&#x25C0; Prev</button>
+                                <span class="library__page-indicator">
+                                    Page {{ currentPageIndex() + 1 }} of {{ bookPages().length }}
+                                </span>
+                                <button
+                                    class="library__page-btn"
+                                    [disabled]="currentPageIndex() >= bookPages().length - 1"
+                                    (click)="nextPage()">Next &#x25B6;</button>
+                            </div>
                             <div class="library__book-reader">
-                                @for (page of bookPages(); track page.id; let i = $index) {
-                                    @if (i > 0) {
-                                        <div class="library__page-divider">
-                                            <span class="library__page-divider-label">Page {{ i + 1 }}</span>
-                                        </div>
-                                    }
-                                    <pre class="library__card-pre library__page-content">{{ page.content }}</pre>
-                                }
+                                <div class="library__markdown-content" [innerHTML]="currentPage()!.content | markdown"></div>
                             </div>
                         } @else {
-                            <pre class="library__card-pre library__overlay-pre">{{ selectedEntry()!.content }}</pre>
+                            <div class="library__markdown-content" [innerHTML]="selectedEntry()!.content | markdown"></div>
                         }
                     </div>
                 </div>
@@ -275,11 +317,14 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             color: var(--accent-cyan, #00e5ff);
             background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
         }
-        .library__search-row {
+        .library__toolbar {
+            display: flex;
+            gap: 0.5rem;
             margin-bottom: 0.75rem;
+            align-items: center;
         }
         .library__search {
-            width: 100%;
+            flex: 1;
             padding: 0.5rem 0.75rem;
             font-size: 0.8rem;
             font-family: inherit;
@@ -292,6 +337,51 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
         }
         .library__search:focus {
             border-color: var(--accent-cyan, #00e5ff);
+        }
+        .library__sort-buttons {
+            display: flex;
+            gap: 0;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        .library__sort-btn {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary, #888);
+            cursor: pointer;
+            transition: color 0.15s, background 0.15s;
+            white-space: nowrap;
+        }
+        .library__sort-btn:hover {
+            color: var(--text-primary, #e0e0e0);
+        }
+        .library__sort-btn--active {
+            color: var(--accent-cyan, #00e5ff);
+            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+        }
+        .library__stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+        }
+        .library__stat {
+            padding: 2px 8px;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.6));
+            border-radius: 10px;
+        }
+        .library__stat--total {
+            color: var(--text-primary, #e0e0e0);
         }
         .library__loading, .library__empty {
             text-align: center;
@@ -502,6 +592,184 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             font-weight: 600;
         }
 
+        /* Tag filtering */
+        .library__card-tag--clickable {
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .library__card-tag--clickable:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+        .library__card-tag--active {
+            background: rgba(167, 139, 250, 0.3);
+            border-color: var(--accent-purple, #a78bfa);
+        }
+        .library__active-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.72rem;
+        }
+        .library__filter-label {
+            color: var(--text-secondary, #888);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .library__filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: rgba(167, 139, 250, 0.15);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 10px;
+            color: var(--accent-purple, #a78bfa);
+            font-weight: 600;
+        }
+        .library__filter-clear {
+            background: transparent;
+            border: none;
+            color: var(--accent-purple, #a78bfa);
+            cursor: pointer;
+            font-size: 0.6rem;
+            padding: 0 2px;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .library__filter-clear:hover {
+            color: var(--text-primary, #e0e0e0);
+        }
+
+        /* Page navigation */
+        .library__page-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.6));
+            border-radius: 8px;
+        }
+        .library__page-btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            color: var(--accent-cyan, #00e5ff);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .library__page-btn:hover:not(:disabled) {
+            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+            border-color: var(--accent-cyan, #00e5ff);
+        }
+        .library__page-btn:disabled {
+            color: var(--text-tertiary, #555);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .library__page-indicator {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-secondary, #888);
+            min-width: 6rem;
+            text-align: center;
+        }
+
+        /* Markdown content styling */
+        .library__markdown-content {
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: var(--text-primary, #e0e0e0);
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        :host ::ng-deep .library__markdown-content h1,
+        :host ::ng-deep .library__markdown-content h2,
+        :host ::ng-deep .library__markdown-content h3,
+        :host ::ng-deep .library__markdown-content h4 {
+            color: var(--accent-cyan, #00e5ff);
+            margin: 1rem 0 0.5rem;
+            font-weight: 700;
+        }
+        :host ::ng-deep .library__markdown-content h1 { font-size: 1.1rem; }
+        :host ::ng-deep .library__markdown-content h2 { font-size: 1rem; }
+        :host ::ng-deep .library__markdown-content h3 { font-size: 0.9rem; }
+        :host ::ng-deep .library__markdown-content h4 { font-size: 0.85rem; }
+        :host ::ng-deep .library__markdown-content p {
+            margin: 0.5rem 0;
+        }
+        :host ::ng-deep .library__markdown-content code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.75rem;
+            background: rgba(0, 229, 255, 0.06);
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: var(--accent-cyan, #00e5ff);
+        }
+        :host ::ng-deep .library__markdown-content pre {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            padding: 0.75rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+        :host ::ng-deep .library__markdown-content pre code {
+            background: transparent;
+            padding: 0;
+        }
+        :host ::ng-deep .library__markdown-content ul,
+        :host ::ng-deep .library__markdown-content ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        :host ::ng-deep .library__markdown-content li {
+            margin: 0.25rem 0;
+        }
+        :host ::ng-deep .library__markdown-content blockquote {
+            border-left: 3px solid var(--accent-purple, #a78bfa);
+            padding-left: 0.75rem;
+            margin: 0.5rem 0;
+            color: var(--text-secondary, #888);
+        }
+        :host ::ng-deep .library__markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.5rem 0;
+            font-size: 0.75rem;
+        }
+        :host ::ng-deep .library__markdown-content th,
+        :host ::ng-deep .library__markdown-content td {
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            padding: 0.35rem 0.5rem;
+            text-align: left;
+        }
+        :host ::ng-deep .library__markdown-content th {
+            background: rgba(0, 229, 255, 0.06);
+            font-weight: 600;
+        }
+        :host ::ng-deep .library__markdown-content a {
+            color: var(--accent-cyan, #00e5ff);
+            text-decoration: none;
+        }
+        :host ::ng-deep .library__markdown-content a:hover {
+            text-decoration: underline;
+        }
+        :host ::ng-deep .library__markdown-content hr {
+            border: none;
+            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            margin: 1rem 0;
+        }
+
         /* Search panel */
         .library__search-panel {
             background: var(--card-bg, rgba(10, 10, 20, 0.97));
@@ -592,6 +860,8 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             .library { padding: 0.5rem; }
             .library__card { padding: 0.5rem; }
             .library__search-panel { max-width: 100%; padding: 0.75rem; }
+            .library__toolbar { flex-direction: column; }
+            .library__sort-buttons { align-self: flex-end; }
         }
     `,
 })
@@ -600,8 +870,15 @@ export class LibraryComponent implements OnInit, OnDestroy {
     private readonly viewModeService = inject(ViewModeService);
 
     protected readonly categories = CATEGORIES;
+    protected readonly sortOptions: { key: SortKey; label: string }[] = [
+        { key: 'date', label: 'Date' },
+        { key: 'name', label: 'Name' },
+        { key: 'author', label: 'Author' },
+    ];
     protected readonly activeCategory = signal<LibraryCategory | 'all'>('all');
+    protected readonly activeTag = signal<string | null>(null);
     protected readonly searchQuery = signal('');
+    protected readonly sortKey = signal<SortKey>('date');
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
     protected readonly bookPages = signal<LibraryEntry[]>([]);
     protected readonly currentPageIndex = signal(0);
@@ -614,6 +891,22 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected readonly loading = this.libraryService.loading;
     protected readonly allEntries = this.libraryService.entries;
 
+    protected readonly categoryStats = computed(() => {
+        const entries = this.allEntries();
+        const counts = new Map<LibraryCategory, number>();
+        for (const e of entries) {
+            counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
+        }
+        return CATEGORIES.filter((c) => c.key !== 'all')
+            .map((c) => ({
+                key: c.key as LibraryCategory,
+                label: c.label.toLowerCase(),
+                count: counts.get(c.key as LibraryCategory) ?? 0,
+                color: CATEGORY_COLORS[c.key as LibraryCategory],
+            }))
+            .filter((s) => s.count > 0);
+    });
+
     protected readonly searchResults = computed(() => {
         let entries = this.allEntries();
         const cat = this.orbSearchCategory();
@@ -624,6 +917,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
         if (q) {
             entries = entries.filter(
                 (e) =>
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.key.toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
@@ -638,17 +932,30 @@ export class LibraryComponent implements OnInit, OnDestroy {
         if (cat !== 'all') {
             entries = entries.filter((e) => e.category === cat);
         }
+        const tag = this.activeTag();
+        if (tag) {
+            entries = entries.filter((e) => e.tags.includes(tag));
+        }
         const q = this.searchQuery().toLowerCase().trim();
         if (q) {
             entries = entries.filter(
                 (e) =>
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.key.toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
             );
         }
-        // Most recent first
-        return [...entries].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        const key = this.sortKey();
+        return [...entries].sort((a, b) => {
+            if (key === 'name') {
+                return this.getDisplayTitle(a).localeCompare(this.getDisplayTitle(b));
+            }
+            if (key === 'author') {
+                return a.authorName.localeCompare(b.authorName);
+            }
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
     });
 
     private onEscKey = (e: KeyboardEvent) => {
@@ -718,14 +1025,40 @@ export class LibraryComponent implements OnInit, OnDestroy {
         this.loadingBook.set(false);
     }
 
+    protected readonly currentPage = computed(() => {
+        const pages = this.bookPages();
+        const idx = this.currentPageIndex();
+        return pages[idx] ?? null;
+    });
+
+    protected prevPage(): void {
+        const idx = this.currentPageIndex();
+        if (idx > 0) this.currentPageIndex.set(idx - 1);
+    }
+
+    protected nextPage(): void {
+        const idx = this.currentPageIndex();
+        if (idx < this.bookPages().length - 1) this.currentPageIndex.set(idx + 1);
+    }
+
+    protected filterByTag(tag: string, event: Event): void {
+        event.stopPropagation();
+        this.activeTag.set(this.activeTag() === tag ? null : tag);
+    }
+
+    protected clearTagFilter(): void {
+        this.activeTag.set(null);
+    }
+
     protected getDisplayTitle(entry: LibraryEntry): string {
+        // Prefer explicit title
+        if (entry.title) return entry.title;
+        // For books, humanize the book key
         if (entry.book) {
-            // Convert book key like "agent-onboarding-handbook" to "Agent Onboarding Handbook"
-            return entry.book
-                .replace(/[-_]/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return this.humanizeKey(entry.book);
         }
-        return entry.key;
+        // For notes, humanize the entry key (strip common prefixes)
+        return this.humanizeKey(entry.key);
     }
 
     protected openSearch(): void {
@@ -748,8 +1081,14 @@ export class LibraryComponent implements OnInit, OnDestroy {
     }
 
     protected getPreview(content: string): string {
-        const line = content.split('\n').find((l) => l.trim().length > 0) ?? '';
-        return line.length > 80 ? `${line.slice(0, 78)}...` : line;
+        // Skip markdown headers and blank lines, strip formatting chars
+        const lines = content.split('\n');
+        const line = lines.find((l) => {
+            const t = l.trim();
+            return t.length > 0 && !t.startsWith('#') && !t.startsWith('---') && !t.startsWith('===');
+        }) ?? '';
+        const clean = line.replace(/[*_`~#>]/g, '').trim();
+        return clean.length > 100 ? `${clean.slice(0, 98)}...` : clean;
     }
 
     protected getCategoryColor(category: LibraryCategory): string {
@@ -766,5 +1105,13 @@ export class LibraryComponent implements OnInit, OnDestroy {
         } catch {
             return iso;
         }
+    }
+
+    private humanizeKey(key: string): string {
+        // Strip common prefixes like "ref-", "guide-", "std-", "dec-", "rb-"
+        const stripped = key.replace(/^(ref|guide|std|dec|rb|runbook|decision|standard|reference)-/i, '');
+        return stripped
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
     }
 }
