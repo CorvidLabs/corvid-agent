@@ -993,11 +993,24 @@ async function routeToThread(
     // Without this guard, the zombie check fires 8s later on a never-started process,
     // sending a false "session ended unexpectedly" crash embed.
     if (!ctx.processManager.isRunning(sessionId)) {
-      log.warn('resumeProcess did not start — skipping subscription', { sessionId, threadId });
-      await sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
-        description: 'This session could not be resumed. Start a new `/session` to continue.',
-        color: 0xff3355,
-      });
+      log.warn('resumeProcess did not start — creating fresh session in thread', { sessionId, threadId });
+      // Clear stale mapping and create a brand new session, same as expired sessions
+      ctx.threadSessions.delete(threadId);
+      const resumed = await resumeExpiredThreadSession(
+        ctx,
+        threadId,
+        threadInfo,
+        text,
+        authorId,
+        authorUsername,
+        attachments,
+      );
+      if (!resumed) {
+        await sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
+          description: 'This session could not be resumed. Start a new `/session` to continue.',
+          color: 0xff3355,
+        });
+      }
       return;
     }
     subscribeForResponseWithEmbed(
