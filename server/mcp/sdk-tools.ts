@@ -92,10 +92,11 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'Publish or update an entry in the shared agent library (CRVLIB). ' +
             'Library entries are plaintext ARC-69 ASAs on localnet — readable by ALL agents. ' +
             'Use this for shared knowledge: guides, standards, decisions, runbooks, and reference docs. ' +
-            'Unlike private memories (corvid_save_memory), library entries are a shared commons.',
+            'Unlike private memories (corvid_save_memory), library entries are a shared commons. ' +
+            'Large content is automatically split into a multi-page book (linked ASA chain).',
             {
-                key: z.string().describe('Unique key for this entry (e.g. "coding-standards", "deploy-runbook")'),
-                content: z.string().describe('The content to publish (plaintext, max ~700 chars for on-chain)'),
+                key: z.string().describe('Unique key for this entry (e.g. "coding-standards", "deploy-runbook"). For auto-split books, pages are keyed as {key}/page-1, {key}/page-2, etc.'),
+                content: z.string().describe('The content to publish (plaintext). No size limit — content exceeding ~700 chars is auto-split into a multi-page book.'),
                 category: z.enum(['guide', 'reference', 'decision', 'standard', 'runbook']).optional().describe('Entry category (default: reference)'),
                 tags: z.array(z.string()).optional().describe('Tags for discovery (e.g. ["typescript", "testing"])'),
             },

@@ -234,12 +234,12 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         // ── Shared Library (CRVLIB) ──────────────────────────────────────
         {
             name: 'corvid_library_write',
-            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents.',
+            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents. Large content is auto-split into a multi-page book.',
             parameters: {
                 type: 'object',
                 properties: {
-                    key: { type: 'string', description: 'Unique key for this entry' },
-                    content: { type: 'string', description: 'Content to publish' },
+                    key: { type: 'string', description: 'Unique key for this entry. For auto-split books, pages are keyed as {key}/page-1, etc.' },
+                    content: { type: 'string', description: 'Content to publish. No size limit — large content auto-splits into linked pages.' },
                     category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Entry category (default: reference)' },
                     tags: { type: 'array', items: { type: 'string' }, description: 'Tags for discovery' },
                 },
