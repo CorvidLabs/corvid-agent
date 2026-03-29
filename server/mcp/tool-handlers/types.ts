@@ -28,7 +28,7 @@ export interface McpToolContext {
     agentDirectory: AgentDirectory;
     agentWalletService: AgentWalletService;
     depth?: number;
-    /** Session source — 'web', 'algochat', 'agent', or 'discord'. */
+    /** Session source — 'web', 'algochat', or 'agent'. */
     sessionSource?: string;
     /** Emit a status message for UI progress updates (e.g. "Querying CorvidLabs..."). */
     emitStatus?: (message: string) => void;
