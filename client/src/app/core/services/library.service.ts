@@ -8,6 +8,7 @@ export interface LibraryEntry {
     id: string;
     asaId: number | null;
     key: string;
+    title: string | null;
     authorId: string;
     authorName: string;
     category: LibraryCategory;
