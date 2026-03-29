@@ -6,12 +6,21 @@ import {
     computed,
     OnInit,
     OnDestroy,
-    HostListener,
 } from '@angular/core';
+import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
+import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { Library3DComponent } from './library-3d.component';
+
+type SortMode = 'date' | 'name' | 'author';
+
+const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+    { key: 'date', label: 'Date' },
+    { key: 'name', label: 'Name' },
+    { key: 'author', label: 'Author' },
+];
 
 const CATEGORIES: { key: LibraryCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -33,7 +42,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
 @Component({
     selector: 'app-library',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ViewModeToggleComponent, Library3DComponent],
+    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe],
     template: `
         <div class="library">
             <div class="library__header">
@@ -42,6 +51,16 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                     [mode]="viewMode()"
                     ariaLabel="Library view mode"
                     (modeChange)="setViewMode($event)" />
+            </div>
+
+            <!-- Stats bar -->
+            <div class="library__stats">
+                @for (stat of categoryStats(); track stat.key) {
+                    <span class="library__stat" [style.color]="stat.color">
+                        <span class="library__stat-count">{{ stat.count }}</span>
+                        <span class="library__stat-label">{{ stat.label }}</span>
+                    </span>
+                }
             </div>
 
             @if (viewMode() === 'basic') {
@@ -59,7 +78,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                     }
                 </div>
 
-                <!-- Search -->
+                <!-- Search + Sort -->
                 <div class="library__search-row">
                     <input
                         class="library__search"
@@ -67,6 +86,16 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                         placeholder="Search by title or tags..."
                         [value]="searchQuery()"
                         (input)="onSearch($event)" />
+                    <div class="library__sort">
+                        @for (opt of sortOptions; track opt.key) {
+                            <button
+                                class="library__sort-btn"
+                                [class.library__sort-btn--active]="activeSort() === opt.key"
+                                (click)="activeSort.set(opt.key)">
+                                {{ opt.label }}
+                            </button>
+                        }
+                    </div>
                 </div>
 
                 @if (loading()) {
@@ -122,7 +151,7 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                             <div class="library__search-panel-header">
                                 <span class="library__search-panel-title">Search Library</span>
                                 <span class="library__search-panel-count">{{ searchResults().length }} entries</span>
-                                <button class="library__overlay-close" (click)="closeSearch()">✕</button>
+                                <button class="library__overlay-close" (click)="closeSearch()">&#x2715;</button>
                             </div>
                             <input
                                 class="library__search library__search--panel"
@@ -214,11 +243,11 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                             <span class="library__page-divider-label">Page {{ i + 1 }}</span>
                                         </div>
                                     }
-                                    <pre class="library__card-pre library__page-content">{{ page.content }}</pre>
+                                    <div class="library__markdown library__page-content" [innerHTML]="renderMarkdown(page.content)"></div>
                                 }
                             </div>
                         } @else {
-                            <pre class="library__card-pre library__overlay-pre">{{ selectedEntry()!.content }}</pre>
+                            <div class="library__markdown library__overlay-pre" [innerHTML]="renderMarkdown(selectedEntry()!.content)"></div>
                         }
                     </div>
                 </div>
@@ -243,6 +272,29 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             color: var(--text-primary, #e0e0e0);
             margin: 0;
         }
+
+        /* Stats bar */
+        .library__stats {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .library__stat {
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+        }
+        .library__stat-count {
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .library__stat-label {
+            opacity: 0.7;
+            text-transform: lowercase;
+        }
+
         .library__tabs {
             display: flex;
             gap: 0;
@@ -275,6 +327,9 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
         }
         .library__search-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
             margin-bottom: 0.75rem;
         }
         .library__search {
@@ -292,6 +347,36 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
         .library__search:focus {
             border-color: var(--accent-cyan, #00e5ff);
         }
+
+        /* Sort buttons */
+        .library__sort {
+            display: flex;
+            gap: 0;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        .library__sort-btn {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary, #888);
+            cursor: pointer;
+            transition: color 0.15s, background 0.15s;
+            white-space: nowrap;
+        }
+        .library__sort-btn:hover {
+            color: var(--text-primary, #e0e0e0);
+        }
+        .library__sort-btn--active {
+            color: var(--accent-cyan, #00e5ff);
+            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+        }
+
         .library__loading, .library__empty {
             text-align: center;
             padding: 2rem;
@@ -397,6 +482,87 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             margin: 0;
             max-height: 400px;
             overflow-y: auto;
+        }
+
+        /* Markdown rendered content */
+        .library__markdown {
+            font-size: 0.82rem;
+            color: var(--text-primary, #e0e0e0);
+            line-height: 1.65;
+            word-break: break-word;
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-top: 0.75rem;
+        }
+        :host ::ng-deep .library__markdown > :first-child { margin-top: 0; }
+        :host ::ng-deep .library__markdown h1,
+        :host ::ng-deep .library__markdown h2,
+        :host ::ng-deep .library__markdown h3 {
+            color: var(--accent-cyan, #00e5ff);
+            margin: 1.25rem 0 0.5rem;
+            line-height: 1.3;
+        }
+        :host ::ng-deep .library__markdown h1 { font-size: 1.15rem; }
+        :host ::ng-deep .library__markdown h2 { font-size: 1rem; }
+        :host ::ng-deep .library__markdown h3 { font-size: 0.9rem; }
+        :host ::ng-deep .library__markdown p { margin: 0.5rem 0; }
+        :host ::ng-deep .library__markdown ul,
+        :host ::ng-deep .library__markdown ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        :host ::ng-deep .library__markdown li { margin: 0.25rem 0; }
+        :host ::ng-deep .library__markdown code {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.78rem;
+        }
+        :host ::ng-deep .library__markdown pre {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            padding: 0.75rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+        :host ::ng-deep .library__markdown pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.75rem;
+        }
+        :host ::ng-deep .library__markdown blockquote {
+            border-left: 3px solid var(--accent-cyan, #00e5ff);
+            margin: 0.75rem 0;
+            padding: 0.25rem 0.75rem;
+            color: var(--text-secondary, #888);
+        }
+        :host ::ng-deep .library__markdown a {
+            color: var(--accent-cyan, #00e5ff);
+            text-decoration: none;
+        }
+        :host ::ng-deep .library__markdown a:hover { text-decoration: underline; }
+        :host ::ng-deep .library__markdown table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.75rem 0;
+            font-size: 0.78rem;
+        }
+        :host ::ng-deep .library__markdown th,
+        :host ::ng-deep .library__markdown td {
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            padding: 0.35rem 0.6rem;
+            text-align: left;
+        }
+        :host ::ng-deep .library__markdown th {
+            background: rgba(255, 255, 255, 0.04);
+            font-weight: 600;
+        }
+        :host ::ng-deep .library__markdown hr {
+            border: none;
+            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            margin: 1rem 0;
         }
 
         /* 3D overlay */
@@ -591,15 +757,20 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             .library { padding: 0.5rem; }
             .library__card { padding: 0.5rem; }
             .library__search-panel { max-width: 100%; padding: 0.75rem; }
+            .library__search-row { flex-direction: column; }
         }
     `,
 })
 export class LibraryComponent implements OnInit, OnDestroy {
     private readonly libraryService = inject(LibraryService);
     private readonly viewModeService = inject(ViewModeService);
+    private readonly sanitizer = inject(DomSanitizer);
+    private readonly markdownPipe = new MarkdownPipe();
 
     protected readonly categories = CATEGORIES;
+    protected readonly sortOptions = SORT_OPTIONS;
     protected readonly activeCategory = signal<LibraryCategory | 'all'>('all');
+    protected readonly activeSort = signal<SortMode>('date');
     protected readonly searchQuery = signal('');
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
     protected readonly bookPages = signal<LibraryEntry[]>([]);
@@ -613,6 +784,23 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected readonly loading = this.libraryService.loading;
     protected readonly allEntries = this.libraryService.entries;
 
+    protected readonly categoryStats = computed(() => {
+        const entries = this.allEntries();
+        const counts = new Map<string, number>();
+        for (const e of entries) {
+            counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
+        }
+        return [
+            { key: 'total', label: 'total', count: entries.length, color: 'var(--text-primary, #e0e0e0)' },
+            ...CATEGORIES.filter((c) => c.key !== 'all').map((c) => ({
+                key: c.key,
+                label: c.label.toLowerCase(),
+                count: counts.get(c.key) ?? 0,
+                color: CATEGORY_COLORS[c.key as LibraryCategory] ?? '#888',
+            })),
+        ];
+    });
+
     protected readonly searchResults = computed(() => {
         let entries = this.allEntries();
         const cat = this.orbSearchCategory();
@@ -624,6 +812,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
             entries = entries.filter(
                 (e) =>
                     e.key.toLowerCase().includes(q) ||
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
             );
@@ -642,12 +831,24 @@ export class LibraryComponent implements OnInit, OnDestroy {
             entries = entries.filter(
                 (e) =>
                     e.key.toLowerCase().includes(q) ||
+                    (e.title ?? '').toLowerCase().includes(q) ||
                     e.tags.some((t) => t.toLowerCase().includes(q)) ||
                     e.content.toLowerCase().includes(q),
             );
         }
-        // Most recent first
-        return [...entries].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        const sorted = [...entries];
+        const sort = this.activeSort();
+        if (sort === 'name') {
+            sorted.sort((a, b) => this.getDisplayTitle(a).localeCompare(this.getDisplayTitle(b)));
+        } else if (sort === 'author') {
+            sorted.sort((a, b) =>
+                a.authorName.localeCompare(b.authorName) ||
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+            );
+        } else {
+            sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        }
+        return sorted;
     });
 
     private onEscKey = (e: KeyboardEvent) => {
@@ -712,13 +913,22 @@ export class LibraryComponent implements OnInit, OnDestroy {
     }
 
     protected getDisplayTitle(entry: LibraryEntry): string {
+        if (entry.title) return entry.title;
         if (entry.book) {
-            // Convert book key like "agent-onboarding-handbook" to "Agent Onboarding Handbook"
             return entry.book
                 .replace(/[-_]/g, ' ')
                 .replace(/\b\w/g, (c) => c.toUpperCase());
         }
-        return entry.key;
+        // Humanize key: "ref-team-alpha-roster" -> "Team Alpha Roster"
+        return entry.key
+            .replace(/^(ref|guide|std|dec|rb)-/, '')
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    protected renderMarkdown(content: string): SafeHtml {
+        const html = this.markdownPipe.transform(content);
+        return this.sanitizer.bypassSecurityTrustHtml(html);
     }
 
     protected openSearch(): void {
@@ -741,8 +951,13 @@ export class LibraryComponent implements OnInit, OnDestroy {
     }
 
     protected getPreview(content: string): string {
-        const line = content.split('\n').find((l) => l.trim().length > 0) ?? '';
-        return line.length > 80 ? `${line.slice(0, 78)}...` : line;
+        // Skip markdown headers and empty lines to find meaningful content
+        const line = content.split('\n').find((l) => {
+            const trimmed = l.trim();
+            return trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('---');
+        }) ?? '';
+        const clean = line.replace(/[*_`~[\]]/g, '').trim();
+        return clean.length > 100 ? `${clean.slice(0, 98)}...` : clean;
     }
 
     protected getCategoryColor(category: LibraryCategory): string {

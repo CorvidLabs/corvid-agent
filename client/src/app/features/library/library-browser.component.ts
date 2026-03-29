@@ -245,11 +245,15 @@ export class LibraryBrowserComponent implements OnInit {
     }
 
     protected getDisplayTitle(entry: LibraryEntry): string {
+        if (entry.title) return entry.title;
         if (entry.book) {
             return entry.book
                 .replace(/[-_]/g, ' ')
                 .replace(/\b\w/g, (c) => c.toUpperCase());
         }
-        return entry.key;
+        return entry.key
+            .replace(/^(ref|guide|std|dec|rb)-/, '')
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
     }
 }

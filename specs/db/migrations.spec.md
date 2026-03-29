@@ -39,6 +39,8 @@ files:
   - server/db/migrations/107_session_restart_initiated.ts
   - server/db/migrations/108_memory_book_pages.ts
   - server/db/migrations/109_discord_processed_messages.ts
+  - server/db/migrations/110_session_conversation_summary.ts
+  - server/db/migrations/111_library_title.ts
 db_tables:
   - schema_version
 depends_on: []

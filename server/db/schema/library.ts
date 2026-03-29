@@ -8,6 +8,7 @@ export const tables: string[] = [
         category TEXT NOT NULL DEFAULT 'reference',
         tags TEXT NOT NULL DEFAULT '[]',
         content TEXT NOT NULL,
+        title TEXT DEFAULT NULL,
         book TEXT DEFAULT NULL,
         page INTEGER DEFAULT NULL,
         txid TEXT DEFAULT NULL,

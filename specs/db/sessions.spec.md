@@ -45,6 +45,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateConversationSession` | `(db: Database, id: string, sessionId: string)` | `void` | Link a conversation to a session |
 | `updateConversationAgent` | `(db: Database, id: string, agentId: string, sessionId: string)` | `void` | Update both agent and session for a conversation |
 | `listPollingActivity` | `(db: Database, repo: string, limit?: number)` | `Session[]` | List sessions related to a repo for polling activity display. Default limit 25 |
+| `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for a session |
+| `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session (for context carry-over) |
 | `getParticipantForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup: get wallet address for a session via conversations |
 
 ## Invariants
@@ -133,6 +135,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
 | council_role | TEXT | nullable | chairman/member/synthesizer |
 | work_dir | TEXT | nullable | Override working directory (e.g. git worktree) |
+| conversation_summary | TEXT | DEFAULT NULL | Conversation summary for context carry-over across session restarts |
 | credits_consumed | INTEGER | DEFAULT 0 | Credits consumed by this session |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |

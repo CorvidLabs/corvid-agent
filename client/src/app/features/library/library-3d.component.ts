@@ -883,10 +883,12 @@ export class Library3DComponent implements OnDestroy {
                         glowMesh.position.copy(bookMesh.position);
                         this.scene!.add(glowMesh);
 
-                        // Label — clean title only
-                        const displayName = entry.book && pageCount > 1
-                            ? entry.book
-                            : entry.key;
+                        // Label — prefer title, then book name, then humanized key
+                        const displayName = entry.title
+                            ? entry.title
+                            : entry.book && pageCount > 1
+                              ? entry.book
+                              : entry.key.replace(/^(ref|guide|std|dec|rb)-/, '').replace(/[-_]/g, ' ');
                         const labelBase = displayName.length > 28 ? `${displayName.slice(0, 26)}..` : displayName;
                         const labelText = isBook
                             ? `${labelBase}  (${pageCount}p)`
