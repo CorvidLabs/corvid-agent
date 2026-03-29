@@ -115,9 +115,67 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             } @else {
                 <app-library-3d
                     [entries]="allEntries()"
-                    [paused]="!!selectedEntry()"
+                    [paused]="!!selectedEntry() || showSearch()"
                     (entrySelect)="onEntrySelect($event)"
-                    (bookPageSelect)="onBookPageSelect($event)" />
+                    (bookPageSelect)="onBookPageSelect($event)"
+                    (orbSearch)="openSearch()" />
+                @if (showSearch()) {
+                    <div class="library__overlay" (click)="closeSearch()">
+                        <div class="library__search-panel" (click)="$event.stopPropagation()">
+                            <div class="library__search-panel-header">
+                                <span class="library__search-panel-title">Search Library</span>
+                                <span class="library__search-panel-count">{{ searchResults().length }} entries</span>
+                                <button class="library__overlay-close" (click)="closeSearch()">✕</button>
+                            </div>
+                            <input
+                                class="library__search library__search--panel"
+                                type="text"
+                                placeholder="Search by title, tags, or content..."
+                                [value]="orbSearchQuery()"
+                                (input)="onOrbSearch($event)"
+                                autofocus />
+                            <div class="library__search-panel-tabs">
+                                @for (cat of categories; track cat.key) {
+                                    <button
+                                        class="library__tab"
+                                        [class.library__tab--active]="orbSearchCategory() === cat.key"
+                                        (click)="orbSearchCategory.set(cat.key)">
+                                        {{ cat.label }}
+                                    </button>
+                                }
+                            </div>
+                            <div class="library__search-results">
+                                @for (entry of searchResults(); track entry.id) {
+                                    <div class="library__search-result" (click)="onSearchResultClick(entry)">
+                                        <span
+                                            class="library__card-badge"
+                                            [style.background]="getCategoryColor(entry.category)"
+                                            [style.box-shadow]="'0 0 6px ' + getCategoryColor(entry.category) + '30'">
+                                            {{ entry.category }}
+                                        </span>
+                                        <div class="library__search-result-info">
+                                            <span class="library__search-result-title">{{ entry.key }}</span>
+                                            @if (entry.book) {
+                                                <span class="library__card-book">{{ entry.book }} p.{{ entry.page }}</span>
+                                            }
+                                            <span class="library__search-result-preview">{{ getPreview(entry.content) }}</span>
+                                        </div>
+                                        @if (entry.tags.length > 0) {
+                                            <div class="library__card-tags library__search-result-tags">
+                                                @for (tag of entry.tags.slice(0, 3); track tag) {
+                                                    <span class="library__card-tag">{{ tag }}</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                @if (searchResults().length === 0) {
+                                    <div class="library__empty">No matching entries.</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
                 @if (selectedEntry()) {
                     <div class="library__overlay" (click)="clearSelection()">
                         <div class="library__overlay-content" (click)="$event.stopPropagation()">
@@ -441,9 +499,96 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             white-space: nowrap;
         }
 
+        /* Search panel */
+        .library__search-panel {
+            background: var(--card-bg, rgba(10, 10, 20, 0.97));
+            border: 1px solid var(--border-bright, #2a2a3e);
+            border-radius: 12px;
+            padding: 1rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .library__search-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .library__search-panel-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--accent-cyan, #00e5ff);
+            flex: 1;
+        }
+        .library__search-panel-count {
+            font-size: 0.65rem;
+            color: var(--text-secondary, #888);
+        }
+        .library__search--panel {
+            margin-bottom: 0;
+        }
+        .library__search-panel-tabs {
+            display: flex;
+            gap: 0;
+            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .library__search-results {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+            max-height: 50vh;
+            padding-right: 4px;
+        }
+        .library__search-result {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.5rem 0.6rem;
+            background: var(--card-bg, rgba(15, 15, 25, 0.6));
+            border: 1px solid var(--border-subtle, #1a1a2e);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .library__search-result:hover {
+            border-color: var(--accent-cyan-border, rgba(0, 229, 255, 0.3));
+            background: var(--card-bg-hover, rgba(20, 20, 35, 0.8));
+        }
+        .library__search-result-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .library__search-result-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-primary, #e0e0e0);
+        }
+        .library__search-result-preview {
+            font-size: 0.68rem;
+            color: var(--text-secondary, #888);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .library__search-result-tags {
+            flex-shrink: 0;
+            align-self: center;
+        }
+
         @media (max-width: 600px) {
             .library { padding: 0.5rem; }
             .library__card { padding: 0.5rem; }
+            .library__search-panel { max-width: 100%; padding: 0.75rem; }
         }
     `,
 })
@@ -458,10 +603,31 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
     protected readonly bookPages = signal<LibraryEntry[]>([]);
     protected readonly currentPageIndex = signal(0);
+    protected readonly showSearch = signal(false);
+    protected readonly orbSearchQuery = signal('');
+    protected readonly orbSearchCategory = signal<LibraryCategory | 'all'>('all');
 
     protected readonly viewMode = this.viewModeService.getMode('library');
     protected readonly loading = this.libraryService.loading;
     protected readonly allEntries = this.libraryService.entries;
+
+    protected readonly searchResults = computed(() => {
+        let entries = this.allEntries();
+        const cat = this.orbSearchCategory();
+        if (cat !== 'all') {
+            entries = entries.filter((e) => e.category === cat);
+        }
+        const q = this.orbSearchQuery().toLowerCase().trim();
+        if (q) {
+            entries = entries.filter(
+                (e) =>
+                    e.key.toLowerCase().includes(q) ||
+                    e.tags.some((t) => t.toLowerCase().includes(q)) ||
+                    e.content.toLowerCase().includes(q),
+            );
+        }
+        return [...entries].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    });
 
     protected readonly filteredEntries = computed(() => {
         let entries = this.allEntries();
@@ -483,9 +649,13 @@ export class LibraryComponent implements OnInit, OnDestroy {
     });
 
     private onEscKey = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && this.selectedEntry()) {
+        if (e.key === 'Escape') {
             e.preventDefault();
-            this.clearSelection();
+            if (this.selectedEntry()) {
+                this.clearSelection();
+            } else if (this.showSearch()) {
+                this.closeSearch();
+            }
         }
     };
 
@@ -547,6 +717,30 @@ export class LibraryComponent implements OnInit, OnDestroy {
             this.currentPageIndex.set(idx + 1);
             this.selectedEntry.set(pages[idx + 1]);
         }
+    }
+
+    protected openSearch(): void {
+        this.showSearch.set(true);
+        this.orbSearchQuery.set('');
+        this.orbSearchCategory.set('all');
+    }
+
+    protected closeSearch(): void {
+        this.showSearch.set(false);
+    }
+
+    protected onOrbSearch(event: Event): void {
+        this.orbSearchQuery.set((event.target as HTMLInputElement).value);
+    }
+
+    protected onSearchResultClick(entry: LibraryEntry): void {
+        this.showSearch.set(false);
+        this.onEntrySelect(entry);
+    }
+
+    protected getPreview(content: string): string {
+        const line = content.split('\n').find((l) => l.trim().length > 0) ?? '';
+        return line.length > 80 ? `${line.slice(0, 78)}...` : line;
     }
 
     protected getCategoryColor(category: LibraryCategory): string {
