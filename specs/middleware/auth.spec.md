@@ -38,6 +38,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | Type | Description |
 |------|-------------|
 | `AuthConfig` | `{ apiKey: string \| null; allowedOrigins: string[]; bindHost: string }` |
+| `SecurityConfigError` | Error subclass thrown by `validateStartupSecurity` when the configuration is unsafe (e.g., wildcard CORS origins in remote mode) |
 
 ## Invariants
 
@@ -94,6 +95,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | Condition | Behavior |
 |-----------|----------|
 | Non-localhost without API_KEY | `process.exit(1)` during startup |
+| Non-localhost with wildcard CORS origins | Throws `SecurityConfigError` during startup |
 | Missing Authorization header | 401 with `WWW-Authenticate: Bearer` |
 | Malformed Authorization header | 401 with `WWW-Authenticate: Bearer` |
 | Invalid API key | 403 with `{ error: "Invalid API key" }` |
