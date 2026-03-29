@@ -149,6 +149,7 @@ export function subscribeForResponseWithEmbed(
     // Periodic progress for long-running operations
     const progressInterval = setInterval(() => {
         if (receivedAnyContent || sentErrorMessage) return;
+        if (!processManager.isRunning(sessionId)) { clearInterval(progressInterval); return; }
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         sendEmbed(delivery, botToken, threadId, {
             description: `Still working (${elapsed}s elapsed)...`,
@@ -191,7 +192,7 @@ export function subscribeForResponseWithEmbed(
 
     // Safety timeout: clear typing if no terminal event arrives
     const typingSafetyTimeout = setTimeout(() => {
-        clearInterval(typingInterval);
+        clearTyping();
         log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
         if (!receivedAnyActivity) {
             sendEmbed(delivery, botToken, threadId, {
