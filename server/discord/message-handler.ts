@@ -988,6 +988,18 @@ async function routeToThread(
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
     ctx.processManager.resumeProcess(session, resumeText);
+    // Only subscribe if the process actually started — resumeProcess may fail
+    // (e.g., worktree cleaned up, spawn error) and returns void, so check the map.
+    // Without this guard, the zombie check fires 8s later on a never-started process,
+    // sending a false "session ended unexpectedly" crash embed.
+    if (!ctx.processManager.isRunning(sessionId)) {
+      log.warn('resumeProcess did not start — skipping subscription', { sessionId, threadId });
+      await sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
+        description: 'This session could not be resumed. Start a new `/session` to continue.',
+        color: 0xff3355,
+      });
+      return;
+    }
     subscribeForResponseWithEmbed(
       ctx.processManager,
       ctx.delivery,
