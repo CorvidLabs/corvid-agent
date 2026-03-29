@@ -18,7 +18,7 @@ import { validateGitHubTokenOnStartup } from './lib/github-token-check';
 import { createLogger } from './lib/logger';
 import { applySecurityHeaders } from './lib/security-headers';
 import { handleMcpHttpRequest } from './mcp/http-transport';
-import { checkWsAuth, loadAuthConfig, timingSafeEqual, validateStartupSecurity } from './middleware/auth';
+import { checkWsAuth, loadAuthConfig, SecurityConfigError, timingSafeEqual, validateStartupSecurity } from './middleware/auth';
 import {
   activeSessions as activeSessionsGauge,
   buildTraceparent,
@@ -45,7 +45,16 @@ const log = createLogger('Server');
 
 // Load auth configuration for WebSocket authentication
 const authConfig = loadAuthConfig();
-validateStartupSecurity(authConfig);
+try {
+    validateStartupSecurity(authConfig);
+} catch (err) {
+    if (err instanceof SecurityConfigError) {
+        log.error(`SECURITY: ${err.message}`);
+        log.error('Refusing to start. Fix your configuration and restart.');
+        process.exit(1);
+    }
+    throw err;
+}
 
 // Validate GH_TOKEN scopes (async, never blocks startup)
 validateGitHubTokenOnStartup().catch(() => {

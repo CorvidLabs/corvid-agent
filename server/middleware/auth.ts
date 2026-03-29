@@ -18,6 +18,14 @@ import { randomBytes } from 'node:crypto';
 
 const log = createLogger('Auth');
 
+/** Thrown by validateStartupSecurity when the configuration is unsafe to run. */
+export class SecurityConfigError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'SecurityConfigError';
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -173,7 +181,9 @@ export function validateStartupSecurity(config: AuthConfig): void {
     if (config.allowedOrigins.length > 0) {
         log.info(`CORS restricted to origins: ${config.allowedOrigins.join(', ')}`);
     } else if (!isLocalhost) {
-        log.warn('CORS allows all origins (Access-Control-Allow-Origin: *). Set ALLOWED_ORIGINS to restrict access in production.');
+        throw new SecurityConfigError(
+            'CORS allows all origins (Access-Control-Allow-Origin: *) in remote mode. Set ALLOWED_ORIGINS in your .env to restrict access.',
+        );
     }
 }
 
@@ -400,18 +410,24 @@ export function getApiKeyExpiryWarning(config: AuthConfig): string | null {
  */
 export function buildCorsHeaders(req: Request, config: AuthConfig): Record<string, string> {
     const requestOrigin = req.headers.get('Origin');
+    const isLocalhost =
+        config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
 
     let allowOrigin = '*';
     if (config.allowedOrigins.length > 0) {
-        // If specific origins are configured, only reflect back if the request origin is allowed
+        // Specific allowlist — reflect only matching origins
         if (requestOrigin && config.allowedOrigins.includes(requestOrigin)) {
             allowOrigin = requestOrigin;
         } else if (requestOrigin) {
-            // Origin not in allowlist — return empty origin (browser will block)
-            allowOrigin = '';
+            allowOrigin = ''; // not in allowlist
         }
-        // No Origin header (same-origin or non-browser) — allow
+        // No Origin header: allow (same-origin or non-browser)
+    } else if (!isLocalhost) {
+        // Publicly exposed, no allowlist — deny cross-origin requests.
+        // Set ALLOWED_ORIGINS to permit specific origins.
+        allowOrigin = requestOrigin ? '' : '*';
     }
+    // isLocalhost + no allowlist: keep '*' (development mode)
 
     const headers: Record<string, string> = {
         'Access-Control-Allow-Origin': allowOrigin,
@@ -419,7 +435,6 @@ export function buildCorsHeaders(req: Request, config: AuthConfig): Record<strin
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
-    // When we're reflecting a specific origin (not *), Vary on Origin
     if (allowOrigin !== '*') {
         headers['Vary'] = 'Origin';
     }

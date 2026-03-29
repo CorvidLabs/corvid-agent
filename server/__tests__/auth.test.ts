@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import {
     loadAuthConfig,
     validateStartupSecurity,
+    SecurityConfigError,
     checkHttpAuth,
     checkWsAuth,
     buildCorsHeaders,
@@ -30,6 +31,12 @@ const AUTH_ENABLED: AuthConfig = {
 };
 
 const AUTH_DISABLED: AuthConfig = {
+    apiKey: null,
+    allowedOrigins: [],
+    bindHost: '127.0.0.1',
+};
+
+const AUTH_LOCALHOST_NO_KEY: AuthConfig = {
     apiKey: null,
     allowedOrigins: [],
     bindHost: '127.0.0.1',
@@ -86,13 +93,28 @@ describe('validateStartupSecurity', () => {
         expect(() => validateStartupSecurity(AUTH_DISABLED)).not.toThrow();
     });
 
-    it('does not throw for non-localhost with API_KEY', () => {
-        expect(() => validateStartupSecurity(AUTH_ENABLED)).not.toThrow();
+    it('does not throw for non-localhost with API_KEY and restricted origins', () => {
+        expect(() => validateStartupSecurity(AUTH_WITH_ORIGINS)).not.toThrow();
     });
 
-    // Note: testing process.exit(1) case requires mocking process.exit,
-    // which would complicate these unit tests. The behavior is verified
-    // by integration testing: start server with BIND_HOST=0.0.0.0 and no API_KEY.
+    it('throws SecurityConfigError when CORS allows all origins in remote mode', () => {
+        const remoteWildcard: AuthConfig = {
+            apiKey: 'test-secret-key-12345',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+        expect(() => validateStartupSecurity(remoteWildcard)).toThrow(SecurityConfigError);
+        expect(() => validateStartupSecurity(remoteWildcard)).toThrow(/CORS allows all origins/);
+    });
+
+    it('does not throw when CORS origins are explicitly set in remote mode', () => {
+        const remoteRestricted: AuthConfig = {
+            apiKey: 'test-secret-key-12345',
+            allowedOrigins: ['https://dashboard.example.com'],
+            bindHost: '0.0.0.0',
+        };
+        expect(() => validateStartupSecurity(remoteRestricted)).not.toThrow();
+    });
 });
 
 // --- checkHttpAuth ----------------------------------------------------------
@@ -224,10 +246,25 @@ describe('checkWsAuth', () => {
 // --- buildCorsHeaders -------------------------------------------------------
 
 describe('buildCorsHeaders', () => {
-    it('returns wildcard origin when no origins are configured', () => {
+    it('returns wildcard origin when no origins are configured (localhost dev mode)', () => {
         const req = makeRequest('/api/sessions', {
             headers: { Origin: 'https://anything.com' },
         });
+        const headers = buildCorsHeaders(req, AUTH_LOCALHOST_NO_KEY);
+        expect(headers['Access-Control-Allow-Origin']).toBe('*');
+    });
+
+    it('blocks cross-origin requests when no allowlist and non-localhost', () => {
+        const req = makeRequest('/api/sessions', {
+            headers: { Origin: 'https://anything.com' },
+        });
+        const headers = buildCorsHeaders(req, AUTH_ENABLED);
+        expect(headers['Access-Control-Allow-Origin']).toBe('');
+        expect(headers['Vary']).toBe('Origin');
+    });
+
+    it('allows non-browser requests when non-localhost and no allowlist', () => {
+        const req = makeRequest('/api/sessions');
         const headers = buildCorsHeaders(req, AUTH_ENABLED);
         expect(headers['Access-Control-Allow-Origin']).toBe('*');
     });

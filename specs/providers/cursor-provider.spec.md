@@ -31,11 +31,13 @@ Cursor LLM provider wrapping the cursor-agent CLI as a first-class `LlmProvider`
 | `isAvailable` | `()` | `Promise<boolean>` | Check cursor-agent binary exists and passes `--version` |
 | `acquireSlot` | `(model, signal?, onStatus?)` | `Promise<boolean>` | Acquire a concurrency slot, queues if full |
 | `releaseSlot` | `(model)` | `void` | Release slot and wake next queued waiter |
+| `getSlotStatus` | `()` | `{ active, max, queued }` | Current slot usage for observability |
+| `maxConcurrent` | getter | `number` | Maximum concurrent cursor-agent processes |
 | `doComplete` | `(params)` | `Promise<LlmCompletionResult>` | Spawn cursor-agent, parse stream-json, return result |
 
 ## Invariants
 
-1. **Slot-based concurrency**: `activeSlots` never exceeds `maxSlots` (default 2, configurable via `CURSOR_MAX_PARALLEL`). Never goes negative — clamped to 0
+1. **Slot-based concurrency**: `activeSlots` never exceeds `maxSlots` (default 4, configurable via `CURSOR_MAX_CONCURRENT`). Never goes negative — clamped to 0
 2. **Slot always released**: Every `acquireSlot` returning `true` must have a corresponding `releaseSlot`, even on abort or error
 3. **Abort removes from queue**: If an abort signal fires while queued, the waiter is removed and `acquireSlot` returns `false`
 4. **Completion timeout (10 min)**: Cursor-agent process is killed if no result after 10 minutes
@@ -46,9 +48,9 @@ Cursor LLM provider wrapping the cursor-agent CLI as a first-class `LlmProvider`
 
 ### Scenario: Slot acquisition when full
 
-- **Given** `maxSlots=2` and both slots occupied
-- **When** a third request calls `acquireSlot`
-- **Then** it queues and the `onStatus` callback reports the queue position
+- **Given** `maxSlots=4` (default) and all slots occupied
+- **When** a request beyond the limit calls `acquireSlot`
+- **Then** it queues (not rejected) and the `onStatus` callback reports the queue position
 - **And** when a slot is released, the queued request resolves with `true`
 
 ### Scenario: Abort during slot wait
@@ -99,10 +101,11 @@ Cursor LLM provider wrapping the cursor-agent CLI as a first-class `LlmProvider`
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `CURSOR_MAX_PARALLEL` | `2` | Maximum parallel cursor-agent processes |
+| `CURSOR_MAX_CONCURRENT` | `4` | Maximum parallel cursor-agent processes (queued, not rejected when exceeded) |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-27 | corvid-agent | Initial spec for CursorProvider (#1529) |
+| 2026-03-28 | corvid-agent | Rename CURSOR_MAX_PARALLEL → CURSOR_MAX_CONCURRENT, default 2→4, add getSlotStatus/maxConcurrent (#1532) |
