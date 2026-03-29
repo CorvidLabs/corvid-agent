@@ -47,6 +47,10 @@ const log = createLogger('ProcessManager');
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
+// Circuit breaker: if the last N completions in a row were zero-turn,
+// refuse to resume — the session is in a death loop.
+const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
+
 /** Result of a provider routing decision — exported for testing. */
 export interface RoutingDecision {
     /** Which provider to use (sdk, cursor, ollama). */
@@ -707,6 +711,42 @@ export class ProcessManager {
                 if (prompt) {
                     this.sendMessage(session.id, prompt);
                 }
+                return;
+            }
+        }
+
+        // Circuit breaker: detect zero-turn death loops.
+        // If the last N completions were all zero-turn, the session context is likely
+        // too bloated to make progress. Refuse to resume and emit an error.
+        const recentMessages = getSessionMessages(this.db, session.id);
+        const recentSystemMsgs = recentMessages
+            .filter((m) => m.role === 'system' && /Session (completed|exited).*Turns: 0/.test(m.content))
+            .slice(-ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD);
+        if (recentSystemMsgs.length >= ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD) {
+            // Check that the last N system messages are ALL zero-turn completions
+            // (no successful completions in between)
+            const allSystemMsgs = recentMessages.filter((m) => m.role === 'system' && /Session (completed|exited)/.test(m.content));
+            const lastN = allSystemMsgs.slice(-ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD);
+            const allZeroTurn = lastN.every((m) => /Turns: 0/.test(m.content));
+            if (allZeroTurn) {
+                log.error('Zero-turn death loop detected — refusing to resume', {
+                    sessionId: session.id,
+                    consecutiveZeroTurns: lastN.length,
+                });
+                updateSessionStatus(this.db, session.id, 'error');
+                addSessionMessage(this.db, session.id, 'system',
+                    `Session stuck in zero-turn death loop (${lastN.length} consecutive 0-turn completions). ` +
+                    'Context is likely too bloated. Please start a fresh session.');
+                this.eventBus.emit(session.id, {
+                    type: 'session_error',
+                    session_id: session.id,
+                    error: {
+                        message: `Zero-turn death loop detected (${lastN.length} consecutive 0-turn completions). Start a fresh session.`,
+                        errorType: 'crash',
+                        severity: 'error',
+                        recoverable: false,
+                    },
+                } as ClaudeStreamEvent);
                 return;
             }
         }
