@@ -73,7 +73,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
         }
         .header__title {
             font-family: var(--font-display);
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 700;
             margin: 0;
             color: var(--accent-cyan);
@@ -118,14 +118,14 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             cursor: not-allowed;
         }
         .network-btn--active.network-btn--testnet {
-            background: var(--network-testnet-dim);
+            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
             color: var(--network-testnet);
-            box-shadow: inset 0 0 8px var(--network-testnet-glow);
+            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-testnet) 20%, transparent);
         }
         .network-btn--active.network-btn--mainnet {
-            background: var(--network-mainnet-dim);
+            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
             color: var(--network-mainnet);
-            box-shadow: inset 0 0 8px var(--network-mainnet-glow);
+            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-mainnet) 20%, transparent);
         }
         .header__status {
             display: flex;

@@ -166,11 +166,8 @@
 
     /* ── Provider colors — for model/provider badges ── */
     --provider-anthropic: #d4a574;
-    --provider-anthropic-dim: rgba(212, 165, 116, 0.4);
     --provider-openai: #74d4a5;
-    --provider-openai-dim: rgba(116, 212, 165, 0.4);
     --provider-ollama: #a5a5ff;
-    --provider-ollama-dim: rgba(165, 165, 255, 0.4);
     --provider-cursor: var(--accent-amber);
     --provider-google: #4a90d9;
 
@@ -206,14 +203,14 @@
     --radius-xl: 16px;
 
     /* ── Typography scale (rem based, root 16px) ── */
-    --text-3xl: 2.25rem;
-    --text-2xl: 1.75rem;
-    --text-xl: 1.35rem;
-    --text-lg: 1.1rem;
+    --text-3xl: 2rem;
+    --text-2xl: 1.5rem;
+    --text-xl: 1.25rem;
+    --text-lg: 1rem;
     --text-base: 1rem;
     --text-sm: 0.875rem;
     --text-xs: 0.75rem;
-    --text-xxs: 0.65rem;
+    --text-xxs: 0.7rem;
 
     /* ── Transitions ── */
     --transition-fast: 0.1s ease;
