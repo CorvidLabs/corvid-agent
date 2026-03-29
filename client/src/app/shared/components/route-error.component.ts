@@ -70,7 +70,7 @@ import { Router, RouterLink } from '@angular/router';
         }
         .route-error__icon {
             margin: 0 0 1.5rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
             font-size: 0.55rem;
             line-height: 1.3;
             color: var(--accent-red, #ff3c5f);
@@ -98,7 +98,7 @@ import { Router, RouterLink } from '@angular/router';
             display: block;
             font-size: 0.65rem;
             font-weight: 600;
-            font-family: monospace;
+            font-family: var(--font-mono);
             letter-spacing: 0.15em;
             text-transform: uppercase;
             color: var(--accent-red, #ff3c5f);
@@ -133,7 +133,7 @@ import { Router, RouterLink } from '@angular/router';
             border-radius: var(--radius, 8px);
             font-size: 0.8rem;
             font-weight: 600;
-            font-family: monospace;
+            font-family: var(--font-mono);
             text-decoration: none;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -174,7 +174,7 @@ import { Router, RouterLink } from '@angular/router';
         .route-error__hint {
             margin: 1.5rem 0 0;
             font-size: 0.6rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
             color: var(--text-tertiary, #555770);
             letter-spacing: 0.1em;
         }

@@ -245,10 +245,10 @@ const TABS: NavTab[] = [
             align-items: center;
         }
         .topnav__logo-text {
-            font-family: 'Dogica Pixel', 'Dogica', monospace;
+            font-family: var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            background: var(--gradient-cyan-amber);
             background-size: 200% 200%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;

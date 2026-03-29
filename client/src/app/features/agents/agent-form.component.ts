@@ -186,7 +186,7 @@ import { firstValueFrom } from 'rxjs';
         }
         .color-picker__input::-webkit-color-swatch-wrapper { padding: 2px; }
         .color-picker__input::-webkit-color-swatch { border-radius: 3px; border: none; }
-        .color-picker__hex { width: 100px; font-family: 'Courier New', monospace; }
+        .color-picker__hex { width: 100px; font-family: var(--font-mono); }
         .icon-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
         .icon-picker__option {
             width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;

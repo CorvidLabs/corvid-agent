@@ -236,7 +236,7 @@ interface LogEntry {
         .network-3d__log-time {
             color: var(--text-tertiary, #555);
             font-size: 0.55rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .network-3d__log-flow {
             color: var(--text-secondary, #aaa);

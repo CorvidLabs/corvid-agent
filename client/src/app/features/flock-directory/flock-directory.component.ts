@@ -797,7 +797,7 @@ interface FlockStats {
         }
         .flock-detail__field-label { color: var(--text-tertiary, #666); }
         .flock-detail__field-value { color: var(--text-secondary, #bbb); }
-        .flock-detail__field-value--mono { font-family: monospace; font-size: 0.7rem; }
+        .flock-detail__field-value--mono { font-family: var(--font-mono); font-size: 0.7rem; }
 
         /* Actions */
         .flock-detail__actions {

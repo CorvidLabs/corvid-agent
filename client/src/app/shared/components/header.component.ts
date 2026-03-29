@@ -72,7 +72,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             gap: 0.75rem;
         }
         .header__title {
-            font-family: 'Dogica Pixel', 'Dogica', monospace;
+            font-family: var(--font-display);
             font-size: 1.25rem;
             font-weight: 700;
             margin: 0;
