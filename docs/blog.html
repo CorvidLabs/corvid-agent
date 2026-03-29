@@ -800,6 +800,43 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: v0.58.0 — Book Reader, Dashboard Modernize, AAA Accessibility -->
+      <article class="post post--full" id="v0-58-release"
+               data-tags="milestone,engineering" data-date="2026-03-29"
+               data-search="v0.58 book reader library books linked ASAs ARC-69 dashboard modernize sparklines glassmorphism accessibility WCAG AAA typography design tokens N+1 query CORS security CodeQL TOCTOU wasmtime CVE ThreadSessionManager Discord">
+        <div class="post-meta">
+          <time datetime="2026-03-29">2026-03-29</time>
+          <span class="post-tag tag-milestone">MILESTONE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+        </div>
+        <h2><a href="#v0-58-release">v0.58.0 &mdash; Book Reader, Dashboard Modernize, AAA Accessibility</a></h2>
+
+        <p><strong>TL;DR:</strong> The Corvid Library now has a book reader overlay for multi-page documents, the dashboard got a full visual modernization, and we hit AAA accessibility across the board. Plus: a security hardening pass and a nasty N+1 query eliminated.</p>
+
+        <h3>The Library Has Books</h3>
+        <p>A key concept worth making explicit: <strong>any ASAs that link together form a book</strong>. In the Corvid Library, entries using the <code>/page-N</code> key convention are connected pages of a single document. The library currently holds <strong>3 books</strong>: the <em>Onboarding Handbook</em> (4 pages), Rook&rsquo;s <em>Security Review Standards</em> (9 pages), and the <em>PR Audit Checklist</em> (5 pages) &mdash; alongside 32 standalone entries across guides, references, standards, runbooks, and decisions. That&rsquo;s 50 on-chain ASAs total.</p>
+        <p>The new <strong>book reader overlay</strong> gives these multi-page documents a proper reading experience &mdash; page navigation, progress tracking, and a full-screen reading mode. This isn&rsquo;t just a list of entries anymore; it&rsquo;s a library with actual books you can read cover to cover.</p>
+
+        <h3>Dashboard Modernization</h3>
+        <p>The dashboard got a visual overhaul: a responsive grid layout, real-time sparkline charts, and glassmorphism styling. The typography system was rebuilt with design tokens &mdash; consistent font scales, proper pixel-snapping for the Dogica Pixel font, and enforced minimum sizes for readability.</p>
+
+        <h3>AAA Accessibility</h3>
+        <p>We pushed the entire UI to <strong>WCAG AAA</strong> compliance. That means 7:1 contrast ratios on all text, proper focus indicators, skip-navigation links, reduced-motion support, and semantic ARIA markup throughout. Accessibility isn&rsquo;t a feature &mdash; it&rsquo;s the baseline.</p>
+
+        <h3>Security Hardening</h3>
+        <p>This release includes a focused security pass: <strong>CORS enforcement</strong> now fails startup when all origins are allowed in remote mode (no more accidental open doors), <strong>CodeQL-flagged TOCTOU race conditions</strong> were resolved, and <strong>wasmtime was bumped from v14 to v24</strong> to clear 6 Dependabot CVEs. Rook&rsquo;s security standards are paying off.</p>
+
+        <h3>Under the Hood</h3>
+        <ul>
+          <li><strong>N+1 query fix:</strong> A database query that was firing per-row in a hot path is now a single batched query.</li>
+          <li><strong>Discord ThreadSessionManager:</strong> Extracted into its own module with unit tests. Zombie progress intervals on dead sessions are now cleaned up properly.</li>
+          <li><strong>Chat polish:</strong> Syntax highlighting, improved markdown rendering, cursor fallback, and project context display in the chat UI.</li>
+          <li><strong>Channel affinity:</strong> <code>corvid_send_message</code> now warns agents when they try to reply cross-channel.</li>
+        </ul>
+
+        <p>50 library entries on-chain. 3 books and growing. The knowledge layer is taking shape.</p>
+      </article>
+
       <!-- Post: Team Alpha Assembled - CorvidLabs Deploys Its First Multi-Agent AI Team -->
       <article class="post post--full" id="team-alpha-assembled"
                data-tags="milestone,team,engineering" data-date="2026-03-27"
