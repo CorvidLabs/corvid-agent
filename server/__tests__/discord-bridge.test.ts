@@ -331,7 +331,7 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // Simulate a tracked thread session
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
         createAgent(db, { name: 'TestAgent' });
         createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
 
@@ -388,7 +388,7 @@ describe('DiscordBridge thread subscription dedup', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // Set up a tracked thread session
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
         const { createSession } = await import('../db/sessions');
         const session = createSession(db, {
             projectId: (await import('../db/projects')).listProjects(db)[0].id,
@@ -453,8 +453,8 @@ describe('DiscordBridge thread subscription dedup', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const threadCallbacks = (bridge as unknown as { threadCallbacks: Map<string, { sessionId: string; callback: unknown }> }).threadCallbacks;
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadCallbacks = (bridge as unknown as { tsm: { threadCallbacks: Map<string, { sessionId: string; callback: unknown }> } }).tsm.threadCallbacks;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
 
         const { createSession } = await import('../db/sessions');
         const session = createSession(db, {
@@ -832,7 +832,7 @@ describe('DiscordBridge mention-reply resume', () => {
             source: 'discord',
         });
 
-        const mentionSessions = (bridge as unknown as { mentionSessions: Map<string, import('../discord/message-handler').MentionSessionInfo> }).mentionSessions;
+        const mentionSessions = (bridge as unknown as { tsm: { mentionSessions: Map<string, import('../discord/message-handler').MentionSessionInfo> } }).tsm.mentionSessions;
         mentionSessions.set('600000000000000001', {
             sessionId: session.id,
             agentName: 'TestAgent',
@@ -1188,7 +1188,7 @@ describe('DiscordBridge expired thread session resume', () => {
         createAgent(db, { name: 'ResumeAgent', model: 'test-model' });
         createProject(db, { name: 'ResumeProject', workingDir: '/tmp/test' });
 
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
 
         // Set up thread info pointing to a non-existent session ID
         threadSessions.set('600000000000000001', {
@@ -1243,7 +1243,7 @@ describe('DiscordBridge expired thread session resume', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // No agents or projects created — resume should fail
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
         threadSessions.set('700000000000000001', {
             sessionId: 'non-existent-session-id',
             agentName: 'GhostAgent',
@@ -1305,7 +1305,7 @@ describe('DiscordBridge expired thread session resume', () => {
         createAgent(db, { name: 'FallbackAgent', model: 'fallback-model' });
         createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
 
-        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
         threadSessions.set('800000000000000001', {
             sessionId: 'non-existent-session-id',
             agentName: 'DeletedAgent', // This agent doesn't exist
