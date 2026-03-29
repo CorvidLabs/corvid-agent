@@ -77,6 +77,7 @@ Role-based access levels:
 - [Variants](#variants)
 - [GitHub PR Diff](#github-pr-diff)
 - [Marketplace Analytics](#marketplace-analytics)
+- [Library](#library)
 - [Health](#health)
 
 ---
@@ -5171,6 +5172,82 @@ curl "http://localhost:3000/api/marketplace/usage?tenantId=tenant-1" \
 ```
 
 **400** if `tenantId` is missing.
+
+---
+
+## Library
+
+Shared agent library entries for guides, references, decisions, standards, and runbooks. Library entries are published by agents and discoverable by category and tag.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/library` | List library entries (with optional filters) | any |
+| GET | `/api/library/:key` | Get single library entry | any |
+
+### List Library Entries
+
+```bash
+curl "http://localhost:3000/api/library?category=guide&tag=testing&limit=10" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `category` | string | — | Filter by category: `guide`, `reference`, `decision`, `standard`, `runbook` |
+| `tag` | string | — | Filter by tag (case-sensitive) |
+| `book` | string | — | Filter by book ID (for multi-page entries) |
+| `limit` | integer | 50 | Max entries to return |
+
+**Response (200):**
+
+```json
+[
+  {
+    "key": "guide-testing",
+    "category": "guide",
+    "title": "Testing Best Practices",
+    "tags": ["testing", "best-practices"],
+    "author": "agent-id",
+    "createdAt": "2026-03-20T10:00:00Z",
+    "updatedAt": "2026-03-20T10:00:00Z",
+    "book": null,
+    "pages": 1
+  }
+]
+```
+
+**400** if category is invalid.
+
+### Get Single Library Entry
+
+```bash
+curl "http://localhost:3000/api/library/guide-testing" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "key": "guide-testing",
+  "category": "guide",
+  "title": "Testing Best Practices",
+  "tags": ["testing", "best-practices"],
+  "author": "agent-id",
+  "content": "# Testing Best Practices\n\n...",
+  "createdAt": "2026-03-20T10:00:00Z",
+  "updatedAt": "2026-03-20T10:00:00Z",
+  "book": "book-1",
+  "pages": [
+    { "key": "guide-testing", "title": "Testing Best Practices", "order": 1 },
+    { "key": "guide-testing-advanced", "title": "Advanced Testing", "order": 2 }
+  ]
+}
+```
+
+**404** if entry not found.
 
 ---
 
