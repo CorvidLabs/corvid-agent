@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.58.0] - 2026-03-29
+
+### Added
+- **Book reader overlay** — library book reader with Phase 3 UI polish (#1661)
+- **Discord channel affinity** — warning for cross-channel corvid_send_message (#1657)
+- **Dashboard modernize** — grid layout, sparklines, glassmorphism effects (#1652)
+- **Chat polish** — syntax highlighting, markdown rendering, cursor fallback, project context (#1653)
+- **UI Phase 1 & 2 polish** — animations, micro-interactions, visual depth, stagger effects (#1647, #1649)
+- **3D enhanced visuals** — twinkling stars, hex grid, nebula clouds (#1643)
+- **Cursor fallback chain** — added cursor to DEFAULT_FALLBACK_CHAINS (#1640)
+- **Cursor concurrency** — renamed CURSOR_MAX_PARALLEL → CURSOR_MAX_CONCURRENT, default 2→4, added getSlotStatus() (#1634)
+
+### Fixed
+- **N+1 query** — replaced per-book SELECT COUNT(*) loop with single GROUP BY batch in listLibraryEntriesGrouped (#1670)
+- **WCAG AA contrast** — --text-tertiary bumped from #6f6c87 (3.3:1) to #8985a3 (4.6:1) (#1670)
+- **Junk files** — untracked .discord-last-connect, deleted empty playwright preflight, updated .gitignore (#1670)
+- **ThreadSessionManager refactor** — extract ThreadSessionManager + unit tests, fix CI (#1662, #1669)
+- **Discord zombie intervals** — stop progress intervals when session dies (#1660)
+- **Discord message dedup** — persist dedup + zero-turn death loop breaker (#1645)
+- **CORS secure defaults** — fail startup when CORS allows all origins in remote mode (#1650, #1658)
+- **SDK project pin** — pin active project in system prompt to survive context compression (#1648)
+- **E2E audit routes** — fix routes and external MCP test slice size (#1644)
+
+### Security
+- **CORS origin enforcement** — block wildcard CORS in remote deployments (#1650)
+- **Device auth tenant** — use actual tenant from request context in device auth verify page (#1659)
+
+### Docs & Tests
+- **Library API docs** — Library API documentation and spec coverage (#1656)
+- **WCAG AA audit** — fix contrast and select labels across 13 pages (#1646)
+- **Council smoke tests** — Cursor smoke and failure-injection tests (#1642)
+- **Discord thread refactor** — decompose Discord thread-manager into sub-modules (#1654)
+
 ## [0.57.0] - 2026-03-28
 
 ### Added
