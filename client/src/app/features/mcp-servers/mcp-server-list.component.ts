@@ -482,7 +482,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .official-card__desc { margin: 0 0 0.35rem; font-size: 0.7rem; color: var(--text-secondary); }
         .official-card__cmd { display: block; font-size: 0.65rem; color: var(--text-tertiary); margin-bottom: 0.5rem; word-break: break-all; }
         .official-card__env { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
-        .env-input { padding: 0.35rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: monospace; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
+        .env-input { padding: 0.35rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: var(--font-mono); background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
         .env-input:focus { border-color: var(--accent-cyan); outline: none; }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
@@ -501,7 +501,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .form-textarea { resize: vertical; min-height: 3em; line-height: 1.5; }
-        .mono { font-family: monospace; }
+        .mono { font-family: var(--font-mono); }
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary); }
@@ -521,7 +521,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         }
         .server-card__status[data-enabled="true"] { color: var(--accent-green); border-color: var(--accent-green); }
         .server-card__status[data-enabled="false"] { color: var(--text-secondary); }
-        .server-card__command { font-size: 0.75rem; color: var(--text-secondary); font-family: monospace; }
+        .server-card__command { font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); }
         .server-card__details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .server-detail-list { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin-bottom: 1rem; }
         .server-detail-list dt { font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; }

@@ -327,7 +327,7 @@ const TEMPLATES: AgentTemplate[] = [
             font-size: 0.85rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .template-card__name {
             font-size: 0.8rem;

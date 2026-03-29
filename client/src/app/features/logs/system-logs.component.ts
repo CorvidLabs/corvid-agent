@@ -278,7 +278,7 @@ interface CreditTransaction {
             margin: 0.25rem 0 0;
             font-size: 0.65rem;
             color: var(--text-tertiary);
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
 
         /* Credit table */

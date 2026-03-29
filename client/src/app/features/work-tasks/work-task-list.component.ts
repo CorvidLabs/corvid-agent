@@ -443,7 +443,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             background: var(--accent-magenta-dim);
             padding: 2px 6px;
             border-radius: var(--radius-sm);
-            font-family: monospace;
+            font-family: var(--font-mono);
             text-decoration: none;
             max-width: 250px;
             overflow: hidden;
@@ -490,7 +490,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             border-radius: var(--radius);
             color: var(--accent-red);
             font-size: 0.7rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .task-error--interrupted {
             background: var(--accent-orange-dim);

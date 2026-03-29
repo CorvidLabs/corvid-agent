@@ -62,7 +62,7 @@ import { RouterLink } from '@angular/router';
         }
         .empty-state__icon {
             margin: 0 0 1.25rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
             font-size: 0.7rem;
             line-height: 1.4;
             color: var(--text-secondary);

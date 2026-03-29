@@ -245,10 +245,10 @@ const TABS: NavTab[] = [
             align-items: center;
         }
         .topnav__logo-text {
-            font-family: 'Dogica Pixel', 'Dogica', monospace;
+            font-family: var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            background: var(--gradient-cyan-amber);
             background-size: 200% 200%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -371,12 +371,12 @@ const TABS: NavTab[] = [
         }
         .network-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .network-btn--active.network-btn--testnet {
-            background: rgba(74, 144, 217, 0.15);
-            color: #4a90d9;
+            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
+            color: var(--network-testnet);
         }
         .network-btn--active.network-btn--mainnet {
-            background: rgba(80, 227, 194, 0.15);
-            color: #50e3c2;
+            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
+            color: var(--network-mainnet);
         }
         .topnav__status {
             display: flex;

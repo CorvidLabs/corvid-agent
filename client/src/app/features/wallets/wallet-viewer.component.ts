@@ -236,7 +236,7 @@ interface WalletMessage {
 
         .wallet-card__info { flex: 1; min-width: 0; }
         .wallet-card__address {
-            font-family: monospace; font-size: 0.85rem; color: var(--text-primary);
+            font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary);
             display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
         }
         .wallet-card__label {
@@ -294,7 +294,7 @@ interface WalletMessage {
             font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.75rem;
             word-break: break-all;
         }
-        .full-address code { font-family: monospace; color: var(--text-secondary); }
+        .full-address code { font-family: var(--font-mono); color: var(--text-secondary); }
 
         .message-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 400px; overflow-y: auto; }
 
@@ -342,7 +342,7 @@ interface WalletMessage {
         @keyframes modalSlideIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .modal__title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; }
         .modal__address {
-            font-family: monospace; font-size: 0.75rem; color: var(--accent-cyan);
+            font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-cyan);
             margin-bottom: 1rem; word-break: break-all;
         }
         .modal__field { margin-bottom: 0.75rem; }
