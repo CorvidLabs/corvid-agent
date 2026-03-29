@@ -94,6 +94,7 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `deleteLibraryEntryRow` | `(db: Database, key: string)` | `boolean` | Hard-delete row from SQLite |
 | `resolveLibraryAsaId` | `(db: Database, key: string)` | `number \| null` | Look up ASA ID for a key |
 | `upsertLibraryEntryFromChain` | `(db: Database, params)` | `void` | Restore from on-chain sync |
+| `listLibraryEntriesGrouped` | `(db: Database, options?)` | `(LibraryEntry & { totalPages?: number })[]` | List entries with books collapsed to page 1 only, includes totalPages count |
 
 ### Exported Type — `server/db/agent-library.ts`
 

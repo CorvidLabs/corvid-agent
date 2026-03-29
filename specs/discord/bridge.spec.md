@@ -347,6 +347,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `formatDuration` | `(ms: number)` | `string` | Format a duration in milliseconds as human-readable "Xm Ys" or "Xs" |
 | `tryRecoverThread` | `(db: Database, threadSessions: Map, threadId: string)` | `ThreadSessionInfo \| null` | Try to recover a thread-to-session mapping from the database after server restart |
 
+### Exported Classes (from thread-session-manager.ts)
+
+| Class | Description |
+|-------|-------------|
+| `ThreadSessionManager` | Owns all thread/session/mention state for DiscordBridge — centralises Maps/Sets and adds TTL-based cleanup for mention sessions |
+
 ### Exported Types (from extracted modules)
 
 | Type | Source | Description |
