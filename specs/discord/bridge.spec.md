@@ -26,6 +26,7 @@ files:
   - server/discord/image-attachments.ts
   - server/discord/thread-lifecycle.ts
   - server/discord/thread-session-map.ts
+  - server/discord/thread-session-manager.ts
   - server/discord/command-handlers/message-commands.ts
 db_tables:
   - sessions
