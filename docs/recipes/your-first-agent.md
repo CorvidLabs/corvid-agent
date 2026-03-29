@@ -59,7 +59,7 @@ bun run dev
 
 Expected output:
 ```
-corvid-agent v0.59.0
+corvid-agent v0.59.1
 ✓ Database initialized (migrations: 111)
 ✓ Agent "CorvidAgent" ready
 ✓ Server listening on http://localhost:3000

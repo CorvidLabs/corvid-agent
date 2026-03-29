@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.59.1] - 2026-03-29
+
+### Fixed
+- **Docker build** — add missing `marked` dependency to client package.json (#1687)
+
 ## [0.59.0] - 2026-03-29
 
 ### Added
