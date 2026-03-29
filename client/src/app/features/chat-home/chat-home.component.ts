@@ -181,7 +181,7 @@ import { OnboardingComponent } from './onboarding.component';
         }
         .chat-home__center {
             width: 100%;
-            max-width: 640px;
+            max-width: 820px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -189,15 +189,15 @@ import { OnboardingComponent } from './onboarding.component';
             z-index: 1;
         }
         .chat-home__logo-mark {
-            width: 56px;
-            height: 56px;
+            width: 64px;
+            height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: var(--radius-xl, 16px);
             background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.08));
             border: 1px solid rgba(0, 229, 255, 0.2);
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: 800;
             color: var(--accent-cyan);
             text-shadow: 0 0 16px rgba(0, 229, 255, 0.5);
@@ -205,9 +205,9 @@ import { OnboardingComponent } from './onboarding.component';
             box-shadow: 0 4px 24px rgba(0, 229, 255, 0.1);
         }
         .chat-home__title {
-            font-size: 2rem;
+            font-size: 2.4rem;
             font-weight: 700;
-            margin: 0 0 0.4rem;
+            margin: 0 0 0.5rem;
             letter-spacing: 0.03em;
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
             background-size: 200% 200%;
@@ -218,14 +218,14 @@ import { OnboardingComponent } from './onboarding.component';
         }
         .chat-home__subtitle {
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 1.05rem;
             margin: 0 0 0.75rem;
         }
         .chat-home__shortcut-hint {
             display: flex;
             align-items: center;
             gap: 0.25rem;
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             color: var(--text-tertiary);
             margin: 0 0 1.5rem;
             opacity: 0.7;
@@ -236,7 +236,7 @@ import { OnboardingComponent } from './onboarding.component';
             border-radius: 3px;
             background: var(--bg-raised);
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: 0.7rem;
         }
         .chat-home__input-card {
             width: 100%;
@@ -260,7 +260,7 @@ import { OnboardingComponent } from './onboarding.component';
             background: transparent;
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: 1rem;
             line-height: 1.6;
             resize: none;
             outline: none;
@@ -291,7 +291,7 @@ import { OnboardingComponent } from './onboarding.component';
             gap: 0.5rem;
         }
         .chat-home__picker-label {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--text-tertiary);
             text-transform: uppercase;
@@ -304,7 +304,7 @@ import { OnboardingComponent } from './onboarding.component';
             background: var(--bg-input, var(--bg-deep));
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: border-color 0.15s;
         }
@@ -322,7 +322,7 @@ import { OnboardingComponent } from './onboarding.component';
             background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(0, 229, 255, 0.08));
             color: var(--accent-cyan);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -377,7 +377,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: flex-start;
             gap: 0.6rem;
-            padding: 0.75rem 0.85rem;
+            padding: 0.85rem 1rem;
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: var(--radius-lg, 10px);
             background: rgba(15, 16, 24, 0.5);
@@ -385,7 +385,7 @@ import { OnboardingComponent } from './onboarding.component';
             -webkit-backdrop-filter: blur(8px);
             color: var(--text-secondary);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: border-color 0.2s, background 0.2s, transform 0.15s;
             text-align: left;
@@ -396,7 +396,7 @@ import { OnboardingComponent } from './onboarding.component';
             transform: translateY(-1px);
         }
         .chat-home__template-icon {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             line-height: 1;
             flex-shrink: 0;
             margin-top: 0.1rem;
@@ -409,11 +409,11 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home__template-label {
             font-weight: 600;
             color: var(--text-primary);
-            font-size: 0.78rem;
+            font-size: 0.9rem;
         }
         .chat-home__template-desc {
             color: var(--text-tertiary);
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             line-height: 1.3;
         }
 
@@ -429,7 +429,7 @@ import { OnboardingComponent } from './onboarding.component';
             margin-bottom: 0.75rem;
         }
         .chat-home__recent-title {
-            font-size: 0.78rem;
+            font-size: 0.85rem;
             font-weight: 600;
             color: var(--text-tertiary);
             text-transform: uppercase;
@@ -437,7 +437,7 @@ import { OnboardingComponent } from './onboarding.component';
             margin: 0;
         }
         .chat-home__recent-all {
-            font-size: 0.72rem;
+            font-size: 0.82rem;
             color: var(--text-tertiary);
             background: none;
             border: none;
@@ -465,7 +465,7 @@ import { OnboardingComponent } from './onboarding.component';
             background: transparent;
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: background 0.15s;
             text-align: left;
@@ -503,7 +503,7 @@ import { OnboardingComponent } from './onboarding.component';
             white-space: nowrap;
         }
         .chat-home__recent-meta {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             color: var(--text-tertiary);
             flex-shrink: 0;
         }

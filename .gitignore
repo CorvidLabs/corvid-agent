@@ -34,6 +34,10 @@ client/package-lock.json
 
 tmp/
 
+# Runtime files
+.discord-last-connect
+playwright.config.js.esm.preflight
+
 # Scratch/prototype files
 dashboard-preview.html
 pc-upgrade-dashboard*.html

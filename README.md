@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.56.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.58.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
@@ -11,7 +11,7 @@
 
 No coding experience required. You describe what you want in plain English, and your agent builds it.
 
-**[Website](https://corvid-agent.github.io)** | **[Docs](https://corvid-agent.github.io/docs)** | **[Blog](https://corvid-agent.github.io/blog)** | **[API Reference](docs/api-reference.md)**
+**[Website](https://corvid-agent.github.io)** | **[Docs](docs/README.md)** | **[Examples](docs/use-case-gallery.md)** | **[Blog](https://corvid-agent.github.io/blog)** | **[API Reference](docs/api-reference.md)**
 
 ---
 
@@ -44,6 +44,8 @@ corvid-agent init --mcp    # configures MCP server + copies Agent Skills
 
 **[Full setup guide →](docs/quickstart.md)** | **[MCP setup →](docs/mcp-setup.md)** | **[VibeKit integration →](docs/vibekit-integration.md)**
 
+> **New here?** See what you can build: [Use-case gallery →](docs/use-case-gallery.md) | [Step-by-step recipes →](docs/recipes/your-first-agent.md)
+
 ---
 
 ## What is corvid-agent?
@@ -71,7 +73,7 @@ Every app above was designed, coded, tested, and deployed by corvid-agent — ze
 | | What you get |
 |---|---|
 | **Creators** — have ideas but don't code | Describe what you want in plain English. It designs, codes, and deploys. **[Get started →](docs/quickstart.md)** |
-| **Developers** — write code and want help | Automated PR reviews, CI fixes, test generation, issue triage. **[Use cases →](docs/use-cases.md)** |
+| **Developers** — write code and want help | Automated PR reviews, CI fixes, test generation, issue triage. **[Use-case gallery →](docs/use-case-gallery.md)** |
 | **Teams** — need AI to handle dev work | Agents review code, write features, ship PRs. **[Business guide →](docs/business-guide.md)** |
 | **Enterprise** — need security, compliance, scale | Multi-tenant, RBAC, audit trails, Docker/K8s. **[Enterprise guide →](docs/enterprise.md)** |
 
@@ -122,7 +124,7 @@ skills/
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, ~380 API endpoints, 10,500+ test files, 196 module specs.
+Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, ~380 API endpoints, 10,500+ test files, 201 module specs.
 
 **[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
 

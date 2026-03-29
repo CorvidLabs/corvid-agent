@@ -1,6 +1,7 @@
 {
   "excludeDirs": [
-    "__tests__"
+    "__tests__",
+    "public"
   ],
   "excludePatterns": [
     "**/__tests__/**",

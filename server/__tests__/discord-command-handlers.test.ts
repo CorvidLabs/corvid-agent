@@ -507,7 +507,7 @@ describe('handleComponentInteraction', () => {
     expect(ctx.threadLastActivity.has('100000000000000001')).toBe(true);
   });
 
-  test('resume_thread — subscribes callback if not already present', async () => {
+  test('resume_thread — does not subscribe callback (deferred to routeToThread)', async () => {
     const ctx = createTestContext({ defaultPermissionLevel: 2 });
     ctx.threadSessions.set('100000000000000001', {
       sessionId: 'sess-1',
@@ -519,31 +519,9 @@ describe('handleComponentInteraction', () => {
     const interaction = makeComponentInteraction('resume_thread');
     await handleComponentInteraction(ctx, interaction);
 
-    expect(ctx.subscribeForResponseWithEmbed).toHaveBeenCalledWith(
-      'sess-1',
-      '100000000000000001',
-      'TestAgent',
-      'test-model',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-    );
-  });
-
-  test('resume_thread — skips subscribe if callback exists', async () => {
-    const ctx = createTestContext({ defaultPermissionLevel: 2 });
-    ctx.threadSessions.set('100000000000000001', {
-      sessionId: 'sess-1',
-      agentName: 'TestAgent',
-      agentModel: 'test-model',
-      ownerUserId: '200000000000000001',
-    });
-    ctx.threadCallbacks.set('100000000000000001', { sessionId: 'sess-1', callback: () => {} });
-
-    const interaction = makeComponentInteraction('resume_thread');
-    await handleComponentInteraction(ctx, interaction);
-
+    // subscribeForResponseWithEmbed is NOT called on resume — it's deferred
+    // to routeToThread when the user actually sends a message, to avoid
+    // starting zombie-detection timers against a non-running process.
     expect(ctx.subscribeForResponseWithEmbed).not.toHaveBeenCalled();
   });
 

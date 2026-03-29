@@ -737,7 +737,7 @@ interface SyncStatus {
             font-size: 0.6rem;
             color: var(--text-tertiary);
             flex-shrink: 0;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .memory-card__category {
             padding: 0.1rem 0.3rem;
@@ -801,7 +801,7 @@ interface SyncStatus {
             color: var(--text-secondary);
             word-break: break-all;
         }
-        .detail-value--mono { font-family: monospace; font-size: 0.65rem; }
+        .detail-value--mono { font-family: var(--font-mono); font-size: 0.65rem; }
         .detail-value--txid { color: var(--accent-green); }
         .detail-value--asa { color: var(--accent-cyan); }
         [data-storage="arc69"] { color: var(--accent-green); }
@@ -904,7 +904,7 @@ interface SyncStatus {
             font-size: 0.6rem;
             color: var(--text-tertiary);
             flex-shrink: 0;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .obs-card__status {
             font-size: 0.6rem;

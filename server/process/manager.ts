@@ -14,7 +14,7 @@ import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
-import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession, updateSessionSummary } from '../db/sessions';
 import { saveMemory } from '../db/agent-memories';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
@@ -46,6 +46,10 @@ const log = createLogger('ProcessManager');
 // system messages, and safety buffers. Revisit if model context windows change.
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
+
+// Circuit breaker: if the last N completions in a row were zero-turn,
+// refuse to resume — the session is in a death loop.
+const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
 
 /** Result of a provider routing decision — exported for testing. */
 export interface RoutingDecision {
@@ -711,6 +715,81 @@ export class ProcessManager {
             }
         }
 
+        // Circuit breaker: detect zero-turn death loops.
+        // If the last N completions were all zero-turn, the session context is likely
+        // too bloated to make progress. Refuse to resume and emit an error.
+        const recentMessages = getSessionMessages(this.db, session.id);
+        const recentSystemMsgs = recentMessages
+            .filter((m) => m.role === 'system' && /Session (completed|exited).*Turns: 0/.test(m.content))
+            .slice(-ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD);
+        if (recentSystemMsgs.length >= ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD) {
+            // Check that the last N system messages are ALL zero-turn completions
+            // (no successful completions in between)
+            const allSystemMsgs = recentMessages.filter((m) => m.role === 'system' && /Session (completed|exited)/.test(m.content));
+            const lastN = allSystemMsgs.slice(-ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD);
+            const allZeroTurn = lastN.every((m) => /Turns: 0/.test(m.content));
+            if (allZeroTurn) {
+                log.warn('Zero-turn death loop detected — resetting session context', {
+                    sessionId: session.id,
+                    consecutiveZeroTurns: lastN.length,
+                });
+
+                // Generate a conversation summary before clearing messages
+                try {
+                    const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
+                    const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
+                    const summary = summarizeConversation(recentMessages, projectContext);
+                    updateSessionSummary(this.db, session.id, summary);
+                    // Store in meta so buildResumePrompt can inject it
+                    const existingMeta = this.sessionMeta.get(session.id);
+                    if (existingMeta) {
+                        existingMeta.contextSummary = summary;
+                        existingMeta.turnCount = 0;
+                    } else {
+                        this.sessionMeta.set(session.id, {
+                            startedAt: Date.now(),
+                            source: session.source ?? 'unknown',
+                            restartCount: 0,
+                            lastKnownCostUsd: 0,
+                            turnCount: 0,
+                            lastActivityAt: Date.now(),
+                            contextSummary: summary,
+                        });
+                    }
+                    log.info(`Generated context summary before death-loop reset (${summary.length} chars)`);
+                } catch (err) {
+                    log.warn('Failed to generate summary for death-loop reset', { error: err });
+                }
+
+                // Purge session messages to break the death loop — the summary preserves context
+                this.db.query('DELETE FROM session_messages WHERE session_id = ?').run(session.id);
+                updateSessionStatus(this.db, session.id, 'idle');
+
+                // Clean up stale process state
+                const existingProcess = this.processes.get(session.id);
+                if (existingProcess) {
+                    existingProcess.kill();
+                    this.processes.delete(session.id);
+                }
+                updateSessionPid(this.db, session.id, null);
+                this.timerManager.cleanupSession(session.id);
+                this.approvalManager.cancelSession(session.id);
+
+                this.eventBus.emit(session.id, {
+                    type: 'session_error',
+                    session_id: session.id,
+                    error: {
+                        message: 'Session context was bloated — restarting with fresh context.',
+                        errorType: 'context_exhausted',
+                        severity: 'info',
+                        recoverable: true,
+                    },
+                } as ClaudeStreamEvent);
+
+                // Fall through to start a fresh process with clean context
+            }
+        }
+
         const project = session.projectId ? getProject(this.db, session.projectId) : null;
         const defaultProject = {
             id: 'general',
@@ -1367,6 +1446,10 @@ export class ProcessManager {
             this.saveSessionSummaryToMemory(sessionId);
         }
 
+        // Always persist conversation summary to session record (even on crash)
+        // so resumed sessions can pick up context from the previous conversation
+        this.persistConversationSummary(sessionId);
+
         if (code !== 0) {
             const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
             this.eventBus.emit(sessionId, {
@@ -1452,6 +1535,30 @@ export class ProcessManager {
             log.info('Session summary saved to memory', { sessionId, key });
         } catch (err) {
             log.warn('Failed to save session summary to memory', {
+                sessionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    /**
+     * Persist a conversation summary to the session record so that when a new
+     * session is created in the same thread, it can carry over context.
+     * Runs on every exit (including crashes) — fire-and-forget.
+     */
+    private persistConversationSummary(sessionId: string): void {
+        try {
+            const messages = getSessionMessages(this.db, sessionId);
+            const conversational = messages.filter(m => m.role === 'user' || m.role === 'assistant');
+            if (conversational.length === 0) return;
+
+            const summary = summarizeConversation(
+                conversational.map(m => ({ role: m.role, content: m.content })),
+            );
+            updateSessionSummary(this.db, sessionId, summary);
+            log.debug('Persisted conversation summary to session', { sessionId });
+        } catch (err) {
+            log.warn('Failed to persist conversation summary', {
                 sessionId,
                 error: err instanceof Error ? err.message : String(err),
             });

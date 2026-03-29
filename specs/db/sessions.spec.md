@@ -35,6 +35,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionStatus` | `(db: Database, id: string, status: string)` | `void` | Set session status (idle, running, stopped, error, paused) |
 | `updateSessionCost` | `(db: Database, id: string, costUsd: number, turns: number)` | `void` | Update cumulative cost and turn count |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
+| `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for cross-session context carry-over |
+| `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session |
 | `deleteSession` | `(db: Database, id: string)` | `boolean` | Delete session and cascade: delete messages, unlink conversations. Returns false if not found |
 | `getSessionMessages` | `(db: Database, sessionId: string)` | `SessionMessage[]` | Get all messages for a session, ordered by `timestamp ASC` |
 | `addSessionMessage` | `(db: Database, sessionId: string, role: string, content: string, costUsd?: number)` | `SessionMessage` | Append a message to a session |
@@ -133,6 +135,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
 | council_role | TEXT | nullable | chairman/member/synthesizer |
 | work_dir | TEXT | nullable | Override working directory (e.g. git worktree) |
+| conversation_summary | TEXT | DEFAULT NULL | Conversation summary for cross-session context carry-over |
 | credits_consumed | INTEGER | DEFAULT 0 | Credits consumed by this session |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |

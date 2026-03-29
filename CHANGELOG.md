@@ -2,6 +2,72 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.58.0] - 2026-03-29
+
+### Added
+- **Book reader overlay** — library book reader with Phase 3 UI polish (#1661)
+- **Discord channel affinity** — warning for cross-channel corvid_send_message (#1657)
+- **Dashboard modernize** — grid layout, sparklines, glassmorphism effects (#1652)
+- **Chat polish** — syntax highlighting, markdown rendering, cursor fallback, project context (#1653)
+- **UI Phase 1 & 2 polish** — animations, micro-interactions, visual depth, stagger effects (#1647, #1649)
+- **3D enhanced visuals** — twinkling stars, hex grid, nebula clouds (#1643)
+- **Cursor fallback chain** — added cursor to DEFAULT_FALLBACK_CHAINS (#1640)
+- **Cursor concurrency** — renamed CURSOR_MAX_PARALLEL → CURSOR_MAX_CONCURRENT, default 2→4, added getSlotStatus() (#1634)
+
+### Fixed
+- **N+1 query** — replaced per-book SELECT COUNT(*) loop with single GROUP BY batch in listLibraryEntriesGrouped (#1670)
+- **WCAG AA contrast** — --text-tertiary bumped from #6f6c87 (3.3:1) to #8985a3 (4.6:1) (#1670)
+- **Junk files** — untracked .discord-last-connect, deleted empty playwright preflight, updated .gitignore (#1670)
+- **ThreadSessionManager refactor** — extract ThreadSessionManager + unit tests, fix CI (#1662, #1669)
+- **Discord zombie intervals** — stop progress intervals when session dies (#1660)
+- **Discord message dedup** — persist dedup + zero-turn death loop breaker (#1645)
+- **CORS secure defaults** — fail startup when CORS allows all origins in remote mode (#1650, #1658)
+- **SDK project pin** — pin active project in system prompt to survive context compression (#1648)
+- **E2E audit routes** — fix routes and external MCP test slice size (#1644)
+- **Discord false crash embeds** — prevent false crash embeds when resuming ended sessions
+- **GitHub Pages URLs** — standardize all GitHub Pages URLs to corvid-agent.github.io (#1672)
+
+### Security
+- **CORS origin enforcement** — block wildcard CORS in remote deployments (#1650)
+- **Device auth tenant** — use actual tenant from request context in device auth verify page (#1659)
+
+### Docs & Tests
+- **Library API docs** — Library API documentation and spec coverage (#1656)
+- **WCAG AA audit** — fix contrast and select labels across 13 pages (#1646)
+- **Council smoke tests** — Cursor smoke and failure-injection tests (#1642)
+- **Discord thread refactor** — decompose Discord thread-manager into sub-modules (#1654)
+
+## [0.57.0] - 2026-03-28
+
+### Added
+- **3D library visualization** — Three.js immersive 3D library browser with FPS mouse look, book grouping, and reading mode (#1630, #1636)
+- **3D comms visualization** — persistent trails, message log panel, and pointer lock orbit for agent communication view (#1637)
+- **3D network visualization** — Three.js agent network constellation with dual-mode toggle (#1626, #1591)
+- **CLI doctor command** — `corvid-agent doctor` health check with first-run welcome banner (#1486, #1627)
+- **UI animations & micro-interactions** — dashboard polish with streamlined layout and Discord progress feedback (#1612, #1607)
+- **Work delegation attribution** — agent ID parameter for delegation tracking (#1606)
+- **Library boot-time loader** — pre-load library at startup with librarian permission spec (#1589)
+- **Discord agent personalization** — avatars and icons in embeds (#1592)
+
+### Fixed
+- **Cursor provider: stream idle timeout** — prevent hung sessions with idle timeout detection (#1639)
+- **Client: cursor/pointer capture** — fix book reading freeze, newest-first lists (#1638)
+- **Client: nav/layout** — fix dropdowns, session overflow, layout spacing, library 3D access (#1635, #1633)
+- **Model-aware context budgets** — overflow error recovery for different model sizes (#1629)
+- **Ollama output sanitizer** — strip leaked prompt artifacts (#1609)
+- **Discord rate limiting** — apply rate limiting to slash command interactions (#1593)
+- **Work: agent signature injection** — inject agent signature into work task PR prompt (#1590)
+
+### Security
+- **path-to-regexp ReDoS** — update to patch regex denial-of-service vulnerability (#1602)
+- **CodeQL alerts** — fix TOCTOU race, fd leak, schema consolidation (#1608)
+
+### Docs & Tests
+- **Hero stats accuracy** — update landing page stats (#1622)
+- **Version/routes spec** — fix version mismatch and update routes spec (#1605)
+- **Ollama council smoke tests** — council participation tests (#1594)
+- **Dead-end embed test** — stabilize for CI (#1631)
+
 ## [0.56.0] - 2026-03-27
 
 ### Added

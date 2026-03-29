@@ -1,4 +1,3 @@
-import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildAgentCard } from './a2a/agent-card';
 import {
@@ -529,13 +528,14 @@ const server = Bun.serve<WsData>({
         return instrumentResponse(apiResponse, route);
       }
 
-      // Serve Angular static files (use try/catch to avoid TOCTOU race)
+      // Serve Angular static files (open directly to avoid TOCTOU race)
       {
         const filePath = join(CLIENT_DIST, url.pathname);
         if (!filePath.endsWith('/')) {
           try {
-            const stat = statSync(filePath);
-            if (stat.isFile()) {
+            const file = Bun.file(filePath);
+            // Bun.file() is lazy — .size triggers the actual stat atomically
+            if (file.size > 0) {
               const headers: Record<string, string> = {};
               const basename = url.pathname.split('/').pop() ?? '';
               // Angular outputHashing:"all" produces files like main.abc1234f.js
@@ -546,7 +546,7 @@ const server = Bun.serve<WsData>({
               } else {
                 headers['Cache-Control'] = 'public, max-age=3600';
               }
-              return instrumentResponse(new Response(Bun.file(filePath), { headers }), '/static');
+              return instrumentResponse(new Response(file, { headers }), '/static');
             }
           } catch { /* file not found, fall through */ }
         }
@@ -645,23 +645,29 @@ if (discordBridge) {
   const cooldownFile = join(import.meta.dir, '..', '.discord-last-connect');
   let cooldownMs = 0;
   try {
-    const { readFileSync, openSync, writeFileSync, closeSync } = await import('fs');
-    const { constants: fsC } = await import('fs');
+    const { openSync, readSync, writeSync, ftruncateSync, closeSync, constants: fsC } = await import('node:fs');
+    // Open once with read+write to avoid TOCTOU race between read and write
+    let fd: number | undefined;
     try {
-      const lastConnect = parseInt(readFileSync(cooldownFile, 'utf-8'), 10);
-      const elapsed = Date.now() - lastConnect;
-      if (elapsed < 10_000) {
-        cooldownMs = Math.min(30_000, 10_000 - elapsed + 5_000);
-        log.warn(`Discord connection cooldown: waiting ${cooldownMs}ms (last connect ${elapsed}ms ago)`);
+      fd = openSync(cooldownFile, fsC.O_RDWR | fsC.O_CREAT, 0o600);
+      const buf = Buffer.alloc(32);
+      const bytesRead = readSync(fd, buf, 0, 32, 0);
+      if (bytesRead > 0) {
+        const lastConnect = parseInt(buf.toString('utf-8', 0, bytesRead), 10);
+        const elapsed = Date.now() - lastConnect;
+        if (elapsed < 10_000) {
+          cooldownMs = Math.min(30_000, 10_000 - elapsed + 5_000);
+          log.warn(`Discord connection cooldown: waiting ${cooldownMs}ms (last connect ${elapsed}ms ago)`);
+        }
       }
+      // Truncate and write new timestamp while still holding the fd
+      ftruncateSync(fd);
+      const data = Buffer.from(Date.now().toString());
+      writeSync(fd, data, 0, data.length, 0);
     } catch {
-      /* file doesn't exist yet — no cooldown needed */
-    }
-    const fd = openSync(cooldownFile, fsC.O_WRONLY | fsC.O_CREAT | fsC.O_TRUNC, 0o600);
-    try {
-      writeFileSync(fd, Date.now().toString());
+      /* file doesn't exist yet or other error — no cooldown needed */
     } finally {
-      closeSync(fd);
+      if (fd !== undefined) closeSync(fd);
     }
   } catch {
     /* ignore cooldown file errors */

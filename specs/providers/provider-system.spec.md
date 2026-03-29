@@ -63,7 +63,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 | Constant | Type | Description |
 |----------|------|-------------|
 | `MODEL_PRICING` | `ModelPricing[]` | Full pricing table for all supported models across Anthropic, OpenAI, and Ollama (local + cloud) |
-| `DEFAULT_FALLBACK_CHAINS` | `Record<string, FallbackChain>` | Pre-defined fallback chains: `'high-capability'`, `'balanced'`, `'cost-optimized'`, `'local'`, `'cloud'` |
+| `DEFAULT_FALLBACK_CHAINS` | `Record<string, FallbackChain>` | Pre-defined fallback chains: `'high-capability'`, `'balanced'`, `'cost-optimized'`, `'local'`, `'cloud'`, `'cursor'` |
 | `OLLAMA_DEFAULT_LOCAL_MODEL` | `string` | Default Ollama model for local inference, from `OLLAMA_DEFAULT_MODEL` env var or `'qwen3:14b'` |
 | `CLAUDE_TIER_MODELS` | `Record<ModelTier, string>` | Maps each ModelTier to its canonical Claude model ID (e.g. OPUS → `'claude-opus-4-6'`) |
 
@@ -151,6 +151,11 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 - **When** claude-opus-4-6 throws a rate limit error
 - **Then** the failure is recorded, and the request is retried with claude-sonnet-4-6 (same provider)
 
+### Scenario: Cursor fallback chain degrades from auto to composer-2-fast
+- **Given** the `'cursor'` fallback chain is used and `cursor/auto` times out
+- **When** `completeWithFallback()` tries the next entry
+- **Then** `cursor/composer-2-fast` completes the request and `usedModel` is `'composer-2-fast'`
+
 ### Scenario: All providers in chain fail
 - **Given** a fallback chain where every provider throws an error
 - **When** `completeWithFallback()` exhausts all options
@@ -198,5 +203,6 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-28 | jackdaw | Add `'cursor'` to `DEFAULT_FALLBACK_CHAINS`; add cursor health-tracking test (closes #1530) |
 | 2026-03-27 | rook | Document `OLLAMA_DEFAULT_LOCAL_MODEL` constant (closes #1573) |
 | 2026-03-04 | corvid-agent | Initial spec |

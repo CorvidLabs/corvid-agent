@@ -55,20 +55,22 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
             } @else {
                 <div class="entry-list stagger-children">
                     @for (entry of filtered(); track entry.id) {
-                        <div class="entry-card card-lift" [class.entry-card--expanded]="expandedId() === entry.id"
-                             (click)="toggle(entry.id)">
+                        <div class="entry-card card-lift"
+                             [class.entry-card--book]="!!entry.book"
+                             [class.entry-card--expanded]="expandedId() === entry.id"
+                             (click)="openEntry(entry)">
                             <div class="entry-card__header">
-                                <span class="entry-card__key">{{ entry.key }}</span>
+                                <span class="entry-card__key">{{ getDisplayTitle(entry) }}</span>
                                 <span class="entry-card__category" [attr.data-category]="entry.category">{{ entry.category }}</span>
+                                @if (entry.totalPages && entry.totalPages > 1) {
+                                    <span class="entry-card__pages">{{ entry.totalPages }} pages</span>
+                                }
                             </div>
                             <div class="entry-card__meta">
                                 <span class="entry-card__author">{{ entry.authorName || 'Unknown' }}</span>
                                 <span class="entry-card__time">{{ entry.updatedAt | relativeTime }}</span>
                                 @if (entry.asaId) {
                                     <span class="entry-card__asa">ASA #{{ entry.asaId }}</span>
-                                }
-                                @if (entry.book) {
-                                    <span class="entry-card__book">{{ entry.book }} p.{{ entry.page }}</span>
                                 }
                             </div>
                             @if (entry.tags.length > 0) {
@@ -79,9 +81,24 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
                                 </div>
                             }
                             @if (expandedId() === entry.id) {
-                                <div class="entry-card__content">
-                                    <pre>{{ entry.content }}</pre>
-                                </div>
+                                @if (loadingBook()) {
+                                    <div class="entry-card__content"><p class="loading-text">Loading book...</p></div>
+                                } @else if (bookPages().length > 1) {
+                                    <div class="entry-card__content entry-card__book-reader">
+                                        @for (page of bookPages(); track page.id; let i = $index) {
+                                            @if (i > 0) {
+                                                <div class="page-divider">
+                                                    <span class="page-divider__label">Page {{ i + 1 }}</span>
+                                                </div>
+                                            }
+                                            <pre>{{ page.content }}</pre>
+                                        }
+                                    </div>
+                                } @else {
+                                    <div class="entry-card__content">
+                                        <pre>{{ entry.content }}</pre>
+                                    </div>
+                                }
                             }
                         </div>
                     }
@@ -127,8 +144,13 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__category[data-category="runbook"] { color: var(--accent-red); }
 
         .entry-card__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.25rem; }
-        .entry-card__asa { font-family: monospace; color: var(--accent-green); }
-        .entry-card__book { color: var(--accent-purple, #a78bfa); }
+        .entry-card__asa { font-family: var(--font-mono); color: var(--accent-green); }
+        .entry-card--book { border-left: 3px solid var(--accent-purple, #a78bfa); }
+        .entry-card__pages {
+            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple, #a78bfa);
+            background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2);
+            padding: 1px 8px; border-radius: 10px;
+        }
 
         .entry-card__tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
         .tag {
@@ -142,6 +164,18 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__content pre {
             font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;
             margin: 0; font-family: inherit; line-height: 1.5;
+        }
+        .entry-card__book-reader { max-height: 500px; overflow-y: auto; }
+        .loading-text { color: var(--text-tertiary); font-size: 0.8rem; margin: 0; }
+        .page-divider {
+            display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0;
+        }
+        .page-divider::before, .page-divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+        .page-divider__label {
+            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-tertiary); white-space: nowrap;
         }
 
         @media (max-width: 767px) {
@@ -157,13 +191,18 @@ export class LibraryBrowserComponent implements OnInit {
     protected searchQuery = '';
     protected categoryFilter = '';
     protected readonly expandedId = signal<string | null>(null);
+    protected readonly bookPages = signal<LibraryEntry[]>([]);
+    protected readonly loadingBook = signal(false);
 
     protected readonly filtered = computed(() => {
         let entries = this.libraryService.entries();
         const query = this.searchQuery.toLowerCase();
         if (query) {
             entries = entries.filter(
-                (e) => e.key.toLowerCase().includes(query) || e.content.toLowerCase().includes(query),
+                (e) =>
+                    (e.title ?? '').toLowerCase().includes(query) ||
+                    e.key.toLowerCase().includes(query) ||
+                    e.content.toLowerCase().includes(query),
             );
         }
         return entries;
@@ -183,7 +222,37 @@ export class LibraryBrowserComponent implements OnInit {
         this.refresh();
     }
 
-    protected toggle(id: string): void {
-        this.expandedId.set(this.expandedId() === id ? null : id);
+    protected openEntry(entry: LibraryEntry): void {
+        const isExpanded = this.expandedId() === entry.id;
+        if (isExpanded) {
+            this.expandedId.set(null);
+            this.bookPages.set([]);
+            this.loadingBook.set(false);
+            return;
+        }
+
+        this.expandedId.set(entry.id);
+        this.bookPages.set([]);
+
+        if (entry.book) {
+            this.loadingBook.set(true);
+            this.libraryService.getEntry(entry.key).then((full) => {
+                if (full.pages && full.pages.length > 1) {
+                    this.bookPages.set(full.pages);
+                }
+                this.loadingBook.set(false);
+            }).catch(() => {
+                this.loadingBook.set(false);
+            });
+        }
+    }
+
+    protected getDisplayTitle(entry: LibraryEntry): string {
+        if (entry.title) return entry.title;
+        const raw = entry.book ?? entry.key;
+        return raw
+            .replace(/^(ref|guide|std|dec|rb|runbook|decision|standard|reference)-/i, '')
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
     }
 }

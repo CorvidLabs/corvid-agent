@@ -55,7 +55,7 @@ interface SessionGroup {
                     Failed ({{ countByStatus('error') }})
                 </button>
                 <div class="filter-tabs__spacer"></div>
-                <select class="source-select" [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event">
+                <select class="source-select" [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event" aria-label="Filter by source">
                     <option value="">All Sources</option>
                     <option value="web">Web</option>
                     <option value="algochat">AlgoChat</option>
@@ -174,7 +174,7 @@ interface SessionGroup {
         .session-table__row--running { border-left: 2px solid var(--accent-green); }
         .session-table__name { font-weight: 600; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .session-table__agent { color: var(--text-secondary); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .session-table__cost { color: var(--accent-green); font-family: monospace; }
+        .session-table__cost { color: var(--accent-green); font-family: var(--font-mono); }
         .session-table__source { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; }
         .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
 

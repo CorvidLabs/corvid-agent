@@ -19,6 +19,7 @@ import {
 import { getAgent } from '../../db/agents';
 import { createLogger } from '../../lib/logger';
 import type { LibraryContext } from '../../memory/arc69-library';
+import { buildNotePayload } from '../../memory/arc69-library';
 import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
 
@@ -55,9 +56,91 @@ async function buildLibraryContext(ctx: McpToolContext): Promise<LibraryContext 
   }
 }
 
+/** Maximum ARC-69 note size in bytes. */
+const MAX_NOTE_BYTES = 1024;
+
+/**
+ * Estimate the maximum content length (in chars) that fits in a single ASA note.
+ * We build a test payload with the actual metadata to measure the JSON overhead,
+ * then subtract from the 1024-byte limit with a small safety margin.
+ */
+function estimateMaxContentChars(
+  key: string,
+  agentId: string,
+  agentName: string,
+  category: LibraryCategory,
+  tags: string[],
+  bookMeta?: { book?: string; page?: number; prev?: number; total?: number },
+): number {
+  // Build a payload with empty content to measure overhead
+  const overhead = buildNotePayload(key, agentId, agentName, category, tags, '', bookMeta);
+  // Leave 16 bytes of safety margin for JSON escaping edge cases
+  return Math.max(100, MAX_NOTE_BYTES - overhead.byteLength - 16);
+}
+
+/**
+ * Split content into chunks that fit within the note byte limit.
+ * Splits on paragraph boundaries when possible, falls back to sentence/word boundaries.
+ */
+function splitContentIntoPages(content: string, maxCharsPerPage: number): string[] {
+  if (new TextEncoder().encode(content).byteLength <= maxCharsPerPage) {
+    return [content];
+  }
+
+  const pages: string[] = [];
+  let remaining = content;
+
+  while (remaining.length > 0) {
+    if (new TextEncoder().encode(remaining).byteLength <= maxCharsPerPage) {
+      pages.push(remaining.trim());
+      break;
+    }
+
+    // Find a good split point within the byte limit
+    let splitAt = maxCharsPerPage;
+
+    // Binary search for the right char position that fits in bytes
+    while (new TextEncoder().encode(remaining.slice(0, splitAt)).byteLength > maxCharsPerPage && splitAt > 50) {
+      splitAt = Math.floor(splitAt * 0.9);
+    }
+
+    // Try to split at a paragraph boundary
+    const chunk = remaining.slice(0, splitAt);
+    let breakIdx = chunk.lastIndexOf('\n\n');
+
+    // Fall back to single newline
+    if (breakIdx < splitAt * 0.3) {
+      breakIdx = chunk.lastIndexOf('\n');
+    }
+
+    // Fall back to sentence boundary
+    if (breakIdx < splitAt * 0.3) {
+      breakIdx = chunk.lastIndexOf('. ');
+      if (breakIdx > 0) breakIdx += 1; // Keep the period
+    }
+
+    // Fall back to word boundary
+    if (breakIdx < splitAt * 0.3) {
+      breakIdx = chunk.lastIndexOf(' ');
+    }
+
+    // Last resort: hard split
+    if (breakIdx < splitAt * 0.3) {
+      breakIdx = splitAt;
+    }
+
+    pages.push(remaining.slice(0, breakIdx).trim());
+    remaining = remaining.slice(breakIdx).trim();
+  }
+
+  return pages.filter((p) => p.length > 0);
+}
+
 /**
  * corvid_library_write — Create or update a shared library entry.
  * Saves to SQLite and mints/updates a CRVLIB ASA on localnet.
+ * Automatically splits large content into a multi-page book when it exceeds
+ * the 1024-byte ARC-69 note limit.
  */
 export async function handleLibraryWrite(
   ctx: McpToolContext,
@@ -78,7 +161,7 @@ export async function handleLibraryWrite(
     const agent = getAgent(ctx.db, ctx.agentId);
     const agentName = agent?.name ?? 'unknown';
 
-    // Save to SQLite first
+    // Save full content to SQLite (local cache keeps the complete text)
     saveLibraryEntry(ctx.db, {
       authorId: ctx.agentId,
       authorName: agentName,
@@ -97,39 +180,23 @@ export async function handleLibraryWrite(
     }
 
     try {
-      const existingAsaId = resolveLibraryAsaId(ctx.db, args.key);
+      // Check if content fits in a single ASA
+      const singleNoteSize = buildNotePayload(
+        args.key,
+        ctx.agentId,
+        agentName,
+        category,
+        tags,
+        args.content,
+      ).byteLength;
 
-      if (existingAsaId) {
-        const { readLibraryEntry, updateLibraryEntry } = await import('../../memory/arc69-library');
-        const existing = await readLibraryEntry(libCtx, existingAsaId);
-        if (!existing) {
-          return errorResult(`Library ASA ${existingAsaId} exists but could not be read from chain.`);
-        }
-        const { txid } = await updateLibraryEntry(
-          libCtx,
-          existingAsaId,
-          {
-            key: args.key,
-            content: args.content,
-            category,
-            tags,
-          },
-          existing,
-        );
-        updateLibraryEntryTxid(ctx.db, args.key, txid);
-        return textResult(`Library entry "${args.key}" updated (ASA: ${existingAsaId}).`);
-      } else {
-        const { createLibraryEntry } = await import('../../memory/arc69-library');
-        const { asaId, txid } = await createLibraryEntry(libCtx, {
-          key: args.key,
-          content: args.content,
-          category,
-          tags,
-        });
-        updateLibraryEntryAsaId(ctx.db, args.key, asaId);
-        updateLibraryEntryTxid(ctx.db, args.key, txid);
-        return textResult(`Library entry "${args.key}" published (ASA: ${asaId}).`);
+      if (singleNoteSize <= MAX_NOTE_BYTES) {
+        // Content fits — single entry (existing behavior)
+        return await writeSingleEntry(ctx, libCtx, args.key, args.content, category, tags);
       }
+
+      // Content too large — auto-split into a multi-page book
+      return await writeBook(ctx, libCtx, args.key, args.content, category, tags, agentName);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error('CRVLIB on-chain write failed', { key: args.key, error: message });
@@ -140,6 +207,114 @@ export async function handleLibraryWrite(
     log.error('MCP library_write failed', { error: message });
     return errorResult(`Failed to write library entry: ${message}`);
   }
+}
+
+/**
+ * Write a single-page library entry (content fits in one ASA).
+ */
+async function writeSingleEntry(
+  ctx: McpToolContext,
+  libCtx: LibraryContext,
+  key: string,
+  content: string,
+  category: LibraryCategory,
+  tags: string[],
+): Promise<CallToolResult> {
+  const existingAsaId = resolveLibraryAsaId(ctx.db, key);
+
+  if (existingAsaId) {
+    const { readLibraryEntry, updateLibraryEntry } = await import('../../memory/arc69-library');
+    const existing = await readLibraryEntry(libCtx, existingAsaId);
+    if (!existing) {
+      return errorResult(`Library ASA ${existingAsaId} exists but could not be read from chain.`);
+    }
+    const { txid } = await updateLibraryEntry(libCtx, existingAsaId, { key, content, category, tags }, existing);
+    updateLibraryEntryTxid(ctx.db, key, txid);
+    return textResult(`Library entry "${key}" updated (ASA: ${existingAsaId}).`);
+  }
+
+  const { createLibraryEntry } = await import('../../memory/arc69-library');
+  const { asaId, txid } = await createLibraryEntry(libCtx, { key, content, category, tags });
+  updateLibraryEntryAsaId(ctx.db, key, asaId);
+  updateLibraryEntryTxid(ctx.db, key, txid);
+  return textResult(`Library entry "${key}" published (ASA: ${asaId}).`);
+}
+
+/**
+ * Write a multi-page book — splits content across linked ASAs.
+ */
+async function writeBook(
+  ctx: McpToolContext,
+  libCtx: LibraryContext,
+  bookKey: string,
+  content: string,
+  category: LibraryCategory,
+  tags: string[],
+  agentName: string,
+): Promise<CallToolResult> {
+  const { createLibraryEntry, updateLibraryEntry, readLibraryEntry } = await import('../../memory/arc69-library');
+
+  // Estimate max content per page using page-1 metadata as reference
+  const maxChars = estimateMaxContentChars(`${bookKey}/page-1`, ctx.agentId, agentName, category, tags, {
+    book: bookKey,
+    page: 1,
+    total: 1,
+  });
+
+  const pages = splitContentIntoPages(content, maxChars);
+  const totalPages = pages.length;
+  log.info('Auto-splitting into book', { bookKey, pages: totalPages, maxChars });
+
+  // Create all pages sequentially with prev pointers (we know the ASA IDs as we go)
+  const pageAsaIds: number[] = [];
+
+  for (let i = 0; i < totalPages; i++) {
+    const pageNum = i + 1;
+    const pageKey = `${bookKey}/page-${pageNum}`;
+    const prevAsaId = i > 0 ? pageAsaIds[i - 1] : undefined;
+
+    const { asaId, txid } = await createLibraryEntry(libCtx, {
+      key: pageKey,
+      content: pages[i],
+      category,
+      tags,
+      book: bookKey,
+      page: pageNum,
+      total: totalPages,
+      ...(prevAsaId !== undefined ? { prev: prevAsaId } : {}),
+    });
+
+    pageAsaIds.push(asaId);
+
+    // Save to local DB
+    saveLibraryEntry(ctx.db, {
+      authorId: ctx.agentId,
+      authorName: agentName,
+      key: pageKey,
+      content: pages[i],
+      category,
+      tags,
+      book: bookKey,
+      page: pageNum,
+    });
+    updateLibraryEntryAsaId(ctx.db, pageKey, asaId);
+    updateLibraryEntryTxid(ctx.db, pageKey, txid);
+  }
+
+  // Now wire up `next` pointers on all pages except the last.
+  // We need to read each ASA from chain to get current state for the update.
+  for (let i = 0; i < totalPages - 1; i++) {
+    const existing = await readLibraryEntry(libCtx, pageAsaIds[i]);
+    if (existing) {
+      await updateLibraryEntry(libCtx, pageAsaIds[i], {
+        key: existing.key,
+        next: pageAsaIds[i + 1],
+      }, existing);
+    }
+  }
+
+  const asaList = pageAsaIds.map((id, i) => `page ${i + 1}: ASA ${id}`).join(', ');
+  return textResult(`Library book "${bookKey}" published as ${pages.length} pages (${asaList}).`);
 }
 
 /**

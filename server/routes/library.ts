@@ -1,5 +1,11 @@
 import type { Database } from 'bun:sqlite';
-import { getBookPages, getLibraryEntry, type LibraryCategory, listLibraryEntries } from '../db/agent-library';
+import {
+  getBookPages,
+  getLibraryEntry,
+  type LibraryCategory,
+  listLibraryEntries,
+  listLibraryEntriesGrouped,
+} from '../db/agent-library';
 import { json, safeNumParam } from '../lib/response';
 import type { RequestContext } from '../middleware/guards';
 
@@ -18,6 +24,17 @@ export function handleLibraryRoutes(req: Request, url: URL, db: Database, _conte
 
     if (category && !VALID_CATEGORIES.includes(category)) {
       return json({ error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` }, 400);
+    }
+
+    const grouped = url.searchParams.get('grouped') === 'true';
+    if (grouped) {
+      const entries = listLibraryEntriesGrouped(db, {
+        category: category ?? undefined,
+        tag,
+        book,
+        limit,
+      });
+      return json(entries);
     }
 
     const entries = listLibraryEntries(db, {

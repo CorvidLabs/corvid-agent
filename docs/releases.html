@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.56.0</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.58.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -13,8 +13,8 @@
     --bg-card-hover: rgba(255,255,255,0.06);
     --border: rgba(255,255,255,0.08);
     --text: #e4e4e7;
-    --text-muted: #71717a;
-    --text-dim: #52525b;
+    --text-muted: #a1a1aa;  /* AAA: 7.7:1 on --bg */
+    --text-dim: #9a9aa5;    /* AAA: 7.2:1 on --bg */
     --accent: #a78bfa;
     --accent-glow: rgba(167,139,250,0.15);
     --green: #4ade80;
@@ -23,6 +23,22 @@
     --pink: #f472b6;
     --cyan: #22d3ee;
     --red: #f87171;
+  }
+
+  /* Focus Styles (WCAG AAA) */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Reduced Motion (WCAG AAA) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -450,28 +466,31 @@
 </head>
 <body>
 
+<a href="#main-content" class="skip-nav" style="position:absolute;top:-100%;left:16px;z-index:200;padding:12px 24px;background:var(--bg);color:var(--accent);border:2px solid var(--accent);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;text-decoration:none" onfocus="this.style.top='12px'" onblur="this.style.top='-100%'">Skip to main content</a>
+
+<main id="main-content">
 <div class="container">
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">51 days · 56 releases · 1012 commits</div>
+    <div class="hero-badge">52 days · 58 releases · 1081 commits</div>
     <h1>CorvidAgent<br>Release Retrospective</h1>
     <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
     <div class="hero-version-range">
       <span class="version">v0.1.0</span>
       <span class="arrow">→</span>
-      <span class="version">v0.56.0</span>
+      <span class="version">v0.58.0</span>
     </div>
   </section>
 
   <!-- Stats bar -->
   <section class="stats-bar">
     <div class="stat-card">
-      <div class="stat-number">56</div>
+      <div class="stat-number">58</div>
       <div class="stat-label">Releases</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">1012</div>
+      <div class="stat-number">1081</div>
       <div class="stat-label">Commits</div>
     </div>
     <div class="stat-card">
@@ -929,9 +948,9 @@
         <div class="era-icon">&#x1F680;</div>
         <div>
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
-          <div class="era-date">Mar 21 – Mar 27, 2026</div>
+          <div class="era-date">Mar 21 – Mar 29, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.56.0</div>
+        <div class="era-versions">v0.42.0 – v0.58.0</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -977,6 +996,38 @@
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
           </ul>
         </div>
+        <div class="release-card" style="border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.58.0</span>
+            <span class="release-date">Mar 29</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Book reader overlay</strong> — library book reader with Phase 3 UI polish</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Dashboard modernize</strong> — grid layout, sparklines, glassmorphism</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Chat polish</strong> — syntax highlighting, markdown, cursor fallback</li>
+            <li><span class="tag tag-feat">feat</span> <strong>UI Phase 1 &amp; 2</strong> — animations, micro-interactions, visual depth</li>
+            <li><span class="tag tag-fix">fix</span> <strong>N+1 query</strong> — batch GROUP BY replaces per-book SELECT COUNT(*) loop</li>
+            <li><span class="tag tag-fix">fix</span> WCAG AA contrast, Discord zombies, CORS enforcement, ThreadSessionManager refactor</li>
+            <li><span class="tag tag-fix">fix</span> <strong>Discord false crash embeds</strong> — prevent false crash embeds when resuming ended sessions</li>
+            <li><span class="tag tag-fix">fix</span> <strong>GitHub Pages URLs</strong> — standardize all URLs to corvid-agent.github.io</li>
+            <li><span class="tag tag-security">security</span> CORS wildcard blocked in remote mode, device auth tenant fix</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.57.0</span>
+            <span class="release-date">Mar 28</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>3D library visualization</strong> — immersive Three.js library browser with FPS mouse look and book grouping</li>
+            <li><span class="tag tag-feat">feat</span> <strong>3D comms & network</strong> — persistent trails, message log, agent constellation visualization</li>
+            <li><span class="tag tag-feat">feat</span> <strong>CLI doctor</strong> — health check command with first-run welcome banner</li>
+            <li><span class="tag tag-feat">feat</span> <strong>UI animations</strong> — micro-interactions, streamlined dashboard, Discord progress feedback</li>
+            <li><span class="tag tag-fix">fix</span> <strong>Cursor idle timeout</strong> — prevent hung sessions with stream idle detection</li>
+            <li><span class="tag tag-fix">fix</span> Model-aware context budgets, nav/layout fixes, Ollama output sanitizer</li>
+            <li><span class="tag tag-security">security</span> ReDoS patch (path-to-regexp), CodeQL fixes (TOCTOU, fd leak)</li>
+          </ul>
+        </div>
         <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">
           <div class="release-header">
             <span class="release-version">v0.56.0</span>
@@ -1001,11 +1052,12 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="footer-logo">CorvidAgent</div>
-    <p>Built by <a href="https://github.com/CorvidLabs">CorvidLabs</a> · Feb 6 – Mar 27, 2026</p>
-    <p style="margin-top: 8px;">50 days from zero to a full autonomous AI agent platform.</p>
+    <p>Built by <a href="https://github.com/CorvidLabs">CorvidLabs</a> · Feb 6 – Mar 29, 2026</p>
+    <p style="margin-top: 8px;">51 days from zero to a full autonomous AI agent platform.</p>
   </footer>
 
 </div>
+</main>
 
 </body>
 </html>

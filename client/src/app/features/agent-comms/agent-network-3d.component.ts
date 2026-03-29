@@ -236,7 +236,7 @@ interface LogEntry {
         .network-3d__log-time {
             color: var(--text-tertiary, #555);
             font-size: 0.55rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
         .network-3d__log-flow {
             color: var(--text-secondary, #aaa);
@@ -306,6 +306,10 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private edgeMap = new Map<string, Edge3D>();
     private particles: Particle3D[] = [];
     private starField: THREE.Points | null = null;
+    private starTwinklePhases: Float32Array | null = null;
+    private starBaseOpacities: Float32Array | null = null;
+    private groundGrid: THREE.Group | null = null;
+    private nebulaClouds: THREE.Group | null = null;
     private trails: Trail3D[] = [];
     private static readonly MAX_LOG_ENTRIES = 50;
     private static readonly TRAIL_MAX_AGE = 45; // seconds
@@ -399,6 +403,18 @@ export class AgentNetwork3DComponent implements OnDestroy {
         });
         this.starField?.geometry.dispose();
         (this.starField?.material as THREE.Material)?.dispose();
+        this.groundGrid?.traverse((child) => {
+            if (child instanceof THREE.Line) {
+                child.geometry.dispose();
+                (child.material as THREE.Material).dispose();
+            }
+        });
+        this.nebulaClouds?.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                child.geometry.dispose();
+                (child.material as THREE.Material).dispose();
+            }
+        });
         this.renderer?.dispose();
     }
 
@@ -450,8 +466,10 @@ export class AgentNetwork3DComponent implements OnDestroy {
         fillLight.position.set(-10, -5, 10);
         this.scene.add(fillLight);
 
-        // Starfield
+        // Starfield + visual enhancements
         this.createStarfield();
+        this.createGroundGrid();
+        this.createNebulaClouds();
 
         // Events — use pointer capture instead of pointer lock for orbit dragging
         canvas.style.cursor = 'crosshair';
@@ -494,13 +512,17 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private createStarfield(): void {
-        const starCount = 600;
+        const starCount = 900;
         const positions = new Float32Array(starCount * 3);
         const colors = new Float32Array(starCount * 3);
+        const sizes = new Float32Array(starCount);
+
+        // Store twinkle data for animation
+        this.starTwinklePhases = new Float32Array(starCount);
+        this.starBaseOpacities = new Float32Array(starCount);
 
         for (let i = 0; i < starCount; i++) {
             const i3 = i * 3;
-            // Distribute in a large sphere
             const r = 50 + Math.random() * 50;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -508,28 +530,130 @@ export class AgentNetwork3DComponent implements OnDestroy {
             positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
             positions[i3 + 2] = r * Math.cos(phi);
 
-            // Slight color variation
-            const brightness = 0.3 + Math.random() * 0.7;
-            colors[i3] = brightness * (0.7 + Math.random() * 0.3);
-            colors[i3 + 1] = brightness * (0.7 + Math.random() * 0.3);
-            colors[i3 + 2] = brightness;
+            // Color variation: some stars blue-white, some warm, some cyan
+            const colorType = Math.random();
+            if (colorType < 0.3) {
+                // Cyan-tinted (corvid theme)
+                colors[i3] = 0.4 + Math.random() * 0.3;
+                colors[i3 + 1] = 0.7 + Math.random() * 0.3;
+                colors[i3 + 2] = 0.9 + Math.random() * 0.1;
+            } else if (colorType < 0.5) {
+                // Warm/amber
+                colors[i3] = 0.9 + Math.random() * 0.1;
+                colors[i3 + 1] = 0.6 + Math.random() * 0.2;
+                colors[i3 + 2] = 0.3 + Math.random() * 0.2;
+            } else {
+                // Blue-white
+                const brightness = 0.4 + Math.random() * 0.6;
+                colors[i3] = brightness * (0.8 + Math.random() * 0.2);
+                colors[i3 + 1] = brightness * (0.8 + Math.random() * 0.2);
+                colors[i3 + 2] = brightness;
+            }
+
+            sizes[i] = 0.08 + Math.random() * 0.25;
+            this.starTwinklePhases[i] = Math.random() * Math.PI * 2;
+            this.starBaseOpacities[i] = 0.3 + Math.random() * 0.7;
         }
 
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
         const material = new THREE.PointsMaterial({
-            size: 0.15,
+            size: 0.18,
             vertexColors: true,
             transparent: true,
-            opacity: 0.6,
+            opacity: 0.7,
             sizeAttenuation: true,
             depthWrite: false,
         });
 
         this.starField = new THREE.Points(geometry, material);
         this.scene!.add(this.starField);
+    }
+
+    private createGroundGrid(): void {
+        this.groundGrid = new THREE.Group();
+
+        // Hexagonal grid on XZ plane
+        const gridColor = new THREE.Color(0x0a0a1e);
+        const accentColor = new THREE.Color(0x00e5ff);
+        const hexRadius = 3;
+        const gridExtent = 40;
+        const hexHeight = hexRadius * Math.sqrt(3);
+
+        for (let row = -gridExtent / hexHeight; row <= gridExtent / hexHeight; row++) {
+            for (let col = -gridExtent / (hexRadius * 1.5); col <= gridExtent / (hexRadius * 1.5); col++) {
+                const x = col * hexRadius * 1.5;
+                const z = row * hexHeight + (col % 2 ? hexHeight / 2 : 0);
+                const dist = Math.sqrt(x * x + z * z);
+                if (dist > gridExtent) continue;
+
+                // Hex outline
+                const hexPoints: THREE.Vector3[] = [];
+                for (let k = 0; k <= 6; k++) {
+                    const angle = (Math.PI / 3) * k + Math.PI / 6;
+                    hexPoints.push(new THREE.Vector3(
+                        x + Math.cos(angle) * hexRadius * 0.95,
+                        -8,
+                        z + Math.sin(angle) * hexRadius * 0.95,
+                    ));
+                }
+
+                const hexGeo = new THREE.BufferGeometry().setFromPoints(hexPoints);
+                const fadeOpacity = Math.max(0, 0.12 - dist * 0.002);
+                const isCenter = dist < 8;
+                const hexMat = new THREE.LineBasicMaterial({
+                    color: isCenter ? accentColor : gridColor,
+                    transparent: true,
+                    opacity: isCenter ? fadeOpacity * 2 : fadeOpacity,
+                });
+                this.groundGrid.add(new THREE.Line(hexGeo, hexMat));
+            }
+        }
+
+        this.scene!.add(this.groundGrid);
+    }
+
+    private createNebulaClouds(): void {
+        this.nebulaClouds = new THREE.Group();
+
+        // Procedural nebula using transparent spheres at varying distances
+        const nebulaColors = [
+            { color: 0x1a0030, opacity: 0.03 }, // deep purple
+            { color: 0x001a33, opacity: 0.025 }, // deep blue
+            { color: 0x003322, opacity: 0.02 }, // teal
+            { color: 0x0a0020, opacity: 0.035 }, // violet
+        ];
+
+        for (let i = 0; i < 12; i++) {
+            const config = nebulaColors[i % nebulaColors.length];
+            const size = 15 + Math.random() * 25;
+            const geo = new THREE.SphereGeometry(size, 12, 12);
+            const mat = new THREE.MeshBasicMaterial({
+                color: config.color,
+                transparent: true,
+                opacity: config.opacity,
+                side: THREE.BackSide,
+                depthWrite: false,
+            });
+            const cloud = new THREE.Mesh(geo, mat);
+
+            const r = 40 + Math.random() * 40;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            cloud.position.set(
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.sin(phi) * Math.sin(theta) * 0.5, // flatten vertically
+                r * Math.cos(phi),
+            );
+            cloud.scale.set(1, 0.5 + Math.random() * 0.5, 1); // Flatten clouds
+
+            this.nebulaClouds.add(cloud);
+        }
+
+        this.scene!.add(this.nebulaClouds);
     }
 
     /* ── Graph building ─────────────────────────────────── */
@@ -835,9 +959,36 @@ export class AgentNetwork3DComponent implements OnDestroy {
                 trail.mesh.scale.setScalar(0.5 + remaining * 0.3);
             }
 
-            // Rotate starfield slowly
+            // Rotate starfield slowly + twinkle
             if (this.starField) {
                 this.starField.rotation.y = time * 0.02;
+
+                // Twinkle: modulate per-star color brightness
+                if (this.starTwinklePhases && this.starBaseOpacities) {
+                    const colors = this.starField.geometry.attributes['color'] as THREE.BufferAttribute;
+                    const starCount = this.starTwinklePhases.length;
+                    for (let i = 0; i < starCount; i++) {
+                        const phase = this.starTwinklePhases[i];
+                        const base = this.starBaseOpacities[i];
+                        // Each star twinkles at its own frequency
+                        const twinkle = base * (0.6 + 0.4 * Math.sin(time * (0.8 + phase) + phase * 10));
+                        const i3 = i * 3;
+                        // Modulate brightness while preserving hue
+                        const r = colors.array[i3] as number;
+                        const g = colors.array[i3 + 1] as number;
+                        const b = colors.array[i3 + 2] as number;
+                        const maxC = Math.max(r, g, b, 0.01);
+                        (colors.array as Float32Array)[i3] = (r / maxC) * twinkle;
+                        (colors.array as Float32Array)[i3 + 1] = (g / maxC) * twinkle;
+                        (colors.array as Float32Array)[i3 + 2] = (b / maxC) * twinkle;
+                    }
+                    colors.needsUpdate = true;
+                }
+            }
+
+            // Slowly rotate nebula clouds
+            if (this.nebulaClouds) {
+                this.nebulaClouds.rotation.y = time * 0.005;
             }
 
             // Render

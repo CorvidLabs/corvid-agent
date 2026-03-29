@@ -60,29 +60,31 @@ import type { NotificationType } from '../../core/models/notification.model';
             align-items: flex-start;
             gap: 0.5rem;
             padding: 0.75rem 1rem;
-            border-radius: var(--radius);
+            border-radius: var(--radius-lg);
             border: 1px solid;
             font-size: 0.8rem;
             pointer-events: auto;
-            animation: toast-in 0.3s ease-out;
-            backdrop-filter: blur(8px);
+            animation: toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             position: relative;
             overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         /* Stagger toasts */
         .toast:nth-child(1) { animation-delay: 0ms; }
-        .toast:nth-child(2) { animation-delay: 60ms; }
-        .toast:nth-child(3) { animation-delay: 120ms; }
+        .toast:nth-child(2) { animation-delay: 80ms; }
+        .toast:nth-child(3) { animation-delay: 160ms; }
 
         @keyframes toast-in {
             from {
                 opacity: 0;
-                transform: translateX(1rem);
+                transform: translateX(1.5rem) scale(0.95);
             }
             to {
                 opacity: 1;
-                transform: translateX(0);
+                transform: translateX(0) scale(1);
             }
         }
 

@@ -8,6 +8,7 @@ import type { Database } from 'bun:sqlite';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, DeviceTokenSchema, DeviceAuthorizeSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import type { RequestContext } from '../middleware/guards';
 
 const log = createLogger('AuthFlow');
 
@@ -58,6 +59,7 @@ export function handleAuthFlowRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -79,7 +81,7 @@ export function handleAuthFlowRoutes(
 
     // Verify page (shows user code input)
     if (path === '/api/auth/verify' && method === 'GET') {
-        return handleVerifyPage(url);
+        return handleVerifyPage(url, context?.tenantId ?? 'default');
     }
 
     return null;
@@ -213,11 +215,12 @@ function escapeHtml(str: string): string {
         .replace(/'/g, '&#39;');
 }
 
-function handleVerifyPage(url: URL): Response {
+function handleVerifyPage(url: URL, tenantId: string): Response {
     const rawCode = url.searchParams.get('code') ?? '';
     // Validate: user codes are uppercase alphanumeric only
     const code = /^[A-Z0-9]{0,16}$/.test(rawCode) ? rawCode : '';
     const safeCode = escapeHtml(code);
+    const safeTenantId = JSON.stringify(tenantId);
 
     const html = `<!DOCTYPE html>
 <html><head><title>CorvidAgent - Device Authorization</title>
@@ -242,7 +245,7 @@ async function authorize() {
   const resp = await fetch('/api/auth/device/authorize', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({userCode:code,tenantId:'default',email:'owner@localhost',approve:true})
+    body: JSON.stringify({userCode:code,tenantId:${safeTenantId},email:'owner@localhost',approve:true})
   });
   if (resp.ok) { document.body.innerHTML = '<h1>Authorized!</h1><p>You can close this window.</p>'; }
   else { document.body.innerHTML = '<h1>Error</h1><p>Authorization failed.</p>'; }

@@ -118,7 +118,7 @@ import type { Session } from '../../core/models/session.model';
             border-bottom: none;
         }
         .rail__heading {
-            font-size: 0.6rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-tertiary);

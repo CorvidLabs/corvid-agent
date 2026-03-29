@@ -331,7 +331,7 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // Simulate a tracked thread session
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
+        const tsm = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm;
         createAgent(db, { name: 'TestAgent' });
         createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
 
@@ -345,7 +345,7 @@ describe('DiscordBridge', () => {
             source: 'discord',
         });
 
-        threadSessions.set('300000000000000001', {
+        tsm.threadSessions.set('300000000000000001', {
             sessionId: session.id,
             agentName: 'TestAgent',
             agentModel: 'test-model',
@@ -388,7 +388,7 @@ describe('DiscordBridge thread subscription dedup', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // Set up a tracked thread session
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
+        const tsm = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm;
         const { createSession } = await import('../db/sessions');
         const session = createSession(db, {
             projectId: (await import('../db/projects')).listProjects(db)[0].id,
@@ -398,7 +398,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             source: 'discord',
         });
 
-        threadSessions.set('400000000000000001', {
+        tsm.threadSessions.set('400000000000000001', {
             sessionId: session.id,
             agentName: 'TestAgent',
             agentModel: 'test-model',
@@ -453,8 +453,7 @@ describe('DiscordBridge thread subscription dedup', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const threadCallbacks = (bridge as unknown as { tsm: { threadCallbacks: Map<string, { sessionId: string; callback: unknown }> } }).tsm.threadCallbacks;
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
+        const tsm = (bridge as unknown as { tsm: { threadCallbacks: Map<string, { sessionId: string; callback: unknown }>; threadSessions: Map<string, unknown> } }).tsm;
 
         const { createSession } = await import('../db/sessions');
         const session = createSession(db, {
@@ -465,7 +464,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             source: 'discord',
         });
 
-        threadSessions.set('500000000000000001', {
+        tsm.threadSessions.set('500000000000000001', {
             sessionId: session.id,
             agentName: 'TestAgent',
             agentModel: 'test-model',
@@ -479,7 +478,7 @@ describe('DiscordBridge thread subscription dedup', () => {
 
         try {
             // Before any message, no threadCallbacks entry
-            expect(threadCallbacks.has('500000000000000001')).toBe(false);
+            expect(tsm.threadCallbacks.has('500000000000000001')).toBe(false);
 
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
                 id: '200000000000000020',
@@ -490,8 +489,8 @@ describe('DiscordBridge thread subscription dedup', () => {
             });
 
             // After first message, threadCallbacks should have an entry
-            expect(threadCallbacks.has('500000000000000001')).toBe(true);
-            const firstCallback = threadCallbacks.get('500000000000000001')!.callback;
+            expect(tsm.threadCallbacks.has('500000000000000001')).toBe(true);
+            const firstCallback = tsm.threadCallbacks.get('500000000000000001')!.callback;
 
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
                 id: '200000000000000021',
@@ -502,8 +501,8 @@ describe('DiscordBridge thread subscription dedup', () => {
             });
 
             // After second message, callback should be replaced
-            expect(threadCallbacks.has('500000000000000001')).toBe(true);
-            const secondCallback = threadCallbacks.get('500000000000000001')!.callback;
+            expect(tsm.threadCallbacks.has('500000000000000001')).toBe(true);
+            const secondCallback = tsm.threadCallbacks.get('500000000000000001')!.callback;
             expect(secondCallback).not.toBe(firstCallback);
         } finally {
             globalThis.fetch = originalFetch;
@@ -832,8 +831,8 @@ describe('DiscordBridge mention-reply resume', () => {
             source: 'discord',
         });
 
-        const mentionSessions = (bridge as unknown as { tsm: { mentionSessions: Map<string, import('../discord/message-handler').MentionSessionInfo> } }).tsm.mentionSessions;
-        mentionSessions.set('600000000000000001', {
+        const tsm = (bridge as unknown as { tsm: { mentionSessions: Map<string, import('../discord/message-handler').MentionSessionInfo> } }).tsm;
+        tsm.mentionSessions.set('600000000000000001', {
             sessionId: session.id,
             agentName: 'TestAgent',
             agentModel: 'test-model',
@@ -1188,10 +1187,10 @@ describe('DiscordBridge expired thread session resume', () => {
         createAgent(db, { name: 'ResumeAgent', model: 'test-model' });
         createProject(db, { name: 'ResumeProject', workingDir: '/tmp/test' });
 
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
+        const tsm = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm;
 
         // Set up thread info pointing to a non-existent session ID
-        threadSessions.set('600000000000000001', {
+        tsm.threadSessions.set('600000000000000001', {
             sessionId: 'non-existent-session-id',
             agentName: 'ResumeAgent',
             agentModel: 'test-model',
@@ -1221,7 +1220,7 @@ describe('DiscordBridge expired thread session resume', () => {
             expect(pm.startProcess).toHaveBeenCalled();
 
             // Thread session should be updated with a new session ID
-            const updatedInfo = threadSessions.get('600000000000000001') as { sessionId: string; agentName: string };
+            const updatedInfo = tsm.threadSessions.get('600000000000000001') as { sessionId: string; agentName: string };
             expect(updatedInfo).toBeDefined();
             expect(updatedInfo.sessionId).not.toBe('non-existent-session-id');
             expect(updatedInfo.agentName).toBe('ResumeAgent');
@@ -1243,8 +1242,8 @@ describe('DiscordBridge expired thread session resume', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // No agents or projects created — resume should fail
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
-        threadSessions.set('700000000000000001', {
+        const tsm = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm;
+        tsm.threadSessions.set('700000000000000001', {
             sessionId: 'non-existent-session-id',
             agentName: 'GhostAgent',
             agentModel: 'test-model',
@@ -1278,7 +1277,7 @@ describe('DiscordBridge expired thread session resume', () => {
             expect(pm.startProcess).not.toHaveBeenCalled();
 
             // Thread session should be cleaned up (session expired, resume failed)
-            expect(threadSessions.has('700000000000000001')).toBe(false);
+            expect(tsm.threadSessions.has('700000000000000001')).toBe(false);
 
             // Should have sent a message to the thread channel (dead-end embed)
             const threadMessages = fetchUrls.filter(u =>
@@ -1305,8 +1304,8 @@ describe('DiscordBridge expired thread session resume', () => {
         createAgent(db, { name: 'FallbackAgent', model: 'fallback-model' });
         createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
 
-        const threadSessions = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm.threadSessions;
-        threadSessions.set('800000000000000001', {
+        const tsm = (bridge as unknown as { tsm: { threadSessions: Map<string, unknown> } }).tsm;
+        tsm.threadSessions.set('800000000000000001', {
             sessionId: 'non-existent-session-id',
             agentName: 'DeletedAgent', // This agent doesn't exist
             agentModel: 'old-model',
@@ -1331,7 +1330,7 @@ describe('DiscordBridge expired thread session resume', () => {
             expect(pm.startProcess).toHaveBeenCalled();
 
             // Thread should be updated with FallbackAgent
-            const updatedInfo = threadSessions.get('800000000000000001') as { agentName: string };
+            const updatedInfo = tsm.threadSessions.get('800000000000000001') as { agentName: string };
             expect(updatedInfo).toBeDefined();
             expect(updatedInfo.agentName).toBe('FallbackAgent');
         } finally {

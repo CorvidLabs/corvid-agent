@@ -38,7 +38,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | Type | Description |
 |------|-------------|
 | `AuthConfig` | `{ apiKey: string \| null; allowedOrigins: string[]; bindHost: string }` |
-| `SecurityConfigError` | Error subclass thrown by `validateStartupSecurity` when the configuration is unsafe to run |
+| `SecurityConfigError` | Error subclass thrown by `validateStartupSecurity` when the configuration is unsafe (e.g., wildcard CORS origins in remote mode) |
 
 ## Invariants
 
@@ -50,6 +50,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 6. **WebSocket auth via Bearer or query param**: `checkWsAuth` checks `Authorization: Bearer <key>` header first, then `?key=<key>` query parameter
 7. **CORS origin reflection with Vary**: When `allowedOrigins` is configured, the request origin is reflected if it matches the allowlist; `Vary: Origin` is set when the reflected origin is not `*`
 8. **Disallowed origin**: When `allowedOrigins` is set and the request origin is not in the list, `Access-Control-Allow-Origin` is set to empty string (browser blocks the response)
+9. **CORS secure default on public deployments**: When `allowedOrigins` is empty and `bindHost` is not localhost, cross-origin requests (those with an `Origin` header) receive `Access-Control-Allow-Origin: ''` (browser blocks). Non-browser requests (no `Origin` header) receive `Access-Control-Allow-Origin: *`.
 
 ## Behavioral Examples
 
@@ -94,6 +95,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | Condition | Behavior |
 |-----------|----------|
 | Non-localhost without API_KEY | `process.exit(1)` during startup |
+| Non-localhost with wildcard CORS origins | Throws `SecurityConfigError` during startup |
 | Missing Authorization header | 401 with `WWW-Authenticate: Bearer` |
 | Malformed Authorization header | 401 with `WWW-Authenticate: Bearer` |
 | Invalid API key | 403 with `{ error: "Invalid API key" }` |
@@ -120,7 +122,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 |---------|---------|-------------|
 | `API_KEY` | `null` | API key for authentication. Null disables auth (localhost-only) |
 | `BIND_HOST` | `127.0.0.1` | Server bind address. Non-localhost requires API_KEY |
-| `ALLOWED_ORIGINS` | `""` (allow all) | Comma-separated list of allowed CORS origins |
+| `ALLOWED_ORIGINS` | `""` (block cross-origin on non-localhost) | Comma-separated list of allowed CORS origins. Empty = allow all on localhost, block all cross-origin on public deployments. |
 
 ## Change Log
 
