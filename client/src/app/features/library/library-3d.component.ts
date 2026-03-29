@@ -844,8 +844,6 @@ export class Library3DComponent implements OnDestroy {
                             // BOOKS: thick, tall, bright colored spine — unmistakable
                             const thickness = 0.4 + Math.min(pageCount * 0.12, 1.0);
                             height = 1.8;
-                            const bookGroup = new THREE.Group();
-
                             // Main body (cover)
                             const bodyGeo = new THREE.BoxGeometry(1.2, height, thickness);
                             const bodyMat = new THREE.MeshStandardMaterial({
