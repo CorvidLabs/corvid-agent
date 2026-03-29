@@ -6,7 +6,7 @@ import { formatToolDescription } from './approval-types';
 import { isProtectedPath, extractFilePathsFromInput, BASH_WRITE_OPERATORS } from './protected-paths';
 import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool, type McpSdkServerConfigWithInstance, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { McpServerConfig as DbMcpServerConfig } from '../../shared/types';
-import { getMessagingSafetyPrompt, getResponseRoutingPrompt, getWorktreeIsolationPrompt } from '../providers/ollama/tool-prompt-templates';
+import { getMessagingSafetyPrompt, getResponseRoutingPrompt, getWorktreeIsolationPrompt, getProjectContextPrompt } from '../providers/ollama/tool-prompt-templates';
 import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
 
@@ -275,6 +275,10 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     if (session.workDir) {
         appendParts.push(getWorktreeIsolationPrompt());
     }
+    // Pin the active project in the system prompt so it survives context compression.
+    // Without this, agents can "forget" which repo they're working on after context
+    // fills up and fall back to operating on their home project (issue #1628).
+    appendParts.push(getProjectContextPrompt(project));
 
     if (appendParts.length > 0) {
         const combinedAppend = appendParts.join('\n\n');

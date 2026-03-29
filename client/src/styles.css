@@ -1,4 +1,9 @@
-/* Dogica Pixel — 8×8 pixel font by Roberto Mocci (Public Domain / GPL / OFL) */
+/* ══════════════════════════════════════════════════════════
+   CORVID NEXUS — Design System Fonts
+   ══════════════════════════════════════════════════════════ */
+
+/* Dogica Pixel — 8×8 pixel font by Roberto Mocci (Public Domain / GPL / OFL)
+   Used for: headers, nav labels, status badges, agent names — the brand identity */
 @font-face {
     font-family: 'Dogica Pixel';
     src: url('/assets/fonts/dogicapixel.ttf') format('truetype');
@@ -31,29 +36,54 @@
     font-display: swap;
 }
 
+/* Space Grotesk — geometric sans-serif by Florian Karsten (OFL)
+   Used for: body text, descriptions, form labels — the readable workhorse */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/assets/fonts/SpaceGrotesk-Variable.ttf') format('truetype');
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* JetBrains Mono — monospace by JetBrains (OFL)
+   Used for: code blocks, data readouts, terminal output, addresses */
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/assets/fonts/JetBrainsMono-Variable.ttf') format('truetype');
+    font-weight: 100 800;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
-    /* Backgrounds */
-    --bg-deep: #0a0a12;
-    --bg-base: #0a0a12;
-    --bg-surface: #0f1018;
-    --bg-raised: #161822;
-    --bg-input: #0c0d14;
-    --bg-hover: #1a1c2e;
+    /* ── Font Stacks ── */
+    --font-display: 'Dogica Pixel', 'Dogica', monospace;      /* Headers, nav, badges, brand */
+    --font-body: 'Space Grotesk', 'Inter', system-ui, sans-serif; /* Body text, descriptions */
+    --font-mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace; /* Code, data, addresses */
 
-    /* Borders */
-    --border: #1e2035;
-    --border-bright: #2a2d48;
+    /* ── Backgrounds — warm charcoal with subtle blue undertone ── */
+    --bg-deep: #0c0c14;
+    --bg-base: #0c0c14;
+    --bg-surface: #12131c;
+    --bg-raised: #191b26;
+    --bg-input: #0e0f17;
+    --bg-hover: #1e2030;
 
-    /* Text — all pass WCAG AA (4.5:1) on --bg-deep #0a0a12 */
-    --text-primary: #e0e0ec;
-    --text-secondary: #8b8eaa;
-    --text-tertiary: #6b6e88;
+    /* ── Borders — warmer, less alien ── */
+    --border: #222438;
+    --border-bright: #2e3150;
 
-    /* Accents */
+    /* ── Text — creamier whites, WCAG AA (4.5:1) on --bg-deep #0c0c14 ── */
+    --text-primary: #e8e6f0;
+    --text-secondary: #9490ad;
+    --text-tertiary: #6f6c87;
+
+    /* ── Accents — cyan primary, amber warm secondary, magenta rare highlight ── */
     --accent-cyan: #00e5ff;
     --accent-cyan-dim: rgba(0, 229, 255, 0.15);
     --accent-magenta: #ff00aa;
-    --accent-magenta-dim: rgba(255, 0, 170, 0.15);
+    --accent-magenta-dim: rgba(255, 0, 170, 0.12);
     --accent-green: #00ff88;
     --accent-green-dim: rgba(0, 255, 136, 0.15);
     --accent-red: #ff3355;
@@ -67,7 +97,7 @@
     --accent-gold: #f5a623;
     --accent-gold-dim: rgba(245, 166, 35, 0.15);
 
-    /* Status colors — WCAG AAA on --bg-surface */
+    /* ── Status colors — WCAG AAA on --bg-surface ── */
     --status-running: #5ddb72;
     --status-running-dim: rgba(93, 219, 114, 0.15);
     --status-idle: #a8b2c1;
@@ -79,85 +109,115 @@
     --status-failed: #ff7b72;
     --status-failed-dim: rgba(255, 123, 114, 0.12);
 
-    /* Source colors */
+    /* ── Source colors ── */
     --source-schedule: #c792ea;
     --source-poll: #ffa657;
     --source-manual: #56d4e0;
     --source-work: #79b8ff;
 
-    /* Subtle backgrounds — very low opacity for tinted surfaces */
+    /* ── Subtle backgrounds — very low opacity for tinted surfaces ── */
     --accent-cyan-subtle: rgba(0, 229, 255, 0.06);
     --accent-green-subtle: rgba(0, 255, 136, 0.06);
     --accent-red-subtle: rgba(255, 51, 85, 0.06);
     --accent-amber-subtle: rgba(255, 170, 0, 0.06);
-    --accent-magenta-subtle: rgba(255, 0, 170, 0.06);
+    --accent-magenta-subtle: rgba(255, 0, 170, 0.05);
     --accent-purple-subtle: rgba(167, 139, 250, 0.06);
 
-    /* Semi-transparent borders — for badges, pills, outlined elements */
+    /* ── Semi-transparent borders — for badges, pills, outlined elements ── */
     --accent-cyan-border: rgba(0, 229, 255, 0.25);
     --accent-green-border: rgba(0, 255, 136, 0.25);
     --accent-red-border: rgba(255, 51, 85, 0.25);
     --accent-amber-border: rgba(255, 170, 0, 0.25);
-    --accent-magenta-border: rgba(255, 0, 170, 0.25);
+    --accent-magenta-border: rgba(255, 0, 170, 0.2);
 
-    /* Glow colors — for box-shadow and text-shadow effects */
+    /* ── Glow colors — for box-shadow and text-shadow effects ── */
     --accent-cyan-glow: rgba(0, 229, 255, 0.3);
     --accent-green-glow: rgba(0, 255, 136, 0.3);
     --accent-red-glow: rgba(255, 51, 85, 0.3);
     --accent-amber-glow: rgba(255, 170, 0, 0.3);
-    --accent-magenta-glow: rgba(255, 0, 170, 0.3);
+    --accent-magenta-glow: rgba(255, 0, 170, 0.25);
 
-    /* Glow effects (box-shadow shorthand) */
+    /* ── Glow effects (box-shadow shorthand) ── */
     --glow-cyan: 0 0 8px rgba(0, 229, 255, 0.25);
-    --glow-magenta: 0 0 8px rgba(255, 0, 170, 0.25);
+    --glow-magenta: 0 0 8px rgba(255, 0, 170, 0.2);
     --glow-green: 0 0 8px rgba(0, 255, 136, 0.25);
+    --glow-amber: 0 0 8px rgba(255, 170, 0, 0.25);
 
-    /* Shadows */
-    --shadow-deep: rgba(0, 0, 0, 0.5);
+    /* ── Shadows ── */
+    --shadow-deep: rgba(0, 0, 0, 0.55);
 
     /* Yellow accent (used by some status badges) */
     --accent-yellow: #fbbf24;
 
-    /* Subtle borders — softer than --border for dividers and separators */
-    --border-subtle: rgba(30, 32, 53, 0.6);
-    --border-faint: rgba(30, 32, 53, 0.35);
+    /* ── Subtle borders — softer than --border for dividers and separators ── */
+    --border-subtle: rgba(34, 36, 56, 0.6);
+    --border-faint: rgba(34, 36, 56, 0.35);
 
-    /* Overlays — backdrop for modals, drawers, and popovers */
+    /* ── Terminal — deep-void surface for code/chat panels ── */
+    --terminal-bg: #0e0f18;
+    --terminal-surface: #151722;
+    --terminal-border: var(--border);
+    --terminal-text: var(--text-primary);
+    --terminal-text-dim: var(--text-secondary);
+    --terminal-text-faint: var(--text-tertiary);
+    --terminal-prompt-out: var(--accent-green);
+    --terminal-code: var(--accent-amber);
+    --terminal-cursor: var(--accent-green);
+
+    /* ── Provider colors — for model/provider badges ── */
+    --provider-anthropic: #d4a574;
+    --provider-openai: #74d4a5;
+    --provider-ollama: #a5a5ff;
+    --provider-cursor: var(--accent-amber);
+    --provider-google: #4a90d9;
+
+    /* ── Network colors — for blockchain network indicators ── */
+    --network-testnet: #4a90d9;
+    --network-testnet-dim: rgba(74, 144, 217, 0.15);
+    --network-testnet-glow: rgba(74, 144, 217, 0.2);
+    --network-mainnet: #50e3c2;
+    --network-mainnet-dim: rgba(80, 227, 194, 0.15);
+    --network-mainnet-glow: rgba(80, 227, 194, 0.2);
+
+    /* ── Overlays — backdrop for modals, drawers, and popovers ── */
     --overlay: rgba(0, 0, 0, 0.5);
     --overlay-heavy: rgba(0, 0, 0, 0.75);
+    --overlay-surface: rgba(15, 16, 24, 0.85);  /* Semi-transparent deep surface */
 
-    /* Glassmorphism */
-    --glass-bg: rgba(15, 16, 24, 0.6);
-    --glass-bg-solid: linear-gradient(180deg, rgba(15, 16, 24, 0.95) 0%, rgba(10, 10, 18, 0.98) 100%);
+    /* ── Glassmorphism ── */
+    --glass-bg: rgba(18, 19, 28, 0.65);
+    --glass-bg-solid: linear-gradient(180deg, rgba(18, 19, 28, 0.95) 0%, rgba(12, 12, 20, 0.98) 100%);
     --glass-border: var(--border);
     --glass-blur: 12px;
 
-    /* Gradients */
+    /* ── Gradients ── */
     --gradient-cyan-magenta: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+    --gradient-cyan-amber: linear-gradient(135deg, var(--accent-cyan), var(--accent-amber));
     --gradient-cyan-green: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
     --gradient-surface: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-deep) 100%);
 
-    /* Radius */
+    /* ── Radius ── */
     --radius-sm: 3px;
     --radius: 6px;
     --radius-lg: 10px;
     --radius-xl: 16px;
 
-    /* Typography scale (rem based on 10px root) */
-    --text-2xl: 1.8rem;
+    /* ── Typography scale (rem based, root 16px) ── */
+    --text-3xl: 2.25rem;
+    --text-2xl: 1.75rem;
     --text-xl: 1.35rem;
     --text-lg: 1.1rem;
     --text-base: 1rem;
-    --text-sm: 0.85rem;
+    --text-sm: 0.875rem;
     --text-xs: 0.75rem;
     --text-xxs: 0.65rem;
 
-    /* Transitions */
+    /* ── Transitions ── */
     --transition-fast: 0.1s ease;
     --transition-base: 0.15s ease;
     --transition-slow: 0.25s ease;
 
-    /* Motion — route, skeleton stagger, collapsible (used with transform/opacity) */
+    /* ── Motion — route, skeleton stagger, collapsible (used with transform/opacity) ── */
     --motion-route-ms: 220ms;
     --motion-skeleton-stagger: 40ms;
     --motion-collapse-ms: 320ms;
@@ -172,9 +232,9 @@
 html, body {
     margin: 0;
     padding: 0;
-    font-family: 'Dogica Pixel', 'Dogica', monospace;
-    font-size: 10px;
-    line-height: 1.8;
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
     color: var(--text-primary);
     background: var(--bg-deep);
     -webkit-font-smoothing: antialiased;
@@ -192,14 +252,14 @@ html, body {
     html { scroll-behavior: auto; }
 }
 
-/* Large displays (4K / high-res): bump to 12px for comfort */
+/* Large displays (4K / high-res) */
 @media (min-height: 1200px) and (min-width: 1600px) {
-    html { font-size: 12px; }
+    html { font-size: 18px; }
 }
 
-/* Mobile: ensure readable base */
+/* Mobile: slightly smaller base */
 @media (max-width: 480px) {
-    html { font-size: 10px; }
+    html { font-size: 12px; }
 }
 
 a {
@@ -266,9 +326,15 @@ select:focus-visible {
 
 /* ── Typography utilities ── */
 
+/* Display font — Dogica Pixel for headers, nav, brand elements */
+.font-display {
+    font-family: var(--font-display);
+}
+
+/* Monospace — JetBrains Mono for code, data, addresses */
 .mono {
-    font-family: 'Courier New', 'Consolas', monospace;
-    letter-spacing: 0.02em;
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
 }
 
 .truncate {
@@ -278,6 +344,7 @@ select:focus-visible {
 }
 
 .page-title {
+    font-family: var(--font-display);
     font-size: var(--text-2xl);
     font-weight: 700;
     color: var(--text-primary);
@@ -286,6 +353,7 @@ select:focus-visible {
 }
 
 .section-header {
+    font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text-primary);
@@ -294,6 +362,7 @@ select:focus-visible {
 }
 
 .card-title {
+    font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: 700;
     color: var(--text-primary);
@@ -301,10 +370,11 @@ select:focus-visible {
 }
 
 .caption {
+    font-family: var(--font-display);
     font-size: var(--text-xs);
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
 }
 
 /* ── Shared form styles ── */
@@ -312,18 +382,19 @@ select:focus-visible {
 .form { display: flex; flex-direction: column; gap: 1rem; }
 .form__field { display: flex; flex-direction: column; gap: 0.25rem; }
 .form__label {
-    font-size: var(--text-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
 }
 .form__input {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-bright);
     border-radius: var(--radius);
     font-size: var(--text-sm);
-    font-family: inherit;
+    font-family: var(--font-body);
     background: var(--bg-input);
     color: var(--text-primary);
 }
@@ -357,7 +428,8 @@ select:focus-visible {
     margin: 0;
 }
 .form__legend {
-    font-size: var(--text-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
     font-weight: 700;
     color: var(--text-primary);
     padding: 0 0.5rem;
@@ -375,13 +447,13 @@ select:focus-visible {
 .btn {
     padding: 0.5rem 1rem;
     border-radius: var(--radius);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 600;
     cursor: pointer;
     border: 1px solid;
-    font-family: inherit;
+    font-family: var(--font-display);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     transition:
         background var(--transition-base),
         box-shadow var(--transition-base),
@@ -391,11 +463,13 @@ select:focus-visible {
 .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
 .btn--primary:hover:not(:disabled) {
     background: var(--accent-cyan-dim);
-    box-shadow: var(--glow-cyan);
-    transform: translateY(-1px);
+    box-shadow: var(--glow-cyan), 0 4px 16px rgba(0, 229, 255, 0.1);
+    transform: translateY(-2px);
+    border-color: var(--accent-cyan);
 }
 .btn--primary:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.97);
+    transition-duration: 0.08s;
 }
 .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
@@ -475,6 +549,15 @@ button:active:not(:disabled) {
 @keyframes subtlePulse {
     0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
     50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+}
+
+/* ── Ambient glow — subtle breathing effect for hero/feature cards ── */
+@keyframes ambientGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.04), 0 0 60px rgba(0, 229, 255, 0.02); }
+    50% { box-shadow: 0 0 30px rgba(0, 229, 255, 0.08), 0 0 80px rgba(0, 229, 255, 0.04); }
+}
+.ambient-glow {
+    animation: ambientGlow 4s ease-in-out infinite;
 }
 
 /* ── Staggered entrance animation ── */
@@ -596,6 +679,15 @@ button:active:not(:disabled) {
 
 /* ── Gradient text utility ── */
 .gradient-text {
+    background: var(--gradient-cyan-amber);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 6s ease infinite;
+}
+/* Legacy gradient text — cyan to magenta */
+.gradient-text--cool {
     background: var(--gradient-cyan-magenta);
     background-size: 200% 200%;
     -webkit-background-clip: text;
@@ -979,31 +1071,38 @@ select:focus {
     position: fixed;
     bottom: 2rem;
     right: 2rem;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: var(--bg-raised);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--border-bright);
     color: var(--accent-cyan);
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transform: translateY(12px) scale(0.8);
+    transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
     pointer-events: none;
     z-index: 50;
 }
 .scroll-to-top--visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     pointer-events: auto;
 }
 .scroll-to-top:hover {
-    box-shadow: var(--glow-cyan);
+    box-shadow: var(--glow-cyan), 0 4px 16px rgba(0, 0, 0, 0.3);
     border-color: var(--accent-cyan);
+    transform: translateY(-2px) scale(1.05);
+}
+.scroll-to-top:active {
+    transform: translateY(0) scale(0.95);
+    transition-duration: 0.08s;
 }
 
 /* ── Page skeleton loading ── */
@@ -1350,8 +1449,8 @@ select:focus {
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 0.7rem;
-    font-family: inherit;
+    font-size: var(--text-xxs);
+    font-family: var(--font-display);
     transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-base);
 }
 .filter-pill:hover {

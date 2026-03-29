@@ -19,6 +19,8 @@ export interface LibraryEntry {
     createdAt: string;
     updatedAt: string;
     archived: boolean;
+    /** Total pages when using grouped listing */
+    totalPages?: number;
     /** Populated for multi-page book entries */
     pages?: LibraryEntry[];
 }
@@ -40,11 +42,11 @@ export class LibraryService {
     async load(params: ListLibraryParams = {}): Promise<void> {
         this.loading.set(true);
         try {
-            const queryParts: string[] = [];
+            const queryParts: string[] = ['grouped=true'];
             if (params.category) queryParts.push(`category=${params.category}`);
             if (params.tag) queryParts.push(`tag=${encodeURIComponent(params.tag)}`);
             if (params.limit) queryParts.push(`limit=${params.limit}`);
-            const qs = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+            const qs = `?${queryParts.join('&')}`;
             const items = await firstValueFrom(this.api.get<LibraryEntry[]>(`/library${qs}`));
             this.entries.set(items);
         } finally {

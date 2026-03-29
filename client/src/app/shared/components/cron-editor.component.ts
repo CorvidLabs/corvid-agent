@@ -124,7 +124,7 @@ const PRESETS: CronPreset[] = [
             background: var(--accent-cyan-dim);
         }
         .cron-preset__icon {
-            font-family: monospace;
+            font-family: var(--font-mono);
             font-size: 0.6rem;
             font-weight: 700;
             opacity: 0.7;
@@ -149,7 +149,7 @@ const PRESETS: CronPreset[] = [
             border-radius: var(--radius);
             color: var(--text-primary);
             font-size: 0.85rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
             letter-spacing: 0.08em;
             transition: border-color 0.15s, box-shadow 0.15s;
         }

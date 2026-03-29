@@ -16,6 +16,8 @@ export interface TerminalMessage {
     content: string;
     direction: 'inbound' | 'outbound' | 'status';
     timestamp: Date;
+    /** Optional delivery status shown as a subtle icon after the message. */
+    status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
 export interface ToolEvent {
@@ -38,14 +40,30 @@ interface AutocompleteItem {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="terminal">
-            <div class="terminal__output" #outputEl role="log" aria-label="Chat messages">
-                @for (msg of messages(); track msg.timestamp) {
-                    <div class="terminal__line" [class.terminal__line--inbound]="msg.direction === 'inbound'"
+            <div class="terminal__output" #outputEl role="log" aria-label="Chat messages"
+                 (click)="onOutputClick($event)">
+                @for (msg of messages(); track msg.timestamp; let i = $index) {
+                    @if (shouldShowDateSeparator(i)) {
+                        <div class="terminal__date-sep" role="separator" aria-hidden="true">
+                            <span>{{ formatDate(msg.timestamp) }}</span>
+                        </div>
+                    }
+                    <div class="terminal__line"
+                         [class.terminal__line--inbound]="msg.direction === 'inbound'"
                          [class.terminal__line--outbound]="msg.direction === 'outbound'"
                          [class.terminal__line--status]="msg.direction === 'status'">
-                        <span class="terminal__prompt">{{ msg.direction === 'inbound' ? '> ' : msg.direction === 'status' ? '... ' : 'assistant> ' }}</span>
+                        <span class="terminal__prompt">{{ promptFor(msg.direction) }}</span>
                         <span class="terminal__text" [innerHTML]="renderMarkdown(msg.content)"></span>
-                        <button class="terminal__copy" (click)="copyMessage(msg.content)" aria-label="Copy message">cp</button>
+                        <span class="terminal__line-actions">
+                            @if (msg.status) {
+                                <span class="terminal__status"
+                                      [attr.data-status]="msg.status"
+                                      [title]="msg.status">{{ statusIcon(msg.status) }}</span>
+                            }
+                            <button class="terminal__copy"
+                                    (click)="copyMessage(msg.content)"
+                                    aria-label="Copy message">cp</button>
+                        </span>
                     </div>
                 }
                 @for (tool of toolEvents(); track tool.timestamp) {
@@ -64,8 +82,10 @@ interface AutocompleteItem {
                     </div>
                 }
                 @if (thinking()) {
-                    <div class="terminal__thinking" aria-label="Agent is thinking">
-                        <span class="terminal__thinking-dot"></span>
+                    <div class="terminal__thinking" aria-live="polite">
+                        <span class="terminal__typing-dot"></span>
+                        <span class="terminal__typing-dot"></span>
+                        <span class="terminal__typing-dot"></span>
                         <span>thinking...</span>
                     </div>
                 }
@@ -126,11 +146,11 @@ interface AutocompleteItem {
         .terminal {
             display: flex;
             flex-direction: column;
-            border: 1px solid var(--border);
+            border: 1px solid var(--terminal-border);
             border-radius: var(--radius-lg);
-            background: #0d1117;
-            font-family: 'Dogica Pixel', 'Dogica', monospace;
-            font-size: 0.8rem;
+            background: var(--terminal-bg);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
             line-height: 1.6;
             overflow: hidden;
             flex: 1;
@@ -144,88 +164,230 @@ interface AutocompleteItem {
             scrollbar-width: thin;
             scrollbar-color: var(--border) transparent;
         }
+
+        /* ── Date separator ─────────────────────────────── */
+        .terminal__date-sep {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.75rem 0 0.5rem;
+            color: #484f58;
+            font-size: 0.65rem;
+        }
+        .terminal__date-sep::before,
+        .terminal__date-sep::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #21262d;
+        }
+
+        /* ── Message lines ──────────────────────────────── */
         .terminal__line {
             margin-bottom: 0.5rem;
             word-break: break-word;
             white-space: pre-wrap;
             position: relative;
-            padding-right: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 0;
+            animation: msg-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
+        @keyframes msg-enter {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .terminal__line--inbound .terminal__prompt { color: var(--accent-cyan); }
-        .terminal__line--outbound .terminal__prompt { color: #7ee787; }
-        .terminal__line--status .terminal__prompt { color: var(--accent-amber, #ffaa00); }
+        .terminal__line--outbound .terminal__prompt { color: var(--terminal-prompt-out); }
+        .terminal__line--status .terminal__prompt { color: var(--accent-amber); }
         .terminal__line--status { opacity: 0.7; font-style: italic; }
         .terminal__line--streaming { opacity: 0.9; }
-        .terminal__prompt { font-weight: 700; user-select: none; }
-        .terminal__text { color: #c9d1d9; }
+        .terminal__prompt { font-weight: 700; user-select: none; flex-shrink: 0; }
+        .terminal__text {
+            color: var(--terminal-text);
+            flex: 1;
+            min-width: 0;
+        }
         .terminal__text :global(code) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.78rem;
-            color: #f0883e;
+            color: var(--terminal-code);
         }
         .terminal__text :global(pre) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 0.75rem;
             border-radius: var(--radius);
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
             overflow-x: auto;
             margin: 0.5rem 0;
+            white-space: pre;
         }
         .terminal__text :global(pre code) {
             background: none;
             padding: 0;
-            color: #c9d1d9;
+            color: var(--terminal-text);
         }
-        .terminal__text :global(strong) { color: #f0f6fc; font-weight: 600; }
+        .terminal__text :global(strong) { color: var(--text-primary); font-weight: 600; }
+        .terminal__text :global(em) { color: var(--text-secondary); font-style: italic; }
+        .terminal__text :global(h1),
+        .terminal__text :global(h2),
+        .terminal__text :global(h3) {
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin: 0.5rem 0 0.25rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.2rem;
+        }
+        .terminal__text :global(ul),
+        .terminal__text :global(ol) {
+            padding-left: 1.25rem;
+            margin: 0.25rem 0;
+        }
+        .terminal__text :global(li) { margin: 0.1rem 0; }
+        .terminal__text :global(blockquote) {
+            border-left: 3px solid var(--border-bright);
+            padding-left: 0.75rem;
+            color: var(--text-secondary);
+            margin: 0.25rem 0;
+        }
+        .terminal__text :global(hr) {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 0.5rem 0;
+        }
+        .terminal__text :global(a) {
+            color: var(--accent-cyan);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        /* ── Code blocks with syntax highlight + copy btn ─ */
+        .terminal__text :global(.code-block) {
+            margin: 0.5rem 0;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .terminal__text :global(.code-block__bar) {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-deep);
+            padding: 0.3rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .terminal__text :global(.code-block__lang) {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            text-transform: lowercase;
+        }
         .terminal__copy {
             position: absolute;
             top: 0;
             right: 0;
             background: transparent;
+            border: 1px solid var(--border);
+            color: var(--terminal-text-faint);
+            font-family: inherit;
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: color 0.1s, border-color 0.1s;
+            min-height: 24px;
+        }
+        .terminal__text :global(.code-block__copy-btn:hover) {
+            color: #c9d1d9;
+            border-color: #484f58;
+        }
+        .terminal__text :global(.code-block pre) {
+            background: #0d1117;
+            padding: 0.75rem;
+            margin: 0;
+            border-radius: 0;
+            border: none;
+            overflow-x: auto;
+        }
+        .terminal__text :global(.code-block pre code) {
+            background: none;
+            padding: 0;
+            font-size: 0.75rem;
+        }
+
+        /* ── Syntax highlight tokens (GitHub dark palette) ─ */
+        .terminal__text :global(.hl-cmt) { color: #8b949e; font-style: italic; }
+        .terminal__text :global(.hl-str) { color: #a5d6ff; }
+        .terminal__text :global(.hl-kw)  { color: #ff7b72; }
+        .terminal__text :global(.hl-num) { color: #79c0ff; }
+        .terminal__text :global(.hl-fn)  { color: #d2a8ff; }
+        .terminal__text :global(.hl-prop){ color: #7ee787; }
+
+        /* ── Message actions (status + copy) ────────────── */
+        .terminal__line-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex-shrink: 0;
+            margin-left: 0.25rem;
+        }
+        .terminal__status {
+            font-size: 0.6rem;
+            color: #484f58;
+            user-select: none;
+        }
+        .terminal__status[data-status="read"] { color: var(--accent-cyan, #00e5ff); }
+        .terminal__status[data-status="delivered"] { color: #7ee787; }
+        .terminal__status[data-status="sent"] { color: #8b949e; }
+        .terminal__copy {
+            background: transparent;
             border: 1px solid #30363d;
             color: #484f58;
             font-family: inherit;
             font-size: 0.65rem;
-            padding: 4px 8px;
-            min-width: 44px;
-            min-height: 44px;
-            display: flex;
+            padding: 2px 6px;
+            min-width: 32px;
+            min-height: 26px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
             transition: opacity 0.15s;
         }
-        /* Hover devices: hidden until line hover (existing behavior) */
+        /* Hover devices: hidden until line hover */
         @media (hover: hover) {
             .terminal__copy { opacity: 0; }
             .terminal__line:hover .terminal__copy { opacity: 1; }
-            .terminal__copy:hover { color: #c9d1d9; border-color: #484f58; }
+            .terminal__copy:hover { color: var(--terminal-text); border-color: var(--terminal-text-faint); }
         }
-        /* Touch devices: always subtly visible, full opacity on tap */
+        /* Touch devices: always subtly visible */
         @media (hover: none) {
             .terminal__copy { opacity: 0.4; }
             .terminal__copy:active { opacity: 1; }
         }
-        /* Mobile: reduce padding, improve touch input area */
+        /* Mobile */
         @media (max-width: 480px) {
             .terminal__output { padding: 0.5rem; }
             .terminal__input-area { padding: 0.5rem 0.75rem; }
-            .terminal__line { padding-right: 0; }
-            .terminal__copy {
-                position: static;
-                margin-top: 0.25rem;
-                min-width: 44px;
-                min-height: 44px;
-            }
         }
+
+        /* ── Blinking cursor ────────────────────────────── */
         .terminal__cursor {
             display: inline-block;
             width: 7px;
             height: 1em;
-            background: #7ee787;
+            background: var(--terminal-cursor);
             animation: blink 1s step-end infinite;
             vertical-align: text-bottom;
             margin-left: 1px;
@@ -233,64 +395,76 @@ interface AutocompleteItem {
         @keyframes blink {
             50% { opacity: 0; }
         }
+
+        /* ── Tool events ────────────────────────────────── */
         .terminal__tool {
             margin: 0.25rem 0;
-            color: #8b949e;
+            color: var(--terminal-text-dim);
         }
         .terminal__tool-name {
             cursor: pointer;
             font-size: 0.75rem;
-            color: #f0883e;
+            color: var(--terminal-code);
             user-select: none;
         }
-        .terminal__tool-name:hover { color: #f0f6fc; }
+        .terminal__tool-name:hover { color: var(--text-primary); }
         .terminal__tool-input {
-            background: #161b22;
-            border: 1px solid #30363d;
+            background: var(--terminal-surface);
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 0.5rem;
             font-size: 0.75rem;
-            color: #8b949e;
+            color: var(--terminal-text-dim);
             overflow-x: auto;
             margin: 0.25rem 0 0;
         }
+
+        /* ── Typing indicator (3 bouncing dots) ─────────── */
         .terminal__thinking {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: #8b949e;
+            color: var(--terminal-text-dim);
             font-size: 0.75rem;
             padding: 0.25rem 0;
+            margin-bottom: 0.5rem;
         }
-        .terminal__thinking-dot {
+        .terminal__typing-dot {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #f0883e;
-            animation: pulse 1.5s ease-in-out infinite;
+            background: var(--terminal-code);
+            animation: typing-bounce 1.2s ease-in-out infinite;
+            flex-shrink: 0;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.3; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
+        .terminal__typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .terminal__typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+            30% { transform: translateY(-5px); opacity: 1; }
         }
+
+        /* ── Empty state ────────────────────────────────── */
         .terminal__empty {
-            color: #484f58;
+            color: var(--terminal-text-faint);
             margin: 0;
             font-style: italic;
         }
         .terminal__empty :global(code) {
-            background: #161b22;
+            background: var(--terminal-surface);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.78rem;
-            color: #f0883e;
+            color: var(--terminal-code);
         }
+
+        /* ── Input area ─────────────────────────────────── */
         .terminal__input-area {
             display: flex;
             align-items: flex-start;
-            border-top: 1px solid #30363d;
+            border-top: 1px solid var(--border);
             padding: 0.75rem 1rem;
-            background: #0d1117;
+            background: var(--terminal-bg);
         }
         .terminal__input-prompt {
             color: var(--accent-cyan);
@@ -306,7 +480,7 @@ interface AutocompleteItem {
             width: 100%;
             background: transparent;
             border: none;
-            color: #c9d1d9;
+            color: var(--terminal-text);
             font-family: inherit;
             font-size: inherit;
             line-height: inherit;
@@ -315,12 +489,12 @@ interface AutocompleteItem {
             padding: 0 0 0 0.25rem;
             min-height: 1.6em;
         }
-        .terminal__input::placeholder { color: #484f58; }
+        .terminal__input::placeholder { color: var(--terminal-text-faint); }
         .terminal__input:disabled { opacity: 0.3; }
         .terminal__help-btn {
             background: transparent;
-            border: 1px solid #30363d;
-            color: #484f58;
+            border: 1px solid var(--border);
+            color: var(--terminal-text-faint);
             font-family: inherit;
             font-size: 0.75rem;
             font-weight: 700;
@@ -341,7 +515,7 @@ interface AutocompleteItem {
             border-color: var(--accent-cyan);
         }
 
-        /* Autocomplete overlay */
+        /* ── Autocomplete overlay ───────────────────────── */
         .autocomplete {
             position: absolute;
             bottom: 100%;
@@ -349,14 +523,21 @@ interface AutocompleteItem {
             right: 0;
             max-height: 220px;
             overflow-y: auto;
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: var(--radius, 6px);
-            box-shadow: 0 4px 16px var(--shadow-deep);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(0,229,255,0.05);
             z-index: 10;
             margin-bottom: 4px;
             scrollbar-width: thin;
-            scrollbar-color: #30363d transparent;
+            scrollbar-color: var(--border) transparent;
+            animation: acEnter 0.15s ease-out;
+        }
+        @keyframes acEnter {
+            from { opacity: 0; transform: translateY(4px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .autocomplete__item {
             display: flex;
@@ -368,29 +549,37 @@ interface AutocompleteItem {
         }
         .autocomplete__item:hover,
         .autocomplete__item--active {
-            background: #1c2128;
+            background: var(--bg-hover);
         }
         .autocomplete__item--active {
-            border-left: 2px solid var(--accent-cyan, #00e5ff);
+            border-left: 2px solid var(--accent-cyan);
+            background: var(--accent-cyan-subtle);
         }
         .autocomplete__label {
-            color: #f0f6fc;
+            color: var(--text-primary);
             font-weight: 600;
             font-size: 0.78rem;
             white-space: nowrap;
         }
         .autocomplete__item[data-kind="command"] .autocomplete__label {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
         }
         .autocomplete__item[data-kind="agent"] .autocomplete__label {
-            color: var(--accent-magenta, #ff00aa);
+            color: var(--accent-magenta);
         }
         .autocomplete__desc {
-            color: #8b949e;
+            color: var(--terminal-text-dim);
             font-size: 0.7rem;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        /* ── Reduced motion ─────────────────────────────── */
+        @media (prefers-reduced-motion: reduce) {
+            .terminal__line { animation: none; }
+            .terminal__typing-dot { animation: none; opacity: 0.8; }
+            .terminal__cursor { animation: none; }
         }
     `,
 })
@@ -441,6 +630,69 @@ export class TerminalChatComponent implements AfterViewChecked {
             const el = this.outputEl.nativeElement;
             el.scrollTop = el.scrollHeight;
             this.shouldScroll = false;
+        }
+    }
+
+    protected promptFor(direction: 'inbound' | 'outbound' | 'status'): string {
+        if (direction === 'inbound') return '> ';
+        if (direction === 'status') return '... ';
+        return 'assistant> ';
+    }
+
+    protected statusIcon(status: string): string {
+        switch (status) {
+            case 'sending':
+                return '○';
+            case 'sent':
+                return '✓';
+            case 'delivered':
+                return '✓✓';
+            case 'read':
+                return '✓✓';
+            default:
+                return '';
+        }
+    }
+
+    /** Returns true when a date separator should appear above message at [index]. */
+    protected shouldShowDateSeparator(index: number): boolean {
+        if (index === 0) return false;
+        const msgs = this.messages();
+        const curr = msgs[index];
+        const prev = msgs[index - 1];
+        if (!curr || !prev) return false;
+        return !isSameDay(curr.timestamp, prev.timestamp);
+    }
+
+    protected formatDate(date: Date): string {
+        const now = new Date();
+        if (isSameDay(date, now)) return 'Today';
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (isSameDay(date, yesterday)) return 'Yesterday';
+        return date.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    }
+
+    /** Event delegation handler for copy buttons inside code blocks. */
+    protected onOutputClick(event: MouseEvent): void {
+        const target = event.target as HTMLElement;
+        const btn = target.closest('[data-copy-code]') as HTMLElement | null;
+        if (!btn) return;
+        const encoded = btn.getAttribute('data-copy-code');
+        if (!encoded) return;
+        try {
+            const code = decodeURIComponent(atob(encoded));
+            navigator.clipboard.writeText(code);
+            btn.textContent = 'copied!';
+            setTimeout(() => {
+                if (btn.isConnected) btn.textContent = 'copy';
+            }, 1500);
+        } catch {
+            // clipboard or decode failure — ignore
         }
     }
 
@@ -600,7 +852,9 @@ export class TerminalChatComponent implements AfterViewChecked {
         // Defer to next frame so the DOM reflects the new active state
         requestAnimationFrame(() => {
             const container = this.inputEl?.nativeElement.parentElement?.querySelector('.autocomplete');
-            const active = container?.querySelectorAll('.autocomplete__item')[index] as HTMLElement | undefined;
+            const active = container?.querySelectorAll('.autocomplete__item')[index] as
+                | HTMLElement
+                | undefined;
             active?.scrollIntoView({ block: 'nearest' });
         });
     }
@@ -636,30 +890,209 @@ export class TerminalChatComponent implements AfterViewChecked {
     }
 }
 
+// ── Utility ──────────────────────────────────────────────────────────────────
+
+function isSameDay(a: Date, b: Date): boolean {
+    return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+    );
+}
+
+function escHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// ── Syntax highlighter ───────────────────────────────────────────────────────
+
+const JS_KEYWORDS = [
+    'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while',
+    'do', 'break', 'continue', 'switch', 'case', 'default', 'class', 'extends',
+    'new', 'this', 'super', 'import', 'export', 'from', 'as', 'async', 'await',
+    'try', 'catch', 'finally', 'throw', 'typeof', 'instanceof', 'in', 'of',
+    'void', 'delete', 'null', 'undefined', 'true', 'false', 'type', 'interface',
+    'enum', 'implements', 'abstract', 'static', 'readonly', 'override',
+    'public', 'private', 'protected', 'namespace', 'module', 'declare',
+];
+
+const PYTHON_KEYWORDS = [
+    'def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'break',
+    'continue', 'pass', 'import', 'from', 'as', 'try', 'except', 'finally',
+    'raise', 'with', 'yield', 'lambda', 'and', 'or', 'not', 'in', 'is',
+    'None', 'True', 'False', 'async', 'await', 'global', 'nonlocal', 'del',
+];
+
+const BASH_KEYWORDS = [
+    'if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'do', 'done',
+    'case', 'esac', 'function', 'return', 'exit', 'echo', 'export',
+    'local', 'readonly', 'unset', 'shift', 'source', 'alias',
+];
+
+function getKeywordsForLang(lang: string): string[] | null {
+    const l = lang.toLowerCase();
+    if (['js', 'ts', 'javascript', 'typescript', 'jsx', 'tsx', ''].includes(l)) {
+        return JS_KEYWORDS;
+    }
+    if (['python', 'py'].includes(l)) return PYTHON_KEYWORDS;
+    if (['bash', 'sh', 'shell', 'zsh'].includes(l)) return BASH_KEYWORDS;
+    return null;
+}
+
 /**
- * Lightweight markdown renderer for terminal chat.
- * Handles: bold, inline code, code blocks, line breaks.
+ * Tokenizes `code` into spans with CSS classes for syntax highlighting.
+ * Uses a combined regex (alternation) to respect token priority.
+ */
+function highlightCode(code: string, lang: string): string {
+    const l = lang.toLowerCase();
+    const isJsonLike = l === 'json';
+    const hasPyHashComment = ['python', 'py', 'bash', 'sh', 'shell', 'zsh', 'yaml', 'yml', 'toml', 'ini'].includes(l);
+    const keywords = getKeywordsForLang(l);
+
+    // Patterns in priority order: earlier = higher priority
+    const patterns: Array<[string, RegExp]> = [];
+
+    // Block comment (C-style)
+    if (!hasPyHashComment) {
+        patterns.push(['cmt', /\/\*[\s\S]*?\*\//]);
+    }
+    // Line comment
+    if (!hasPyHashComment && !isJsonLike) {
+        patterns.push(['cmt', /\/\/[^\n]*/]);
+    }
+    // Hash comment
+    if (hasPyHashComment) {
+        patterns.push(['cmt', /#[^\n]*/]);
+    }
+
+    // Strings (triple-quoted Python first, then regular)
+    patterns.push(['str', /"""[\s\S]*?"""/]);
+    patterns.push(['str', /'''[\s\S]*?'''/]);
+    patterns.push(['str', /"(?:\\.|[^"\\])*"/]);
+    patterns.push(['str', /'(?:\\.|[^'\\])*'/]);
+    patterns.push(['str', /`(?:\\.|[^`\\])*`/]);
+
+    // Keywords
+    if (keywords) {
+        patterns.push(['kw', new RegExp(`\\b(${keywords.join('|')})\\b`)]);
+    }
+
+    // JSON keys
+    if (isJsonLike) {
+        patterns.push(['prop', /"(?:[^"\\]|\\.)*"(?=\s*:)/]);
+    }
+
+    // Numbers (int, float, hex, binary)
+    patterns.push(['num', /\b0[xX][0-9a-fA-F]+\b/]);
+    patterns.push(['num', /\b0[bB][01]+\b/]);
+    patterns.push(['num', /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/]);
+
+    // Build combined regex
+    const combined = new RegExp(
+        patterns.map(([, re]) => `(${re.source})`).join('|'),
+        'gm',
+    );
+
+    const parts: string[] = [];
+    let lastIndex = 0;
+
+    for (const match of code.matchAll(combined)) {
+        const idx = match.index ?? 0;
+        if (idx > lastIndex) {
+            parts.push(escHtml(code.slice(lastIndex, idx)));
+        }
+        const groupIdx = match.slice(1).findIndex((g) => g !== undefined);
+        if (groupIdx >= 0) {
+            const [type] = patterns[groupIdx];
+            parts.push(`<span class="hl-${type}">${escHtml(match[0])}</span>`);
+        }
+        lastIndex = idx + match[0].length;
+    }
+
+    if (lastIndex < code.length) {
+        parts.push(escHtml(code.slice(lastIndex)));
+    }
+
+    return parts.join('');
+}
+
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+
+/**
+ * Improved lightweight markdown renderer for terminal chat.
+ *
+ * Supports: bold, italic, inline code, fenced code blocks (with syntax
+ * highlighting + copy button), headers (##), unordered/ordered lists,
+ * blockquotes, horizontal rules, and links.
  */
 function renderLightMarkdown(text: string): string {
-    // Escape HTML
-    let html = text
+    // ── Fenced code blocks (must go first, before any other substitution) ──
+    // Capture the raw code before escaping so the highlighter works correctly.
+    const codeBlocks: string[] = [];
+    let html = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
+        const trimmed = code.trim();
+        const highlighted = highlightCode(trimmed, lang || '');
+        const encoded = btoa(encodeURIComponent(trimmed));
+        const langLabel = lang || 'code';
+        const block = `<div class="code-block"><div class="code-block__bar"><span class="code-block__lang">${escHtml(langLabel)}</span><button class="code-block__copy-btn" data-copy-code="${encoded}" type="button">copy</button></div><pre><code>${highlighted}</code></pre></div>`;
+        const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`;
+        codeBlocks.push(block);
+        return placeholder;
+    });
+
+    // ── Escape HTML in remaining text ──
+    html = html
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    // Code blocks (```...```)
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
-        return `<pre><code>${code.trim()}</code></pre>`;
-    });
-
-    // Inline code (`...`)
+    // ── Inline code (before bold/italic to avoid misinterpreting `*`) ──
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
-    // Bold (**...**)
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // ── Horizontal rule ──
+    html = html.replace(/^---+$/gm, '<hr>');
 
-    // Line breaks
-    html = html.replace(/\n/g, '<br>');
+    // ── Headers (## Heading, ### Heading) ──
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // ── Blockquote ──
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // ── Unordered list items ──
+    html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+
+    // ── Ordered list items ──
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // ── Wrap consecutive <li> in <ul> ──
+    html = html.replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, (block) => {
+        return `<ul>${block}</ul>`;
+    });
+
+    // ── Bold (**...**) ──
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+
+    // ── Italic (*...* or _..._) — avoid matching bold residuals ──
+    html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+    html = html.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+    // ── Links ([text](url)) — only allow http/https/mailto ──
+    html = html.replace(
+        /\[([^\]]+)\]\(((?:https?|mailto):[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    );
+
+    // ── Line breaks (preserve \n not inside block elements) ──
+    // Replace remaining newlines with <br>, but not after block-level tags
+    html = html.replace(/\n(?!<\/?(ul|li|h[123]|blockquote|hr|div))/g, '<br>');
+
+    // ── Restore code blocks ──
+    html = html.replace(/\x00CODEBLOCK(\d+)\x00/g, (_, i) => codeBlocks[Number(i)]);
 
     return html;
 }

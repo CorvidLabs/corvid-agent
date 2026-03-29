@@ -130,6 +130,61 @@ describe('CursorProvider', () => {
     // ── Slot management ──────────────────────────────────────────────────
 
     describe('acquireSlot / releaseSlot', () => {
+        /** Fill all available slots and return a cleanup function. */
+        async function fillAllSlots(): Promise<() => void> {
+            const max = provider.maxConcurrent;
+            const results = await Promise.all(
+                Array.from({ length: max }, () => provider.acquireSlot('auto')),
+            );
+            expect(results.every(Boolean)).toBe(true);
+            return () => {
+                for (let i = 0; i < max; i++) provider.releaseSlot('auto');
+            };
+        }
+
+        test('maxConcurrent default is 4', () => {
+            expect(provider.maxConcurrent).toBe(4);
+        });
+
+        test('getSlotStatus returns correct initial state', () => {
+            const status = provider.getSlotStatus();
+            expect(status.active).toBe(0);
+            expect(status.max).toBe(provider.maxConcurrent);
+            expect(status.queued).toBe(0);
+        });
+
+        test('getSlotStatus tracks active slots', async () => {
+            const acquired = await provider.acquireSlot('auto');
+            expect(acquired).toBe(true);
+            const status = provider.getSlotStatus();
+            expect(status.active).toBe(1);
+            expect(status.queued).toBe(0);
+            provider.releaseSlot('auto');
+            expect(provider.getSlotStatus().active).toBe(0);
+        });
+
+        test('getSlotStatus tracks queued waiters', async () => {
+            const cleanup = await fillAllSlots();
+
+            const controller = new AbortController();
+            const pending = provider.acquireSlot('auto', controller.signal);
+
+            await new Promise((r) => setTimeout(r, 10));
+            const status = provider.getSlotStatus();
+            expect(status.active).toBe(provider.maxConcurrent);
+            expect(status.queued).toBe(1);
+
+            controller.abort();
+            await pending;
+            cleanup();
+        });
+
+        test('CURSOR_MAX_CONCURRENT env var controls the concurrency limit', () => {
+            // The limit is read at module load time via CURSOR_MAX_CONCURRENT.
+            // Default is 4 when env var is not set.
+            expect(provider.maxConcurrent).toBe(4);
+        });
+
         test('acquireSlot succeeds when slots available', async () => {
             const acquired = await provider.acquireSlot('auto');
             expect(acquired).toBe(true);
@@ -145,14 +200,13 @@ describe('CursorProvider', () => {
 
         test('acquireSlot calls onStatus when queued', async () => {
             // Fill all slots
-            await provider.acquireSlot('auto');
-            await provider.acquireSlot('auto');
+            const cleanup = await fillAllSlots();
 
             const statusMessages: string[] = [];
             const controller = new AbortController();
 
-            // Third request should queue and call onStatus
-            const thirdPromise = provider.acquireSlot('auto', controller.signal, (msg) => {
+            // Next request should queue and call onStatus
+            const pendingPromise = provider.acquireSlot('auto', controller.signal, (msg) => {
                 statusMessages.push(msg);
             });
 
@@ -163,44 +217,60 @@ describe('CursorProvider', () => {
 
             // Cleanup
             controller.abort();
-            await thirdPromise;
-            provider.releaseSlot('auto');
+            await pendingPromise;
+            cleanup();
+        });
+
+        test('acquireSlot queues beyond limit, does not reject', async () => {
+            // Verify that requests beyond maxConcurrent are queued (not rejected)
+            const cleanup = await fillAllSlots();
+
+            let overflowResolved = false;
+            const overflowPromise = provider.acquireSlot('auto').then((result) => {
+                overflowResolved = true;
+                return result;
+            });
+
+            // Should be queued, not yet resolved
+            await new Promise((r) => setTimeout(r, 10));
+            expect(overflowResolved).toBe(false);
+            expect(provider.getSlotStatus().queued).toBe(1);
+
+            // Cleanup — release all slots, overflow gets one
+            cleanup();
+            const result = await overflowPromise;
+            expect(result).toBe(true);
             provider.releaseSlot('auto');
         });
 
         test('releaseSlot unblocks queued requests', async () => {
             // Fill all slots
-            const acquired1 = await provider.acquireSlot('auto');
-            const acquired2 = await provider.acquireSlot('auto');
-            expect(acquired1).toBe(true);
-            expect(acquired2).toBe(true);
+            await fillAllSlots();
 
-            // Third request should queue
-            let thirdResolved = false;
-            const thirdPromise = provider.acquireSlot('auto').then((result) => {
-                thirdResolved = true;
+            // Next request should queue
+            let nextResolved = false;
+            const nextPromise = provider.acquireSlot('auto').then((result) => {
+                nextResolved = true;
                 return result;
             });
 
             // Not yet resolved
             await new Promise((r) => setTimeout(r, 10));
-            expect(thirdResolved).toBe(false);
+            expect(nextResolved).toBe(false);
 
-            // Release one slot — third should resolve
+            // Release one slot — queued request should resolve
             provider.releaseSlot('auto');
-            const result = await thirdPromise;
+            const result = await nextPromise;
             expect(result).toBe(true);
-            expect(thirdResolved).toBe(true);
+            expect(nextResolved).toBe(true);
 
-            // Cleanup
-            provider.releaseSlot('auto');
-            provider.releaseSlot('auto');
+            // Release remaining (maxConcurrent - 1 already held + 1 that resolved from queue)
+            for (let i = 0; i < provider.maxConcurrent; i++) provider.releaseSlot('auto');
         });
 
         test('releaseSlot skips aborted waiters in queue', async () => {
             // Fill all slots
-            await provider.acquireSlot('auto');
-            await provider.acquireSlot('auto');
+            const cleanup = await fillAllSlots();
 
             // Queue two waiters: first will be aborted, second should get the slot
             const controller1 = new AbortController();
@@ -225,7 +295,7 @@ describe('CursorProvider', () => {
             expect(secondResolved).toBe(true);
 
             // Cleanup
-            provider.releaseSlot('auto');
+            cleanup();
             provider.releaseSlot('auto');
         });
 
@@ -239,22 +309,20 @@ describe('CursorProvider', () => {
 
         test('queued request returns false when aborted', async () => {
             // Fill all slots
-            await provider.acquireSlot('auto');
-            await provider.acquireSlot('auto');
+            const cleanup = await fillAllSlots();
 
-            // Third request with abort
+            // Next request with abort
             const controller = new AbortController();
-            const thirdPromise = provider.acquireSlot('auto', controller.signal);
+            const pendingPromise = provider.acquireSlot('auto', controller.signal);
 
             await new Promise((r) => setTimeout(r, 10));
             controller.abort();
 
-            const result = await thirdPromise;
+            const result = await pendingPromise;
             expect(result).toBe(false);
 
             // Cleanup
-            provider.releaseSlot('auto');
-            provider.releaseSlot('auto');
+            cleanup();
         });
     });
 

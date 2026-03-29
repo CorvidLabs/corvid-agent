@@ -34,6 +34,9 @@ client/package-lock.json
 
 tmp/
 
+# Runtime files
+.discord-last-connect
+
 # Scratch/prototype files
 dashboard-preview.html
 pc-upgrade-dashboard*.html

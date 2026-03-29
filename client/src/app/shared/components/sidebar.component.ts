@@ -165,13 +165,14 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             scrollbar-color: var(--border-bright) transparent;
         }
         .sidebar__link {
-            display: block;
+            display: flex;
+            align-items: center;
             padding: 0.75rem 1.5rem;
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 0.85rem;
             letter-spacing: 0.03em;
-            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease, padding-left 0.15s ease;
             border-left: 3px solid transparent;
             position: relative;
         }
@@ -185,13 +186,14 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             width: 3px;
             background: var(--accent-cyan);
             transform: scaleY(0);
-            transition: transform 0.2s ease;
+            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
             border-radius: 0 2px 2px 0;
         }
         @media (hover: hover) {
             .sidebar__link:hover {
                 background: var(--bg-hover);
                 color: var(--accent-cyan);
+                padding-left: 1.65rem;
             }
             .sidebar__link:hover::before {
                 transform: scaleY(1);
@@ -202,10 +204,17 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             background: linear-gradient(90deg, var(--accent-cyan-subtle) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px var(--accent-cyan-border);
-            animation: sidebarActiveGlow 0.3s ease-out;
+            animation: sidebarActiveGlow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
         }
         @keyframes sidebarActiveGlow {
-            from { background: transparent; border-left-color: transparent; }
+            from {
+                background: transparent;
+                border-left-color: transparent;
+                padding-left: 1rem;
+            }
+            to {
+                padding-left: 1.5rem;
+            }
         }
         .sidebar__link--active::before {
             display: none;
