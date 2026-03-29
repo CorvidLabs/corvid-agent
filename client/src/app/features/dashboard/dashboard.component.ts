@@ -171,6 +171,7 @@ interface ActivityEvent {
 
                         <!-- metrics -->
                         @if (widget.id === 'metrics') {
+                            <div class="section section--metrics">
                             <div class="metrics-row stagger-scale">
                                 <div class="metric-card">
                                     <div class="metric-card__header">
@@ -239,6 +240,7 @@ interface ActivityEvent {
                                     <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
                                 </div>
                             </div>
+                            </div>
                         }
 
                         <!-- agents -->
@@ -246,7 +248,11 @@ interface ActivityEvent {
                             @if (agentSummaries().length > 0) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3><app-icon name="agents" [size]="14" /> Agent Activity</h3>
+                                        <h3><app-icon name="agents" [size]="14" /> Agent Activity
+                                            @if (agentSummaries().length > 0) {
+                                                <span class="section__live-count">{{ agentSummaries().length }}</span>
+                                            }
+                                        </h3>
                                         <div class="section__header-actions">
                                             <a class="section__link" routerLink="/agents">View all agents</a>
                                             <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['agents']" (click)="refreshWidget('agents')" title="Refresh">&#x21bb;</button>
@@ -304,6 +310,15 @@ interface ActivityEvent {
                                                         <span class="agent-card__stat-label">Last Active</span>
                                                     </div>
                                                 </div>
+                                                <div class="agent-card__sparkline">
+                                                    <svg width="100%" height="24" viewBox="0 0 80 24" preserveAspectRatio="none"
+                                                         [attr.data-health-class]="getAgentHealthClass(summary)">
+                                                        <path [attr.d]="getSparklineArea(summary.agent.id)"
+                                                              [class]="'sparkline-area sparkline-area--' + getAgentHealthClass(summary)" />
+                                                        <path [attr.d]="getSparklineLine(summary.agent.id)"
+                                                              [class]="'sparkline-line sparkline-line--' + getAgentHealthClass(summary)" />
+                                                    </svg>
+                                                </div>
                                                 <div class="agent-card__actions">
                                                     <button class="agent-card__btn" (click)="startChat(summary.agent.id, $event)">Chat</button>
                                                     <button class="agent-card__btn" (click)="startWorkTask(summary.agent.id, $event)">Work Task</button>
@@ -327,6 +342,9 @@ interface ActivityEvent {
                                 <div class="section__header">
                                     <h3><app-icon name="activity" [size]="14" /> Active Sessions</h3>
                                     <div class="section__header-actions">
+                                        @if (runningSessions().length > 0) {
+                                            <span class="live-badge"><span class="live-badge__dot"></span>LIVE</span>
+                                        }
                                         <a class="section__link" routerLink="/sessions">View all sessions</a>
                                         <button class="section__refresh" [class.section__refresh--spinning]="widgetRefreshing()['active-sessions']" (click)="refreshWidget('active-sessions')" title="Refresh">&#x21bb;</button>
                                     </div>
@@ -1007,6 +1025,55 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.agentMessages.set(unique.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20));
         } catch {
             // Non-critical
+        }
+    }
+
+    /** Memoized sparkline cache — computed from agent ID (deterministic, decorative) */
+    private readonly _sparklineCache = new Map<string, { line: string; area: string }>();
+
+    private buildSparkline(seed: string, width = 80, height = 24): { line: string; area: string } {
+        if (this._sparklineCache.has(seed)) return this._sparklineCache.get(seed)!;
+        let h = 5381;
+        for (let i = 0; i < seed.length; i++) {
+            h = ((h << 5) + h) ^ seed.charCodeAt(i);
+            h = h >>> 0;
+        }
+        const pts: number[] = [];
+        for (let i = 0; i < 8; i++) {
+            h = ((h * 1664525 + 1013904223) >>> 0);
+            pts.push(h % 100);
+        }
+        const min = Math.min(...pts), max = Math.max(...pts), range = max - min || 1;
+        const norm = pts.map(v => (v - min) / range);
+        const step = width / (norm.length - 1);
+        const pad = 3;
+        const coords = norm.map((v, i) => ({
+            x: +(i * step).toFixed(1),
+            y: +(pad + (1 - v) * (height - pad * 2)).toFixed(1),
+        }));
+        const line = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+        const lastX = coords[coords.length - 1].x;
+        const area = `${line} L${lastX},${height} L0,${height} Z`;
+        const result = { line, area };
+        this._sparklineCache.set(seed, result);
+        return result;
+    }
+
+    protected getSparklineLine(agentId: string): string {
+        return this.buildSparkline(agentId).line;
+    }
+
+    protected getSparklineArea(agentId: string): string {
+        return this.buildSparkline(agentId).area;
+    }
+
+    protected getAgentHealthClass(summary: AgentSummary): string {
+        const health = this.getAgentHealth(summary);
+        switch (health) {
+            case 'green': return 'cyan';
+            case 'yellow': return 'amber';
+            case 'red': return 'red';
+            default: return 'grey';
         }
     }
 }
