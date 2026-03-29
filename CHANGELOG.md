@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file.
 - **CORS secure defaults** — fail startup when CORS allows all origins in remote mode (#1650, #1658)
 - **SDK project pin** — pin active project in system prompt to survive context compression (#1648)
 - **E2E audit routes** — fix routes and external MCP test slice size (#1644)
+- **Discord false crash embeds** — prevent false crash embeds when resuming ended sessions
+- **GitHub Pages URLs** — standardize all GitHub Pages URLs to corvid-agent.github.io (#1672)
 
 ### Security
 - **CORS origin enforcement** — block wildcard CORS in remote deployments (#1650)
