@@ -760,6 +760,13 @@ async function handleMentionReplyResume(
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername, channelId), attachments);
     ctx.processManager.resumeProcess(session, resumeText);
+
+    // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
+    if (!ctx.processManager.isRunning(sessionId)) {
+      log.warn('Mention resumeProcess did not start — creating new mention session', { sessionId, channelId });
+      await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
+      return;
+    }
   }
 
   subscribeForAdaptiveInlineResponse(

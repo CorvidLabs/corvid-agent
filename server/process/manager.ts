@@ -729,25 +729,64 @@ export class ProcessManager {
             const lastN = allSystemMsgs.slice(-ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD);
             const allZeroTurn = lastN.every((m) => /Turns: 0/.test(m.content));
             if (allZeroTurn) {
-                log.error('Zero-turn death loop detected — refusing to resume', {
+                log.warn('Zero-turn death loop detected — resetting session context', {
                     sessionId: session.id,
                     consecutiveZeroTurns: lastN.length,
                 });
-                updateSessionStatus(this.db, session.id, 'error');
-                addSessionMessage(this.db, session.id, 'system',
-                    `Session stuck in zero-turn death loop (${lastN.length} consecutive 0-turn completions). ` +
-                    'Context is likely too bloated. Please start a fresh session.');
+
+                // Generate a conversation summary before clearing messages
+                try {
+                    const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
+                    const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
+                    const summary = summarizeConversation(recentMessages, projectContext);
+                    updateSessionSummary(this.db, session.id, summary);
+                    // Store in meta so buildResumePrompt can inject it
+                    const existingMeta = this.sessionMeta.get(session.id);
+                    if (existingMeta) {
+                        existingMeta.contextSummary = summary;
+                        existingMeta.turnCount = 0;
+                    } else {
+                        this.sessionMeta.set(session.id, {
+                            startedAt: Date.now(),
+                            source: session.source ?? 'unknown',
+                            restartCount: 0,
+                            lastKnownCostUsd: 0,
+                            turnCount: 0,
+                            lastActivityAt: Date.now(),
+                            contextSummary: summary,
+                        });
+                    }
+                    log.info(`Generated context summary before death-loop reset (${summary.length} chars)`);
+                } catch (err) {
+                    log.warn('Failed to generate summary for death-loop reset', { error: err });
+                }
+
+                // Purge session messages to break the death loop — the summary preserves context
+                this.db.query('DELETE FROM session_messages WHERE session_id = ?').run(session.id);
+                updateSessionStatus(this.db, session.id, 'idle');
+
+                // Clean up stale process state
+                const existingProcess = this.processes.get(session.id);
+                if (existingProcess) {
+                    existingProcess.kill();
+                    this.processes.delete(session.id);
+                }
+                updateSessionPid(this.db, session.id, null);
+                this.timerManager.cleanupSession(session.id);
+                this.approvalManager.cancelSession(session.id);
+
                 this.eventBus.emit(session.id, {
                     type: 'session_error',
                     session_id: session.id,
                     error: {
-                        message: `Zero-turn death loop detected (${lastN.length} consecutive 0-turn completions). Start a fresh session.`,
-                        errorType: 'crash',
-                        severity: 'error',
-                        recoverable: false,
+                        message: 'Session context was bloated — restarting with fresh context.',
+                        errorType: 'context_exhausted',
+                        severity: 'info',
+                        recoverable: true,
                     },
                 } as ClaudeStreamEvent);
-                return;
+
+                // Fall through to start a fresh process with clean context
             }
         }
 

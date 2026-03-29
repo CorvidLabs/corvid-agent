@@ -101,20 +101,20 @@ export function saveLibraryEntry(
   const page = params.page ?? null;
 
   db.query(`
-        INSERT INTO agent_library (id, author_id, author_name, key, content, category, tags, title, book, page)
+        INSERT INTO agent_library (id, author_id, author_name, key, title, content, category, tags, book, page)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET
             content = excluded.content,
             author_id = excluded.author_id,
             author_name = excluded.author_name,
+            title = excluded.title,
             category = excluded.category,
             tags = excluded.tags,
-            title = excluded.title,
             book = excluded.book,
             page = excluded.page,
             txid = NULL,
             updated_at = datetime('now')
-    `).run(id, params.authorId, params.authorName, params.key, params.content, category, tags, title, book, page);
+    `).run(id, params.authorId, params.authorName, params.key, title, params.content, category, tags, book, page);
 
   const row = db.query('SELECT * FROM agent_library WHERE key = ?').get(params.key) as LibraryRow | null;
 
@@ -286,12 +286,12 @@ export function upsertLibraryEntryFromChain(
   params: {
     asaId: number;
     key: string;
+    title?: string | null;
     authorId: string;
     authorName: string;
     category: LibraryCategory;
     tags: string[];
     content: string;
-    title?: string | null;
     book?: string | null;
     page?: number | null;
     txid: string;
@@ -299,16 +299,16 @@ export function upsertLibraryEntryFromChain(
 ): void {
   const tags = JSON.stringify(params.tags ?? []);
   db.query(`
-        INSERT INTO agent_library (id, asa_id, key, author_id, author_name, category, tags, content, title, book, page, txid)
+        INSERT INTO agent_library (id, asa_id, key, title, author_id, author_name, category, tags, content, book, page, txid)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET
             asa_id = excluded.asa_id,
+            title = excluded.title,
             author_id = excluded.author_id,
             author_name = excluded.author_name,
             category = excluded.category,
             tags = excluded.tags,
             content = excluded.content,
-            title = excluded.title,
             book = excluded.book,
             page = excluded.page,
             txid = excluded.txid,
@@ -318,12 +318,12 @@ export function upsertLibraryEntryFromChain(
     crypto.randomUUID(),
     params.asaId,
     params.key,
+    params.title ?? null,
     params.authorId,
     params.authorName,
     params.category,
     tags,
     params.content,
-    params.title ?? null,
     params.book ?? null,
     params.page ?? null,
     params.txid,

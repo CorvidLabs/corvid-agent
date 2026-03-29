@@ -586,6 +586,52 @@ export interface InteractionContext {
   rateLimitMaxMessages: number;
 }
 
+/**
+ * Unified command handler signature — every entry in COMMAND_HANDLERS receives the full
+ * resolved context so handlers can pick exactly what they need.
+ */
+type CommandHandler = (
+  ctx: InteractionContext,
+  interaction: DiscordInteractionData,
+  permLevel: number,
+  getOption: (name: string) => string | undefined,
+  userId: string,
+) => Promise<void>;
+
+/**
+ * Map-based slash command dispatcher.
+ *
+ * Adding a new command: add one entry here. No other file needs to change.
+ * O(1) lookup replaces the previous linear switch statement.
+ */
+const COMMAND_HANDLERS = new Map<string, CommandHandler>([
+  ['session', (ctx, interaction, permLevel, getOption, userId) => handleSessionCommand(ctx, interaction, permLevel, getOption, userId)],
+  ['message', (ctx, interaction, permLevel, getOption, userId) => handleMessageCommand(ctx, interaction, permLevel, getOption, userId)],
+  ['work', (ctx, interaction, permLevel, getOption, userId) => handleWorkCommand(ctx, interaction, permLevel, getOption, userId)],
+  ['agents', (ctx, interaction) => handleAgentsCommand(ctx, interaction)],
+  ['status', (ctx, interaction) => handleStatusCommand(ctx, interaction)],
+  ['dashboard', (ctx, interaction) => handleDashboardCommand(ctx, interaction)],
+  ['tasks', (ctx, interaction) => handleTasksCommand(ctx, interaction)],
+  ['schedule', (ctx, interaction, permLevel) => handleScheduleCommand(ctx, interaction, permLevel)],
+  ['config', (ctx, interaction, permLevel) => handleConfigCommand(ctx, interaction, permLevel)],
+  ['council', (ctx, interaction, permLevel, getOption) => handleCouncilCommand(ctx, interaction, permLevel, getOption)],
+  ['quickstart', (ctx, interaction) => handleQuickstartCommand(ctx, interaction)],
+  ['help', (_ctx, interaction) => handleHelpCommand(interaction)],
+  ['tools', (_ctx, interaction, _permLevel, getOption) => handleToolsCommand(interaction, getOption)],
+  ['mute', (ctx, interaction, permLevel, getOption) => handleMuteCommand(ctx, interaction, permLevel, getOption)],
+  ['unmute', (ctx, interaction, permLevel, getOption) => handleUnmuteCommand(ctx, interaction, permLevel, getOption)],
+  ['admin', async (ctx, interaction, permLevel) => {
+    if (permLevel < PermissionLevel.ADMIN) {
+      await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
+      return;
+    }
+    const options = interaction.data?.options ?? [];
+    await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options, ctx.guildCache, ctx.syncGuildData);
+  }],
+  ['agent-skill', (ctx, interaction, permLevel) => handleAgentSkillCommand(ctx, interaction, permLevel)],
+  ['agent-persona', (ctx, interaction, permLevel) => handleAgentPersonaCommand(ctx, interaction, permLevel)],
+]);
+
 export async function handleInteraction(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
   // Handle button/component interactions
   if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
@@ -630,76 +676,10 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
   const options = interaction.data?.options ?? [];
   const getOption = (name: string) => options.find((o) => o.name === name)?.value as string | undefined;
 
-  switch (commandName) {
-    case 'session':
-      await handleSessionCommand(ctx, interaction, permLevel, getOption, userId);
-      break;
-    case 'message':
-      await handleMessageCommand(ctx, interaction, permLevel, getOption, userId);
-      break;
-    case 'work':
-      await handleWorkCommand(ctx, interaction, permLevel, getOption, userId);
-      break;
-    case 'agents':
-      await handleAgentsCommand(ctx, interaction);
-      break;
-    case 'status':
-      await handleStatusCommand(ctx, interaction);
-      break;
-    case 'dashboard':
-      await handleDashboardCommand(ctx, interaction);
-      break;
-    case 'tasks':
-      await handleTasksCommand(ctx, interaction);
-      break;
-    case 'schedule':
-      await handleScheduleCommand(ctx, interaction, permLevel);
-      break;
-    case 'config':
-      await handleConfigCommand(ctx, interaction, permLevel);
-      break;
-    case 'council':
-      await handleCouncilCommand(ctx, interaction, permLevel, getOption);
-      break;
-    case 'quickstart':
-      await handleQuickstartCommand(ctx, interaction);
-      break;
-    case 'help':
-      await handleHelpCommand(interaction);
-      break;
-    case 'tools':
-      await handleToolsCommand(interaction, getOption);
-      break;
-    case 'mute':
-      await handleMuteCommand(ctx, interaction, permLevel, getOption);
-      break;
-    case 'unmute':
-      await handleUnmuteCommand(ctx, interaction, permLevel, getOption);
-      break;
-    case 'admin': {
-      if (permLevel < PermissionLevel.ADMIN) {
-        await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
-        break;
-      }
-      await handleAdminCommand(
-        ctx.db,
-        ctx.config,
-        ctx.mutedUsers,
-        ctx.threadSessions.size,
-        interaction,
-        options,
-        ctx.guildCache,
-        ctx.syncGuildData,
-      );
-      break;
-    }
-    case 'agent-skill':
-      await handleAgentSkillCommand(ctx, interaction, permLevel);
-      break;
-    case 'agent-persona':
-      await handleAgentPersonaCommand(ctx, interaction, permLevel);
-      break;
-    default:
-      await respondToInteraction(interaction, `Unknown command: ${commandName}`);
+  const handler = COMMAND_HANDLERS.get(commandName);
+  if (!handler) {
+    await respondToInteraction(interaction, `Unknown command: ${commandName}`);
+    return;
   }
+  await handler(ctx, interaction, permLevel, getOption, userId);
 }

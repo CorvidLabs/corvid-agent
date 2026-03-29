@@ -11,7 +11,7 @@
 
 No coding experience required. You describe what you want in plain English, and your agent builds it.
 
-**[Website](https://corvid-agent.github.io)** | **[Docs](https://corvid-agent.github.io/docs)** | **[Blog](https://corvid-agent.github.io/blog)** | **[API Reference](docs/api-reference.md)**
+**[Website](https://corvid-agent.github.io)** | **[Docs](docs/README.md)** | **[Examples](docs/use-case-gallery.md)** | **[Blog](https://corvid-agent.github.io/blog)** | **[API Reference](docs/api-reference.md)**
 
 ---
 
@@ -44,6 +44,8 @@ corvid-agent init --mcp    # configures MCP server + copies Agent Skills
 
 **[Full setup guide →](docs/quickstart.md)** | **[MCP setup →](docs/mcp-setup.md)** | **[VibeKit integration →](docs/vibekit-integration.md)**
 
+> **New here?** See what you can build: [Use-case gallery →](docs/use-case-gallery.md) | [Step-by-step recipes →](docs/recipes/your-first-agent.md)
+
 ---
 
 ## What is corvid-agent?
@@ -71,7 +73,7 @@ Every app above was designed, coded, tested, and deployed by corvid-agent — ze
 | | What you get |
 |---|---|
 | **Creators** — have ideas but don't code | Describe what you want in plain English. It designs, codes, and deploys. **[Get started →](docs/quickstart.md)** |
-| **Developers** — write code and want help | Automated PR reviews, CI fixes, test generation, issue triage. **[Use cases →](docs/use-cases.md)** |
+| **Developers** — write code and want help | Automated PR reviews, CI fixes, test generation, issue triage. **[Use-case gallery →](docs/use-case-gallery.md)** |
 | **Teams** — need AI to handle dev work | Agents review code, write features, ship PRs. **[Business guide →](docs/business-guide.md)** |
 | **Enterprise** — need security, compliance, scale | Multi-tenant, RBAC, audit trails, Docker/K8s. **[Enterprise guide →](docs/enterprise.md)** |
 
