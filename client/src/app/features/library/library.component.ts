@@ -78,8 +78,8 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                         @for (entry of filteredEntries(); track entry.id) {
                             <div
                                 class="library__card"
-                                [class.library__card--expanded]="expandedKey() === entry.key"
-                                (click)="toggleExpand(entry.key)">
+                                [class.library__card--book]="!!entry.book"
+                                (click)="openEntry(entry)">
                                 <div class="library__card-header">
                                     <span
                                         class="library__card-badge"
@@ -87,9 +87,9 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                         [style.box-shadow]="'0 0 8px ' + getCategoryColor(entry.category) + '40'">
                                         {{ entry.category }}
                                     </span>
-                                    <span class="library__card-title">{{ entry.key }}</span>
-                                    @if (entry.book) {
-                                        <span class="library__card-book">{{ entry.book }} p.{{ entry.page }}</span>
+                                    <span class="library__card-title">{{ getDisplayTitle(entry) }}</span>
+                                    @if (entry.totalPages && entry.totalPages > 1) {
+                                        <span class="library__card-pages">{{ entry.totalPages }} pages</span>
                                     }
                                 </div>
                                 <div class="library__card-meta">
@@ -103,11 +103,9 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                         }
                                     </div>
                                 }
-                                @if (expandedKey() === entry.key) {
-                                    <div class="library__card-content">
-                                        <pre class="library__card-pre">{{ entry.content }}</pre>
-                                    </div>
-                                }
+                                <div class="library__card-preview">
+                                    {{ getPreview(entry.content) }}
+                                </div>
                             </div>
                         }
                     </div>
@@ -154,9 +152,9 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                                             {{ entry.category }}
                                         </span>
                                         <div class="library__search-result-info">
-                                            <span class="library__search-result-title">{{ entry.key }}</span>
-                                            @if (entry.book) {
-                                                <span class="library__card-book">{{ entry.book }} p.{{ entry.page }}</span>
+                                            <span class="library__search-result-title">{{ getDisplayTitle(entry) }}</span>
+                                            @if (entry.totalPages && entry.totalPages > 1) {
+                                                <span class="library__card-pages">{{ entry.totalPages }} pages</span>
                                             }
                                             <span class="library__search-result-preview">{{ getPreview(entry.content) }}</span>
                                         </div>
@@ -176,58 +174,55 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
                         </div>
                     </div>
                 }
-                @if (selectedEntry()) {
-                    <div class="library__overlay" (click)="clearSelection()">
-                        <div class="library__overlay-content" (click)="$event.stopPropagation()">
-                            <div class="library__overlay-header">
-                                <span
-                                    class="library__card-badge"
-                                    [style.background]="getCategoryColor(selectedEntry()!.category)">
-                                    {{ selectedEntry()!.category }}
-                                </span>
-                                <span class="library__overlay-title">{{ selectedEntry()!.key }}</span>
-                                @if (bookPages().length > 1) {
-                                    <span class="library__overlay-page-info">
-                                        Page {{ currentPageIndex() + 1 }} of {{ bookPages().length }}
-                                    </span>
-                                } @else {
-                                    <span class="library__overlay-type">Note</span>
-                                }
-                                <button class="library__overlay-close" (click)="clearSelection()">✕</button>
-                            </div>
-                            <div class="library__overlay-meta">
-                                {{ selectedEntry()!.authorName }} · {{ formatDate(selectedEntry()!.updatedAt) }}
-                            </div>
-                            @if (selectedEntry()!.tags.length > 0) {
-                                <div class="library__card-tags">
-                                    @for (tag of selectedEntry()!.tags; track tag) {
-                                        <span class="library__card-tag">{{ tag }}</span>
-                                    }
-                                </div>
-                            }
-                            <pre class="library__card-pre library__overlay-pre">{{ selectedEntry()!.content }}</pre>
+            }
+
+            @if (selectedEntry()) {
+                <div class="library__overlay" (click)="clearSelection()">
+                    <div class="library__overlay-content library__overlay-content--reader" (click)="$event.stopPropagation()">
+                        <div class="library__overlay-header">
+                            <span
+                                class="library__card-badge"
+                                [style.background]="getCategoryColor(selectedEntry()!.category)">
+                                {{ selectedEntry()!.category }}
+                            </span>
+                            <span class="library__overlay-title">{{ getDisplayTitle(selectedEntry()!) }}</span>
                             @if (bookPages().length > 1) {
-                                <div class="library__overlay-nav">
-                                    <button
-                                        class="library__overlay-nav-btn"
-                                        [disabled]="currentPageIndex() === 0"
-                                        (click)="prevPage()">
-                                        ← Prev
-                                    </button>
-                                    <span class="library__overlay-nav-label">
-                                        {{ selectedEntry()!.key }}
-                                    </span>
-                                    <button
-                                        class="library__overlay-nav-btn"
-                                        [disabled]="currentPageIndex() === bookPages().length - 1"
-                                        (click)="nextPage()">
-                                        Next →
-                                    </button>
-                                </div>
+                                <span class="library__overlay-page-info">
+                                    {{ bookPages().length }} pages
+                                </span>
+                            } @else {
+                                <span class="library__overlay-type">Note</span>
                             }
+                            <button class="library__overlay-close" (click)="clearSelection()">&#x2715;</button>
                         </div>
+                        <div class="library__overlay-meta">
+                            {{ selectedEntry()!.authorName }} · {{ formatDate(selectedEntry()!.updatedAt) }}
+                        </div>
+                        @if (selectedEntry()!.tags.length > 0) {
+                            <div class="library__card-tags">
+                                @for (tag of selectedEntry()!.tags; track tag) {
+                                    <span class="library__card-tag">{{ tag }}</span>
+                                }
+                            </div>
+                        }
+                        @if (loadingBook()) {
+                            <div class="library__loading">Loading book...</div>
+                        } @else if (bookPages().length > 1) {
+                            <div class="library__book-reader">
+                                @for (page of bookPages(); track page.id; let i = $index) {
+                                    @if (i > 0) {
+                                        <div class="library__page-divider">
+                                            <span class="library__page-divider-label">Page {{ i + 1 }}</span>
+                                        </div>
+                                    }
+                                    <pre class="library__card-pre library__page-content">{{ page.content }}</pre>
+                                }
+                            </div>
+                        } @else {
+                            <pre class="library__card-pre library__overlay-pre">{{ selectedEntry()!.content }}</pre>
+                        }
                     </div>
-                }
+                </div>
             }
         </div>
     `,
@@ -345,12 +340,25 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             font-size: 0.85rem;
             color: var(--text-primary, #e0e0e0);
         }
-        .library__card-book {
-            font-size: 0.65rem;
-            color: var(--text-secondary, #888);
-            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
-            padding: 1px 6px;
-            border-radius: 4px;
+        .library__card-pages {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--accent-purple, #a78bfa);
+            background: var(--tag-bg, rgba(167, 139, 250, 0.1));
+            border: 1px solid var(--tag-border, rgba(167, 139, 250, 0.2));
+            padding: 1px 8px;
+            border-radius: 10px;
+        }
+        .library__card--book {
+            border-left: 3px solid var(--accent-purple, #a78bfa);
+        }
+        .library__card-preview {
+            margin-top: 0.35rem;
+            font-size: 0.72rem;
+            color: var(--text-tertiary, #666);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .library__card-meta {
             display: flex;
@@ -444,8 +452,41 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             color: var(--text-secondary, #888);
             margin-top: 0.35rem;
         }
+        .library__overlay-content--reader {
+            max-height: 85vh;
+        }
         .library__overlay-pre {
-            max-height: 50vh;
+            max-height: 60vh;
+        }
+        .library__book-reader {
+            margin-top: 0.75rem;
+            max-height: 65vh;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+        .library__page-content {
+            margin: 0;
+        }
+        .library__page-divider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        .library__page-divider::before,
+        .library__page-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle, #1a1a2e);
+        }
+        .library__page-divider-label {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary, #555);
+            white-space: nowrap;
         }
         .library__overlay-type {
             font-size: 0.6rem;
@@ -459,44 +500,6 @@ const CATEGORY_COLORS: Record<LibraryCategory, string> = {
             font-size: 0.65rem;
             color: var(--accent-cyan, #00e5ff);
             font-weight: 600;
-        }
-        .library__overlay-nav {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--border-subtle, #1a1a2e);
-        }
-        .library__overlay-nav-btn {
-            padding: 0.35rem 0.75rem;
-            font-size: 0.72rem;
-            font-weight: 600;
-            font-family: inherit;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
-            border: 1px solid var(--border-bright, #2a2a3e);
-            border-radius: 6px;
-            color: var(--accent-cyan, #00e5ff);
-            cursor: pointer;
-            transition: background 0.15s, border-color 0.15s;
-        }
-        .library__overlay-nav-btn:hover:not(:disabled) {
-            background: rgba(0, 229, 255, 0.08);
-            border-color: var(--accent-cyan, #00e5ff);
-        }
-        .library__overlay-nav-btn:disabled {
-            opacity: 0.3;
-            cursor: default;
-        }
-        .library__overlay-nav-label {
-            font-size: 0.7rem;
-            color: var(--text-secondary, #888);
-            text-align: center;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
 
         /* Search panel */
@@ -599,10 +602,10 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected readonly categories = CATEGORIES;
     protected readonly activeCategory = signal<LibraryCategory | 'all'>('all');
     protected readonly searchQuery = signal('');
-    protected readonly expandedKey = signal<string | null>(null);
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
     protected readonly bookPages = signal<LibraryEntry[]>([]);
     protected readonly currentPageIndex = signal(0);
+    protected readonly loadingBook = signal(false);
     protected readonly showSearch = signal(false);
     protected readonly orbSearchQuery = signal('');
     protected readonly orbSearchCategory = signal<LibraryCategory | 'all'>('all');
@@ -680,14 +683,26 @@ export class LibraryComponent implements OnInit, OnDestroy {
         this.searchQuery.set((event.target as HTMLInputElement).value);
     }
 
-    protected toggleExpand(key: string): void {
-        this.expandedKey.update((current) => (current === key ? null : key));
-    }
-
-    protected onEntrySelect(entry: LibraryEntry): void {
+    protected openEntry(entry: LibraryEntry): void {
         this.selectedEntry.set(entry);
         this.bookPages.set([]);
         this.currentPageIndex.set(0);
+
+        if (entry.book) {
+            this.loadingBook.set(true);
+            this.libraryService.getEntry(entry.key).then((full) => {
+                if (full.pages && full.pages.length > 1) {
+                    this.bookPages.set(full.pages);
+                }
+                this.loadingBook.set(false);
+            }).catch(() => {
+                this.loadingBook.set(false);
+            });
+        }
+    }
+
+    protected onEntrySelect(entry: LibraryEntry): void {
+        this.openEntry(entry);
     }
 
     protected onBookPageSelect(event: { entry: LibraryEntry; pages: LibraryEntry[] }): void {
@@ -700,23 +715,17 @@ export class LibraryComponent implements OnInit, OnDestroy {
         this.selectedEntry.set(null);
         this.bookPages.set([]);
         this.currentPageIndex.set(0);
+        this.loadingBook.set(false);
     }
 
-    protected prevPage(): void {
-        const idx = this.currentPageIndex();
-        if (idx > 0) {
-            this.currentPageIndex.set(idx - 1);
-            this.selectedEntry.set(this.bookPages()[idx - 1]);
+    protected getDisplayTitle(entry: LibraryEntry): string {
+        if (entry.book) {
+            // Convert book key like "agent-onboarding-handbook" to "Agent Onboarding Handbook"
+            return entry.book
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
         }
-    }
-
-    protected nextPage(): void {
-        const idx = this.currentPageIndex();
-        const pages = this.bookPages();
-        if (idx < pages.length - 1) {
-            this.currentPageIndex.set(idx + 1);
-            this.selectedEntry.set(pages[idx + 1]);
-        }
+        return entry.key;
     }
 
     protected openSearch(): void {
