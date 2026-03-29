@@ -60,7 +60,9 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             justify-content: space-between;
             padding: 0 1.5rem;
             height: 56px;
-            background: var(--bg-surface);
+            background: rgba(15, 16, 24, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             color: var(--text-primary);
             border-bottom: 1px solid var(--border);
         }
@@ -100,12 +102,16 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             background: transparent;
             color: var(--text-tertiary);
             cursor: pointer;
-            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+            transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
             text-transform: uppercase;
         }
         .network-btn:hover:not(:disabled):not(.network-btn--active) {
             background: var(--bg-hover);
             color: var(--text-secondary);
+            transform: translateY(-1px);
+        }
+        .network-btn:active:not(:disabled) {
+            transform: scale(0.95);
         }
         .network-btn:disabled {
             opacity: 0.4;
@@ -162,7 +168,17 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             width: 100%;
             background: var(--text-secondary);
             border-radius: 1px;
-            transition: background 0.15s;
+            transition: transform 0.25s ease, opacity 0.2s, background 0.15s;
+            transform-origin: center;
+        }
+        :host-context(.sidebar-open) .header__hamburger-icon span:nth-child(1) {
+            transform: translateY(6px) rotate(45deg);
+        }
+        :host-context(.sidebar-open) .header__hamburger-icon span:nth-child(2) {
+            opacity: 0; transform: scaleX(0);
+        }
+        :host-context(.sidebar-open) .header__hamburger-icon span:nth-child(3) {
+            transform: translateY(-6px) rotate(-45deg);
         }
 
         /* Show hamburger only on mobile */
