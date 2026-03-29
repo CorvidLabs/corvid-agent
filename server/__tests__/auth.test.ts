@@ -35,6 +35,12 @@ const AUTH_DISABLED: AuthConfig = {
     bindHost: '127.0.0.1',
 };
 
+const AUTH_LOCALHOST_NO_KEY: AuthConfig = {
+    apiKey: null,
+    allowedOrigins: [],
+    bindHost: '127.0.0.1',
+};
+
 const AUTH_WITH_ORIGINS: AuthConfig = {
     apiKey: 'test-secret-key-12345',
     allowedOrigins: ['https://dashboard.example.com', 'http://localhost:4200'],
@@ -224,10 +230,25 @@ describe('checkWsAuth', () => {
 // --- buildCorsHeaders -------------------------------------------------------
 
 describe('buildCorsHeaders', () => {
-    it('returns wildcard origin when no origins are configured', () => {
+    it('returns wildcard origin when no origins are configured (localhost dev mode)', () => {
         const req = makeRequest('/api/sessions', {
             headers: { Origin: 'https://anything.com' },
         });
+        const headers = buildCorsHeaders(req, AUTH_LOCALHOST_NO_KEY);
+        expect(headers['Access-Control-Allow-Origin']).toBe('*');
+    });
+
+    it('blocks cross-origin requests when no allowlist and non-localhost', () => {
+        const req = makeRequest('/api/sessions', {
+            headers: { Origin: 'https://anything.com' },
+        });
+        const headers = buildCorsHeaders(req, AUTH_ENABLED);
+        expect(headers['Access-Control-Allow-Origin']).toBe('');
+        expect(headers['Vary']).toBe('Origin');
+    });
+
+    it('allows non-browser requests when non-localhost and no allowlist', () => {
+        const req = makeRequest('/api/sessions');
         const headers = buildCorsHeaders(req, AUTH_ENABLED);
         expect(headers['Access-Control-Allow-Origin']).toBe('*');
     });
