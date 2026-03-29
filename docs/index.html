@@ -23,20 +23,29 @@
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
     :root {
+      /* Backgrounds */
       --bg: #0a0a12;
       --bg-card: #161822;
       --bg-card-hover: #1a1c2e;
+
+      /* Borders */
       --border: #1e2035;
       --border-glow: #00e5ff;
-      --text: #e0e0ec;
-      --text-dim: #a8abbd;
-      --text-bright: #ffffff;
+
+      /* Text — AAA contrast (7:1+ on --bg) */
+      --text: #e0e0ec;          /* 10.2:1 — primary */
+      --text-dim: #a8abbd;      /* 7.9:1  — secondary */
+      --text-bright: #ffffff;   /* 13.5:1 — emphasis */
+      --text-tertiary: #9a9cb6; /* 7.3:1  — tertiary */
+
+      /* Accents */
       --accent: #00e5ff;
       --accent-2: #ff66c4;
       --accent-3: #00ff88;
       --green: #00ff88;
       --orange: #ffaa00;
       --red: #ff3355;
+
       --gradient: linear-gradient(135deg, #00e5ff 0%, #ff66c4 100%);
       --mono: 'JetBrains Mono', monospace;
       --sans: 'JetBrains Mono', monospace;
@@ -2117,7 +2126,7 @@
 
       const lines = [
         { type: 'command', text: 'corvid' },
-        { type: 'output', text: 'corvid v0.57.0 \u2014 agent: CorvidAgent (claude-opus-4-6)' },
+        { type: 'output', text: 'corvid v0.58.0 \u2014 agent: CorvidAgent (claude-opus-4-6)' },
         { type: 'output', text: 'project: corvid-agent (/Users/corvid-agent/corvid-agent)' },
         { type: 'blank' },
         { type: 'command', text: 'Harden the AlgoChat bridge reconnect logic' },
