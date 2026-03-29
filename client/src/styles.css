@@ -391,11 +391,13 @@ select:focus-visible {
 .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
 .btn--primary:hover:not(:disabled) {
     background: var(--accent-cyan-dim);
-    box-shadow: var(--glow-cyan);
-    transform: translateY(-1px);
+    box-shadow: var(--glow-cyan), 0 4px 16px rgba(0, 229, 255, 0.1);
+    transform: translateY(-2px);
+    border-color: var(--accent-cyan);
 }
 .btn--primary:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.97);
+    transition-duration: 0.08s;
 }
 .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
@@ -475,6 +477,15 @@ button:active:not(:disabled) {
 @keyframes subtlePulse {
     0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
     50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+}
+
+/* ── Ambient glow — subtle breathing effect for hero/feature cards ── */
+@keyframes ambientGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.04), 0 0 60px rgba(0, 229, 255, 0.02); }
+    50% { box-shadow: 0 0 30px rgba(0, 229, 255, 0.08), 0 0 80px rgba(0, 229, 255, 0.04); }
+}
+.ambient-glow {
+    animation: ambientGlow 4s ease-in-out infinite;
 }
 
 /* ── Staggered entrance animation ── */
@@ -979,31 +990,38 @@ select:focus {
     position: fixed;
     bottom: 2rem;
     right: 2rem;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: var(--bg-raised);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--border-bright);
     color: var(--accent-cyan);
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transform: translateY(12px) scale(0.8);
+    transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
     pointer-events: none;
     z-index: 50;
 }
 .scroll-to-top--visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     pointer-events: auto;
 }
 .scroll-to-top:hover {
-    box-shadow: var(--glow-cyan);
+    box-shadow: var(--glow-cyan), 0 4px 16px rgba(0, 0, 0, 0.3);
     border-color: var(--accent-cyan);
+    transform: translateY(-2px) scale(1.05);
+}
+.scroll-to-top:active {
+    transform: translateY(0) scale(0.95);
+    transition-duration: 0.08s;
 }
 
 /* ── Page skeleton loading ── */
