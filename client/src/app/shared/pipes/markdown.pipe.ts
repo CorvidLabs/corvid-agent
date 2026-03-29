@@ -5,7 +5,7 @@ import { marked } from 'marked';
 marked.use({
     renderer: {
         // Open links in new tab
-        link({ href, text }) {
+        link({ href, text }: { href: string; text: string }) {
             const escapedHref = href.replace(/"/g, '&quot;');
             return `<a href="${escapedHref}" target="_blank" rel="noopener noreferrer">${text}</a>`;
         },
