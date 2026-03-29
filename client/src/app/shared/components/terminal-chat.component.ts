@@ -65,7 +65,11 @@ interface AutocompleteItem {
                 }
                 @if (thinking()) {
                     <div class="terminal__thinking" aria-label="Agent is thinking">
-                        <span class="terminal__thinking-dot"></span>
+                        <span class="terminal__thinking-dots">
+                            <span class="terminal__thinking-dot"></span>
+                            <span class="terminal__thinking-dot"></span>
+                            <span class="terminal__thinking-dot"></span>
+                        </span>
                         <span>thinking...</span>
                     </div>
                 }
@@ -150,6 +154,11 @@ interface AutocompleteItem {
             white-space: pre-wrap;
             position: relative;
             padding-right: 2rem;
+            animation: msgEnter 0.3s ease-out both;
+        }
+        @keyframes msgEnter {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .terminal__line--inbound .terminal__prompt { color: var(--accent-cyan); }
         .terminal__line--outbound .terminal__prompt { color: #7ee787; }
@@ -262,16 +271,23 @@ interface AutocompleteItem {
             font-size: 0.75rem;
             padding: 0.25rem 0;
         }
+        .terminal__thinking-dots {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+        }
         .terminal__thinking-dot {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #f0883e;
-            animation: pulse 1.5s ease-in-out infinite;
+            animation: thinkWave 1.4s ease-in-out infinite;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.3; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
+        .terminal__thinking-dot:nth-child(2) { animation-delay: 0.15s; }
+        .terminal__thinking-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes thinkWave {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.7) translateY(0); }
+            40% { opacity: 1; transform: scale(1.1) translateY(-4px); }
         }
         .terminal__empty {
             color: #484f58;
@@ -349,14 +365,21 @@ interface AutocompleteItem {
             right: 0;
             max-height: 220px;
             overflow-y: auto;
-            background: #161b22;
+            background: rgba(22, 27, 34, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid #30363d;
             border-radius: var(--radius, 6px);
-            box-shadow: 0 4px 16px var(--shadow-deep);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(0,229,255,0.05);
             z-index: 10;
             margin-bottom: 4px;
             scrollbar-width: thin;
             scrollbar-color: #30363d transparent;
+            animation: acEnter 0.15s ease-out;
+        }
+        @keyframes acEnter {
+            from { opacity: 0; transform: translateY(4px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .autocomplete__item {
             display: flex;
@@ -372,6 +395,7 @@ interface AutocompleteItem {
         }
         .autocomplete__item--active {
             border-left: 2px solid var(--accent-cyan, #00e5ff);
+            background: rgba(0, 229, 255, 0.06);
         }
         .autocomplete__label {
             color: #f0f6fc;
