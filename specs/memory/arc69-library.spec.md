@@ -87,7 +87,7 @@ Supports multi-page "book" chaining where ASAs link together like chapters — u
 | `getLibraryEntry` | `(db: Database, key: string)` | `LibraryEntry \| null` | Fetch non-archived entry by key |
 | `getLibraryEntryByAsaId` | `(db: Database, asaId: number)` | `LibraryEntry \| null` | Fetch entry by ASA ID |
 | `listLibraryEntries` | `(db: Database, options?)` | `LibraryEntry[]` | List with optional category/author/tag filters |
-| `listLibraryEntriesGrouped` | `(db: Database, options?)` | `(LibraryEntry & { totalPages?: number })[]` | List entries grouped by book (one row per book with totalPages) and standalone entries |
+| `listLibraryEntriesGrouped` | `(db: Database, options?)` | `(LibraryEntry & { totalPages?: number })[]` | List entries with book pages collapsed — returns page 1 per book plus all non-book entries |
 | `getBookPages` | `(db: Database, book: string)` | `LibraryEntry[]` | Return all pages of a book sorted by page number |
 | `updateLibraryEntryTxid` | `(db: Database, key: string, txid: string)` | `void` | Set txid after on-chain sync |
 | `updateLibraryEntryAsaId` | `(db: Database, key: string, asaId: number)` | `void` | Store ASA ID after minting |

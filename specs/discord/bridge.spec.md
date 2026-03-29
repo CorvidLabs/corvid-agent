@@ -52,6 +52,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Class | Description |
 |-------|-------------|
 | `DiscordBridge` | Manages the Discord gateway WebSocket connection, heartbeating, and message routing |
+| `ThreadSessionManager` | Owns thread/session/mention in-memory Maps and TTL-based cleanup for mention sessions (re-exported from thread-session-manager) |
 
 #### DiscordBridge Constructor
 

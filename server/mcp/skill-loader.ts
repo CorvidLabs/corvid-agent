@@ -16,7 +16,7 @@
  * 2. When a skill is activated (matched by name or trigger), load the full body.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { createLogger } from '../lib/logger';
 
@@ -105,8 +105,6 @@ export const SKILL_DIRECTORY_NAMES = ['.skills', 'skills'] as const;
  * @returns Array of discovered skill entries (frontmatter only, body not loaded).
  */
 export function discoverSkills(skillsDir: string): SkillEntry[] {
-    if (!existsSync(skillsDir)) return [];
-
     const entries: SkillEntry[] = [];
 
     try {
@@ -117,11 +115,10 @@ export function discoverSkills(skillsDir: string): SkillEntry[] {
 
             if (item.isDirectory()) {
                 // Look for SKILL.md inside the subdirectory
+                // parseSkillFile has its own try/catch — no need for existsSync
                 const skillFile = join(fullPath, 'SKILL.md');
-                if (existsSync(skillFile)) {
-                    const entry = parseSkillFile(skillFile);
-                    if (entry) entries.push(entry);
-                }
+                const entry = parseSkillFile(skillFile);
+                if (entry) entries.push(entry);
             } else if (item.isFile() && item.name.endsWith('.md') && item.name !== 'README.md') {
                 // Top-level markdown files are also valid skills
                 const entry = parseSkillFile(fullPath);
@@ -129,8 +126,12 @@ export function discoverSkills(skillsDir: string): SkillEntry[] {
             }
         }
     } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.warn('Failed to scan skills directory', { dir: skillsDir, error: msg });
+        // ENOENT for non-existent dir, or other FS errors
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== 'ENOENT') {
+            const msg = err instanceof Error ? err.message : String(err);
+            log.warn('Failed to scan skills directory', { dir: skillsDir, error: msg });
+        }
     }
 
     log.info(`Discovered ${entries.length} skills`, { dir: skillsDir, skills: entries.map(e => e.name).join(', ') });
@@ -207,10 +208,9 @@ export function buildSkillDiscoveryPrompt(entries: SkillEntry[]): string {
 export function discoverProjectSkills(projectRoot: string): SkillEntry[] {
     for (const dirName of SKILL_DIRECTORY_NAMES) {
         const dir = join(projectRoot, dirName);
-        if (existsSync(dir) && statSync(dir).isDirectory()) {
-            const skills = discoverSkills(dir);
-            if (skills.length > 0) return skills;
-        }
+        // discoverSkills handles ENOENT gracefully — no need for existsSync
+        const skills = discoverSkills(dir);
+        if (skills.length > 0) return skills;
     }
     return [];
 }
