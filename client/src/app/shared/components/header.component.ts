@@ -73,7 +73,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
         }
         .header__title {
             font-family: var(--font-display);
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 700;
             margin: 0;
             color: var(--accent-cyan);

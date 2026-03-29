@@ -125,7 +125,7 @@ const PRESETS: CronPreset[] = [
         }
         .cron-preset__icon {
             font-family: var(--font-mono);
-            font-size: 0.6rem;
+            font-size: 0.7rem;
             font-weight: 700;
             opacity: 0.7;
         }
@@ -172,7 +172,7 @@ const PRESETS: CronPreset[] = [
         .cron-editor__field-hints span {
             flex: 1;
             text-align: center;
-            font-size: 0.5rem;
+            font-size: 0.65rem;
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.03em;
