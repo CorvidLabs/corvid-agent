@@ -72,7 +72,7 @@ curl http://localhost:3000/api/health
 
 Expected:
 ```json
-{"status":"ok","version":"0.58.0","uptime":120,"agents":1}
+{"status":"ok","version":"0.59.0","uptime":120,"agents":1}
 ```
 
 ### 4. Set up automatic restarts
