@@ -35,10 +35,10 @@ export function saveMemory(
     const id = crypto.randomUUID();
     db.query(
         `INSERT INTO agent_memories (id, agent_id, key, content, status)
-         VALUES (?, ?, ?, ?, 'pending')
+         VALUES (?, ?, ?, ?, 'short_term')
          ON CONFLICT(agent_id, key) DO UPDATE SET
              content = excluded.content,
-             status = 'pending',
+             status = 'short_term',
              txid = NULL,
              updated_at = datetime('now')`
     ).run(id, params.agentId, params.key, params.content);
@@ -55,7 +55,7 @@ export function saveMemory(
         content: params.content,
         txid: null,
         asa_id: null,
-        status: 'pending',
+        status: 'short_term',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     });

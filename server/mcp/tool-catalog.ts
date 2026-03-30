@@ -38,7 +38,8 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
 export const TOOL_CATALOG: ToolCatalogEntry[] = [
     // ── Communication & Memory ──────────────────────────────────────────
     { name: 'corvid_send_message', description: 'Send a message to another agent and wait for response', category: 'communication' },
-    { name: 'corvid_save_memory', description: 'Save a memory to long-term on-chain storage with local cache', category: 'communication' },
+    { name: 'corvid_save_memory', description: 'Save a memory to short-term SQLite storage', category: 'communication' },
+    { name: 'corvid_promote_memory', description: 'Promote a short-term memory to long-term on-chain ARC-69 storage', category: 'communication' },
     { name: 'corvid_recall_memory', description: 'Recall memories by key, query, or list recent', category: 'communication' },
     { name: 'corvid_delete_memory', description: 'Delete (forget) an on-chain ARC-69 memory', category: 'communication' },
     { name: 'corvid_read_on_chain_memories', description: 'Read memories directly from Algorand blockchain', category: 'communication' },

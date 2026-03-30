@@ -22,10 +22,10 @@ depends_on: []
 
 Structured memory subsystem for agents implementing a **two-tier memory architecture**:
 
-- **Long-term storage (localnet AlgoChat):** All memories are persisted as encrypted self-messages on the localnet blockchain via `sendOnChainToSelf()`. This is the durable source of truth — always available, timestamped, immutable.
-- **Short-term cache (SQLite `agent_memories` table):** Fast local access for in-session recall. Ephemeral — may be cleared or lost at any time.
+- **Short-term storage (SQLite `agent_memories` table):** All new memories default here. Fast local access for in-session recall. Status: `short_term`. Ephemeral — may be cleared or lost at any time.
+- **Long-term storage (ARC-69 ASA on localnet AlgoChat):** Durable on-chain storage. Requires explicit promotion via `corvid_promote_memory`. Status: `confirmed`. Mutable (can be updated or soft-deleted on localnet).
 
-Both tiers are written on every save. SQLite is checked first for speed; localnet is the authoritative record.
+New memories always enter as short-term. Promotion to long-term is an explicit agent or graduation-service decision. SQLite is checked first for speed; on-chain is the authoritative record for promoted memories.
 
 Provides automatic categorization, TF-IDF embedding generation, LRU caching, dual-mode semantic search (fast FTS5 + TF-IDF hybrid and deep LLM re-ranking), temporal decay, summarization of old memories, and cross-reference tracking between related memories. All new capabilities are additive and backward compatible with the core `agent_memories` CRUD.
 
@@ -129,8 +129,8 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 16. **Cosine similarity for zero vectors**: Both `cosineSimilaritySparse` and `cosineSimilarityDense` return 0 when either input is a zero vector (no division by zero).
 17. **Fast search scoring blend**: When TF-IDF produces non-zero query vectors, scores blend 40% FTS5 positional rank + 60% TF-IDF cosine. When TF-IDF zeroes out, 100% FTS5 rank is used.
 18. **Category fallback in search**: If category filtering eliminates all FTS5 candidates, the filter is dropped and unfiltered results are returned.
-19. **Two-tier persistence**: Every memory save writes to both SQLite (short-term cache) and localnet AlgoChat (long-term storage). SQLite may be cleared without data loss because localnet is the authoritative record.
-20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which writes to both tiers. Channel of origin does not affect storage behavior.
+19. **Short-term default**: Every new memory save writes to SQLite only with `status: 'short_term'`. On-chain promotion (ARC-69 ASA) requires an explicit `corvid_promote_memory` call. Updating an existing confirmed memory resets its status to `short_term` and clears txid until re-promoted.
+20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which saves to SQLite short-term storage. Channel of origin does not affect storage behavior. Promotion to on-chain is a separate explicit step via `corvid_promote_memory`.
 21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
 
 ## Behavioral Examples

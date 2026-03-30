@@ -85,8 +85,8 @@ server.tool(
 
 server.tool(
     'corvid_save_memory',
-    'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache. ' +
-    'Long-term storage is durable and always available; short-term cache is ephemeral. ' +
+    'Save a memory to short-term local storage (SQLite). ' +
+    'Use corvid_promote_memory to promote to long-term on-chain storage (ARC-69 ASA). ' +
     'Use this for ANY "remember this" request regardless of channel. Use a descriptive key for easy recall later.',
     {
         key: z.string().describe('A short descriptive key for this memory'),
@@ -179,6 +179,25 @@ server.tool(
             agentId,
             key: args.key,
             mode: args.mode,
+        });
+        return {
+            content: [{ type: 'text' as const, text: data.response }],
+            isError: data.isError,
+        };
+    },
+);
+
+server.tool(
+    'corvid_promote_memory',
+    'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). ' +
+    'Use after corvid_save_memory when you want to make a memory permanent.',
+    {
+        key: z.string().describe('Memory key to promote to long-term on-chain storage'),
+    },
+    async (args) => {
+        const data = await callApi('/api/mcp/promote-memory', {
+            agentId,
+            key: args.key,
         });
         return {
             content: [{ type: 'text' as const, text: data.response }],

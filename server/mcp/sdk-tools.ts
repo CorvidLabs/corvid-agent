@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser, handleRestartServer } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handlePromoteMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser, handleRestartServer } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { handleDiscordSendMessage, handleDiscordSendImage } from './tool-handlers/discord';
@@ -33,8 +33,8 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         ),
         tool(
             'corvid_save_memory',
-            'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache for fast recall. ' +
-            'Long-term storage is durable and always available; short-term cache is ephemeral. ' +
+            'Save a memory to short-term local storage (SQLite). ' +
+            'New memories are short-term by default — use corvid_promote_memory to promote to long-term on-chain storage (ARC-69 ASA). ' +
             'Use this for ANY "remember this" request regardless of channel. Use a descriptive key for easy recall later.',
             {
                 key: z.string().describe('A short descriptive key for this memory (e.g. "user-preferences", "project-status")'),
@@ -85,6 +85,16 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 mode: z.enum(['soft', 'hard']).optional().describe('Delete mode: "soft" (default, archives) or "hard" (destroys ASA)'),
             },
             async (args) => handleDeleteMemory(ctx, args),
+        ),
+        tool(
+            'corvid_promote_memory',
+            'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). ' +
+            'After promotion the memory is durable, encrypted, and stored on the Algorand blockchain. ' +
+            'Use this after corvid_save_memory when you want to make a memory permanent.',
+            {
+                key: z.string().describe('Memory key to promote to long-term on-chain storage'),
+            },
+            async (args) => handlePromoteMemory(ctx, args),
         ),
         // ── Shared Library (CRVLIB) ──────────────────────────────────────────
         tool(

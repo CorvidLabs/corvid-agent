@@ -10,6 +10,7 @@ import type { McpToolContext } from './tool-handlers';
 import {
     handleSendMessage,
     handleSaveMemory,
+    handlePromoteMemory,
     handleRecallMemory,
     handleDeleteMemory,
     handleReadOnChainMemories,
@@ -64,6 +65,7 @@ export interface DirectToolDefinition {
 const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_save_memory',
+    'corvid_promote_memory',
     'corvid_recall_memory',
     'corvid_delete_memory',
     'corvid_read_on_chain_memories',
@@ -230,6 +232,22 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 required: ['key'],
             },
             handler: async (args) => unwrapResult(await handleDeleteMemory(ctx, args as { key: string; mode?: string })),
+        },
+        {
+            name: 'corvid_promote_memory',
+            description: 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). Use after corvid_save_memory to make a memory permanent.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    key: { type: 'string', description: 'Memory key to promote to long-term on-chain storage' },
+                },
+                required: ['key'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_promote_memory', args, ['key']);
+                if (err) return err;
+                return unwrapResult(await handlePromoteMemory(ctx, args as { key: string }));
+            },
         },
         // ── Shared Library (CRVLIB) ──────────────────────────────────────
         {

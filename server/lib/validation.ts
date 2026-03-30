@@ -411,6 +411,11 @@ export const McpDeleteMemorySchema = z.object({
     mode: z.enum(['soft', 'hard']).optional(),
 });
 
+export const McpPromoteMemorySchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    key: z.string().min(1, 'key is required'),
+});
+
 // ─── Observation routes ──────────────────────────────────────────────────────
 
 export const McpRecordObservationSchema = z.object({

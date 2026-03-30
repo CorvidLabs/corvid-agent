@@ -79,7 +79,7 @@ describe('session summary auto-save', () => {
 
         const memory = saveMemory(db, { agentId, key, content });
 
-        expect(memory.status).toBe('pending');
+        expect(memory.status).toBe('short_term');
         expect(memory.key).toContain(`session:${session.id}`);
         expect(memory.content).toContain('discord source');
         expect(memory.content).toContain('1 user messages');
@@ -116,7 +116,7 @@ describe('session summary auto-save', () => {
         const recalled = recallMemory(db, agentId, key);
         expect(recalled).not.toBeNull();
         expect(recalled!.content).toContain('fixed auth bug');
-        expect(recalled!.status).toBe('pending');
+        expect(recalled!.status).toBe('short_term');
     });
 
     test('skips save when session has no user messages', () => {
