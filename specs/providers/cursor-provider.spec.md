@@ -40,7 +40,7 @@ Cursor LLM provider wrapping the cursor-agent CLI as a first-class `LlmProvider`
 1. **Slot-based concurrency**: `activeSlots` never exceeds `maxSlots` (default 4, configurable via `CURSOR_MAX_CONCURRENT`). Never goes negative — clamped to 0
 2. **Slot always released**: Every `acquireSlot` returning `true` must have a corresponding `releaseSlot`, even on abort or error
 3. **Abort removes from queue**: If an abort signal fires while queued, the waiter is removed and `acquireSlot` returns `false`
-4. **Completion timeout (10 min)**: Cursor-agent process is killed if no result after 10 minutes
+4. **Completion timeout (15 min, configurable)**: Cursor-agent process is killed after `CURSOR_COMPLETION_TIMEOUT` ms (default 15 minutes). Stream idle timeout is `CURSOR_STREAM_IDLE_TIMEOUT` ms (default 120 seconds)
 5. **Readiness probe**: `isAvailable()` runs `cursor-agent --version` — binary must exist AND exit 0
 6. **Stream-json parsing**: Non-JSON lines from stdout are silently skipped; only structured events are processed
 

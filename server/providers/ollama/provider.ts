@@ -132,6 +132,19 @@ export class OllamaProvider extends BaseLlmProvider {
     }
 
     /**
+     * Extract the base model name from a cloud model string.
+     * Strips size tags (e.g. `:480b`) and cloud suffixes (`:cloud`, `-cloud`).
+     * Examples:
+     *   "qwen3-coder:480b-cloud" → "qwen3-coder"
+     *   "deepseek-v3.1:671b-cloud" → "deepseek-v3.1"
+     *   "qwen3.5:cloud" → "qwen3.5"
+     *   "devstral-small-2:cloud" → "devstral-small-2"
+     */
+    private static cloudBaseModel(model: string): string {
+        return model.replace(/:.*$/, '').replace(/-cloud$/, '');
+    }
+
+    /**
      * Get the host for a specific model. Cloud models (suffix "-cloud" or ":cloud")
      * require the local Ollama instance because cloud proxying uses locally-stored auth.
      * If OLLAMA_HOST points to a non-local address, cloud models fall back to localhost.
@@ -228,11 +241,40 @@ export class OllamaProvider extends BaseLlmProvider {
 
     /**
      * Model families that use a "thinking" mode by default (extended CoT).
-     * For these models we explicitly set `think: false` so the model produces
-     * content directly rather than spending the entire token budget on
-     * internal reasoning and returning an empty `content` field.
+     * For LOCAL models we set `think: false` so the model produces content
+     * directly rather than spending the entire token budget on internal
+     * reasoning and returning an empty `content` field.
+     *
+     * Cloud models with thinking support get `think: true` — they have the
+     * compute headroom to benefit from extended reasoning.
      */
-    private static readonly THINKING_MODEL_FAMILIES = new Set(['qwen3']);
+    private static readonly THINKING_MODEL_FAMILIES = new Set([
+        'qwen3', 'qwen3.5', 'qwen3next', 'qwen3moe',
+    ]);
+
+    /**
+     * Cloud models where thinking mode should be enabled.
+     * These are frontier-class models with enough compute to benefit from CoT.
+     */
+    private static readonly CLOUD_THINKING_MODELS = new Set([
+        'qwen3.5', 'deepseek-v3.2', 'qwen3-coder-next', 'minimax-m2.5',
+        'glm-5', 'kimi-k2.5', 'deepseek-v3.1', 'qwen3-coder',
+    ]);
+
+    /**
+     * Per-model context window overrides for cloud models.
+     * Frontier models with large native context windows get higher limits.
+     * Key is the model name WITHOUT the :cloud suffix.
+     */
+    private static readonly CLOUD_CONTEXT_OVERRIDES = new Map<string, number>([
+        ['minimax-m2.5', 131072],   // 1M native, give 128K
+        ['qwen3.5', 65536],         // 397B frontier — 64K
+        ['deepseek-v3.2', 65536],   // 671B — 64K
+        ['qwen3-coder', 65536],     // 480B coder — 64K
+        ['deepseek-v3.1', 65536],   // 671B — 64K
+        ['kimi-k2.5', 131072],      // Kimi has 128K+ native context
+        ['qwen3-coder-next', 65536], // 235B coder — 64K
+    ]);
 
     /**
      * Model families where the native Ollama `tools` API parameter either
@@ -249,7 +291,9 @@ export class OllamaProvider extends BaseLlmProvider {
      *   system prompt, which the text-based extractor handles well.
      */
     private static readonly TEXT_BASED_TOOL_FAMILIES = new Set([
-        'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron',
+        'qwen3', 'qwen3.5', 'qwen3next', 'qwen3moe',
+        'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron',
+        'deepseek3.2', 'gpt-oss',
     ]);
 
     /**
@@ -456,10 +500,11 @@ export class OllamaProvider extends BaseLlmProvider {
     /** Resolve the concurrency weight for a model based on its parameter size. */
     private getModelWeight(modelName: string): number {
         // Cloud models (e.g. "qwen3.5:cloud") are proxied through Ollama's cloud
-        // gateway which serializes requests. Assign maxWeight so only one cloud
-        // model inference runs at a time, preventing proxy bottleneck & timeouts.
+        // gateway. Allow up to 2 concurrent cloud requests — modern cloud proxies
+        // handle parallel inference. Use half of maxWeight (min 2) so two cloud
+        // models can run simultaneously.
         if (modelName.includes('-cloud') || modelName.includes(':cloud')) {
-            return this.maxWeight;
+            return Math.max(2, Math.ceil(this.maxWeight / 2));
         }
         const tag = this.cachedTags.find(t => t.name === modelName);
         const paramSize = tag?.details?.parameter_size; // e.g. "14B", "3.4B", "8B"
@@ -476,7 +521,11 @@ export class OllamaProvider extends BaseLlmProvider {
 
         // Detect model family for family-specific options
         const modelFamily = this.getModelFamily(params.model);
-        const useTextBasedTools = OllamaProvider.TEXT_BASED_TOOL_FAMILIES.has(modelFamily);
+        const isCloud = OllamaProvider.isCloudModel(params.model);
+        // Cloud-proxied models always use text-based tools — the Ollama proxy
+        // doesn't reliably translate native tool_calls back for any model.
+        // Local models only use text-based if their family is known to be slow/broken.
+        const useTextBasedTools = isCloud || OllamaProvider.TEXT_BASED_TOOL_FAMILIES.has(modelFamily);
 
         // System prompt as first message
         if (params.systemPrompt) {
@@ -519,14 +568,24 @@ export class OllamaProvider extends BaseLlmProvider {
         };
 
         // Build Ollama options for optimal performance.
-        const isCloud = OllamaProvider.isCloudModel(params.model);
         const defaultCtx = parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
-        // Cloud-proxied models have tight server-side timeouts (~90s on NVIDIA).
-        // Reduce context window to speed up prompt evaluation on the remote side.
-        const effectiveCtx = isCloud ? Math.min(defaultCtx, 4096) : defaultCtx;
+        // Cloud models run on powerful remote hardware — give them generous context
+        // and output limits. Per-model overrides allow frontier models with 128K+
+        // context to use their full capacity.
+        const cloudCtxOverride = OllamaProvider.CLOUD_CONTEXT_OVERRIDES.get(
+            OllamaProvider.cloudBaseModel(params.model),
+        );
+        const cloudCtxDefault = parseInt(
+            process.env.OLLAMA_CLOUD_NUM_CTX ?? '32768', 10,
+        );
+        const effectiveCtx = isCloud
+            ? (cloudCtxOverride ?? cloudCtxDefault)
+            : defaultCtx;
         const localMaxOutput = parseInt(process.env.OLLAMA_NUM_PREDICT ?? '2048', 10);
-        // Cap output tokens lower to stay within the cloud timeout window.
-        const maxOutput = isCloud ? Math.min(localMaxOutput, 1024) : localMaxOutput;
+        const cloudMaxOutput = parseInt(
+            process.env.OLLAMA_CLOUD_NUM_PREDICT ?? '4096', 10,
+        );
+        const maxOutput = isCloud ? cloudMaxOutput : localMaxOutput;
         const options: Record<string, unknown> = {
             num_ctx: effectiveCtx,
             // Cap output tokens to prevent runaway generation (14B models can get stuck)
@@ -545,9 +604,17 @@ export class OllamaProvider extends BaseLlmProvider {
         }
         body.options = options;
 
-        // Disable thinking mode for models that default to it.
-        // Qwen3 spends all tokens in `thinking` and returns empty `content`.
-        if (OllamaProvider.THINKING_MODEL_FAMILIES.has(modelFamily)) {
+        // Thinking mode handling:
+        // - Cloud models with thinking support: ENABLE thinking (they have compute
+        //   headroom and produce better results with extended CoT).
+        // - Local thinking models: DISABLE thinking (they spend all tokens on
+        //   internal reasoning and return empty `content`).
+        if (isCloud) {
+            const baseModel = OllamaProvider.cloudBaseModel(params.model);
+            if (OllamaProvider.CLOUD_THINKING_MODELS.has(baseModel)) {
+                body.think = true;
+            }
+        } else if (OllamaProvider.THINKING_MODEL_FAMILIES.has(modelFamily)) {
             body.think = false;
         }
 

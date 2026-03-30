@@ -32,23 +32,25 @@ export interface ModelCapabilities {
 
 /** Models known to support tool calling based on Ollama docs + testing. */
 const TOOL_CAPABLE_FAMILIES = new Set([
-    'llama',     // Llama 3.1+
-    'qwen2',     // Qwen 2/2.5
-    'qwen3',     // Qwen 3
-    'qwen3moe',  // Qwen 3 MoE (e.g. qwen3-coder:480b)
-    'qwen3next', // Qwen 3 Coder Next
-    'mistral',   // Mistral/Mixtral
-    'command-r', // Cohere Command R
+    'llama',        // Llama 3.1+
+    'qwen2',        // Qwen 2/2.5
+    'qwen3',        // Qwen 3
+    'qwen3.5',      // Qwen 3.5 (frontier cloud)
+    'qwen3moe',     // Qwen 3 MoE (e.g. qwen3-coder:480b)
+    'qwen3next',    // Qwen 3 Coder Next
+    'mistral',      // Mistral/Mixtral
+    'command-r',    // Cohere Command R
     'firefunction', // Fireworks FireFunction
-    'hermes',    // Nous Hermes
-    'nemotron',  // NVIDIA Nemotron
-    'deepseek2', // DeepSeek V2/V3
-    'deepseek3.2', // DeepSeek V3.2
-    'minimax',   // MiniMax M2.5
-    'glm',       // Zhipu GLM-5
-    'kimi',      // Moonshot Kimi K2.5
-    'devstral',  // Mistral Devstral
-    'gemini',    // Google Gemini
+    'hermes',       // Nous Hermes
+    'nemotron',     // NVIDIA Nemotron
+    'deepseek2',    // DeepSeek V2/V3
+    'deepseek3.2',  // DeepSeek V3.2
+    'minimax',      // MiniMax M2.5
+    'glm',          // Zhipu GLM-5
+    'kimi',         // Moonshot Kimi K2.5
+    'devstral',     // Mistral Devstral
+    'gemini',       // Google Gemini
+    'gpt-oss',      // GPT-OSS open-source GPT variant
 ]);
 
 /** Models known to NOT support tool calling even if family might. */
@@ -268,11 +270,14 @@ export class ModelCapabilityDetector {
         let family = 'unknown';
         const lowerName = name.toLowerCase();
         // Order matters: more specific families before generic ones
-        if (lowerName.includes('qwen3moe')) family = 'qwen3moe';
+        if (lowerName.includes('qwen3.5')) family = 'qwen3.5';
+        else if (lowerName.includes('qwen3moe')) family = 'qwen3moe';
+        else if (lowerName.includes('qwen3next') || lowerName.includes('qwen3-coder-next')) family = 'qwen3next';
         else if (lowerName.includes('qwen3')) family = 'qwen3';
         else if (lowerName.includes('qwen')) family = 'qwen2';
         else if (lowerName.includes('llama')) family = 'llama';
-        else if (lowerName.includes('mistral')) family = 'mistral';
+        else if (lowerName.includes('mistral') || lowerName.includes('devstral')) family = lowerName.includes('devstral') ? 'devstral' : 'mistral';
+        else if (lowerName.includes('deepseek-v3.2') || lowerName.includes('deepseek3.2')) family = 'deepseek3.2';
         else if (lowerName.includes('deepseek2') || lowerName.includes('deepseek-v')) family = 'deepseek2';
         else if (lowerName.includes('command-r')) family = 'command-r';
         else if (lowerName.includes('nemotron')) family = 'nemotron';
@@ -281,8 +286,8 @@ export class ModelCapabilityDetector {
         else if (lowerName.includes('minimax')) family = 'minimax';
         else if (lowerName.includes('glm')) family = 'glm';
         else if (lowerName.includes('kimi')) family = 'kimi';
-        else if (lowerName.includes('devstral')) family = 'devstral';
         else if (lowerName.includes('gemini')) family = 'gemini';
+        else if (lowerName.includes('gpt-oss')) family = 'gpt-oss';
         else if (lowerName.includes('phi')) family = 'phi';
         else if (lowerName.includes('gemma')) family = 'gemma';
 
@@ -293,7 +298,7 @@ export class ModelCapabilityDetector {
             supportsTools,
             supportsVision: isVision,
             isEmbeddingModel: isEmbedding,
-            contextLength: isEmbedding ? 512 : 4096,
+            contextLength: isEmbedding ? 512 : (name.includes(':cloud') || name.includes('-cloud') ? 32768 : 4096),
             parameterSize: 'unknown',
             quantization: 'unknown',
             family,
