@@ -1,21 +1,21 @@
-import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 // Mock worktree creation — git is not available in CI / test environments.
 mock.module('../lib/worktree', () => ({
-    createWorktree: async () => ({ success: true, worktreeDir: '/tmp/mock-worktree' }),
-    resolveAndCreateWorktree: async () => ({ success: true, workDir: '/tmp/mock-worktree' }),
-    generateChatBranchName: (agent: string, id: string) => `chat/${agent}/${id.slice(0, 8)}`,
-    getWorktreeBaseDir: (dir: string) => `${dir}/.worktrees`,
-    removeWorktree: async () => ({ success: true }),
+  createWorktree: async () => ({ success: true, worktreeDir: '/tmp/mock-worktree' }),
+  resolveAndCreateWorktree: async () => ({ success: true, workDir: '/tmp/mock-worktree' }),
+  generateChatBranchName: (agent: string, id: string) => `chat/${agent}/${id.slice(0, 8)}`,
+  getWorktreeBaseDir: (dir: string) => `${dir}/.worktrees`,
+  removeWorktree: async () => ({ success: true }),
 }));
 
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
-import { handleInteraction, type InteractionContext } from '../discord/commands';
-import { InteractionType } from '../discord/types';
-import type { DiscordBridgeConfig, DiscordInteractionData } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+import { runMigrations } from '../db/schema';
+import { handleInteraction, type InteractionContext } from '../discord/commands';
+import type { DiscordBridgeConfig, DiscordInteractionData } from '../discord/types';
+import { InteractionType } from '../discord/types';
 
 let db: Database;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,276 +25,306 @@ const originalAppId = process.env.DISCORD_APP_ID;
 
 /** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
 function getContent(): string {
-    return (capturedResponse?.data?.content ?? capturedResponse?.content) as string;
+  return (capturedResponse?.data?.content ?? capturedResponse?.content) as string;
 }
 
 function createTestConfig(): DiscordBridgeConfig {
-    return {
-        botToken: 'test-token',
-        channelId: '100000000000000001',
-        allowedUserIds: ['200000000000000001'],
-        publicMode: true,
-        defaultPermissionLevel: 2,
-        mode: 'chat',
-    };
+  return {
+    botToken: 'test-token',
+    channelId: '100000000000000001',
+    allowedUserIds: ['200000000000000001'],
+    publicMode: true,
+    defaultPermissionLevel: 2,
+    mode: 'chat',
+  };
 }
 
 function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionContext {
-    return {
-        db,
-        config: { ...createTestConfig(), ...config },
-        processManager: {
-            startProcess: mock(() => {}),
-            stopProcess: mock(() => {}),
-            subscribe: mock(() => {}),
-            unsubscribe: mock(() => {}),
-        } as unknown as InteractionContext['processManager'],
-        workTaskService: null,
-        delivery: { track: mock(() => {}) } as unknown as InteractionContext['delivery'],
-        mutedUsers: new Set<string>(),
-        threadSessions: new Map(),
-        threadCallbacks: new Map(),
-        threadLastActivity: new Map(),
-        createStandaloneThread: mock(async () => '300000000000000001'),
-        subscribeForResponseWithEmbed: mock(() => {}),
-        sendTaskResult: mock(async () => {}),
-        muteUser: mock(() => {}),
-        unmuteUser: mock(() => {}),
-        mentionSessions: new Map(),
-        subscribeForInlineResponse: mock(() => {}),
-        guildCache: { info: null, roles: [], channels: [] },
-        syncGuildData: mock(() => {}),
-        userMessageTimestamps: new Map(),
-        rateLimitWindowMs: 60_000,
-        rateLimitMaxMessages: 10,
-    };
+  return {
+    db,
+    config: { ...createTestConfig(), ...config },
+    processManager: {
+      startProcess: mock(() => {}),
+      stopProcess: mock(() => {}),
+      subscribe: mock(() => {}),
+      unsubscribe: mock(() => {}),
+    } as unknown as InteractionContext['processManager'],
+    workTaskService: null,
+    delivery: { track: mock(() => {}) } as unknown as InteractionContext['delivery'],
+    mutedUsers: new Set<string>(),
+    threadSessions: new Map(),
+    threadCallbacks: new Map(),
+    threadLastActivity: new Map(),
+    createStandaloneThread: mock(async () => '300000000000000001'),
+    subscribeForResponseWithEmbed: mock(() => {}),
+    sendTaskResult: mock(async () => {}),
+    muteUser: mock(() => {}),
+    unmuteUser: mock(() => {}),
+    mentionSessions: new Map(),
+    subscribeForInlineResponse: mock(() => {}),
+    guildCache: { info: null, roles: [], channels: [] },
+    syncGuildData: mock(() => {}),
+    userMessageTimestamps: new Map(),
+    rateLimitWindowMs: 60_000,
+    rateLimitMaxMessages: 10,
+  };
 }
 
-function makeInteraction(commandName: string, options: Array<{ name: string; value: string | number }> = []): DiscordInteractionData {
-    return {
-        id: '400000000000000001',
-        type: InteractionType.APPLICATION_COMMAND,
-        token: 'test-interaction-token',
-        channel_id: '100000000000000001',
-        member: {
-            user: { id: '200000000000000001', username: 'testuser' },
-            roles: [],
-        },
-        data: {
-            name: commandName,
-            options: options.map(o => ({ ...o, type: typeof o.value === 'number' ? 4 : 3 })),
-        },
-    } as unknown as DiscordInteractionData;
+function makeInteraction(
+  commandName: string,
+  options: Array<{ name: string; value: string | number }> = [],
+): DiscordInteractionData {
+  return {
+    id: '400000000000000001',
+    type: InteractionType.APPLICATION_COMMAND,
+    token: 'test-interaction-token',
+    channel_id: '100000000000000001',
+    member: {
+      user: { id: '200000000000000001', username: 'testuser' },
+      roles: [],
+    },
+    data: {
+      name: commandName,
+      options: options.map((o) => ({ ...o, type: typeof o.value === 'number' ? 4 : 3 })),
+    },
+  } as unknown as DiscordInteractionData;
 }
 
 beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    runMigrations(db);
-    capturedResponse = null;
-    process.env.DISCORD_APP_ID = 'test-app-id';
+  db = new Database(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  runMigrations(db);
+  capturedResponse = null;
+  process.env.DISCORD_APP_ID = 'test-app-id';
 
-    // Mock fetch to capture interaction responses
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-        if (init?.body) {
-            try {
-                capturedResponse = JSON.parse(String(init.body));
-            } catch { /* non-json body */ }
-        }
-        return new Response(JSON.stringify({}), { status: 200 });
-    }) as unknown as typeof fetch;
+  // Mock fetch to capture interaction responses
+  globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+    if (init?.body) {
+      try {
+        capturedResponse = JSON.parse(String(init.body));
+      } catch {
+        /* non-json body */
+      }
+    }
+    return new Response(JSON.stringify({}), { status: 200 });
+  }) as unknown as typeof fetch;
 });
 
 afterEach(() => {
-    db.close();
-    globalThis.fetch = originalFetch;
-    if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
-    else delete process.env.DISCORD_APP_ID;
+  db.close();
+  globalThis.fetch = originalFetch;
+  if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
+  else delete process.env.DISCORD_APP_ID;
 });
 
 describe('Discord /tasks command', () => {
-    test('shows empty state when no tasks', async () => {
-        const ctx = createTestContext();
-        await handleInteraction(ctx, makeInteraction('tasks'));
+  test('shows empty state when no tasks', async () => {
+    const ctx = createTestContext();
+    await handleInteraction(ctx, makeInteraction('tasks'));
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('No active or pending work tasks');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('No active or pending work tasks');
+  });
 
-    test('shows active tasks as embed', async () => {
-        const ctx = createTestContext();
-        const project = createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
-        const agent = createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'test-model' });
+  test('shows active tasks as embed', async () => {
+    const ctx = createTestContext();
+    const project = createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+    const agent = createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'test-model' });
 
-        db.query(`
+    db.query(`
             INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, created_at)
             VALUES (?, ?, ?, ?, 'running', 'web', '{}', datetime('now'))
         `).run('task-1', agent.id, project.id, 'Fix the bug in authentication');
 
-        await handleInteraction(ctx, makeInteraction('tasks'));
+    await handleInteraction(ctx, makeInteraction('tasks'));
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
-        expect(embeds).toBeDefined();
-        expect(embeds[0].title).toBe('Work Tasks');
-        const activeField = embeds[0].fields.find((f: { name: string }) => f.name === 'Active');
-        expect(activeField).toBeDefined();
-    });
+    expect(capturedResponse).not.toBeNull();
+    const embeds = capturedResponse!.data?.embeds as Array<{
+      title: string;
+      fields: Array<{ name: string; value: string }>;
+    }>;
+    expect(embeds).toBeDefined();
+    expect(embeds[0].title).toBe('Work Tasks');
+    const activeField = embeds[0].fields.find((f: { name: string }) => f.name === 'Active');
+    expect(activeField).toBeDefined();
+  });
 });
 
 describe('Discord /schedule command', () => {
-    test('shows empty state when no schedules', async () => {
-        const ctx = createTestContext();
-        await handleInteraction(ctx, makeInteraction('schedule'));
+  test('shows empty state when no schedules', async () => {
+    const ctx = createTestContext();
+    await handleInteraction(ctx, makeInteraction('schedule'));
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('No schedules');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('No schedules');
+  });
 
-    test('shows active schedules', async () => {
-        const ctx = createTestContext();
-        const agent = createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'test-model' });
+  test('shows active schedules', async () => {
+    const ctx = createTestContext();
+    const agent = createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'test-model' });
 
-        db.query(`
+    db.query(`
             INSERT INTO agent_schedules (id, agent_id, name, description, cron_expression, actions, approval_policy, status, execution_count, next_run_at, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, 'auto', 'active', 3, ?, datetime('now'), datetime('now'))
         `).run(
-            'sched-1', agent.id, 'Nightly Review', 'Reviews code nightly',
-            '0 2 * * *', '[]',
-            new Date(Date.now() + 3600000).toISOString(),
-        );
+      'sched-1',
+      agent.id,
+      'Nightly Review',
+      'Reviews code nightly',
+      '0 2 * * *',
+      '[]',
+      new Date(Date.now() + 3600000).toISOString(),
+    );
 
-        await handleInteraction(ctx, makeInteraction('schedule'));
+    await handleInteraction(ctx, makeInteraction('schedule'));
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
-        expect(embeds).toBeDefined();
-        expect(embeds[0].title).toBe('Schedules');
-        expect(embeds[0].description).toContain('Nightly Review');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
+    expect(embeds).toBeDefined();
+    expect(embeds[0].title).toBe('Schedules');
+    expect(embeds[0].description).toContain('Nightly Review');
+  });
 });
 
 describe('Discord /config command', () => {
-    test('shows config for admin users', async () => {
-        const ctx = createTestContext({ defaultPermissionLevel: 3 });
-        await handleInteraction(ctx, makeInteraction('config'));
+  test('shows config for admin users', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 3 });
+    await handleInteraction(ctx, makeInteraction('config'));
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
-        expect(embeds).toBeDefined();
-        expect(embeds[0].title).toBe('Bot Configuration');
+    expect(capturedResponse).not.toBeNull();
+    const embeds = capturedResponse!.data?.embeds as Array<{
+      title: string;
+      fields: Array<{ name: string; value: string }>;
+    }>;
+    expect(embeds).toBeDefined();
+    expect(embeds[0].title).toBe('Bot Configuration');
 
-        const modeField = embeds[0].fields.find((f: { name: string }) => f.name === 'Mode');
-        expect(modeField?.value).toBe('chat');
-    });
+    const modeField = embeds[0].fields.find((f: { name: string }) => f.name === 'Mode');
+    expect(modeField?.value).toBe('chat');
+  });
 
-    test('denies non-admin users', async () => {
-        const ctx = createTestContext({ defaultPermissionLevel: 2 });
-        await handleInteraction(ctx, makeInteraction('config'));
+  test('denies non-admin users', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 });
+    await handleInteraction(ctx, makeInteraction('config'));
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('Only admins');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('Only admins');
+  });
 });
 
 describe('Discord /session model suffix stripping', () => {
-    test('finds agent when name includes model suffix like "(claude-opus-4-6)"', async () => {
-        const ctx = createTestContext();
-        createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'claude-opus-4-6' });
-        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+  test('finds agent when name includes model suffix like "(claude-opus-4-6)"', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'claude-opus-4-6' });
+    createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'TestAgent (claude-opus-4-6)' },
-            { name: 'topic', value: 'Test topic' },
-        ]));
+    await handleInteraction(
+      ctx,
+      makeInteraction('session', [
+        { name: 'agent', value: 'TestAgent (claude-opus-4-6)' },
+        { name: 'topic', value: 'Test topic' },
+      ]),
+    );
 
-        expect(capturedResponse).not.toBeNull();
-        const content = getContent();
-        // Should succeed and mention the agent, not show "Agent not found"
-        expect(content).toContain('TestAgent');
-        expect(content).not.toContain('Agent not found');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = getContent();
+    // Should succeed and mention the agent, not show "Agent not found"
+    expect(content).toContain('TestAgent');
+    expect(content).not.toContain('Agent not found');
+  });
 
-    test('finds agent when name includes arbitrary model suffix', async () => {
-        const ctx = createTestContext();
-        createAgent(db, { name: 'MyAssistant', systemPrompt: 'test', model: 'some-model' });
-        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+  test('finds agent when name includes arbitrary model suffix', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'MyAssistant', systemPrompt: 'test', model: 'some-model' });
+    createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'MyAssistant (some-model)' },
-            { name: 'topic', value: 'Debug issue' },
-        ]));
+    await handleInteraction(
+      ctx,
+      makeInteraction('session', [
+        { name: 'agent', value: 'MyAssistant (some-model)' },
+        { name: 'topic', value: 'Debug issue' },
+      ]),
+    );
 
-        expect(capturedResponse).not.toBeNull();
-        const content = getContent();
-        expect(content).toContain('MyAssistant');
-        expect(content).not.toContain('Agent not found');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = getContent();
+    expect(content).toContain('MyAssistant');
+    expect(content).not.toContain('Agent not found');
+  });
 
-    test('still rejects truly unknown agent names with suffix', async () => {
-        const ctx = createTestContext();
-        createAgent(db, { name: 'RealAgent', systemPrompt: 'test', model: 'test-model' });
+  test('still rejects truly unknown agent names with suffix', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'RealAgent', systemPrompt: 'test', model: 'test-model' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'FakeAgent (claude-opus-4-6)' },
-            { name: 'topic', value: 'Test topic' },
-        ]));
+    await handleInteraction(
+      ctx,
+      makeInteraction('session', [
+        { name: 'agent', value: 'FakeAgent (claude-opus-4-6)' },
+        { name: 'topic', value: 'Test topic' },
+      ]),
+    );
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('Agent not found');
-        expect(content).toContain('FakeAgent');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('Agent not found');
+    expect(content).toContain('FakeAgent');
+  });
 });
 
 describe('Discord /work model suffix stripping', () => {
-    test('finds agent when name includes model suffix', async () => {
-        const ctx = createTestContext();
-        const agent = createAgent(db, { name: 'WorkerBot', systemPrompt: 'test', model: 'claude-opus-4-6' });
-        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+  test('finds agent when name includes model suffix', async () => {
+    const ctx = createTestContext();
+    const agent = createAgent(db, { name: 'WorkerBot', systemPrompt: 'test', model: 'claude-opus-4-6' });
+    createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
 
-        // Provide a workTaskService mock so the /work command proceeds
-        ctx.workTaskService = {
-            create: mock(async (params: Record<string, unknown>) => ({
-                id: 'task-123',
-                agentId: agent.id,
-                description: params.description,
-                status: 'running',
-                branchName: null,
-            })),
-        } as unknown as InteractionContext['workTaskService'];
+    // Provide a workTaskService mock so the /work command proceeds
+    ctx.workTaskService = {
+      create: mock(async (params: Record<string, unknown>) => ({
+        id: 'task-123',
+        agentId: agent.id,
+        description: params.description,
+        status: 'running',
+        branchName: null,
+      })),
+    } as unknown as InteractionContext['workTaskService'];
 
-        await handleInteraction(ctx, makeInteraction('work', [
-            { name: 'description', value: 'Fix the tests' },
-            { name: 'agent', value: 'WorkerBot (claude-opus-4-6)' },
-        ]));
+    await handleInteraction(
+      ctx,
+      makeInteraction('work', [
+        { name: 'description', value: 'Fix the tests' },
+        { name: 'agent', value: 'WorkerBot (claude-opus-4-6)' },
+      ]),
+    );
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        // Should succeed — mentions the agent name, not "Agent not found"
-        expect(content).toContain('WorkerBot');
-        expect(content).not.toContain('Agent not found');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    // Should succeed — mentions the agent name, not "Agent not found"
+    expect(content).toContain('WorkerBot');
+    expect(content).not.toContain('Agent not found');
+  });
 
-    test('still rejects unknown agent names with suffix in /work', async () => {
-        const ctx = createTestContext();
-        createAgent(db, { name: 'RealWorker', systemPrompt: 'test', model: 'test-model' });
+  test('still rejects unknown agent names with suffix in /work', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'RealWorker', systemPrompt: 'test', model: 'test-model' });
 
-        ctx.workTaskService = {
-            create: mock(async () => ({})),
-        } as unknown as InteractionContext['workTaskService'];
+    ctx.workTaskService = {
+      create: mock(async () => ({})),
+    } as unknown as InteractionContext['workTaskService'];
 
-        await handleInteraction(ctx, makeInteraction('work', [
-            { name: 'description', value: 'Do something' },
-            { name: 'agent', value: 'GhostAgent (claude-opus-4-6)' },
-        ]));
+    await handleInteraction(
+      ctx,
+      makeInteraction('work', [
+        { name: 'description', value: 'Do something' },
+        { name: 'agent', value: 'GhostAgent (claude-opus-4-6)' },
+      ]),
+    );
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('Agent not found');
-        expect(content).toContain('GhostAgent');
-    });
+    expect(capturedResponse).not.toBeNull();
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('Agent not found');
+    expect(content).toContain('GhostAgent');
+  });
 });

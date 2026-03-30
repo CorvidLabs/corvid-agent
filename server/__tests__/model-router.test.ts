@@ -4,505 +4,521 @@
  * - router.ts: Complexity estimation, model selection
  * - fallback.ts: Fallback chains, provider health
  */
-import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
-    MODEL_PRICING,
-    getModelPricing,
-    estimateCost,
-    getModelsForProvider,
-    getModelsByCost,
+  estimateCost,
+  getModelPricing,
+  getModelsByCost,
+  getModelsForProvider,
+  MODEL_PRICING,
 } from '../providers/cost-table';
-import { estimateComplexity, ModelRouter, resolveModelForTier, CLAUDE_TIER_MODELS, _resetClaudeCliCache } from '../providers/router';
-import { FallbackManager, DEFAULT_FALLBACK_CHAINS } from '../providers/fallback';
+import { DEFAULT_FALLBACK_CHAINS, FallbackManager } from '../providers/fallback';
 import { LlmProviderRegistry } from '../providers/registry';
+import {
+  _resetClaudeCliCache,
+  CLAUDE_TIER_MODELS,
+  estimateComplexity,
+  ModelRouter,
+  resolveModelForTier,
+} from '../providers/router';
+import type {
+  LlmCompletionParams,
+  LlmCompletionResult,
+  LlmProvider,
+  LlmProviderInfo,
+  LlmProviderType,
+} from '../providers/types';
 import { ModelTier } from '../providers/types';
-import type { LlmProvider, LlmProviderType, LlmCompletionParams, LlmCompletionResult, LlmProviderInfo } from '../providers/types';
 
 // ─── Mock Provider ───────────────────────────────────────────────────────────
 
 function createMockProvider(type: LlmProviderType, models: string[]): LlmProvider {
-    return {
+  return {
+    type,
+    executionMode: 'direct' as const,
+    getInfo(): LlmProviderInfo {
+      return {
         type,
-        executionMode: 'direct' as const,
-        getInfo(): LlmProviderInfo {
-            return {
-                type,
-                name: `Mock ${type}`,
-                executionMode: 'direct',
-                models,
-                defaultModel: models[0],
-                supportsTools: true,
-                supportsStreaming: true,
-            };
-        },
-        async complete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
-            return {
-                content: 'Mock response',
-                model: params.model,
-                usage: { inputTokens: 100, outputTokens: 50 },
-            };
-        },
-        async isAvailable(): Promise<boolean> {
-            return true;
-        },
-    };
+        name: `Mock ${type}`,
+        executionMode: 'direct',
+        models,
+        defaultModel: models[0],
+        supportsTools: true,
+        supportsStreaming: true,
+      };
+    },
+    async complete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
+      return {
+        content: 'Mock response',
+        model: params.model,
+        usage: { inputTokens: 100, outputTokens: 50 },
+      };
+    },
+    async isAvailable(): Promise<boolean> {
+      return true;
+    },
+  };
 }
 
 // ─── Cost Table Tests ────────────────────────────────────────────────────────
 
 describe('Cost Table', () => {
-    test('MODEL_PRICING has entries for all providers', () => {
-        const providers = new Set(MODEL_PRICING.map((m) => m.provider));
-        expect(providers.has('anthropic')).toBe(true);
-        expect(providers.has('openai')).toBe(true);
-        expect(providers.has('ollama')).toBe(true);
-    });
+  test('MODEL_PRICING has entries for all providers', () => {
+    const providers = new Set(MODEL_PRICING.map((m) => m.provider));
+    expect(providers.has('anthropic')).toBe(true);
+    expect(providers.has('openai')).toBe(true);
+    expect(providers.has('ollama')).toBe(true);
+  });
 
-    test('all models have required fields', () => {
-        for (const model of MODEL_PRICING) {
-            expect(model.model).toBeTruthy();
-            expect(model.provider).toBeTruthy();
-            expect(model.displayName).toBeTruthy();
-            expect(typeof model.inputPricePerMillion).toBe('number');
-            expect(typeof model.outputPricePerMillion).toBe('number');
-            expect(model.maxContextTokens).toBeGreaterThan(0);
-            expect(model.maxOutputTokens).toBeGreaterThan(0);
-            expect(model.capabilityTier).toBeGreaterThanOrEqual(1);
-            expect(model.capabilityTier).toBeLessThanOrEqual(4);
-        }
-    });
+  test('all models have required fields', () => {
+    for (const model of MODEL_PRICING) {
+      expect(model.model).toBeTruthy();
+      expect(model.provider).toBeTruthy();
+      expect(model.displayName).toBeTruthy();
+      expect(typeof model.inputPricePerMillion).toBe('number');
+      expect(typeof model.outputPricePerMillion).toBe('number');
+      expect(model.maxContextTokens).toBeGreaterThan(0);
+      expect(model.maxOutputTokens).toBeGreaterThan(0);
+      expect(model.capabilityTier).toBeGreaterThanOrEqual(1);
+      expect(model.capabilityTier).toBeLessThanOrEqual(4);
+    }
+  });
 
-    test('getModelPricing returns correct model', () => {
-        const opus = getModelPricing('claude-opus-4-6');
-        expect(opus).not.toBeNull();
-        expect(opus!.provider).toBe('anthropic');
-        expect(opus!.capabilityTier).toBe(1);
-    });
+  test('getModelPricing returns correct model', () => {
+    const opus = getModelPricing('claude-opus-4-6');
+    expect(opus).not.toBeNull();
+    expect(opus!.provider).toBe('anthropic');
+    expect(opus!.capabilityTier).toBe(1);
+  });
 
-    test('getModelPricing returns null for unknown model', () => {
-        expect(getModelPricing('nonexistent-model')).toBeNull();
-    });
+  test('getModelPricing returns null for unknown model', () => {
+    expect(getModelPricing('nonexistent-model')).toBeNull();
+  });
 
-    test('estimateCost calculates correctly', () => {
-        // claude-opus-4-6: $5/M input, $25/M output
-        const cost = estimateCost('claude-opus-4-6', 1_000_000, 1_000_000);
-        expect(cost).toBe(30); // $5 input + $25 output
-    });
+  test('estimateCost calculates correctly', () => {
+    // claude-opus-4-6: $5/M input, $25/M output
+    const cost = estimateCost('claude-opus-4-6', 1_000_000, 1_000_000);
+    expect(cost).toBe(30); // $5 input + $25 output
+  });
 
-    test('estimateCost returns 0 for unknown model', () => {
-        expect(estimateCost('nonexistent', 1000, 1000)).toBe(0);
-    });
+  test('estimateCost returns 0 for unknown model', () => {
+    expect(estimateCost('nonexistent', 1000, 1000)).toBe(0);
+  });
 
-    test('ollama models have zero cost', () => {
-        const ollamaModels = getModelsForProvider('ollama');
-        expect(ollamaModels.length).toBeGreaterThan(0);
-        for (const m of ollamaModels) {
-            expect(m.inputPricePerMillion).toBe(0);
-            expect(m.outputPricePerMillion).toBe(0);
-        }
-    });
+  test('ollama models have zero cost', () => {
+    const ollamaModels = getModelsForProvider('ollama');
+    expect(ollamaModels.length).toBeGreaterThan(0);
+    for (const m of ollamaModels) {
+      expect(m.inputPricePerMillion).toBe(0);
+      expect(m.outputPricePerMillion).toBe(0);
+    }
+  });
 
-    test('getModelsByCost returns cheapest first', () => {
-        const sorted = getModelsByCost();
-        for (let i = 1; i < sorted.length; i++) {
-            expect(sorted[i].outputPricePerMillion).toBeGreaterThanOrEqual(
-                sorted[i - 1].outputPricePerMillion,
-            );
-        }
-    });
+  test('getModelsByCost returns cheapest first', () => {
+    const sorted = getModelsByCost();
+    for (let i = 1; i < sorted.length; i++) {
+      expect(sorted[i].outputPricePerMillion).toBeGreaterThanOrEqual(sorted[i - 1].outputPricePerMillion);
+    }
+  });
 
-    test('getModelsForProvider filters correctly', () => {
-        const anthropic = getModelsForProvider('anthropic');
-        expect(anthropic.length).toBeGreaterThan(0);
-        for (const m of anthropic) {
-            expect(m.provider).toBe('anthropic');
-        }
-    });
+  test('getModelsForProvider filters correctly', () => {
+    const anthropic = getModelsForProvider('anthropic');
+    expect(anthropic.length).toBeGreaterThan(0);
+    for (const m of anthropic) {
+      expect(m.provider).toBe('anthropic');
+    }
+  });
 });
 
 // ─── Complexity Estimation Tests ─────────────────────────────────────────────
 
 describe('Complexity Estimation', () => {
-    test('simple prompts are classified as simple', () => {
-        const { level } = estimateComplexity('list files');
-        expect(level).toBe('simple');
-    });
+  test('simple prompts are classified as simple', () => {
+    const { level } = estimateComplexity('list files');
+    expect(level).toBe('simple');
+  });
 
-    test('short queries are simple or moderate', () => {
-        const { level } = estimateComplexity('show status');
-        expect(['simple', 'moderate']).toContain(level);
-    });
+  test('short queries are simple or moderate', () => {
+    const { level } = estimateComplexity('show status');
+    expect(['simple', 'moderate']).toContain(level);
+  });
 
-    test('complex prompts with keywords are classified higher', () => {
-        const { level } = estimateComplexity(
-            'Refactor the authentication system, migrate to JWT, and optimize database queries',
-        );
-        expect(['complex', 'expert']).toContain(level);
-    });
+  test('complex prompts with keywords are classified higher', () => {
+    const { level } = estimateComplexity(
+      'Refactor the authentication system, migrate to JWT, and optimize database queries',
+    );
+    expect(['complex', 'expert']).toContain(level);
+  });
 
-    test('multi-step prompts are classified as complex or expert', () => {
-        const { level } = estimateComplexity(
-            'First analyze the codebase. Then refactor the API layer. After that, implement tests.',
-        );
-        expect(['complex', 'expert']).toContain(level);
-    });
+  test('multi-step prompts are classified as complex or expert', () => {
+    const { level } = estimateComplexity(
+      'First analyze the codebase. Then refactor the API layer. After that, implement tests.',
+    );
+    expect(['complex', 'expert']).toContain(level);
+  });
 
-    test('returns complexity signals', () => {
-        const { signals } = estimateComplexity('refactor and optimize the code');
-        expect(signals.inputTokenEstimate).toBeGreaterThan(0);
-        expect(typeof signals.requiresTools).toBe('boolean');
-        expect(typeof signals.requiresThinking).toBe('boolean');
-        expect(signals.complexityKeywords).toBeGreaterThanOrEqual(0);
-    });
+  test('returns complexity signals', () => {
+    const { signals } = estimateComplexity('refactor and optimize the code');
+    expect(signals.inputTokenEstimate).toBeGreaterThan(0);
+    expect(typeof signals.requiresTools).toBe('boolean');
+    expect(typeof signals.requiresThinking).toBe('boolean');
+    expect(signals.complexityKeywords).toBeGreaterThanOrEqual(0);
+  });
 
-    test('tool-related prompts signal requiresTools', () => {
-        const { signals } = estimateComplexity('create a new file and run the tests');
-        expect(signals.requiresTools).toBe(true);
-    });
+  test('tool-related prompts signal requiresTools', () => {
+    const { signals } = estimateComplexity('create a new file and run the tests');
+    expect(signals.requiresTools).toBe(true);
+  });
 });
 
 // ─── Model Router Tests ──────────────────────────────────────────────────────
 
 describe('ModelRouter', () => {
-    let registry: LlmProviderRegistry;
-    let router: ModelRouter;
-    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
-    const savedOpenaiKey = process.env.OPENAI_API_KEY;
+  let registry: LlmProviderRegistry;
+  let router: ModelRouter;
+  const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const savedOpenaiKey = process.env.OPENAI_API_KEY;
 
-    beforeEach(() => {
-        // Set dummy API keys so registry doesn't auto-restrict to ollama-only
-        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
-        process.env.OPENAI_API_KEY = 'sk-test-dummy';
-        // Create a fresh registry (bypass singleton for tests)
-        registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001']));
-        registry.register(createMockProvider('openai', ['gpt-4o', 'gpt-4o-mini']));
-        router = new ModelRouter(registry);
+  beforeEach(() => {
+    // Set dummy API keys so registry doesn't auto-restrict to ollama-only
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+    process.env.OPENAI_API_KEY = 'sk-test-dummy';
+    // Create a fresh registry (bypass singleton for tests)
+    registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(
+      createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001']),
+    );
+    registry.register(createMockProvider('openai', ['gpt-4o', 'gpt-4o-mini']));
+    router = new ModelRouter(registry);
+  });
+
+  afterEach(() => {
+    if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+    if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = savedOpenaiKey;
+  });
+
+  test('selects model for simple prompt', () => {
+    const result = router.selectModel('list files');
+    expect(result.model).toBeTruthy();
+    expect(result.provider).toBeTruthy();
+    expect(result.complexity).toBeTruthy();
+    expect(typeof result.estimatedCost).toBe('number');
+  });
+
+  test('selects cheaper model for simple tasks', () => {
+    const simple = router.selectModel('show status');
+    const complex = router.selectModel(
+      'Refactor the entire authentication system, migrate to JWT tokens, and optimize all database queries for performance',
+    );
+
+    // Simple task should select a cheaper or equal cost model
+    expect(simple.estimatedCost).toBeLessThanOrEqual(complex.estimatedCost + 0.01);
+  });
+
+  test('respects preferred provider', () => {
+    const result = router.selectModel('help me code', {
+      preferredProvider: 'openai',
     });
+    expect(result.provider).toBe('openai');
+  });
 
-    afterEach(() => {
-        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
-        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
-        else process.env.OPENAI_API_KEY = savedOpenaiKey;
-    });
+  test('returns complexity level', () => {
+    const simple = router.selectModel('list');
+    const complex = router.selectModel('refactor and architect the entire system design');
 
-    test('selects model for simple prompt', () => {
-        const result = router.selectModel('list files');
-        expect(result.model).toBeTruthy();
-        expect(result.provider).toBeTruthy();
-        expect(result.complexity).toBeTruthy();
-        expect(typeof result.estimatedCost).toBe('number');
-    });
+    expect(['simple', 'moderate']).toContain(simple.complexity);
+    expect(['complex', 'expert']).toContain(complex.complexity);
+  });
 
-    test('selects cheaper model for simple tasks', () => {
-        const simple = router.selectModel('show status');
-        const complex = router.selectModel('Refactor the entire authentication system, migrate to JWT tokens, and optimize all database queries for performance');
+  test('getFallbackChain returns chain for each complexity', () => {
+    const expert = router.getFallbackChain('expert');
+    const simple = router.getFallbackChain('simple');
 
-        // Simple task should select a cheaper or equal cost model
-        expect(simple.estimatedCost).toBeLessThanOrEqual(complex.estimatedCost + 0.01);
-    });
+    expect(expert.chain.length).toBeGreaterThan(0);
+    expect(simple.chain.length).toBeGreaterThan(0);
+  });
 
-    test('respects preferred provider', () => {
-        const result = router.selectModel('help me code', {
-            preferredProvider: 'openai',
-        });
-        expect(result.provider).toBe('openai');
-    });
-
-    test('returns complexity level', () => {
-        const simple = router.selectModel('list');
-        const complex = router.selectModel('refactor and architect the entire system design');
-
-        expect(['simple', 'moderate']).toContain(simple.complexity);
-        expect(['complex', 'expert']).toContain(complex.complexity);
-    });
-
-    test('getFallbackChain returns chain for each complexity', () => {
-        const expert = router.getFallbackChain('expert');
-        const simple = router.getFallbackChain('simple');
-
-        expect(expert.chain.length).toBeGreaterThan(0);
-        expect(simple.chain.length).toBeGreaterThan(0);
-    });
-
-    test('getStats returns current routing info', () => {
-        const stats = router.getStats();
-        expect(stats.availableModels).toBeGreaterThan(0);
-        expect(stats.availableProviders.length).toBeGreaterThan(0);
-        expect(Array.isArray(stats.healthStatus)).toBe(true);
-    });
+  test('getStats returns current routing info', () => {
+    const stats = router.getStats();
+    expect(stats.availableModels).toBeGreaterThan(0);
+    expect(stats.availableProviders.length).toBeGreaterThan(0);
+    expect(Array.isArray(stats.healthStatus)).toBe(true);
+  });
 });
 
 // ─── Fallback Manager Tests ──────────────────────────────────────────────────
 
 describe('FallbackManager', () => {
-    let registry: LlmProviderRegistry;
-    let fallback: FallbackManager;
-    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
-    const savedOpenaiKey = process.env.OPENAI_API_KEY;
-    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+  let registry: LlmProviderRegistry;
+  let fallback: FallbackManager;
+  const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const savedOpenaiKey = process.env.OPENAI_API_KEY;
+  const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
 
-    beforeEach(() => {
-        // Set dummy API keys so registry doesn't auto-restrict to ollama-only
-        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
-        process.env.OPENAI_API_KEY = 'sk-test-dummy';
-        // Explicitly allow all providers to avoid cross-test env pollution
-        process.env.ENABLED_PROVIDERS = 'anthropic,openai,ollama,openrouter,cursor';
-        registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('anthropic', ['claude-sonnet-4-5-20250929']));
-        registry.register(createMockProvider('openai', ['gpt-4o']));
-        fallback = new FallbackManager(registry);
-    });
+  beforeEach(() => {
+    // Set dummy API keys so registry doesn't auto-restrict to ollama-only
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+    process.env.OPENAI_API_KEY = 'sk-test-dummy';
+    // Explicitly allow all providers to avoid cross-test env pollution
+    process.env.ENABLED_PROVIDERS = 'anthropic,openai,ollama,openrouter,cursor';
+    registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(createMockProvider('anthropic', ['claude-sonnet-4-5-20250929']));
+    registry.register(createMockProvider('openai', ['gpt-4o']));
+    fallback = new FallbackManager(registry);
+  });
 
-    afterEach(() => {
-        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
-        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
-        else process.env.OPENAI_API_KEY = savedOpenaiKey;
-        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
-        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
-    });
+  afterEach(() => {
+    if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+    if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = savedOpenaiKey;
+    if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+    else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+  });
 
-    test('DEFAULT_FALLBACK_CHAINS has expected chains', () => {
-        expect(DEFAULT_FALLBACK_CHAINS['high-capability']).toBeTruthy();
-        expect(DEFAULT_FALLBACK_CHAINS['balanced']).toBeTruthy();
-        expect(DEFAULT_FALLBACK_CHAINS['cost-optimized']).toBeTruthy();
-    });
+  test('DEFAULT_FALLBACK_CHAINS has expected chains', () => {
+    expect(DEFAULT_FALLBACK_CHAINS['high-capability']).toBeTruthy();
+    expect(DEFAULT_FALLBACK_CHAINS.balanced).toBeTruthy();
+    expect(DEFAULT_FALLBACK_CHAINS['cost-optimized']).toBeTruthy();
+  });
 
-    test('all chains have at least one entry', () => {
-        for (const [, chain] of Object.entries(DEFAULT_FALLBACK_CHAINS)) {
-            expect(chain.chain.length).toBeGreaterThan(0);
-        }
-    });
+  test('all chains have at least one entry', () => {
+    for (const [, chain] of Object.entries(DEFAULT_FALLBACK_CHAINS)) {
+      expect(chain.chain.length).toBeGreaterThan(0);
+    }
+  });
 
-    test('isProviderAvailable returns true initially', () => {
-        expect(fallback.isProviderAvailable('anthropic')).toBe(true);
-        expect(fallback.isProviderAvailable('openai')).toBe(true);
-    });
+  test('isProviderAvailable returns true initially', () => {
+    expect(fallback.isProviderAvailable('anthropic')).toBe(true);
+    expect(fallback.isProviderAvailable('openai')).toBe(true);
+  });
 
-    test('getHealthStatus returns empty initially', () => {
-        expect(fallback.getHealthStatus()).toEqual([]);
-    });
+  test('getHealthStatus returns empty initially', () => {
+    expect(fallback.getHealthStatus()).toEqual([]);
+  });
 
-    test('resetHealth clears all status', () => {
-        fallback.resetHealth();
-        expect(fallback.getHealthStatus()).toEqual([]);
-    });
+  test('resetHealth clears all status', () => {
+    fallback.resetHealth();
+    expect(fallback.getHealthStatus()).toEqual([]);
+  });
 
-    test('completeWithFallback succeeds with first provider', async () => {
-        const result = await fallback.completeWithFallback(
-            {
-                model: 'claude-sonnet-4-5-20250929',
-                systemPrompt: 'You are helpful',
-                messages: [{ role: 'user', content: 'Hello' }],
-            },
-            DEFAULT_FALLBACK_CHAINS['balanced'],
-        );
+  test('completeWithFallback succeeds with first provider', async () => {
+    const result = await fallback.completeWithFallback(
+      {
+        model: 'claude-sonnet-4-5-20250929',
+        systemPrompt: 'You are helpful',
+        messages: [{ role: 'user', content: 'Hello' }],
+      },
+      DEFAULT_FALLBACK_CHAINS.balanced,
+    );
 
-        expect(result.content).toBe('Mock response');
-        expect(result.usedProvider).toBeTruthy();
-        expect(result.usedModel).toBeTruthy();
-    });
+    expect(result.content).toBe('Mock response');
+    expect(result.usedProvider).toBeTruthy();
+    expect(result.usedModel).toBeTruthy();
+  });
 
-    test('completeWithFallback fails when chain is empty', async () => {
-        try {
-            await fallback.completeWithFallback(
-                {
-                    model: 'test',
-                    systemPrompt: 'test',
-                    messages: [{ role: 'user', content: 'test' }],
-                },
-                { chain: [] },
-            );
-            expect(true).toBe(false); // Should not reach here
-        } catch (err: unknown) {
-            expect((err as Error).message).toContain('All providers in fallback chain failed');
-        }
-    });
+  test('completeWithFallback fails when chain is empty', async () => {
+    try {
+      await fallback.completeWithFallback(
+        {
+          model: 'test',
+          systemPrompt: 'test',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        { chain: [] },
+      );
+      expect(true).toBe(false); // Should not reach here
+    } catch (err: unknown) {
+      expect((err as Error).message).toContain('All providers in fallback chain failed');
+    }
+  });
 
-    // Council decision 2026-03-13: production chains must not contain Ollama
-    test('production fallback chains do not contain Ollama entries', () => {
-        const productionChains = ['high-capability', 'balanced', 'cost-optimized'];
-        for (const name of productionChains) {
-            const chain = DEFAULT_FALLBACK_CHAINS[name];
-            expect(chain).toBeTruthy();
-            const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
-            expect(ollamaEntries).toHaveLength(0);
-        }
-    });
+  // Council decision 2026-03-13: production chains must not contain Ollama
+  test('production fallback chains do not contain Ollama entries', () => {
+    const productionChains = ['high-capability', 'balanced', 'cost-optimized'];
+    for (const name of productionChains) {
+      const chain = DEFAULT_FALLBACK_CHAINS[name];
+      expect(chain).toBeTruthy();
+      const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
+      expect(ollamaEntries).toHaveLength(0);
+    }
+  });
 
-    test('local and cloud chains retain Ollama entries for experimental use', () => {
-        const experimentalChains = ['local', 'cloud'];
-        for (const name of experimentalChains) {
-            const chain = DEFAULT_FALLBACK_CHAINS[name];
-            expect(chain).toBeTruthy();
-            const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
-            expect(ollamaEntries.length).toBeGreaterThan(0);
-        }
-    });
+  test('local and cloud chains retain Ollama entries for experimental use', () => {
+    const experimentalChains = ['local', 'cloud'];
+    for (const name of experimentalChains) {
+      const chain = DEFAULT_FALLBACK_CHAINS[name];
+      expect(chain).toBeTruthy();
+      const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
+      expect(ollamaEntries.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 // ─── ModelTier Dispatch Tests ─────────────────────────────────────────────────
 
 describe('ModelTier', () => {
-    test('CLAUDE_TIER_MODELS maps all tiers to claude model IDs', () => {
-        expect(CLAUDE_TIER_MODELS[ModelTier.OPUS]).toBe('claude-opus-4-6');
-        expect(CLAUDE_TIER_MODELS[ModelTier.SONNET]).toBe('claude-sonnet-4-6');
-        expect(CLAUDE_TIER_MODELS[ModelTier.HAIKU]).toBe('claude-haiku-4-5-20251001');
-    });
+  test('CLAUDE_TIER_MODELS maps all tiers to claude model IDs', () => {
+    expect(CLAUDE_TIER_MODELS[ModelTier.OPUS]).toBe('claude-opus-4-6');
+    expect(CLAUDE_TIER_MODELS[ModelTier.SONNET]).toBe('claude-sonnet-4-6');
+    expect(CLAUDE_TIER_MODELS[ModelTier.HAIKU]).toBe('claude-haiku-4-5-20251001');
+  });
 
-    test('all CLAUDE_TIER_MODELS values start with "claude-"', () => {
-        for (const model of Object.values(CLAUDE_TIER_MODELS)) {
-            expect(model.startsWith('claude-')).toBe(true);
-        }
-    });
+  test('all CLAUDE_TIER_MODELS values start with "claude-"', () => {
+    for (const model of Object.values(CLAUDE_TIER_MODELS)) {
+      expect(model.startsWith('claude-')).toBe(true);
+    }
+  });
 
-    test('resolveModelForTier returns correct model and anthropic provider', () => {
-        expect(resolveModelForTier(ModelTier.OPUS)).toEqual({
-            model: 'claude-opus-4-6',
-            provider: 'anthropic',
-        });
-        expect(resolveModelForTier(ModelTier.SONNET)).toEqual({
-            model: 'claude-sonnet-4-6',
-            provider: 'anthropic',
-        });
-        expect(resolveModelForTier(ModelTier.HAIKU)).toEqual({
-            model: 'claude-haiku-4-5-20251001',
-            provider: 'anthropic',
-        });
+  test('resolveModelForTier returns correct model and anthropic provider', () => {
+    expect(resolveModelForTier(ModelTier.OPUS)).toEqual({
+      model: 'claude-opus-4-6',
+      provider: 'anthropic',
     });
+    expect(resolveModelForTier(ModelTier.SONNET)).toEqual({
+      model: 'claude-sonnet-4-6',
+      provider: 'anthropic',
+    });
+    expect(resolveModelForTier(ModelTier.HAIKU)).toEqual({
+      model: 'claude-haiku-4-5-20251001',
+      provider: 'anthropic',
+    });
+  });
 
-    test('resolveModelForTier never returns an Ollama model', () => {
-        for (const tier of Object.values(ModelTier)) {
-            const { model } = resolveModelForTier(tier);
-            expect(model).not.toContain('ollama');
-            expect(model).not.toContain('llama');
-            expect(model).not.toContain('qwen');
-        }
-    });
+  test('resolveModelForTier never returns an Ollama model', () => {
+    for (const tier of Object.values(ModelTier)) {
+      const { model } = resolveModelForTier(tier);
+      expect(model).not.toContain('ollama');
+      expect(model).not.toContain('llama');
+      expect(model).not.toContain('qwen');
+    }
+  });
 
-    test('ModelTier enum values are correct strings', () => {
-        expect(ModelTier.OPUS as string).toBe('opus');
-        expect(ModelTier.SONNET as string).toBe('sonnet');
-        expect(ModelTier.HAIKU as string).toBe('haiku');
-    });
+  test('ModelTier enum values are correct strings', () => {
+    expect(ModelTier.OPUS as string).toBe('opus');
+    expect(ModelTier.SONNET as string).toBe('sonnet');
+    expect(ModelTier.HAIKU as string).toBe('haiku');
+  });
 });
 
 // ─── selectModelByTier Tests ──────────────────────────────────────────────────
 
 describe('ModelRouter.selectModelByTier', () => {
-    let registry: LlmProviderRegistry;
-    let router: ModelRouter;
-    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
-    const savedOpenaiKey = process.env.OPENAI_API_KEY;
-    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+  let registry: LlmProviderRegistry;
+  let router: ModelRouter;
+  const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const savedOpenaiKey = process.env.OPENAI_API_KEY;
+  const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
 
-    beforeEach(() => {
-        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
-        process.env.OPENAI_API_KEY = 'sk-test-dummy';
-        delete process.env.ENABLED_PROVIDERS;
-        _resetClaudeCliCache(null);
-        registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']));
-        router = new ModelRouter(registry);
-    });
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+    process.env.OPENAI_API_KEY = 'sk-test-dummy';
+    delete process.env.ENABLED_PROVIDERS;
+    _resetClaudeCliCache(null);
+    registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(
+      createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']),
+    );
+    router = new ModelRouter(registry);
+  });
 
-    afterEach(() => {
-        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
-        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
-        else process.env.OPENAI_API_KEY = savedOpenaiKey;
-        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
-        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
-    });
+  afterEach(() => {
+    if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+    if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = savedOpenaiKey;
+    if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+    else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+  });
 
-    test('OPUS tier selects claude-opus-4-6 via anthropic', () => {
-        const result = router.selectModelByTier(ModelTier.OPUS);
-        expect(result.model).toBe('claude-opus-4-6');
-        expect(result.provider).toBe('anthropic');
-    });
+  test('OPUS tier selects claude-opus-4-6 via anthropic', () => {
+    const result = router.selectModelByTier(ModelTier.OPUS);
+    expect(result.model).toBe('claude-opus-4-6');
+    expect(result.provider).toBe('anthropic');
+  });
 
-    test('SONNET tier selects claude-sonnet-4-6 via anthropic', () => {
-        const result = router.selectModelByTier(ModelTier.SONNET);
-        expect(result.model).toBe('claude-sonnet-4-6');
-        expect(result.provider).toBe('anthropic');
-    });
+  test('SONNET tier selects claude-sonnet-4-6 via anthropic', () => {
+    const result = router.selectModelByTier(ModelTier.SONNET);
+    expect(result.model).toBe('claude-sonnet-4-6');
+    expect(result.provider).toBe('anthropic');
+  });
 
-    test('HAIKU tier selects claude-haiku-4-5-20251001 via anthropic', () => {
-        const result = router.selectModelByTier(ModelTier.HAIKU);
-        expect(result.model).toBe('claude-haiku-4-5-20251001');
-        expect(result.provider).toBe('anthropic');
-    });
+  test('HAIKU tier selects claude-haiku-4-5-20251001 via anthropic', () => {
+    const result = router.selectModelByTier(ModelTier.HAIKU);
+    expect(result.model).toBe('claude-haiku-4-5-20251001');
+    expect(result.provider).toBe('anthropic');
+  });
 
-    test('throws when Anthropic provider is unavailable rather than degrading', () => {
-        const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        // No providers registered — simulates Claude API being unavailable
-        const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
-        expect(() => routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET)).toThrow();
-    });
+  test('throws when Anthropic provider is unavailable rather than degrading', () => {
+    const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    // No providers registered — simulates Claude API being unavailable
+    const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
+    expect(() => routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET)).toThrow();
+  });
 
-    test('error message references TaskQueueService', () => {
-        const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
-        try {
-            routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET);
-            expect(true).toBe(false); // should not reach
-        } catch (err: unknown) {
-            expect((err as Error).message).toContain('TaskQueueService');
-        }
-    });
+  test('error message references TaskQueueService', () => {
+    const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
+    try {
+      routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET);
+      expect(true).toBe(false); // should not reach
+    } catch (err: unknown) {
+      expect((err as Error).message).toContain('TaskQueueService');
+    }
+  });
 });
 
 // ─── Ollama Feature Flag Tests ────────────────────────────────────────────────
 
 describe('Ollama OLLAMA_LOCAL_EXPERIMENTAL gate', () => {
-    const savedFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
-    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
-    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+  const savedFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+  const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
 
-    beforeEach(() => {
-        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
-        delete process.env.ENABLED_PROVIDERS;
-        _resetClaudeCliCache(null);
-    });
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+    delete process.env.ENABLED_PROVIDERS;
+    _resetClaudeCliCache(null);
+  });
 
-    afterEach(() => {
-        if (savedFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
-        else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedFlag;
-        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
-        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
-        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
-    });
+  afterEach(() => {
+    if (savedFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+    else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedFlag;
+    if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+    if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+    else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+  });
 
-    test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL is unset', () => {
-        delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
-        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('ollama', ['llama3.3']));
-        expect(registry.get('ollama')).toBeUndefined();
-    });
+  test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL is unset', () => {
+    delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+    const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(createMockProvider('ollama', ['llama3.3']));
+    expect(registry.get('ollama')).toBeUndefined();
+  });
 
-    test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL=false', () => {
-        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'false';
-        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('ollama', ['llama3.3']));
-        expect(registry.get('ollama')).toBeUndefined();
-    });
+  test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL=false', () => {
+    process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'false';
+    const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(createMockProvider('ollama', ['llama3.3']));
+    expect(registry.get('ollama')).toBeUndefined();
+  });
 
-    test('Ollama provider IS registered when OLLAMA_LOCAL_EXPERIMENTAL=true', () => {
-        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
-        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('ollama', ['llama3.3']));
-        expect(registry.get('ollama')).toBeDefined();
-    });
+  test('Ollama provider IS registered when OLLAMA_LOCAL_EXPERIMENTAL=true', () => {
+    process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
+    const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(createMockProvider('ollama', ['llama3.3']));
+    expect(registry.get('ollama')).toBeDefined();
+  });
 
-    test('non-Ollama providers are unaffected by the feature flag', () => {
-        delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
-        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
-        registry.register(createMockProvider('anthropic', ['claude-sonnet-4-6']));
-        registry.register(createMockProvider('openai', ['gpt-4.1']));
-        expect(registry.get('anthropic')).toBeDefined();
-        expect(registry.get('openai')).toBeDefined();
-    });
+  test('non-Ollama providers are unaffected by the feature flag', () => {
+    delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+    const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+    registry.register(createMockProvider('anthropic', ['claude-sonnet-4-6']));
+    registry.register(createMockProvider('openai', ['gpt-4.1']));
+    expect(registry.get('anthropic')).toBeDefined();
+    expect(registry.get('openai')).toBeDefined();
+  });
 });

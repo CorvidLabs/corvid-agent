@@ -1,1 +1,1 @@
-export type { ChannelAdapter, SessionMessage, ChannelStatus } from './types';
+export type { ChannelAdapter, ChannelStatus, SessionMessage } from './types';

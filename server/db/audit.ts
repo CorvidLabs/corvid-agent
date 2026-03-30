@@ -7,8 +7,8 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { getTraceId } from '../observability/trace-context';
 import { createLogger } from '../lib/logger';
+import { getTraceId } from '../observability/trace-context';
 import { queryCount } from './types';
 
 const log = createLogger('Audit');
@@ -16,82 +16,82 @@ const log = createLogger('Audit');
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type AuditAction =
-    | 'credit_grant'
-    | 'credit_deduction'
-    | 'schedule_create'
-    | 'schedule_modify'
-    | 'schedule_execute'
-    | 'schedule_skip'
-    | 'schedule_delete'
-    | 'work_task_create'
-    | 'work_task_complete'
-    | 'work_task_retry'
-    | 'work_task_governance_blocked'
-    | 'workflow_create'
-    | 'workflow_trigger'
-    | 'agent_message_send'
-    | 'config_change'
-    | 'injection_blocked'
-    | 'psk_drift_alert'
-    | 'key_rotation'
-    | 'psk_rotation'
-    | 'api_key_rotation'
-    | 'session_create'
-    | 'session_kill'
-    | 'agent_create'
-    | 'agent_update'
-    | 'agent_delete'
-    | 'tenant_register'
-    | 'tenant_member_add'
-    | 'tenant_member_remove'
-    | 'webhook_register'
-    | 'webhook_delete'
-    | 'auth_login'
-    | 'auth_failed'
-    | 'permission_grant'
-    | 'permission_revoke'
-    | 'permission_emergency_revoke'
-    | 'subscription_create'
-    | 'subscription_cancel'
-    | 'discord_config_update'
-    | 'discord_config_delete'
-    | 'key_access_decrypt'
-    | 'key_access_encrypt'
-    | 'key_access_sign'
-    | 'key_access'
-    | 'key_access_denied'
-    | 'purge_test_data'
-    | 'contact_create'
-    | 'contact_update'
-    | 'contact_delete'
-    | 'link_add'
-    | 'link_remove'
-    | 'link_verify'
-    | 'session_ollama_complexity_warning'
-    | 'discord_permission_denied'
-    | 'discord_rate_limited'
-    | 'agent_conversation_mode_change';
+  | 'credit_grant'
+  | 'credit_deduction'
+  | 'schedule_create'
+  | 'schedule_modify'
+  | 'schedule_execute'
+  | 'schedule_skip'
+  | 'schedule_delete'
+  | 'work_task_create'
+  | 'work_task_complete'
+  | 'work_task_retry'
+  | 'work_task_governance_blocked'
+  | 'workflow_create'
+  | 'workflow_trigger'
+  | 'agent_message_send'
+  | 'config_change'
+  | 'injection_blocked'
+  | 'psk_drift_alert'
+  | 'key_rotation'
+  | 'psk_rotation'
+  | 'api_key_rotation'
+  | 'session_create'
+  | 'session_kill'
+  | 'agent_create'
+  | 'agent_update'
+  | 'agent_delete'
+  | 'tenant_register'
+  | 'tenant_member_add'
+  | 'tenant_member_remove'
+  | 'webhook_register'
+  | 'webhook_delete'
+  | 'auth_login'
+  | 'auth_failed'
+  | 'permission_grant'
+  | 'permission_revoke'
+  | 'permission_emergency_revoke'
+  | 'subscription_create'
+  | 'subscription_cancel'
+  | 'discord_config_update'
+  | 'discord_config_delete'
+  | 'key_access_decrypt'
+  | 'key_access_encrypt'
+  | 'key_access_sign'
+  | 'key_access'
+  | 'key_access_denied'
+  | 'purge_test_data'
+  | 'contact_create'
+  | 'contact_update'
+  | 'contact_delete'
+  | 'link_add'
+  | 'link_remove'
+  | 'link_verify'
+  | 'session_ollama_complexity_warning'
+  | 'discord_permission_denied'
+  | 'discord_rate_limited'
+  | 'agent_conversation_mode_change';
 
 export interface AuditEntry {
-    id: number;
-    timestamp: string;
-    action: AuditAction;
-    actor: string;
-    resourceType: string;
-    resourceId: string | null;
-    detail: string | null;
-    traceId: string | null;
-    ipAddress: string | null;
+  id: number;
+  timestamp: string;
+  action: AuditAction;
+  actor: string;
+  resourceType: string;
+  resourceId: string | null;
+  detail: string | null;
+  traceId: string | null;
+  ipAddress: string | null;
 }
 
 export interface AuditQueryOptions {
-    action?: string;
-    actor?: string;
-    resourceType?: string;
-    startDate?: string;
-    endDate?: string;
-    offset?: number;
-    limit?: number;
+  action?: string;
+  actor?: string;
+  resourceType?: string;
+  startDate?: string;
+  endDate?: string;
+  offset?: number;
+  limit?: number;
 }
 
 // ─── Write operations (insert only) ──────────────────────────────────────
@@ -101,39 +101,31 @@ export interface AuditQueryOptions {
  * Automatically captures the current trace ID from AsyncLocalStorage if available.
  */
 export function recordAudit(
-    db: Database,
-    action: AuditAction,
-    actor: string,
-    resourceType: string,
-    resourceId?: string | null,
-    detail?: string | null,
-    traceId?: string | null,
-    ipAddress?: string | null,
+  db: Database,
+  action: AuditAction,
+  actor: string,
+  resourceType: string,
+  resourceId?: string | null,
+  detail?: string | null,
+  traceId?: string | null,
+  ipAddress?: string | null,
 ): void {
-    const resolvedTraceId = traceId ?? getTraceId() ?? null;
+  const resolvedTraceId = traceId ?? getTraceId() ?? null;
 
-    try {
-        db.query(
-            `INSERT INTO audit_log (action, actor, resource_type, resource_id, detail, trace_id, ip_address)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-            action,
-            actor,
-            resourceType,
-            resourceId ?? null,
-            detail ?? null,
-            resolvedTraceId,
-            ipAddress ?? null,
-        );
-    } catch (err) {
-        // Audit logging should never crash the caller — log and continue
-        log.error('Failed to record audit entry', {
-            action,
-            actor,
-            resourceType,
-            error: err instanceof Error ? err.message : String(err),
-        });
-    }
+  try {
+    db.query(
+      `INSERT INTO audit_log (action, actor, resource_type, resource_id, detail, trace_id, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(action, actor, resourceType, resourceId ?? null, detail ?? null, resolvedTraceId, ipAddress ?? null);
+  } catch (err) {
+    // Audit logging should never crash the caller — log and continue
+    log.error('Failed to record audit entry', {
+      action,
+      actor,
+      resourceType,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 // ─── Read operations ─────────────────────────────────────────────────────
@@ -142,68 +134,70 @@ export function recordAudit(
  * Query audit log entries with optional filters and pagination.
  */
 export function queryAuditLog(db: Database, options: AuditQueryOptions = {}): { entries: AuditEntry[]; total: number } {
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
 
-    if (options.action) {
-        conditions.push('action = ?');
-        params.push(options.action);
-    }
-    if (options.actor) {
-        conditions.push('actor = ?');
-        params.push(options.actor);
-    }
-    if (options.resourceType) {
-        conditions.push('resource_type = ?');
-        params.push(options.resourceType);
-    }
-    if (options.startDate) {
-        conditions.push('timestamp >= ?');
-        params.push(options.startDate);
-    }
-    if (options.endDate) {
-        conditions.push('timestamp <= ?');
-        params.push(options.endDate);
-    }
+  if (options.action) {
+    conditions.push('action = ?');
+    params.push(options.action);
+  }
+  if (options.actor) {
+    conditions.push('actor = ?');
+    params.push(options.actor);
+  }
+  if (options.resourceType) {
+    conditions.push('resource_type = ?');
+    params.push(options.resourceType);
+  }
+  if (options.startDate) {
+    conditions.push('timestamp >= ?');
+    params.push(options.startDate);
+  }
+  if (options.endDate) {
+    conditions.push('timestamp <= ?');
+    params.push(options.endDate);
+  }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Count total matching rows
-    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM audit_log ${whereClause}`, ...params);
+  // Count total matching rows
+  const total = queryCount(db, `SELECT COUNT(*) as cnt FROM audit_log ${whereClause}`, ...params);
 
-    // Fetch paginated results
-    const limit = Math.min(options.limit ?? 50, 500);
-    const offset = options.offset ?? 0;
+  // Fetch paginated results
+  const limit = Math.min(options.limit ?? 50, 500);
+  const offset = options.offset ?? 0;
 
-    const rows = db.query(
-        `SELECT id, timestamp, action, actor, resource_type, resource_id, detail, trace_id, ip_address
+  const rows = db
+    .query(
+      `SELECT id, timestamp, action, actor, resource_type, resource_id, detail, trace_id, ip_address
          FROM audit_log ${whereClause}
          ORDER BY id DESC
-         LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset) as Array<{
-        id: number;
-        timestamp: string;
-        action: string;
-        actor: string;
-        resource_type: string;
-        resource_id: string | null;
-        detail: string | null;
-        trace_id: string | null;
-        ip_address: string | null;
-    }>;
+         LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset) as Array<{
+    id: number;
+    timestamp: string;
+    action: string;
+    actor: string;
+    resource_type: string;
+    resource_id: string | null;
+    detail: string | null;
+    trace_id: string | null;
+    ip_address: string | null;
+  }>;
 
-    return {
-        entries: rows.map(r => ({
-            id: r.id,
-            timestamp: r.timestamp,
-            action: r.action as AuditAction,
-            actor: r.actor,
-            resourceType: r.resource_type,
-            resourceId: r.resource_id,
-            detail: r.detail,
-            traceId: r.trace_id,
-            ipAddress: r.ip_address,
-        })),
-        total,
-    };
+  return {
+    entries: rows.map((r) => ({
+      id: r.id,
+      timestamp: r.timestamp,
+      action: r.action as AuditAction,
+      actor: r.actor,
+      resourceType: r.resource_type,
+      resourceId: r.resource_id,
+      detail: r.detail,
+      traceId: r.trace_id,
+      ipAddress: r.ip_address,
+    })),
+    total,
+  };
 }

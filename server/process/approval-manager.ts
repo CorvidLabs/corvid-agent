@@ -1,7 +1,13 @@
 import type { Database } from 'bun:sqlite';
-import type { ApprovalRequest, ApprovalResponse } from './approval-types';
-import { enqueueRequest, resolveRequest as resolveEscalation, getPendingRequests, expireOldRequests, type EscalationRequest } from '../db/escalation-queue';
+import {
+  type EscalationRequest,
+  enqueueRequest,
+  expireOldRequests,
+  getPendingRequests,
+  resolveRequest as resolveEscalation,
+} from '../db/escalation-queue';
 import { createLogger } from '../lib/logger';
+import type { ApprovalRequest, ApprovalResponse } from './approval-types';
 
 const log = createLogger('ApprovalManager');
 
@@ -11,10 +17,10 @@ const DEFAULT_TIMEOUT_ALGOCHAT_MS = 120_000;
 export type OperationalMode = 'normal' | 'queued' | 'paused';
 
 interface PendingRequest {
-    request: ApprovalRequest;
-    resolve: (response: ApprovalResponse) => void;
-    timer: ReturnType<typeof setTimeout>;
-    senderAddress?: string;
+  request: ApprovalRequest;
+  resolve: (response: ApprovalResponse) => void;
+  timer: ReturnType<typeof setTimeout>;
+  senderAddress?: string;
 }
 
 /**
@@ -22,287 +28,287 @@ interface PendingRequest {
  * that is waiting for the queued approval decision.
  */
 interface QueuedResolver {
-    sessionId: string;
-    resolve: (response: ApprovalResponse) => void;
-    requestId: string;
+  sessionId: string;
+  resolve: (response: ApprovalResponse) => void;
+  requestId: string;
 }
 
 const ESCALATION_EXPIRY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const ESCALATION_MAX_AGE_HOURS = 24;
 
 export class ApprovalManager {
-    private pending: Map<string, PendingRequest> = new Map();
-    private queuedResolvers: Map<number, QueuedResolver> = new Map();
-    private _operationalMode: OperationalMode = 'normal';
-    private db: Database | null = null;
-    private expiryTimer: ReturnType<typeof setInterval> | null = null;
+  private pending: Map<string, PendingRequest> = new Map();
+  private queuedResolvers: Map<number, QueuedResolver> = new Map();
+  private _operationalMode: OperationalMode = 'normal';
+  private db: Database | null = null;
+  private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
-    get operationalMode(): OperationalMode {
-        return this._operationalMode;
-    }
+  get operationalMode(): OperationalMode {
+    return this._operationalMode;
+  }
 
-    set operationalMode(mode: OperationalMode) {
-        log.info(`Operational mode changed: ${this._operationalMode} → ${mode}`);
-        this._operationalMode = mode;
-    }
+  set operationalMode(mode: OperationalMode) {
+    log.info(`Operational mode changed: ${this._operationalMode} → ${mode}`);
+    this._operationalMode = mode;
+  }
 
-    setDatabase(db: Database): void {
-        this.db = db;
-        this.startExpiryTimer();
-    }
+  setDatabase(db: Database): void {
+    this.db = db;
+    this.startExpiryTimer();
+  }
 
-    /** Expire stale escalation requests on startup and every hour. */
-    private startExpiryTimer(): void {
-        if (!this.db) return;
+  /** Expire stale escalation requests on startup and every hour. */
+  private startExpiryTimer(): void {
+    if (!this.db) return;
 
-        // Expire on boot
-        this.runExpiry();
+    // Expire on boot
+    this.runExpiry();
 
-        this.expiryTimer = setInterval(() => this.runExpiry(), ESCALATION_EXPIRY_INTERVAL_MS);
-    }
+    this.expiryTimer = setInterval(() => this.runExpiry(), ESCALATION_EXPIRY_INTERVAL_MS);
+  }
 
-    private runExpiry(): void {
-        if (!this.db) return;
-        const expired = expireOldRequests(this.db, ESCALATION_MAX_AGE_HOURS);
-        if (expired > 0) {
-            log.info(`Expired ${expired} stale escalation request(s)`);
+  private runExpiry(): void {
+    if (!this.db) return;
+    const expired = expireOldRequests(this.db, ESCALATION_MAX_AGE_HOURS);
+    if (expired > 0) {
+      log.info(`Expired ${expired} stale escalation request(s)`);
 
-            // Resolve any in-memory resolvers for expired requests so blocked
-            // SDK processes aren't stuck forever
-            for (const [queueId, resolver] of this.queuedResolvers) {
-                // Check if this queued request was expired — its DB status is now 'expired'
-                const dbRequests = getPendingRequests(this.db);
-                const stillPending = dbRequests.some((r) => r.id === queueId);
-                if (!stillPending) {
-                    this.queuedResolvers.delete(queueId);
-                    resolver.resolve({
-                        requestId: resolver.requestId,
-                        behavior: 'deny',
-                        message: 'Escalation request expired',
-                    });
-                }
-            }
+      // Resolve any in-memory resolvers for expired requests so blocked
+      // SDK processes aren't stuck forever
+      for (const [queueId, resolver] of this.queuedResolvers) {
+        // Check if this queued request was expired — its DB status is now 'expired'
+        const dbRequests = getPendingRequests(this.db);
+        const stillPending = dbRequests.some((r) => r.id === queueId);
+        if (!stillPending) {
+          this.queuedResolvers.delete(queueId);
+          resolver.resolve({
+            requestId: resolver.requestId,
+            behavior: 'deny',
+            message: 'Escalation request expired',
+          });
         }
+      }
+    }
+  }
+
+  getDefaultTimeout(source: string): number {
+    return source === 'algochat' ? DEFAULT_TIMEOUT_ALGOCHAT_MS : DEFAULT_TIMEOUT_WEB_MS;
+  }
+
+  createRequest(request: ApprovalRequest, senderAddress?: string): Promise<ApprovalResponse> {
+    // In paused mode, immediately deny all requests
+    if (this._operationalMode === 'paused') {
+      log.info(`Approval request ${request.id} immediately denied (paused mode)`);
+      return Promise.resolve({
+        requestId: request.id,
+        behavior: 'deny',
+        message: 'System is in paused mode — all tool requests denied',
+      });
     }
 
-    getDefaultTimeout(source: string): number {
-        return source === 'algochat' ? DEFAULT_TIMEOUT_ALGOCHAT_MS : DEFAULT_TIMEOUT_WEB_MS;
+    // In queued mode, immediately queue without waiting
+    if (this._operationalMode === 'queued' && this.db) {
+      return this.enqueueAndWait(request);
     }
 
-    createRequest(request: ApprovalRequest, senderAddress?: string): Promise<ApprovalResponse> {
-        // In paused mode, immediately deny all requests
-        if (this._operationalMode === 'paused') {
-            log.info(`Approval request ${request.id} immediately denied (paused mode)`);
-            return Promise.resolve({
-                requestId: request.id,
-                behavior: 'deny',
-                message: 'System is in paused mode — all tool requests denied',
-            });
+    // Normal mode: wait for approval with timeout, then queue on timeout
+    return new Promise<ApprovalResponse>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(request.id);
+
+        // Persist to escalation queue for later review, but always
+        // resolve immediately so the direct process loop doesn't
+        // block indefinitely (which would leak the Ollama slot).
+        if (this.db) {
+          const queued = enqueueRequest(this.db, request.sessionId, request.toolName, request.toolInput);
+          log.info(`Approval request ${request.id} timed out — queued as escalation #${queued.id}`);
+        } else {
+          log.info(`Approval request ${request.id} timed out after ${request.timeoutMs}ms`);
         }
-
-        // In queued mode, immediately queue without waiting
-        if (this._operationalMode === 'queued' && this.db) {
-            return this.enqueueAndWait(request);
-        }
-
-        // Normal mode: wait for approval with timeout, then queue on timeout
-        return new Promise<ApprovalResponse>((resolve) => {
-            const timer = setTimeout(() => {
-                this.pending.delete(request.id);
-
-                // Persist to escalation queue for later review, but always
-                // resolve immediately so the direct process loop doesn't
-                // block indefinitely (which would leak the Ollama slot).
-                if (this.db) {
-                    const queued = enqueueRequest(this.db, request.sessionId, request.toolName, request.toolInput);
-                    log.info(`Approval request ${request.id} timed out — queued as escalation #${queued.id}`);
-                } else {
-                    log.info(`Approval request ${request.id} timed out after ${request.timeoutMs}ms`);
-                }
-                resolve({
-                    requestId: request.id,
-                    behavior: 'deny',
-                    message: 'Approval timed out',
-                });
-            }, request.timeoutMs);
-
-            this.pending.set(request.id, { request, resolve, timer, senderAddress });
-            log.debug(`Created approval request ${request.id}`, {
-                sessionId: request.sessionId,
-                toolName: request.toolName,
-            });
+        resolve({
+          requestId: request.id,
+          behavior: 'deny',
+          message: 'Approval timed out',
         });
+      }, request.timeoutMs);
+
+      this.pending.set(request.id, { request, resolve, timer, senderAddress });
+      log.debug(`Created approval request ${request.id}`, {
+        sessionId: request.sessionId,
+        toolName: request.toolName,
+      });
+    });
+  }
+
+  private enqueueAndWait(request: ApprovalRequest): Promise<ApprovalResponse> {
+    return new Promise<ApprovalResponse>((resolve) => {
+      const queued = enqueueRequest(this.db!, request.sessionId, request.toolName, request.toolInput);
+      log.info(`Approval request ${request.id} immediately queued as escalation #${queued.id} (queued mode)`);
+
+      this.queuedResolvers.set(queued.id, {
+        sessionId: request.sessionId,
+        resolve,
+        requestId: request.id,
+      });
+    });
+  }
+
+  resolveRequest(requestId: string, response: ApprovalResponse): boolean {
+    const entry = this.pending.get(requestId);
+    if (!entry) {
+      log.debug(`Approval request ${requestId} not found (already resolved or timed out)`);
+      return false;
     }
 
-    private enqueueAndWait(request: ApprovalRequest): Promise<ApprovalResponse> {
-        return new Promise<ApprovalResponse>((resolve) => {
-            const queued = enqueueRequest(this.db!, request.sessionId, request.toolName, request.toolInput);
-            log.info(`Approval request ${request.id} immediately queued as escalation #${queued.id} (queued mode)`);
+    clearTimeout(entry.timer);
+    this.pending.delete(requestId);
+    entry.resolve(response);
+    log.info(`Resolved approval request ${requestId}`, { behavior: response.behavior });
+    return true;
+  }
 
-            this.queuedResolvers.set(queued.id, {
-                sessionId: request.sessionId,
-                resolve,
-                requestId: request.id,
-            });
-        });
+  /**
+   * Resolve a queued escalation request. This unblocks the SDK process
+   * that was waiting for the decision.
+   */
+  resolveQueuedRequest(queueId: number, approved: boolean): boolean {
+    if (!this.db) return false;
+
+    const resolution = approved ? 'approved' : 'denied';
+    const escalation = resolveEscalation(this.db, queueId, resolution);
+    if (!escalation) {
+      log.debug(`Escalation #${queueId} not found or already resolved`);
+      return false;
     }
 
-    resolveRequest(requestId: string, response: ApprovalResponse): boolean {
-        const entry = this.pending.get(requestId);
-        if (!entry) {
-            log.debug(`Approval request ${requestId} not found (already resolved or timed out)`);
-            return false;
+    const resolver = this.queuedResolvers.get(queueId);
+    if (resolver) {
+      this.queuedResolvers.delete(queueId);
+      resolver.resolve({
+        requestId: resolver.requestId,
+        behavior: approved ? 'allow' : 'deny',
+        message: approved ? 'Approved from escalation queue' : 'Denied from escalation queue',
+      });
+      log.info(`Resolved escalation #${queueId}`, { approved, sessionId: resolver.sessionId });
+      return true;
+    }
+
+    log.info(`Escalation #${queueId} resolved in DB but no active resolver found`, { resolution });
+    return true;
+  }
+
+  getQueuedRequests(): EscalationRequest[] {
+    if (!this.db) return [];
+    return getPendingRequests(this.db);
+  }
+
+  /**
+   * Resolve a pending request by matching a short ID prefix.
+   * Used by AlgoChat where users reply with abbreviated IDs.
+   */
+  resolveByShortId(
+    shortId: string,
+    partial: { behavior: 'allow' | 'deny'; message?: string },
+    senderAddress?: string,
+  ): boolean {
+    const lower = shortId.toLowerCase();
+    for (const [id, entry] of this.pending) {
+      if (id.toLowerCase().startsWith(lower)) {
+        // Verify sender matches the original request sender (if tracked)
+        if (entry.senderAddress && senderAddress && entry.senderAddress !== senderAddress) {
+          log.warn(`Approval response from wrong sender`, {
+            expected: entry.senderAddress,
+            actual: senderAddress,
+            shortId,
+          });
+          return false;
         }
+        return this.resolveRequest(id, {
+          requestId: id,
+          behavior: partial.behavior,
+          message: partial.message,
+        });
+      }
+    }
+    log.debug(`No pending approval matching short ID "${shortId}"`);
+    return false;
+  }
 
+  /**
+   * Associate a sender address with an existing pending request.
+   * Used by AlgoChat to mark which on-chain participant should be
+   * allowed to respond to the approval.
+   */
+  setSenderAddress(requestId: string, senderAddress: string): void {
+    const entry = this.pending.get(requestId);
+    if (entry) {
+      entry.senderAddress = senderAddress;
+    }
+  }
+
+  getPendingForSession(sessionId: string): ApprovalRequest[] {
+    const result: ApprovalRequest[] = [];
+    for (const entry of this.pending.values()) {
+      if (entry.request.sessionId === sessionId) {
+        result.push(entry.request);
+      }
+    }
+    return result;
+  }
+
+  hasPendingRequests(): boolean {
+    return this.pending.size > 0;
+  }
+
+  cancelSession(sessionId: string): void {
+    for (const [id, entry] of this.pending) {
+      if (entry.request.sessionId === sessionId) {
         clearTimeout(entry.timer);
-        this.pending.delete(requestId);
-        entry.resolve(response);
-        log.info(`Resolved approval request ${requestId}`, { behavior: response.behavior });
-        return true;
+        this.pending.delete(id);
+        entry.resolve({
+          requestId: id,
+          behavior: 'deny',
+          message: 'Session stopped',
+        });
+      }
     }
 
-    /**
-     * Resolve a queued escalation request. This unblocks the SDK process
-     * that was waiting for the decision.
-     */
-    resolveQueuedRequest(queueId: number, approved: boolean): boolean {
-        if (!this.db) return false;
+    // Also clean up any queued resolvers for this session
+    for (const [queueId, resolver] of this.queuedResolvers) {
+      if (resolver.sessionId === sessionId) {
+        this.queuedResolvers.delete(queueId);
+        resolver.resolve({
+          requestId: resolver.requestId,
+          behavior: 'deny',
+          message: 'Session stopped',
+        });
+      }
+    }
+  }
 
-        const resolution = approved ? 'approved' : 'denied';
-        const escalation = resolveEscalation(this.db, queueId, resolution);
-        if (!escalation) {
-            log.debug(`Escalation #${queueId} not found or already resolved`);
-            return false;
-        }
-
-        const resolver = this.queuedResolvers.get(queueId);
-        if (resolver) {
-            this.queuedResolvers.delete(queueId);
-            resolver.resolve({
-                requestId: resolver.requestId,
-                behavior: approved ? 'allow' : 'deny',
-                message: approved ? 'Approved from escalation queue' : 'Denied from escalation queue',
-            });
-            log.info(`Resolved escalation #${queueId}`, { approved, sessionId: resolver.sessionId });
-            return true;
-        }
-
-        log.info(`Escalation #${queueId} resolved in DB but no active resolver found`, { resolution });
-        return true;
+  shutdown(): void {
+    if (this.expiryTimer) {
+      clearInterval(this.expiryTimer);
+      this.expiryTimer = null;
     }
 
-    getQueuedRequests(): EscalationRequest[] {
-        if (!this.db) return [];
-        return getPendingRequests(this.db);
+    for (const [id, entry] of this.pending) {
+      clearTimeout(entry.timer);
+      entry.resolve({
+        requestId: id,
+        behavior: 'deny',
+        message: 'Server shutting down',
+      });
     }
+    this.pending.clear();
 
-    /**
-     * Resolve a pending request by matching a short ID prefix.
-     * Used by AlgoChat where users reply with abbreviated IDs.
-     */
-    resolveByShortId(
-        shortId: string,
-        partial: { behavior: 'allow' | 'deny'; message?: string },
-        senderAddress?: string,
-    ): boolean {
-        const lower = shortId.toLowerCase();
-        for (const [id, entry] of this.pending) {
-            if (id.toLowerCase().startsWith(lower)) {
-                // Verify sender matches the original request sender (if tracked)
-                if (entry.senderAddress && senderAddress && entry.senderAddress !== senderAddress) {
-                    log.warn(`Approval response from wrong sender`, {
-                        expected: entry.senderAddress,
-                        actual: senderAddress,
-                        shortId,
-                    });
-                    return false;
-                }
-                return this.resolveRequest(id, {
-                    requestId: id,
-                    behavior: partial.behavior,
-                    message: partial.message,
-                });
-            }
-        }
-        log.debug(`No pending approval matching short ID "${shortId}"`);
-        return false;
+    for (const [, resolver] of this.queuedResolvers) {
+      resolver.resolve({
+        requestId: resolver.requestId,
+        behavior: 'deny',
+        message: 'Server shutting down',
+      });
     }
-
-    /**
-     * Associate a sender address with an existing pending request.
-     * Used by AlgoChat to mark which on-chain participant should be
-     * allowed to respond to the approval.
-     */
-    setSenderAddress(requestId: string, senderAddress: string): void {
-        const entry = this.pending.get(requestId);
-        if (entry) {
-            entry.senderAddress = senderAddress;
-        }
-    }
-
-    getPendingForSession(sessionId: string): ApprovalRequest[] {
-        const result: ApprovalRequest[] = [];
-        for (const entry of this.pending.values()) {
-            if (entry.request.sessionId === sessionId) {
-                result.push(entry.request);
-            }
-        }
-        return result;
-    }
-
-    hasPendingRequests(): boolean {
-        return this.pending.size > 0;
-    }
-
-    cancelSession(sessionId: string): void {
-        for (const [id, entry] of this.pending) {
-            if (entry.request.sessionId === sessionId) {
-                clearTimeout(entry.timer);
-                this.pending.delete(id);
-                entry.resolve({
-                    requestId: id,
-                    behavior: 'deny',
-                    message: 'Session stopped',
-                });
-            }
-        }
-
-        // Also clean up any queued resolvers for this session
-        for (const [queueId, resolver] of this.queuedResolvers) {
-            if (resolver.sessionId === sessionId) {
-                this.queuedResolvers.delete(queueId);
-                resolver.resolve({
-                    requestId: resolver.requestId,
-                    behavior: 'deny',
-                    message: 'Session stopped',
-                });
-            }
-        }
-    }
-
-    shutdown(): void {
-        if (this.expiryTimer) {
-            clearInterval(this.expiryTimer);
-            this.expiryTimer = null;
-        }
-
-        for (const [id, entry] of this.pending) {
-            clearTimeout(entry.timer);
-            entry.resolve({
-                requestId: id,
-                behavior: 'deny',
-                message: 'Server shutting down',
-            });
-        }
-        this.pending.clear();
-
-        for (const [, resolver] of this.queuedResolvers) {
-            resolver.resolve({
-                requestId: resolver.requestId,
-                behavior: 'deny',
-                message: 'Server shutting down',
-            });
-        }
-        this.queuedResolvers.clear();
-    }
+    this.queuedResolvers.clear();
+  }
 }

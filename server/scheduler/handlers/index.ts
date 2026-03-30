@@ -1,20 +1,21 @@
 /**
  * Barrel export for all scheduler action handlers.
  */
-export { execStarRepos, execForkRepos, execReviewPrs, execGithubSuggest } from './github';
-export { execWorkTask } from './work-task';
+
 export { execCouncilLaunch, execSendMessage } from './council';
-export { execCodebaseReview, execDependencyAudit } from './review';
+export { execDiscordPost } from './discord-post';
+export { execFlockTesting } from './flock-testing';
+export { execForkRepos, execGithubSuggest, execReviewPrs, execStarRepos } from './github';
 export { execImprovementLoop } from './improvement';
 export {
-    execMemoryMaintenance,
-    execReputationAttestation,
-    execOutcomeAnalysis,
-    execDailyReview,
-    execStatusCheckin,
-    execCustom,
+  execCustom,
+  execDailyReview,
+  execMemoryMaintenance,
+  execOutcomeAnalysis,
+  execReputationAttestation,
+  execStatusCheckin,
 } from './maintenance';
 export { execMarketplaceBilling } from './marketplace-billing';
-export { execFlockTesting } from './flock-testing';
-export { execDiscordPost } from './discord-post';
+export { execCodebaseReview, execDependencyAudit } from './review';
 export type { HandlerContext } from './types';
+export { execWorkTask } from './work-task';

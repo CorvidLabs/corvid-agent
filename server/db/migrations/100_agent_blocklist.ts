@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 100: Agent blocklist — kill switch for malicious agents.
@@ -9,11 +9,11 @@ import { Database } from 'bun:sqlite';
  */
 
 export function down(db: Database): void {
-    db.exec('DROP TABLE IF EXISTS agent_blocklist');
+  db.exec('DROP TABLE IF EXISTS agent_blocklist');
 }
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS agent_blocklist (
             agent_id    TEXT PRIMARY KEY,
             reason      TEXT NOT NULL DEFAULT 'manual',
@@ -22,5 +22,5 @@ export function up(db: Database): void {
             created_at  TEXT DEFAULT (datetime('now'))
         )
     `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_blocklist_reason ON agent_blocklist(reason)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_blocklist_reason ON agent_blocklist(reason)`);
 }

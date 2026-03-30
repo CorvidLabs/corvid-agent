@@ -12,13 +12,13 @@
  * is a clean baseline.
  */
 
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 // ── Tables (alphabetical) ───────────────────────────────────────────────────
 
 const TABLES = [
-    // --- agent_daily_spending ---
-    `CREATE TABLE IF NOT EXISTS agent_daily_spending (
+  // --- agent_daily_spending ---
+  `CREATE TABLE IF NOT EXISTS agent_daily_spending (
         agent_id   TEXT    NOT NULL,
         date       TEXT    NOT NULL,
         algo_micro INTEGER NOT NULL DEFAULT 0,
@@ -27,8 +27,8 @@ const TABLES = [
         FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )`,
 
-    // --- agent_identity ---
-    `CREATE TABLE IF NOT EXISTS agent_identity (
+  // --- agent_identity ---
+  `CREATE TABLE IF NOT EXISTS agent_identity (
         agent_id               TEXT PRIMARY KEY,
         tier                   TEXT NOT NULL DEFAULT 'UNVERIFIED',
         verified_at            TEXT DEFAULT NULL,
@@ -36,8 +36,8 @@ const TABLES = [
         updated_at             TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agent_memories ---
-    `CREATE TABLE IF NOT EXISTS agent_memories (
+  // --- agent_memories ---
+  `CREATE TABLE IF NOT EXISTS agent_memories (
         id         TEXT PRIMARY KEY,
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         key        TEXT NOT NULL,
@@ -51,8 +51,8 @@ const TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agent_messages ---
-    `CREATE TABLE IF NOT EXISTS agent_messages (
+  // --- agent_messages ---
+  `CREATE TABLE IF NOT EXISTS agent_messages (
         id               TEXT PRIMARY KEY,
         from_agent_id    TEXT NOT NULL,
         to_agent_id      TEXT NOT NULL,
@@ -73,8 +73,8 @@ const TABLES = [
         completed_at     TEXT DEFAULT NULL
     )`,
 
-    // --- agent_personas ---
-    `CREATE TABLE IF NOT EXISTS agent_personas (
+  // --- agent_personas ---
+  `CREATE TABLE IF NOT EXISTS agent_personas (
         agent_id         TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
         archetype        TEXT DEFAULT 'custom',
         traits           TEXT NOT NULL DEFAULT '[]',
@@ -85,8 +85,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agent_reputation ---
-    `CREATE TABLE IF NOT EXISTS agent_reputation (
+  // --- agent_reputation ---
+  `CREATE TABLE IF NOT EXISTS agent_reputation (
         agent_id            TEXT PRIMARY KEY,
         overall_score       INTEGER DEFAULT 0,
         trust_level         TEXT DEFAULT 'untrusted',
@@ -100,8 +100,8 @@ const TABLES = [
         computed_at         TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agent_schedules ---
-    `CREATE TABLE IF NOT EXISTS agent_schedules (
+  // --- agent_schedules ---
+  `CREATE TABLE IF NOT EXISTS agent_schedules (
         id                 TEXT PRIMARY KEY,
         agent_id           TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         name               TEXT NOT NULL,
@@ -126,16 +126,16 @@ const TABLES = [
         updated_at         TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agent_skills ---
-    `CREATE TABLE IF NOT EXISTS agent_skills (
+  // --- agent_skills ---
+  `CREATE TABLE IF NOT EXISTS agent_skills (
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         bundle_id  TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
         sort_order INTEGER DEFAULT 0,
         PRIMARY KEY (agent_id, bundle_id)
     )`,
 
-    // --- agent_spending_caps ---
-    `CREATE TABLE IF NOT EXISTS agent_spending_caps (
+  // --- agent_spending_caps ---
+  `CREATE TABLE IF NOT EXISTS agent_spending_caps (
         agent_id               TEXT PRIMARY KEY,
         daily_limit_microalgos INTEGER NOT NULL DEFAULT 5000000,
         daily_limit_usdc       INTEGER NOT NULL DEFAULT 0,
@@ -144,8 +144,8 @@ const TABLES = [
         FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )`,
 
-    // --- agent_usdc_revenue ---
-    `CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
+  // --- agent_usdc_revenue ---
+  `CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         amount_micro   INTEGER NOT NULL,
@@ -156,8 +156,8 @@ const TABLES = [
         created_at     TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- agents ---
-    `CREATE TABLE IF NOT EXISTS agents (
+  // --- agents ---
+  `CREATE TABLE IF NOT EXISTS agents (
         id                       TEXT PRIMARY KEY,
         name                     TEXT NOT NULL,
         description              TEXT DEFAULT '',
@@ -184,15 +184,15 @@ const TABLES = [
         updated_at               TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- algochat_allowlist ---
-    `CREATE TABLE IF NOT EXISTS algochat_allowlist (
+  // --- algochat_allowlist ---
+  `CREATE TABLE IF NOT EXISTS algochat_allowlist (
         address    TEXT PRIMARY KEY,
         label      TEXT DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- algochat_conversations ---
-    `CREATE TABLE IF NOT EXISTS algochat_conversations (
+  // --- algochat_conversations ---
+  `CREATE TABLE IF NOT EXISTS algochat_conversations (
         id               TEXT PRIMARY KEY,
         participant_addr TEXT NOT NULL,
         agent_id         TEXT REFERENCES agents(id),
@@ -201,8 +201,8 @@ const TABLES = [
         created_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- algochat_messages ---
-    `CREATE TABLE IF NOT EXISTS algochat_messages (
+  // --- algochat_messages ---
+  `CREATE TABLE IF NOT EXISTS algochat_messages (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         participant TEXT NOT NULL,
         content     TEXT NOT NULL,
@@ -213,8 +213,8 @@ const TABLES = [
         created_at  TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- algochat_psk_state ---
-    `CREATE TABLE IF NOT EXISTS algochat_psk_state (
+  // --- algochat_psk_state ---
+  `CREATE TABLE IF NOT EXISTS algochat_psk_state (
         address           TEXT NOT NULL,
         network           TEXT NOT NULL DEFAULT 'testnet',
         initial_psk       BLOB NOT NULL,
@@ -228,8 +228,8 @@ const TABLES = [
         PRIMARY KEY (address, network)
     )`,
 
-    // --- api_keys ---
-    `CREATE TABLE IF NOT EXISTS api_keys (
+  // --- api_keys ---
+  `CREATE TABLE IF NOT EXISTS api_keys (
         key_hash     TEXT PRIMARY KEY,
         tenant_id    TEXT NOT NULL,
         label        TEXT DEFAULT 'default',
@@ -238,8 +238,8 @@ const TABLES = [
         created_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- audit_log ---
-    `CREATE TABLE IF NOT EXISTS audit_log (
+  // --- audit_log ---
+  `CREATE TABLE IF NOT EXISTS audit_log (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp     TEXT NOT NULL DEFAULT (datetime('now')),
         action        TEXT NOT NULL,
@@ -251,8 +251,8 @@ const TABLES = [
         ip_address    TEXT
     )`,
 
-    // --- council_discussion_messages ---
-    `CREATE TABLE IF NOT EXISTS council_discussion_messages (
+  // --- council_discussion_messages ---
+  `CREATE TABLE IF NOT EXISTS council_discussion_messages (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         launch_id  TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -264,8 +264,8 @@ const TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- council_launch_logs ---
-    `CREATE TABLE IF NOT EXISTS council_launch_logs (
+  // --- council_launch_logs ---
+  `CREATE TABLE IF NOT EXISTS council_launch_logs (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         launch_id  TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
         level      TEXT DEFAULT 'info',
@@ -274,8 +274,8 @@ const TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- council_launches ---
-    `CREATE TABLE IF NOT EXISTS council_launches (
+  // --- council_launches ---
+  `CREATE TABLE IF NOT EXISTS council_launches (
         id                       TEXT PRIMARY KEY,
         council_id               TEXT NOT NULL REFERENCES councils(id),
         project_id               TEXT NOT NULL REFERENCES projects(id),
@@ -292,16 +292,16 @@ const TABLES = [
         created_at               TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- council_members ---
-    `CREATE TABLE IF NOT EXISTS council_members (
+  // --- council_members ---
+  `CREATE TABLE IF NOT EXISTS council_members (
         council_id TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         sort_order INTEGER DEFAULT 0,
         PRIMARY KEY (council_id, agent_id)
     )`,
 
-    // --- councils ---
-    `CREATE TABLE IF NOT EXISTS councils (
+  // --- councils ---
+  `CREATE TABLE IF NOT EXISTS councils (
         id                TEXT PRIMARY KEY,
         name              TEXT NOT NULL,
         description       TEXT DEFAULT '',
@@ -315,15 +315,15 @@ const TABLES = [
         updated_at        TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- credit_config ---
-    `CREATE TABLE IF NOT EXISTS credit_config (
+  // --- credit_config ---
+  `CREATE TABLE IF NOT EXISTS credit_config (
         key        TEXT PRIMARY KEY,
         value      TEXT NOT NULL,
         updated_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- credit_ledger ---
-    `CREATE TABLE IF NOT EXISTS credit_ledger (
+  // --- credit_ledger ---
+  `CREATE TABLE IF NOT EXISTS credit_ledger (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         wallet_address  TEXT NOT NULL,
         credits         INTEGER NOT NULL DEFAULT 0,
@@ -334,8 +334,8 @@ const TABLES = [
         updated_at      TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- credit_transactions ---
-    `CREATE TABLE IF NOT EXISTS credit_transactions (
+  // --- credit_transactions ---
+  `CREATE TABLE IF NOT EXISTS credit_transactions (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
         wallet_address TEXT NOT NULL,
         type           TEXT NOT NULL,
@@ -347,23 +347,23 @@ const TABLES = [
         created_at     TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- daily_spending ---
-    `CREATE TABLE IF NOT EXISTS daily_spending (
+  // --- daily_spending ---
+  `CREATE TABLE IF NOT EXISTS daily_spending (
         date         TEXT PRIMARY KEY,
         algo_micro   INTEGER DEFAULT 0,
         api_cost_usd REAL DEFAULT 0.0
     )`,
 
-    // --- dedup_state ---
-    `CREATE TABLE IF NOT EXISTS dedup_state (
+  // --- dedup_state ---
+  `CREATE TABLE IF NOT EXISTS dedup_state (
         namespace  TEXT NOT NULL,
         key        TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
         PRIMARY KEY (namespace, key)
     )`,
 
-    // --- escalation_queue ---
-    `CREATE TABLE IF NOT EXISTS escalation_queue (
+  // --- escalation_queue ---
+  `CREATE TABLE IF NOT EXISTS escalation_queue (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id  TEXT NOT NULL,
         tool_name   TEXT NOT NULL,
@@ -373,8 +373,8 @@ const TABLES = [
         resolved_at TEXT DEFAULT NULL
     )`,
 
-    // --- escrow_transactions ---
-    `CREATE TABLE IF NOT EXISTS escrow_transactions (
+  // --- escrow_transactions ---
+  `CREATE TABLE IF NOT EXISTS escrow_transactions (
         id               TEXT PRIMARY KEY,
         listing_id       TEXT NOT NULL,
         buyer_tenant_id  TEXT NOT NULL,
@@ -388,8 +388,8 @@ const TABLES = [
         resolved_at      TEXT DEFAULT NULL
     )`,
 
-    // --- federated_instances ---
-    `CREATE TABLE IF NOT EXISTS federated_instances (
+  // --- federated_instances ---
+  `CREATE TABLE IF NOT EXISTS federated_instances (
         url           TEXT PRIMARY KEY,
         name          TEXT NOT NULL,
         last_sync_at  TEXT DEFAULT NULL,
@@ -397,8 +397,8 @@ const TABLES = [
         status        TEXT DEFAULT 'active'
     )`,
 
-    // --- flock_agents ---
-    `CREATE TABLE IF NOT EXISTS flock_agents (
+  // --- flock_agents ---
+  `CREATE TABLE IF NOT EXISTS flock_agents (
         id                     TEXT PRIMARY KEY,
         address                TEXT NOT NULL UNIQUE,
         name                   TEXT NOT NULL,
@@ -415,15 +415,15 @@ const TABLES = [
         updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- github_allowlist ---
-    `CREATE TABLE IF NOT EXISTS github_allowlist (
+  // --- github_allowlist ---
+  `CREATE TABLE IF NOT EXISTS github_allowlist (
         username   TEXT PRIMARY KEY,
         label      TEXT DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- governance_member_votes ---
-    `CREATE TABLE IF NOT EXISTS governance_member_votes (
+  // --- governance_member_votes ---
+  `CREATE TABLE IF NOT EXISTS governance_member_votes (
         id                 INTEGER PRIMARY KEY AUTOINCREMENT,
         governance_vote_id INTEGER NOT NULL REFERENCES governance_votes(id) ON DELETE CASCADE,
         agent_id           TEXT NOT NULL,
@@ -433,8 +433,8 @@ const TABLES = [
         UNIQUE(governance_vote_id, agent_id)
     )`,
 
-    // --- governance_proposals ---
-    `CREATE TABLE IF NOT EXISTS governance_proposals (
+  // --- governance_proposals ---
+  `CREATE TABLE IF NOT EXISTS governance_proposals (
         id               TEXT PRIMARY KEY,
         council_id       TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
         title            TEXT NOT NULL,
@@ -454,8 +454,8 @@ const TABLES = [
         enacted_at       TEXT DEFAULT NULL
     )`,
 
-    // --- governance_votes ---
-    `CREATE TABLE IF NOT EXISTS governance_votes (
+  // --- governance_votes ---
+  `CREATE TABLE IF NOT EXISTS governance_votes (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
         launch_id         TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
         governance_tier   INTEGER NOT NULL,
@@ -469,8 +469,8 @@ const TABLES = [
         resolved_at       TEXT DEFAULT NULL
     )`,
 
-    // --- health_snapshots ---
-    `CREATE TABLE IF NOT EXISTS health_snapshots (
+  // --- health_snapshots ---
+  `CREATE TABLE IF NOT EXISTS health_snapshots (
         id                 TEXT PRIMARY KEY,
         agent_id           TEXT NOT NULL,
         project_id         TEXT NOT NULL,
@@ -486,8 +486,8 @@ const TABLES = [
         collected_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- invoices ---
-    `CREATE TABLE IF NOT EXISTS invoices (
+  // --- invoices ---
+  `CREATE TABLE IF NOT EXISTS invoices (
         id                TEXT PRIMARY KEY,
         tenant_id         TEXT NOT NULL,
         stripe_invoice_id TEXT NOT NULL,
@@ -500,8 +500,8 @@ const TABLES = [
         created_at        TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_listings ---
-    `CREATE TABLE IF NOT EXISTS marketplace_listings (
+  // --- marketplace_listings ---
+  `CREATE TABLE IF NOT EXISTS marketplace_listings (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL,
         name             TEXT NOT NULL,
@@ -523,8 +523,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_pricing_tiers ---
-    `CREATE TABLE IF NOT EXISTS marketplace_pricing_tiers (
+  // --- marketplace_pricing_tiers ---
+  `CREATE TABLE IF NOT EXISTS marketplace_pricing_tiers (
         id            TEXT PRIMARY KEY,
         listing_id    TEXT NOT NULL,
         name          TEXT NOT NULL,
@@ -537,8 +537,8 @@ const TABLES = [
         created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_reviews ---
-    `CREATE TABLE IF NOT EXISTS marketplace_reviews (
+  // --- marketplace_reviews ---
+  `CREATE TABLE IF NOT EXISTS marketplace_reviews (
         id                TEXT PRIMARY KEY,
         listing_id        TEXT NOT NULL,
         reviewer_agent_id TEXT DEFAULT NULL,
@@ -548,8 +548,8 @@ const TABLES = [
         created_at        TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_subscriptions ---
-    `CREATE TABLE IF NOT EXISTS marketplace_subscriptions (
+  // --- marketplace_subscriptions ---
+  `CREATE TABLE IF NOT EXISTS marketplace_subscriptions (
         id                   TEXT PRIMARY KEY,
         listing_id           TEXT NOT NULL,
         subscriber_tenant_id TEXT NOT NULL,
@@ -563,8 +563,8 @@ const TABLES = [
         created_at           TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_trials ---
-    `CREATE TABLE IF NOT EXISTS marketplace_trials (
+  // --- marketplace_trials ---
+  `CREATE TABLE IF NOT EXISTS marketplace_trials (
         id             TEXT PRIMARY KEY,
         listing_id     TEXT NOT NULL,
         tenant_id      TEXT NOT NULL,
@@ -574,8 +574,8 @@ const TABLES = [
         created_at     TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- marketplace_usage_events ---
-    `CREATE TABLE IF NOT EXISTS marketplace_usage_events (
+  // --- marketplace_usage_events ---
+  `CREATE TABLE IF NOT EXISTS marketplace_usage_events (
         id              TEXT PRIMARY KEY,
         listing_id      TEXT NOT NULL,
         user_tenant_id  TEXT NOT NULL,
@@ -584,8 +584,8 @@ const TABLES = [
         created_at      TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- mcp_server_configs ---
-    `CREATE TABLE IF NOT EXISTS mcp_server_configs (
+  // --- mcp_server_configs ---
+  `CREATE TABLE IF NOT EXISTS mcp_server_configs (
         id         TEXT PRIMARY KEY,
         agent_id   TEXT DEFAULT NULL REFERENCES agents(id) ON DELETE CASCADE,
         name       TEXT NOT NULL,
@@ -599,8 +599,8 @@ const TABLES = [
         updated_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- mention_polling_configs ---
-    `CREATE TABLE IF NOT EXISTS mention_polling_configs (
+  // --- mention_polling_configs ---
+  `CREATE TABLE IF NOT EXISTS mention_polling_configs (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         repo             TEXT NOT NULL,
@@ -619,8 +619,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- notification_channels ---
-    `CREATE TABLE IF NOT EXISTS notification_channels (
+  // --- notification_channels ---
+  `CREATE TABLE IF NOT EXISTS notification_channels (
         id           TEXT PRIMARY KEY,
         agent_id     TEXT NOT NULL,
         channel_type TEXT NOT NULL,
@@ -631,8 +631,8 @@ const TABLES = [
         updated_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- notification_deliveries ---
-    `CREATE TABLE IF NOT EXISTS notification_deliveries (
+  // --- notification_deliveries ---
+  `CREATE TABLE IF NOT EXISTS notification_deliveries (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         notification_id TEXT NOT NULL REFERENCES owner_notifications(id) ON DELETE CASCADE,
         channel_type    TEXT NOT NULL,
@@ -644,8 +644,8 @@ const TABLES = [
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- owner_notifications ---
-    `CREATE TABLE IF NOT EXISTS owner_notifications (
+  // --- owner_notifications ---
+  `CREATE TABLE IF NOT EXISTS owner_notifications (
         id         TEXT PRIMARY KEY,
         agent_id   TEXT NOT NULL,
         session_id TEXT DEFAULT NULL,
@@ -655,8 +655,8 @@ const TABLES = [
         created_at TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- owner_question_dispatches ---
-    `CREATE TABLE IF NOT EXISTS owner_question_dispatches (
+  // --- owner_question_dispatches ---
+  `CREATE TABLE IF NOT EXISTS owner_question_dispatches (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         question_id  TEXT NOT NULL,
         channel_type TEXT NOT NULL,
@@ -666,8 +666,8 @@ const TABLES = [
         created_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- owner_questions ---
-    `CREATE TABLE IF NOT EXISTS owner_questions (
+  // --- owner_questions ---
+  `CREATE TABLE IF NOT EXISTS owner_questions (
         id          TEXT PRIMARY KEY,
         session_id  TEXT NOT NULL,
         agent_id    TEXT NOT NULL,
@@ -681,8 +681,8 @@ const TABLES = [
         resolved_at TEXT DEFAULT NULL
     )`,
 
-    // --- performance_metrics ---
-    `CREATE TABLE IF NOT EXISTS performance_metrics (
+  // --- performance_metrics ---
+  `CREATE TABLE IF NOT EXISTS performance_metrics (
         id        INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT NOT NULL DEFAULT (datetime('now')),
         metric    TEXT NOT NULL,
@@ -691,8 +691,8 @@ const TABLES = [
         unit      TEXT DEFAULT NULL
     )`,
 
-    // --- permission_checks ---
-    `CREATE TABLE IF NOT EXISTS permission_checks (
+  // --- permission_checks ---
+  `CREATE TABLE IF NOT EXISTS permission_checks (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id   TEXT NOT NULL,
         tool_name  TEXT NOT NULL,
@@ -706,8 +706,8 @@ const TABLES = [
         checked_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- permission_grants ---
-    `CREATE TABLE IF NOT EXISTS permission_grants (
+  // --- permission_grants ---
+  `CREATE TABLE IF NOT EXISTS permission_grants (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id   TEXT NOT NULL,
         action     TEXT NOT NULL,
@@ -721,8 +721,8 @@ const TABLES = [
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- plugin_capabilities ---
-    `CREATE TABLE IF NOT EXISTS plugin_capabilities (
+  // --- plugin_capabilities ---
+  `CREATE TABLE IF NOT EXISTS plugin_capabilities (
         plugin_name TEXT NOT NULL REFERENCES plugins(name) ON DELETE CASCADE,
         capability  TEXT NOT NULL,
         granted     INTEGER DEFAULT 0,
@@ -730,8 +730,8 @@ const TABLES = [
         PRIMARY KEY (plugin_name, capability)
     )`,
 
-    // --- plugins ---
-    `CREATE TABLE IF NOT EXISTS plugins (
+  // --- plugins ---
+  `CREATE TABLE IF NOT EXISTS plugins (
         name         TEXT PRIMARY KEY,
         package_name TEXT NOT NULL,
         version      TEXT NOT NULL,
@@ -743,8 +743,8 @@ const TABLES = [
         config       TEXT DEFAULT '{}'
     )`,
 
-    // --- pr_outcomes ---
-    `CREATE TABLE IF NOT EXISTS pr_outcomes (
+  // --- pr_outcomes ---
+  `CREATE TABLE IF NOT EXISTS pr_outcomes (
         id             TEXT PRIMARY KEY,
         work_task_id   TEXT NOT NULL,
         pr_url         TEXT NOT NULL,
@@ -757,8 +757,8 @@ const TABLES = [
         created_at     TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // --- project_skills ---
-    `CREATE TABLE IF NOT EXISTS project_skills (
+  // --- project_skills ---
+  `CREATE TABLE IF NOT EXISTS project_skills (
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         bundle_id  TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
         sort_order INTEGER DEFAULT 0,
@@ -766,8 +766,8 @@ const TABLES = [
         PRIMARY KEY (project_id, bundle_id)
     )`,
 
-    // --- projects ---
-    `CREATE TABLE IF NOT EXISTS projects (
+  // --- projects ---
+  `CREATE TABLE IF NOT EXISTS projects (
         id          TEXT PRIMARY KEY,
         name        TEXT NOT NULL,
         description TEXT DEFAULT '',
@@ -779,8 +779,8 @@ const TABLES = [
         updated_at  TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- psk_contacts ---
-    `CREATE TABLE IF NOT EXISTS psk_contacts (
+  // --- psk_contacts ---
+  `CREATE TABLE IF NOT EXISTS psk_contacts (
         id             TEXT PRIMARY KEY,
         nickname       TEXT NOT NULL,
         network        TEXT NOT NULL,
@@ -791,8 +791,8 @@ const TABLES = [
         updated_at     TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- rate_limit_state ---
-    `CREATE TABLE IF NOT EXISTS rate_limit_state (
+  // --- rate_limit_state ---
+  `CREATE TABLE IF NOT EXISTS rate_limit_state (
         key           TEXT    NOT NULL,
         bucket        TEXT    NOT NULL,
         window_start  INTEGER NOT NULL,
@@ -801,8 +801,8 @@ const TABLES = [
         PRIMARY KEY (key, bucket, window_start)
     )`,
 
-    // --- repo_blocklist ---
-    `CREATE TABLE IF NOT EXISTS repo_blocklist (
+  // --- repo_blocklist ---
+  `CREATE TABLE IF NOT EXISTS repo_blocklist (
         repo       TEXT NOT NULL,
         reason     TEXT DEFAULT '',
         source     TEXT NOT NULL DEFAULT 'manual',
@@ -812,8 +812,8 @@ const TABLES = [
         PRIMARY KEY (repo, tenant_id)
     )`,
 
-    // --- repo_locks ---
-    `CREATE TABLE IF NOT EXISTS repo_locks (
+  // --- repo_locks ---
+  `CREATE TABLE IF NOT EXISTS repo_locks (
         repo         TEXT NOT NULL PRIMARY KEY,
         execution_id TEXT NOT NULL,
         schedule_id  TEXT NOT NULL,
@@ -822,8 +822,8 @@ const TABLES = [
         expires_at   TEXT NOT NULL
     )`,
 
-    // --- reputation_attestations ---
-    `CREATE TABLE IF NOT EXISTS reputation_attestations (
+  // --- reputation_attestations ---
+  `CREATE TABLE IF NOT EXISTS reputation_attestations (
         agent_id     TEXT NOT NULL,
         hash         TEXT NOT NULL,
         payload      TEXT NOT NULL,
@@ -833,8 +833,8 @@ const TABLES = [
         PRIMARY KEY (agent_id, hash)
     )`,
 
-    // --- reputation_events ---
-    `CREATE TABLE IF NOT EXISTS reputation_events (
+  // --- reputation_events ---
+  `CREATE TABLE IF NOT EXISTS reputation_events (
         id           TEXT PRIMARY KEY,
         agent_id     TEXT NOT NULL,
         event_type   TEXT NOT NULL,
@@ -843,8 +843,8 @@ const TABLES = [
         created_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- sandbox_configs ---
-    `CREATE TABLE IF NOT EXISTS sandbox_configs (
+  // --- sandbox_configs ---
+  `CREATE TABLE IF NOT EXISTS sandbox_configs (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL UNIQUE,
         image            TEXT DEFAULT 'corvid-agent-sandbox:latest',
@@ -859,8 +859,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- schedule_executions ---
-    `CREATE TABLE IF NOT EXISTS schedule_executions (
+  // --- schedule_executions ---
+  `CREATE TABLE IF NOT EXISTS schedule_executions (
         id              TEXT PRIMARY KEY,
         schedule_id     TEXT NOT NULL REFERENCES agent_schedules(id) ON DELETE CASCADE,
         agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -877,8 +877,8 @@ const TABLES = [
         completed_at    TEXT DEFAULT NULL
     )`,
 
-    // --- server_health_snapshots ---
-    `CREATE TABLE IF NOT EXISTS server_health_snapshots (
+  // --- server_health_snapshots ---
+  `CREATE TABLE IF NOT EXISTS server_health_snapshots (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp        TEXT NOT NULL DEFAULT (datetime('now')),
         status           TEXT NOT NULL,
@@ -887,8 +887,8 @@ const TABLES = [
         source           TEXT NOT NULL DEFAULT 'internal'
     )`,
 
-    // --- session_messages ---
-    `CREATE TABLE IF NOT EXISTS session_messages (
+  // --- session_messages ---
+  `CREATE TABLE IF NOT EXISTS session_messages (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL REFERENCES sessions(id),
         role       TEXT NOT NULL,
@@ -898,8 +898,8 @@ const TABLES = [
         timestamp  TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- sessions ---
-    `CREATE TABLE IF NOT EXISTS sessions (
+  // --- sessions ---
+  `CREATE TABLE IF NOT EXISTS sessions (
         id                TEXT PRIMARY KEY,
         project_id        TEXT REFERENCES projects(id),
         agent_id          TEXT REFERENCES agents(id),
@@ -920,8 +920,8 @@ const TABLES = [
         updated_at        TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- skill_bundles ---
-    `CREATE TABLE IF NOT EXISTS skill_bundles (
+  // --- skill_bundles ---
+  `CREATE TABLE IF NOT EXISTS skill_bundles (
         id               TEXT PRIMARY KEY,
         name             TEXT NOT NULL UNIQUE,
         description      TEXT DEFAULT '',
@@ -932,8 +932,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- subscription_items ---
-    `CREATE TABLE IF NOT EXISTS subscription_items (
+  // --- subscription_items ---
+  `CREATE TABLE IF NOT EXISTS subscription_items (
         id              TEXT PRIMARY KEY,
         subscription_id TEXT NOT NULL,
         stripe_item_id  TEXT NOT NULL,
@@ -942,8 +942,8 @@ const TABLES = [
         FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
     )`,
 
-    // --- subscriptions ---
-    `CREATE TABLE IF NOT EXISTS subscriptions (
+  // --- subscriptions ---
+  `CREATE TABLE IF NOT EXISTS subscriptions (
         id                     TEXT PRIMARY KEY,
         tenant_id              TEXT NOT NULL,
         stripe_subscription_id TEXT NOT NULL,
@@ -956,8 +956,8 @@ const TABLES = [
         updated_at             TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- tenant_members ---
-    `CREATE TABLE IF NOT EXISTS tenant_members (
+  // --- tenant_members ---
+  `CREATE TABLE IF NOT EXISTS tenant_members (
         tenant_id  TEXT NOT NULL,
         key_hash   TEXT NOT NULL,
         role       TEXT NOT NULL DEFAULT 'viewer',
@@ -966,8 +966,8 @@ const TABLES = [
         PRIMARY KEY (tenant_id, key_hash)
     )`,
 
-    // --- tenants ---
-    `CREATE TABLE IF NOT EXISTS tenants (
+  // --- tenants ---
+  `CREATE TABLE IF NOT EXISTS tenants (
         id                       TEXT PRIMARY KEY,
         name                     TEXT NOT NULL,
         slug                     TEXT UNIQUE NOT NULL,
@@ -982,8 +982,8 @@ const TABLES = [
         updated_at               TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- usage_records ---
-    `CREATE TABLE IF NOT EXISTS usage_records (
+  // --- usage_records ---
+  `CREATE TABLE IF NOT EXISTS usage_records (
         id            TEXT PRIMARY KEY,
         tenant_id     TEXT NOT NULL,
         credits_used  INTEGER DEFAULT 0,
@@ -996,8 +996,8 @@ const TABLES = [
         created_at    TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- voice_cache ---
-    `CREATE TABLE IF NOT EXISTS voice_cache (
+  // --- voice_cache ---
+  `CREATE TABLE IF NOT EXISTS voice_cache (
         id           TEXT PRIMARY KEY,
         text_hash    TEXT NOT NULL,
         voice_preset TEXT NOT NULL,
@@ -1007,8 +1007,8 @@ const TABLES = [
         created_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- webhook_deliveries ---
-    `CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  // --- webhook_deliveries ---
+  `CREATE TABLE IF NOT EXISTS webhook_deliveries (
         id              TEXT PRIMARY KEY,
         registration_id TEXT NOT NULL REFERENCES webhook_registrations(id) ON DELETE CASCADE,
         event           TEXT NOT NULL,
@@ -1024,8 +1024,8 @@ const TABLES = [
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- webhook_registrations ---
-    `CREATE TABLE IF NOT EXISTS webhook_registrations (
+  // --- webhook_registrations ---
+  `CREATE TABLE IF NOT EXISTS webhook_registrations (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         repo             TEXT NOT NULL,
@@ -1039,8 +1039,8 @@ const TABLES = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    // --- work_tasks ---
-    `CREATE TABLE IF NOT EXISTS work_tasks (
+  // --- work_tasks ---
+  `CREATE TABLE IF NOT EXISTS work_tasks (
         id              TEXT PRIMARY KEY,
         agent_id        TEXT NOT NULL REFERENCES agents(id),
         project_id      TEXT NOT NULL REFERENCES projects(id),
@@ -1062,8 +1062,8 @@ const TABLES = [
         completed_at    TEXT DEFAULT NULL
     )`,
 
-    // --- workflow_node_runs ---
-    `CREATE TABLE IF NOT EXISTS workflow_node_runs (
+  // --- workflow_node_runs ---
+  `CREATE TABLE IF NOT EXISTS workflow_node_runs (
         id           TEXT PRIMARY KEY,
         run_id       TEXT NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
         node_id      TEXT NOT NULL,
@@ -1078,8 +1078,8 @@ const TABLES = [
         completed_at TEXT DEFAULT NULL
     )`,
 
-    // --- workflow_runs ---
-    `CREATE TABLE IF NOT EXISTS workflow_runs (
+  // --- workflow_runs ---
+  `CREATE TABLE IF NOT EXISTS workflow_runs (
         id               TEXT PRIMARY KEY,
         workflow_id      TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -1094,8 +1094,8 @@ const TABLES = [
         completed_at     TEXT DEFAULT NULL
     )`,
 
-    // --- workflows ---
-    `CREATE TABLE IF NOT EXISTS workflows (
+  // --- workflows ---
+  `CREATE TABLE IF NOT EXISTS workflows (
         id                 TEXT PRIMARY KEY,
         agent_id           TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         name               TEXT NOT NULL,
@@ -1123,24 +1123,24 @@ const FTS = `CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_fts USING fts5(
 // ── Triggers (keep FTS index in sync) ───────────────────────────────────────
 
 const TRIGGERS = [
-    `CREATE TRIGGER IF NOT EXISTS agent_memories_ai AFTER INSERT ON agent_memories BEGIN
+  `CREATE TRIGGER IF NOT EXISTS agent_memories_ai AFTER INSERT ON agent_memories BEGIN
         INSERT INTO agent_memories_fts(rowid, key, content)
         VALUES (new.rowid, new.key, new.content);
     END`,
 
-    `CREATE TRIGGER IF NOT EXISTS agent_memories_ad AFTER DELETE ON agent_memories BEGIN
+  `CREATE TRIGGER IF NOT EXISTS agent_memories_ad AFTER DELETE ON agent_memories BEGIN
         INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
         VALUES ('delete', old.rowid, old.key, old.content);
     END`,
 
-    `CREATE TRIGGER IF NOT EXISTS agent_memories_au AFTER UPDATE ON agent_memories BEGIN
+  `CREATE TRIGGER IF NOT EXISTS agent_memories_au AFTER UPDATE ON agent_memories BEGIN
         INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
         VALUES ('delete', old.rowid, old.key, old.content);
         INSERT INTO agent_memories_fts(rowid, key, content)
         VALUES (new.rowid, new.key, new.content);
     END`,
 
-    `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_insert
+  `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_insert
     BEFORE INSERT ON agent_memories
     WHEN (NEW.book IS NOT NULL AND NEW.page IS NULL)
        OR (NEW.book IS NULL AND NEW.page IS NOT NULL)
@@ -1148,7 +1148,7 @@ const TRIGGERS = [
         SELECT RAISE(ABORT, 'book and page must both be set or both be null');
     END`,
 
-    `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_update
+  `CREATE TRIGGER IF NOT EXISTS trg_agent_memories_book_page_update
     BEFORE UPDATE ON agent_memories
     WHEN (NEW.book IS NOT NULL AND NEW.page IS NULL)
        OR (NEW.book IS NULL AND NEW.page IS NOT NULL)
@@ -1160,316 +1160,316 @@ const TRIGGERS = [
 // ── Indexes (alphabetical) ─────────────────────────────────────────────────
 
 const INDEXES = [
-    `CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_reputation_tenant ON agent_reputation(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_schedules_agent ON agent_schedules(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_schedules_next_run ON agent_schedules(next_run_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_schedules_status ON agent_schedules(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_schedules_tenant ON agent_schedules(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
-    `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_council_launch_logs_launch ON council_launch_logs(launch_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_council_launches_council ON council_launches(council_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_council_launches_tenant ON council_launches(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_council_members_council ON council_members(council_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_councils_tenant ON councils(tenant_id)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_ledger_wallet ON credit_ledger(wallet_address)`,
-    `CREATE INDEX IF NOT EXISTS idx_credit_txn_session ON credit_transactions(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_credit_txn_type ON credit_transactions(type)`,
-    `CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet ON credit_transactions(wallet_address)`,
-    `CREATE INDEX IF NOT EXISTS idx_dedup_state_expires ON dedup_state(expires_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_dedup_state_ns_expires ON dedup_state(namespace, expires_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_escalation_queue_status ON escalation_queue(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_escrow_buyer ON escrow_transactions(buyer_tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_escrow_listing ON escrow_transactions(listing_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_transactions(seller_tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_transactions(state)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_address ON flock_agents(address)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_name ON flock_agents(name)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_status ON flock_agents(status)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_gov_member_votes_unique ON governance_member_votes(governance_vote_id, agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_gov_votes_launch ON governance_votes(launch_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_gov_votes_status ON governance_votes(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_gov_votes_tenant ON governance_votes(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_health_snap_agent ON health_snapshots(agent_id, project_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_agent ON marketplace_listings(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_category ON marketplace_listings(category)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_status ON marketplace_listings(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_tenant ON marketplace_listings(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_pricing_tiers_listing ON marketplace_pricing_tiers(listing_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_reviews_listing ON marketplace_reviews(listing_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_listing ON marketplace_subscriptions(listing_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_period_end ON marketplace_subscriptions(current_period_end)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_seller ON marketplace_subscriptions(seller_tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_status ON marketplace_subscriptions(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_subscriber ON marketplace_subscriptions(subscriber_tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_listing ON marketplace_trials(listing_id)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_trials_listing_tenant ON marketplace_trials(listing_id, tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_tenant ON marketplace_trials(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_agent ON mcp_server_configs(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_tenant ON mcp_server_configs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_tenant ON mention_polling_configs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mue_created ON marketplace_usage_events(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_mue_listing ON marketplace_usage_events(listing_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mue_listing_created ON marketplace_usage_events(listing_id, created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_mue_user ON marketplace_usage_events(user_tenant_id)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_channels_agent_type ON notification_channels(agent_id, channel_type)`,
-    `CREATE INDEX IF NOT EXISTS idx_notification_channels_tenant ON notification_channels(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_notification ON notification_deliveries(notification_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_status ON notification_deliveries(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_owner_notifications_agent ON owner_notifications(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_owner_notifications_created ON owner_notifications(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_owner_questions_agent ON owner_questions(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_owner_questions_session ON owner_questions(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perf_metric_ts ON performance_metrics(metric, timestamp)`,
-    `CREATE INDEX IF NOT EXISTS idx_perf_ts ON performance_metrics(timestamp)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_agent ON permission_checks(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_action ON permission_grants(action)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_agent ON permission_grants(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_tenant ON permission_grants(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_repo ON pr_outcomes(repo)`,
-    `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_state ON pr_outcomes(pr_state)`,
-    `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_project_skills_project ON project_skills(project_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tenant_name ON projects(tenant_id, name COLLATE NOCASE)`,
-    `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
-    `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
-    `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question ON owner_question_dispatches(question_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_question_dispatches_status ON owner_question_dispatches(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_rate_limit_window ON rate_limit_state(window_start)`,
-    `CREATE INDEX IF NOT EXISTS idx_repo_blocklist_tenant ON repo_blocklist(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_repo_locks_expires ON repo_locks(expires_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_repo_locks_schedule ON repo_locks(schedule_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_reputation_events_agent ON reputation_events(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_reputation_events_type ON reputation_events(event_type)`,
-    `CREATE INDEX IF NOT EXISTS idx_sandbox_configs_tenant ON sandbox_configs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule ON schedule_executions(schedule_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_schedule_executions_status ON schedule_executions(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_schedule_executions_tenant ON schedule_executions(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_status ON server_health_snapshots(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_timestamp ON server_health_snapshots(timestamp)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_subscription_items_sub ON subscription_items(subscription_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_records_tenant ON usage_records(tenant_id)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_cache_hash ON voice_cache(text_hash, voice_preset)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_registration ON webhook_deliveries(registration_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_agent ON webhook_registrations(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_repo ON webhook_registrations(repo)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_status ON webhook_registrations(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_work_tasks_agent ON work_tasks(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_work_tasks_tenant ON work_tasks(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_memories_book_page ON agent_memories(agent_id, book, page) WHERE book IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_reputation_tenant ON agent_reputation(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_schedules_agent ON agent_schedules(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_schedules_next_run ON agent_schedules(next_run_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_schedules_status ON agent_schedules(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_schedules_tenant ON agent_schedules(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
+  `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_council_launch_logs_launch ON council_launch_logs(launch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_council_launches_council ON council_launches(council_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_council_launches_tenant ON council_launches(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_council_members_council ON council_members(council_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_councils_tenant ON councils(tenant_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_ledger_wallet ON credit_ledger(wallet_address)`,
+  `CREATE INDEX IF NOT EXISTS idx_credit_txn_session ON credit_transactions(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_credit_txn_type ON credit_transactions(type)`,
+  `CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet ON credit_transactions(wallet_address)`,
+  `CREATE INDEX IF NOT EXISTS idx_dedup_state_expires ON dedup_state(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_dedup_state_ns_expires ON dedup_state(namespace, expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_escalation_queue_status ON escalation_queue(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_escrow_buyer ON escrow_transactions(buyer_tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_escrow_listing ON escrow_transactions(listing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_transactions(seller_tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_transactions(state)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_address ON flock_agents(address)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_name ON flock_agents(name)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_status ON flock_agents(status)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_gov_member_votes_unique ON governance_member_votes(governance_vote_id, agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_gov_votes_launch ON governance_votes(launch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_gov_votes_status ON governance_votes(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_gov_votes_tenant ON governance_votes(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_health_snap_agent ON health_snapshots(agent_id, project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_agent ON marketplace_listings(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_category ON marketplace_listings(category)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_status ON marketplace_listings(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_tenant ON marketplace_listings(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_pricing_tiers_listing ON marketplace_pricing_tiers(listing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_reviews_listing ON marketplace_reviews(listing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_listing ON marketplace_subscriptions(listing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_period_end ON marketplace_subscriptions(current_period_end)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_seller ON marketplace_subscriptions(seller_tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_status ON marketplace_subscriptions(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_subscriber ON marketplace_subscriptions(subscriber_tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_listing ON marketplace_trials(listing_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_trials_listing_tenant ON marketplace_trials(listing_id, tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_tenant ON marketplace_trials(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_agent ON mcp_server_configs(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_tenant ON mcp_server_configs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_tenant ON mention_polling_configs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mue_created ON marketplace_usage_events(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_mue_listing ON marketplace_usage_events(listing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mue_listing_created ON marketplace_usage_events(listing_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_mue_user ON marketplace_usage_events(user_tenant_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_channels_agent_type ON notification_channels(agent_id, channel_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_channels_tenant ON notification_channels(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_notification ON notification_deliveries(notification_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_status ON notification_deliveries(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_owner_notifications_agent ON owner_notifications(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_owner_notifications_created ON owner_notifications(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_owner_questions_agent ON owner_questions(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_owner_questions_session ON owner_questions(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perf_metric_ts ON performance_metrics(metric, timestamp)`,
+  `CREATE INDEX IF NOT EXISTS idx_perf_ts ON performance_metrics(timestamp)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_agent ON permission_checks(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_action ON permission_grants(action)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_agent ON permission_grants(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_tenant ON permission_grants(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_repo ON pr_outcomes(repo)`,
+  `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_state ON pr_outcomes(pr_state)`,
+  `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_project_skills_project ON project_skills(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tenant_name ON projects(tenant_id, name COLLATE NOCASE)`,
+  `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
+  `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
+  `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question ON owner_question_dispatches(question_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_question_dispatches_status ON owner_question_dispatches(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_rate_limit_window ON rate_limit_state(window_start)`,
+  `CREATE INDEX IF NOT EXISTS idx_repo_blocklist_tenant ON repo_blocklist(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_repo_locks_expires ON repo_locks(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_repo_locks_schedule ON repo_locks(schedule_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reputation_events_agent ON reputation_events(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reputation_events_type ON reputation_events(event_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_sandbox_configs_tenant ON sandbox_configs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule ON schedule_executions(schedule_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_schedule_executions_status ON schedule_executions(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_schedule_executions_tenant ON schedule_executions(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_status ON server_health_snapshots(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_timestamp ON server_health_snapshots(timestamp)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_subscription_items_sub ON subscription_items(subscription_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_usage_records_tenant ON usage_records(tenant_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_cache_hash ON voice_cache(text_hash, voice_preset)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_registration ON webhook_deliveries(registration_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_agent ON webhook_registrations(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_repo ON webhook_registrations(repo)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_status ON webhook_registrations(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_tasks_agent ON work_tasks(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_tasks_tenant ON work_tasks(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
 ];
 
 // ── Seed data ───────────────────────────────────────────────────────────────
 
 const SEED_DATA = [
-    // Credit configuration defaults
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_algo', '1000')`,
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('low_credit_threshold', '50')`,
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('reserve_per_group_message', '10')`,
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_turn', '1')`,
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_agent_message', '5')`,
-    `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('free_credits_on_first_message', '100')`,
+  // Credit configuration defaults
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_algo', '1000')`,
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('low_credit_threshold', '50')`,
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('reserve_per_group_message', '10')`,
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_turn', '1')`,
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_agent_message', '5')`,
+  `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('free_credits_on_first_message', '100')`,
 
-    // Preset skill bundles
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  // Preset skill bundles
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-code-reviewer', 'Code Reviewer', 'Review pull requests and provide feedback', '["corvid_github_list_prs","corvid_github_review_pr","corvid_github_get_pr_diff","corvid_github_comment_on_pr"]', 'You are an expert code reviewer. Focus on code quality, security, performance, and maintainability. Provide specific, actionable feedback.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-devops', 'DevOps', 'Infrastructure and deployment automation', '["corvid_create_work_task","corvid_github_create_pr","corvid_github_fork_repo"]', 'You specialize in DevOps practices. Focus on CI/CD, infrastructure-as-code, monitoring, and deployment automation.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-researcher', 'Researcher', 'Deep research and information gathering', '["corvid_web_search","corvid_deep_research","corvid_save_memory","corvid_recall_memory"]', 'You are a thorough researcher. Gather comprehensive information, cross-reference sources, and synthesize findings into clear summaries.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-communicator', 'Communicator', 'Inter-agent and external communication', '["corvid_send_message","corvid_list_agents","corvid_discover_agent","corvid_invoke_remote_agent"]', 'You excel at communication and coordination. Draft clear messages, manage conversations, and facilitate collaboration between agents.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-analyst', 'Analyst', 'Code analysis and health monitoring', '["corvid_check_health_trends","corvid_check_reputation","corvid_github_repo_info","corvid_github_list_issues"]', 'You are a data-driven analyst. Examine metrics, identify trends, and provide actionable insights from codebase health and project data.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-coder', 'Coder', 'Read, write, and edit code with command execution', '["read_file","write_file","edit_file","run_command","list_files","search_files"]', 'You are an expert coder. Read files to understand context before making changes. Use edit_file for targeted modifications and write_file only for new files. Always verify changes by reading the result. Run commands to test and validate your work.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-github-ops', 'GitHub Ops', 'GitHub PR and issue management', '["corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_github_repo_info"]', 'You specialize in GitHub operations. Review PRs thoroughly by reading diffs before commenting. When creating issues or PRs, write clear titles and descriptions. Check existing issues before creating duplicates.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-full-stack', 'Full Stack', 'Code, GitHub, tasks, and web search combined', '["read_file","write_file","edit_file","run_command","list_files","search_files","corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_create_work_task","corvid_web_search"]', 'You are a full-stack developer agent. You can read and edit code, run commands, manage GitHub PRs and issues, and create work tasks. Approach problems methodically: understand the codebase first, make targeted changes, test your work, then create PRs or report findings.', 1)`,
-    `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+  `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
         ('preset-memory-manager', 'Memory Manager', 'Knowledge and memory management with research', '["corvid_save_memory","corvid_recall_memory","corvid_web_search","corvid_deep_research"]', 'You manage knowledge and memory. Save important findings, decisions, and context using structured keys. Recall relevant memories before starting new work. Use web search and deep research to fill knowledge gaps.', 1)`,
 ];
 
 // ── Drop order (reverse dependency) ─────────────────────────────────────────
 
 const DROP_ORDER = [
-    // FTS and triggers first
-    'agent_memories_fts',
+  // FTS and triggers first
+  'agent_memories_fts',
 
-    // Junction / child tables
-    'agent_skills',
-    'project_skills',
-    'council_members',
-    'council_discussion_messages',
-    'council_launch_logs',
-    'governance_member_votes',
-    'governance_votes',
-    'governance_proposals',
-    'workflow_node_runs',
-    'workflow_runs',
-    'workflows',
-    'schedule_executions',
-    'agent_schedules',
-    'notification_deliveries',
-    'owner_notifications',
-    'notification_channels',
-    'owner_question_dispatches',
-    'owner_questions',
-    'webhook_deliveries',
-    'webhook_registrations',
-    'mention_polling_configs',
-    'marketplace_trials',
-    'marketplace_usage_events',
-    'marketplace_pricing_tiers',
-    'marketplace_subscriptions',
-    'marketplace_reviews',
-    'marketplace_listings',
-    'federated_instances',
-    'escrow_transactions',
-    'subscription_items',
-    'subscriptions',
-    'usage_records',
-    'invoices',
-    'tenant_members',
-    'api_keys',
-    'tenants',
-    'council_launches',
-    'councils',
-    'session_messages',
-    'sessions',
-    'agent_messages',
-    'agent_memories',
-    'algochat_conversations',
-    'algochat_messages',
-    'algochat_psk_state',
-    'algochat_allowlist',
-    'psk_contacts',
-    'work_tasks',
-    'agent_personas',
-    'agent_reputation',
-    'reputation_events',
-    'reputation_attestations',
-    'agent_spending_caps',
-    'agent_daily_spending',
-    'agent_identity',
-    'agent_usdc_revenue',
-    'sandbox_configs',
-    'mcp_server_configs',
-    'skill_bundles',
-    'voice_cache',
-    'credit_config',
-    'credit_ledger',
-    'credit_transactions',
-    'daily_spending',
-    'health_snapshots',
-    'server_health_snapshots',
-    'performance_metrics',
-    'escalation_queue',
-    'plugins',
-    'plugin_capabilities',
-    'pr_outcomes',
-    'permission_checks',
-    'permission_grants',
-    'dedup_state',
-    'rate_limit_state',
-    'repo_blocklist',
-    'repo_locks',
-    'audit_log',
-    'github_allowlist',
-    'flock_agents',
+  // Junction / child tables
+  'agent_skills',
+  'project_skills',
+  'council_members',
+  'council_discussion_messages',
+  'council_launch_logs',
+  'governance_member_votes',
+  'governance_votes',
+  'governance_proposals',
+  'workflow_node_runs',
+  'workflow_runs',
+  'workflows',
+  'schedule_executions',
+  'agent_schedules',
+  'notification_deliveries',
+  'owner_notifications',
+  'notification_channels',
+  'owner_question_dispatches',
+  'owner_questions',
+  'webhook_deliveries',
+  'webhook_registrations',
+  'mention_polling_configs',
+  'marketplace_trials',
+  'marketplace_usage_events',
+  'marketplace_pricing_tiers',
+  'marketplace_subscriptions',
+  'marketplace_reviews',
+  'marketplace_listings',
+  'federated_instances',
+  'escrow_transactions',
+  'subscription_items',
+  'subscriptions',
+  'usage_records',
+  'invoices',
+  'tenant_members',
+  'api_keys',
+  'tenants',
+  'council_launches',
+  'councils',
+  'session_messages',
+  'sessions',
+  'agent_messages',
+  'agent_memories',
+  'algochat_conversations',
+  'algochat_messages',
+  'algochat_psk_state',
+  'algochat_allowlist',
+  'psk_contacts',
+  'work_tasks',
+  'agent_personas',
+  'agent_reputation',
+  'reputation_events',
+  'reputation_attestations',
+  'agent_spending_caps',
+  'agent_daily_spending',
+  'agent_identity',
+  'agent_usdc_revenue',
+  'sandbox_configs',
+  'mcp_server_configs',
+  'skill_bundles',
+  'voice_cache',
+  'credit_config',
+  'credit_ledger',
+  'credit_transactions',
+  'daily_spending',
+  'health_snapshots',
+  'server_health_snapshots',
+  'performance_metrics',
+  'escalation_queue',
+  'plugins',
+  'plugin_capabilities',
+  'pr_outcomes',
+  'permission_checks',
+  'permission_grants',
+  'dedup_state',
+  'rate_limit_state',
+  'repo_blocklist',
+  'repo_locks',
+  'audit_log',
+  'github_allowlist',
+  'flock_agents',
 
-    // Parent tables last
-    'agents',
-    'projects',
+  // Parent tables last
+  'agents',
+  'projects',
 ];
 
 // ── Migration exports ───────────────────────────────────────────────────────
 
 export function up(db: Database): void {
-    // Create all tables
-    for (const sql of TABLES) {
-        db.exec(sql);
-    }
+  // Create all tables
+  for (const sql of TABLES) {
+    db.exec(sql);
+  }
 
-    // Create FTS virtual table
-    db.exec(FTS);
+  // Create FTS virtual table
+  db.exec(FTS);
 
-    // Create triggers
-    for (const sql of TRIGGERS) {
-        db.exec(sql);
-    }
+  // Create triggers
+  for (const sql of TRIGGERS) {
+    db.exec(sql);
+  }
 
-    // Create indexes
-    for (const sql of INDEXES) {
-        db.exec(sql);
-    }
+  // Create indexes
+  for (const sql of INDEXES) {
+    db.exec(sql);
+  }
 
-    // Insert seed data
-    for (const sql of SEED_DATA) {
-        db.exec(sql);
-    }
+  // Insert seed data
+  for (const sql of SEED_DATA) {
+    db.exec(sql);
+  }
 }
 
 export function down(db: Database): void {
-    // Drop triggers first
-    db.exec('DROP TRIGGER IF EXISTS agent_memories_ai');
-    db.exec('DROP TRIGGER IF EXISTS agent_memories_ad');
-    db.exec('DROP TRIGGER IF EXISTS agent_memories_au');
+  // Drop triggers first
+  db.exec('DROP TRIGGER IF EXISTS agent_memories_ai');
+  db.exec('DROP TRIGGER IF EXISTS agent_memories_ad');
+  db.exec('DROP TRIGGER IF EXISTS agent_memories_au');
 
-    // Drop tables in reverse dependency order
-    for (const table of DROP_ORDER) {
-        db.exec(`DROP TABLE IF EXISTS ${table}`);
-    }
+  // Drop tables in reverse dependency order
+  for (const table of DROP_ORDER) {
+    db.exec(`DROP TABLE IF EXISTS ${table}`);
+  }
 }

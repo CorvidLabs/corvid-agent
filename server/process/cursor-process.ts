@@ -86,42 +86,49 @@ export type CursorErrorCategory =
  * Exit code 0 = success, 2 = invalid arguments (permanent).
  * Exit code 1 is ambiguous — stderr is examined to disambiguate.
  */
-export const CURSOR_EXIT_CODE_MAP: Record<number, { category: CursorErrorCategory; transient: boolean; message: string }> = {
-  0:   { category: 'success',       transient: false, message: 'Success' },
-  2:   { category: 'invalid_args',  transient: false, message: 'Invalid arguments — check CLI flags' },
-  126: { category: 'config_error',  transient: false, message: 'Binary not executable — check permissions' },
-  127: { category: 'config_error',  transient: false, message: 'Binary not found — check CURSOR_AGENT_BIN' },
+export const CURSOR_EXIT_CODE_MAP: Record<
+  number,
+  { category: CursorErrorCategory; transient: boolean; message: string }
+> = {
+  0: { category: 'success', transient: false, message: 'Success' },
+  2: { category: 'invalid_args', transient: false, message: 'Invalid arguments — check CLI flags' },
+  126: { category: 'config_error', transient: false, message: 'Binary not executable — check permissions' },
+  127: { category: 'config_error', transient: false, message: 'Binary not found — check CURSOR_AGENT_BIN' },
   130: { category: 'general_error', transient: false, message: 'Process interrupted (SIGINT)' },
-  137: { category: 'general_error', transient: true,  message: 'Process killed (SIGKILL) — possible OOM or timeout' },
-  143: { category: 'general_error', transient: true,  message: 'Process terminated (SIGTERM)' },
+  137: { category: 'general_error', transient: true, message: 'Process killed (SIGKILL) — possible OOM or timeout' },
+  143: { category: 'general_error', transient: true, message: 'Process terminated (SIGTERM)' },
 };
 
 /** Stderr patterns that indicate transient (retryable) failures. */
 const TRANSIENT_STDERR_PATTERNS: Array<{ pattern: RegExp; category: CursorErrorCategory; message: string }> = [
-  { pattern: /ECONNRESET/i,              category: 'network_error',   message: 'Connection reset — transient network failure' },
-  { pattern: /ETIMEDOUT/i,               category: 'network_timeout', message: 'Connection timed out — transient network failure' },
-  { pattern: /ECONNREFUSED/i,            category: 'network_error',   message: 'Connection refused — service may be starting up' },
-  { pattern: /EPIPE/i,                   category: 'network_error',   message: 'Broken pipe — transient network failure' },
-  { pattern: /rate.?limit/i,             category: 'rate_limit',      message: 'Rate limited — back off and retry' },
-  { pattern: /429/,                      category: 'rate_limit',      message: 'Rate limited (HTTP 429) — back off and retry' },
-  { pattern: /503/,                      category: 'network_error',   message: 'Service unavailable (HTTP 503) — transient' },
-  { pattern: /502/,                      category: 'network_error',   message: 'Bad gateway (HTTP 502) — transient' },
-  { pattern: /timeout/i,                 category: 'network_timeout', message: 'Request timed out — transient' },
-  { pattern: /overloaded/i,              category: 'rate_limit',      message: 'Server overloaded — transient' },
-  { pattern: /fetch.?failed/i,           category: 'network_error',   message: 'Network fetch failed — transient' },
-  { pattern: /network.?error/i,          category: 'network_error',   message: 'Network error — transient' },
+  { pattern: /ECONNRESET/i, category: 'network_error', message: 'Connection reset — transient network failure' },
+  { pattern: /ETIMEDOUT/i, category: 'network_timeout', message: 'Connection timed out — transient network failure' },
+  { pattern: /ECONNREFUSED/i, category: 'network_error', message: 'Connection refused — service may be starting up' },
+  { pattern: /EPIPE/i, category: 'network_error', message: 'Broken pipe — transient network failure' },
+  { pattern: /rate.?limit/i, category: 'rate_limit', message: 'Rate limited — back off and retry' },
+  { pattern: /429/, category: 'rate_limit', message: 'Rate limited (HTTP 429) — back off and retry' },
+  { pattern: /503/, category: 'network_error', message: 'Service unavailable (HTTP 503) — transient' },
+  { pattern: /502/, category: 'network_error', message: 'Bad gateway (HTTP 502) — transient' },
+  { pattern: /timeout/i, category: 'network_timeout', message: 'Request timed out — transient' },
+  { pattern: /overloaded/i, category: 'rate_limit', message: 'Server overloaded — transient' },
+  { pattern: /fetch.?failed/i, category: 'network_error', message: 'Network fetch failed — transient' },
+  { pattern: /network.?error/i, category: 'network_error', message: 'Network error — transient' },
 ];
 
 /** Stderr patterns that indicate permanent (non-retryable) failures. */
 const PERMANENT_STDERR_PATTERNS: Array<{ pattern: RegExp; category: CursorErrorCategory; message: string }> = [
-  { pattern: /auth(entication|orization)?.?(fail|error|denied|invalid)/i, category: 'auth_failure',   message: 'Authentication failed — check credentials' },
-  { pattern: /invalid.?api.?key/i,       category: 'auth_failure',   message: 'Invalid API key' },
-  { pattern: /unauthorized/i,            category: 'auth_failure',   message: 'Unauthorized — check API key or token' },
-  { pattern: /forbidden/i,              category: 'auth_failure',   message: 'Forbidden — insufficient permissions' },
-  { pattern: /invalid.?model/i,          category: 'invalid_model',  message: 'Invalid model — model not available' },
-  { pattern: /model.?not.?found/i,       category: 'invalid_model',  message: 'Model not found' },
-  { pattern: /unknown.?model/i,          category: 'invalid_model',  message: 'Unknown model identifier' },
-  { pattern: /invalid.?config/i,         category: 'config_error',   message: 'Invalid configuration' },
+  {
+    pattern: /auth(entication|orization)?.?(fail|error|denied|invalid)/i,
+    category: 'auth_failure',
+    message: 'Authentication failed — check credentials',
+  },
+  { pattern: /invalid.?api.?key/i, category: 'auth_failure', message: 'Invalid API key' },
+  { pattern: /unauthorized/i, category: 'auth_failure', message: 'Unauthorized — check API key or token' },
+  { pattern: /forbidden/i, category: 'auth_failure', message: 'Forbidden — insufficient permissions' },
+  { pattern: /invalid.?model/i, category: 'invalid_model', message: 'Invalid model — model not available' },
+  { pattern: /model.?not.?found/i, category: 'invalid_model', message: 'Model not found' },
+  { pattern: /unknown.?model/i, category: 'invalid_model', message: 'Unknown model identifier' },
+  { pattern: /invalid.?config/i, category: 'config_error', message: 'Invalid configuration' },
 ];
 
 /**
@@ -233,7 +240,11 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
       if (!killed) {
         log.warn(`Stream idle timeout (${STREAM_IDLE_TIMEOUT_MS}ms) for session ${session.id} — killing process`);
         killed = true;
-        try { currentProc.kill(); } catch { /* already exited */ }
+        try {
+          currentProc.kill();
+        } catch {
+          /* already exited */
+        }
         const classification = classifyCursorError(null, 'stream idle timeout');
         onExit(null, `[cursor:${classification.category}:transient] ${classification.message}`);
       }
@@ -294,7 +305,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
   readStream(currentProc.stderr, (event) => {
     const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
     if (typeof message === 'string') {
-      stderrBuffer += message + '\n';
+      stderrBuffer += `${message}\n`;
     }
     log.debug(`cursor-agent stderr: ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
   });
@@ -306,7 +317,11 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
         if (code !== 0) {
           const classification = classifyCursorError(code, stderrBuffer);
           const tag = classification.transient ? 'transient' : 'permanent';
-          log.warn(`cursor-agent exit classified`, { exitCode: code, category: classification.category, transient: classification.transient });
+          log.warn(`cursor-agent exit classified`, {
+            exitCode: code,
+            category: classification.category,
+            transient: classification.transient,
+          });
           onExit(code, `[cursor:${classification.category}:${tag}] ${classification.message}`);
         } else {
           onExit(code);
@@ -370,7 +385,7 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
     readStream(currentProc.stderr, (event) => {
       const message = typeof event === 'object' && event !== null ? JSON.stringify(event) : String(event);
       if (typeof message === 'string') {
-        stderrBuffer += message + '\n';
+        stderrBuffer += `${message}\n`;
       }
       log.debug(`cursor-agent stderr (resume): ${typeof message === 'string' ? message.slice(0, 200) : ''}`);
     });
@@ -417,8 +432,9 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
 export function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {
   const args: string[] = [
     '--print',
-    '--output-format', 'stream-json',
-    '--stream-partial-output',  // Stream text deltas for real-time output
+    '--output-format',
+    'stream-json',
+    '--stream-partial-output', // Stream text deltas for real-time output
     '--trust',
   ];
 
@@ -460,7 +476,6 @@ export function buildArgs(project: Project, agent: Agent | null, worktree?: stri
  * Extract a human-readable description from a cursor-agent tool_call event.
  * Returns e.g. "Reading package.json" or "Running: git status"
  */
-// biome-ignore lint/suspicious/noExplicitAny: cursor-agent tool_call shape is dynamic
 export function describeCursorToolCall(event: any): string | null {
   const tc = event.tool_call;
   if (!tc || typeof tc !== 'object') return null;
@@ -498,7 +513,9 @@ function basename(p: string): string {
   return idx >= 0 ? p.slice(idx + 1) : p;
 }
 
-export function extractCursorCostAndTurns(raw: Record<string, unknown>): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
+export function extractCursorCostAndTurns(
+  raw: Record<string, unknown>,
+): Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> {
   const out: Pick<SessionTurnMetricsEvent, 'total_cost_usd' | 'num_turns'> = {};
   if (typeof raw.total_cost_usd === 'number') out.total_cost_usd = raw.total_cost_usd;
   if (typeof raw.num_turns === 'number') out.num_turns = raw.num_turns;

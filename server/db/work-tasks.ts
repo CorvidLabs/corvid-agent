@@ -1,101 +1,102 @@
 import type { Database } from 'bun:sqlite';
-import type { WorkTask, WorkTaskStatus, WorkTaskPriority } from '../../shared/types';
+import type { WorkTask, WorkTaskPriority, WorkTaskStatus } from '../../shared/types';
+import { validateTenantOwnership, withTenantFilter } from '../tenant/db-filter';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 import { writeTransaction } from './pool';
 
 interface WorkTaskRow {
-    id: string;
-    agent_id: string;
-    project_id: string;
-    session_id: string | null;
-    source: string;
-    source_id: string | null;
-    requester_info: string;
-    description: string;
-    branch_name: string | null;
-    status: string;
-    pr_url: string | null;
-    summary: string | null;
-    error: string | null;
-    original_branch: string | null;
-    worktree_dir: string | null;
-    iteration_count: number;
-    priority: number;
-    queued_at: string | null;
-    created_at: string;
-    completed_at: string | null;
+  id: string;
+  agent_id: string;
+  project_id: string;
+  session_id: string | null;
+  source: string;
+  source_id: string | null;
+  requester_info: string;
+  description: string;
+  branch_name: string | null;
+  status: string;
+  pr_url: string | null;
+  summary: string | null;
+  error: string | null;
+  original_branch: string | null;
+  worktree_dir: string | null;
+  iteration_count: number;
+  priority: number;
+  queued_at: string | null;
+  created_at: string;
+  completed_at: string | null;
 }
 
 function rowToWorkTask(row: WorkTaskRow): WorkTask {
-    let requesterInfo: Record<string, unknown> = {};
-    try {
-        requesterInfo = JSON.parse(row.requester_info);
-    } catch {
-        // Default to empty object
-    }
+  let requesterInfo: Record<string, unknown> = {};
+  try {
+    requesterInfo = JSON.parse(row.requester_info);
+  } catch {
+    // Default to empty object
+  }
 
-    return {
-        id: row.id,
-        agentId: row.agent_id,
-        projectId: row.project_id,
-        sessionId: row.session_id,
-        source: row.source as WorkTask['source'],
-        sourceId: row.source_id,
-        requesterInfo,
-        description: row.description,
-        branchName: row.branch_name,
-        status: row.status as WorkTaskStatus,
-        priority: (row.priority ?? 2) as WorkTaskPriority,
-        queuedAt: row.queued_at ?? null,
-        prUrl: row.pr_url,
-        summary: row.summary,
-        error: row.error,
-        originalBranch: row.original_branch,
-        worktreeDir: row.worktree_dir,
-        iterationCount: row.iteration_count ?? 0,
-        maxRetries: (row as unknown as Record<string, unknown>).max_retries as number ?? 0,
-        retryCount: (row as unknown as Record<string, unknown>).retry_count as number ?? 0,
-        retryBackoff: ((row as unknown as Record<string, unknown>).retry_backoff as string ?? 'fixed') as WorkTask['retryBackoff'],
-        lastRetryAt: (row as unknown as Record<string, unknown>).last_retry_at as string ?? null,
-        preemptedBy: null,
-        createdAt: row.created_at,
-        completedAt: row.completed_at,
-    };
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    projectId: row.project_id,
+    sessionId: row.session_id,
+    source: row.source as WorkTask['source'],
+    sourceId: row.source_id,
+    requesterInfo,
+    description: row.description,
+    branchName: row.branch_name,
+    status: row.status as WorkTaskStatus,
+    priority: (row.priority ?? 2) as WorkTaskPriority,
+    queuedAt: row.queued_at ?? null,
+    prUrl: row.pr_url,
+    summary: row.summary,
+    error: row.error,
+    originalBranch: row.original_branch,
+    worktreeDir: row.worktree_dir,
+    iterationCount: row.iteration_count ?? 0,
+    maxRetries: ((row as unknown as Record<string, unknown>).max_retries as number) ?? 0,
+    retryCount: ((row as unknown as Record<string, unknown>).retry_count as number) ?? 0,
+    retryBackoff: (((row as unknown as Record<string, unknown>).retry_backoff as string) ??
+      'fixed') as WorkTask['retryBackoff'],
+    lastRetryAt: ((row as unknown as Record<string, unknown>).last_retry_at as string) ?? null,
+    preemptedBy: null,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
 }
 
 export function createWorkTask(
-    db: Database,
-    params: {
-        agentId: string;
-        projectId: string;
-        description: string;
-        source?: string;
-        sourceId?: string;
-        requesterInfo?: Record<string, unknown>;
-        priority?: WorkTaskPriority;
-        tenantId?: string;
-    },
+  db: Database,
+  params: {
+    agentId: string;
+    projectId: string;
+    description: string;
+    source?: string;
+    sourceId?: string;
+    requesterInfo?: Record<string, unknown>;
+    priority?: WorkTaskPriority;
+    tenantId?: string;
+  },
 ): WorkTask {
-    const id = crypto.randomUUID();
-    const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
-    const priority = params.priority ?? 2;
-    db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
-    ).run(
-        id,
-        params.agentId,
-        params.projectId,
-        params.description,
-        params.source ?? 'web',
-        params.sourceId ?? null,
-        JSON.stringify(params.requesterInfo ?? {}),
-        priority,
-        tenantId,
-    );
+  const id = crypto.randomUUID();
+  const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
+  const priority = params.priority ?? 2;
+  db.query(
+    `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`,
+  ).run(
+    id,
+    params.agentId,
+    params.projectId,
+    params.description,
+    params.source ?? 'web',
+    params.sourceId ?? null,
+    JSON.stringify(params.requesterInfo ?? {}),
+    priority,
+    tenantId,
+  );
 
-    return getWorkTask(db, id) as WorkTask;
+  return getWorkTask(db, id) as WorkTask;
 }
 
 /**
@@ -103,127 +104,127 @@ export function createWorkTask(
  * Returns the new WorkTask, or null if another active task blocked the insert.
  */
 export function createWorkTaskAtomic(
-    db: Database,
-    params: {
-        agentId: string;
-        projectId: string;
-        description: string;
-        source?: string;
-        sourceId?: string;
-        requesterInfo?: Record<string, unknown>;
-        priority?: WorkTaskPriority;
-        tenantId?: string;
-    },
+  db: Database,
+  params: {
+    agentId: string;
+    projectId: string;
+    description: string;
+    source?: string;
+    sourceId?: string;
+    requesterInfo?: Record<string, unknown>;
+    priority?: WorkTaskPriority;
+    tenantId?: string;
+  },
 ): WorkTask | null {
-    const id = crypto.randomUUID();
-    const source = params.source ?? 'web';
-    const sourceId = params.sourceId ?? null;
-    const requesterInfo = JSON.stringify(params.requesterInfo ?? {});
-    const priority = params.priority ?? 2;
-    const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
+  const id = crypto.randomUUID();
+  const source = params.source ?? 'web';
+  const sourceId = params.sourceId ?? null;
+  const requesterInfo = JSON.stringify(params.requesterInfo ?? {});
+  const priority = params.priority ?? 2;
+  const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
 
-    const result = db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
+  const result = db
+    .query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
          WHERE NOT EXISTS (
              SELECT 1 FROM work_tasks
              WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
-         )`
-    ).run(
-        id,
-        params.agentId,
-        params.projectId,
-        params.description,
-        source,
-        sourceId,
-        requesterInfo,
-        priority,
-        tenantId,
-        params.projectId,
+         )`,
+    )
+    .run(
+      id,
+      params.agentId,
+      params.projectId,
+      params.description,
+      source,
+      sourceId,
+      requesterInfo,
+      priority,
+      tenantId,
+      params.projectId,
     );
 
-    if (result.changes === 0) {
-        return null;
-    }
+  if (result.changes === 0) {
+    return null;
+  }
 
-    return getWorkTask(db, id) as WorkTask;
+  return getWorkTask(db, id) as WorkTask;
 }
 
 export function getWorkTask(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask | null {
-    if (!validateTenantOwnership(db, 'work_tasks', id, tenantId)) return null;
-    const row = db.query('SELECT * FROM work_tasks WHERE id = ?').get(id) as WorkTaskRow | null;
-    return row ? rowToWorkTask(row) : null;
+  if (!validateTenantOwnership(db, 'work_tasks', id, tenantId)) return null;
+  const row = db.query('SELECT * FROM work_tasks WHERE id = ?').get(id) as WorkTaskRow | null;
+  return row ? rowToWorkTask(row) : null;
 }
 
 export function getWorkTaskBySessionId(db: Database, sessionId: string): WorkTask | null {
-    const row = db.query(
-        'SELECT * FROM work_tasks WHERE session_id = ?'
-    ).get(sessionId) as WorkTaskRow | null;
-    return row ? rowToWorkTask(row) : null;
+  const row = db.query('SELECT * FROM work_tasks WHERE session_id = ?').get(sessionId) as WorkTaskRow | null;
+  return row ? rowToWorkTask(row) : null;
 }
 
 export function updateWorkTaskStatus(
-    db: Database,
-    id: string,
-    status: WorkTaskStatus,
-    extra?: {
-        sessionId?: string;
-        branchName?: string;
-        prUrl?: string;
-        summary?: string;
-        error?: string;
-        originalBranch?: string;
-        worktreeDir?: string;
-        iterationCount?: number;
-    },
+  db: Database,
+  id: string,
+  status: WorkTaskStatus,
+  extra?: {
+    sessionId?: string;
+    branchName?: string;
+    prUrl?: string;
+    summary?: string;
+    error?: string;
+    originalBranch?: string;
+    worktreeDir?: string;
+    iterationCount?: number;
+  },
 ): void {
-    const fields: string[] = ['status = ?'];
-    const values: unknown[] = [status];
+  const fields: string[] = ['status = ?'];
+  const values: unknown[] = [status];
 
-    if (extra?.sessionId !== undefined) {
-        fields.push('session_id = ?');
-        values.push(extra.sessionId);
+  if (extra?.sessionId !== undefined) {
+    fields.push('session_id = ?');
+    values.push(extra.sessionId);
+  }
+  if (extra?.branchName !== undefined) {
+    fields.push('branch_name = ?');
+    values.push(extra.branchName);
+  }
+  if (extra?.prUrl !== undefined) {
+    fields.push('pr_url = ?');
+    values.push(extra.prUrl);
+  }
+  if (extra?.summary !== undefined) {
+    fields.push('summary = ?');
+    values.push(extra.summary);
+  }
+  if (extra?.error !== undefined) {
+    fields.push('error = ?');
+    values.push(extra.error);
+  }
+  if (extra?.originalBranch !== undefined) {
+    fields.push('original_branch = ?');
+    values.push(extra.originalBranch);
+  }
+  if (extra?.worktreeDir !== undefined) {
+    fields.push('worktree_dir = ?');
+    values.push(extra.worktreeDir);
+  }
+  if (extra?.iterationCount !== undefined) {
+    fields.push('iteration_count = ?');
+    values.push(extra.iterationCount);
+  }
+  if (status === 'completed') {
+    fields.push("completed_at = datetime('now')");
+    // Clear any stale error from a previous failed attempt
+    if (extra?.error === undefined) {
+      fields.push('error = NULL');
     }
-    if (extra?.branchName !== undefined) {
-        fields.push('branch_name = ?');
-        values.push(extra.branchName);
-    }
-    if (extra?.prUrl !== undefined) {
-        fields.push('pr_url = ?');
-        values.push(extra.prUrl);
-    }
-    if (extra?.summary !== undefined) {
-        fields.push('summary = ?');
-        values.push(extra.summary);
-    }
-    if (extra?.error !== undefined) {
-        fields.push('error = ?');
-        values.push(extra.error);
-    }
-    if (extra?.originalBranch !== undefined) {
-        fields.push('original_branch = ?');
-        values.push(extra.originalBranch);
-    }
-    if (extra?.worktreeDir !== undefined) {
-        fields.push('worktree_dir = ?');
-        values.push(extra.worktreeDir);
-    }
-    if (extra?.iterationCount !== undefined) {
-        fields.push('iteration_count = ?');
-        values.push(extra.iterationCount);
-    }
-    if (status === 'completed') {
-        fields.push("completed_at = datetime('now')");
-        // Clear any stale error from a previous failed attempt
-        if (extra?.error === undefined) {
-            fields.push('error = NULL');
-        }
-    } else if (status === 'failed') {
-        fields.push("completed_at = datetime('now')");
-    }
+  } else if (status === 'failed') {
+    fields.push("completed_at = datetime('now')");
+  }
 
-    values.push(id);
-    db.query(`UPDATE work_tasks SET ${fields.join(', ')} WHERE id = ?`).run(...(values as string[]));
+  values.push(id);
+  db.query(`UPDATE work_tasks SET ${fields.join(', ')} WHERE id = ?`).run(...(values as string[]));
 }
 
 /**
@@ -232,28 +233,26 @@ export function updateWorkTaskStatus(
  * Returns the list of affected tasks (for branch restoration).
  */
 export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
-    // Wrap SELECT→UPDATE in a BEGIN IMMEDIATE transaction to prevent a race where
-    // a task starts between the read and the status update.
-    return writeTransaction(db, (db) => {
-        const staleRows = db.query(
-            `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
-        ).all() as WorkTaskRow[];
+  // Wrap SELECT→UPDATE in a BEGIN IMMEDIATE transaction to prevent a race where
+  // a task starts between the read and the status update.
+  return writeTransaction(db, (db) => {
+    const staleRows = db
+      .query(`SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`)
+      .all() as WorkTaskRow[];
 
-        if (staleRows.length === 0) return [];
+    if (staleRows.length === 0) return [];
 
-        db.query(
-            `UPDATE work_tasks
+    db.query(
+      `UPDATE work_tasks
              SET status = 'failed', error = 'Interrupted by server restart', completed_at = datetime('now')
-             WHERE status IN ('branching', 'running', 'validating')`
-        ).run();
+             WHERE status IN ('branching', 'running', 'validating')`,
+    ).run();
 
-        // Also resume any paused tasks — the preempting task is now gone
-        db.query(
-            `UPDATE work_tasks SET status = 'pending' WHERE status = 'paused'`
-        ).run();
+    // Also resume any paused tasks — the preempting task is now gone
+    db.query(`UPDATE work_tasks SET status = 'pending' WHERE status = 'paused'`).run();
 
-        return staleRows.map(rowToWorkTask);
-    });
+    return staleRows.map(rowToWorkTask);
+  });
 }
 
 /**
@@ -261,8 +260,8 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
  * Clears transient fields so the task can be re-executed from scratch.
  */
 export function resetWorkTaskForRetry(db: Database, id: string): void {
-    db.query(
-        `UPDATE work_tasks
+  db.query(
+    `UPDATE work_tasks
          SET status = 'pending',
              session_id = NULL,
              branch_name = NULL,
@@ -271,18 +270,18 @@ export function resetWorkTaskForRetry(db: Database, id: string): void {
              error = NULL,
              completed_at = NULL,
              iteration_count = 0
-         WHERE id = ?`
-    ).run(id);
+         WHERE id = ?`,
+  ).run(id);
 }
 
 /**
  * Return all work tasks currently in an active state (branching, running, validating, paused, queued).
  */
 export function getActiveWorkTasks(db: Database): WorkTask[] {
-    const rows = db.query(
-        `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating', 'paused', 'queued')`
-    ).all() as WorkTaskRow[];
-    return rows.map(rowToWorkTask);
+  const rows = db
+    .query(`SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating', 'paused', 'queued')`)
+    .all() as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }
 
 /**
@@ -290,13 +289,15 @@ export function getActiveWorkTasks(db: Database): WorkTask[] {
  * Priority-based ordering is handled at the service layer using in-memory state.
  */
 export function dequeueNextTask(db: Database, projectId: string): WorkTask | null {
-    const row = db.query(
-        `SELECT * FROM work_tasks
+  const row = db
+    .query(
+      `SELECT * FROM work_tasks
          WHERE project_id = ? AND status IN ('pending', 'queued')
          ORDER BY created_at ASC
-         LIMIT 1`
-    ).get(projectId) as WorkTaskRow | null;
-    return row ? rowToWorkTask(row) : null;
+         LIMIT 1`,
+    )
+    .get(projectId) as WorkTaskRow | null;
+  return row ? rowToWorkTask(row) : null;
 }
 
 /**
@@ -304,24 +305,28 @@ export function dequeueNextTask(db: Database, projectId: string): WorkTask | nul
  * The service layer re-sorts these by in-memory priority.
  */
 export function getPendingTasksForProject(db: Database, projectId: string): WorkTask[] {
-    const rows = db.query(
-        `SELECT * FROM work_tasks
+  const rows = db
+    .query(
+      `SELECT * FROM work_tasks
          WHERE project_id = ? AND status IN ('pending', 'queued')
-         ORDER BY created_at ASC`
-    ).all(projectId) as WorkTaskRow[];
-    return rows.map(rowToWorkTask);
+         ORDER BY created_at ASC`,
+    )
+    .all(projectId) as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }
 
 /**
  * Find the currently active (branching/running/validating) task on a project.
  */
 export function getActiveTaskForProject(db: Database, projectId: string): WorkTask | null {
-    const row = db.query(
-        `SELECT * FROM work_tasks
+  const row = db
+    .query(
+      `SELECT * FROM work_tasks
          WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
-         LIMIT 1`
-    ).get(projectId) as WorkTaskRow | null;
-    return row ? rowToWorkTask(row) : null;
+         LIMIT 1`,
+    )
+    .get(projectId) as WorkTaskRow | null;
+  return row ? rowToWorkTask(row) : null;
 }
 
 /**
@@ -329,54 +334,48 @@ export function getActiveTaskForProject(db: Database, projectId: string): WorkTa
  * Preemption tracking (who paused whom) is managed in-memory by the service.
  */
 export function pauseWorkTask(db: Database, taskId: string): void {
-    db.query(
-        `UPDATE work_tasks SET status = 'paused' WHERE id = ?`
-    ).run(taskId);
+  db.query(`UPDATE work_tasks SET status = 'paused' WHERE id = ?`).run(taskId);
 }
 
 /**
  * Resume a paused task after the preempting task completes.
  */
 export function resumePausedTask(db: Database, taskId: string): void {
-    db.query(
-        `UPDATE work_tasks SET status = 'pending' WHERE id = ? AND status = 'paused'`
-    ).run(taskId);
+  db.query(`UPDATE work_tasks SET status = 'pending' WHERE id = ? AND status = 'paused'`).run(taskId);
 }
 
 /**
  * Get all paused tasks for a project.
  */
 export function getPausedTasks(db: Database, projectId: string): WorkTask[] {
-    const rows = db.query(
-        `SELECT * FROM work_tasks WHERE project_id = ? AND status = 'paused' ORDER BY created_at ASC`
-    ).all(projectId) as WorkTaskRow[];
-    return rows.map(rowToWorkTask);
+  const rows = db
+    .query(`SELECT * FROM work_tasks WHERE project_id = ? AND status = 'paused' ORDER BY created_at ASC`)
+    .all(projectId) as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }
 
 /**
  * Count pending/queued tasks for a project.
  */
 export function countQueuedTasks(db: Database, projectId: string): number {
-    const row = db.query(
-        `SELECT COUNT(*) as cnt FROM work_tasks WHERE project_id = ? AND status IN ('pending', 'queued')`
-    ).get(projectId) as { cnt: number };
-    return row.cnt;
+  const row = db
+    .query(`SELECT COUNT(*) as cnt FROM work_tasks WHERE project_id = ? AND status IN ('pending', 'queued')`)
+    .get(projectId) as { cnt: number };
+  return row.cnt;
 }
 
 /** Count globally active work tasks (branching, running, validating). */
 export function countActiveTasks(db: Database): number {
-    const row = db.query(
-        `SELECT COUNT(*) as cnt FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
-    ).get() as { cnt: number };
-    return row.cnt;
+  const row = db
+    .query(`SELECT COUNT(*) as cnt FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`)
+    .get() as { cnt: number };
+  return row.cnt;
 }
 
 /** Count globally pending work tasks. */
 export function countPendingTasks(db: Database): number {
-    const row = db.query(
-        `SELECT COUNT(*) as cnt FROM work_tasks WHERE status = 'pending'`
-    ).get() as { cnt: number };
-    return row.cnt;
+  const row = db.query(`SELECT COUNT(*) as cnt FROM work_tasks WHERE status = 'pending'`).get() as { cnt: number };
+  return row.cnt;
 }
 
 /**
@@ -384,29 +383,31 @@ export function countPendingTasks(db: Database): number {
  * Ordered by priority DESC, created_at ASC (FIFO within same priority).
  */
 export function dispatchCandidates(db: Database, limit: number): WorkTask[] {
-    const rows = db.query(
-        `SELECT * FROM work_tasks
+  const rows = db
+    .query(
+      `SELECT * FROM work_tasks
          WHERE status = 'pending'
          AND project_id NOT IN (
              SELECT project_id FROM work_tasks
              WHERE status IN ('branching', 'running', 'validating')
          )
          ORDER BY priority DESC, created_at ASC
-         LIMIT ?`
-    ).all(limit) as WorkTaskRow[];
-    return rows.map(rowToWorkTask);
+         LIMIT ?`,
+    )
+    .all(limit) as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }
 
 /** Get a map of projectId → taskId for all active tasks. */
 export function getActiveTasksByProject(db: Database): Record<string, string> {
-    const rows = db.query(
-        `SELECT id, project_id FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
-    ).all() as Array<{ id: string; project_id: string }>;
-    const result: Record<string, string> = {};
-    for (const row of rows) {
-        result[row.project_id] = row.id;
-    }
-    return result;
+  const rows = db
+    .query(`SELECT id, project_id FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`)
+    .all() as Array<{ id: string; project_id: string }>;
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.project_id] = row.id;
+  }
+  return result;
 }
 
 /**
@@ -414,23 +415,28 @@ export function getActiveTasksByProject(db: Database): Record<string, string> {
  * Used for deduplication: prevents creating a new task when one already exists for the same issue.
  */
 export function findActiveTasksForIssue(db: Database, issueNumber: number): WorkTask[] {
-    const pattern = `%#${issueNumber}%`;
-    const rows = db.query(
-        `SELECT * FROM work_tasks
+  const pattern = `%#${issueNumber}%`;
+  const rows = db
+    .query(
+      `SELECT * FROM work_tasks
          WHERE status IN ('pending', 'queued', 'branching', 'running', 'validating', 'paused')
-         AND description LIKE ?`
-    ).all(pattern) as WorkTaskRow[];
-    return rows.map(rowToWorkTask);
+         AND description LIKE ?`,
+    )
+    .all(pattern) as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }
 
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
-    if (agentId) {
-        const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
-        const rows = db.query(query).all(agentId, ...bindings) as WorkTaskRow[];
-        return rows.map(rowToWorkTask);
-    }
-
-    const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks ORDER BY created_at DESC', tenantId);
-    const rows = db.query(query).all(...bindings) as WorkTaskRow[];
+  if (agentId) {
+    const { query, bindings } = withTenantFilter(
+      'SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC',
+      tenantId,
+    );
+    const rows = db.query(query).all(agentId, ...bindings) as WorkTaskRow[];
     return rows.map(rowToWorkTask);
+  }
+
+  const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks ORDER BY created_at DESC', tenantId);
+  const rows = db.query(query).all(...bindings) as WorkTaskRow[];
+  return rows.map(rowToWorkTask);
 }

@@ -23,12 +23,12 @@ const log = createLogger('ToolGuardrails');
  * operations. These are hidden from sessions unless explicitly enabled.
  */
 export const EXPENSIVE_NETWORKING_TOOLS = new Set([
-    'corvid_send_message',
-    'corvid_invoke_remote_agent',
-    'corvid_list_agents',
-    'corvid_discover_agent',
-    'corvid_launch_council',
-    'corvid_flock_directory',
+  'corvid_send_message',
+  'corvid_invoke_remote_agent',
+  'corvid_list_agents',
+  'corvid_discover_agent',
+  'corvid_launch_council',
+  'corvid_flock_directory',
 ]);
 
 /**
@@ -55,9 +55,9 @@ export type ToolAccessPolicy = 'full' | 'standard' | 'restricted';
  * will still have access to corvid_list_agents but not corvid_send_message.
  */
 export interface ToolAccessConfig {
-    policy: ToolAccessPolicy;
-    /** Specific expensive tools to enable even under 'standard' or 'restricted' policy. */
-    allowedExpensiveTools?: string[];
+  policy: ToolAccessPolicy;
+  /** Specific expensive tools to enable even under 'standard' or 'restricted' policy. */
+  allowedExpensiveTools?: string[];
 }
 
 /**
@@ -73,18 +73,15 @@ export interface ToolAccessConfig {
  * (server/lib/communication-tiers.ts) now enforces directional messaging,
  * and per-session rate limiters bound abuse from any source.
  */
-export function resolveToolAccessPolicy(
-    source: string | undefined,
-    _agentModel?: string,
-): ToolAccessPolicy {
-    // Agent-to-agent sessions should never re-invoke networking tools
-    // (prevents recursive invocation loops)
-    if (source === 'agent') return 'restricted';
+export function resolveToolAccessPolicy(source: string | undefined, _agentModel?: string): ToolAccessPolicy {
+  // Agent-to-agent sessions should never re-invoke networking tools
+  // (prevents recursive invocation loops)
+  if (source === 'agent') return 'restricted';
 
-    // All other sources (web, discord, telegram, slack, algochat) get full
-    // access. Directional messaging rules are enforced in handleSendMessage()
-    // via checkCommunicationTier(), and rate limiters cap message volume.
-    return 'full';
+  // All other sources (web, discord, telegram, slack, algochat) get full
+  // access. Directional messaging rules are enforced in handleSendMessage()
+  // via checkCommunicationTier(), and rate limiters cap message volume.
+  return 'full';
 }
 
 /**
@@ -92,60 +89,54 @@ export function resolveToolAccessPolicy(
  *
  * @returns true if the tool should be REMOVED from the tool set
  */
-export function isToolBlockedByGuardrail(
-    toolName: string,
-    config: ToolAccessConfig,
-): boolean {
-    // 'full' policy — nothing blocked
-    if (config.policy === 'full') return false;
+export function isToolBlockedByGuardrail(toolName: string, config: ToolAccessConfig): boolean {
+  // 'full' policy — nothing blocked
+  if (config.policy === 'full') return false;
 
-    // Check if the tool is in the expensive set
-    if (!EXPENSIVE_NETWORKING_TOOLS.has(toolName)) return false;
+  // Check if the tool is in the expensive set
+  if (!EXPENSIVE_NETWORKING_TOOLS.has(toolName)) return false;
 
-    // Check if explicitly allowed via override
-    if (config.allowedExpensiveTools?.includes(toolName)) return false;
+  // Check if explicitly allowed via override
+  if (config.allowedExpensiveTools?.includes(toolName)) return false;
 
-    // Under 'standard' or 'restricted', expensive tools are blocked
-    return true;
+  // Under 'standard' or 'restricted', expensive tools are blocked
+  return true;
 }
 
 /**
  * Filter a list of tool names, removing those blocked by the guardrail config.
  */
-export function filterToolsByGuardrail<T extends { name: string }>(
-    tools: T[],
-    config: ToolAccessConfig,
-): T[] {
-    const before = tools.length;
-    const filtered = tools.filter((t) => !isToolBlockedByGuardrail(t.name, config));
-    const removed = before - filtered.length;
+export function filterToolsByGuardrail<T extends { name: string }>(tools: T[], config: ToolAccessConfig): T[] {
+  const before = tools.length;
+  const filtered = tools.filter((t) => !isToolBlockedByGuardrail(t.name, config));
+  const removed = before - filtered.length;
 
-    if (removed > 0) {
-        log.debug('Tool guardrails filtered tools', {
-            policy: config.policy,
-            removed,
-            remainingCount: filtered.length,
-        });
-    }
+  if (removed > 0) {
+    log.debug('Tool guardrails filtered tools', {
+      policy: config.policy,
+      removed,
+      remainingCount: filtered.length,
+    });
+  }
 
-    return filtered;
+  return filtered;
 }
 
 // ── Per-session messaging rate limiter ───────────────────────────────────────
 
 export interface SessionMessageRateLimitConfig {
-    /** Maximum agent-to-agent messages per session. */
-    maxMessagesPerSession: number;
-    /** Maximum unique agents a session can message. */
-    maxUniqueTargetsPerSession: number;
-    /** Minimum milliseconds between consecutive sends. */
-    minIntervalMs: number;
+  /** Maximum agent-to-agent messages per session. */
+  maxMessagesPerSession: number;
+  /** Maximum unique agents a session can message. */
+  maxUniqueTargetsPerSession: number;
+  /** Minimum milliseconds between consecutive sends. */
+  minIntervalMs: number;
 }
 
 const DEFAULT_SESSION_MESSAGE_LIMITS: SessionMessageRateLimitConfig = {
-    maxMessagesPerSession: 5,
-    maxUniqueTargetsPerSession: 2,
-    minIntervalMs: 3000,
+  maxMessagesPerSession: 5,
+  maxUniqueTargetsPerSession: 2,
+  minIntervalMs: 3000,
 };
 
 /**
@@ -157,74 +148,74 @@ const DEFAULT_SESSION_MESSAGE_LIMITS: SessionMessageRateLimitConfig = {
  * - Minimum interval between sends
  */
 export class SessionMessageRateLimiter {
-    private sendCount = 0;
-    private uniqueTargets = new Set<string>();
-    private lastSendAt = 0;
-    private readonly config: SessionMessageRateLimitConfig;
+  private sendCount = 0;
+  private uniqueTargets = new Set<string>();
+  private lastSendAt = 0;
+  private readonly config: SessionMessageRateLimitConfig;
 
-    constructor(config?: Partial<SessionMessageRateLimitConfig>) {
-        this.config = { ...DEFAULT_SESSION_MESSAGE_LIMITS, ...config };
+  constructor(config?: Partial<SessionMessageRateLimitConfig>) {
+    this.config = { ...DEFAULT_SESSION_MESSAGE_LIMITS, ...config };
+  }
+
+  /**
+   * Check if a send to the given target is allowed.
+   * @returns null if allowed, or an error message if blocked.
+   */
+  check(targetAgent: string): string | null {
+    if (this.sendCount >= this.config.maxMessagesPerSession) {
+      return `Session message limit reached: max ${this.config.maxMessagesPerSession} agent messages per session (sent ${this.sendCount}).`;
     }
 
-    /**
-     * Check if a send to the given target is allowed.
-     * @returns null if allowed, or an error message if blocked.
-     */
-    check(targetAgent: string): string | null {
-        if (this.sendCount >= this.config.maxMessagesPerSession) {
-            return `Session message limit reached: max ${this.config.maxMessagesPerSession} agent messages per session (sent ${this.sendCount}).`;
-        }
-
-        if (
-            !this.uniqueTargets.has(targetAgent) &&
-            this.uniqueTargets.size >= this.config.maxUniqueTargetsPerSession
-        ) {
-            return `Session target limit reached: max ${this.config.maxUniqueTargetsPerSession} unique agents per session (contacted ${this.uniqueTargets.size}).`;
-        }
-
-        const now = Date.now();
-        const elapsed = now - this.lastSendAt;
-        if (this.lastSendAt > 0 && elapsed < this.config.minIntervalMs) {
-            return `Message cooldown active: please wait ${this.config.minIntervalMs - elapsed}ms before sending again.`;
-        }
-
-        return null;
+    if (!this.uniqueTargets.has(targetAgent) && this.uniqueTargets.size >= this.config.maxUniqueTargetsPerSession) {
+      return `Session target limit reached: max ${this.config.maxUniqueTargetsPerSession} unique agents per session (contacted ${this.uniqueTargets.size}).`;
     }
 
-    /** Record a successful send. */
-    record(targetAgent: string): void {
-        this.sendCount++;
-        this.uniqueTargets.add(targetAgent);
-        this.lastSendAt = Date.now();
+    const now = Date.now();
+    const elapsed = now - this.lastSendAt;
+    if (this.lastSendAt > 0 && elapsed < this.config.minIntervalMs) {
+      return `Message cooldown active: please wait ${this.config.minIntervalMs - elapsed}ms before sending again.`;
     }
 
-    /** Current send count. */
-    getSendCount(): number {
-        return this.sendCount;
-    }
+    return null;
+  }
 
-    /** Current unique target count. */
-    getUniqueTargetCount(): number {
-        return this.uniqueTargets.size;
-    }
+  /** Record a successful send. */
+  record(targetAgent: string): void {
+    this.sendCount++;
+    this.uniqueTargets.add(targetAgent);
+    this.lastSendAt = Date.now();
+  }
+
+  /** Current send count. */
+  getSendCount(): number {
+    return this.sendCount;
+  }
+
+  /** Current unique target count. */
+  getUniqueTargetCount(): number {
+    return this.uniqueTargets.size;
+  }
 }
 
 /**
  * Load session message rate limit config from environment variables.
  */
 export function loadSessionMessageLimits(): SessionMessageRateLimitConfig {
-    const parse = (key: string, fallback: number, allowZero = false): number => {
-        const raw = process.env[key];
-        if (!raw) return fallback;
-        const n = parseInt(raw, 10);
-        if (isNaN(n)) return fallback;
-        if (allowZero ? n < 0 : n <= 0) return fallback;
-        return n;
-    };
+  const parse = (key: string, fallback: number, allowZero = false): number => {
+    const raw = process.env[key];
+    if (!raw) return fallback;
+    const n = parseInt(raw, 10);
+    if (Number.isNaN(n)) return fallback;
+    if (allowZero ? n < 0 : n <= 0) return fallback;
+    return n;
+  };
 
-    return {
-        maxMessagesPerSession: parse('SESSION_MAX_AGENT_MESSAGES', DEFAULT_SESSION_MESSAGE_LIMITS.maxMessagesPerSession),
-        maxUniqueTargetsPerSession: parse('SESSION_MAX_UNIQUE_TARGETS', DEFAULT_SESSION_MESSAGE_LIMITS.maxUniqueTargetsPerSession),
-        minIntervalMs: parse('SESSION_MESSAGE_INTERVAL_MS', DEFAULT_SESSION_MESSAGE_LIMITS.minIntervalMs, true),
-    };
+  return {
+    maxMessagesPerSession: parse('SESSION_MAX_AGENT_MESSAGES', DEFAULT_SESSION_MESSAGE_LIMITS.maxMessagesPerSession),
+    maxUniqueTargetsPerSession: parse(
+      'SESSION_MAX_UNIQUE_TARGETS',
+      DEFAULT_SESSION_MESSAGE_LIMITS.maxUniqueTargetsPerSession,
+    ),
+    minIntervalMs: parse('SESSION_MESSAGE_INTERVAL_MS', DEFAULT_SESSION_MESSAGE_LIMITS.minIntervalMs, true),
+  };
 }

@@ -13,11 +13,18 @@ import { getCurrentVersion } from './db/migrate';
 import { getSession } from './db/sessions';
 import { publishToTenant, wireEventBroadcasting } from './events/broadcasting';
 import type { HealthCheckDeps } from './health/service';
+import { printFirstRunBanner } from './lib/first-run-banner';
 import { validateGitHubTokenOnStartup } from './lib/github-token-check';
 import { createLogger } from './lib/logger';
 import { applySecurityHeaders } from './lib/security-headers';
 import { handleMcpHttpRequest } from './mcp/http-transport';
-import { checkWsAuth, loadAuthConfig, SecurityConfigError, timingSafeEqual, validateStartupSecurity } from './middleware/auth';
+import {
+  checkWsAuth,
+  loadAuthConfig,
+  SecurityConfigError,
+  timingSafeEqual,
+  validateStartupSecurity,
+} from './middleware/auth';
 import {
   activeSessions as activeSessionsGauge,
   buildTraceparent,
@@ -38,21 +45,20 @@ import { handlePermissionRoutes } from './routes/permissions';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
 import { createWebSocketHandler } from './ws/handler';
-import { printFirstRunBanner } from './lib/first-run-banner';
 
 const log = createLogger('Server');
 
 // Load auth configuration for WebSocket authentication
 const authConfig = loadAuthConfig();
 try {
-    validateStartupSecurity(authConfig);
+  validateStartupSecurity(authConfig);
 } catch (err) {
-    if (err instanceof SecurityConfigError) {
-        log.error(`SECURITY: ${err.message}`);
-        log.error('Refusing to start. Fix your configuration and restart.');
-        process.exit(1);
-    }
-    throw err;
+  if (err instanceof SecurityConfigError) {
+    log.error(`SECURITY: ${err.message}`);
+    log.error('Refusing to start. Fix your configuration and restart.');
+    process.exit(1);
+  }
+  throw err;
 }
 
 // Validate GH_TOKEN scopes (async, never blocks startup)
@@ -329,7 +335,7 @@ const server = Bun.serve<WsData>({
       // Extract wallet address if provided (from chat client)
       const walletAddress = url.searchParams.get('wallet') || undefined;
       if (walletAddress) {
-        log.info('WebSocket connection with wallet identity', { wallet: walletAddress.slice(0, 8) + '...' });
+        log.info('WebSocket connection with wallet identity', { wallet: `${walletAddress.slice(0, 8)}...` });
       }
 
       // Resolve tenant for WS connection scoping
@@ -545,7 +551,7 @@ const server = Bun.serve<WsData>({
               }
               const basename = url.pathname.split('/').pop() ?? '';
               // Angular outputHashing:"all" produces files like main-4TYFKVIL.js
-              if (/[-\.][A-Za-z0-9]{8,}\.\w+$/.test(basename)) {
+              if (/[-.][A-Za-z0-9]{8,}\.\w+$/.test(basename)) {
                 headers['Cache-Control'] = 'public, max-age=31536000, immutable';
               } else if (basename === 'index.html') {
                 headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
@@ -554,7 +560,9 @@ const server = Bun.serve<WsData>({
               }
               return instrumentResponse(new Response(bytes, { headers }), '/static');
             }
-          } catch { /* file not found, fall through */ }
+          } catch {
+            /* file not found, fall through */
+          }
         }
 
         // SPA fallback - serve index.html for unmatched routes
@@ -573,7 +581,9 @@ const server = Bun.serve<WsData>({
               '/static',
             );
           }
-        } catch { /* no index.html, fall through */ }
+        } catch {
+          /* no index.html, fall through */
+        }
       }
 
       return instrumentResponse(new Response('Not Found', { status: 404 }), '/not-found');

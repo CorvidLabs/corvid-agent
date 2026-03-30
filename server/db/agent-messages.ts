@@ -1,204 +1,208 @@
 import type { Database } from 'bun:sqlite';
 import type { AgentMessage, AgentMessageStatus, MessageErrorCode } from '../../shared/types';
-import { queryCount } from './types';
 import { MESSAGE_PROTOCOL_VERSION } from '../../shared/types';
+import { queryCount } from './types';
 
 interface AgentMessageRow {
-    id: string;
-    from_agent_id: string;
-    to_agent_id: string;
-    content: string;
-    payment_micro: number;
-    txid: string | null;
-    status: string;
-    response: string | null;
-    response_txid: string | null;
-    session_id: string | null;
-    thread_id: string | null;
-    provider: string;
-    model: string;
-    fire_and_forget: number;
-    message_version: number;
-    error_code: string | null;
-    created_at: string;
-    completed_at: string | null;
+  id: string;
+  from_agent_id: string;
+  to_agent_id: string;
+  content: string;
+  payment_micro: number;
+  txid: string | null;
+  status: string;
+  response: string | null;
+  response_txid: string | null;
+  session_id: string | null;
+  thread_id: string | null;
+  provider: string;
+  model: string;
+  fire_and_forget: number;
+  message_version: number;
+  error_code: string | null;
+  created_at: string;
+  completed_at: string | null;
 }
 
 function rowToAgentMessage(row: AgentMessageRow): AgentMessage {
-    return {
-        id: row.id,
-        fromAgentId: row.from_agent_id,
-        toAgentId: row.to_agent_id,
-        content: row.content,
-        paymentMicro: row.payment_micro,
-        txid: row.txid,
-        status: row.status as AgentMessageStatus,
-        response: row.response,
-        responseTxid: row.response_txid,
-        sessionId: row.session_id,
-        threadId: row.thread_id,
-        provider: row.provider || undefined,
-        model: row.model || undefined,
-        fireAndForget: row.fire_and_forget === 1,
-        messageVersion: row.message_version ?? MESSAGE_PROTOCOL_VERSION,
-        errorCode: (row.error_code as MessageErrorCode) ?? null,
-        createdAt: row.created_at,
-        completedAt: row.completed_at,
-    };
+  return {
+    id: row.id,
+    fromAgentId: row.from_agent_id,
+    toAgentId: row.to_agent_id,
+    content: row.content,
+    paymentMicro: row.payment_micro,
+    txid: row.txid,
+    status: row.status as AgentMessageStatus,
+    response: row.response,
+    responseTxid: row.response_txid,
+    sessionId: row.session_id,
+    threadId: row.thread_id,
+    provider: row.provider || undefined,
+    model: row.model || undefined,
+    fireAndForget: row.fire_and_forget === 1,
+    messageVersion: row.message_version ?? MESSAGE_PROTOCOL_VERSION,
+    errorCode: (row.error_code as MessageErrorCode) ?? null,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
 }
 
 export function createAgentMessage(
-    db: Database,
-    params: {
-        fromAgentId: string;
-        toAgentId: string;
-        content: string;
-        paymentMicro?: number;
-        threadId?: string;
-        provider?: string;
-        model?: string;
-        fireAndForget?: boolean;
-    },
+  db: Database,
+  params: {
+    fromAgentId: string;
+    toAgentId: string;
+    content: string;
+    paymentMicro?: number;
+    threadId?: string;
+    provider?: string;
+    model?: string;
+    fireAndForget?: boolean;
+  },
 ): AgentMessage {
-    const id = crypto.randomUUID();
-    db.query(
-        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id, provider, model, fire_and_forget, message_version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-        id,
-        params.fromAgentId,
-        params.toAgentId,
-        params.content,
-        params.paymentMicro ?? 0,
-        params.threadId ?? null,
-        params.provider ?? '',
-        params.model ?? '',
-        params.fireAndForget ? 1 : 0,
-        MESSAGE_PROTOCOL_VERSION,
-    );
+  const id = crypto.randomUUID();
+  db.query(
+    `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id, provider, model, fire_and_forget, message_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    params.fromAgentId,
+    params.toAgentId,
+    params.content,
+    params.paymentMicro ?? 0,
+    params.threadId ?? null,
+    params.provider ?? '',
+    params.model ?? '',
+    params.fireAndForget ? 1 : 0,
+    MESSAGE_PROTOCOL_VERSION,
+  );
 
-    return getAgentMessage(db, id) as AgentMessage;
+  return getAgentMessage(db, id) as AgentMessage;
 }
 
 export function getAgentMessage(db: Database, id: string): AgentMessage | null {
-    const row = db.query('SELECT * FROM agent_messages WHERE id = ?').get(id) as AgentMessageRow | null;
-    return row ? rowToAgentMessage(row) : null;
+  const row = db.query('SELECT * FROM agent_messages WHERE id = ?').get(id) as AgentMessageRow | null;
+  return row ? rowToAgentMessage(row) : null;
 }
 
 export function updateAgentMessageStatus(
-    db: Database,
-    id: string,
-    status: AgentMessageStatus,
-    extra?: {
-        txid?: string;
-        sessionId?: string;
-        response?: string;
-        responseTxid?: string;
-        errorCode?: MessageErrorCode;
-    },
+  db: Database,
+  id: string,
+  status: AgentMessageStatus,
+  extra?: {
+    txid?: string;
+    sessionId?: string;
+    response?: string;
+    responseTxid?: string;
+    errorCode?: MessageErrorCode;
+  },
 ): void {
-    const fields: string[] = ['status = ?'];
-    const values: unknown[] = [status];
+  const fields: string[] = ['status = ?'];
+  const values: unknown[] = [status];
 
-    if (extra?.txid !== undefined) {
-        fields.push('txid = ?');
-        values.push(extra.txid);
-    }
-    if (extra?.sessionId !== undefined) {
-        fields.push('session_id = ?');
-        values.push(extra.sessionId);
-    }
-    if (extra?.response !== undefined) {
-        fields.push('response = ?');
-        values.push(extra.response);
-    }
-    if (extra?.responseTxid !== undefined) {
-        fields.push('response_txid = ?');
-        values.push(extra.responseTxid);
-    }
-    if (extra?.errorCode !== undefined) {
-        fields.push('error_code = ?');
-        values.push(extra.errorCode);
-    }
-    if (status === 'completed' || status === 'failed') {
-        fields.push("completed_at = datetime('now')");
-    }
+  if (extra?.txid !== undefined) {
+    fields.push('txid = ?');
+    values.push(extra.txid);
+  }
+  if (extra?.sessionId !== undefined) {
+    fields.push('session_id = ?');
+    values.push(extra.sessionId);
+  }
+  if (extra?.response !== undefined) {
+    fields.push('response = ?');
+    values.push(extra.response);
+  }
+  if (extra?.responseTxid !== undefined) {
+    fields.push('response_txid = ?');
+    values.push(extra.responseTxid);
+  }
+  if (extra?.errorCode !== undefined) {
+    fields.push('error_code = ?');
+    values.push(extra.errorCode);
+  }
+  if (status === 'completed' || status === 'failed') {
+    fields.push("completed_at = datetime('now')");
+  }
 
-    values.push(id);
-    db.query(`UPDATE agent_messages SET ${fields.join(', ')} WHERE id = ?`).run(...(values as string[]));
+  values.push(id);
+  db.query(`UPDATE agent_messages SET ${fields.join(', ')} WHERE id = ?`).run(...(values as string[]));
 }
 
 export function listAgentMessages(db: Database, agentId: string): AgentMessage[] {
-    const rows = db.query(
-        `SELECT * FROM agent_messages
+  const rows = db
+    .query(
+      `SELECT * FROM agent_messages
          WHERE from_agent_id = ? OR to_agent_id = ?
-         ORDER BY created_at DESC`
-    ).all(agentId, agentId) as AgentMessageRow[];
-    return rows.map(rowToAgentMessage);
+         ORDER BY created_at DESC`,
+    )
+    .all(agentId, agentId) as AgentMessageRow[];
+  return rows.map(rowToAgentMessage);
 }
 
 export function listRecentAgentMessages(db: Database, limit: number = 50): AgentMessage[] {
-    const rows = db.query(
-        `SELECT * FROM agent_messages
+  const rows = db
+    .query(
+      `SELECT * FROM agent_messages
          ORDER BY created_at DESC
-         LIMIT ?`
-    ).all(limit) as AgentMessageRow[];
-    return rows.map(rowToAgentMessage);
+         LIMIT ?`,
+    )
+    .all(limit) as AgentMessageRow[];
+  return rows.map(rowToAgentMessage);
 }
 
 export function searchAgentMessages(
-    db: Database,
-    options: {
-        limit?: number;
-        offset?: number;
-        search?: string;
-        agentId?: string;
-        threadId?: string;
-    },
+  db: Database,
+  options: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    agentId?: string;
+    threadId?: string;
+  },
 ): { messages: AgentMessage[]; total: number } {
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+  const conditions: string[] = [];
+  const params: unknown[] = [];
 
-    if (options.search) {
-        conditions.push('(content LIKE ? OR response LIKE ?)');
-        const pattern = `%${options.search}%`;
-        params.push(pattern, pattern);
-    }
-    if (options.agentId) {
-        conditions.push('(from_agent_id = ? OR to_agent_id = ?)');
-        params.push(options.agentId, options.agentId);
-    }
-    if (options.threadId) {
-        conditions.push('thread_id = ?');
-        params.push(options.threadId);
-    }
+  if (options.search) {
+    conditions.push('(content LIKE ? OR response LIKE ?)');
+    const pattern = `%${options.search}%`;
+    params.push(pattern, pattern);
+  }
+  if (options.agentId) {
+    conditions.push('(from_agent_id = ? OR to_agent_id = ?)');
+    params.push(options.agentId, options.agentId);
+  }
+  if (options.threadId) {
+    conditions.push('thread_id = ?');
+    params.push(options.threadId);
+  }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM agent_messages ${where}`, ...(params as string[]));
+  const total = queryCount(db, `SELECT COUNT(*) as cnt FROM agent_messages ${where}`, ...(params as string[]));
 
-    const limit = Math.min(options.limit ?? 50, 100);
-    const offset = options.offset ?? 0;
+  const limit = Math.min(options.limit ?? 50, 100);
+  const offset = options.offset ?? 0;
 
-    const rows = db.query(
-        `SELECT * FROM agent_messages ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).all(...(params as string[]), limit, offset) as AgentMessageRow[];
+  const rows = db
+    .query(`SELECT * FROM agent_messages ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(...(params as string[]), limit, offset) as AgentMessageRow[];
 
-    return { messages: rows.map(rowToAgentMessage), total };
+  return { messages: rows.map(rowToAgentMessage), total };
 }
 
 export function getAgentMessageBySessionId(db: Database, sessionId: string): AgentMessage | null {
-    const row = db.query(
-        'SELECT * FROM agent_messages WHERE session_id = ?'
-    ).get(sessionId) as AgentMessageRow | null;
-    return row ? rowToAgentMessage(row) : null;
+  const row = db.query('SELECT * FROM agent_messages WHERE session_id = ?').get(sessionId) as AgentMessageRow | null;
+  return row ? rowToAgentMessage(row) : null;
 }
 
 export function getThreadMessages(db: Database, threadId: string): AgentMessage[] {
-    const rows = db.query(
-        `SELECT * FROM agent_messages
+  const rows = db
+    .query(
+      `SELECT * FROM agent_messages
          WHERE thread_id = ?
-         ORDER BY created_at ASC`
-    ).all(threadId) as AgentMessageRow[];
-    return rows.map(rowToAgentMessage);
+         ORDER BY created_at ASC`,
+    )
+    .all(threadId) as AgentMessageRow[];
+  return rows.map(rowToAgentMessage);
 }

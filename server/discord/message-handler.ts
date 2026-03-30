@@ -12,7 +12,7 @@ import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession } from '../db/discord-mention-sessions';
 import { listProjects } from '../db/projects';
-import { createSession, getSession, getPreviousThreadSessionSummary } from '../db/sessions';
+import { createSession, getPreviousThreadSessionSummary, getSession } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
@@ -764,7 +764,17 @@ async function handleMentionReplyResume(
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
     if (!ctx.processManager.isRunning(sessionId)) {
       log.warn('Mention resumeProcess did not start — creating new mention session', { sessionId, channelId });
-      await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
+      await handleMentionReply(
+        ctx,
+        channelId,
+        _userId,
+        messageId,
+        text,
+        mentions,
+        authorId,
+        authorUsername,
+        attachments,
+      );
       return;
     }
   }

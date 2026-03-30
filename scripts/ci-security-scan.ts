@@ -11,38 +11,36 @@
  *   3. SQL injection  — string interpolation in SQL queries
  */
 
-import { scanDiff as scanCode, formatScanReport as formatCodeReport } from '../server/lib/code-scanner';
-import { scanDiff as scanFetch, formatScanReport as formatFetchReport } from '../server/lib/fetch-detector';
+import { formatScanReport as formatCodeReport, scanDiff as scanCode } from '../server/lib/code-scanner';
+import { formatScanReport as formatFetchReport, scanDiff as scanFetch } from '../server/lib/fetch-detector';
 
 let failed = false;
 
 // ── 1. Get diff ─────────────────────────────────────────────────────────
 
 const baseRef = process.env.GITHUB_BASE_REF;
-const diffArgs = baseRef
-    ? ['git', 'diff', `origin/${baseRef}...HEAD`]
-    : ['git', 'diff', 'HEAD~1'];
+const diffArgs = baseRef ? ['git', 'diff', `origin/${baseRef}...HEAD`] : ['git', 'diff', 'HEAD~1'];
 
 let diffOutput = '';
 try {
-    const diffProc = Bun.spawn(diffArgs, { stdout: 'pipe', stderr: 'pipe' });
-    diffOutput = await new Response(diffProc.stdout).text();
-    const exitCode = await diffProc.exited;
+  const diffProc = Bun.spawn(diffArgs, { stdout: 'pipe', stderr: 'pipe' });
+  diffOutput = await new Response(diffProc.stdout).text();
+  const exitCode = await diffProc.exited;
 
-    if (exitCode !== 0) {
-        // Fallback: no prior commits (fresh repo) — scan everything staged
-        const fallbackProc = Bun.spawn(['git', 'diff', '--cached'], { stdout: 'pipe', stderr: 'pipe' });
-        diffOutput = await new Response(fallbackProc.stdout).text();
-        await fallbackProc.exited;
-    }
+  if (exitCode !== 0) {
+    // Fallback: no prior commits (fresh repo) — scan everything staged
+    const fallbackProc = Bun.spawn(['git', 'diff', '--cached'], { stdout: 'pipe', stderr: 'pipe' });
+    diffOutput = await new Response(fallbackProc.stdout).text();
+    await fallbackProc.exited;
+  }
 } catch (err) {
-    console.error('Failed to get diff:', err instanceof Error ? err.message : String(err));
-    process.exit(1);
+  console.error('Failed to get diff:', err instanceof Error ? err.message : String(err));
+  process.exit(1);
 }
 
 if (!diffOutput.trim()) {
-    console.log('No diff to scan — all checks passed.');
-    process.exit(0);
+  console.log('No diff to scan — all checks passed.');
+  process.exit(0);
 }
 
 /**
@@ -50,18 +48,22 @@ if (!diffOutput.trim()) {
  * and unapproved URLs as test fixtures, not real code.
  */
 function stripTestFiles(diff: string): string {
-    const lines = diff.split('\n');
-    const result: string[] = [];
-    let skip = false;
+  const lines = diff.split('\n');
+  const result: string[] = [];
+  let skip = false;
 
-    for (const line of lines) {
-        if (line.startsWith('diff --git')) {
-            skip = /\b__tests__\//.test(line) || /\.test\.ts\b/.test(line) || /\bspecs\//.test(line) || /\.spec\.(md|ts)\b/.test(line);
-        }
-        if (!skip) result.push(line);
+  for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      skip =
+        /\b__tests__\//.test(line) ||
+        /\.test\.ts\b/.test(line) ||
+        /\bspecs\//.test(line) ||
+        /\.spec\.(md|ts)\b/.test(line);
     }
+    if (!skip) result.push(line);
+  }
 
-    return result.join('\n');
+  return result.join('\n');
 }
 
 const filteredDiff = stripTestFiles(diffOutput);
@@ -74,11 +76,11 @@ const codeReport = formatCodeReport(codeResult);
 if (codeReport) console.log(codeReport);
 
 if (codeResult.hasCriticalFindings) {
-    failed = true;
+  failed = true;
 } else if (codeResult.hasWarnings) {
-    console.log('Code scanner: warnings only (non-blocking).');
+  console.log('Code scanner: warnings only (non-blocking).');
 } else {
-    console.log('Code scanner: clean.');
+  console.log('Code scanner: clean.');
 }
 
 // ── 3. Fetch detector ──────────────────────────────────────────────────
@@ -89,41 +91,41 @@ const fetchReport = formatFetchReport(fetchResult);
 if (fetchReport) console.log(fetchReport);
 
 if (fetchResult.hasUnapprovedFetches) {
-    failed = true;
+  failed = true;
 } else {
-    console.log('Fetch detector: clean.');
+  console.log('Fetch detector: clean.');
 }
 
 // ── 4. SQL injection check ─────────────────────────────────────────────
 
 console.log('\nRunning SQL injection check...');
 try {
-    const sqlProc = Bun.spawn(['bash', 'scripts/check-sql-injection.sh'], {
-        stdout: 'pipe',
-        stderr: 'pipe',
-    });
-    const sqlStdout = await new Response(sqlProc.stdout).text();
-    const sqlExit = await sqlProc.exited;
+  const sqlProc = Bun.spawn(['bash', 'scripts/check-sql-injection.sh'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const sqlStdout = await new Response(sqlProc.stdout).text();
+  const sqlExit = await sqlProc.exited;
 
-    if (sqlStdout.trim()) console.log(sqlStdout.trim());
+  if (sqlStdout.trim()) console.log(sqlStdout.trim());
 
-    if (sqlExit !== 0) {
-        console.log('SQL injection check: warnings found (non-blocking).');
-    } else {
-        console.log('SQL injection check: clean.');
-    }
+  if (sqlExit !== 0) {
+    console.log('SQL injection check: warnings found (non-blocking).');
+  } else {
+    console.log('SQL injection check: clean.');
+  }
 } catch (err) {
-    console.error('SQL injection check error:', err instanceof Error ? err.message : String(err));
-    // Non-fatal: don't block on script execution errors
+  console.error('SQL injection check error:', err instanceof Error ? err.message : String(err));
+  // Non-fatal: don't block on script execution errors
 }
 
 // ── Summary ────────────────────────────────────────────────────────────
 
-console.log('\n' + '='.repeat(50));
+console.log(`\n${'='.repeat(50)}`);
 if (failed) {
-    console.log('SECURITY SCAN FAILED — see findings above.');
-    process.exit(1);
+  console.log('SECURITY SCAN FAILED — see findings above.');
+  process.exit(1);
 } else {
-    console.log('All security checks passed.');
-    process.exit(0);
+  console.log('All security checks passed.');
+  process.exit(0);
 }

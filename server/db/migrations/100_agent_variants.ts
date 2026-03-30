@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 100: Agent variant profiles — preset skill + persona combinations.
@@ -10,13 +10,15 @@ import { Database } from 'bun:sqlite';
  */
 
 function tableExists(db: Database, name: string): boolean {
-    const row = db.query(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name) as { name: string } | null;
-    return !!row;
+  const row = db.query(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name) as {
+    name: string;
+  } | null;
+  return !!row;
 }
 
 export function up(db: Database): void {
-    if (!tableExists(db, 'agent_variants')) {
-        db.exec(`
+  if (!tableExists(db, 'agent_variants')) {
+    db.exec(`
             CREATE TABLE agent_variants (
                 id               TEXT PRIMARY KEY,
                 name             TEXT UNIQUE NOT NULL,
@@ -28,21 +30,23 @@ export function up(db: Database): void {
                 updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
             )
         `);
-    }
+  }
 
-    if (!tableExists(db, 'agent_variant_assignments')) {
-        db.exec(`
+  if (!tableExists(db, 'agent_variant_assignments')) {
+    db.exec(`
             CREATE TABLE agent_variant_assignments (
                 agent_id   TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
                 variant_id TEXT NOT NULL REFERENCES agent_variants(id) ON DELETE CASCADE,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         `);
-        db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_variant_assignments_variant ON agent_variant_assignments(variant_id)`);
-    }
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_agent_variant_assignments_variant ON agent_variant_assignments(variant_id)`,
+    );
+  }
 }
 
 export function down(db: Database): void {
-    db.exec('DROP TABLE IF EXISTS agent_variant_assignments');
-    db.exec('DROP TABLE IF EXISTS agent_variants');
+  db.exec('DROP TABLE IF EXISTS agent_variant_assignments');
+  db.exec('DROP TABLE IF EXISTS agent_variants');
 }

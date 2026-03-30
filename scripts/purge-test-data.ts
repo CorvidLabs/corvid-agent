@@ -15,7 +15,7 @@ import { purgeTestData } from '../server/db/purge-test-data';
 const dryRun = !process.argv.includes('--force');
 
 if (dryRun) {
-    console.log('=== DRY RUN (pass --force to actually delete) ===\n');
+  console.log('=== DRY RUN (pass --force to actually delete) ===\n');
 }
 
 const db = getDb();
@@ -29,5 +29,5 @@ console.log(`  Session messages: ${result.sessionMessages}`);
 console.log(`  Dry run:          ${result.dryRun}`);
 
 if (dryRun) {
-    console.log('\nRe-run with --force to delete these rows.');
+  console.log('\nRe-run with --force to delete these rows.');
 }

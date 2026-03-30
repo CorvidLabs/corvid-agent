@@ -80,7 +80,7 @@
   .detail-tools li { margin: 3px 0; list-style: none; }
   .detail-tools li::before { content: '> '; color: #444; }
   .detail-meta { display: flex; gap: 16px; font-size: 12px; color: #666; }
-  .detail-meta span { }
+  .detail-meta span { /* layout placeholder */ }
   .detail-meta .val { color: #ccc; }
   .tier-summary { display: flex; gap: 16px; margin-bottom: 20px; }
   .tier-card {
@@ -118,7 +118,7 @@
 <div class="detail-panel" id="detail-panel">
   <div class="detail-header">
     <h3 id="detail-title"></h3>
-    <button class="detail-close" onclick="closeDetail()">&times;</button>
+    <button type="button" class="detail-close" onclick="closeDetail()">&times;</button>
   </div>
   <div class="detail-body">
     <div class="detail-section">
@@ -170,7 +170,7 @@ const TEST_DEFS = [
 const TIER_NAMES = { 1: 'Basic Competence', 2: 'Reasoning Quality', 3: 'Council Readiness' };
 const TIER_REQUIRED = { 1: [4,4], 2: [3,4], 3: [2,3] };
 
-let resultsData = new Map(); // testId -> result from JSON
+const resultsData = new Map(); // testId -> result from JSON
 let selectedTest = null;
 
 function classify(session, result) {
@@ -190,14 +190,14 @@ function classify(session, result) {
 }
 
 function formatTime(session, result) {
-  if (result && result.durationMs) {
-    return (result.durationMs / 1000).toFixed(1) + 's';
+  if (result?.durationMs) {
+    return `${(result.durationMs / 1000).toFixed(1)}s`;
   }
-  if (!session || !session.createdAt) return '';
-  const created = new Date(session.createdAt.includes('T') ? session.createdAt : session.createdAt.replace(' ', 'T') + 'Z');
+  if (!session?.createdAt) return '';
+  const created = new Date(session.createdAt.includes('T') ? session.createdAt : `${session.createdAt.replace(' ', 'T')}Z`);
   if (session.status === 'running') {
     const elapsed = (Date.now() - created.getTime()) / 1000;
-    return Math.floor(elapsed) + 's...';
+    return `${Math.floor(elapsed)}s...`;
   }
   return '';
 }
@@ -260,7 +260,7 @@ async function refresh() {
     // Progress bar
     const pct = ((done + running * 0.5) / total) * 100;
     const fill = document.getElementById('progress-fill');
-    fill.style.width = pct + '%';
+    fill.style.width = `${pct}%`;
     fill.style.background = fail > 0
       ? 'linear-gradient(90deg, #50fa7b, #ff5555)'
       : 'linear-gradient(90deg, #50fa7b, #8be9fd)';
@@ -308,9 +308,9 @@ async function refresh() {
     // Refresh detail panel if open
     if (selectedTest) showDetail(selectedTest, true);
 
-    document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('last-update').textContent = `Updated ${new Date().toLocaleTimeString()}`;
   } catch (e) {
-    document.getElementById('last-update').textContent = 'Error: ' + e.message;
+    document.getElementById('last-update').textContent = `Error: ${e.message}`;
   }
 }
 
@@ -370,7 +370,7 @@ function showDetail(testId, isRefresh) {
   if (!isRefresh) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function closeDetail() {
+function _closeDetail() {
   selectedTest = null;
   document.getElementById('detail-panel').classList.remove('visible');
 }

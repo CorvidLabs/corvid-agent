@@ -9,7 +9,7 @@
  * prompt string and model name. No credentials, mnemonics, or API keys are
  * inspected or stored.
  */
-import { estimateComplexity, type ComplexityLevel } from '../providers/router';
+import { type ComplexityLevel, estimateComplexity } from '../providers/router';
 
 /** Complexity levels that trigger an advisory warning for Ollama models. */
 const COMPLEX_LEVELS: ReadonlySet<ComplexityLevel> = new Set(['complex', 'expert']);
@@ -19,7 +19,7 @@ const COMPLEX_LEVELS: ReadonlySet<ComplexityLevel> = new Set(['complex', 'expert
  * Accepts the `provider` field from an Agent record.
  */
 export function isOllamaProvider(provider: string | undefined): boolean {
-    return provider === 'ollama';
+  return provider === 'ollama';
 }
 
 /**
@@ -32,32 +32,30 @@ export function isOllamaProvider(provider: string | undefined): boolean {
  * @param provider - The provider string from the agent config.
  */
 export function buildOllamaComplexityWarning(
-    prompt: string,
-    model: string,
-    provider: string | undefined,
+  prompt: string,
+  model: string,
+  provider: string | undefined,
 ): string | null {
-    if (!isOllamaProvider(provider)) return null;
-    if (!prompt.trim()) return null;
+  if (!isOllamaProvider(provider)) return null;
+  if (!prompt.trim()) return null;
 
-    const { level, signals } = estimateComplexity(prompt);
+  const { level, signals } = estimateComplexity(prompt);
 
-    if (!COMPLEX_LEVELS.has(level)) return null;
+  if (!COMPLEX_LEVELS.has(level)) return null;
 
-    const reasons: string[] = [];
-    if (signals.multiStep) reasons.push('multi-step reasoning');
-    if (signals.requiresThinking) reasons.push('extended thinking');
-    if (signals.complexityKeywords > 0) reasons.push('high-complexity keywords');
-    if (signals.suggestsSubagents) reasons.push('parallel sub-tasks');
-    if (signals.inputTokenEstimate > 1000) reasons.push('large context');
+  const reasons: string[] = [];
+  if (signals.multiStep) reasons.push('multi-step reasoning');
+  if (signals.requiresThinking) reasons.push('extended thinking');
+  if (signals.complexityKeywords > 0) reasons.push('high-complexity keywords');
+  if (signals.suggestsSubagents) reasons.push('parallel sub-tasks');
+  if (signals.inputTokenEstimate > 1000) reasons.push('large context');
 
-    const reasonStr = reasons.length > 0
-        ? ` (detected: ${reasons.join(', ')})`
-        : '';
+  const reasonStr = reasons.length > 0 ? ` (detected: ${reasons.join(', ')})` : '';
 
-    return (
-        `Advisory: task complexity is "${level}"${reasonStr} but model "${model}" is a local ` +
-        `Ollama model. Local models may produce lower-quality results for complex tasks. ` +
-        `Consider upgrading to a Claude tier (claude-sonnet-4-6 or claude-opus-4-6) for ` +
-        `best results. Task will proceed with the selected model.`
-    );
+  return (
+    `Advisory: task complexity is "${level}"${reasonStr} but model "${model}" is a local ` +
+    `Ollama model. Local models may produce lower-quality results for complex tasks. ` +
+    `Consider upgrading to a Claude tier (claude-sonnet-4-6 or claude-opus-4-6) for ` +
+    `best results. Task will proceed with the selected model.`
+  );
 }

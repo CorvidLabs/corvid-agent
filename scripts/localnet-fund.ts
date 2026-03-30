@@ -28,7 +28,9 @@ interface AgentRow {
 
 async function main() {
   const db = new Database(DB_PATH, { readonly: true });
-  const agents = db.query<AgentRow, []>('SELECT id, name, wallet_address FROM agents WHERE wallet_address IS NOT NULL').all();
+  const agents = db
+    .query<AgentRow, []>('SELECT id, name, wallet_address FROM agents WHERE wallet_address IS NOT NULL')
+    .all();
   db.close();
 
   if (agents.length === 0) {
@@ -41,7 +43,7 @@ async function main() {
 
   // Get dispenser account from KMD
   const parsed = new URL(KMD_URL);
-  const kmd = new algosdk.Kmd(KMD_TOKEN, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002'));
+  const kmd = new algosdk.Kmd(KMD_TOKEN, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002', 10));
   const wallets = await kmd.listWallets();
   const defaultWallet = wallets.wallets.find((w: { name: string }) => w.name === 'unencrypted-default-wallet');
   if (!defaultWallet) {
@@ -86,7 +88,9 @@ async function main() {
       const signedTxn = txn.signTxn(dispenserAccount.sk);
       await algod.sendRawTransaction(signedTxn).do();
 
-      console.log(`  ↑ ${agent.name} — ${balanceAlgo} → +${fundAlgo} ALGO (was below ${thresholdAlgo}, ${assetCount} ASAs)`);
+      console.log(
+        `  ↑ ${agent.name} — ${balanceAlgo} → +${fundAlgo} ALGO (was below ${thresholdAlgo}, ${assetCount} ASAs)`,
+      );
       funded++;
     } catch (err) {
       console.error(`  ✗ ${agent.name} — ${err instanceof Error ? err.message : String(err)}`);

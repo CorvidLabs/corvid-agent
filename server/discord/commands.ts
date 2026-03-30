@@ -606,9 +606,21 @@ type CommandHandler = (
  * O(1) lookup replaces the previous linear switch statement.
  */
 const COMMAND_HANDLERS = new Map<string, CommandHandler>([
-  ['session', (ctx, interaction, permLevel, getOption, userId) => handleSessionCommand(ctx, interaction, permLevel, getOption, userId)],
-  ['message', (ctx, interaction, permLevel, getOption, userId) => handleMessageCommand(ctx, interaction, permLevel, getOption, userId)],
-  ['work', (ctx, interaction, permLevel, getOption, userId) => handleWorkCommand(ctx, interaction, permLevel, getOption, userId)],
+  [
+    'session',
+    (ctx, interaction, permLevel, getOption, userId) =>
+      handleSessionCommand(ctx, interaction, permLevel, getOption, userId),
+  ],
+  [
+    'message',
+    (ctx, interaction, permLevel, getOption, userId) =>
+      handleMessageCommand(ctx, interaction, permLevel, getOption, userId),
+  ],
+  [
+    'work',
+    (ctx, interaction, permLevel, getOption, userId) =>
+      handleWorkCommand(ctx, interaction, permLevel, getOption, userId),
+  ],
   ['agents', (ctx, interaction) => handleAgentsCommand(ctx, interaction)],
   ['status', (ctx, interaction) => handleStatusCommand(ctx, interaction)],
   ['dashboard', (ctx, interaction) => handleDashboardCommand(ctx, interaction)],
@@ -621,14 +633,26 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['tools', (_ctx, interaction, _permLevel, getOption) => handleToolsCommand(interaction, getOption)],
   ['mute', (ctx, interaction, permLevel, getOption) => handleMuteCommand(ctx, interaction, permLevel, getOption)],
   ['unmute', (ctx, interaction, permLevel, getOption) => handleUnmuteCommand(ctx, interaction, permLevel, getOption)],
-  ['admin', async (ctx, interaction, permLevel) => {
-    if (permLevel < PermissionLevel.ADMIN) {
-      await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
-      return;
-    }
-    const options = interaction.data?.options ?? [];
-    await handleAdminCommand(ctx.db, ctx.config, ctx.mutedUsers, ctx.threadSessions.size, interaction, options, ctx.guildCache, ctx.syncGuildData);
-  }],
+  [
+    'admin',
+    async (ctx, interaction, permLevel) => {
+      if (permLevel < PermissionLevel.ADMIN) {
+        await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
+        return;
+      }
+      const options = interaction.data?.options ?? [];
+      await handleAdminCommand(
+        ctx.db,
+        ctx.config,
+        ctx.mutedUsers,
+        ctx.threadSessions.size,
+        interaction,
+        options,
+        ctx.guildCache,
+        ctx.syncGuildData,
+      );
+    },
+  ],
   ['agent-skill', (ctx, interaction, permLevel) => handleAgentSkillCommand(ctx, interaction, permLevel)],
   ['agent-persona', (ctx, interaction, permLevel) => handleAgentPersonaCommand(ctx, interaction, permLevel)],
 ]);
@@ -669,7 +693,16 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
   }
 
   // Rate-limit slash commands using the same per-user timestamps as channel messages
-  if (!checkRateLimit(ctx.config, ctx.userMessageTimestamps, userId, ctx.rateLimitWindowMs, ctx.rateLimitMaxMessages, permLevel)) {
+  if (
+    !checkRateLimit(
+      ctx.config,
+      ctx.userMessageTimestamps,
+      userId,
+      ctx.rateLimitWindowMs,
+      ctx.rateLimitMaxMessages,
+      permLevel,
+    )
+  ) {
     await respondEphemeral(interaction, 'You are sending commands too quickly. Please wait before trying again.');
     return;
   }

@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 086: Add display customization fields to agents.
@@ -13,28 +13,28 @@ import { Database } from 'bun:sqlite';
  */
 
 function columnExists(db: Database, table: string, column: string): boolean {
-    const cols = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-    return cols.some((c) => c.name === column);
+  const cols = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return cols.some((c) => c.name === column);
 }
 
 export function up(db: Database): void {
-    if (!columnExists(db, 'agents', 'display_color')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN display_color TEXT DEFAULT NULL`);
-    }
-    if (!columnExists(db, 'agents', 'display_icon')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN display_icon TEXT DEFAULT NULL`);
-    }
-    if (!columnExists(db, 'agents', 'avatar_url')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN avatar_url TEXT DEFAULT NULL`);
-    }
-    if (!columnExists(db, 'agents', 'disabled')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN disabled INTEGER DEFAULT 0`);
-    }
+  if (!columnExists(db, 'agents', 'display_color')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN display_color TEXT DEFAULT NULL`);
+  }
+  if (!columnExists(db, 'agents', 'display_icon')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN display_icon TEXT DEFAULT NULL`);
+  }
+  if (!columnExists(db, 'agents', 'avatar_url')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN avatar_url TEXT DEFAULT NULL`);
+  }
+  if (!columnExists(db, 'agents', 'disabled')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN disabled INTEGER DEFAULT 0`);
+  }
 }
 
 export function down(db: Database): void {
-    // Best-effort rollback — columns are nullable so leaving them is safe
-    db.exec(`
+  // Best-effort rollback — columns are nullable so leaving them is safe
+  db.exec(`
         CREATE TABLE IF NOT EXISTS agents_backup AS SELECT
             id, name, description, system_prompt, append_prompt, model, provider,
             allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
@@ -43,8 +43,8 @@ export function down(db: Database): void {
             wallet_mnemonic_encrypted, wallet_funded_algo, tenant_id, created_at, updated_at
         FROM agents
     `);
-    db.exec(`DROP TABLE IF EXISTS agents`);
-    db.exec(`
+  db.exec(`DROP TABLE IF EXISTS agents`);
+  db.exec(`
         CREATE TABLE agents (
             id                        TEXT PRIMARY KEY,
             name                      TEXT NOT NULL,
@@ -72,6 +72,6 @@ export function down(db: Database): void {
             updated_at                TEXT DEFAULT (datetime('now'))
         )
     `);
-    db.exec(`INSERT INTO agents SELECT * FROM agents_backup`);
-    db.exec(`DROP TABLE IF EXISTS agents_backup`);
+  db.exec(`INSERT INTO agents SELECT * FROM agents_backup`);
+  db.exec(`DROP TABLE IF EXISTS agents_backup`);
 }

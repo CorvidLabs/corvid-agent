@@ -1,55 +1,64 @@
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
-import type { McpServerConfig, CreateMcpServerConfigInput, UpdateMcpServerConfigInput } from '../../shared/types';
+import type { CreateMcpServerConfigInput, McpServerConfig, UpdateMcpServerConfigInput } from '../../shared/types';
+import { decryptEnvVars, encryptEnvVars } from '../lib/env-encryption';
 import { NotFoundError } from '../lib/errors';
+import { validateTenantOwnership, withTenantFilter } from '../tenant/db-filter';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
-import { encryptEnvVars, decryptEnvVars } from '../lib/env-encryption';
 
 interface McpServerConfigRow {
-    id: string;
-    agent_id: string | null;
-    name: string;
-    command: string;
-    args: string;
-    env_vars: string;
-    cwd: string | null;
-    enabled: number;
-    created_at: string;
-    updated_at: string;
+  id: string;
+  agent_id: string | null;
+  name: string;
+  command: string;
+  args: string;
+  env_vars: string;
+  cwd: string | null;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
 }
 
 function rowToConfig(row: McpServerConfigRow): McpServerConfig {
-    return {
-        id: row.id,
-        agentId: row.agent_id,
-        name: row.name,
-        command: row.command,
-        args: JSON.parse(row.args),
-        envVars: JSON.parse(decryptEnvVars(row.env_vars)),
-        cwd: row.cwd,
-        enabled: row.enabled === 1,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-    };
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    name: row.name,
+    command: row.command,
+    args: JSON.parse(row.args),
+    envVars: JSON.parse(decryptEnvVars(row.env_vars)),
+    cwd: row.cwd,
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 /** List all MCP server configs, optionally filtered by agent. */
-export function listMcpServerConfigs(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig[] {
-    if (agentId) {
-        const { query, bindings } = withTenantFilter('SELECT * FROM mcp_server_configs WHERE agent_id = ? ORDER BY name', tenantId);
-        return (db.query(query).all(agentId, ...bindings) as McpServerConfigRow[]).map(rowToConfig);
-    }
-    const { query, bindings } = withTenantFilter('SELECT * FROM mcp_server_configs ORDER BY name', tenantId);
-    return (db.query(query).all(...bindings) as McpServerConfigRow[]).map(rowToConfig);
+export function listMcpServerConfigs(
+  db: Database,
+  agentId?: string,
+  tenantId: string = DEFAULT_TENANT_ID,
+): McpServerConfig[] {
+  if (agentId) {
+    const { query, bindings } = withTenantFilter(
+      'SELECT * FROM mcp_server_configs WHERE agent_id = ? ORDER BY name',
+      tenantId,
+    );
+    return (db.query(query).all(agentId, ...bindings) as McpServerConfigRow[]).map(rowToConfig);
+  }
+  const { query, bindings } = withTenantFilter('SELECT * FROM mcp_server_configs ORDER BY name', tenantId);
+  return (db.query(query).all(...bindings) as McpServerConfigRow[]).map(rowToConfig);
 }
 
 /** Get a single MCP server config by ID. */
-export function getMcpServerConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig | null {
-    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'mcp_server_configs', id, tenantId)) return null;
-    const row = db.query(
-        'SELECT * FROM mcp_server_configs WHERE id = ?',
-    ).get(id) as McpServerConfigRow | null;
-    return row ? rowToConfig(row) : null;
+export function getMcpServerConfig(
+  db: Database,
+  id: string,
+  tenantId: string = DEFAULT_TENANT_ID,
+): McpServerConfig | null {
+  if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'mcp_server_configs', id, tenantId)) return null;
+  const row = db.query('SELECT * FROM mcp_server_configs WHERE id = ?').get(id) as McpServerConfigRow | null;
+  return row ? rowToConfig(row) : null;
 }
 
 /**
@@ -57,81 +66,90 @@ export function getMcpServerConfig(db: Database, id: string, tenantId: string = 
  * Returns global configs (agent_id IS NULL) plus agent-specific ones.
  */
 export function getActiveServersForAgent(db: Database, agentId: string): McpServerConfig[] {
-    const rows = db.query(
-        'SELECT * FROM mcp_server_configs WHERE enabled = 1 AND (agent_id IS NULL OR agent_id = ?) ORDER BY name',
-    ).all(agentId) as McpServerConfigRow[];
-    return rows.map(rowToConfig);
+  const rows = db
+    .query('SELECT * FROM mcp_server_configs WHERE enabled = 1 AND (agent_id IS NULL OR agent_id = ?) ORDER BY name')
+    .all(agentId) as McpServerConfigRow[];
+  return rows.map(rowToConfig);
 }
 
 /** Create a new MCP server config. */
-export function createMcpServerConfig(db: Database, input: CreateMcpServerConfigInput, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig {
-    const id = crypto.randomUUID();
-    db.query(
-        `INSERT INTO mcp_server_configs (id, agent_id, name, command, args, env_vars, cwd, enabled, tenant_id)
+export function createMcpServerConfig(
+  db: Database,
+  input: CreateMcpServerConfigInput,
+  tenantId: string = DEFAULT_TENANT_ID,
+): McpServerConfig {
+  const id = crypto.randomUUID();
+  db.query(
+    `INSERT INTO mcp_server_configs (id, agent_id, name, command, args, env_vars, cwd, enabled, tenant_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-        id,
-        input.agentId ?? null,
-        input.name,
-        input.command,
-        JSON.stringify(input.args ?? []),
-        encryptEnvVars(JSON.stringify(input.envVars ?? {})),
-        input.cwd ?? null,
-        input.enabled !== false ? 1 : 0,
-        tenantId,
-    );
+  ).run(
+    id,
+    input.agentId ?? null,
+    input.name,
+    input.command,
+    JSON.stringify(input.args ?? []),
+    encryptEnvVars(JSON.stringify(input.envVars ?? {})),
+    input.cwd ?? null,
+    input.enabled !== false ? 1 : 0,
+    tenantId,
+  );
 
-    const created = getMcpServerConfig(db, id);
-    if (!created) throw new NotFoundError('MCP server config', id);
-    return created;
+  const created = getMcpServerConfig(db, id);
+  if (!created) throw new NotFoundError('MCP server config', id);
+  return created;
 }
 
 /** Update an existing MCP server config. Returns null if not found. */
-export function updateMcpServerConfig(db: Database, id: string, input: UpdateMcpServerConfigInput, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig | null {
-    const existing = getMcpServerConfig(db, id, tenantId);
-    if (!existing) return null;
+export function updateMcpServerConfig(
+  db: Database,
+  id: string,
+  input: UpdateMcpServerConfigInput,
+  tenantId: string = DEFAULT_TENANT_ID,
+): McpServerConfig | null {
+  const existing = getMcpServerConfig(db, id, tenantId);
+  if (!existing) return null;
 
-    const fields: string[] = [];
-    const values: unknown[] = [];
+  const fields: string[] = [];
+  const values: unknown[] = [];
 
-    if (input.name !== undefined) {
-        fields.push('name = ?');
-        values.push(input.name);
-    }
-    if (input.command !== undefined) {
-        fields.push('command = ?');
-        values.push(input.command);
-    }
-    if (input.args !== undefined) {
-        fields.push('args = ?');
-        values.push(JSON.stringify(input.args));
-    }
-    if (input.envVars !== undefined) {
-        fields.push('env_vars = ?');
-        values.push(encryptEnvVars(JSON.stringify(input.envVars)));
-    }
-    if (input.cwd !== undefined) {
-        fields.push('cwd = ?');
-        values.push(input.cwd);
-    }
-    if (input.enabled !== undefined) {
-        fields.push('enabled = ?');
-        values.push(input.enabled ? 1 : 0);
-    }
+  if (input.name !== undefined) {
+    fields.push('name = ?');
+    values.push(input.name);
+  }
+  if (input.command !== undefined) {
+    fields.push('command = ?');
+    values.push(input.command);
+  }
+  if (input.args !== undefined) {
+    fields.push('args = ?');
+    values.push(JSON.stringify(input.args));
+  }
+  if (input.envVars !== undefined) {
+    fields.push('env_vars = ?');
+    values.push(encryptEnvVars(JSON.stringify(input.envVars)));
+  }
+  if (input.cwd !== undefined) {
+    fields.push('cwd = ?');
+    values.push(input.cwd);
+  }
+  if (input.enabled !== undefined) {
+    fields.push('enabled = ?');
+    values.push(input.enabled ? 1 : 0);
+  }
 
-    if (fields.length === 0) return existing;
+  if (fields.length === 0) return existing;
 
-    fields.push("updated_at = datetime('now')");
-    values.push(id);
+  fields.push("updated_at = datetime('now')");
+  values.push(id);
 
-    db.query(`UPDATE mcp_server_configs SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getMcpServerConfig(db, id);
+  db.query(`UPDATE mcp_server_configs SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
+  return getMcpServerConfig(db, id);
 }
 
 /** Delete an MCP server config. Returns true if deleted, false if not found. */
 export function deleteMcpServerConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
-    const existing = getMcpServerConfig(db, id, tenantId);
-    if (!existing) return false;
-    db.query('DELETE FROM mcp_server_configs WHERE id = ?').run(id);
-    return true;
+  const existing = getMcpServerConfig(db, id, tenantId);
+  if (!existing) return false;
+  db.query('DELETE FROM mcp_server_configs WHERE id = ?').run(id);
+  return true;
 }

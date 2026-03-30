@@ -1,267 +1,263 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { EnvKeyProvider, createKeyProvider, detectPlaintextKeyConfig, type KeyProvider } from '../lib/key-provider';
-import {
-    encryptMnemonicWithPassphrase,
-    decryptMnemonicWithPassphrase,
-} from '../lib/crypto';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { decryptMnemonicWithPassphrase, encryptMnemonicWithPassphrase } from '../lib/crypto';
+import { createKeyProvider, detectPlaintextKeyConfig, EnvKeyProvider, type KeyProvider } from '../lib/key-provider';
 
-const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+const TEST_MNEMONIC =
+  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const TEST_PASSPHRASE = 'test-encryption-key-for-unit-tests-32chars!';
 
 describe('KeyProvider', () => {
-    describe('EnvKeyProvider', () => {
-        let originalKey: string | undefined;
+  describe('EnvKeyProvider', () => {
+    let originalKey: string | undefined;
 
-        beforeEach(() => {
-            originalKey = process.env.WALLET_ENCRYPTION_KEY;
-        });
-
-        afterEach(() => {
-            if (originalKey === undefined) {
-                delete process.env.WALLET_ENCRYPTION_KEY;
-            } else {
-                process.env.WALLET_ENCRYPTION_KEY = originalKey;
-            }
-        });
-
-        it('returns env var passphrase when set', async () => {
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            const provider = new EnvKeyProvider('localnet');
-
-            const passphrase = await provider.getEncryptionPassphrase();
-            expect(passphrase).toBe(TEST_PASSPHRASE);
-        });
-
-        it('returns default key on localnet when no env var', async () => {
-            delete process.env.WALLET_ENCRYPTION_KEY;
-            const provider = new EnvKeyProvider('localnet');
-
-            const passphrase = await provider.getEncryptionPassphrase();
-            expect(passphrase).toBeTruthy();
-            expect(typeof passphrase).toBe('string');
-        });
-
-        it('throws on testnet when no env var', async () => {
-            delete process.env.WALLET_ENCRYPTION_KEY;
-            const provider = new EnvKeyProvider('testnet');
-
-            await expect(provider.getEncryptionPassphrase()).rejects.toThrow('WALLET_ENCRYPTION_KEY must be set');
-        });
-
-        it('throws on mainnet when no env var', async () => {
-            delete process.env.WALLET_ENCRYPTION_KEY;
-            const provider = new EnvKeyProvider('mainnet');
-
-            await expect(provider.getEncryptionPassphrase()).rejects.toThrow('WALLET_ENCRYPTION_KEY must be set');
-        });
-
-        it('has providerType "env"', () => {
-            const provider = new EnvKeyProvider();
-            expect(provider.providerType).toBe('env');
-        });
-
-        it('dispose is safe to call multiple times', () => {
-            const provider = new EnvKeyProvider();
-            provider.dispose();
-            provider.dispose();
-            // No error thrown
-        });
+    beforeEach(() => {
+      originalKey = process.env.WALLET_ENCRYPTION_KEY;
     });
 
-    describe('createKeyProvider', () => {
-        let originalKey: string | undefined;
-        let originalAllow: string | undefined;
-
-        beforeEach(() => {
-            originalKey = process.env.WALLET_ENCRYPTION_KEY;
-            originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-        });
-
-        afterEach(() => {
-            if (originalKey === undefined) {
-                delete process.env.WALLET_ENCRYPTION_KEY;
-            } else {
-                process.env.WALLET_ENCRYPTION_KEY = originalKey;
-            }
-            if (originalAllow === undefined) {
-                delete process.env.ALLOW_PLAINTEXT_KEYS;
-            } else {
-                process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
-            }
-        });
-
-        it('returns an EnvKeyProvider by default', () => {
-            const provider = createKeyProvider('localnet');
-            expect(provider).toBeInstanceOf(EnvKeyProvider);
-        });
-
-        it('returned provider resolves passphrase', async () => {
-            const provider = createKeyProvider('localnet');
-            const passphrase = await provider.getEncryptionPassphrase();
-            expect(passphrase).toBe(TEST_PASSPHRASE);
-        });
-
-        it('throws on mainnet without WALLET_ENCRYPTION_KEY', () => {
-            delete process.env.WALLET_ENCRYPTION_KEY;
-            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
-        });
-
-        it('allows mainnet with WALLET_ENCRYPTION_KEY set', () => {
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
-            const provider = createKeyProvider('mainnet');
-            expect(provider).toBeInstanceOf(EnvKeyProvider);
-        });
-
-        it('ignores deprecated ALLOW_PLAINTEXT_KEYS on mainnet (still requires key)', () => {
-            // ALLOW_PLAINTEXT_KEYS is deprecated — mainnet now requires WALLET_ENCRYPTION_KEY
-            delete process.env.WALLET_ENCRYPTION_KEY;
-            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
-            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
-        });
-
-        it('allows mainnet with WALLET_ENCRYPTION_KEY even when ALLOW_PLAINTEXT_KEYS is set', () => {
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
-            const provider = createKeyProvider('mainnet');
-            expect(provider).toBeInstanceOf(EnvKeyProvider);
-        });
+    afterEach(() => {
+      if (originalKey === undefined) {
+        delete process.env.WALLET_ENCRYPTION_KEY;
+      } else {
+        process.env.WALLET_ENCRYPTION_KEY = originalKey;
+      }
     });
 
-    describe('detectPlaintextKeyConfig', () => {
-        let originalKey: string | undefined;
-        let originalAllow: string | undefined;
-        let originalMnemonic: string | undefined;
+    it('returns env var passphrase when set', async () => {
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      const provider = new EnvKeyProvider('localnet');
 
-        beforeEach(() => {
-            originalKey = process.env.WALLET_ENCRYPTION_KEY;
-            originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
-            originalMnemonic = process.env.ALGOCHAT_MNEMONIC;
-        });
-
-        afterEach(() => {
-            if (originalKey === undefined) delete process.env.WALLET_ENCRYPTION_KEY;
-            else process.env.WALLET_ENCRYPTION_KEY = originalKey;
-            if (originalAllow === undefined) delete process.env.ALLOW_PLAINTEXT_KEYS;
-            else process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
-            if (originalMnemonic === undefined) delete process.env.ALGOCHAT_MNEMONIC;
-            else process.env.ALGOCHAT_MNEMONIC = originalMnemonic;
-        });
-
-        it('returns no warnings on localnet', () => {
-            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
-            const warnings = detectPlaintextKeyConfig('localnet');
-            expect(warnings).toEqual([]);
-        });
-
-        it('warns about deprecated ALLOW_PLAINTEXT_KEYS on testnet', () => {
-            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            const warnings = detectPlaintextKeyConfig('testnet');
-            expect(warnings.some(w => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
-        });
-
-        it('warns about deprecated ALLOW_PLAINTEXT_KEYS on mainnet', () => {
-            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            const warnings = detectPlaintextKeyConfig('mainnet');
-            expect(warnings.some(w => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
-        });
-
-        it('warns about raw 25-word mnemonic on mainnet', () => {
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
-            const warnings = detectPlaintextKeyConfig('mainnet');
-            expect(warnings.some(w => w.includes('raw 25-word mnemonic'))).toBe(true);
-        });
-
-        it('does not warn about mnemonic on testnet', () => {
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
-            const warnings = detectPlaintextKeyConfig('testnet');
-            expect(warnings.some(w => w.includes('raw 25-word mnemonic'))).toBe(false);
-        });
-
-        it('warns about short WALLET_ENCRYPTION_KEY', () => {
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
-            delete process.env.ALGOCHAT_MNEMONIC;
-            process.env.WALLET_ENCRYPTION_KEY = 'short-key';
-            const warnings = detectPlaintextKeyConfig('testnet');
-            expect(warnings.some(w => w.includes('only 9 chars'))).toBe(true);
-        });
-
-        it('returns no warnings when everything is properly configured', () => {
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
-            delete process.env.ALGOCHAT_MNEMONIC;
-            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
-            const warnings = detectPlaintextKeyConfig('testnet');
-            expect(warnings).toEqual([]);
-        });
+      const passphrase = await provider.getEncryptionPassphrase();
+      expect(passphrase).toBe(TEST_PASSPHRASE);
     });
 
-    describe('custom KeyProvider', () => {
-        it('can implement the interface for testing', async () => {
-            const customProvider: KeyProvider = {
-                providerType: 'mock-kms',
-                async getEncryptionPassphrase() {
-                    return 'custom-test-passphrase-for-mock-kms';
-                },
-                dispose() {},
-            };
+    it('returns default key on localnet when no env var', async () => {
+      delete process.env.WALLET_ENCRYPTION_KEY;
+      const provider = new EnvKeyProvider('localnet');
 
-            const passphrase = await customProvider.getEncryptionPassphrase();
-            expect(passphrase).toBe('custom-test-passphrase-for-mock-kms');
-        });
+      const passphrase = await provider.getEncryptionPassphrase();
+      expect(passphrase).toBeTruthy();
+      expect(typeof passphrase).toBe('string');
     });
+
+    it('throws on testnet when no env var', async () => {
+      delete process.env.WALLET_ENCRYPTION_KEY;
+      const provider = new EnvKeyProvider('testnet');
+
+      await expect(provider.getEncryptionPassphrase()).rejects.toThrow('WALLET_ENCRYPTION_KEY must be set');
+    });
+
+    it('throws on mainnet when no env var', async () => {
+      delete process.env.WALLET_ENCRYPTION_KEY;
+      const provider = new EnvKeyProvider('mainnet');
+
+      await expect(provider.getEncryptionPassphrase()).rejects.toThrow('WALLET_ENCRYPTION_KEY must be set');
+    });
+
+    it('has providerType "env"', () => {
+      const provider = new EnvKeyProvider();
+      expect(provider.providerType).toBe('env');
+    });
+
+    it('dispose is safe to call multiple times', () => {
+      const provider = new EnvKeyProvider();
+      provider.dispose();
+      provider.dispose();
+      // No error thrown
+    });
+  });
+
+  describe('createKeyProvider', () => {
+    let originalKey: string | undefined;
+    let originalAllow: string | undefined;
+
+    beforeEach(() => {
+      originalKey = process.env.WALLET_ENCRYPTION_KEY;
+      originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+    });
+
+    afterEach(() => {
+      if (originalKey === undefined) {
+        delete process.env.WALLET_ENCRYPTION_KEY;
+      } else {
+        process.env.WALLET_ENCRYPTION_KEY = originalKey;
+      }
+      if (originalAllow === undefined) {
+        delete process.env.ALLOW_PLAINTEXT_KEYS;
+      } else {
+        process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
+      }
+    });
+
+    it('returns an EnvKeyProvider by default', () => {
+      const provider = createKeyProvider('localnet');
+      expect(provider).toBeInstanceOf(EnvKeyProvider);
+    });
+
+    it('returned provider resolves passphrase', async () => {
+      const provider = createKeyProvider('localnet');
+      const passphrase = await provider.getEncryptionPassphrase();
+      expect(passphrase).toBe(TEST_PASSPHRASE);
+    });
+
+    it('throws on mainnet without WALLET_ENCRYPTION_KEY', () => {
+      delete process.env.WALLET_ENCRYPTION_KEY;
+      expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+    });
+
+    it('allows mainnet with WALLET_ENCRYPTION_KEY set', () => {
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      delete process.env.ALLOW_PLAINTEXT_KEYS;
+      const provider = createKeyProvider('mainnet');
+      expect(provider).toBeInstanceOf(EnvKeyProvider);
+    });
+
+    it('ignores deprecated ALLOW_PLAINTEXT_KEYS on mainnet (still requires key)', () => {
+      // ALLOW_PLAINTEXT_KEYS is deprecated — mainnet now requires WALLET_ENCRYPTION_KEY
+      delete process.env.WALLET_ENCRYPTION_KEY;
+      process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+      expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+    });
+
+    it('allows mainnet with WALLET_ENCRYPTION_KEY even when ALLOW_PLAINTEXT_KEYS is set', () => {
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+      const provider = createKeyProvider('mainnet');
+      expect(provider).toBeInstanceOf(EnvKeyProvider);
+    });
+  });
+
+  describe('detectPlaintextKeyConfig', () => {
+    let originalKey: string | undefined;
+    let originalAllow: string | undefined;
+    let originalMnemonic: string | undefined;
+
+    beforeEach(() => {
+      originalKey = process.env.WALLET_ENCRYPTION_KEY;
+      originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
+      originalMnemonic = process.env.ALGOCHAT_MNEMONIC;
+    });
+
+    afterEach(() => {
+      if (originalKey === undefined) delete process.env.WALLET_ENCRYPTION_KEY;
+      else process.env.WALLET_ENCRYPTION_KEY = originalKey;
+      if (originalAllow === undefined) delete process.env.ALLOW_PLAINTEXT_KEYS;
+      else process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
+      if (originalMnemonic === undefined) delete process.env.ALGOCHAT_MNEMONIC;
+      else process.env.ALGOCHAT_MNEMONIC = originalMnemonic;
+    });
+
+    it('returns no warnings on localnet', () => {
+      process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+      const warnings = detectPlaintextKeyConfig('localnet');
+      expect(warnings).toEqual([]);
+    });
+
+    it('warns about deprecated ALLOW_PLAINTEXT_KEYS on testnet', () => {
+      process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      const warnings = detectPlaintextKeyConfig('testnet');
+      expect(warnings.some((w) => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
+    });
+
+    it('warns about deprecated ALLOW_PLAINTEXT_KEYS on mainnet', () => {
+      process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      const warnings = detectPlaintextKeyConfig('mainnet');
+      expect(warnings.some((w) => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
+    });
+
+    it('warns about raw 25-word mnemonic on mainnet', () => {
+      delete process.env.ALLOW_PLAINTEXT_KEYS;
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
+      const warnings = detectPlaintextKeyConfig('mainnet');
+      expect(warnings.some((w) => w.includes('raw 25-word mnemonic'))).toBe(true);
+    });
+
+    it('does not warn about mnemonic on testnet', () => {
+      delete process.env.ALLOW_PLAINTEXT_KEYS;
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
+      const warnings = detectPlaintextKeyConfig('testnet');
+      expect(warnings.some((w) => w.includes('raw 25-word mnemonic'))).toBe(false);
+    });
+
+    it('warns about short WALLET_ENCRYPTION_KEY', () => {
+      delete process.env.ALLOW_PLAINTEXT_KEYS;
+      delete process.env.ALGOCHAT_MNEMONIC;
+      process.env.WALLET_ENCRYPTION_KEY = 'short-key';
+      const warnings = detectPlaintextKeyConfig('testnet');
+      expect(warnings.some((w) => w.includes('only 9 chars'))).toBe(true);
+    });
+
+    it('returns no warnings when everything is properly configured', () => {
+      delete process.env.ALLOW_PLAINTEXT_KEYS;
+      delete process.env.ALGOCHAT_MNEMONIC;
+      process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+      const warnings = detectPlaintextKeyConfig('testnet');
+      expect(warnings).toEqual([]);
+    });
+  });
+
+  describe('custom KeyProvider', () => {
+    it('can implement the interface for testing', async () => {
+      const customProvider: KeyProvider = {
+        providerType: 'mock-kms',
+        async getEncryptionPassphrase() {
+          return 'custom-test-passphrase-for-mock-kms';
+        },
+        dispose() {},
+      };
+
+      const passphrase = await customProvider.getEncryptionPassphrase();
+      expect(passphrase).toBe('custom-test-passphrase-for-mock-kms');
+    });
+  });
 });
 
 describe('encryptMnemonicWithPassphrase / decryptMnemonicWithPassphrase', () => {
-    it('encrypts and decrypts with explicit passphrase', async () => {
-        const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
-        expect(encrypted).not.toBe(TEST_MNEMONIC);
-        expect(typeof encrypted).toBe('string');
+  it('encrypts and decrypts with explicit passphrase', async () => {
+    const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
+    expect(encrypted).not.toBe(TEST_MNEMONIC);
+    expect(typeof encrypted).toBe('string');
 
-        const decrypted = await decryptMnemonicWithPassphrase(encrypted, TEST_PASSPHRASE);
-        expect(decrypted).toBe(TEST_MNEMONIC);
-    });
+    const decrypted = await decryptMnemonicWithPassphrase(encrypted, TEST_PASSPHRASE);
+    expect(decrypted).toBe(TEST_MNEMONIC);
+  });
 
-    it('produces different ciphertexts for same input (random salt/IV)', async () => {
-        const enc1 = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
-        const enc2 = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
-        expect(enc1).not.toBe(enc2);
+  it('produces different ciphertexts for same input (random salt/IV)', async () => {
+    const enc1 = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
+    const enc2 = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
+    expect(enc1).not.toBe(enc2);
 
-        expect(await decryptMnemonicWithPassphrase(enc1, TEST_PASSPHRASE)).toBe(TEST_MNEMONIC);
-        expect(await decryptMnemonicWithPassphrase(enc2, TEST_PASSPHRASE)).toBe(TEST_MNEMONIC);
-    });
+    expect(await decryptMnemonicWithPassphrase(enc1, TEST_PASSPHRASE)).toBe(TEST_MNEMONIC);
+    expect(await decryptMnemonicWithPassphrase(enc2, TEST_PASSPHRASE)).toBe(TEST_MNEMONIC);
+  });
 
-    it('fails to decrypt with wrong passphrase', async () => {
-        const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
-        await expect(
-            decryptMnemonicWithPassphrase(encrypted, 'wrong-passphrase-that-will-fail'),
-        ).rejects.toThrow();
-    });
+  it('fails to decrypt with wrong passphrase', async () => {
+    const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
+    await expect(decryptMnemonicWithPassphrase(encrypted, 'wrong-passphrase-that-will-fail')).rejects.toThrow();
+  });
 
-    it('output is valid base64', async () => {
-        const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
-        const decoded = atob(encrypted);
-        expect(decoded.length).toBeGreaterThan(0);
-    });
+  it('output is valid base64', async () => {
+    const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, TEST_PASSPHRASE);
+    const decoded = atob(encrypted);
+    expect(decoded.length).toBeGreaterThan(0);
+  });
 
-    it('round-trips through KeyProvider pattern', async () => {
-        const provider: KeyProvider = {
-            providerType: 'test',
-            async getEncryptionPassphrase() {
-                return TEST_PASSPHRASE;
-            },
-            dispose() {},
-        };
+  it('round-trips through KeyProvider pattern', async () => {
+    const provider: KeyProvider = {
+      providerType: 'test',
+      async getEncryptionPassphrase() {
+        return TEST_PASSPHRASE;
+      },
+      dispose() {},
+    };
 
-        const passphrase = await provider.getEncryptionPassphrase();
-        const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, passphrase);
-        const decrypted = await decryptMnemonicWithPassphrase(encrypted, passphrase);
-        expect(decrypted).toBe(TEST_MNEMONIC);
-    });
+    const passphrase = await provider.getEncryptionPassphrase();
+    const encrypted = await encryptMnemonicWithPassphrase(TEST_MNEMONIC, passphrase);
+    const decrypted = await decryptMnemonicWithPassphrase(encrypted, passphrase);
+    expect(decrypted).toBe(TEST_MNEMONIC);
+  });
 });

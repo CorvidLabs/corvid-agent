@@ -31,63 +31,63 @@ export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => voi
  * field for type-safe handling.
  */
 export interface ISessionEventBus {
-    /**
-     * Subscribe to events for a specific session.
-     * Multiple callbacks can be registered per session.
-     */
-    subscribe(sessionId: string, callback: EventCallback): void;
+  /**
+   * Subscribe to events for a specific session.
+   * Multiple callbacks can be registered per session.
+   */
+  subscribe(sessionId: string, callback: EventCallback): void;
 
-    /**
-     * Unsubscribe a callback from a specific session's events.
-     * Automatically cleans up the session's subscriber set when empty.
-     */
-    unsubscribe(sessionId: string, callback: EventCallback): void;
+  /**
+   * Unsubscribe a callback from a specific session's events.
+   * Automatically cleans up the session's subscriber set when empty.
+   */
+  unsubscribe(sessionId: string, callback: EventCallback): void;
 
-    /**
-     * Subscribe to events from ALL sessions (global listener).
-     * Used by cross-cutting concerns like AlgoChatBridge notifications.
-     */
-    subscribeAll(callback: EventCallback): void;
+  /**
+   * Subscribe to events from ALL sessions (global listener).
+   * Used by cross-cutting concerns like AlgoChatBridge notifications.
+   */
+  subscribeAll(callback: EventCallback): void;
 
-    /**
-     * Unsubscribe a global listener.
-     */
-    unsubscribeAll(callback: EventCallback): void;
+  /**
+   * Unsubscribe a global listener.
+   */
+  unsubscribeAll(callback: EventCallback): void;
 
-    /**
-     * Emit an event to all subscribers (session-scoped + global).
-     * Swallows individual callback errors to prevent one bad subscriber
-     * from breaking the event pipeline.
-     */
-    emit(sessionId: string, event: ClaudeStreamEvent): void;
+  /**
+   * Emit an event to all subscribers (session-scoped + global).
+   * Swallows individual callback errors to prevent one bad subscriber
+   * from breaking the event pipeline.
+   */
+  emit(sessionId: string, event: ClaudeStreamEvent): void;
 
-    /**
-     * Remove all subscribers for a specific session.
-     * Called during session cleanup to prevent memory leaks.
-     */
-    removeSessionSubscribers(sessionId: string): void;
+  /**
+   * Remove all subscribers for a specific session.
+   * Called during session cleanup to prevent memory leaks.
+   */
+  removeSessionSubscribers(sessionId: string): void;
 
-    /**
-     * Remove all session-scoped subscribers (used during shutdown).
-     * Does NOT clear global subscribers — those belong to long-lived
-     * services that manage their own lifecycle.
-     */
-    clearAllSessionSubscribers(): void;
+  /**
+   * Remove all session-scoped subscribers (used during shutdown).
+   * Does NOT clear global subscribers — those belong to long-lived
+   * services that manage their own lifecycle.
+   */
+  clearAllSessionSubscribers(): void;
 
-    /**
-     * Get the count of session subscriber entries (Map size, not total callbacks).
-     */
-    getSubscriberCount(): number;
+  /**
+   * Get the count of session subscriber entries (Map size, not total callbacks).
+   */
+  getSubscriberCount(): number;
 
-    /**
-     * Get the count of global subscribers.
-     */
-    getGlobalSubscriberCount(): number;
+  /**
+   * Get the count of global subscribers.
+   */
+  getGlobalSubscriberCount(): number;
 
-    /**
-     * Prune subscriber entries for sessions that match the given predicate.
-     * Used by the orphan pruner to clean up subscribers for sessions that
-     * no longer have active processes. Returns the number of entries pruned.
-     */
-    pruneSubscribers(shouldPrune: (sessionId: string) => boolean): number;
+  /**
+   * Prune subscriber entries for sessions that match the given predicate.
+   * Used by the orphan pruner to clean up subscribers for sessions that
+   * no longer have active processes. Returns the number of entries pruned.
+   */
+  pruneSubscribers(shouldPrune: (sessionId: string) => boolean): number;
 }

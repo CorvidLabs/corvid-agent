@@ -11,9 +11,9 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { createLogger } from '../lib/logger';
 import { createWorkTask, getWorkTask } from '../db/work-tasks';
 import { buildSafeGhEnv } from '../lib/env';
+import { createLogger } from '../lib/logger';
 
 const log = createLogger('PRVerification');
 
@@ -24,64 +24,66 @@ const CHECKBOX_REGEX = /^- \[ \] (.+)$/gm;
 const PR_PARTS_REGEX = /github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/;
 
 export interface TestPlanItem {
-    /** The raw text of the checkbox item (without the `- [ ] ` prefix) */
-    text: string;
-    /** 0-based index of this item among all checkboxes in the body */
-    index: number;
+  /** The raw text of the checkbox item (without the `- [ ] ` prefix) */
+  text: string;
+  /** 0-based index of this item among all checkboxes in the body */
+  index: number;
 }
 
 /**
  * Parse unchecked test plan items from a PR body.
  */
 export function parseTestPlanItems(prBody: string): TestPlanItem[] {
-    const items: TestPlanItem[] = [];
-    let match: RegExpExecArray | null;
-    let index = 0;
+  const items: TestPlanItem[] = [];
+  let index = 0;
 
-    // Reset regex state
-    CHECKBOX_REGEX.lastIndex = 0;
-    while ((match = CHECKBOX_REGEX.exec(prBody)) !== null) {
-        items.push({ text: match[1].trim(), index });
-        index++;
-    }
+  // Reset regex state
+  CHECKBOX_REGEX.lastIndex = 0;
+  let match = CHECKBOX_REGEX.exec(prBody);
+  while (match !== null) {
+    items.push({ text: match[1].trim(), index });
+    index++;
+    match = CHECKBOX_REGEX.exec(prBody);
+  }
 
-    return items;
+  return items;
 }
 
 /**
  * Extract repo (owner/name) and PR number from a PR URL.
  */
 export function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
-    const match = prUrl.match(PR_PARTS_REGEX);
-    if (!match) return null;
-    return { repo: match[1], prNumber: parseInt(match[2], 10) };
+  const match = prUrl.match(PR_PARTS_REGEX);
+  if (!match) return null;
+  return { repo: match[1], prNumber: parseInt(match[2], 10) };
 }
 
 /**
  * Fetch the PR body from GitHub.
  */
 export async function fetchPrBody(repo: string, prNumber: number): Promise<string | null> {
-    try {
-        const proc = Bun.spawn(
-            ['gh', 'pr', 'view', String(prNumber), '--repo', repo, '--json', 'body', '--jq', '.body'],
-            { stdout: 'pipe', stderr: 'pipe', env: buildSafeGhEnv() },
-        );
-        const stdout = await new Response(proc.stdout).text();
-        const exitCode = await proc.exited;
+  try {
+    const proc = Bun.spawn(['gh', 'pr', 'view', String(prNumber), '--repo', repo, '--json', 'body', '--jq', '.body'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: buildSafeGhEnv(),
+    });
+    const stdout = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
 
-        if (exitCode !== 0) {
-            log.warn('Failed to fetch PR body', { repo, prNumber });
-            return null;
-        }
-        return stdout.trim();
-    } catch (err) {
-        log.warn('Error fetching PR body', {
-            repo,
-            prNumber,
-            error: err instanceof Error ? err.message : String(err),
-        });
-        return null;
+    if (exitCode !== 0) {
+      log.warn('Failed to fetch PR body', { repo, prNumber });
+      return null;
     }
+    return stdout.trim();
+  } catch (err) {
+    log.warn('Error fetching PR body', {
+      repo,
+      prNumber,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
 
 /**
@@ -89,58 +91,54 @@ export async function fetchPrBody(repo: string, prNumber: number): Promise<strin
  * Replaces `- [ ] {text}` with `- [x] {text}`.
  */
 export async function checkOffPrItem(repo: string, prNumber: number, itemText: string): Promise<boolean> {
-    try {
-        // Fetch current body
-        const body = await fetchPrBody(repo, prNumber);
-        if (!body) return false;
+  try {
+    // Fetch current body
+    const body = await fetchPrBody(repo, prNumber);
+    if (!body) return false;
 
-        const unchecked = `- [ ] ${itemText}`;
-        const checked = `- [x] ${itemText}`;
+    const unchecked = `- [ ] ${itemText}`;
+    const checked = `- [x] ${itemText}`;
 
-        if (!body.includes(unchecked)) {
-            log.warn('Checkbox item not found in PR body', { repo, prNumber, itemText });
-            return false;
-        }
-
-        // Replace only the first occurrence of this exact checkbox
-        const updatedBody = body.replace(unchecked, checked);
-
-        const proc = Bun.spawn(
-            ['gh', 'pr', 'edit', String(prNumber), '--repo', repo, '--body', updatedBody],
-            { stdout: 'pipe', stderr: 'pipe', env: buildSafeGhEnv() },
-        );
-        const exitCode = await proc.exited;
-
-        if (exitCode !== 0) {
-            const stderr = await new Response(proc.stderr).text();
-            log.warn('Failed to check off PR item', { repo, prNumber, itemText, stderr: stderr.trim() });
-            return false;
-        }
-
-        log.info('Checked off PR item', { repo, prNumber, itemText });
-        return true;
-    } catch (err) {
-        log.warn('Error checking off PR item', {
-            repo,
-            prNumber,
-            itemText,
-            error: err instanceof Error ? err.message : String(err),
-        });
-        return false;
+    if (!body.includes(unchecked)) {
+      log.warn('Checkbox item not found in PR body', { repo, prNumber, itemText });
+      return false;
     }
+
+    // Replace only the first occurrence of this exact checkbox
+    const updatedBody = body.replace(unchecked, checked);
+
+    const proc = Bun.spawn(['gh', 'pr', 'edit', String(prNumber), '--repo', repo, '--body', updatedBody], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: buildSafeGhEnv(),
+    });
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text();
+      log.warn('Failed to check off PR item', { repo, prNumber, itemText, stderr: stderr.trim() });
+      return false;
+    }
+
+    log.info('Checked off PR item', { repo, prNumber, itemText });
+    return true;
+  } catch (err) {
+    log.warn('Error checking off PR item', {
+      repo,
+      prNumber,
+      itemText,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
 }
 
 /**
  * Build the prompt for a verification work task.
  * The agent will check out the PR branch and verify the specific item.
  */
-export function buildVerificationPrompt(
-    prUrl: string,
-    prNumber: number,
-    branchName: string,
-    itemText: string,
-): string {
-    return `You are verifying a test plan item for PR #${prNumber} (${prUrl}).
+export function buildVerificationPrompt(prUrl: string, prNumber: number, branchName: string, itemText: string): string {
+  return `You are verifying a test plan item for PR #${prNumber} (${prUrl}).
 
 ## Verification Task
 ${itemText}
@@ -159,8 +157,8 @@ Output VERIFICATION_PASSED or VERIFICATION_FAILED as the very last line of your 
 }
 
 export interface VerificationResult {
-    itemText: string;
-    taskId: string;
+  itemText: string;
+  taskId: string;
 }
 
 /**
@@ -170,67 +168,67 @@ export interface VerificationResult {
  * Returns the list of created verification tasks, or empty array if none needed.
  */
 export async function createVerificationTasks(
-    db: Database,
-    parentTaskId: string,
-    prUrl: string,
+  db: Database,
+  parentTaskId: string,
+  prUrl: string,
 ): Promise<VerificationResult[]> {
-    const parsed = parsePrUrl(prUrl);
-    if (!parsed) {
-        log.warn('Could not parse PR URL for verification', { prUrl });
-        return [];
-    }
+  const parsed = parsePrUrl(prUrl);
+  if (!parsed) {
+    log.warn('Could not parse PR URL for verification', { prUrl });
+    return [];
+  }
 
-    const { repo, prNumber } = parsed;
+  const { repo, prNumber } = parsed;
 
-    // Get parent task to inherit agent/project (check before network call)
-    const parentTask = getWorkTask(db, parentTaskId);
-    if (!parentTask) {
-        log.warn('Parent task not found for verification', { parentTaskId });
-        return [];
-    }
+  // Get parent task to inherit agent/project (check before network call)
+  const parentTask = getWorkTask(db, parentTaskId);
+  if (!parentTask) {
+    log.warn('Parent task not found for verification', { parentTaskId });
+    return [];
+  }
 
-    // Fetch the PR body to parse test plan items
-    const body = await fetchPrBody(repo, prNumber);
-    if (!body) {
-        log.info('No PR body found, skipping verification', { prUrl });
-        return [];
-    }
+  // Fetch the PR body to parse test plan items
+  const body = await fetchPrBody(repo, prNumber);
+  if (!body) {
+    log.info('No PR body found, skipping verification', { prUrl });
+    return [];
+  }
 
-    const items = parseTestPlanItems(body);
-    if (items.length === 0) {
-        log.info('No test plan items found in PR body', { prUrl });
-        return [];
-    }
+  const items = parseTestPlanItems(body);
+  if (items.length === 0) {
+    log.info('No test plan items found in PR body', { prUrl });
+    return [];
+  }
 
-    const results: VerificationResult[] = [];
+  const results: VerificationResult[] = [];
 
-    for (const item of items) {
-        const description = `[Verify PR #${prNumber}] ${item.text}`;
-        const task = createWorkTask(db, {
-            agentId: parentTask.agentId,
-            projectId: parentTask.projectId,
-            description,
-            source: 'agent',
-            sourceId: `verify:${parentTaskId}:${prNumber}:${item.index}`,
-        });
-
-        log.info('Created verification task', {
-            taskId: task.id,
-            parentTaskId,
-            prNumber,
-            item: item.text,
-        });
-
-        results.push({ itemText: item.text, taskId: task.id });
-    }
-
-    log.info('Created verification tasks for PR', {
-        prUrl,
-        count: results.length,
-        parentTaskId,
+  for (const item of items) {
+    const description = `[Verify PR #${prNumber}] ${item.text}`;
+    const task = createWorkTask(db, {
+      agentId: parentTask.agentId,
+      projectId: parentTask.projectId,
+      description,
+      source: 'agent',
+      sourceId: `verify:${parentTaskId}:${prNumber}:${item.index}`,
     });
 
-    return results;
+    log.info('Created verification task', {
+      taskId: task.id,
+      parentTaskId,
+      prNumber,
+      item: item.text,
+    });
+
+    results.push({ itemText: item.text, taskId: task.id });
+  }
+
+  log.info('Created verification tasks for PR', {
+    prUrl,
+    count: results.length,
+    parentTaskId,
+  });
+
+  return results;
 }
 
 /**
@@ -240,46 +238,46 @@ export async function createVerificationTasks(
  * Returns true if the item was successfully checked off.
  */
 export async function handleVerificationComplete(
-    db: Database,
-    taskId: string,
-    sessionOutput: string,
+  db: Database,
+  taskId: string,
+  sessionOutput: string,
 ): Promise<boolean> {
-    const task = getWorkTask(db, taskId);
-    if (!task?.sourceId?.startsWith('verify:')) return false;
+  const task = getWorkTask(db, taskId);
+  if (!task?.sourceId?.startsWith('verify:')) return false;
 
-    // Parse sourceId: verify:{parentTaskId}:{prNumber}:{itemIndex}
-    const parts = task.sourceId.split(':');
-    if (parts.length < 4) return false;
+  // Parse sourceId: verify:{parentTaskId}:{prNumber}:{itemIndex}
+  const parts = task.sourceId.split(':');
+  if (parts.length < 4) return false;
 
-    const parentTaskId = parts[1];
-    const prNumber = parseInt(parts[2], 10);
+  const parentTaskId = parts[1];
+  const prNumber = parseInt(parts[2], 10);
 
-    // Check if verification passed
-    const passed = sessionOutput.trimEnd().endsWith('VERIFICATION_PASSED');
-    if (!passed) {
-        log.info('Verification task did not pass, skipping checkbox', { taskId, prNumber });
-        return false;
-    }
+  // Check if verification passed
+  const passed = sessionOutput.trimEnd().endsWith('VERIFICATION_PASSED');
+  if (!passed) {
+    log.info('Verification task did not pass, skipping checkbox', { taskId, prNumber });
+    return false;
+  }
 
-    // Get parent task to find PR URL
-    const parentTask = getWorkTask(db, parentTaskId);
-    if (!parentTask?.prUrl) {
-        log.warn('Parent task or PR URL not found', { taskId, parentTaskId });
-        return false;
-    }
+  // Get parent task to find PR URL
+  const parentTask = getWorkTask(db, parentTaskId);
+  if (!parentTask?.prUrl) {
+    log.warn('Parent task or PR URL not found', { taskId, parentTaskId });
+    return false;
+  }
 
-    const parsed = parsePrUrl(parentTask.prUrl);
-    if (!parsed) return false;
+  const parsed = parsePrUrl(parentTask.prUrl);
+  if (!parsed) return false;
 
-    // Extract the item text from the task description
-    const itemText = task.description.replace(`[Verify PR #${prNumber}] `, '');
+  // Extract the item text from the task description
+  const itemText = task.description.replace(`[Verify PR #${prNumber}] `, '');
 
-    return checkOffPrItem(parsed.repo, prNumber, itemText);
+  return checkOffPrItem(parsed.repo, prNumber, itemText);
 }
 
 /**
  * Check if a work task is a verification task (by sourceId pattern).
  */
 export function isVerificationTask(sourceId: string | null): boolean {
-    return sourceId?.startsWith('verify:') ?? false;
+  return sourceId?.startsWith('verify:') ?? false;
 }

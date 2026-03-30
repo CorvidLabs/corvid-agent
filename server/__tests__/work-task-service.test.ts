@@ -1,54 +1,64 @@
-import { test, expect, beforeEach, afterEach, beforeAll, afterAll, describe, mock, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 // Restore the REAL worktree module — other test files use mock.module() for
 // ../lib/worktree and in Bun 1.x the mock leaks across files. The real module
 // calls Bun.spawn which this file already intercepts via spyOn(Bun, 'spawn').
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
 mock.module('../lib/worktree', () => ({
-    getWorktreeBaseDir: (projectWorkingDir: string) =>
-        process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees'),
-    generateChatBranchName: (agentName: string, sessionId: string) => {
-        const agentSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        return `chat/${agentSlug}/${sessionId.slice(0, 12)}`;
-    },
-    createWorktree: async (options: { projectWorkingDir: string; branchName: string; worktreeId: string }) => {
-        const { projectWorkingDir, branchName, worktreeId } = options;
-        const base = process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
-        const worktreeDir = resolve(base, worktreeId);
-        try {
-            const proc = Bun.spawn(['git', 'worktree', 'add', '-b', branchName, worktreeDir], {
-                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
-            });
-            const stderr = await new Response(proc.stderr).text();
-            const exitCode = await proc.exited;
-            if (exitCode !== 0) return { success: false, worktreeDir, error: `Failed to create worktree: ${stderr.trim()}` };
-            return { success: true, worktreeDir };
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return { success: false, worktreeDir, error: `Failed to create worktree: ${message}` };
-        }
-    },
-    removeWorktree: async (projectWorkingDir: string, worktreeDir: string) => {
-        try {
-            const proc = Bun.spawn(['git', 'worktree', 'remove', '--force', worktreeDir], {
-                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
-            });
-            await new Response(proc.stderr).text();
-            await proc.exited;
-        } catch { /* non-fatal */ }
-    },
+  getWorktreeBaseDir: (projectWorkingDir: string) =>
+    process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees'),
+  generateChatBranchName: (agentName: string, sessionId: string) => {
+    const agentSlug = agentName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    return `chat/${agentSlug}/${sessionId.slice(0, 12)}`;
+  },
+  createWorktree: async (options: { projectWorkingDir: string; branchName: string; worktreeId: string }) => {
+    const { projectWorkingDir, branchName, worktreeId } = options;
+    const base = process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
+    const worktreeDir = resolve(base, worktreeId);
+    try {
+      const proc = Bun.spawn(['git', 'worktree', 'add', '-b', branchName, worktreeDir], {
+        cwd: projectWorkingDir,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+      if (exitCode !== 0) return { success: false, worktreeDir, error: `Failed to create worktree: ${stderr.trim()}` };
+      return { success: true, worktreeDir };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, worktreeDir, error: `Failed to create worktree: ${message}` };
+    }
+  },
+  removeWorktree: async (projectWorkingDir: string, worktreeDir: string) => {
+    try {
+      const proc = Bun.spawn(['git', 'worktree', 'remove', '--force', worktreeDir], {
+        cwd: projectWorkingDir,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      await new Response(proc.stderr).text();
+      await proc.exited;
+    } catch {
+      /* non-fatal */
+    }
+  },
 }));
 
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
-import { createProject } from '../db/projects';
+import type { AstParserService } from '../ast/service';
+import type { AstSymbol, FileSymbolIndex, ProjectSymbolIndex } from '../ast/types';
 import { createAgent } from '../db/agents';
-import { getWorkTask, updateWorkTaskStatus, cleanupStaleWorkTasks } from '../db/work-tasks';
-import { WorkTaskService } from '../work/service';
+import { createProject } from '../db/projects';
+import { runMigrations } from '../db/schema';
+import { cleanupStaleWorkTasks, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
-import type { AstParserService } from '../ast/service';
-import type { AstSymbol, ProjectSymbolIndex, FileSymbolIndex } from '../ast/types';
+import { WorkTaskService } from '../work/service';
 
 /**
  * Tests for WorkTaskService.
@@ -71,129 +81,125 @@ let subscribeCallbacks: Map<string, Set<(sid: string, event: ClaudeStreamEvent) 
 /**
  * Create a mock AstParserService with configurable symbol data.
  */
-function createMockAstParserService(opts?: {
-    files?: Map<string, FileSymbolIndex>;
-}): AstParserService {
-    const files = opts?.files ?? new Map<string, FileSymbolIndex>();
-    const projectIndexes = new Map<string, ProjectSymbolIndex>();
+function createMockAstParserService(opts?: { files?: Map<string, FileSymbolIndex> }): AstParserService {
+  const files = opts?.files ?? new Map<string, FileSymbolIndex>();
+  const projectIndexes = new Map<string, ProjectSymbolIndex>();
 
-    return {
-        init: mock(async () => {}),
-        parseFile: mock(async () => null),
-        parseSource: mock(async () => []),
-        indexProject: mock(async (projectDir: string) => {
-            const index: ProjectSymbolIndex = {
-                projectDir,
-                files,
-                lastFullIndexAt: Date.now(),
-            };
-            projectIndexes.set(projectDir, index);
-            return index;
-        }),
-        getProjectIndex: mock((projectDir: string) => {
-            return projectIndexes.get(projectDir) ?? null;
-        }),
-        searchSymbols: mock((projectDir: string, query: string, options?: { kinds?: string[]; limit?: number }) => {
-            const index = projectIndexes.get(projectDir);
-            if (!index) return [];
-            const lowerQuery = query.toLowerCase();
-            const results: AstSymbol[] = [];
-            const limit = options?.limit ?? 100;
+  return {
+    init: mock(async () => {}),
+    parseFile: mock(async () => null),
+    parseSource: mock(async () => []),
+    indexProject: mock(async (projectDir: string) => {
+      const index: ProjectSymbolIndex = {
+        projectDir,
+        files,
+        lastFullIndexAt: Date.now(),
+      };
+      projectIndexes.set(projectDir, index);
+      return index;
+    }),
+    getProjectIndex: mock((projectDir: string) => {
+      return projectIndexes.get(projectDir) ?? null;
+    }),
+    searchSymbols: mock((projectDir: string, query: string, options?: { kinds?: string[]; limit?: number }) => {
+      const index = projectIndexes.get(projectDir);
+      if (!index) return [];
+      const lowerQuery = query.toLowerCase();
+      const results: AstSymbol[] = [];
+      const limit = options?.limit ?? 100;
 
-            for (const fileIndex of index.files.values()) {
-                for (const symbol of fileIndex.symbols) {
-                    if (results.length >= limit) return results;
-                    if (symbol.name.toLowerCase().includes(lowerQuery)) {
-                        results.push(symbol);
-                    }
-                    if (symbol.children) {
-                        for (const child of symbol.children) {
-                            if (results.length >= limit) return results;
-                            if (child.name.toLowerCase().includes(lowerQuery)) {
-                                results.push(child);
-                            }
-                        }
-                    }
-                }
+      for (const fileIndex of index.files.values()) {
+        for (const symbol of fileIndex.symbols) {
+          if (results.length >= limit) return results;
+          if (symbol.name.toLowerCase().includes(lowerQuery)) {
+            results.push(symbol);
+          }
+          if (symbol.children) {
+            for (const child of symbol.children) {
+              if (results.length >= limit) return results;
+              if (child.name.toLowerCase().includes(lowerQuery)) {
+                results.push(child);
+              }
             }
-            return results;
-        }),
-        invalidateFile: mock(() => {}),
-        clearProjectIndex: mock(() => {}),
-    } as unknown as AstParserService;
+          }
+        }
+      }
+      return results;
+    }),
+    invalidateFile: mock(() => {}),
+    clearProjectIndex: mock(() => {}),
+  } as unknown as AstParserService;
 }
 
 /**
  * Build sample file symbol indexes for testing.
  */
 function buildSampleSymbolIndex(projectDir: string): Map<string, FileSymbolIndex> {
-    const files = new Map<string, FileSymbolIndex>();
+  const files = new Map<string, FileSymbolIndex>();
 
-    files.set(`${projectDir}/server/work/service.ts`, {
-        filePath: `${projectDir}/server/work/service.ts`,
-        mtimeMs: 1000,
-        symbols: [
-            {
-                name: 'WorkTaskService',
-                kind: 'class',
-                startLine: 30,
-                endLine: 200,
-                isExported: true,
-                children: [
-                    { name: 'create', kind: 'method', startLine: 68, endLine: 150, isExported: false },
-                    { name: 'cancelTask', kind: 'method', startLine: 155, endLine: 175, isExported: false },
-                    { name: 'buildWorkPrompt', kind: 'method', startLine: 180, endLine: 200, isExported: false },
-                ],
-            },
+  files.set(`${projectDir}/server/work/service.ts`, {
+    filePath: `${projectDir}/server/work/service.ts`,
+    mtimeMs: 1000,
+    symbols: [
+      {
+        name: 'WorkTaskService',
+        kind: 'class',
+        startLine: 30,
+        endLine: 200,
+        isExported: true,
+        children: [
+          { name: 'create', kind: 'method', startLine: 68, endLine: 150, isExported: false },
+          { name: 'cancelTask', kind: 'method', startLine: 155, endLine: 175, isExported: false },
+          { name: 'buildWorkPrompt', kind: 'method', startLine: 180, endLine: 200, isExported: false },
         ],
-    });
+      },
+    ],
+  });
 
-    files.set(`${projectDir}/server/ast/service.ts`, {
-        filePath: `${projectDir}/server/ast/service.ts`,
-        mtimeMs: 1000,
-        symbols: [
-            {
-                name: 'AstParserService',
-                kind: 'class',
-                startLine: 25,
-                endLine: 250,
-                isExported: true,
-                children: [
-                    { name: 'indexProject', kind: 'method', startLine: 103, endLine: 163, isExported: false },
-                    { name: 'searchSymbols', kind: 'method', startLine: 175, endLine: 204, isExported: false },
-                ],
-            },
+  files.set(`${projectDir}/server/ast/service.ts`, {
+    filePath: `${projectDir}/server/ast/service.ts`,
+    mtimeMs: 1000,
+    symbols: [
+      {
+        name: 'AstParserService',
+        kind: 'class',
+        startLine: 25,
+        endLine: 250,
+        isExported: true,
+        children: [
+          { name: 'indexProject', kind: 'method', startLine: 103, endLine: 163, isExported: false },
+          { name: 'searchSymbols', kind: 'method', startLine: 175, endLine: 204, isExported: false },
         ],
-    });
+      },
+    ],
+  });
 
-    files.set(`${projectDir}/server/ast/types.ts`, {
-        filePath: `${projectDir}/server/ast/types.ts`,
-        mtimeMs: 1000,
-        symbols: [
-            { name: 'AstSymbolKind', kind: 'type_alias', startLine: 1, endLine: 10, isExported: true },
-            { name: 'AstSymbol', kind: 'interface', startLine: 12, endLine: 23, isExported: true },
-            { name: 'FileSymbolIndex', kind: 'interface', startLine: 25, endLine: 29, isExported: true },
-        ],
-    });
+  files.set(`${projectDir}/server/ast/types.ts`, {
+    filePath: `${projectDir}/server/ast/types.ts`,
+    mtimeMs: 1000,
+    symbols: [
+      { name: 'AstSymbolKind', kind: 'type_alias', startLine: 1, endLine: 10, isExported: true },
+      { name: 'AstSymbol', kind: 'interface', startLine: 12, endLine: 23, isExported: true },
+      { name: 'FileSymbolIndex', kind: 'interface', startLine: 25, endLine: 29, isExported: true },
+    ],
+  });
 
-    files.set(`${projectDir}/src/utils/helpers.ts`, {
-        filePath: `${projectDir}/src/utils/helpers.ts`,
-        mtimeMs: 1000,
-        symbols: [
-            { name: 'formatOutput', kind: 'function', startLine: 5, endLine: 15, isExported: true },
-            { name: 'parseInput', kind: 'function', startLine: 17, endLine: 30, isExported: true },
-        ],
-    });
+  files.set(`${projectDir}/src/utils/helpers.ts`, {
+    filePath: `${projectDir}/src/utils/helpers.ts`,
+    mtimeMs: 1000,
+    symbols: [
+      { name: 'formatOutput', kind: 'function', startLine: 5, endLine: 15, isExported: true },
+      { name: 'parseInput', kind: 'function', startLine: 17, endLine: 30, isExported: true },
+    ],
+  });
 
-    files.set(`${projectDir}/server/__tests__/work-task-service.test.ts`, {
-        filePath: `${projectDir}/server/__tests__/work-task-service.test.ts`,
-        mtimeMs: 1000,
-        symbols: [
-            { name: 'createMockProcessManager', kind: 'function', startLine: 60, endLine: 85, isExported: false },
-        ],
-    });
+  files.set(`${projectDir}/server/__tests__/work-task-service.test.ts`, {
+    filePath: `${projectDir}/server/__tests__/work-task-service.test.ts`,
+    mtimeMs: 1000,
+    symbols: [{ name: 'createMockProcessManager', kind: 'function', startLine: 60, endLine: 85, isExported: false }],
+  });
 
-    return files;
+  return files;
 }
 
 /**
@@ -202,35 +208,35 @@ function buildSampleSymbolIndex(projectDir: string): Map<string, FileSymbolIndex
  * and .exited as a Promise<number>.
  */
 function makeMockProc(result: { exitCode: number; stdout: string; stderr: string }) {
-    // Use ReadableStream directly instead of Blob.stream() for cross-version Bun compat.
-    // Blob.stream() can fail when multiple streams are consumed concurrently via
-    // new Response(stream).text() in some Bun versions (e.g. 1.3.8 in CI).
-    const makeStream = (text: string) =>
-        new ReadableStream<Uint8Array>({
-            start(controller) {
-                controller.enqueue(new TextEncoder().encode(text));
-                controller.close();
-            },
-        });
-    return {
-        stdout: makeStream(result.stdout),
-        stderr: makeStream(result.stderr),
-        exited: Promise.resolve(result.exitCode),
-        pid: 12345,
-        kill: () => {},
-    };
+  // Use ReadableStream directly instead of Blob.stream() for cross-version Bun compat.
+  // Blob.stream() can fail when multiple streams are consumed concurrently via
+  // new Response(stream).text() in some Bun versions (e.g. 1.3.8 in CI).
+  const makeStream = (text: string) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text));
+        controller.close();
+      },
+    });
+  return {
+    stdout: makeStream(result.stdout),
+    stderr: makeStream(result.stderr),
+    exited: Promise.resolve(result.exitCode),
+    pid: 12345,
+    kill: () => {},
+  };
 }
 
 /** Queue a spawn result. Calls are served FIFO. */
 function queueSpawn(exitCode: number, stdout = '', stderr = '') {
-    spawnResults.push({ exitCode, stdout, stderr });
+  spawnResults.push({ exitCode, stdout, stderr });
 }
 
 /** Queue multiple successful spawns. */
 function queueSuccessfulSpawns(count: number) {
-    for (let i = 0; i < count; i++) {
-        queueSpawn(0);
-    }
+  for (let i = 0; i < count; i++) {
+    queueSpawn(0);
+  }
 }
 
 /**
@@ -238,30 +244,38 @@ function queueSuccessfulSpawns(count: number) {
  * us to simulate session completion via subscribe callbacks.
  */
 function createMockProcessManager(): ProcessManager {
-    subscribeCallbacks = new Map();
+  subscribeCallbacks = new Map();
 
-    return {
-        startProcess: mock(() => {}),
-        stopProcess: mock(() => {}),
-        isRunning: mock(() => false),
-        subscribe: mock((sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
-            let cbs = subscribeCallbacks.get(sessionId);
-            if (!cbs) {
-                cbs = new Set();
-                subscribeCallbacks.set(sessionId, cbs);
-            }
-            cbs.add(cb);
-        }),
-        unsubscribe: mock((sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
-            subscribeCallbacks.get(sessionId)?.delete(cb);
-        }),
-        // Stubs for other ProcessManager methods that aren't used by WorkTaskService
-        subscribeAll: mock(() => {}),
-        unsubscribeAll: mock(() => {}),
-        getMemoryStats: mock(() => ({ processes: 0, subscribers: 0, sessionMeta: 0, pausedSessions: 0, sessionTimeouts: 0, stableTimers: 0, globalSubscribers: 0 })),
-        cleanupSessionState: mock(() => {}),
-        shutdown: mock(() => {}),
-    } as unknown as ProcessManager;
+  return {
+    startProcess: mock(() => {}),
+    stopProcess: mock(() => {}),
+    isRunning: mock(() => false),
+    subscribe: mock((sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+      let cbs = subscribeCallbacks.get(sessionId);
+      if (!cbs) {
+        cbs = new Set();
+        subscribeCallbacks.set(sessionId, cbs);
+      }
+      cbs.add(cb);
+    }),
+    unsubscribe: mock((sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+      subscribeCallbacks.get(sessionId)?.delete(cb);
+    }),
+    // Stubs for other ProcessManager methods that aren't used by WorkTaskService
+    subscribeAll: mock(() => {}),
+    unsubscribeAll: mock(() => {}),
+    getMemoryStats: mock(() => ({
+      processes: 0,
+      subscribers: 0,
+      sessionMeta: 0,
+      pausedSessions: 0,
+      sessionTimeouts: 0,
+      stableTimers: 0,
+      globalSubscribers: 0,
+    })),
+    cleanupSessionState: mock(() => {}),
+    shutdown: mock(() => {}),
+  } as unknown as ProcessManager;
 }
 
 /**
@@ -269,64 +283,64 @@ function createMockProcessManager(): ProcessManager {
  * This mimics what ProcessManager does when a Claude session ends.
  */
 function simulateSessionEnd(sessionId: string, output: string) {
-    const cbs = subscribeCallbacks.get(sessionId);
-    if (!cbs) return;
+  const cbs = subscribeCallbacks.get(sessionId);
+  if (!cbs) return;
 
-    // First send assistant content
-    if (output) {
-        for (const cb of cbs) {
-            cb(sessionId, {
-                type: 'assistant',
-                message: { role: 'assistant', content: output },
-            });
-        }
+  // First send assistant content
+  if (output) {
+    for (const cb of cbs) {
+      cb(sessionId, {
+        type: 'assistant',
+        message: { role: 'assistant', content: output },
+      });
     }
+  }
 
-    // Then send result event
-    // Copy the set since callbacks may unsubscribe themselves
-    const cbsCopy = new Set(cbs);
-    for (const cb of cbsCopy) {
-        cb(sessionId, { type: 'result', total_cost_usd: 0 });
-    }
+  // Then send result event
+  // Copy the set since callbacks may unsubscribe themselves
+  const cbsCopy = new Set(cbs);
+  for (const cb of cbsCopy) {
+    cb(sessionId, { type: 'result', total_cost_usd: 0 });
+  }
 }
 
 /** Create a standard agent + project in the test DB. */
 function createTestAgentAndProject(opts?: { agentName?: string; projectWorkingDir?: string }) {
-    const agent = createAgent(db, { name: opts?.agentName ?? 'TestAgent' });
-    const project = createProject(db, {
-        name: 'TestProject',
-        workingDir: opts?.projectWorkingDir ?? '/tmp/test-project',
-    });
-    return { agent, project };
+  const agent = createAgent(db, { name: opts?.agentName ?? 'TestAgent' });
+  const project = createProject(db, {
+    name: 'TestProject',
+    workingDir: opts?.projectWorkingDir ?? '/tmp/test-project',
+  });
+  return { agent, project };
 }
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    runMigrations(db);
+  db = new Database(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  runMigrations(db);
 
-    spawnCalls = [];
-    spawnResults = [];
+  spawnCalls = [];
+  spawnResults = [];
 
-    // Mock Bun.spawn globally
-    spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
-        const cmd = args[0] as string[];
-        const opts = args[1] as { cwd?: string } | undefined;
-        spawnCalls.push({ cmd, cwd: opts?.cwd });
+  // Mock Bun.spawn globally
+  spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
+    const cmd = args[0] as string[];
+    const opts = args[1] as { cwd?: string } | undefined;
+    spawnCalls.push({ cmd, cwd: opts?.cwd });
 
-        const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
-        return makeMockProc(result) as ReturnType<typeof Bun.spawn>;
-    });
+    const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
+    return makeMockProc(result) as ReturnType<typeof Bun.spawn>;
+  });
 
-    mockProcessManager = createMockProcessManager();
-    service = new WorkTaskService(db, mockProcessManager);
+  mockProcessManager = createMockProcessManager();
+  service = new WorkTaskService(db, mockProcessManager);
 });
 
 afterEach(() => {
-    db.close();
-    mock.restore();
+  db.close();
+  mock.restore();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -334,108 +348,108 @@ afterEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Branch name generation', () => {
-    test('normal input produces valid git branch name format: agent/{slug}/{taskSlug}-{timestamp}-{suffix}', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: worktree add (success), bun install (success)
-        queueSuccessfulSpawns(2);
+  test('normal input produces valid git branch name format: agent/{slug}/{taskSlug}-{timestamp}-{suffix}', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: worktree add (success), bun install (success)
+    queueSuccessfulSpawns(2);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Fix the login bug',
-            projectId: project.id,
-        });
-
-        expect(task.branchName).toBeTruthy();
-        // Verify format: agent/{agentSlug}/{taskSlug}-{timestamp}-{suffix}
-        const parts = task.branchName!.split('/');
-        expect(parts[0]).toBe('agent');
-        expect(parts[1]).toBe('testagent');
-        // The third part should be: {taskSlug}-{timestamp}-{suffix}
-        expect(parts[2]).toMatch(/^fix-the-login-bug-[a-z0-9]+-[a-f0-9]{6}$/);
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Fix the login bug',
+      projectId: project.id,
     });
 
-    test('special characters in agent name and description are sanitized to [a-z0-9-]', async () => {
-        const agent = createAgent(db, { name: 'My Agent!@#$%^&*()' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.branchName).toBeTruthy();
+    // Verify format: agent/{agentSlug}/{taskSlug}-{timestamp}-{suffix}
+    const parts = task.branchName!.split('/');
+    expect(parts[0]).toBe('agent');
+    expect(parts[1]).toBe('testagent');
+    // The third part should be: {taskSlug}-{timestamp}-{suffix}
+    expect(parts[2]).toMatch(/^fix-the-login-bug-[a-z0-9]+-[a-f0-9]{6}$/);
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Fix bug #123 (urgent!!)',
-            projectId: project.id,
-        });
+  test('special characters in agent name and description are sanitized to [a-z0-9-]', async () => {
+    const agent = createAgent(db, { name: 'My Agent!@#$%^&*()' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        const parts = task.branchName!.split('/');
-        // Agent slug should only contain a-z0-9 and hyphens
-        expect(parts[1]).toMatch(/^[a-z0-9-]+$/);
-        expect(parts[1]).toBe('my-agent');
-        // Task slug in the third part should also be sanitized
-        const taskPart = parts[2];
-        // Should not contain special chars — only a-z, 0-9, hyphens
-        expect(taskPart).toMatch(/^[a-z0-9-]+$/);
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Fix bug #123 (urgent!!)',
+      projectId: project.id,
     });
 
-    test('very long descriptions are truncated to 40 chars before slugification', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    const parts = task.branchName!.split('/');
+    // Agent slug should only contain a-z0-9 and hyphens
+    expect(parts[1]).toMatch(/^[a-z0-9-]+$/);
+    expect(parts[1]).toBe('my-agent');
+    // Task slug in the third part should also be sanitized
+    const taskPart = parts[2];
+    // Should not contain special chars — only a-z, 0-9, hyphens
+    expect(taskPart).toMatch(/^[a-z0-9-]+$/);
+  });
 
-        const longDescription = 'a'.repeat(100);
-        const task = await service.create({
-            agentId: agent.id,
-            description: longDescription,
-            projectId: project.id,
-        });
+  test('very long descriptions are truncated to 40 chars before slugification', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        const parts = task.branchName!.split('/');
-        const taskPart = parts[2];
-        // The slug portion (before timestamp-suffix) should come from max 40 chars
-        // After slugification of 40 'a's, we get 'aaaa...a' (40 chars)
-        // Total taskPart = taskSlug + '-' + timestamp + '-' + suffix
-        const segments = taskPart.split('-');
-        // The task slug is the first segment(s) before the timestamp
-        // With 40 'a's the slug is just 'aaaaaaa...' (40 a's)
-        const slugPart = segments[0];
-        expect(slugPart.length).toBeLessThanOrEqual(40);
+    const longDescription = 'a'.repeat(100);
+    const task = await service.create({
+      agentId: agent.id,
+      description: longDescription,
+      projectId: project.id,
     });
 
-    test('empty or whitespace-only description produces valid (non-empty) branch names', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    const parts = task.branchName!.split('/');
+    const taskPart = parts[2];
+    // The slug portion (before timestamp-suffix) should come from max 40 chars
+    // After slugification of 40 'a's, we get 'aaaa...a' (40 chars)
+    // Total taskPart = taskSlug + '-' + timestamp + '-' + suffix
+    const segments = taskPart.split('-');
+    // The task slug is the first segment(s) before the timestamp
+    // With 40 'a's the slug is just 'aaaaaaa...' (40 a's)
+    const slugPart = segments[0];
+    expect(slugPart.length).toBeLessThanOrEqual(40);
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: '   ',
-            projectId: project.id,
-        });
+  test('empty or whitespace-only description produces valid (non-empty) branch names', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        expect(task.branchName).toBeTruthy();
-        // Should still have the format agent/{slug}/...-{timestamp}-{suffix}
-        expect(task.branchName!.startsWith('agent/')).toBe(true);
-        // Timestamp and suffix should still be present even if taskSlug is empty
-        const parts = task.branchName!.split('/');
-        expect(parts.length).toBe(3);
-        // The last part should still contain timestamp and suffix
-        expect(parts[2]).toMatch(/[a-z0-9]/);
+    const task = await service.create({
+      agentId: agent.id,
+      description: '   ',
+      projectId: project.id,
     });
 
-    test('leading/trailing hyphens are stripped from slugs', async () => {
-        const agent = createAgent(db, { name: '---Agent---' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.branchName).toBeTruthy();
+    // Should still have the format agent/{slug}/...-{timestamp}-{suffix}
+    expect(task.branchName!.startsWith('agent/')).toBe(true);
+    // Timestamp and suffix should still be present even if taskSlug is empty
+    const parts = task.branchName!.split('/');
+    expect(parts.length).toBe(3);
+    // The last part should still contain timestamp and suffix
+    expect(parts[2]).toMatch(/[a-z0-9]/);
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: '---fix things---',
-            projectId: project.id,
-        });
+  test('leading/trailing hyphens are stripped from slugs', async () => {
+    const agent = createAgent(db, { name: '---Agent---' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        const parts = task.branchName!.split('/');
-        // Agent slug should not have leading/trailing hyphens
-        expect(parts[1]).toBe('agent');
-        expect(parts[1]).not.toMatch(/^-|-$/);
-        // Task part should not start with a hyphen
-        expect(parts[2]).not.toMatch(/^-/);
+    const task = await service.create({
+      agentId: agent.id,
+      description: '---fix things---',
+      projectId: project.id,
     });
+
+    const parts = task.branchName!.split('/');
+    // Agent slug should not have leading/trailing hyphens
+    expect(parts[1]).toBe('agent');
+    expect(parts[1]).not.toMatch(/^-|-$/);
+    // Task part should not start with a hyphen
+    expect(parts[2]).not.toMatch(/^-/);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -443,96 +457,98 @@ describe('Branch name generation', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('bun install retry logic', () => {
-    test('successful frozen-lockfile install does not trigger retry', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: git worktree add (success), bun install --frozen-lockfile (success)
-        queueSpawn(0); // git worktree add
-        queueSpawn(0); // bun install --frozen-lockfile
+  test('successful frozen-lockfile install does not trigger retry', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: git worktree add (success), bun install --frozen-lockfile (success)
+    queueSpawn(0); // git worktree add
+    queueSpawn(0); // bun install --frozen-lockfile
 
-        await service.create({
-            agentId: agent.id,
-            description: 'Test task',
-            projectId: project.id,
-        });
-
-        // Find bun install calls
-        const installCalls = spawnCalls.filter(c => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
-        // Only one install call should have been made (the frozen-lockfile one)
-        expect(installCalls).toHaveLength(1);
-        expect(installCalls[0].cmd).toContain('--frozen-lockfile');
+    await service.create({
+      agentId: agent.id,
+      description: 'Test task',
+      projectId: project.id,
     });
 
-    test('failed frozen-lockfile install triggers retry without --frozen-lockfile', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: git remote check (success), git worktree add (success), bun install --frozen-lockfile (FAIL), bun install (success)
-        queueSpawn(0);  // git remote get-url origin (off-limits check)
-        queueSpawn(0);  // git worktree add
-        queueSpawn(1, '', 'lockfile mismatch');  // bun install --frozen-lockfile FAILS
-        queueSpawn(0);  // bun install retry (success)
+    // Find bun install calls
+    const installCalls = spawnCalls.filter((c) => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
+    // Only one install call should have been made (the frozen-lockfile one)
+    expect(installCalls).toHaveLength(1);
+    expect(installCalls[0].cmd).toContain('--frozen-lockfile');
+  });
 
-        await service.create({
-            agentId: agent.id,
-            description: 'Test task',
-            projectId: project.id,
-        });
+  test('failed frozen-lockfile install triggers retry without --frozen-lockfile', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: git remote check (success), git worktree add (success), bun install --frozen-lockfile (FAIL), bun install (success)
+    queueSpawn(0); // git remote get-url origin (off-limits check)
+    queueSpawn(0); // git worktree add
+    queueSpawn(1, '', 'lockfile mismatch'); // bun install --frozen-lockfile FAILS
+    queueSpawn(0); // bun install retry (success)
 
-        const installCalls = spawnCalls.filter(c => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
-        expect(installCalls).toHaveLength(2);
-        expect(installCalls[0].cmd).toContain('--frozen-lockfile');
-        expect(installCalls[1].cmd).not.toContain('--frozen-lockfile');
+    await service.create({
+      agentId: agent.id,
+      description: 'Test task',
+      projectId: project.id,
     });
 
-    test('retry exit code is NOT checked (known issue — documented)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: git remote check (ok), worktree (ok), frozen-lockfile (fail), retry (also fail)
-        queueSpawn(0);  // git remote get-url origin (off-limits check)
-        queueSpawn(0);  // git worktree add
-        queueSpawn(1, '', 'lockfile error');  // frozen-lockfile fails
-        queueSpawn(1, '', 'retry also fails'); // retry also fails
+    const installCalls = spawnCalls.filter((c) => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
+    expect(installCalls).toHaveLength(2);
+    expect(installCalls[0].cmd).toContain('--frozen-lockfile');
+    expect(installCalls[1].cmd).not.toContain('--frozen-lockfile');
+  });
 
-        // NOTE: The retry's exit code is never checked in the source code
-        // (see service.ts lines ~157-163). The retry proc's .exited is awaited
-        // but its exit code is discarded. This is a known issue — the task
-        // continues regardless of whether the retry succeeds or fails.
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Test task',
-            projectId: project.id,
-        });
+  test('retry exit code is NOT checked (known issue — documented)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: git remote check (ok), worktree (ok), frozen-lockfile (fail), retry (also fail)
+    queueSpawn(0); // git remote get-url origin (off-limits check)
+    queueSpawn(0); // git worktree add
+    queueSpawn(1, '', 'lockfile error'); // frozen-lockfile fails
+    queueSpawn(1, '', 'retry also fails'); // retry also fails
 
-        // Task should still be running (install failure is non-fatal)
-        expect(task.status).toBe('running');
+    // NOTE: The retry's exit code is never checked in the source code
+    // (see service.ts lines ~157-163). The retry proc's .exited is awaited
+    // but its exit code is discarded. This is a known issue — the task
+    // continues regardless of whether the retry succeeds or fails.
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Test task',
+      projectId: project.id,
     });
 
-    test('total failure of both installs is non-fatal (caught, logged, continues)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: worktree (ok), then install will throw
-        queueSpawn(0);  // git worktree add
+    // Task should still be running (install failure is non-fatal)
+    expect(task.status).toBe('running');
+  });
 
-        // Make Bun.spawn throw for install commands
-        let callCount = 0;
-        (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation((...args: unknown[]) => {
-            callCount++;
-            const cmd = args[0] as string[];
-            if (cmd[0] === 'bun' && cmd[1] === 'install') {
-                throw new Error('spawn failed: command not found');
-            }
-            // For non-install commands, use the normal mock behavior
-            const opts = args[1] as { cwd?: string } | undefined;
-            spawnCalls.push({ cmd, cwd: opts?.cwd });
-            const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
-            return makeMockProc(result);
-        });
+  test('total failure of both installs is non-fatal (caught, logged, continues)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: worktree (ok), then install will throw
+    queueSpawn(0); // git worktree add
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Test task',
-            projectId: project.id,
-        });
+    // Make Bun.spawn throw for install commands
+    let _callCount = 0;
+    (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation(
+      (...args: unknown[]) => {
+        _callCount++;
+        const cmd = args[0] as string[];
+        if (cmd[0] === 'bun' && cmd[1] === 'install') {
+          throw new Error('spawn failed: command not found');
+        }
+        // For non-install commands, use the normal mock behavior
+        const opts = args[1] as { cwd?: string } | undefined;
+        spawnCalls.push({ cmd, cwd: opts?.cwd });
+        const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
+        return makeMockProc(result);
+      },
+    );
 
-        // Task should still proceed to running status — install failure is non-fatal
-        expect(task.status).toBe('running');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Test task',
+      projectId: project.id,
     });
+
+    // Task should still proceed to running status — install failure is non-fatal
+    expect(task.status).toBe('running');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -540,103 +556,101 @@ describe('bun install retry logic', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Worktree cleanup', () => {
-    test('successful git worktree remove --force logs success (no throw)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Create a task that has a worktreeDir
-        queueSuccessfulSpawns(2); // worktree add + install
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Cleanup test',
-            projectId: project.id,
-        });
-
-        // Now cancel it — this triggers cleanupWorktree
-        queueSpawn(0); // git worktree remove --force (success)
-        const cancelled = await service.cancelTask(task.id);
-
-        expect(cancelled).not.toBeNull();
-        expect(cancelled!.status).toBe('failed');
-        expect(cancelled!.error).toBe('Cancelled by user');
-
-        // Verify git worktree remove was called
-        const removeCalls = spawnCalls.filter(
-            c => c.cmd.includes('worktree') && c.cmd.includes('remove')
-        );
-        expect(removeCalls.length).toBeGreaterThanOrEqual(1);
+  test('successful git worktree remove --force logs success (no throw)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Create a task that has a worktreeDir
+    queueSuccessfulSpawns(2); // worktree add + install
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Cleanup test',
+      projectId: project.id,
     });
 
-    test('failed cleanup logs warning but does not throw', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2); // worktree add + install
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Cleanup fail test',
-            projectId: project.id,
-        });
+    // Now cancel it — this triggers cleanupWorktree
+    queueSpawn(0); // git worktree remove --force (success)
+    const cancelled = await service.cancelTask(task.id);
 
-        // Queue a failing worktree remove
-        queueSpawn(1, '', 'worktree not found');
+    expect(cancelled).not.toBeNull();
+    expect(cancelled!.status).toBe('failed');
+    expect(cancelled!.error).toBe('Cancelled by user');
 
-        // This should NOT throw even though cleanup fails
-        const cancelled = await service.cancelTask(task.id);
-        expect(cancelled).not.toBeNull();
-        expect(cancelled!.status).toBe('failed');
+    // Verify git worktree remove was called
+    const removeCalls = spawnCalls.filter((c) => c.cmd.includes('worktree') && c.cmd.includes('remove'));
+    expect(removeCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('failed cleanup logs warning but does not throw', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2); // worktree add + install
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Cleanup fail test',
+      projectId: project.id,
     });
 
-    test('null/missing worktreeDir returns early (no git commands)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Manually create a task in the DB without worktreeDir
-        const { createWorkTask } = await import('../db/work-tasks');
-        const task = createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description: 'No worktree task',
-        });
+    // Queue a failing worktree remove
+    queueSpawn(1, '', 'worktree not found');
 
-        const spawnCountBefore = spawnCalls.length;
+    // This should NOT throw even though cleanup fails
+    const cancelled = await service.cancelTask(task.id);
+    expect(cancelled).not.toBeNull();
+    expect(cancelled!.status).toBe('failed');
+  });
 
-        // Cancel — should not attempt worktree cleanup since worktreeDir is null
-        const cancelled = await service.cancelTask(task.id);
-        expect(cancelled).not.toBeNull();
-
-        // No new spawn calls for worktree removal
-        const removeCallsAfter = spawnCalls
-            .slice(spawnCountBefore)
-            .filter(c => c.cmd.includes('worktree') && c.cmd.includes('remove'));
-        expect(removeCallsAfter).toHaveLength(0);
+  test('null/missing worktreeDir returns early (no git commands)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Manually create a task in the DB without worktreeDir
+    const { createWorkTask } = await import('../db/work-tasks');
+    const task = createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description: 'No worktree task',
     });
 
-    test('missing project returns early (no git commands)', async () => {
-        const { agent, project } = createTestAgentAndProject();
+    const spawnCountBefore = spawnCalls.length;
 
-        // Create a work task directly in DB with a worktreeDir, pointing to a
-        // project that we will then remove. We need to disable FK constraints
-        // temporarily so we can delete the project despite references.
-        const { createWorkTask } = await import('../db/work-tasks');
-        const task = createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description: 'Cleanup project missing test',
-        });
-        updateWorkTaskStatus(db, task.id, 'running', { worktreeDir: '/tmp/some-worktree' });
+    // Cancel — should not attempt worktree cleanup since worktreeDir is null
+    const cancelled = await service.cancelTask(task.id);
+    expect(cancelled).not.toBeNull();
 
-        // Disable FK constraints so we can remove the project
-        db.exec('PRAGMA foreign_keys = OFF');
-        db.query('DELETE FROM projects WHERE id = ?').run(project.id);
-        db.exec('PRAGMA foreign_keys = ON');
+    // No new spawn calls for worktree removal
+    const removeCallsAfter = spawnCalls
+      .slice(spawnCountBefore)
+      .filter((c) => c.cmd.includes('worktree') && c.cmd.includes('remove'));
+    expect(removeCallsAfter).toHaveLength(0);
+  });
 
-        const spawnCountBefore = spawnCalls.length;
+  test('missing project returns early (no git commands)', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        // Cancel — cleanupWorktree should return early because getProject returns null
-        const cancelled = await service.cancelTask(task.id);
-        expect(cancelled).not.toBeNull();
-
-        // Verify no worktree remove calls were made after cancellation
-        const removeCallsAfter = spawnCalls
-            .slice(spawnCountBefore)
-            .filter(c => c.cmd.includes('worktree') && c.cmd.includes('remove'));
-        expect(removeCallsAfter).toHaveLength(0);
+    // Create a work task directly in DB with a worktreeDir, pointing to a
+    // project that we will then remove. We need to disable FK constraints
+    // temporarily so we can delete the project despite references.
+    const { createWorkTask } = await import('../db/work-tasks');
+    const task = createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description: 'Cleanup project missing test',
     });
+    updateWorkTaskStatus(db, task.id, 'running', { worktreeDir: '/tmp/some-worktree' });
+
+    // Disable FK constraints so we can remove the project
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.query('DELETE FROM projects WHERE id = ?').run(project.id);
+    db.exec('PRAGMA foreign_keys = ON');
+
+    const spawnCountBefore = spawnCalls.length;
+
+    // Cancel — cleanupWorktree should return early because getProject returns null
+    const cancelled = await service.cancelTask(task.id);
+    expect(cancelled).not.toBeNull();
+
+    // Verify no worktree remove calls were made after cancellation
+    const removeCallsAfter = spawnCalls
+      .slice(spawnCountBefore)
+      .filter((c) => c.cmd.includes('worktree') && c.cmd.includes('remove'));
+    expect(removeCallsAfter).toHaveLength(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -644,137 +658,137 @@ describe('Worktree cleanup', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Validation loop iteration control', () => {
-    /**
-     * Helper: Create a task that is in 'running' state with a session,
-     * ready for handleSessionEnd to be triggered via session completion events.
-     */
-    async function createRunningTask(opts?: { description?: string }) {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2); // worktree add + install
+  /**
+   * Helper: Create a task that is in 'running' state with a session,
+   * ready for handleSessionEnd to be triggered via session completion events.
+   */
+  async function createRunningTask(opts?: { description?: string }) {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2); // worktree add + install
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: opts?.description ?? 'Test validation task',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('running');
-        expect(task.sessionId).toBeTruthy();
-
-        return { task, agent, project };
-    }
-
-    test('validation passing → task finalized as completed (with PR URL)', async () => {
-        const { task } = await createRunningTask();
-
-        // Queue validation spawns: bun install (success), tsc (success), bun test (success)
-        queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(0); // bun x tsc --noEmit
-        queueSpawn(0); // bun test
-
-        // Simulate session ending with a PR URL in the output
-        const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/42';
-        simulateSessionEnd(task.sessionId!, `All done!\n\n${prUrl}`);
-
-        // Give async handlers time to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        const updatedTask = getWorkTask(db, task.id);
-        expect(updatedTask!.status).toBe('completed');
-        expect(updatedTask!.prUrl).toBe(prUrl);
+    const task = await service.create({
+      agentId: agent.id,
+      description: opts?.description ?? 'Test validation task',
+      projectId: project.id,
     });
 
-    test('validation passing but no PR URL → task marked failed', async () => {
-        const { task } = await createRunningTask();
+    expect(task.status).toBe('running');
+    expect(task.sessionId).toBeTruthy();
 
-        // Queue validation spawns: install, tsc, test (all pass)
-        queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(0); // bun x tsc
-        queueSpawn(0); // bun test
+    return { task, agent, project };
+  }
 
-        // Simulate session ending WITHOUT a PR URL
-        simulateSessionEnd(task.sessionId!, 'Done but forgot to create PR');
+  test('validation passing → task finalized as completed (with PR URL)', async () => {
+    const { task } = await createRunningTask();
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+    // Queue validation spawns: bun install (success), tsc (success), bun test (success)
+    queueSpawn(0); // bun install --frozen-lockfile
+    queueSpawn(0); // bun x tsc --noEmit
+    queueSpawn(0); // bun test
 
-        const updatedTask = getWorkTask(db, task.id);
-        expect(updatedTask!.status).toBe('failed');
-        expect(updatedTask!.error).toContain('no PR URL');
-    });
+    // Simulate session ending with a PR URL in the output
+    const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/42';
+    simulateSessionEnd(task.sessionId!, `All done!\n\n${prUrl}`);
 
-    test('validation failing under WORK_MAX_ITERATIONS → spawns follow-up session with incremented iteration', async () => {
-        const { task } = await createRunningTask();
+    // Give async handlers time to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // Queue validation spawns: install ok, tsc FAILS, test not reached
-        queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(1, 'error TS2304: Cannot find name', ''); // tsc fails
-        queueSpawn(1, '', 'test failures'); // bun test fails
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('completed');
+    expect(updatedTask!.prUrl).toBe(prUrl);
+  });
 
-        // Simulate session ending
-        simulateSessionEnd(task.sessionId!, 'I made some changes');
+  test('validation passing but no PR URL → task marked failed', async () => {
+    const { task } = await createRunningTask();
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+    // Queue validation spawns: install, tsc, test (all pass)
+    queueSpawn(0); // bun install --frozen-lockfile
+    queueSpawn(0); // bun x tsc
+    queueSpawn(0); // bun test
 
-        const updatedTask = getWorkTask(db, task.id);
-        // Should be back to running with incremented iteration
-        expect(updatedTask!.status).toBe('running');
-        expect(updatedTask!.iterationCount).toBe(2);
+    // Simulate session ending WITHOUT a PR URL
+    simulateSessionEnd(task.sessionId!, 'Done but forgot to create PR');
 
-        // A new session should have been created and started
-        expect(updatedTask!.sessionId).not.toBe(task.sessionId);
-        expect((mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(2);
-    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    test('validation failing at WORK_MAX_ITERATIONS → task marked failed with truncated error', async () => {
-        const { task } = await createRunningTask();
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.error).toContain('no PR URL');
+  });
 
-        // Manually set iteration count to max (default 3)
-        updateWorkTaskStatus(db, task.id, 'running', { iterationCount: 3 });
+  test('validation failing under WORK_MAX_ITERATIONS → spawns follow-up session with incremented iteration', async () => {
+    const { task } = await createRunningTask();
 
-        // Queue validation spawns: install ok, tsc FAILS
-        queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(1, 'lots of TypeScript errors here', ''); // tsc fails
-        queueSpawn(1, '', 'test failures'); // bun test fails
+    // Queue validation spawns: install ok, tsc FAILS, test not reached
+    queueSpawn(0); // bun install --frozen-lockfile
+    queueSpawn(1, 'error TS2304: Cannot find name', ''); // tsc fails
+    queueSpawn(1, '', 'test failures'); // bun test fails
 
-        // Simulate session ending
-        simulateSessionEnd(task.sessionId!, 'Tried to fix things');
+    // Simulate session ending
+    simulateSessionEnd(task.sessionId!, 'I made some changes');
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-        const updatedTask = getWorkTask(db, task.id);
-        expect(updatedTask!.status).toBe('failed');
-        expect(updatedTask!.error).toContain('Validation failed after 3 iteration(s)');
-    });
+    const updatedTask = getWorkTask(db, task.id);
+    // Should be back to running with incremented iteration
+    expect(updatedTask!.status).toBe('running');
+    expect(updatedTask!.iterationCount).toBe(2);
 
-    test('iteration count is correctly incremented in DB', async () => {
-        const { task } = await createRunningTask();
+    // A new session should have been created and started
+    expect(updatedTask!.sessionId).not.toBe(task.sessionId);
+    expect((mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
 
-        // Verify initial iteration count
-        const initial = getWorkTask(db, task.id);
-        expect(initial!.iterationCount).toBe(1);
+  test('validation failing at WORK_MAX_ITERATIONS → task marked failed with truncated error', async () => {
+    const { task } = await createRunningTask();
 
-        // Fail validation to trigger iteration increment
-        queueSpawn(0); // bun install
-        queueSpawn(1, 'tsc error', ''); // tsc fails
-        queueSpawn(1, '', 'test error'); // test fails
+    // Manually set iteration count to max (default 3)
+    updateWorkTaskStatus(db, task.id, 'running', { iterationCount: 3 });
 
-        simulateSessionEnd(task.sessionId!, 'Attempt 1');
-        await new Promise(resolve => setTimeout(resolve, 100));
+    // Queue validation spawns: install ok, tsc FAILS
+    queueSpawn(0); // bun install --frozen-lockfile
+    queueSpawn(1, 'lots of TypeScript errors here', ''); // tsc fails
+    queueSpawn(1, '', 'test failures'); // bun test fails
 
-        const afterFirst = getWorkTask(db, task.id);
-        expect(afterFirst!.iterationCount).toBe(2);
+    // Simulate session ending
+    simulateSessionEnd(task.sessionId!, 'Tried to fix things');
 
-        // Fail validation again
-        queueSpawn(0); // bun install
-        queueSpawn(1, 'tsc error again', ''); // tsc fails
-        queueSpawn(1, '', 'test error'); // test fails
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-        simulateSessionEnd(afterFirst!.sessionId!, 'Attempt 2');
-        await new Promise(resolve => setTimeout(resolve, 100));
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.error).toContain('Validation failed after 3 iteration(s)');
+  });
 
-        const afterSecond = getWorkTask(db, task.id);
-        expect(afterSecond!.iterationCount).toBe(3);
-    });
+  test('iteration count is correctly incremented in DB', async () => {
+    const { task } = await createRunningTask();
+
+    // Verify initial iteration count
+    const initial = getWorkTask(db, task.id);
+    expect(initial!.iterationCount).toBe(1);
+
+    // Fail validation to trigger iteration increment
+    queueSpawn(0); // bun install
+    queueSpawn(1, 'tsc error', ''); // tsc fails
+    queueSpawn(1, '', 'test error'); // test fails
+
+    simulateSessionEnd(task.sessionId!, 'Attempt 1');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const afterFirst = getWorkTask(db, task.id);
+    expect(afterFirst!.iterationCount).toBe(2);
+
+    // Fail validation again
+    queueSpawn(0); // bun install
+    queueSpawn(1, 'tsc error again', ''); // tsc fails
+    queueSpawn(1, '', 'test error'); // test fails
+
+    simulateSessionEnd(afterFirst!.sessionId!, 'Attempt 2');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const afterSecond = getWorkTask(db, task.id);
+    expect(afterSecond!.iterationCount).toBe(3);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -782,91 +796,91 @@ describe('Validation loop iteration control', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('handleSessionEnd edge cases', () => {
-    test('task not found in DB → early return, no crash', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+  test('task not found in DB → early return, no crash', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Will be deleted',
-            projectId: project.id,
-        });
-
-        // Delete the task from DB before session completes
-        db.query('DELETE FROM work_tasks WHERE id = ?').run(task.id);
-
-        // This should NOT throw
-        simulateSessionEnd(task.sessionId!, 'Output after task deleted');
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Verify no crash occurred — the task is gone
-        expect(getWorkTask(db, task.id)).toBeNull();
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Will be deleted',
+      projectId: project.id,
     });
 
-    test('task already completed → no state change (idempotent)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    // Delete the task from DB before session completes
+    db.query('DELETE FROM work_tasks WHERE id = ?').run(task.id);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Already completed',
-            projectId: project.id,
-        });
+    // This should NOT throw
+    simulateSessionEnd(task.sessionId!, 'Output after task deleted');
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // Mark task as completed manually
-        const prUrl = 'https://github.com/example/repo/pull/99';
-        updateWorkTaskStatus(db, task.id, 'completed', { prUrl });
+    // Verify no crash occurred — the task is gone
+    expect(getWorkTask(db, task.id)).toBeNull();
+  });
 
-        // Now delete the session subscriber association and simulate end
-        // The handleSessionEnd will look up the task and find it has no projectId issue
-        // but since we already completed it, let's verify it stays completed
-        const before = getWorkTask(db, task.id);
-        expect(before!.status).toBe('completed');
-        expect(before!.prUrl).toBe(prUrl);
+  test('task already completed → no state change (idempotent)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Already completed',
+      projectId: project.id,
     });
 
-    test('task already failed → no state change (idempotent)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    // Mark task as completed manually
+    const prUrl = 'https://github.com/example/repo/pull/99';
+    updateWorkTaskStatus(db, task.id, 'completed', { prUrl });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Already failed',
-            projectId: project.id,
-        });
+    // Now delete the session subscriber association and simulate end
+    // The handleSessionEnd will look up the task and find it has no projectId issue
+    // but since we already completed it, let's verify it stays completed
+    const before = getWorkTask(db, task.id);
+    expect(before!.status).toBe('completed');
+    expect(before!.prUrl).toBe(prUrl);
+  });
 
-        // Mark task as failed manually
-        updateWorkTaskStatus(db, task.id, 'failed', { error: 'Previous error' });
+  test('task already failed → no state change (idempotent)', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        const before = getWorkTask(db, task.id);
-        expect(before!.status).toBe('failed');
-        expect(before!.error).toBe('Previous error');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Already failed',
+      projectId: project.id,
     });
 
-    test('empty session output handled gracefully', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    // Mark task as failed manually
+    updateWorkTaskStatus(db, task.id, 'failed', { error: 'Previous error' });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Empty output test',
-            projectId: project.id,
-        });
+    const before = getWorkTask(db, task.id);
+    expect(before!.status).toBe('failed');
+    expect(before!.error).toBe('Previous error');
+  });
 
-        // Queue validation passing
-        queueSpawn(0); // bun install
-        queueSpawn(0); // tsc
-        queueSpawn(0); // test
+  test('empty session output handled gracefully', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        // Simulate session ending with empty output
-        simulateSessionEnd(task.sessionId!, '');
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Should fail because no PR URL was found in empty output
-        const updatedTask = getWorkTask(db, task.id);
-        expect(updatedTask!.status).toBe('failed');
-        expect(updatedTask!.error).toContain('no PR URL');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Empty output test',
+      projectId: project.id,
     });
+
+    // Queue validation passing
+    queueSpawn(0); // bun install
+    queueSpawn(0); // tsc
+    queueSpawn(0); // test
+
+    // Simulate session ending with empty output
+    simulateSessionEnd(task.sessionId!, '');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Should fail because no PR URL was found in empty output
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.error).toContain('no PR URL');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -874,365 +888,365 @@ describe('handleSessionEnd edge cases', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Task creation validation', () => {
-    test('throws when agent does not exist', async () => {
-        createProject(db, { name: 'P', workingDir: '/tmp' });
+  test('throws when agent does not exist', async () => {
+    createProject(db, { name: 'P', workingDir: '/tmp' });
 
-        await expect(
-            service.create({
-                agentId: 'nonexistent-agent',
-                description: 'Test',
-            })
-        ).rejects.toThrow('Agent nonexistent-agent not found');
+    await expect(
+      service.create({
+        agentId: 'nonexistent-agent',
+        description: 'Test',
+      }),
+    ).rejects.toThrow('Agent nonexistent-agent not found');
+  });
+
+  test('throws when project does not exist', async () => {
+    const agent = createAgent(db, { name: 'Agent' });
+
+    await expect(
+      service.create({
+        agentId: agent.id,
+        description: 'Test',
+        projectId: 'nonexistent-project',
+      }),
+    ).rejects.toThrow('Project nonexistent-project not found');
+  });
+
+  test('throws when project has no workingDir', async () => {
+    const agent = createAgent(db, { name: 'Agent' });
+    // Create a project with empty workingDir
+    const project = createProject(db, { name: 'P', workingDir: '' });
+
+    await expect(
+      service.create({
+        agentId: agent.id,
+        description: 'Test',
+        projectId: project.id,
+      }),
+    ).rejects.toThrow('has no workingDir');
+  });
+
+  test('throws when concurrent active task exists on same project', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    // Create first task successfully
+    await service.create({
+      agentId: agent.id,
+      description: 'First task',
+      projectId: project.id,
     });
 
-    test('throws when project does not exist', async () => {
-        const agent = createAgent(db, { name: 'Agent' });
-
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Test',
-                projectId: 'nonexistent-project',
-            })
-        ).rejects.toThrow('Project nonexistent-project not found');
-    });
-
-    test('throws when project has no workingDir', async () => {
-        const agent = createAgent(db, { name: 'Agent' });
-        // Create a project with empty workingDir
-        const project = createProject(db, { name: 'P', workingDir: '' });
-
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Test',
-                projectId: project.id,
-            })
-        ).rejects.toThrow('has no workingDir');
-    });
-
-    test('throws when concurrent active task exists on same project', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
-
-        // Create first task successfully
-        await service.create({
-            agentId: agent.id,
-            description: 'First task',
-            projectId: project.id,
-        });
-
-        // Second task on same project should fail
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Second task',
-                projectId: project.id,
-            })
-        ).rejects.toThrow('Another task is already active');
-    });
+    // Second task on same project should fail
+    await expect(
+      service.create({
+        agentId: agent.id,
+        description: 'Second task',
+        projectId: project.id,
+      }),
+    ).rejects.toThrow('Another task is already active');
+  });
 });
 
 describe('getTask and listTasks', () => {
-    test('getTask returns task by ID', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+  test('getTask returns task by ID', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Get task test',
-            projectId: project.id,
-        });
-
-        const found = service.getTask(task.id);
-        expect(found).not.toBeNull();
-        expect(found!.id).toBe(task.id);
-        expect(found!.description).toBe('Get task test');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Get task test',
+      projectId: project.id,
     });
 
-    test('getTask returns null for nonexistent ID', () => {
-        expect(service.getTask('nonexistent')).toBeNull();
-    });
+    const found = service.getTask(task.id);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(task.id);
+    expect(found!.description).toBe('Get task test');
+  });
 
-    test('listTasks returns all tasks', async () => {
-        const agent = createAgent(db, { name: 'Agent' });
-        const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/p1' });
-        const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/p2' });
+  test('getTask returns null for nonexistent ID', () => {
+    expect(service.getTask('nonexistent')).toBeNull();
+  });
 
-        queueSuccessfulSpawns(4); // 2 tasks × 2 spawns each
+  test('listTasks returns all tasks', async () => {
+    const agent = createAgent(db, { name: 'Agent' });
+    const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/p1' });
+    const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/p2' });
 
-        await service.create({ agentId: agent.id, description: 'Task 1', projectId: p1.id });
-        await service.create({ agentId: agent.id, description: 'Task 2', projectId: p2.id });
+    queueSuccessfulSpawns(4); // 2 tasks × 2 spawns each
 
-        const tasks = service.listTasks();
-        expect(tasks).toHaveLength(2);
-    });
+    await service.create({ agentId: agent.id, description: 'Task 1', projectId: p1.id });
+    await service.create({ agentId: agent.id, description: 'Task 2', projectId: p2.id });
 
-    test('listTasks filters by agentId', async () => {
-        const a1 = createAgent(db, { name: 'Agent1' });
-        const a2 = createAgent(db, { name: 'Agent2' });
-        const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/p1' });
-        const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/p2' });
+    const tasks = service.listTasks();
+    expect(tasks).toHaveLength(2);
+  });
 
-        queueSuccessfulSpawns(4);
+  test('listTasks filters by agentId', async () => {
+    const a1 = createAgent(db, { name: 'Agent1' });
+    const a2 = createAgent(db, { name: 'Agent2' });
+    const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/p1' });
+    const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/p2' });
 
-        await service.create({ agentId: a1.id, description: 'A1 Task', projectId: p1.id });
-        await service.create({ agentId: a2.id, description: 'A2 Task', projectId: p2.id });
+    queueSuccessfulSpawns(4);
 
-        expect(service.listTasks(a1.id)).toHaveLength(1);
-        expect(service.listTasks(a2.id)).toHaveLength(1);
-        expect(service.listTasks('nonexistent')).toHaveLength(0);
-    });
+    await service.create({ agentId: a1.id, description: 'A1 Task', projectId: p1.id });
+    await service.create({ agentId: a2.id, description: 'A2 Task', projectId: p2.id });
+
+    expect(service.listTasks(a1.id)).toHaveLength(1);
+    expect(service.listTasks(a2.id)).toHaveLength(1);
+    expect(service.listTasks('nonexistent')).toHaveLength(0);
+  });
 });
 
 describe('cancelTask', () => {
-    test('returns null for nonexistent task', async () => {
-        expect(await service.cancelTask('nonexistent')).toBeNull();
+  test('returns null for nonexistent task', async () => {
+    expect(await service.cancelTask('nonexistent')).toBeNull();
+  });
+
+  test('stops running session when cancelling', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    // Make isRunning return true
+    (mockProcessManager.isRunning as ReturnType<typeof mock>).mockImplementation(() => true);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Cancel test',
+      projectId: project.id,
     });
 
-    test('stops running session when cancelling', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    queueSpawn(0); // worktree remove
+    await service.cancelTask(task.id);
 
-        // Make isRunning return true
-        (mockProcessManager.isRunning as ReturnType<typeof mock>).mockImplementation(() => true);
-
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Cancel test',
-            projectId: project.id,
-        });
-
-        queueSpawn(0); // worktree remove
-        await service.cancelTask(task.id);
-
-        // Verify stopProcess was called with the session ID
-        expect((mockProcessManager.stopProcess as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(1);
-    });
+    // Verify stopProcess was called with the session ID
+    expect((mockProcessManager.stopProcess as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('onComplete callbacks', () => {
-    test('completion callback is invoked when task completes', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+  test('completion callback is invoked when task completes', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Callback test',
-            projectId: project.id,
-        });
-
-        let callbackTask: unknown = null;
-        service.onComplete(task.id, (t) => {
-            callbackTask = t;
-        });
-
-        // Queue validation passing + worktree cleanup
-        queueSpawn(0); // bun install
-        queueSpawn(0); // tsc
-        queueSpawn(0); // test
-        queueSpawn(0); // worktree remove
-
-        const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/100';
-        simulateSessionEnd(task.sessionId!, `Done!\n${prUrl}`);
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-        expect(callbackTask).not.toBeNull();
-        expect((callbackTask as { status: string }).status).toBe('completed');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Callback test',
+      projectId: project.id,
     });
 
-    test('callback errors are caught and do not crash the service', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
-
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Error callback test',
-            projectId: project.id,
-        });
-
-        // Register a callback that throws
-        service.onComplete(task.id, () => {
-            throw new Error('Callback exploded!');
-        });
-
-        // Register a second callback that should still work
-        let secondCallbackInvoked = false;
-        service.onComplete(task.id, () => {
-            secondCallbackInvoked = true;
-        });
-
-        // Queue validation passing + cleanup
-        queueSpawn(0); // bun install
-        queueSpawn(0); // tsc
-        queueSpawn(0); // test
-        queueSpawn(0); // worktree remove
-
-        const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/101';
-        simulateSessionEnd(task.sessionId!, prUrl);
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-        // The throwing callback shouldn't prevent the second one from running
-        expect(secondCallbackInvoked).toBe(true);
+    let callbackTask: unknown = null;
+    service.onComplete(task.id, (t) => {
+      callbackTask = t;
     });
+
+    // Queue validation passing + worktree cleanup
+    queueSpawn(0); // bun install
+    queueSpawn(0); // tsc
+    queueSpawn(0); // test
+    queueSpawn(0); // worktree remove
+
+    const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/100';
+    simulateSessionEnd(task.sessionId!, `Done!\n${prUrl}`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(callbackTask).not.toBeNull();
+    expect((callbackTask as { status: string }).status).toBe('completed');
+  });
+
+  test('callback errors are caught and do not crash the service', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Error callback test',
+      projectId: project.id,
+    });
+
+    // Register a callback that throws
+    service.onComplete(task.id, () => {
+      throw new Error('Callback exploded!');
+    });
+
+    // Register a second callback that should still work
+    let secondCallbackInvoked = false;
+    service.onComplete(task.id, () => {
+      secondCallbackInvoked = true;
+    });
+
+    // Queue validation passing + cleanup
+    queueSpawn(0); // bun install
+    queueSpawn(0); // tsc
+    queueSpawn(0); // test
+    queueSpawn(0); // worktree remove
+
+    const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/101';
+    simulateSessionEnd(task.sessionId!, prUrl);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // The throwing callback shouldn't prevent the second one from running
+    expect(secondCallbackInvoked).toBe(true);
+  });
 });
 
 describe('recoverStaleTasks', () => {
-    test('retries interrupted tasks after recovery', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        const { createWorkTask } = await import('../db/work-tasks');
-        const task = createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description: 'Stale task',
-        });
-        updateWorkTaskStatus(db, task.id, 'running');
+  test('retries interrupted tasks after recovery', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    const { createWorkTask } = await import('../db/work-tasks');
+    const task = createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description: 'Stale task',
+    });
+    updateWorkTaskStatus(db, task.id, 'running');
 
-        // Queue spawns for: worktree add, bun install, git remote (off-limits check not called for retry)
-        queueSuccessfulSpawns(3);
+    // Queue spawns for: worktree add, bun install, git remote (off-limits check not called for retry)
+    queueSuccessfulSpawns(3);
 
-        await service.recoverStaleTasks();
+    await service.recoverStaleTasks();
 
-        // Task should be re-executing (running or branching), not failed
-        const recovered = getWorkTask(db, task.id);
-        expect(['branching', 'running']).toContain(recovered!.status);
+    // Task should be re-executing (running or branching), not failed
+    const recovered = getWorkTask(db, task.id);
+    expect(['branching', 'running']).toContain(recovered!.status);
+  });
+
+  test('does nothing when no stale tasks exist', async () => {
+    // No tasks in DB at all
+    await service.recoverStaleTasks(); // Should not throw
+  });
+
+  test('cleans up worktrees before retrying', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    const { createWorkTask } = await import('../db/work-tasks');
+    const task = createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description: 'Stale task with worktree',
+    });
+    updateWorkTaskStatus(db, task.id, 'running', { worktreeDir: '/tmp/worktree-123' });
+
+    // Queue worktree remove + worktree add + bun install for retry
+    queueSuccessfulSpawns(4);
+
+    await service.recoverStaleTasks();
+
+    // Verify worktree removal was attempted
+    const removeCalls = spawnCalls.filter((c) => c.cmd.includes('worktree') && c.cmd.includes('remove'));
+    expect(removeCalls.length).toBeGreaterThanOrEqual(1);
+
+    // Task should be retrying, not permanently failed
+    const recovered = getWorkTask(db, task.id);
+    expect(recovered!.status).not.toBe('failed');
+  });
+
+  test('resets interrupted task to pending before retrying', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    const { createWorkTask, resetWorkTaskForRetry } = await import('../db/work-tasks');
+    const task = createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description: 'Reset test task',
+    });
+    updateWorkTaskStatus(db, task.id, 'running', {
+      sessionId: 'old-session',
+      branchName: 'old-branch',
+      worktreeDir: '/tmp/old-worktree',
     });
 
-    test('does nothing when no stale tasks exist', async () => {
-        // No tasks in DB at all
-        await service.recoverStaleTasks(); // Should not throw
-    });
+    // Simulate the cleanup + reset that recoverStaleTasks does
+    cleanupStaleWorkTasks(db);
+    const failed = getWorkTask(db, task.id)!;
+    expect(failed.status).toBe('failed');
+    expect(failed.error).toContain('server restart');
 
-    test('cleans up worktrees before retrying', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        const { createWorkTask } = await import('../db/work-tasks');
-        const task = createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description: 'Stale task with worktree',
-        });
-        updateWorkTaskStatus(db, task.id, 'running', { worktreeDir: '/tmp/worktree-123' });
-
-        // Queue worktree remove + worktree add + bun install for retry
-        queueSuccessfulSpawns(4);
-
-        await service.recoverStaleTasks();
-
-        // Verify worktree removal was attempted
-        const removeCalls = spawnCalls.filter(
-            c => c.cmd.includes('worktree') && c.cmd.includes('remove')
-        );
-        expect(removeCalls.length).toBeGreaterThanOrEqual(1);
-
-        // Task should be retrying, not permanently failed
-        const recovered = getWorkTask(db, task.id);
-        expect(recovered!.status).not.toBe('failed');
-    });
-
-    test('resets interrupted task to pending before retrying', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        const { createWorkTask, resetWorkTaskForRetry } = await import('../db/work-tasks');
-        const task = createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description: 'Reset test task',
-        });
-        updateWorkTaskStatus(db, task.id, 'running', {
-            sessionId: 'old-session',
-            branchName: 'old-branch',
-            worktreeDir: '/tmp/old-worktree',
-        });
-
-        // Simulate the cleanup + reset that recoverStaleTasks does
-        cleanupStaleWorkTasks(db);
-        const failed = getWorkTask(db, task.id)!;
-        expect(failed.status).toBe('failed');
-        expect(failed.error).toContain('server restart');
-
-        resetWorkTaskForRetry(db, task.id);
-        const reset = getWorkTask(db, task.id)!;
-        expect(reset.status).toBe('pending');
-        expect(reset.sessionId).toBeNull();
-        expect(reset.branchName).toBeNull();
-        expect(reset.worktreeDir).toBeNull();
-        expect(reset.error).toBeNull();
-        expect(reset.completedAt).toBeNull();
-    });
+    resetWorkTaskForRetry(db, task.id);
+    const reset = getWorkTask(db, task.id)!;
+    expect(reset.status).toBe('pending');
+    expect(reset.sessionId).toBeNull();
+    expect(reset.branchName).toBeNull();
+    expect(reset.worktreeDir).toBeNull();
+    expect(reset.error).toBeNull();
+    expect(reset.completedAt).toBeNull();
+  });
 });
 
 describe('Validation install retry during runValidation', () => {
-    test('validation install: frozen-lockfile failure triggers retry', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2); // create task: worktree add + install
+  test('validation install: frozen-lockfile failure triggers retry', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2); // create task: worktree add + install
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Validation install test',
-            projectId: project.id,
-        });
-
-        // Queue for runValidation:
-        // bun install --frozen-lockfile (FAILS) → bun install (retry) → tsc (ok) → test (ok)
-        queueSpawn(1, '', 'lockfile error'); // frozen-lockfile fails
-        queueSpawn(0); // retry without frozen-lockfile
-        queueSpawn(0); // tsc passes
-        queueSpawn(0); // test passes
-        queueSpawn(0); // worktree cleanup
-
-        const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/55';
-        simulateSessionEnd(task.sessionId!, prUrl);
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-        const updatedTask = getWorkTask(db, task.id);
-        expect(updatedTask!.status).toBe('completed');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Validation install test',
+      projectId: project.id,
     });
+
+    // Queue for runValidation:
+    // bun install --frozen-lockfile (FAILS) → bun install (retry) → tsc (ok) → test (ok)
+    queueSpawn(1, '', 'lockfile error'); // frozen-lockfile fails
+    queueSpawn(0); // retry without frozen-lockfile
+    queueSpawn(0); // tsc passes
+    queueSpawn(0); // test passes
+    queueSpawn(0); // worktree cleanup
+
+    const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/55';
+    simulateSessionEnd(task.sessionId!, prUrl);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('completed');
+  });
 });
 
 describe('Git worktree creation failure', () => {
-    test('worktree creation failure marks task as failed', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        // Queue: git remote check (ok), git worktree add FAILS
-        queueSpawn(0);  // git remote get-url origin (off-limits check)
-        queueSpawn(128, '', 'fatal: branch already exists');
+  test('worktree creation failure marks task as failed', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    // Queue: git remote check (ok), git worktree add FAILS
+    queueSpawn(0); // git remote get-url origin (off-limits check)
+    queueSpawn(128, '', 'fatal: branch already exists');
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Worktree fail test',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Failed to create worktree');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Worktree fail test',
+      projectId: project.id,
     });
 
-    test('worktree creation exception marks task as failed', async () => {
-        const { agent, project } = createTestAgentAndProject();
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('Failed to create worktree');
+  });
 
-        // Make spawn throw for the second call (worktree creation)
-        // First call is git remote get-url origin (off-limits check)
-        let callIdx = 0;
-        (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation((...args: unknown[]) => {
-            callIdx++;
-            if (callIdx === 2) {
-                // Second call is the worktree creation — throw
-                throw new Error('git not found');
-            }
-            const cmd = args[0] as string[];
-            const opts = args[1] as { cwd?: string } | undefined;
-            spawnCalls.push({ cmd, cwd: opts?.cwd });
-            const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
-            return makeMockProc(result);
-        });
+  test('worktree creation exception marks task as failed', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Git exception test',
-            projectId: project.id,
-        });
+    // Make spawn throw for the second call (worktree creation)
+    // First call is git remote get-url origin (off-limits check)
+    let callIdx = 0;
+    (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation(
+      (...args: unknown[]) => {
+        callIdx++;
+        if (callIdx === 2) {
+          // Second call is the worktree creation — throw
+          throw new Error('git not found');
+        }
+        const cmd = args[0] as string[];
+        const opts = args[1] as { cwd?: string } | undefined;
+        spawnCalls.push({ cmd, cwd: opts?.cwd });
+        const result = spawnResults.shift() ?? { exitCode: 0, stdout: '', stderr: '' };
+        return makeMockProc(result);
+      },
+    );
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Failed to create worktree');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Git exception test',
+      projectId: project.id,
     });
+
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('Failed to create worktree');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1240,309 +1254,307 @@ describe('Git worktree creation failure', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('generateRepoMap with AstParserService', () => {
-    test('returns properly formatted repo map with line ranges when AstParserService is provided', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+  test('returns properly formatted repo map with line ranges when AstParserService is provided', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        // Create service with AST parser
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    // Create service with AST parser
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        queueSuccessfulSpawns(2); // worktree add + install
+    queueSuccessfulSpawns(2); // worktree add + install
 
-        const task = await astService.create({
-            agentId: agent.id,
-            description: 'Test repo map generation',
-            projectId: project.id,
-        });
-
-        // The task should be running — the prompt was built with a repo map
-        expect(task.status).toBe('running');
-
-        // Verify indexProject was called
-        expect((mockAst.indexProject as ReturnType<typeof mock>).mock.calls.length).toBe(1);
-
-        // Verify startProcess was called and the prompt contains repo map sections
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        expect(startCalls.length).toBeGreaterThanOrEqual(1);
-        const prompt = startCalls[0][1] as string;
-        expect(prompt).toContain('Repository Map');
-        expect(prompt).toContain('line ranges');
-        // Verify line ranges are included in the format [start-end]
-        expect(prompt).toMatch(/\[\d+-\d+\]/);
+    const task = await astService.create({
+      agentId: agent.id,
+      description: 'Test repo map generation',
+      projectId: project.id,
     });
 
-    test('returns null when AstParserService is null', async () => {
-        // Default service has no AST parser
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    // The task should be running — the prompt was built with a repo map
+    expect(task.status).toBe('running');
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Test without AST',
-            projectId: project.id,
-        });
+    // Verify indexProject was called
+    expect((mockAst.indexProject as ReturnType<typeof mock>).mock.calls.length).toBe(1);
 
-        expect(task.status).toBe('running');
+    // Verify startProcess was called and the prompt contains repo map sections
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    expect(startCalls.length).toBeGreaterThanOrEqual(1);
+    const prompt = startCalls[0][1] as string;
+    expect(prompt).toContain('Repository Map');
+    expect(prompt).toContain('line ranges');
+    // Verify line ranges are included in the format [start-end]
+    expect(prompt).toMatch(/\[\d+-\d+\]/);
+  });
 
-        // Verify the prompt does NOT contain a repo map section
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
-        expect(prompt).not.toContain('Repository Map');
+  test('returns null when AstParserService is null', async () => {
+    // Default service has no AST parser
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Test without AST',
+      projectId: project.id,
     });
 
-    test('repo map groups files by directory', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+    expect(task.status).toBe('running');
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    // Verify the prompt does NOT contain a repo map section
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
+    expect(prompt).not.toContain('Repository Map');
+  });
 
-        queueSuccessfulSpawns(2);
+  test('repo map groups files by directory', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Test directory grouping',
-            projectId: project.id,
-        });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    queueSuccessfulSpawns(2);
 
-        // Should have directory headers
-        expect(prompt).toContain('server/work/');
-        expect(prompt).toContain('server/ast/');
+    await astService.create({
+      agentId: agent.id,
+      description: 'Test directory grouping',
+      projectId: project.id,
     });
 
-    test('repo map prioritizes src/ and server/ over test files', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    // Should have directory headers
+    expect(prompt).toContain('server/work/');
+    expect(prompt).toContain('server/ast/');
+  });
 
-        queueSuccessfulSpawns(2);
+  test('repo map prioritizes src/ and server/ over test files', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Test priority ordering',
-            projectId: project.id,
-        });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    queueSuccessfulSpawns(2);
 
-        // src/ and server/ should appear before __tests__
-        const srcIndex = prompt.indexOf('src/');
-        const serverIndex = prompt.indexOf('server/work/');
-        const testsIndex = prompt.indexOf('__tests__');
-
-        // If test files are excluded by having no exported symbols, that's fine too
-        if (testsIndex >= 0) {
-            expect(srcIndex).toBeLessThan(testsIndex);
-            expect(serverIndex).toBeLessThan(testsIndex);
-        }
+    await astService.create({
+      agentId: agent.id,
+      description: 'Test priority ordering',
+      projectId: project.id,
     });
 
-    test('repo map includes class method line ranges', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    // src/ and server/ should appear before __tests__
+    const srcIndex = prompt.indexOf('src/');
+    const serverIndex = prompt.indexOf('server/work/');
+    const testsIndex = prompt.indexOf('__tests__');
 
-        queueSuccessfulSpawns(2);
+    // If test files are excluded by having no exported symbols, that's fine too
+    if (testsIndex >= 0) {
+      expect(srcIndex).toBeLessThan(testsIndex);
+      expect(serverIndex).toBeLessThan(testsIndex);
+    }
+  });
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Test method line ranges',
-            projectId: project.id,
-        });
+  test('repo map includes class method line ranges', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        // Should include class with method line ranges
-        expect(prompt).toContain('WorkTaskService');
-        expect(prompt).toContain('create');
+    queueSuccessfulSpawns(2);
+
+    await astService.create({
+      agentId: agent.id,
+      description: 'Test method line ranges',
+      projectId: project.id,
     });
+
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
+
+    // Should include class with method line ranges
+    expect(prompt).toContain('WorkTaskService');
+    expect(prompt).toContain('create');
+  });
 });
 
 describe('extractRelevantSymbols', () => {
-    test('finds symbols matching task description keywords', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+  test('finds symbols matching task description keywords', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        queueSuccessfulSpawns(2);
+    queueSuccessfulSpawns(2);
 
-        // Description mentions "WorkTask" and "AstParser" — should find matching symbols
-        await astService.create({
-            agentId: agent.id,
-            description: 'Integrate AstParserService into WorkTaskService for symbol indexing',
-            projectId: project.id,
-        });
-
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
-
-        // Should have a relevant symbols section
-        expect(prompt).toContain('Relevant Symbols');
-        expect(prompt).toContain('corvid_code_symbols');
-        expect(prompt).toContain('corvid_find_references');
+    // Description mentions "WorkTask" and "AstParser" — should find matching symbols
+    await astService.create({
+      agentId: agent.id,
+      description: 'Integrate AstParserService into WorkTaskService for symbol indexing',
+      projectId: project.id,
     });
 
-    test('returns null when no symbols match task keywords', async () => {
-        const projectDir = '/tmp/test-project';
-        // Create an index with symbols that won't match
-        const files = new Map<string, FileSymbolIndex>();
-        files.set(`${projectDir}/src/main.ts`, {
-            filePath: `${projectDir}/src/main.ts`,
-            mtimeMs: 1000,
-            symbols: [
-                { name: 'bootstrap', kind: 'function', startLine: 1, endLine: 10, isExported: true },
-            ],
-        });
-        const mockAst = createMockAstParserService({ files });
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    // Should have a relevant symbols section
+    expect(prompt).toContain('Relevant Symbols');
+    expect(prompt).toContain('corvid_code_symbols');
+    expect(prompt).toContain('corvid_find_references');
+  });
 
-        queueSuccessfulSpawns(2);
+  test('returns null when no symbols match task keywords', async () => {
+    const projectDir = '/tmp/test-project';
+    // Create an index with symbols that won't match
+    const files = new Map<string, FileSymbolIndex>();
+    files.set(`${projectDir}/src/main.ts`, {
+      filePath: `${projectDir}/src/main.ts`,
+      mtimeMs: 1000,
+      symbols: [{ name: 'bootstrap', kind: 'function', startLine: 1, endLine: 10, isExported: true }],
+    });
+    const mockAst = createMockAstParserService({ files });
 
-        // Description with no matching keywords
-        await astService.create({
-            agentId: agent.id,
-            description: 'Fix the zygomorphic transmogrification pipeline',
-            projectId: project.id,
-        });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    queueSuccessfulSpawns(2);
 
-        // Should NOT have a relevant symbols section since no matches
-        expect(prompt).not.toContain('Relevant Symbols');
+    // Description with no matching keywords
+    await astService.create({
+      agentId: agent.id,
+      description: 'Fix the zygomorphic transmogrification pipeline',
+      projectId: project.id,
     });
 
-    test('returns null when AstParserService is null', async () => {
-        // Default service (no AST parser) should not include relevant symbols
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        await service.create({
-            agentId: agent.id,
-            description: 'WorkTaskService AstParser integration',
-            projectId: project.id,
-        });
+    // Should NOT have a relevant symbols section since no matches
+    expect(prompt).not.toContain('Relevant Symbols');
+  });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
-        expect(prompt).not.toContain('Relevant Symbols');
+  test('returns null when AstParserService is null', async () => {
+    // Default service (no AST parser) should not include relevant symbols
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    await service.create({
+      agentId: agent.id,
+      description: 'WorkTaskService AstParser integration',
+      projectId: project.id,
     });
+
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
+    expect(prompt).not.toContain('Relevant Symbols');
+  });
 });
 
 describe('buildWorkPrompt with repo map and relevant symbols', () => {
-    test('includes repo map section when repo map is provided', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+  test('includes repo map section when repo map is provided', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        queueSuccessfulSpawns(2);
+    queueSuccessfulSpawns(2);
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Test prompt includes repo map',
-            projectId: project.id,
-        });
-
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
-
-        expect(prompt).toContain('## Repository Map');
-        expect(prompt).toContain('## Task');
-        expect(prompt).toContain('## Instructions');
-        expect(prompt).toContain('Test prompt includes repo map');
+    await astService.create({
+      agentId: agent.id,
+      description: 'Test prompt includes repo map',
+      projectId: project.id,
     });
 
-    test('includes both repo map and relevant symbols when both are available', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    expect(prompt).toContain('## Repository Map');
+    expect(prompt).toContain('## Task');
+    expect(prompt).toContain('## Instructions');
+    expect(prompt).toContain('Test prompt includes repo map');
+  });
 
-        queueSuccessfulSpawns(2);
+  test('includes both repo map and relevant symbols when both are available', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Enhance WorkTaskService with AstParserService integration',
-            projectId: project.id,
-        });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    queueSuccessfulSpawns(2);
 
-        expect(prompt).toContain('## Repository Map');
-        expect(prompt).toContain('## Relevant Symbols');
-        // Relevant Symbols should come after Repository Map
-        const repoMapIdx = prompt.indexOf('## Repository Map');
-        const relevantSymbolsIdx = prompt.indexOf('## Relevant Symbols');
-        expect(relevantSymbolsIdx).toBeGreaterThan(repoMapIdx);
+    await astService.create({
+      agentId: agent.id,
+      description: 'Enhance WorkTaskService with AstParserService integration',
+      projectId: project.id,
     });
 
-    test('prompt includes tool guidance when relevant symbols are present', async () => {
-        const projectDir = '/tmp/test-project';
-        const files = buildSampleSymbolIndex(projectDir);
-        const mockAst = createMockAstParserService({ files });
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
-        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+    expect(prompt).toContain('## Repository Map');
+    expect(prompt).toContain('## Relevant Symbols');
+    // Relevant Symbols should come after Repository Map
+    const repoMapIdx = prompt.indexOf('## Repository Map');
+    const relevantSymbolsIdx = prompt.indexOf('## Relevant Symbols');
+    expect(relevantSymbolsIdx).toBeGreaterThan(repoMapIdx);
+  });
 
-        queueSuccessfulSpawns(2);
+  test('prompt includes tool guidance when relevant symbols are present', async () => {
+    const projectDir = '/tmp/test-project';
+    const files = buildSampleSymbolIndex(projectDir);
+    const mockAst = createMockAstParserService({ files });
 
-        await astService.create({
-            agentId: agent.id,
-            description: 'Integrate AstParserService symbol search into work tasks',
-            projectId: project.id,
-        });
+    const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+    const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+    queueSuccessfulSpawns(2);
 
-        expect(prompt).toContain('corvid_code_symbols');
-        expect(prompt).toContain('corvid_find_references');
+    await astService.create({
+      agentId: agent.id,
+      description: 'Integrate AstParserService symbol search into work tasks',
+      projectId: project.id,
     });
 
-    test('prompt excludes both sections when no AST parser is available', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
 
-        await service.create({
-            agentId: agent.id,
-            description: 'Simple task without AST',
-            projectId: project.id,
-        });
+    expect(prompt).toContain('corvid_code_symbols');
+    expect(prompt).toContain('corvid_find_references');
+  });
 
-        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
-        const prompt = startCalls[0][1] as string;
+  test('prompt excludes both sections when no AST parser is available', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        expect(prompt).not.toContain('## Repository Map');
-        expect(prompt).not.toContain('## Relevant Symbols');
-        // Should still have the basic structure
-        expect(prompt).toContain('## Task');
-        expect(prompt).toContain('## Instructions');
+    await service.create({
+      agentId: agent.id,
+      description: 'Simple task without AST',
+      projectId: project.id,
     });
+
+    const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+    const prompt = startCalls[0][1] as string;
+
+    expect(prompt).not.toContain('## Repository Map');
+    expect(prompt).not.toContain('## Relevant Symbols');
+    // Should still have the basic structure
+    expect(prompt).toContain('## Task');
+    expect(prompt).toContain('## Instructions');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1550,133 +1562,138 @@ describe('buildWorkPrompt with repo map and relevant symbols', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('PR dedup check', () => {
-    let savedGhToken: string | undefined;
+  let savedGhToken: string | undefined;
 
-    beforeAll(() => {
-        savedGhToken = process.env.GH_TOKEN;
-        process.env.GH_TOKEN = 'ghp_test_dedup';
+  beforeAll(() => {
+    savedGhToken = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = 'ghp_test_dedup';
+  });
+
+  afterAll(() => {
+    if (savedGhToken !== undefined) {
+      process.env.GH_TOKEN = savedGhToken;
+    } else {
+      delete process.env.GH_TOKEN;
+    }
+  });
+
+  test('skips task creation when an open PR already references the issue', async () => {
+    const { agent, project } = createTestAgentAndProject();
+
+    // 1. git remote get-url origin → returns a GitHub URL
+    queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+    // 2. gh pr list --search → returns a matching PR
+    queueSpawn(
+      0,
+      JSON.stringify([
+        {
+          number: 716,
+          title: 'fix: heartbeat polling (#710)',
+          url: 'https://github.com/CorvidLabs/corvid-agent/pull/716',
+          author: { login: 'corvid-agent' },
+          state: 'OPEN',
+          headRefName: 'fix/710',
+          baseRefName: 'main',
+          body: 'Fixes #710',
+          createdAt: '2026-03-07T00:00:00Z',
+          additions: 10,
+          deletions: 5,
+          changedFiles: 2,
+        },
+      ]),
+    );
+
+    await expect(
+      service.create({
+        agentId: agent.id,
+        description: 'Fix the council race condition (#710)',
+        projectId: project.id,
+      }),
+    ).rejects.toThrow('An open PR (or active work task) already addresses issue #710. Skipping.');
+  });
+
+  test('proceeds when no open PR references the issue', async () => {
+    const { agent, project } = createTestAgentAndProject();
+
+    // 1. git remote get-url origin
+    queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+    // 2. gh pr list --search → empty results
+    queueSpawn(0, '[]');
+    // 3. git worktree add (success)
+    queueSpawn(0);
+    // 4. bun install (success)
+    queueSpawn(0);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Fix the council race condition (#710)',
+      projectId: project.id,
     });
 
-    afterAll(() => {
-        if (savedGhToken !== undefined) {
-            process.env.GH_TOKEN = savedGhToken;
-        } else {
-            delete process.env.GH_TOKEN;
-        }
+    expect(task.status).toBe('running');
+    expect(task.branchName).toBeTruthy();
+  });
+
+  test('proceeds when description has no issue reference', async () => {
+    const { agent, project } = createTestAgentAndProject();
+
+    // 1. git remote get-url origin (for off-limits check only, no dedup needed)
+    queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+    // 2. git worktree add
+    queueSpawn(0);
+    // 3. bun install
+    queueSpawn(0);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Refactor the logging system',
+      projectId: project.id,
     });
 
-    test('skips task creation when an open PR already references the issue', async () => {
-        const { agent, project } = createTestAgentAndProject();
+    expect(task.status).toBe('running');
+  });
 
-        // 1. git remote get-url origin → returns a GitHub URL
-        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
-        // 2. gh pr list --search → returns a matching PR
-        queueSpawn(0, JSON.stringify([{
-            number: 716,
-            title: 'fix: heartbeat polling (#710)',
-            url: 'https://github.com/CorvidLabs/corvid-agent/pull/716',
-            author: { login: 'corvid-agent' },
-            state: 'OPEN',
-            headRefName: 'fix/710',
-            baseRefName: 'main',
-            body: 'Fixes #710',
-            createdAt: '2026-03-07T00:00:00Z',
-            additions: 10,
-            deletions: 5,
-            changedFiles: 2,
-        }]));
+  test('proceeds when GitHub search fails (non-fatal)', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Fix the council race condition (#710)',
-                projectId: project.id,
-            }),
-        ).rejects.toThrow('An open PR (or active work task) already addresses issue #710. Skipping.');
+    // 1. git remote get-url origin
+    queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+    // 2. gh pr list --search → fails
+    queueSpawn(1, '', 'API rate limit exceeded');
+    // 3. git worktree add
+    queueSpawn(0);
+    // 4. bun install
+    queueSpawn(0);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Fix issue #999',
+      projectId: project.id,
     });
 
-    test('proceeds when no open PR references the issue', async () => {
-        const { agent, project } = createTestAgentAndProject();
+    expect(task.status).toBe('running');
+  });
 
-        // 1. git remote get-url origin
-        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
-        // 2. gh pr list --search → empty results
-        queueSpawn(0, '[]');
-        // 3. git worktree add (success)
-        queueSpawn(0);
-        // 4. bun install (success)
-        queueSpawn(0);
+  test('ignores closed/merged PRs (only open PRs block)', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Fix the council race condition (#710)',
-            projectId: project.id,
-        });
+    // 1. git remote get-url origin
+    queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+    // 2. gh pr list --search (state=open) → empty (the PR is merged so not in results)
+    queueSpawn(0, '[]');
+    // 3. git worktree add
+    queueSpawn(0);
+    // 4. bun install
+    queueSpawn(0);
 
-        expect(task.status).toBe('running');
-        expect(task.branchName).toBeTruthy();
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Follow up on #500',
+      projectId: project.id,
     });
 
-    test('proceeds when description has no issue reference', async () => {
-        const { agent, project } = createTestAgentAndProject();
-
-        // 1. git remote get-url origin (for off-limits check only, no dedup needed)
-        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
-        // 2. git worktree add
-        queueSpawn(0);
-        // 3. bun install
-        queueSpawn(0);
-
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Refactor the logging system',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('running');
-    });
-
-    test('proceeds when GitHub search fails (non-fatal)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-
-        // 1. git remote get-url origin
-        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
-        // 2. gh pr list --search → fails
-        queueSpawn(1, '', 'API rate limit exceeded');
-        // 3. git worktree add
-        queueSpawn(0);
-        // 4. bun install
-        queueSpawn(0);
-
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Fix issue #999',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('running');
-    });
-
-    test('ignores closed/merged PRs (only open PRs block)', async () => {
-        const { agent, project } = createTestAgentAndProject();
-
-        // 1. git remote get-url origin
-        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
-        // 2. gh pr list --search (state=open) → empty (the PR is merged so not in results)
-        queueSpawn(0, '[]');
-        // 3. git worktree add
-        queueSpawn(0);
-        // 4. bun install
-        queueSpawn(0);
-
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Follow up on #500',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('running');
-    });
+    expect(task.status).toBe('running');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1684,222 +1701,222 @@ describe('PR dedup check', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Shutdown gate', () => {
-    test('create() rejects new tasks when shuttingDown flag is set', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+  test('create() rejects new tasks when shuttingDown flag is set', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
 
-        // Trigger the shutdown flag via drainRunningTasks (sets _shuttingDown = true)
-        await service.drainRunningTasks();
+    // Trigger the shutdown flag via drainRunningTasks (sets _shuttingDown = true)
+    await service.drainRunningTasks();
 
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Should be rejected',
-                projectId: project.id,
-            }),
-        ).rejects.toThrow('Server is shutting down');
-    });
+    await expect(
+      service.create({
+        agentId: agent.id,
+        description: 'Should be rejected',
+        projectId: project.id,
+      }),
+    ).rejects.toThrow('Server is shutting down');
+  });
 });
 
 describe('Drain on shutdown (drainRunningTasks)', () => {
-    test('drainRunningTasks() resolves immediately when no active tasks exist', async () => {
-        const start = Date.now();
-        await service.drainRunningTasks();
-        const elapsed = Date.now() - start;
+  test('drainRunningTasks() resolves immediately when no active tasks exist', async () => {
+    const start = Date.now();
+    await service.drainRunningTasks();
+    const elapsed = Date.now() - start;
 
-        expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeLessThan(1000);
+  });
+
+  test('drainRunningTasks() completes quickly when tasks are already done', async () => {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Long running task',
+      projectId: project.id,
     });
 
-    test('drainRunningTasks() completes quickly when tasks are already done', async () => {
-        const { agent, project } = createTestAgentAndProject();
-        queueSuccessfulSpawns(2);
+    updateWorkTaskStatus(db, task.id, 'completed', { prUrl: 'https://github.com/test/test/pull/1' });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Long running task',
-            projectId: project.id,
-        });
+    const start = Date.now();
+    await service.drainRunningTasks();
+    const elapsed = Date.now() - start;
 
-        updateWorkTaskStatus(db, task.id, 'completed', { prUrl: 'https://github.com/test/test/pull/1' });
+    expect(elapsed).toBeLessThan(2000);
 
-        const start = Date.now();
-        await service.drainRunningTasks();
-        const elapsed = Date.now() - start;
-
-        expect(elapsed).toBeLessThan(2000);
-
-        const finalTask = getWorkTask(db, task.id);
-        expect(finalTask?.status).toBe('completed');
-    });
+    const finalTask = getWorkTask(db, task.id);
+    expect(finalTask?.status).toBe('completed');
+  });
 });
 
 describe('Startup recovery with iteration limit', () => {
-    test('recoverStaleTasks retries tasks below max iterations', async () => {
-        const { agent, project } = createTestAgentAndProject();
+  test('recoverStaleTasks retries tasks below max iterations', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        db.query(
-            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+    db.query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
              VALUES (?, ?, ?, ?, 'running', 'web', '{}', 1)`,
-        ).run('stale-task-1', agent.id, project.id, 'Interrupted task');
+    ).run('stale-task-1', agent.id, project.id, 'Interrupted task');
 
-        queueSuccessfulSpawns(2);
+    queueSuccessfulSpawns(2);
 
-        await service.recoverStaleTasks();
+    await service.recoverStaleTasks();
 
-        const recovered = getWorkTask(db, 'stale-task-1');
-        expect(recovered).toBeTruthy();
-        expect(['branching', 'running']).toContain(recovered!.status);
-    });
+    const recovered = getWorkTask(db, 'stale-task-1');
+    expect(recovered).toBeTruthy();
+    expect(['branching', 'running']).toContain(recovered!.status);
+  });
 
-    test('recoverStaleTasks skips tasks at max iterations (3)', async () => {
-        const { agent, project } = createTestAgentAndProject();
+  test('recoverStaleTasks skips tasks at max iterations (3)', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        db.query(
-            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+    db.query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
              VALUES (?, ?, ?, ?, 'running', 'web', '{}', 3)`,
-        ).run('maxed-task', agent.id, project.id, 'Task at max iterations');
+    ).run('maxed-task', agent.id, project.id, 'Task at max iterations');
 
-        await service.recoverStaleTasks();
+    await service.recoverStaleTasks();
 
-        const task = getWorkTask(db, 'maxed-task');
-        expect(task).toBeTruthy();
-        expect(task?.status).toBe('failed');
-        expect(task?.error).toBe('Interrupted by server restart');
-    });
+    const task = getWorkTask(db, 'maxed-task');
+    expect(task).toBeTruthy();
+    expect(task?.status).toBe('failed');
+    expect(task?.error).toBe('Interrupted by server restart');
+  });
 
-    test('recoverStaleTasks retries task at iteration 2 (below max of 3)', async () => {
-        const { agent, project } = createTestAgentAndProject();
+  test('recoverStaleTasks retries task at iteration 2 (below max of 3)', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        db.query(
-            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+    db.query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
              VALUES (?, ?, ?, ?, 'validating', 'web', '{}', 2)`,
-        ).run('mid-task', agent.id, project.id, 'Task at iteration 2');
+    ).run('mid-task', agent.id, project.id, 'Task at iteration 2');
 
-        queueSuccessfulSpawns(2);
+    queueSuccessfulSpawns(2);
 
-        await service.recoverStaleTasks();
+    await service.recoverStaleTasks();
 
-        const task = getWorkTask(db, 'mid-task');
-        expect(task).toBeTruthy();
-        expect(['branching', 'running']).toContain(task!.status);
-    });
+    const task = getWorkTask(db, 'mid-task');
+    expect(task).toBeTruthy();
+    expect(['branching', 'running']).toContain(task!.status);
+  });
 
-    test('recoverStaleTasks handles mix of retryable and maxed-out tasks', async () => {
-        const { agent, project } = createTestAgentAndProject();
+  test('recoverStaleTasks handles mix of retryable and maxed-out tasks', async () => {
+    const { agent, project } = createTestAgentAndProject();
 
-        db.query(
-            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+    db.query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
              VALUES (?, ?, ?, ?, 'running', 'web', '{}', 1)`,
-        ).run('retry-me', agent.id, project.id, 'Retryable task');
+    ).run('retry-me', agent.id, project.id, 'Retryable task');
 
-        const project2 = createProject(db, { name: 'Project2', workingDir: '/tmp/test-project-2' });
+    const project2 = createProject(db, { name: 'Project2', workingDir: '/tmp/test-project-2' });
 
-        db.query(
-            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+    db.query(
+      `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
              VALUES (?, ?, ?, ?, 'running', 'web', '{}', 3)`,
-        ).run('skip-me', agent.id, project2.id, 'Maxed out task');
+    ).run('skip-me', agent.id, project2.id, 'Maxed out task');
 
-        queueSuccessfulSpawns(2);
+    queueSuccessfulSpawns(2);
 
-        await service.recoverStaleTasks();
+    await service.recoverStaleTasks();
 
-        const retryable = getWorkTask(db, 'retry-me');
-        expect(['branching', 'running']).toContain(retryable!.status);
+    const retryable = getWorkTask(db, 'retry-me');
+    expect(['branching', 'running']).toContain(retryable!.status);
 
-        const maxed = getWorkTask(db, 'skip-me');
-        expect(maxed?.status).toBe('failed');
-        expect(maxed?.error).toBe('Interrupted by server restart');
-    });
+    const maxed = getWorkTask(db, 'skip-me');
+    expect(maxed?.status).toBe('failed');
+    expect(maxed?.error).toBe('Interrupted by server restart');
+  });
 });
 
 // ─── Governance impact classification ────────────────────────────────────────
 
 describe('governance impact classification', () => {
-    test('blocks task referencing Layer 0 file (governance.ts)', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+  test('blocks task referencing Layer 0 file (governance.ts)', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Refactor server/councils/governance.ts to add new tier',
-            projectId: project.id,
-        });
-
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
-        expect(task.error).toContain('Constitutional');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Refactor server/councils/governance.ts to add new tier',
+      projectId: project.id,
     });
 
-    test('blocks task referencing Layer 0 file (spending.ts via substring)', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('Layer 0');
+    expect(task.error).toContain('Constitutional');
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Modify server/algochat/spending.ts limits',
-            projectId: project.id,
-        });
+  test('blocks task referencing Layer 0 file (spending.ts via substring)', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Modify server/algochat/spending.ts limits',
+      projectId: project.id,
     });
 
-    test('allows task referencing Layer 1 file (proceeds with governance warning)', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('Layer 0');
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Update server/db/migrations/077_foo.sql for new column',
-            projectId: project.id,
-        });
+  test('allows task referencing Layer 1 file (proceeds with governance warning)', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        expect(task.status).not.toBe('failed');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Update server/db/migrations/077_foo.sql for new column',
+      projectId: project.id,
     });
 
-    test('allows task with no file path references', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.status).not.toBe('failed');
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Fix the login bug in the auth flow',
-            projectId: project.id,
-        });
+  test('allows task with no file path references', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        expect(task.status).not.toBe('failed');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Fix the login bug in the auth flow',
+      projectId: project.id,
     });
 
-    test('blocks task referencing protected-paths.ts (Layer 0 substring)', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.status).not.toBe('failed');
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Update server/process/protected-paths.ts to add new path',
-            projectId: project.id,
-        });
+  test('blocks task referencing protected-paths.ts (Layer 0 substring)', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Update server/process/protected-paths.ts to add new path',
+      projectId: project.id,
     });
 
-    test('allows task referencing Layer 2 file (server/routes/analytics.ts)', async () => {
-        const agent = createAgent(db, { name: 'TestAgent' });
-        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
-        queueSuccessfulSpawns(2);
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('Layer 0');
+  });
 
-        const task = await service.create({
-            agentId: agent.id,
-            description: 'Add new endpoint in server/routes/analytics.ts',
-            projectId: project.id,
-        });
+  test('allows task referencing Layer 2 file (server/routes/analytics.ts)', async () => {
+    const agent = createAgent(db, { name: 'TestAgent' });
+    const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+    queueSuccessfulSpawns(2);
 
-        expect(task.status).not.toBe('failed');
+    const task = await service.create({
+      agentId: agent.id,
+      description: 'Add new endpoint in server/routes/analytics.ts',
+      projectId: project.id,
     });
+
+    expect(task.status).not.toBe('failed');
+  });
 });

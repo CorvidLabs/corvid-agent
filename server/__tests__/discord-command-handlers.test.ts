@@ -421,9 +421,7 @@ describe('handleAutocomplete', () => {
     createPersona(db, { name: 'Friendly Helper', archetype: 'friendly' });
     createPersona(db, { name: 'Code Reviewer', archetype: 'custom' });
 
-    const interaction = makeAutocompleteInteraction('session', [
-      { name: 'persona', value: 'friendly', focused: true },
-    ]);
+    const interaction = makeAutocompleteInteraction('session', [{ name: 'persona', value: 'friendly', focused: true }]);
 
     await handleAutocomplete(ctx, interaction);
 
