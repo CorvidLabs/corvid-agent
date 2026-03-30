@@ -535,9 +535,14 @@ const server = Bun.serve<WsData>({
         if (!filePath.endsWith('/')) {
           try {
             // Read file content atomically — no separate existence check
-            const bytes = await Bun.file(filePath).bytes();
+            const file = Bun.file(filePath);
+            const bytes = await file.bytes();
             if (bytes.length > 0) {
               const headers: Record<string, string> = {};
+              // Bun.file() detects MIME from extension — use it so browsers parse JS/CSS
+              if (file.type) {
+                headers['Content-Type'] = file.type;
+              }
               const basename = url.pathname.split('/').pop() ?? '';
               // Angular outputHashing:"all" produces files like main-4TYFKVIL.js
               if (/[-\.][A-Za-z0-9]{8,}\.\w+$/.test(basename)) {
