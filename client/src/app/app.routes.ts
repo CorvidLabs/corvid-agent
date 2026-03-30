@@ -125,7 +125,7 @@ export const routes: Routes = [
                     import('./features/councils/council-launch-view.component').then((m) => m.CouncilLaunchViewComponent),
             },
             // Backwards-compat: old observe views that lived under sessions/*
-            { path: 'feed', redirectTo: '/observe', pathMatch: 'full' },
+            { path: 'feed', redirectTo: '/observe/comms', pathMatch: 'full' },
             { path: 'analytics', redirectTo: '/observe/analytics', pathMatch: 'full' },
             { path: 'logs', redirectTo: '/observe/logs', pathMatch: 'full' },
             { path: 'brain-viewer', redirectTo: '/observe/memory', pathMatch: 'full' },
@@ -149,8 +149,9 @@ export const routes: Routes = [
     {
         path: 'observe',
         children: [
+            { path: '', redirectTo: 'comms', pathMatch: 'full' },
             {
-                path: '',
+                path: 'comms',
                 loadComponent: () =>
                     import('./features/comms/unified-comms.component').then((m) => m.UnifiedCommsComponent),
             },
@@ -180,8 +181,8 @@ export const routes: Routes = [
                     import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
             },
             // Backwards-compat redirects for old observe paths
-            { path: 'live-feed', redirectTo: '/observe', pathMatch: 'full' },
-            { path: 'agent-comms', redirectTo: '/observe', pathMatch: 'full' },
+            { path: 'live-feed', redirectTo: '/observe/comms', pathMatch: 'full' },
+            { path: 'agent-comms', redirectTo: '/observe/comms', pathMatch: 'full' },
             { path: 'brain-viewer', redirectTo: '/observe/memory', pathMatch: 'full' },
             { path: 'memory-browser', redirectTo: '/observe/memory', pathMatch: 'full' },
         ],
@@ -246,13 +247,13 @@ export const routes: Routes = [
     { path: 'council-launches/:id', redirectTo: 'sessions/council-launches/:id' },
 
     // Old flat observe paths -> observe/*
-    { path: 'feed', redirectTo: 'observe', pathMatch: 'full' },
+    { path: 'feed', redirectTo: 'observe/comms', pathMatch: 'full' },
     { path: 'analytics', redirectTo: 'observe/analytics', pathMatch: 'full' },
     { path: 'logs', redirectTo: 'observe/logs', pathMatch: 'full' },
     { path: 'brain-viewer', redirectTo: 'observe/memory', pathMatch: 'full' },
     { path: 'reputation', redirectTo: 'observe/reputation', pathMatch: 'full' },
     { path: 'memory-browser', redirectTo: 'observe/memory', pathMatch: 'full' },
-    { path: 'agent-comms', redirectTo: 'observe', pathMatch: 'full' },
+    { path: 'agent-comms', redirectTo: 'observe/comms', pathMatch: 'full' },
 
     // Old automate paths -> settings/*
     { path: 'automate', redirectTo: 'settings/automation', pathMatch: 'full' },

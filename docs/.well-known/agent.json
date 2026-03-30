@@ -1,10 +1,10 @@
 {
   "name": "corvid-agent",
   "description": "Autonomous AI software engineer that designs, builds, tests, and deploys full-stack applications",
-  "url": "https://corvid-agent.github.io",
+  "url": "https://corvidlabs.github.io/corvid-agent",
   "provider": {
-    "organization": "corvid-agent",
-    "url": "https://github.com/corvid-agent"
+    "organization": "CorvidLabs",
+    "url": "https://github.com/CorvidLabs"
   },
   "version": "1.0.0",
   "capabilities": {
