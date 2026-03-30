@@ -49,7 +49,7 @@ Detects and caches Ollama model capabilities by querying the `/api/show` endpoin
 1. **Cache TTL 10 minutes**: Capabilities are cached per model name with a 10-minute TTL. Within TTL, cached results are returned without network calls
 2. **Tool support detected via template + family + name**: Detection checks in order: (a) template contains tool-related tokens (`tool_call`, `<tool>`, `function_call`, `.ToolCalls`, `tools`), (b) family is in `TOOL_CAPABLE_FAMILIES` set, (c) model name contains a known tool-capable family name
 3. **Embedding models always supportsTools=false**: Even if family or template suggests tool support, embedding models (`embed`, `nomic`, `mxbai`, `all-minilm`, `snowflake`, `bge` patterns) are forced to `supportsTools=false`
-4. **Fallback inference from name when /api/show fails**: If the API call fails or returns non-200, basic capabilities are inferred from the model name patterns alone, with conservative defaults (4096 context for chat, 512 for embedding). Name matching is ordered specific-to-generic (e.g., `qwen3moe` before `qwen3` before `qwen`)
+4. **Fallback inference from name when /api/show fails**: If the API call fails or returns non-200, basic capabilities are inferred from the model name patterns alone, with conservative defaults (4096 context for local chat, 32768 for cloud models, 512 for embedding). Name matching is ordered specific-to-generic (e.g., `qwen3.5` before `qwen3moe` before `qwen3` before `qwen`)
 5. **Effective context = 80% of raw**: `getEffectiveContextLength()` returns `floor(contextLength * 0.8)` to leave room for model overhead
 6. **Context length from model_info or parameters**: Checks `model_info` keys containing `context_length` or `context_window`, and `parameters` string for `num_ctx`. Uses the maximum found value
 
@@ -128,7 +128,7 @@ Internal constants (not env-configurable):
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `CACHE_TTL_MS` | `600000` (10 min) | Capability cache TTL |
-| `TOOL_CAPABLE_FAMILIES` | `llama, qwen2, qwen3, qwen3moe, mistral, command-r, firefunction, hermes, nemotron, deepseek2` | Families known to support tools |
+| `TOOL_CAPABLE_FAMILIES` | `llama, qwen2, qwen3, qwen3.5, qwen3moe, qwen3next, mistral, command-r, firefunction, hermes, nemotron, deepseek2, deepseek3.2, minimax, glm, kimi, devstral, gemini, gpt-oss` | Families known to support tools |
 | `TOOL_INCAPABLE_PATTERNS` | `embed, nomic, mxbai, all-minilm, snowflake, bge` | Patterns for embedding/non-tool models |
 | `VISION_PATTERNS` | `llava, bakllava, moondream, llama.*vision` | Patterns for vision-capable models |
 

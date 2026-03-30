@@ -415,7 +415,12 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
 }
 
 export function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {
-  const args: string[] = ['--print', '--output-format', 'stream-json', '--trust'];
+  const args: string[] = [
+    '--print',
+    '--output-format', 'stream-json',
+    '--stream-partial-output',  // Stream text deltas for real-time output
+    '--trust',
+  ];
 
   if (project.workingDir) {
     args.push('--workspace', project.workingDir);

@@ -39,10 +39,10 @@ const log = createLogger('CursorProvider');
 const MAX_CONCURRENT = Number(process.env.CURSOR_MAX_CONCURRENT) || 4;
 
 /** Timeout for a single cursor-agent completion (ms). */
-const COMPLETION_TIMEOUT_MS = 10 * 60_000; // 10 minutes
+const COMPLETION_TIMEOUT_MS = Number(process.env.CURSOR_COMPLETION_TIMEOUT) || 15 * 60_000; // 15 minutes default
 
 /** Kill process if no stdout data received within this window (ms). */
-const STREAM_IDLE_TIMEOUT_MS = 60_000; // 60 seconds
+const STREAM_IDLE_TIMEOUT_MS = Number(process.env.CURSOR_STREAM_IDLE_TIMEOUT) || 120_000; // 120 seconds (matches cursor-process.ts)
 
 interface SlotWaiter {
     resolve: (acquired: boolean) => void;
