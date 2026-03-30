@@ -97,8 +97,6 @@ Internal types (`MemoryObservation`, `RecordObservationInput`, `ListObservationO
 | Module | What is used |
 |--------|-------------|
 | `server/mcp/tool-handlers/memory.ts` | Observation CRUD via MCP tools |
-| `server/scheduler/jobs/graduate-observations.ts` | `getGraduationCandidates`, `markGraduated` |
-| `server/scheduler/jobs/expire-observations.ts` | `expireObservations`, `purgeOldObservations` |
 
 ## Database Tables
 

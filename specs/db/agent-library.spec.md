@@ -101,7 +101,7 @@ Data-access layer for CRVLIB — the shared, plaintext on-chain knowledge librar
 | Module | What is used |
 |--------|-------------|
 | `server/mcp/tool-handlers/library.ts` | Full CRUD via MCP library tools |
-| `server/algochat/memory-sync.ts` | `upsertLibraryEntryFromChain`, `resolveLibraryAsaId` for on-chain sync |
+| `server/db/memory-sync.ts` | `upsertLibraryEntryFromChain`, `resolveLibraryAsaId` for on-chain sync |
 
 ## Database Tables
 
