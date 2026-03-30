@@ -116,6 +116,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `McpReadOnChainMemoriesSchema` | MCP API | Validates MCP on-chain memory read: `agentId` (required), optional `search`, `limit`. |
 | `McpSyncOnChainMemoriesSchema` | MCP API | Validates MCP on-chain memory sync: `agentId` (required), optional `limit`. |
 | `McpDeleteMemorySchema` | MCP API | Validates MCP memory delete: `agentId`, `key` (required), optional `mode` (soft/hard). |
+| `McpPromoteMemorySchema` | MCP API | Validates MCP memory promote: `agentId`, `key` (both required). |
 | `McpRecordObservationSchema` | MCP API | Validates MCP observation record: `agentId`, `content` (required), optional `source` (session/feedback/daily-review/health/pr-outcome/manual), `sourceId`, `suggestedKey`, `relevanceScore`. |
 | `McpListObservationsSchema` | MCP API | Validates MCP observation list: `agentId` (required), optional `status` (active/graduated/expired/dismissed), `source`, `query`, `limit`. |
 | `McpBoostObservationSchema` | MCP API | Validates MCP observation boost: `agentId`, `id` (required), optional `scoreBoost`. |

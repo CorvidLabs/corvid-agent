@@ -226,7 +226,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `server/improvement/service.ts` | `MemoryManager`, `ScoredMemory` |
 | `server/improvement/prompt-builder.ts` | `ScoredMemory` |
 | `server/scheduler/service.ts` | `summarizeOldMemories` |
-| `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
+| `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handlePromoteMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
 | `server/process/manager.ts` | `saveMemory` (session exit auto-save) |
 
 ## Database Tables
