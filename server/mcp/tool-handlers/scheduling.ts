@@ -26,12 +26,14 @@ export async function handleManageSchedule(
     try {
         switch (args.action) {
             case 'list': {
-                const schedules = listSchedules(ctx.db, ctx.agentId);
+                // If agent_id provided, filter to that agent; otherwise return all schedules
+                const schedules = listSchedules(ctx.db, args.agent_id);
                 if (schedules.length === 0) return textResult('No schedules found.');
                 const lines = schedules.map((s) =>
-                    `- ${s.name} [${s.id}] status=${s.status} executions=${s.executionCount}${s.nextRunAt ? ` next=${s.nextRunAt}` : ''}`
+                    `- [${s.agentId.slice(0, 8)}] ${s.name} [${s.id}] status=${s.status} executions=${s.executionCount}${s.nextRunAt ? ` next=${s.nextRunAt}` : ''}`
                 );
-                return textResult(`Your schedules:\n\n${lines.join('\n')}`);
+                const header = args.agent_id ? `Schedules for agent ${args.agent_id}:` : `All schedules (${schedules.length}):`;
+                return textResult(`${header}\n\n${lines.join('\n')}`);
             }
 
             case 'create': {

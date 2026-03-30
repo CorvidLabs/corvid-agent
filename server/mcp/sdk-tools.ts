@@ -264,7 +264,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 })).optional().describe('Actions to perform (for create/update)'),
                 approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
                 max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),
-                agent_id: z.string().optional().describe('Agent ID to assign this schedule to (for create/update). Defaults to the calling agent.'),
+                agent_id: z.string().optional().describe('Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.'),
                 schedule_id: z.string().optional().describe('Schedule ID (for get/update/pause/resume/history)'),
                 output_destinations: z.array(z.object({
                     type: z.string().describe('Destination type: discord_channel, algochat_agent, or algochat_address'),
