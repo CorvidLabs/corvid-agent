@@ -28,6 +28,11 @@ interface CacheEntry<T> {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 
+/** Clear the autocomplete cache (useful for testing). */
+export function clearAutocompleteCache(): void {
+  cache.clear();
+}
+
 function cached<T>(key: string, fn: () => T): T {
   const now = Date.now();
   const entry = cache.get(key) as CacheEntry<T> | undefined;

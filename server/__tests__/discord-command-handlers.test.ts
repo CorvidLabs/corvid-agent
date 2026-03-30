@@ -24,7 +24,7 @@ import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
 import { createBundle } from '../db/skill-bundles';
 // Direct imports for unit-level tests
-import { handleAutocomplete } from '../discord/command-handlers/autocomplete-handler';
+import { clearAutocompleteCache, handleAutocomplete } from '../discord/command-handlers/autocomplete-handler';
 import { handleComponentInteraction } from '../discord/command-handlers/component-handlers';
 import {
   formatUptime,
@@ -178,6 +178,7 @@ beforeEach(() => {
   db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
   capturedResponse = null;
+  clearAutocompleteCache();
   process.env.DISCORD_APP_ID = 'test-app-id';
 
   globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
