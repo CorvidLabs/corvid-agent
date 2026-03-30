@@ -134,4 +134,45 @@ describe('MCP API Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(403);
     });
+
+    it('POST /api/mcp/promote-memory with missing fields returns error', async () => {
+        const deps = makeMockDeps();
+        const { req, url } = fakeReq('POST', '/api/mcp/promote-memory', {});
+        const res = await handleMcpApiRoutes(req, url, deps);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
+    });
+
+    it('POST /api/mcp/promote-memory with nonexistent memory returns error', async () => {
+        const deps = makeMockDeps();
+        const { req, url } = fakeReq('POST', '/api/mcp/promote-memory', {
+            agentId: 'nonexistent-agent',
+            key: 'nonexistent-key',
+        });
+        const res = await handleMcpApiRoutes(req, url, deps);
+        expect(res).not.toBeNull();
+        const data = await res!.json();
+        expect(data.isError).toBe(true);
+        expect(data.response).toContain('No memory found');
+    });
+
+    it('POST /api/mcp/promote-memory returns promote result for existing memory', async () => {
+        // First save a memory via the save route
+        const { createAgent } = await import('../db/agents');
+        const agent = createAgent(db, { name: 'promote-test-agent' });
+        const { saveMemory } = await import('../db/agent-memories');
+        saveMemory(db, { agentId: agent.id, key: 'promote-test', content: 'test data' });
+
+        const deps = makeMockDeps();
+        const { req, url } = fakeReq('POST', '/api/mcp/promote-memory', {
+            agentId: agent.id,
+            key: 'promote-test',
+        });
+        const res = await handleMcpApiRoutes(req, url, deps);
+        expect(res).not.toBeNull();
+        const data = await res!.json();
+        // Will fail to promote (no ARC-69 context in test) but should reach the handler
+        expect(data.isError).toBe(true);
+        expect(data.response).toContain('Cannot promote memory');
+    });
 });
