@@ -1,8 +1,9 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
-import { listSchedules, getSchedule, createSchedule, updateSchedule, listExecutions } from '../../db/schedules';
+import { listSchedules, getSchedule, createSchedule, updateSchedule, listExecutions, updateScheduleNextRun } from '../../db/schedules';
 import { validateScheduleFrequency } from '../../scheduler/service';
+import { getNextCronDate } from '../../scheduler/cron-parser';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('McpToolHandlers');
@@ -74,12 +75,24 @@ export async function handleManageSchedule(
                     outputDestinations,
                 });
 
+                // Compute and persist next_run_at so the scheduler picks it up immediately
+                let nextRunAt = schedule.nextRunAt;
+                if (args.cron_expression) {
+                    try {
+                        nextRunAt = getNextCronDate(args.cron_expression).toISOString();
+                        updateScheduleNextRun(ctx.db, schedule.id, nextRunAt);
+                    } catch { /* invalid cron — leave as null */ }
+                } else if (intervalMs) {
+                    nextRunAt = new Date(Date.now() + intervalMs).toISOString();
+                    updateScheduleNextRun(ctx.db, schedule.id, nextRunAt);
+                }
+
                 return textResult(
                     `Schedule created!\n` +
                     `  ID: ${schedule.id}\n` +
                     `  Name: ${schedule.name}\n` +
                     `  Status: ${schedule.status}\n` +
-                    `  Next run: ${schedule.nextRunAt ?? 'pending calculation'}`,
+                    `  Next run: ${nextRunAt ?? 'pending calculation'}`,
                 );
             }
 
@@ -171,6 +184,19 @@ export async function handleManageSchedule(
 
                 const updated = updateSchedule(ctx.db, args.schedule_id, updateInput);
                 if (!updated) return errorResult('Schedule not found');
+
+                // Recompute next_run_at if timing changed
+                if (updateInput.cronExpression !== undefined || updateInput.intervalMs !== undefined) {
+                    const cron = updated.cronExpression;
+                    const interval = updated.intervalMs ?? undefined;
+                    let nextRunAt: string | null = null;
+                    if (cron) {
+                        try { nextRunAt = getNextCronDate(cron).toISOString(); } catch { /* invalid */ }
+                    } else if (interval) {
+                        nextRunAt = new Date(Date.now() + interval).toISOString();
+                    }
+                    if (nextRunAt) updateScheduleNextRun(ctx.db, updated.id, nextRunAt);
+                }
 
                 return textResult(
                     `Schedule "${updated.name}" [${updated.id}] updated.\n` +

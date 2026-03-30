@@ -444,7 +444,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
 
     tools.push({
         name: 'corvid_manage_schedule',
-        description: 'Manage automated schedules for this agent. Use action="list" to view, "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
+        description: 'Manage automated schedules for all agents. Use action="list" without agent_id to see all schedules, or pass agent_id to filter. Use "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
         parameters: {
             type: 'object',
             properties: {

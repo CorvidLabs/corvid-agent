@@ -244,7 +244,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         ] : []),
         tool(
             'corvid_manage_schedule',
-            'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
+            'Manage automated schedules for all agents. Omit agent_id in list/get to see all agents\' schedules. Schedules run actions on a cron or interval basis. ' +
             'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom. ' +
             'Use action="list" to view schedules, "get" to see full details of one, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
