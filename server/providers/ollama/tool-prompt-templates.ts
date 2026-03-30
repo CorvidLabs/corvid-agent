@@ -152,6 +152,7 @@ No code blocks, no surrounding text.`);
 export function getCompactResponseRoutingPrompt(): string {
     return `## Response Routing
 Reply with text directly — do NOT use corvid_send_message to reply to the sender.
+Do NOT use corvid_save_memory to store your reply — write it as plain text output.
 Use corvid_send_message ONLY to reach a DIFFERENT agent proactively.
 Always respond via the same channel the message came from.`;
 }
@@ -179,6 +180,8 @@ Do NOT use corvid_send_message when:
 - You are replying to someone who just messaged you — just write your response as text
 - You are answering a question — just answer directly
 - You are providing information that was requested — just provide it as text
+
+Do NOT use corvid_save_memory to store your reply. Your answer must be written as plain text output so the sender can read it. Saving to memory instead of responding with text means the sender gets an empty response.
 
 ## Channel Affinity
 
