@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import type { InitOptions } from '../../cli/commands/init';
@@ -93,7 +93,7 @@ describe('Agent Skills', () => {
 
     test('copySkills copies to .claude/skills/', () => {
         const { copySkills } = require('../../cli/commands/init');
-        const tmpDir = join(tmpdir(), `corvid-skills-test-${Date.now()}`);
+        const tmpDir = mkdtempSync(join(tmpdir(), 'corvid-skills-test-'));
         mkdirSync(join(tmpDir, '.claude'), { recursive: true });
 
         try {
