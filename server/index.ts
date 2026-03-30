@@ -544,8 +544,8 @@ const server = Bun.serve<WsData>({
                 headers['Content-Type'] = file.type;
               }
               const basename = url.pathname.split('/').pop() ?? '';
-              // Angular outputHashing:"all" produces files like main.abc1234f.js
-              if (/\.[a-f0-9]{8,}\.\w+$/.test(basename)) {
+              // Angular outputHashing:"all" produces files like main-4TYFKVIL.js
+              if (/[-\.][A-Za-z0-9]{8,}\.\w+$/.test(basename)) {
                 headers['Cache-Control'] = 'public, max-age=31536000, immutable';
               } else if (basename === 'index.html') {
                 headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
