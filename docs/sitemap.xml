@@ -1,47 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://corvid-agent.github.io/</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/getting-started.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/getting-started.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/architecture.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/architecture.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/algochat.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/algochat.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/security.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/security.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/self-hosting.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/self-hosting.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/why-corvidagent.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/why-corvidagent.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/business-guide.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/business-guide.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://corvid-agent.github.io/enterprise.html</loc>
+    <loc>https://corvidlabs.github.io/corvid-agent/enterprise.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
