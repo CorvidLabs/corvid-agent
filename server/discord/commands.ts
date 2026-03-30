@@ -184,6 +184,7 @@ export async function registerSlashCommands(_db: Database, config: DiscordBridge
           type: 1,
           options: [
             { name: 'name', description: 'Schedule name', type: 3, required: true },
+            { name: 'agent', description: 'Agent to run the schedule', type: 3, required: false, autocomplete: true },
             { name: 'cron', description: 'Cron expression (e.g. "0 9 * * *" for 9am daily)', type: 3 },
             {
               name: 'action_type',
