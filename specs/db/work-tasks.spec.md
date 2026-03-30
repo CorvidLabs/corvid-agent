@@ -128,7 +128,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | created_at | TEXT | DEFAULT datetime('now') | ISO 8601 creation timestamp |
 | completed_at | TEXT | DEFAULT NULL | ISO 8601 completion timestamp (set on completed/failed) |
 
-**Indexes:** `idx_work_tasks_agent(agent_id)`, `idx_work_tasks_status(status)`, `idx_work_tasks_session(session_id)`, `idx_work_tasks_pending_dispatch(status, project_id, priority DESC, created_at ASC)`
+**Indexes:** `idx_work_tasks_agent(agent_id)`, `idx_work_tasks_status(status)`, `idx_work_tasks_session(session_id)`, `idx_work_tasks_tenant(tenant_id)`, `idx_work_tasks_pending_dispatch(status, project_id, priority DESC, created_at ASC)`
 
 ## Change Log
 | Date | Author | Change |

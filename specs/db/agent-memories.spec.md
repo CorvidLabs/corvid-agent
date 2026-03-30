@@ -121,6 +121,8 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | asa_id | INTEGER | DEFAULT NULL | ARC-69 ASA ID for long-term memories (localnet only). NULL for permanent (plain txn) memories |
 | status | TEXT | DEFAULT 'confirmed' | Lifecycle status: pending, confirmed, failed |
 | archived | INTEGER | NOT NULL, DEFAULT 0 | Soft-delete flag (0 = active, 1 = archived) |
+| book | TEXT | DEFAULT NULL | Book grouping for organized memory collections (e.g. 'operational', 'contacts') |
+| page | INTEGER | DEFAULT NULL | Page number within a book for ordered content |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
 
@@ -131,6 +133,14 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | idx_agent_memories_agent_key | (agent_id, key) | UNIQUE | Enforces one memory per agent+key pair, used for upsert |
 | idx_agent_memories_agent | (agent_id) | INDEX | Speeds up per-agent queries |
 | idx_agent_memories_asa | (agent_id, asa_id) WHERE asa_id IS NOT NULL | INDEX | Fast lookup of memory by ASA ID |
+| idx_agent_memories_book_page | (agent_id, book, page) WHERE book IS NOT NULL | INDEX | Fast lookup of memories within a book |
+
+### Triggers
+
+| Trigger | Event | Description |
+|---------|-------|-------------|
+| trg_agent_memories_book_page_insert | BEFORE INSERT | Enforces book and page must both be set or both be NULL |
+| trg_agent_memories_book_page_update | BEFORE UPDATE | Enforces book and page must both be set or both be NULL |
 
 ## Change Log
 

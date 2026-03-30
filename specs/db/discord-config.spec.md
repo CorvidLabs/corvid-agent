@@ -6,6 +6,8 @@ files:
   - server/db/discord-config.ts
 db_tables:
   - discord_config
+  - discord_muted_users
+  - discord_processed_messages
 depends_on: []
 ---
 
@@ -102,6 +104,24 @@ DB-backed runtime configuration for the Discord integration. Static settings (bo
 | `key` | TEXT | PRIMARY KEY | Config key name (e.g. `mode`, `public_mode`) |
 | `value` | TEXT | NOT NULL | Config value as string |
 | `updated_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | Last update timestamp |
+
+### discord_muted_users
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `user_id` | TEXT | PRIMARY KEY | Discord user ID of the muted user |
+| `muted_by` | TEXT | DEFAULT NULL | Who muted this user (agent ID or 'system') |
+| `created_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | When the user was muted |
+
+### discord_processed_messages
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `message_id` | TEXT | PRIMARY KEY | Discord message ID that was processed |
+| `channel_id` | TEXT | NOT NULL | Discord channel ID where the message was sent |
+| `created_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | When the message was processed |
+
+**Indexes:** `idx_discord_processed_messages_created` on `created_at`
 
 ## Configuration
 
