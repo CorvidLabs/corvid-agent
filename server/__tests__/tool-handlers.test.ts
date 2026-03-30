@@ -44,6 +44,7 @@ import {
     handleListAgents,
     type McpToolContext,
 } from '../mcp/tool-handlers';
+import { getSchedule } from '../db/schedules';
 import { grantCredits } from '../db/credits';
 import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
 const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
@@ -400,6 +401,84 @@ describe('handleManageSchedule', () => {
         });
         expect(result.isError).toBeUndefined();
         expect((result.content[0] as { text: string }).text).toContain('Schedule created');
+    });
+
+    test('create with cron sets next_run_at', async () => {
+        const ctx = createMockContext();
+        const result = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'Cron Next Run',
+            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
+            cron_expression: '@daily',
+        });
+        const text = (result.content[0] as { text: string }).text;
+        const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
+        expect(idMatch).not.toBeNull();
+        // Verify next_run_at was persisted in DB
+        const schedule = getSchedule(db, idMatch![1]);
+        expect(schedule).not.toBeNull();
+        expect(schedule!.nextRunAt).not.toBeNull();
+        // The output should show the computed next run, not 'pending calculation'
+        expect(text).not.toContain('pending calculation');
+    });
+
+    test('create with interval sets next_run_at', async () => {
+        const ctx = createMockContext();
+        const result = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'Interval Next Run',
+            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
+            interval_minutes: 60,
+        });
+        const text = (result.content[0] as { text: string }).text;
+        const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
+        expect(idMatch).not.toBeNull();
+        const schedule = getSchedule(db, idMatch![1]);
+        expect(schedule).not.toBeNull();
+        expect(schedule!.nextRunAt).not.toBeNull();
+        expect(text).not.toContain('pending calculation');
+    });
+
+    test('update with cron_expression recomputes next_run_at', async () => {
+        const ctx = createMockContext();
+        const createResult = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'Update Cron',
+            schedule_actions: [{ type: 'star_repo' }],
+            cron_expression: '@daily',
+        });
+        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+        const scheduleId = idMatch![1];
+
+        const result = await handleManageSchedule(ctx, {
+            action: 'update',
+            schedule_id: scheduleId,
+            cron_expression: '@hourly',
+        });
+        expect(result.isError).toBeUndefined();
+        const schedule = getSchedule(db, scheduleId);
+        expect(schedule!.nextRunAt).not.toBeNull();
+    });
+
+    test('update with interval_minutes recomputes next_run_at', async () => {
+        const ctx = createMockContext();
+        const createResult = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'Update Interval',
+            schedule_actions: [{ type: 'star_repo' }],
+            interval_minutes: 60,
+        });
+        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+        const scheduleId = idMatch![1];
+
+        const result = await handleManageSchedule(ctx, {
+            action: 'update',
+            schedule_id: scheduleId,
+            interval_minutes: 120,
+        });
+        expect(result.isError).toBeUndefined();
+        const schedule = getSchedule(db, scheduleId);
+        expect(schedule!.nextRunAt).not.toBeNull();
     });
 
     test('pause requires schedule_id', async () => {

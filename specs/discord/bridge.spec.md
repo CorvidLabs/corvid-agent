@@ -160,6 +160,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleAutocomplete` | `(ctx, interaction)` | `Promise<void>` | Handle autocomplete interactions — provides live results for agent and project name fields |
+| `clearAutocompleteCache` | `()` | `void` | Clear the TTL cache (used by tests to isolate each run) |
 
 ### Exported Functions (from command-handlers/message-commands.ts)
 
@@ -340,6 +341,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `ThreadSessionInfo` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayColor?, displayIcon?, avatarUrl?, creatorPermLevel?, buddyConfig?) |
 | `ThreadCallbackInfo` | Active subscription info per thread (sessionId, callback) |
 
+### Exported Classes (from thread-session-manager.ts)
+
+| Class | Description |
+|-------|-------------|
+| `ThreadSessionManager` | Owns all thread/session/mention Maps and TTL-based cleanup for DiscordBridge (threadSessions, threadCallbacks, threadLastActivity, mentionSessions, processedMessageIds) |
+
 ### Exported Functions (from thread-session-map.ts)
 
 | Function | Parameters | Returns | Description |
@@ -347,6 +354,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `normalizeTimestamp` | `(ts: string)` | `string` | Normalize a SQLite UTC timestamp by appending 'Z' if missing timezone indicator |
 | `formatDuration` | `(ms: number)` | `string` | Format a duration in milliseconds as human-readable "Xm Ys" or "Xs" |
 | `tryRecoverThread` | `(db: Database, threadSessions: Map, threadId: string)` | `ThreadSessionInfo \| null` | Try to recover a thread-to-session mapping from the database after server restart |
+
+### Exported Classes (from thread-session-manager.ts)
+
+| Class | Description |
+|-------|-------------|
+| `ThreadSessionManager` | Owns all thread/session/mention state for DiscordBridge — centralises Maps/Sets and adds TTL-based cleanup for mention sessions |
 
 ### Exported Types (from extracted modules)
 

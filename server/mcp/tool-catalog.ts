@@ -73,7 +73,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     { name: 'corvid_create_work_task', description: 'Create a work task that spawns a new agent session on a branch', category: 'work', conditional: true },
     { name: 'corvid_check_work_status', description: 'Check the status of a work task by ID', category: 'work', conditional: true },
     { name: 'corvid_list_work_tasks', description: 'List work tasks, optionally filtered by status', category: 'work', conditional: true },
-    { name: 'corvid_manage_schedule', description: 'Manage automated cron/interval schedules for this agent', category: 'work' },
+    { name: 'corvid_manage_schedule', description: 'Manage automated cron/interval schedules across all agents. Use action="list" without agent_id to see all schedules.', category: 'work' },
     { name: 'corvid_manage_workflow', description: 'Manage graph-based workflows for multi-step orchestration', category: 'work' },
 
     // ── Research ──────────────────────────────────────────────────────────

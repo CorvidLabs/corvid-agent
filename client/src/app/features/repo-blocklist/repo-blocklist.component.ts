@@ -104,7 +104,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
             border-radius: var(--radius-lg);
         }
         .list__item-main { flex: 1; min-width: 0; }
-        .list__item-repo { font-family: monospace; font-size: 0.85rem; color: var(--text-primary); }
+        .list__item-repo { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); }
         .list__item-detail { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
         .list__item-reason { font-size: 0.8rem; color: var(--text-secondary); }
         .badge {

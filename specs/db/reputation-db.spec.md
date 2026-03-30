@@ -7,6 +7,8 @@ files:
 db_tables:
   - agent_reputation
   - reputation_events
+  - reputation_attestations
+  - reputation_history
 depends_on: []
 ---
 
@@ -100,6 +102,7 @@ Pure data-access layer for reading and deleting agent reputation scores and repu
 | `security_compliance` | INTEGER | DEFAULT `0` | Security compliance component (0-100) |
 | `activity_level` | INTEGER | DEFAULT `0` | Recent activity level component (0-100) |
 | `attestation_hash` | TEXT | DEFAULT `NULL` | On-chain attestation hash if published |
+| `tenant_id` | TEXT | DEFAULT NULL | Tenant isolation identifier |
 | `computed_at` | TEXT | DEFAULT `datetime('now')` | ISO 8601 timestamp of last score computation |
 
 ### reputation_events
@@ -116,6 +119,37 @@ Pure data-access layer for reading and deleting agent reputation scores and repu
 **Indexes:**
 - `idx_reputation_events_agent` on `agent_id`
 - `idx_reputation_events_type` on `event_type`
+
+### reputation_attestations
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `agent_id` | TEXT | PK part | Agent whose reputation is attested |
+| `hash` | TEXT | PK part | Attestation hash |
+| `payload` | TEXT | DEFAULT NULL | JSON-serialized attestation payload |
+| `txid` | TEXT | DEFAULT NULL | On-chain transaction ID |
+| `published_at` | TEXT | DEFAULT NULL | When the attestation was published on-chain |
+| `created_at` | TEXT | DEFAULT `datetime('now')` | Creation timestamp |
+
+### reputation_history
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing identifier |
+| `agent_id` | TEXT | NOT NULL | Agent whose reputation is tracked |
+| `overall_score` | INTEGER | NOT NULL | Composite reputation score at this point in time |
+| `trust_level` | TEXT | NOT NULL | Trust level at this point in time |
+| `task_completion` | INTEGER | NOT NULL, DEFAULT 0 | Task completion component |
+| `peer_rating` | INTEGER | NOT NULL, DEFAULT 0 | Peer rating component |
+| `credit_pattern` | INTEGER | NOT NULL, DEFAULT 0 | Credit pattern component |
+| `security_compliance` | INTEGER | NOT NULL, DEFAULT 0 | Security compliance component |
+| `activity_level` | INTEGER | NOT NULL, DEFAULT 0 | Activity level component |
+| `computed_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | When this snapshot was computed |
+
+**Indexes:**
+- `idx_reputation_history_agent` on `agent_id`
+- `idx_reputation_history_computed` on `computed_at`
+- `idx_reputation_history_agent_time` on `(agent_id, computed_at)`
 
 ## Change Log
 

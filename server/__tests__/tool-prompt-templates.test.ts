@@ -7,6 +7,7 @@ import {
     getCompactCodingToolPrompt,
     getCodingToolPrompt,
     getCodebaseContextPrompt,
+    getProjectContextPrompt,
 } from '../providers/ollama/tool-prompt-templates';
 
 let savedGithubOwner: string | undefined;
@@ -234,5 +235,59 @@ describe('detectModelFamily', () => {
 
     test('returns unknown for unrecognized model', () => {
         expect(detectModelFamily('some-random-model')).toBe('unknown');
+    });
+});
+
+describe('getProjectContextPrompt', () => {
+    const baseProject = {
+        id: 'proj-1',
+        name: 'rs-algochat',
+        description: 'Rust AlgoChat',
+        workingDir: '/home/user/rs-algochat',
+        claudeMd: '',
+        envVars: {},
+        gitUrl: null,
+        dirStrategy: 'persistent' as const,
+        baseClonePath: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    test('includes project name and working directory', () => {
+        const result = getProjectContextPrompt(baseProject);
+        expect(result).toContain('## Active Project Context');
+        expect(result).toContain('rs-algochat');
+        expect(result).toContain('/home/user/rs-algochat');
+    });
+
+    test('includes GitHub repo slug when gitUrl is a GitHub HTTPS URL', () => {
+        const project = { ...baseProject, gitUrl: 'https://github.com/CorvidLabs/rs-algochat.git' };
+        const result = getProjectContextPrompt(project);
+        expect(result).toContain('CorvidLabs/rs-algochat');
+        expect(result).toContain('GitHub repo:');
+    });
+
+    test('includes GitHub repo slug when gitUrl is a GitHub SSH URL', () => {
+        const project = { ...baseProject, gitUrl: 'git@github.com:CorvidLabs/rs-algochat.git' };
+        const result = getProjectContextPrompt(project);
+        expect(result).toContain('CorvidLabs/rs-algochat');
+    });
+
+    test('includes git remote but no GitHub slug for non-GitHub URLs', () => {
+        const project = { ...baseProject, gitUrl: 'https://gitlab.com/example/repo.git' };
+        const result = getProjectContextPrompt(project);
+        expect(result).toContain('https://gitlab.com/example/repo.git');
+        expect(result).not.toContain('GitHub repo:');
+    });
+
+    test('omits git remote section when gitUrl is null', () => {
+        const result = getProjectContextPrompt(baseProject);
+        expect(result).not.toContain('Git remote:');
+        expect(result).not.toContain('GitHub repo:');
+    });
+
+    test('includes warning against defaulting to wrong repo', () => {
+        const result = getProjectContextPrompt(baseProject);
+        expect(result).toContain('not corvid-agent or any other repository');
     });
 });

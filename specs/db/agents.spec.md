@@ -160,6 +160,13 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 | voice_preset | TEXT | DEFAULT 'alloy' | Voice preset for TTS (alloy, echo, fable, onyx, nova, shimmer) |
 | wallet_address | TEXT | DEFAULT NULL | Algorand wallet address |
 | wallet_mnemonic_encrypted | TEXT | DEFAULT NULL | AES-encrypted wallet mnemonic |
+| display_color | TEXT | DEFAULT NULL | Custom hex color for UI display (e.g. '#FF5733') |
+| display_icon | TEXT | DEFAULT NULL | Custom icon identifier for UI display |
+| avatar_url | TEXT | DEFAULT NULL | URL to agent's avatar image |
+| disabled | INTEGER | DEFAULT 0 | Whether agent is disabled (boolean) |
+| conversation_mode | TEXT | NOT NULL, DEFAULT 'private' | Conversation access mode: 'private', 'allowlist', 'public' |
+| conversation_rate_limit_window | INTEGER | NOT NULL, DEFAULT 3600 | Rate limit window in seconds for conversations |
+| conversation_rate_limit_max | INTEGER | NOT NULL, DEFAULT 10 | Max conversations per rate limit window |
 | wallet_funded_algo | REAL | DEFAULT 0 | Total ALGO funded to this agent |
 | tenant_id | TEXT | NOT NULL, DEFAULT 'default' | Tenant isolation identifier |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |

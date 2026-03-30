@@ -85,15 +85,17 @@ interface CommandItem {
             position: fixed;
             inset: 0;
             z-index: 9999;
-            background: var(--overlay);
+            background: var(--overlay-heavy);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             display: flex;
             justify-content: center;
             padding-top: 15vh;
-            animation: fadeIn 0.1s ease;
+            animation: backdropIn 0.15s ease;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        @keyframes backdropIn {
+            from { opacity: 0; backdrop-filter: blur(0); }
+            to { opacity: 1; backdrop-filter: blur(8px); }
         }
         .palette {
             width: 560px;
@@ -101,11 +103,16 @@ interface CommandItem {
             background: var(--bg-surface, #1a1a2e);
             border: 1px solid var(--border-bright, #333);
             border-radius: 12px;
-            box-shadow: 0 16px 48px var(--shadow-deep);
+            box-shadow: 0 16px 48px var(--shadow-deep), 0 0 80px rgba(0, 229, 255, 0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             align-self: flex-start;
+            animation: paletteIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes paletteIn {
+            from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
         .palette__search {
             display: flex;
@@ -182,6 +189,9 @@ interface CommandItem {
         .palette__item--active {
             background: var(--accent-cyan-dim, var(--accent-cyan-subtle));
             color: var(--text-primary, #eee);
+        }
+        .palette__item--active {
+            box-shadow: inset 3px 0 0 var(--accent-cyan);
         }
         .palette__item-icon {
             width: 24px;

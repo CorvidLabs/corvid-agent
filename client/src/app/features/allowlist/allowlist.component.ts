@@ -118,7 +118,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
             border-radius: var(--radius-lg);
         }
         .list__item-main { flex: 1; min-width: 0; }
-        .list__item-address { font-family: monospace; font-size: 0.8rem; color: var(--text-primary); word-break: break-all; }
+        .list__item-address { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-primary); word-break: break-all; }
         .list__item-label { font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
         .list__item-label:hover { color: var(--text-primary); }
         .label-row { margin-top: 0.25rem; }

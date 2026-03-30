@@ -116,12 +116,16 @@ Pure data-access layer for project CRUD operations. Projects are the top-level o
 | `working_dir` | TEXT | NOT NULL | Filesystem path to the project working directory |
 | `claude_md` | TEXT | DEFAULT `''` | Custom CLAUDE.md content injected into agent sessions |
 | `env_vars` | TEXT | DEFAULT `'{}'` | JSON-serialized key-value pairs of environment variables |
+| `git_url` | TEXT | DEFAULT NULL | Git remote URL for cloneable projects |
+| `dir_strategy` | TEXT | NOT NULL, DEFAULT `'persistent'` | Directory strategy: 'persistent' (fixed dir) or 'clone' (fresh clone per session) |
+| `base_clone_path` | TEXT | DEFAULT NULL | Base filesystem path for clone-strategy projects |
 | `tenant_id` | TEXT | NOT NULL DEFAULT `'default'` | Multi-tenant isolation key (added in migration 57) |
 | `created_at` | TEXT | DEFAULT `datetime('now')` | ISO 8601 creation timestamp |
 | `updated_at` | TEXT | DEFAULT `datetime('now')` | ISO 8601 last-update timestamp |
 
 **Indexes:**
 - `idx_projects_tenant` on `tenant_id`
+- `idx_projects_tenant_name` on `(tenant_id, name COLLATE NOCASE)` UNIQUE — prevents duplicate project names per tenant
 
 ## Change Log
 

@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 108;
+const SCHEMA_VERSION = 111;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -169,6 +169,19 @@ const MIGRATIONS: Record<number, string[]> = {
         `ALTER TABLE agent_memories ADD COLUMN page INTEGER DEFAULT NULL`,
         ...memory.indexes.filter((s) => s.includes('book_page')),
         ...memory.triggers.filter((s) => s.includes('book_page')),
+    ],
+    109: [
+        // Persist processed Discord message IDs across restarts (prevents duplicate handling)
+        ...discord.tables.filter((s) => s.includes('discord_processed_messages')),
+        ...discord.indexes.filter((s) => s.includes('discord_processed_messages')),
+    ],
+    110: [
+        // Conversation summary for Discord session context carry-over
+        `ALTER TABLE sessions ADD COLUMN conversation_summary TEXT DEFAULT NULL`,
+    ],
+    111: [
+        // Library entry titles
+        `ALTER TABLE agent_library ADD COLUMN title TEXT DEFAULT NULL`,
     ],
 };
 

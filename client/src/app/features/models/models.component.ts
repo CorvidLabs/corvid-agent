@@ -359,7 +359,7 @@ interface LibraryResponse {
         .pull-card__status { font-size: 0.72rem; text-transform: uppercase; color: var(--accent-cyan); font-weight: 600; letter-spacing: 0.05em; }
         .pull-card__status--error { color: #ff5050; }
         .pull-card__detail { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-tertiary); margin-top: 0.35rem; }
-        .pull-card__layer { font-size: 0.68rem; color: var(--text-tertiary); margin-top: 0.25rem; font-family: monospace; }
+        .pull-card__layer { font-size: 0.68rem; color: var(--text-tertiary); margin-top: 0.25rem; font-family: var(--font-mono); }
         .pull-card__error { font-size: 0.78rem; color: #ff5050; margin-top: 0.35rem; }
 
         /* Progress Bar */

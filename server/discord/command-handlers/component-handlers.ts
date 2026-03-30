@@ -57,10 +57,11 @@ export async function handleComponentInteraction(
             // Un-archive the thread if it was archived
             await unarchiveThread(ctx.config.botToken, threadId);
 
-            // Resubscribe for responses
-            if (!ctx.threadCallbacks.has(threadId)) {
-                ctx.subscribeForResponseWithEmbed(info.sessionId, threadId, info.agentName, info.agentModel, info.projectName, info.displayColor, info.displayIcon, info.avatarUrl);
-            }
+            // Don't resubscribe here — the process isn't running yet.
+            // subscribeForResponseWithEmbed will be called by routeToThread when
+            // the user sends a message and resumeProcess actually starts the process.
+            // Subscribing now would start the zombie-detection timer against a
+            // non-running process, triggering a false "session ended unexpectedly" embed.
             ctx.threadLastActivity.set(threadId, Date.now());
 
             await acknowledgeButton(interaction, 'Session resumed — send a message to continue.');

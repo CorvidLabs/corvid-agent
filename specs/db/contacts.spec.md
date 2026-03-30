@@ -119,6 +119,8 @@ Cross-platform contact identity mapping. Provides CRUD operations for unified co
 | `created_at` | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | `updated_at` | TEXT | DEFAULT datetime('now') | Last update timestamp |
 
+**Indexes:** `idx_contacts_tenant_name` on `(tenant_id, display_name)`
+
 ### contact_platform_links
 
 | Column | Type | Constraints | Description |
@@ -130,6 +132,10 @@ Cross-platform contact identity mapping. Provides CRUD operations for unified co
 | `platform_id` | TEXT | NOT NULL | Platform-specific identifier |
 | `verified` | INTEGER | NOT NULL, DEFAULT 0 | Whether the link has been verified |
 | `created_at` | TEXT | DEFAULT datetime('now') | Creation timestamp |
+
+**Indexes:**
+- `idx_contact_platform_links_unique` on `(tenant_id, platform, platform_id)` UNIQUE
+- `idx_contact_platform_links_contact` on `contact_id`
 
 ## Change Log
 

@@ -124,4 +124,41 @@ describe('getHealthCheck', () => {
         expect(result.dependencies.algorand.status).toBe('healthy');
         expect(result.dependencies.algorand.configured).toBe(true);
     });
+
+    test('apiKey shows not configured when getAuthConfig is not provided', async () => {
+        const deps = createDeps();
+        const result = await getHealthCheck(deps);
+
+        expect(result.dependencies.apiKey.status).toBe('healthy');
+        expect(result.dependencies.apiKey.configured).toBe(false);
+    });
+
+    test('apiKey shows not configured when config has no apiKey', async () => {
+        const deps = createDeps({
+            getAuthConfig: () => ({
+                apiKey: null,
+                allowedOrigins: [],
+                bindHost: '127.0.0.1',
+            }),
+        });
+        const result = await getHealthCheck(deps);
+
+        expect(result.dependencies.apiKey.status).toBe('healthy');
+        expect(result.dependencies.apiKey.configured).toBe(false);
+    });
+
+    test('apiKey shows configured with no expiry when apiKey set but no expiry', async () => {
+        const deps = createDeps({
+            getAuthConfig: () => ({
+                apiKey: 'test-key-123',
+                allowedOrigins: [],
+                bindHost: '0.0.0.0',
+            }),
+        });
+        const result = await getHealthCheck(deps);
+
+        expect(result.dependencies.apiKey.status).toBe('healthy');
+        expect(result.dependencies.apiKey.configured).toBe(true);
+        expect(result.dependencies.apiKey.expiry).toBe('none');
+    });
 });

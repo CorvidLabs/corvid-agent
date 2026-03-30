@@ -107,7 +107,7 @@ export interface ApprovalDecision {
             color: var(--text-primary, #eee);
             word-break: break-word;
             white-space: pre-wrap;
-            font-family: 'Dogica Pixel', 'Dogica', monospace;
+            font-family: var(--font-mono);
             background: var(--bg-inset, #0d0d1a);
             padding: 0.625rem;
             border-radius: 4px;

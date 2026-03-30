@@ -234,12 +234,12 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         // ── Shared Library (CRVLIB) ──────────────────────────────────────
         {
             name: 'corvid_library_write',
-            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents.',
+            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents. Large content is auto-split into a multi-page book.',
             parameters: {
                 type: 'object',
                 properties: {
-                    key: { type: 'string', description: 'Unique key for this entry' },
-                    content: { type: 'string', description: 'Content to publish' },
+                    key: { type: 'string', description: 'Unique key for this entry. For auto-split books, pages are keyed as {key}/page-1, etc.' },
+                    content: { type: 'string', description: 'Content to publish. No size limit — large content auto-splits into linked pages.' },
                     category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Entry category (default: reference)' },
                     tags: { type: 'array', items: { type: 'string' }, description: 'Tags for discovery' },
                 },
@@ -444,11 +444,11 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
 
     tools.push({
         name: 'corvid_manage_schedule',
-        description: 'Manage automated schedules for this agent. Use action="list" to view, "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
+        description: 'Manage automated schedules for all agents. Use action="list" without agent_id to see all schedules, or pass agent_id to filter. Use "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
         parameters: {
             type: 'object',
             properties: {
-                action: { type: 'string', enum: ['list', 'create', 'update', 'pause', 'resume', 'history'], description: 'What to do' },
+                action: { type: 'string', enum: ['list', 'create', 'update', 'get', 'pause', 'resume', 'history'], description: 'What to do' },
                 name: { type: 'string', description: 'Schedule name (for create/update)' },
                 description: { type: 'string', description: 'Schedule description (for create/update)' },
                 cron_expression: { type: 'string', description: 'Cron expression (for create/update)' },
@@ -472,6 +472,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 },
                 approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve (for create/update)' },
                 max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
+                agent_id: { type: 'string', description: 'Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.' },
                 schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
                 output_destinations: {
                     type: 'array',

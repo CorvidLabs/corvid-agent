@@ -513,7 +513,7 @@ async function handleRoutes(
   if (billingResponse) return billingResponse;
 
   // Auth flow routes (device authorization for CLI login)
-  const authFlowResponse = handleAuthFlowRoutes(req, url, db);
+  const authFlowResponse = handleAuthFlowRoutes(req, url, db, context);
   if (authFlowResponse) return authFlowResponse;
 
   // Plugin routes

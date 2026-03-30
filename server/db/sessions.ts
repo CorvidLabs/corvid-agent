@@ -202,6 +202,23 @@ export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: num
     ).run(microAlgos, id);
 }
 
+export function updateSessionSummary(db: Database, id: string, summary: string): void {
+    db.query("UPDATE sessions SET conversation_summary = ?, updated_at = datetime('now') WHERE id = ?").run(summary, id);
+}
+
+/**
+ * Get the conversation summary from the most recent session in a Discord thread.
+ * Used when creating a fresh session to carry over context from the previous one.
+ */
+export function getPreviousThreadSessionSummary(db: Database, threadId: string): string | null {
+    const row = db.query(
+        `SELECT conversation_summary FROM sessions
+         WHERE name = ? AND source = 'discord' AND conversation_summary IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1`
+    ).get(`Discord thread:${threadId}`) as { conversation_summary: string } | null;
+    return row?.conversation_summary ?? null;
+}
+
 export function deleteSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
     if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return false;
     const result = writeTransaction(db, (db) => {

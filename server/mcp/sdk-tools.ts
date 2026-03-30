@@ -92,10 +92,11 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'Publish or update an entry in the shared agent library (CRVLIB). ' +
             'Library entries are plaintext ARC-69 ASAs on localnet — readable by ALL agents. ' +
             'Use this for shared knowledge: guides, standards, decisions, runbooks, and reference docs. ' +
-            'Unlike private memories (corvid_save_memory), library entries are a shared commons.',
+            'Unlike private memories (corvid_save_memory), library entries are a shared commons. ' +
+            'Large content is automatically split into a multi-page book (linked ASA chain).',
             {
-                key: z.string().describe('Unique key for this entry (e.g. "coding-standards", "deploy-runbook")'),
-                content: z.string().describe('The content to publish (plaintext, max ~700 chars for on-chain)'),
+                key: z.string().describe('Unique key for this entry (e.g. "coding-standards", "deploy-runbook"). For auto-split books, pages are keyed as {key}/page-1, {key}/page-2, etc.'),
+                content: z.string().describe('The content to publish (plaintext). No size limit — content exceeding ~700 chars is auto-split into a multi-page book.'),
                 category: z.enum(['guide', 'reference', 'decision', 'standard', 'runbook']).optional().describe('Entry category (default: reference)'),
                 tags: z.array(z.string()).optional().describe('Tags for discovery (e.g. ["typescript", "testing"])'),
             },
@@ -243,7 +244,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         ] : []),
         tool(
             'corvid_manage_schedule',
-            'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
+            'Manage automated schedules for all agents. Omit agent_id in list/get to see all agents\' schedules. Schedules run actions on a cron or interval basis. ' +
             'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom. ' +
             'Use action="list" to view schedules, "get" to see full details of one, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
@@ -263,7 +264,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 })).optional().describe('Actions to perform (for create/update)'),
                 approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
                 max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),
-                agent_id: z.string().optional().describe('Agent ID to assign this schedule to (for create/update). Defaults to the calling agent.'),
+                agent_id: z.string().optional().describe('Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.'),
                 schedule_id: z.string().optional().describe('Schedule ID (for get/update/pause/resume/history)'),
                 output_destinations: z.array(z.object({
                     type: z.string().describe('Destination type: discord_channel, algochat_agent, or algochat_address'),

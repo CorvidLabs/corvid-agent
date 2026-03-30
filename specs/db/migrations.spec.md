@@ -38,6 +38,9 @@ files:
   - server/db/migrations/105_session_restart_pending.ts
   - server/db/migrations/107_session_restart_initiated.ts
   - server/db/migrations/108_memory_book_pages.ts
+  - server/db/migrations/109_discord_processed_messages.ts
+  - server/db/migrations/110_session_conversation_summary.ts
+  - server/db/migrations/111_library_title.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -527,10 +530,45 @@ Adds `server_restart_initiated_at` column to `sessions` table. Records the times
 | `up` | `(db: Database)` | `void` | Adds `server_restart_initiated_at` TEXT DEFAULT NULL column to `sessions` (idempotent — checks column existence first via `hasColumn` helper) |
 | `down` | `(db: Database)` | `void` | Drops `server_restart_initiated_at` column from `sessions` |
 
+### 108_memory_book_pages.ts
+
+Adds `book_pages` table for structured long-form memory storage. Book pages allow agents to organize knowledge into named books with ordered pages.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `book_pages` table with indexes and triggers |
+| `down` | `(db: Database)` | `void` | Drops `book_pages` table |
+
+### 109_discord_processed_messages.ts
+
+Persists processed Discord message IDs across server restarts. The in-memory dedup Set is lost on restart, allowing gateway reconnect to re-deliver messages that were already processed. This table provides durable dedup that survives restarts.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `discord_processed_messages` table (message_id TEXT PK, channel_id TEXT, created_at TEXT) and index on `created_at` |
+| `down` | `(db: Database)` | `void` | Drops `discord_processed_messages` table |
+
+### 110_session_conversation_summary.ts
+
+Adds a `conversation_summary` column to the sessions table. Used to carry conversation context across session resumes in Discord threads.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `conversation_summary TEXT DEFAULT NULL` column to `sessions` table |
+| `down` | `(db: Database)` | `void` | Drops `conversation_summary` column from `sessions` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-29 | corvid-agent | Add migration 110 to spec coverage |
+| 2026-03-28 | corvid-agent | Add migrations 108, 109 to spec coverage |
 | 2026-03-27 | corvid-agent | Add migration 107 to spec coverage |
 | 2026-03-25 | corvid-agent | Add migration 105 to spec coverage |
 | 2026-03-24 | corvid-agent | Add migration 104 to spec coverage |

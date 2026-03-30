@@ -65,10 +65,11 @@ const NAV_ITEMS: BottomNavItem[] = [
             align-items: stretch;
             justify-content: space-around;
             height: 56px;
-            background: var(--glass-bg-solid);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(15, 16, 24, 0.88);
+            backdrop-filter: blur(16px) saturate(1.2);
+            -webkit-backdrop-filter: blur(16px) saturate(1.2);
             border-top: 1px solid var(--border-faint);
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
             padding-bottom: env(safe-area-inset-bottom, 0);
         }
 
@@ -103,6 +104,12 @@ const NAV_ITEMS: BottomNavItem[] = [
             height: 2px;
             background: var(--accent-cyan);
             border-radius: 0 0 2px 2px;
+            animation: navIndicator 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+        }
+        @keyframes navIndicator {
+            from { transform: scaleX(0); }
+            to { transform: scaleX(1); }
         }
 
         .bottom-nav__label {
@@ -119,19 +126,36 @@ const NAV_ITEMS: BottomNavItem[] = [
             position: absolute;
             top: -4px;
             right: -8px;
-            min-width: 14px;
-            height: 14px;
+            min-width: 16px;
+            height: 16px;
             padding: 0 3px;
-            border-radius: 7px;
+            border-radius: 8px;
             background: var(--accent-cyan);
             color: var(--bg-deep);
-            font-size: 0.5rem;
+            font-size: 0.6rem;
             font-weight: 700;
             display: flex;
             align-items: center;
             justify-content: center;
             line-height: 1;
             box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+            animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes badgePop {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        /* Add active icon scale */
+        .bottom-nav__item--active .bottom-nav__icon-wrapper {
+            transform: scale(1.1);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .bottom-nav__icon-wrapper {
+            transition: transform 0.15s;
+        }
+        .bottom-nav__item:active .bottom-nav__icon-wrapper {
+            transform: scale(0.9);
         }
     `,
 })

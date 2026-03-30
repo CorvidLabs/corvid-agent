@@ -103,6 +103,7 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `agent_model` | TEXT | NOT NULL | Model identifier used for the session |
 | `project_name` | TEXT | | Project name for embed footer context (migration 093) |
 | `channel_id` | TEXT | | Discord channel ID where the mention originated (migration 096) |
+| `conversation_only` | INTEGER | DEFAULT 0 | Whether this session is conversation-only mode (no work tasks) |
 | `created_at` | TEXT | DEFAULT `datetime('now')` | When the mapping was created |
 
 ### Indexes

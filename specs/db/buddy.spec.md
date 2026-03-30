@@ -102,6 +102,10 @@ CRUD helpers for buddy mode database tables: pairings (which agents can pair), s
 
 **Unique constraint**: `(agent_id, buddy_agent_id)`
 
+**Indexes:**
+- `idx_buddy_pairings_agent` on `agent_id`
+- `idx_buddy_pairings_buddy` on `buddy_agent_id`
+
 ### buddy_sessions
 
 | Column | Type | Constraints | Description |
@@ -120,6 +124,12 @@ CRUD helpers for buddy mode database tables: pairings (which agents can pair), s
 | created_at | TEXT | NOT NULL, DEFAULT datetime('now') | Creation timestamp |
 | completed_at | TEXT | | Completion timestamp (set on terminal status) |
 
+**Indexes:**
+- `idx_buddy_sessions_lead` on `lead_agent_id`
+- `idx_buddy_sessions_buddy` on `buddy_agent_id`
+- `idx_buddy_sessions_work_task` on `work_task_id`
+- `idx_buddy_sessions_status` on `status`
+
 ### buddy_messages
 
 | Column | Type | Constraints | Description |
@@ -131,6 +141,8 @@ CRUD helpers for buddy mode database tables: pairings (which agents can pair), s
 | role | TEXT | NOT NULL | Message role: 'lead' or 'buddy' |
 | content | TEXT | NOT NULL | Message content |
 | created_at | TEXT | NOT NULL, DEFAULT datetime('now') | Creation timestamp |
+
+**Indexes:** `idx_buddy_messages_session` on `buddy_session_id`
 
 ## Change Log
 

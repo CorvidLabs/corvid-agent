@@ -1,8 +1,11 @@
 /**
- * Discord thread lifecycle management.
+ * Discord thread response streaming and session recovery.
  *
- * Handles response streaming into threads, thread recovery after server restart,
- * stale thread archival, and standalone thread creation.
+ * Handles streaming agent responses into Discord threads/channels and
+ * re-subscribing to active sessions after server restart.
+ *
+ * Thread lifecycle (archival, creation) → thread-lifecycle.ts
+ * Session state types and DB lookup     → thread-session-map.ts
  */
 
 import type { Database } from 'bun:sqlite';
@@ -23,7 +26,6 @@ import {
     sendTypingIndicator,
     agentColor,
     hexColorToInt,
-    assertSnowflake,
     splitEmbedDescription,
     collapseCodeBlocks,
     buildFooterText,
@@ -32,6 +34,14 @@ import {
     type DiscordFileAttachment,
 } from './embeds';
 
+// Re-export from focused sub-modules so existing consumers don't need to update imports.
+export type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-session-map';
+export { normalizeTimestamp, formatDuration, tryRecoverThread } from './thread-session-map';
+export { archiveThread, archiveStaleThreads, createStandaloneThread } from './thread-lifecycle';
+
+import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-session-map';
+import { normalizeTimestamp, formatDuration } from './thread-session-map';
+
 const log = createLogger('DiscordThreadManager');
 
 /** Drop whitespace-only chunks so Discord never receives empty-looking embed bodies. */
@@ -39,27 +49,6 @@ function visibleEmbedParts(text: string): string[] {
     return splitEmbedDescription(text.trim())
         .map((p) => p.trim())
         .filter((p) => p.length > 0);
-}
-
-/**
- * Normalize a SQLite UTC timestamp by appending 'Z' if it doesn't already
- * have a timezone indicator, so `new Date()` parses it as UTC rather than local.
- * Exported for testing.
- */
-export function normalizeTimestamp(ts: string): string {
-    return ts.endsWith('Z') ? ts : ts + 'Z';
-}
-
-/**
- * Format a duration in milliseconds as a human-readable string.
- * Returns "Xm Ys" for durations >= 1 minute, or "Xs" for shorter.
- * Exported for testing.
- */
-export function formatDuration(ms: number): string {
-    const durationMs = Math.max(0, ms);
-    const minutes = Math.floor(durationMs / 60000);
-    const seconds = Math.floor((durationMs % 60000) / 1000);
-    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 /** Exported for testing. Maps an error type to a user-facing embed title, description, and color. */
@@ -102,35 +91,6 @@ export function sessionErrorEmbed(errorType: string, fallbackMessage?: string): 
                 color: 0xff3355,
             };
     }
-}
-
-export interface ThreadSessionInfo {
-    sessionId: string;
-    agentName: string;
-    agentModel: string;
-    ownerUserId: string;
-    topic?: string;
-    projectName?: string;
-    displayColor?: string | null;
-    displayIcon?: string | null;
-    avatarUrl?: string | null;
-    /**
-     * Permission level of the user who created this thread.
-     * Used to enforce per-tier access: BASIC users cannot interact with
-     * threads created by STANDARD/ADMIN users (which may have tool access).
-     */
-    creatorPermLevel?: number;
-    /** Buddy config for end-of-session review (if specified). */
-    buddyConfig?: {
-        buddyAgentId: string;
-        buddyAgentName: string;
-        maxRounds?: number;
-    };
-}
-
-export interface ThreadCallbackInfo {
-    sessionId: string;
-    callback: EventCallback;
 }
 
 /**
@@ -189,6 +149,7 @@ export function subscribeForResponseWithEmbed(
     // Periodic progress for long-running operations
     const progressInterval = setInterval(() => {
         if (receivedAnyContent || sentErrorMessage) return;
+        if (!processManager.isRunning(sessionId)) { clearInterval(progressInterval); return; }
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         sendEmbed(delivery, botToken, threadId, {
             description: `Still working (${elapsed}s elapsed)...`,
@@ -231,7 +192,7 @@ export function subscribeForResponseWithEmbed(
 
     // Safety timeout: clear typing if no terminal event arrives
     const typingSafetyTimeout = setTimeout(() => {
-        clearInterval(typingInterval);
+        clearTyping();
         log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
         if (!receivedAnyActivity) {
             sendEmbed(delivery, botToken, threadId, {
@@ -1163,47 +1124,6 @@ export function subscribeForInlineProgressResponse(
 }
 
 /**
- * Try to recover a thread-to-session mapping from the database.
- * Sessions are named `Discord thread:{threadId}` so we can look them up.
- */
-export function tryRecoverThread(
-    db: Database,
-    threadSessions: Map<string, ThreadSessionInfo>,
-    threadId: string,
-): ThreadSessionInfo | null {
-    try {
-        const row = db.query(
-            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, a.display_color, a.display_icon, a.avatar_url, p.name as project_name
-             FROM sessions s
-             LEFT JOIN agents a ON a.id = s.agent_id
-             LEFT JOIN projects p ON p.id = s.project_id
-             WHERE s.name = ? AND s.source = 'discord'
-             ORDER BY s.created_at DESC LIMIT 1`,
-        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; display_color: string | null; display_icon: string | null; avatar_url: string | null; project_name: string | null } | null;
-
-        if (!row) return null;
-
-        const info: ThreadSessionInfo = {
-            sessionId: row.id,
-            agentName: row.agent_name || 'Agent',
-            agentModel: row.agent_model || 'unknown',
-            ownerUserId: '',
-            topic: row.initial_prompt || undefined,
-            projectName: row.project_name || undefined,
-            displayColor: row.display_color ?? undefined,
-            displayIcon: row.display_icon ?? undefined,
-            avatarUrl: row.avatar_url ?? undefined,
-        };
-        threadSessions.set(threadId, info);
-        log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
-        return info;
-    } catch (err) {
-        log.warn('Failed to recover thread session', { threadId, error: err instanceof Error ? err.message : String(err) });
-        return null;
-    }
-}
-
-/**
  * Recover event subscriptions for active Discord sessions after server restart.
  */
 export function recoverActiveThreadSubscriptions(
@@ -1257,113 +1177,6 @@ export function recoverActiveThreadSubscriptions(
     } catch (err) {
         log.warn('Failed to recover thread subscriptions', { error: err instanceof Error ? err.message : String(err) });
     }
-}
-
-/**
- * Archive threads that have been inactive for staleThresholdMs.
- */
-export async function archiveStaleThreads(
-    processManager: ProcessManager,
-    delivery: DeliveryTracker,
-    botToken: string,
-    threadLastActivity: Map<string, number>,
-    threadSessions: Map<string, ThreadSessionInfo>,
-    threadCallbacks: Map<string, ThreadCallbackInfo>,
-    staleThresholdMs: number,
-): Promise<void> {
-    const now = Date.now();
-    const staleThreads: string[] = [];
-
-    for (const [threadId, lastActive] of threadLastActivity) {
-        if (now - lastActive >= staleThresholdMs) {
-            staleThreads.push(threadId);
-        }
-    }
-
-    for (const threadId of staleThreads) {
-        try {
-            await sendEmbedWithButtons(delivery, botToken, threadId, {
-                description: 'This conversation has been idle. Archiving thread.',
-                color: 0x95a5a6,
-            }, [
-                buildActionRow(
-                    { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                ),
-            ]);
-
-            await archiveThread(botToken, threadId);
-            threadLastActivity.delete(threadId);
-            threadSessions.delete(threadId);
-            const cb = threadCallbacks.get(threadId);
-            if (cb) {
-                processManager.unsubscribe(cb.sessionId, cb.callback);
-                threadCallbacks.delete(threadId);
-            }
-            log.info('Auto-archived stale thread', { threadId });
-        } catch (err) {
-            log.warn('Failed to archive stale thread', {
-                threadId,
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
-    }
-}
-
-/**
- * Archive a thread via the Discord API.
- */
-export async function archiveThread(botToken: string, threadId: string): Promise<void> {
-    assertSnowflake(threadId, 'thread ID');
-    const response = await fetch(
-        `https://discord.com/api/v10/channels/${threadId}`,
-        {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bot ${botToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ archived: true }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
-        log.warn('Failed to archive thread', { threadId, status: response.status, error: error.slice(0, 200) });
-    }
-}
-
-/**
- * Create a standalone Discord thread (not attached to a message).
- * Used by /session command. Returns the thread channel ID, or null on failure.
- */
-export async function createStandaloneThread(botToken: string, channelId: string, name: string): Promise<string | null> {
-    assertSnowflake(channelId, 'channel ID');
-    const safeChannelId = encodeURIComponent(channelId);
-    const response = await fetch(
-        `https://discord.com/api/v10/channels/${safeChannelId}/threads`,
-        {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bot ${botToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                name: name.slice(0, 100),
-                type: 11, // GUILD_PUBLIC_THREAD
-                auto_archive_duration: 1440, // 24 hours
-            }),
-        },
-    );
-
-    if (response.ok) {
-        const thread = await response.json() as { id: string };
-        log.info('Discord standalone thread created', { threadId: thread.id, name: name.slice(0, 60) });
-        return thread.id;
-    }
-
-    const error = await response.text();
-    log.error('Failed to create Discord thread', { status: response.status, error: error.slice(0, 200) });
-    return null;
 }
 
 /**

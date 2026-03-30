@@ -140,6 +140,9 @@ Provides full CRUD and query operations for agent schedules (cron-based and even
 | `max_budget_per_run` | REAL | DEFAULT NULL | Optional cost cap per execution in USD |
 | `notify_address` | TEXT | DEFAULT NULL | Address for notifications (added in migration) |
 | `trigger_events` | TEXT | DEFAULT NULL | JSON array of ScheduleTriggerEvent objects (added in migration) |
+| `output_destinations` | TEXT | DEFAULT NULL | JSON array of output destination configs (e.g. Discord channel, AlgoChat address) |
+| `execution_mode` | TEXT | DEFAULT 'independent' | Execution mode: 'independent' (default) or 'pipeline' for multi-step execution |
+| `pipeline_steps` | TEXT | DEFAULT NULL | JSON array of pipeline step definitions (used when execution_mode='pipeline') |
 | `tenant_id` | TEXT | NOT NULL, DEFAULT 'default' | Multi-tenant isolation (added in migration) |
 | `last_run_at` | TEXT | DEFAULT NULL | Timestamp of last execution |
 | `next_run_at` | TEXT | DEFAULT NULL | Computed next scheduled run time |
@@ -162,10 +165,11 @@ Provides full CRUD and query operations for agent schedules (cron-based and even
 | `work_task_id` | TEXT | DEFAULT NULL | Associated work task ID if applicable |
 | `cost_usd` | REAL | DEFAULT 0 | Cost of this execution in USD |
 | `config_snapshot` | TEXT | DEFAULT NULL | JSON snapshot of config at execution time (added in migration 25) |
+| `tenant_id` | TEXT | NOT NULL, DEFAULT 'default' | Multi-tenant isolation key |
 | `started_at` | TEXT | DEFAULT (datetime('now')) | Execution start timestamp |
 | `completed_at` | TEXT | DEFAULT NULL | Execution completion timestamp |
 
-**Indexes:** `idx_schedule_executions_schedule(schedule_id)`, `idx_schedule_executions_status(status)`
+**Indexes:** `idx_schedule_executions_schedule(schedule_id)`, `idx_schedule_executions_status(status)`, `idx_schedule_executions_schedule_status(schedule_id, status, started_at DESC)`
 
 ## Change Log
 | Date | Author | Change |

@@ -88,7 +88,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                     <span class="toggle-text">Hide inactive</span>
                 </label>
                 <div class="sort-group">
-                    <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event">
+                    <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event" aria-label="Sort agents by">
                         <option value="name">Sort: Name</option>
                         <option value="created">Sort: Created</option>
                         <option value="lastActive">Sort: Last Active</option>

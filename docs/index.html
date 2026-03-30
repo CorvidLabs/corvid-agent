@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta property="og:image" content="https://corvid-agent.github.io/corvid-agent.github.io/docs/preview.png">
+  <meta property="og:image" content="https://corvid-agent.github.io/preview.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta charset="UTF-8">
@@ -23,20 +23,29 @@
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
     :root {
+      /* Backgrounds */
       --bg: #0a0a12;
       --bg-card: #161822;
       --bg-card-hover: #1a1c2e;
+
+      /* Borders */
       --border: #1e2035;
       --border-glow: #00e5ff;
-      --text: #e0e0ec;
-      --text-dim: #a8abbd;
-      --text-bright: #ffffff;
+
+      /* Text — AAA contrast (7:1+ on --bg) */
+      --text: #e0e0ec;          /* 10.2:1 — primary */
+      --text-dim: #a8abbd;      /* 7.9:1  — secondary */
+      --text-bright: #ffffff;   /* 13.5:1 — emphasis */
+      --text-tertiary: #9a9cb6; /* 7.3:1  — tertiary */
+
+      /* Accents */
       --accent: #00e5ff;
       --accent-2: #ff66c4;
       --accent-3: #00ff88;
       --green: #00ff88;
       --orange: #ffaa00;
       --red: #ff3355;
+
       --gradient: linear-gradient(135deg, #00e5ff 0%, #ff66c4 100%);
       --mono: 'JetBrains Mono', monospace;
       --sans: 'JetBrains Mono', monospace;
@@ -1226,7 +1235,7 @@
         <div class="stat-label">Tests Passing</div>
       </div>
       <div class="stat">
-        <div class="stat-value">196</div>
+        <div class="stat-value">201</div>
         <div class="stat-label">Module Specs</div>
       </div>
       <div class="stat">
@@ -1251,22 +1260,22 @@
       <p>Whether you're a creator with an idea or an enterprise scaling operations, corvid-agent meets you where you are.</p>
     </div>
     <div class="audience-grid">
-      <a href="https://corvidlabs.github.io/corvid-agent/getting-started.html#creators" class="audience-card audience-card--cyan reveal-stagger">
+      <a href="https://corvid-agent.github.io/getting-started.html#creators" class="audience-card audience-card--cyan reveal-stagger">
         <div class="audience-icon">&#x1F3A8;</div>
         <div class="audience-title">Creators</div>
         <div class="audience-desc">Have an idea but don't code? Describe what you want in plain English and the agent builds it.</div>
       </a>
-      <a href="https://corvidlabs.github.io/corvid-agent/getting-started.html#developers" class="audience-card audience-card--magenta reveal-stagger">
+      <a href="https://corvid-agent.github.io/getting-started.html#developers" class="audience-card audience-card--magenta reveal-stagger">
         <div class="audience-icon">&#x1F4BB;</div>
         <div class="audience-title">Developers</div>
         <div class="audience-desc">Supercharge your workflow. The agent writes tests, reviews code, ships PRs, and handles boilerplate.</div>
       </a>
-      <a href="https://corvidlabs.github.io/corvid-agent/business-guide.html" class="audience-card audience-card--green reveal-stagger">
+      <a href="https://corvid-agent.github.io/business-guide.html" class="audience-card audience-card--green reveal-stagger">
         <div class="audience-icon">&#x1F3E2;</div>
         <div class="audience-title">Businesses</div>
         <div class="audience-desc">Automate customer support, internal tools, and workflows. Deploy on your infrastructure.</div>
       </a>
-      <a href="https://corvidlabs.github.io/corvid-agent/enterprise.html" class="audience-card audience-card--orange reveal-stagger">
+      <a href="https://corvid-agent.github.io/enterprise.html" class="audience-card audience-card--orange reveal-stagger">
         <div class="audience-icon">&#x1F30D;</div>
         <div class="audience-title">Enterprise</div>
         <div class="audience-desc">Multi-agent orchestration, governance councils, audit trails, and on-chain identity verification.</div>
@@ -1735,7 +1744,7 @@
             <span class="terminal-cmd">corvid-agent</span>
           </div>
           <div class="terminal-output" style="padding-left: 1.2rem;">
-            <span class="terminal-cmd" style="font-weight: bold;">corvid</span> v0.55.0 — agent: CorvidAgent <span style="color: var(--text-dim);">(claude-opus-4-6)</span>
+            <span class="terminal-cmd" style="font-weight: bold;">corvid</span> v0.59.1 — agent: CorvidAgent <span style="color: var(--text-dim);">(claude-opus-4-6)</span>
           </div>
           <div class="terminal-output" style="padding-left: 1.2rem;">
             <span style="color: var(--text-dim);">project: corvid-agent (/Users/corvid-agent/corvid-agent)</span>
@@ -1839,7 +1848,7 @@
       "https://github.com/corvid-agent",
       "https://github.com/CorvidLabs"
     ],
-    "description": "Your own AI developer. Tell it what to build in plain English. Open-source on Algorand with 8,119 tests passing and 157 module specs."
+    "description": "Your own AI developer. Tell it what to build in plain English. Open-source on Algorand with 10,500+ tests passing and 201 module specs."
   }
   </script>
 
@@ -2117,7 +2126,7 @@
 
       const lines = [
         { type: 'command', text: 'corvid' },
-        { type: 'output', text: 'corvid v0.56.0 \u2014 agent: CorvidAgent (claude-opus-4-6)' },
+        { type: 'output', text: 'corvid v0.59.1 \u2014 agent: CorvidAgent (claude-opus-4-6)' },
         { type: 'output', text: 'project: corvid-agent (/Users/corvid-agent/corvid-agent)' },
         { type: 'blank' },
         { type: 'command', text: 'Harden the AlgoChat bridge reconnect logic' },

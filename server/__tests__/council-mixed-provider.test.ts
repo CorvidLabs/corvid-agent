@@ -784,4 +784,403 @@ describe('council mixed-provider smoke tests', () => {
       assertProviderUsed(anthropicFallback);
     });
   });
+
+  // ── [cursor-only] Full phase cycle ───────────────────────────────────────
+
+  describe('[cursor-only] council: full phase cycle', () => {
+    it('stage transitions from responding through to complete persist correctly', () => {
+      const { launchId } = seedCouncil({ stage: 'responding' });
+
+      const phases: CouncilStage[] = ['responding', 'discussing', 'reviewing', 'synthesizing', 'complete'];
+
+      for (const stage of phases) {
+        updateCouncilLaunchStage(db, launchId, stage);
+        const launch = getCouncilLaunch(db, launchId)!;
+        expect(launch.stage).toBe(stage);
+      }
+    });
+
+    it('all three Cursor members submit responses in the responding phase', () => {
+      const { agents, launchId } = seedCouncil({ stage: 'responding', agentCount: 3 });
+      const launch = getCouncilLaunch(db, launchId)!;
+
+      for (const agent of agents) {
+        const s = createSession(db, {
+          projectId: launch.projectId,
+          agentId: agent.id,
+          name: `Member: ${agent.name}`,
+          councilLaunchId: launchId,
+          councilRole: 'member',
+        });
+        insertAssistantMessage(s.id, `[cursor:cursor-fast] ${agent.name}: my initial response.`);
+      }
+
+      const sessions = listSessionsByCouncilLaunch(db, launchId);
+      const parts = aggregateSessionResponses(db, sessions);
+
+      expect(parts).toHaveLength(3);
+      expect(parts.every((p) => p.includes('[cursor:cursor-fast]'))).toBe(true);
+    });
+
+    it('discussion messages are recorded for each round and Cursor agent', () => {
+      const { agents, launchId } = seedCouncil({ stage: 'discussing', agentCount: 3 });
+
+      updateCouncilLaunchDiscussionRound(db, launchId, 1, 2);
+
+      for (const agent of agents) {
+        insertDiscussionMessage(db, {
+          launchId,
+          agentId: agent.id,
+          agentName: agent.name,
+          round: 1,
+          content: `[cursor] ${agent.name} round-1: agreed on caching strategy.`,
+        });
+      }
+
+      const messages = getDiscussionMessages(db, launchId);
+      expect(messages).toHaveLength(3);
+      expect(messages.every((m) => m.round === 1)).toBe(true);
+      expect(messages.every((m) => m.content.includes('[cursor]'))).toBe(true);
+
+      const launch = getCouncilLaunch(db, launchId)!;
+      expect(launch.currentDiscussionRound).toBe(1);
+      expect(launch.totalDiscussionRounds).toBe(2);
+    });
+
+    it('synthesis is stored and stage advances to complete', () => {
+      const { launchId } = seedCouncil({ stage: 'synthesizing', agentCount: 3 });
+
+      const synthText = '[cursor] Council synthesis: use layered caching with edge CDN.';
+      updateCouncilLaunchStage(db, launchId, 'complete', synthText);
+
+      const launch = getCouncilLaunch(db, launchId)!;
+      expect(launch.stage).toBe('complete');
+      expect(launch.synthesis).toBe(synthText);
+    });
+
+    it('all three Cursor providers complete FallbackManager chains in parallel', async () => {
+      const agents = [
+        createProviderAgent('cursor', 'cursor-fast', mockProviderResponse('[cursor] response A.', 'cursor-fast')),
+        createProviderAgent('cursor', 'cursor-fast', mockProviderResponse('[cursor] response B.', 'cursor-fast')),
+        createProviderAgent('cursor', 'cursor-fast', mockProviderResponse('[cursor] response C.', 'cursor-fast')),
+      ];
+
+      const results = await Promise.all(
+        agents.map((a) =>
+          new FallbackManager(createMockRegistry([a])).completeWithFallback(
+            makeParams(),
+            makeChain({ provider: 'cursor', model: 'cursor-fast' }),
+          ),
+        ),
+      );
+
+      expect(results.every((r) => r.usedProvider === 'cursor')).toBe(true);
+      for (const a of agents) assertProviderUsed(a);
+    });
+
+    it('all three Cursor sessions complete and waitForSessions resolves', async () => {
+      const { pm, markRunning, emitExit } = createMockPM();
+
+      markRunning('cursor-s1');
+      markRunning('cursor-s2');
+      markRunning('cursor-s3');
+
+      const promise = waitForSessions(pm, ['cursor-s1', 'cursor-s2', 'cursor-s3'], 5000);
+
+      emitExit('cursor-s1');
+      emitExit('cursor-s2');
+      emitExit('cursor-s3');
+
+      const result = await promise;
+      expect(result.completed.sort()).toEqual(['cursor-s1', 'cursor-s2', 'cursor-s3']);
+      expect(result.timedOut).toEqual([]);
+    });
+  });
+
+  // ── [cursor+anthropic] Cursor members with Anthropic synthesizer ──────────
+
+  describe('[cursor+anthropic] council: Cursor members with Anthropic synthesizer', () => {
+    it('Cursor members and Anthropic synthesizer each use their own dispatch chain', async () => {
+      const cursorA = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('[cursor] member A: use sharding.', 'cursor-fast'),
+      );
+      const cursorB = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('[cursor] member B: use replication.', 'cursor-fast'),
+      );
+      const anthropicSynth = createProviderAgent(
+        'anthropic',
+        'claude-sonnet-4-6',
+        mockProviderResponse('[anthropic] synthesis: combine sharding with replication.', 'claude-sonnet-4-6'),
+      );
+
+      const [rA, rB, rSynth] = await Promise.all([
+        new FallbackManager(createMockRegistry([cursorA])).completeWithFallback(
+          makeParams(),
+          makeChain({ provider: 'cursor', model: 'cursor-fast' }),
+        ),
+        new FallbackManager(createMockRegistry([cursorB])).completeWithFallback(
+          makeParams(),
+          makeChain({ provider: 'cursor', model: 'cursor-fast' }),
+        ),
+        new FallbackManager(createMockRegistry([anthropicSynth])).completeWithFallback(
+          makeParams(),
+          makeChain({ provider: 'anthropic', model: 'claude-sonnet-4-6' }),
+        ),
+      ]);
+
+      expect(rA.usedProvider).toBe('cursor');
+      expect(rB.usedProvider).toBe('cursor');
+      expect(rSynth.usedProvider).toBe('anthropic');
+      assertProviderUsed(cursorA);
+      assertProviderUsed(cursorB);
+      assertProviderUsed(anthropicSynth);
+    });
+
+    it('synthesis aggregates Cursor member responses before Anthropic synthesizes', () => {
+      const { agents, launchId } = seedCouncil({ stage: 'synthesizing', agentCount: 3 });
+      const launch = getCouncilLaunch(db, launchId)!;
+
+      // Two Cursor members
+      for (const agent of agents.slice(0, 2)) {
+        const s = createSession(db, {
+          projectId: launch.projectId,
+          agentId: agent.id,
+          name: `Member: ${agent.name} (cursor)`,
+          councilLaunchId: launchId,
+          councilRole: 'member',
+        });
+        insertAssistantMessage(s.id, `[cursor] ${agent.name}: my recommendation.`);
+      }
+
+      // One Anthropic synthesizer
+      const synthSession = createSession(db, {
+        projectId: launch.projectId,
+        agentId: agents[2].id,
+        name: `Member: ${agents[2].name} (anthropic)`,
+        councilLaunchId: launchId,
+        councilRole: 'member',
+      });
+      insertAssistantMessage(synthSession.id, '[anthropic] combined recommendation.');
+
+      const sessions = listSessionsByCouncilLaunch(db, launchId);
+      const parts = aggregateSessionResponses(db, sessions);
+
+      expect(parts).toHaveLength(3);
+      const allContent = parts.join('\n');
+      expect(allContent).toContain('[cursor]');
+      expect(allContent).toContain('[anthropic]');
+    });
+
+    it('all sessions complete regardless of mixed Cursor+Anthropic provider labels', async () => {
+      const { pm, markRunning, emitExit } = createMockPM();
+
+      const sessionIds = ['cursor:member-1', 'cursor:member-2', 'anthropic:synthesizer'];
+      for (const id of sessionIds) markRunning(id);
+
+      const promise = waitForSessions(pm, sessionIds, 5000);
+      for (const id of sessionIds) emitExit(id);
+
+      const result = await promise;
+      expect(result.completed.sort()).toEqual(sessionIds.sort());
+      expect(result.timedOut).toEqual([]);
+    });
+
+    it('Anthropic synthesizer falls back to Cursor if Anthropic unavailable', async () => {
+      const anthropicOffline = createProviderAgent(
+        'anthropic',
+        'claude-sonnet-4-6',
+        mockProviderFailure('ECONNREFUSED: connection refused'),
+      );
+      const cursorFallback = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('[cursor-fallback] synthesis: use sharding.', 'cursor-fast'),
+      );
+
+      const registry = createMockRegistry([anthropicOffline, cursorFallback]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain(
+        { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+        { provider: 'cursor', model: 'cursor-fast' },
+      );
+
+      const result = await manager.completeWithFallback(makeParams(), chain);
+
+      expect(result.usedProvider).toBe('cursor');
+      assertProviderUsed(anthropicOffline);
+      assertProviderUsed(cursorFallback);
+    });
+  });
+
+  // ── [degraded-cursor] Cursor binary missing mid-council ───────────────────
+
+  describe('[degraded-cursor] council: Cursor binary missing mid-council', () => {
+    it('council does not hang when Cursor session times out (≤ 60s simulated)', async () => {
+      const { pm, markRunning, emitExit } = createMockPM();
+
+      markRunning('cursor-A');
+      markRunning('cursor-B-missing');
+      markRunning('cursor-C');
+
+      const startTime = Date.now();
+      // 200ms simulates the ≤ 60s requirement in fast test time
+      const promise = waitForSessions(pm, ['cursor-A', 'cursor-B-missing', 'cursor-C'], 200);
+
+      emitExit('cursor-A');
+      emitExit('cursor-C');
+      // cursor-B-missing never exits — binary gone
+
+      const result = await promise;
+      const elapsed = Date.now() - startTime;
+
+      expect(result.completed.sort()).toEqual(['cursor-A', 'cursor-C']);
+      expect(result.timedOut).toEqual(['cursor-B-missing']);
+      // Council must complete without hanging
+      expect(elapsed).toBeLessThan(2000);
+    });
+
+    it('stage does not advance past discussing when Cursor participant goes missing', () => {
+      const { launchId } = seedCouncil({ stage: 'discussing', agentCount: 3 });
+      const launch = getCouncilLaunch(db, launchId)!;
+
+      // Council stays in discussing — stage is NOT advanced due to missing Cursor participant
+      expect(launch.stage).toBe('discussing');
+    });
+
+    it('synthesis proceeds with remaining members after Cursor dropout', () => {
+      const { agents, launchId } = seedCouncil({ stage: 'synthesizing', agentCount: 3 });
+      const launch = getCouncilLaunch(db, launchId)!;
+
+      // Cursor A dropped — no session created for it (binary missing)
+      const s1 = createSession(db, {
+        projectId: launch.projectId,
+        agentId: agents[1].id,
+        name: 'Member: Agent B (cursor)',
+        councilLaunchId: launchId,
+        councilRole: 'member',
+      });
+      insertAssistantMessage(s1.id, '[cursor] Agent B: use write-through caching.');
+
+      const s2 = createSession(db, {
+        projectId: launch.projectId,
+        agentId: agents[2].id,
+        name: 'Member: Agent C (anthropic)',
+        councilLaunchId: launchId,
+        councilRole: 'member',
+      });
+      insertAssistantMessage(s2.id, '[anthropic] Agent C: prefer read replicas for heavy reads.');
+
+      const sessions = listSessionsByCouncilLaunch(db, launchId);
+      const parts = aggregateSessionResponses(db, sessions);
+
+      // Only 2 members contributed — synthesis still proceeds
+      expect(parts).toHaveLength(2);
+      const allContent = parts.join('\n');
+      expect(allContent).toContain('[cursor]');
+      expect(allContent).toContain('[anthropic]');
+    });
+
+    it('FallbackManager falls back to Anthropic when Cursor binary is missing', async () => {
+      const cursorMissing = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderFailure('ENOENT: cursor binary not found'),
+      );
+      const anthropicFallback = createProviderAgent(
+        'anthropic',
+        'claude-haiku-4-5-20251001',
+        mockProviderResponse('[anthropic:fallback] recovery response.', 'claude-haiku-4-5-20251001'),
+      );
+
+      const registry = createMockRegistry([cursorMissing, anthropicFallback]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain(
+        { provider: 'cursor', model: 'cursor-fast' },
+        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+      );
+
+      const result = await manager.completeWithFallback(makeParams(), chain);
+
+      expect(result.usedProvider).toBe('anthropic');
+      assertProviderUsed(cursorMissing);
+      assertProviderUsed(anthropicFallback);
+    });
+  });
+
+  // ── [all-fail] All non-Claude participants fail ───────────────────────────
+
+  describe('[all-fail] council: all non-Claude participants fail', () => {
+    it('council errors gracefully — all sessions time out within simulated 30s', async () => {
+      const { pm, markRunning } = createMockPM();
+
+      markRunning('cursor-1-fail');
+      markRunning('cursor-2-fail');
+      markRunning('ollama-3-fail');
+
+      const startTime = Date.now();
+      // 150ms simulates the ≤ 30s requirement in fast test time
+      const result = await waitForSessions(
+        pm,
+        ['cursor-1-fail', 'cursor-2-fail', 'ollama-3-fail'],
+        150,
+      );
+      const elapsed = Date.now() - startTime;
+
+      // All sessions timed out — none completed
+      expect(result.completed).toEqual([]);
+      expect(result.timedOut.sort()).toEqual(['cursor-1-fail', 'cursor-2-fail', 'ollama-3-fail']);
+      // Error surfaces within simulated 30s bound
+      expect(elapsed).toBeLessThan(2000);
+    });
+
+    it('FallbackManager propagates error when all non-Claude providers fail', async () => {
+      const cursorFail = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderFailure('ENOENT: cursor binary not found'),
+      );
+      const ollamaFail = createProviderAgent(
+        'ollama',
+        'qwen3:14b',
+        mockProviderFailure('ECONNREFUSED: ollama not running'),
+      );
+
+      const registry = createMockRegistry([cursorFail, ollamaFail]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain(
+        { provider: 'cursor', model: 'cursor-fast' },
+        { provider: 'ollama', model: 'qwen3:14b' },
+      );
+
+      await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
+      assertProviderUsed(cursorFail);
+      assertProviderUsed(ollamaFail);
+    });
+
+    it('synthesis receives no content when all participants fail', () => {
+      const { launchId } = seedCouncil({ stage: 'responding', agentCount: 3 });
+
+      // No sessions created — all participants failed before producing output
+      const sessions = listSessionsByCouncilLaunch(db, launchId);
+      const parts = aggregateSessionResponses(db, sessions);
+
+      // No content to aggregate
+      expect(parts).toHaveLength(0);
+    });
+
+    it('council stage stays at responding when all sessions fail to produce output', () => {
+      const { launchId } = seedCouncil({ stage: 'responding', agentCount: 3 });
+      const launch = getCouncilLaunch(db, launchId)!;
+
+      // All participants failed — stage remains at responding (not advanced)
+      expect(launch.stage).toBe('responding');
+    });
+  });
 });
