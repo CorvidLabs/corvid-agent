@@ -93,8 +93,19 @@ export function getToolInstructionPrompt(family: ModelFamily, toolNames: string[
   return parts.join('\n\n');
 }
 
-/** Families that use text-based tool calling and need full schemas in prompt. */
-const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron']);
+/**
+ * Families that use text-based tool calling and need full schemas in prompt.
+ * Models in this set output tool calls as JSON arrays or XML in content text,
+ * rather than using native Ollama `tool_calls` structured output.
+ *
+ * Models NOT in this set use native tool_calls — they get tool definitions via
+ * the Ollama API `tools` field and should NOT receive conflicting JSON format
+ * instructions in the system prompt.
+ *
+ * Updated 2026-03-30: nemotron, minimax, glm, qwen3 now use native tool_calls
+ * via cloud proxies. Added deepseek (XML format) and gemma (text-based).
+ */
+const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['kimi', 'gemini', 'devstral', 'deepseek', 'gemma']);
 
 /** Format tool definitions as a compact reference for the system prompt. */
 function formatToolSchemas(toolDefs: ToolSchema[]): string {
@@ -500,15 +511,26 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
       return `### Gemma-specific guidance
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 
+**Critical rules:**
+- NEVER fabricate or hallucinate file contents, command output, or tool results. If you need to read a file, you MUST call the read_file tool. If you need to list files, you MUST call list_files. Do NOT guess or invent what a file contains.
+- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks.
 - Use the exact tool names from the available tools list. Do not invent tool names.
 - After receiving a tool result, evaluate the result and continue with the next tool call if needed.
 - Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
-- Provide your final answer as plain text only after all tool operations are complete.`;
+- Provide your final answer as plain text only after all tool operations are complete.
+${textBasedMultiStep}`;
 
     case 'deepseek':
       return `### DeepSeek-specific guidance
-${textBasedExample(hasSearchFiles ? 'search_files' : exampleTool)}
 
+**Correct tool call format** — output ONLY a JSON array, no other text:
+[{"name": "${hasSearchFiles ? 'search_files' : exampleTool}", "arguments": {"path": "server/"}}]
+
+**Also accepted** — XML invoke format:
+<function_calls><invoke name="${hasReadFile ? 'read_file' : exampleTool}"><parameter name="path">server/index.ts</parameter></invoke></function_calls>
+
+**Critical rules:**
+- NEVER fabricate file contents or command output. If you need information, CALL the tool.
 - Use the exact tool names from the available tools list. Do not invent tool names.
 - After receiving a tool result, evaluate the result and continue with the next tool call if needed.
 - Call one tool at a time and wait for its result before calling the next.

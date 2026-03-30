@@ -17,6 +17,7 @@ const log = createLogger('ToolParser');
  * - Pattern 2: Plain `function_name({...})` JSON-style patterns matching known tool names
  * - Pattern 3: JSON array of tool calls (Mistral format): `[{"name":"tool","arguments":{}}]`
  * - Pattern 4: Python-style `function_name(key="value")` without <|python_tag|> prefix
+ * - Pattern 5: XML-style `<function_calls><invoke name="tool"><parameter name="key">value</parameter></invoke></function_calls>`
  */
 export function extractToolCallsFromContent(content: string, tools?: LlmToolDefinition[]): LlmToolCall[] {
   if (!tools || tools.length === 0) return [];
@@ -179,6 +180,48 @@ export function extractToolCallsFromContent(content: string, tools?: LlmToolDefi
     }
   }
 
+  // Pattern 5: XML-style function calls (DeepSeek V3.2 format)
+  // e.g., <function_calls><invoke name="read_file"><parameter name="path" string="true">server/index.ts</parameter></invoke></function_calls>
+  if (calls.length === 0 && content.includes('<invoke')) {
+    const invokePattern = /<invoke\s+name="([^"]+)">([\s\S]*?)<\/invoke>/g;
+    let invokeMatch: RegExpExecArray | null = invokePattern.exec(content);
+    while (invokeMatch !== null) {
+      const fnName = invokeMatch[1];
+      const paramsBlock = invokeMatch[2];
+      const args: Record<string, unknown> = {};
+
+      // Extract <parameter name="key">value</parameter> or <parameter name="key" string="true">value</parameter>
+      const paramPattern = /<parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/parameter>/g;
+      let paramMatch: RegExpExecArray | null = paramPattern.exec(paramsBlock);
+      while (paramMatch !== null) {
+        args[paramMatch[1]] = paramMatch[2].trim();
+        paramMatch = paramPattern.exec(paramsBlock);
+      }
+
+      // Resolve tool name (exact or fuzzy)
+      let resolvedName: string | undefined = toolNames.has(fnName) ? fnName : undefined;
+      if (!resolvedName && fnName.startsWith('corvid_')) {
+        const bare = fnName.slice(7);
+        if (toolNames.has(bare)) resolvedName = bare;
+      }
+      if (!resolvedName && toolNames.has(`corvid_${fnName}`)) {
+        resolvedName = `corvid_${fnName}`;
+      }
+      if (!resolvedName) {
+        resolvedName = fuzzyMatchToolName(fnName, args, tools);
+      }
+
+      if (resolvedName) {
+        calls.push({
+          id: crypto.randomUUID().slice(0, 8),
+          name: resolvedName,
+          arguments: args,
+        });
+      }
+      invokeMatch = invokePattern.exec(content);
+    }
+  }
+
   // Log diagnostic info when no tool calls were extracted from non-trivial content
   if (calls.length === 0 && content.length > 50) {
     log.debug('No tool calls extracted from content', {
@@ -186,6 +229,7 @@ export function extractToolCallsFromContent(content: string, tools?: LlmToolDefi
       hasCodeFences: content.includes('```'),
       hasBrackets: content.includes('[{'),
       hasPythonTag: content.includes('<|python_tag|>'),
+      hasXmlInvoke: content.includes('<invoke'),
     });
   }
 
@@ -279,6 +323,9 @@ export function stripJsonToolCallArrays(content: string): string {
       searchFrom = start + 1;
     }
   }
+  // Also strip XML-style function_calls blocks (DeepSeek V3.2 format)
+  result = result.replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '').trim();
+
   return result.trim();
 }
 

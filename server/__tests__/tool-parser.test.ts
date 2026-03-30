@@ -176,6 +176,37 @@ describe('extractToolCallsFromContent', () => {
     });
   });
 
+  describe('Pattern 5: XML-style function_calls (DeepSeek)', () => {
+    it('extracts from XML invoke format', () => {
+      const content =
+        '<function_calls>\n<invoke name="read_file">\n<parameter name="path" string="true">server/index.ts</parameter>\n</invoke>\n</function_calls>';
+      const tools = makeTools('read_file');
+      const calls = extractToolCallsFromContent(content, tools);
+      expect(calls.length).toBe(1);
+      expect(calls[0].name).toBe('read_file');
+      expect(calls[0].arguments).toEqual({ path: 'server/index.ts' });
+    });
+
+    it('extracts multiple invokes from XML', () => {
+      const content =
+        '<function_calls>\n<invoke name="list_files">\n<parameter name="path">server/</parameter>\n</invoke>\n<invoke name="read_file">\n<parameter name="path">server/index.ts</parameter>\n</invoke>\n</function_calls>';
+      const tools = makeTools('list_files', 'read_file');
+      const calls = extractToolCallsFromContent(content, tools);
+      expect(calls.length).toBe(2);
+      expect(calls[0].name).toBe('list_files');
+      expect(calls[1].name).toBe('read_file');
+    });
+
+    it('handles XML invoke with preamble text', () => {
+      const content =
+        'Let me read that file for you.\n\n<function_calls>\n<invoke name="read_file">\n<parameter name="path">test.ts</parameter>\n</invoke>\n</function_calls>';
+      const tools = makeTools('read_file');
+      const calls = extractToolCallsFromContent(content, tools);
+      expect(calls.length).toBe(1);
+      expect(calls[0].name).toBe('read_file');
+    });
+  });
+
   describe('Edge cases', () => {
     it('does not extract from content with no matching patterns', () => {
       const content = 'This is just a regular text response with no tool calls.';

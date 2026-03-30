@@ -128,7 +128,7 @@ describe('getToolInstructionPrompt', () => {
         },
       },
     ];
-    const result = getToolInstructionPrompt('qwen3', ['list_files'], toolDefs);
+    const result = getToolInstructionPrompt('kimi', ['list_files'], toolDefs);
     expect(result).toContain('Tool Schemas');
     expect(result).toContain('list_files');
   });
@@ -144,7 +144,7 @@ describe('getCompactToolInstructionPrompt', () => {
   });
 
   test('includes JSON format guidance for text-based families', () => {
-    const result = getCompactToolInstructionPrompt('qwen3', ['list_files']);
+    const result = getCompactToolInstructionPrompt('kimi', ['list_files']);
     expect(result).toContain('JSON array');
     expect(result).toContain('list_files');
     expect(result).toContain('No code blocks');
