@@ -490,7 +490,7 @@ describe('CursorProvider', () => {
             expect(result.content).toBe('actual content');
         });
 
-        test('includes system prompt in spawn args', async () => {
+        test('prepends system prompt to user prompt instead of --system-prompt flag', async () => {
             let capturedArgs: string[] = [];
             spawnSpy = spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
                 capturedArgs = args[0] as string[];
@@ -503,8 +503,13 @@ describe('CursorProvider', () => {
                 messages: [{ role: 'user', content: 'hi' }],
             });
 
-            expect(capturedArgs).toContain('--system-prompt');
-            expect(capturedArgs).toContain('You are helpful');
+            // Should NOT use --system-prompt flag (cursor-agent expects file path)
+            expect(capturedArgs).not.toContain('--system-prompt');
+            // System prompt should be prepended to the positional prompt argument
+            const lastArg = capturedArgs[capturedArgs.length - 1];
+            expect(lastArg).toContain('<system>');
+            expect(lastArg).toContain('You are helpful');
+            expect(lastArg).toContain('hi');
             expect(capturedArgs).toContain('--model');
             expect(capturedArgs).toContain('auto');
             expect(capturedArgs).toContain('--print');
@@ -529,11 +534,12 @@ describe('CursorProvider', () => {
                 ],
             });
 
-            // Last positional arg should be the last user message
-            expect(capturedArgs[capturedArgs.length - 1]).toBe('second message');
+            // Last positional arg should contain the last user message
+            const lastArg = capturedArgs[capturedArgs.length - 1];
+            expect(lastArg).toContain('second message');
         });
 
-        test('omits --system-prompt flag when systemPrompt is empty', async () => {
+        test('no system prompt wrapping when systemPrompt is empty', async () => {
             let capturedArgs: string[] = [];
             spawnSpy = spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
                 capturedArgs = args[0] as string[];
@@ -547,9 +553,12 @@ describe('CursorProvider', () => {
             });
 
             expect(capturedArgs).not.toContain('--system-prompt');
+            // Prompt should be bare (no <system> wrapper)
+            const lastArg = capturedArgs[capturedArgs.length - 1];
+            expect(lastArg).toBe('hi');
         });
 
-        test('handles non-zero exit code gracefully', async () => {
+        test('throws on non-zero exit code', async () => {
             spawnSpy = spyOn(Bun, 'spawn').mockImplementation(() => {
                 return makeMockProc({
                     exitCode: 1,
@@ -559,14 +568,11 @@ describe('CursorProvider', () => {
                 }) as unknown as ReturnType<typeof Bun.spawn>;
             });
 
-            const result = await provider.complete({
+            await expect(provider.complete({
                 model: 'auto',
                 systemPrompt: 'test',
                 messages: [{ role: 'user', content: 'hi' }],
-            });
-
-            // Should still return partial content
-            expect(result.content).toBe('partial');
+            })).rejects.toThrow();
         });
 
         test('handles empty stdout', async () => {

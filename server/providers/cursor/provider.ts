@@ -189,9 +189,12 @@ export class CursorProvider extends BaseLlmProvider {
             args.push('--model', params.model);
         }
 
-        // Add system prompt if provided
+        // cursor-agent's --system-prompt flag expects a file path, not inline text.
+        // Instead, prepend the system prompt to the user prompt so it's passed as
+        // part of the positional prompt argument.
+        let effectivePrompt = prompt;
         if (params.systemPrompt) {
-            args.push('--system-prompt', params.systemPrompt);
+            effectivePrompt = `<system>\n${params.systemPrompt}\n</system>\n\n${prompt}`;
         }
 
         // Check if this is a follow-up (resume) call
@@ -201,8 +204,8 @@ export class CursorProvider extends BaseLlmProvider {
         }
 
         // Prompt goes as the last positional argument
-        if (prompt) {
-            args.push(prompt);
+        if (effectivePrompt) {
+            args.push(effectivePrompt);
         }
 
         log.info('Starting cursor-agent completion', {
@@ -349,7 +352,9 @@ export class CursorProvider extends BaseLlmProvider {
             const durationMs = Date.now() - startTime;
 
             if (exitCode !== 0 && !params.signal?.aborted) {
-                log.warn('cursor-agent exited with non-zero code', { exitCode, model, durationMs, stderr: stderrBuffer.slice(0, 500) });
+                const errMsg = stderrBuffer.trim().slice(0, 500) || `cursor-agent exited with code ${exitCode}`;
+                log.warn('cursor-agent exited with non-zero code', { exitCode, model, durationMs, stderr: errMsg });
+                throw new Error(errMsg);
             }
 
             log.info('Cursor completion finished', {
