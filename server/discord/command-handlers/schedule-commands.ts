@@ -128,6 +128,7 @@ async function handleScheduleCreate(
     getOption: (name: string) => string | undefined,
 ): Promise<void> {
     const name = getOption('name');
+    const agentName = getOption('agent');
     const cron = getOption('cron');
     const actionType = getOption('action_type') ?? 'discord_post';
     const channelId = getOption('channel');
@@ -138,13 +139,13 @@ async function handleScheduleCreate(
         return;
     }
 
-    // Resolve agent (use first agent as default)
+    // Resolve agent by name, or fall back to first agent
     const agents = listAgents(ctx.db);
     if (agents.length === 0) {
         await respondToInteraction(interaction, 'No agents configured.');
         return;
     }
-    const agent = agents[0];
+    const agent = (agentName && agents.find(a => a.name === agentName)) || agents[0];
 
     // If using a template, resolve it
     if (templateId) {
