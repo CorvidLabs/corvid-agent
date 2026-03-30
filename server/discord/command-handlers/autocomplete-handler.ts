@@ -28,7 +28,7 @@ interface CacheEntry<T> {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 
-/** Clear the autocomplete cache (exposed for testing). */
+/** Clear the autocomplete cache (used by tests). */
 export function clearAutocompleteCache(): void {
   cache.clear();
 }
