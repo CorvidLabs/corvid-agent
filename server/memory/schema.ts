@@ -14,7 +14,7 @@ import type { Database } from 'bun:sqlite';
  * All statements use IF NOT EXISTS so this is safe to call repeatedly.
  */
 export function ensureMemorySchema(db: Database): void {
-  db.exec(`
+    db.exec(`
         -- Category metadata for memories (soft extension — no ALTER needed)
         CREATE TABLE IF NOT EXISTS memory_categories (
             memory_id   TEXT PRIMARY KEY REFERENCES agent_memories(id) ON DELETE CASCADE,
