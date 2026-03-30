@@ -253,21 +253,15 @@ type SortKey = 'date' | 'name' | 'author';
                         @if (loadingBook()) {
                             <div class="library__loading">Loading book...</div>
                         } @else if (bookPages().length > 1) {
-                            <div class="library__page-nav">
-                                <button
-                                    class="library__page-btn"
-                                    [disabled]="currentPageIndex() === 0"
-                                    (click)="prevPage()">&#x25C0; Prev</button>
-                                <span class="library__page-indicator">
-                                    Page {{ currentPageIndex() + 1 }} of {{ bookPages().length }}
-                                </span>
-                                <button
-                                    class="library__page-btn"
-                                    [disabled]="currentPageIndex() >= bookPages().length - 1"
-                                    (click)="nextPage()">Next &#x25B6;</button>
-                            </div>
                             <div class="library__book-reader">
-                                <div class="library__markdown-content" [innerHTML]="currentPage()!.content | markdown"></div>
+                                @for (page of bookPages(); track page.id; let i = $index) {
+                                    @if (i > 0) {
+                                        <div class="library__page-divider">
+                                            <span class="library__page-divider-label">Page {{ i + 1 }}</span>
+                                        </div>
+                                    }
+                                    <div class="library__markdown-content" [innerHTML]="page.content | markdown"></div>
+                                }
                             </div>
                         } @else {
                             <div class="library__markdown-content" [innerHTML]="selectedEntry()!.content | markdown"></div>
@@ -802,8 +796,6 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.8rem;
             line-height: 1.6;
             color: var(--text-primary, #e0e0e0);
-            max-height: 60vh;
-            overflow-y: auto;
         }
         :host ::ng-deep .library__markdown-content h1,
         :host ::ng-deep .library__markdown-content h2,
@@ -993,7 +985,6 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected readonly sortKey = signal<SortKey>('date');
     protected readonly selectedEntry = signal<LibraryEntry | null>(null);
     protected readonly bookPages = signal<LibraryEntry[]>([]);
-    protected readonly currentPageIndex = signal(0);
     protected readonly loadingBook = signal(false);
     protected readonly showSearch = signal(false);
     protected readonly orbSearchQuery = signal('');
@@ -1111,7 +1102,6 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected openEntry(entry: LibraryEntry): void {
         this.selectedEntry.set(entry);
         this.bookPages.set([]);
-        this.currentPageIndex.set(0);
 
         if (entry.book) {
             this.loadingBook.set(true);
@@ -1133,24 +1123,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
     protected clearSelection(): void {
         this.selectedEntry.set(null);
         this.bookPages.set([]);
-        this.currentPageIndex.set(0);
         this.loadingBook.set(false);
-    }
-
-    protected readonly currentPage = computed(() => {
-        const pages = this.bookPages();
-        const idx = this.currentPageIndex();
-        return pages[idx] ?? null;
-    });
-
-    protected prevPage(): void {
-        const idx = this.currentPageIndex();
-        if (idx > 0) this.currentPageIndex.set(idx - 1);
-    }
-
-    protected nextPage(): void {
-        const idx = this.currentPageIndex();
-        if (idx < this.bookPages().length - 1) this.currentPageIndex.set(idx + 1);
     }
 
     protected filterByTag(tag: string, event: Event): void {
