@@ -291,11 +291,16 @@ export class AgentMessenger {
 
         // Build conversation history for threads with prior messages
         const historyBlock = this.buildThreadHistory(threadId, agentMessage.id);
-        const replyInstruction = '\n\nIMPORTANT: Reply by writing your full response as plain text output. '
+        // Reply instruction placed BOTH before and after the message content.
+        // Weaker models (Ollama) often ignore trailing instructions but respect
+        // leading ones, while stronger models benefit from the reminder at the end.
+        const replyPrefix = '[REPLY WITH TEXT ONLY. Do NOT call corvid_send_message or corvid_save_memory. Just write your answer as plain text output.]\n\n';
+        const replySuffix = '\n\nIMPORTANT: Reply by writing your full response as plain text output. '
             + 'Do NOT use corvid_save_memory or corvid_send_message to respond — just write your answer directly as text.';
+        const messageBody = `Agent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}`;
         const prompt = historyBlock
-            ? `${historyBlock}\n\n---\n\nAgent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}${replyInstruction}`
-            : `Agent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}${replyInstruction}`;
+            ? `${replyPrefix}${historyBlock}\n\n---\n\n${messageBody}${replySuffix}`
+            : `${replyPrefix}${messageBody}${replySuffix}`;
 
         const session = createSession(this.db, {
             projectId: resolvedProjectId,
@@ -432,15 +437,24 @@ export class AgentMessenger {
                 }
             }
 
-            // Fallback capture: if the agent calls corvid_save_memory instead of
-            // replying with text, capture the memory content as a shadow response.
-            // This prevents EMPTY_RESPONSE failures for models that misunderstand
-            // the response routing instructions.
+            // Fallback capture: if the agent misroutes its reply through a tool
+            // call instead of plain text, capture the content so we return
+            // *something* instead of EMPTY_RESPONSE. Common with Ollama models
+            // that ignore response routing instructions.
             if (event.type === 'content_block_start') {
                 const block = (event as unknown as Record<string, unknown>).content_block as Record<string, unknown> | undefined;
-                if (block?.type === 'tool_use' && block.name === 'corvid_save_memory') {
+                if (block?.type === 'tool_use') {
                     const input = block.input as Record<string, unknown> | undefined;
-                    if (input && typeof input.content === 'string') {
+                    // corvid_save_memory: model tried to save its reply as a memory
+                    if (block.name === 'corvid_save_memory' && input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
+                    }
+                    // corvid_send_message: model tried to send its reply back via tool
+                    if (block.name === 'corvid_send_message' && input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
+                    }
+                    // corvid_discord_send_message: model tried to reply via Discord tool
+                    if (block.name === 'corvid_discord_send_message' && input && typeof input.content === 'string') {
                         memoryShadow = input.content;
                     }
                 }
@@ -572,13 +586,19 @@ export class AgentMessenger {
                 }
             }
 
-            // Fallback capture: if the agent calls corvid_save_memory instead of
-            // replying with text, capture the memory content as a shadow response.
+            // Fallback capture: if the agent misroutes its reply through a tool
+            // call instead of plain text, capture the content as a shadow response.
             if (event.type === 'content_block_start') {
                 const block = (event as unknown as Record<string, unknown>).content_block as Record<string, unknown> | undefined;
-                if (block?.type === 'tool_use' && block.name === 'corvid_save_memory') {
+                if (block?.type === 'tool_use') {
                     const input = block.input as Record<string, unknown> | undefined;
-                    if (input && typeof input.content === 'string') {
+                    if (block.name === 'corvid_save_memory' && input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
+                    }
+                    if (block.name === 'corvid_send_message' && input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
+                    }
+                    if (block.name === 'corvid_discord_send_message' && input && typeof input.content === 'string') {
                         memoryShadow = input.content;
                     }
                 }

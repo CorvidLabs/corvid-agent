@@ -887,3 +887,281 @@ describe('db property', () => {
         expect(messenger.db).toBe(db);
     });
 });
+
+// ─── subscribeForAgentResponse — response capture edge cases ─────────────────
+// Tests for the new event-capture paths added to handle weaker models
+// (Ollama/Cursor) that misroute replies through tool calls instead of text.
+
+describe('subscribeForAgentResponse — response capture edge cases', () => {
+    let capturedCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null;
+
+    beforeEach(() => {
+        capturedCallback = null;
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (_sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                capturedCallback = cb;
+            },
+        );
+    });
+
+    async function invokeAndCapture(): Promise<{ messageId: string; sessionId: string }> {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'test message',
+            projectId,
+        });
+        return { messageId: result.message.id, sessionId: result.sessionId! };
+    }
+
+    const wait = (ms = 20) => new Promise<void>((r) => setTimeout(r, ms));
+
+    test('captures memoryShadow from corvid_save_memory tool call when no text output', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+        expect(capturedCallback).not.toBeNull();
+
+        // Weaker model routes reply through corvid_save_memory instead of plain text
+        capturedCallback!(sessionId, {
+            type: 'content_block_start',
+            content_block: { type: 'tool_use', name: 'corvid_save_memory', input: { content: 'Saved reply text' } },
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'result', total_cost_usd: 0 });
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Saved reply text');
+    });
+
+    test('captures memoryShadow from corvid_send_message tool call when no text output', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+        expect(capturedCallback).not.toBeNull();
+
+        // Model routes reply through corvid_send_message (should not be used for replies)
+        capturedCallback!(sessionId, {
+            type: 'content_block_start',
+            content_block: { type: 'tool_use', name: 'corvid_send_message', input: { content: 'Tool-routed reply' } },
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Tool-routed reply');
+    });
+
+    test('captures memoryShadow from corvid_discord_send_message tool call', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        capturedCallback!(sessionId, {
+            type: 'content_block_start',
+            content_block: { type: 'tool_use', name: 'corvid_discord_send_message', input: { content: 'Discord reply' } },
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Discord reply');
+    });
+
+    test('prefers plain-text response over memoryShadow when both present', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        // Tool call captured first (shadow)
+        capturedCallback!(sessionId, {
+            type: 'content_block_start',
+            content_block: { type: 'tool_use', name: 'corvid_save_memory', input: { content: 'Shadow fallback' } },
+        } as unknown as ClaudeStreamEvent);
+        // But also real text output — should take priority
+        capturedCallback!(sessionId, {
+            type: 'assistant',
+            message: { role: 'assistant', content: 'Real text reply' },
+        });
+        capturedCallback!(sessionId, { type: 'result', total_cost_usd: 0 });
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Real text reply');
+    });
+
+    test('accumulates text via content_block_delta streaming events', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        // Incremental streaming (Cursor / direct-process style)
+        capturedCallback!(sessionId, {
+            type: 'content_block_delta',
+            delta: { type: 'text_delta', text: 'Hello ' },
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, {
+            type: 'content_block_delta',
+            delta: { type: 'text_delta', text: 'world' },
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Hello world');
+    });
+
+    test('handles assistant_message event type (Cursor-style)', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        capturedCallback!(sessionId, {
+            type: 'assistant_message',
+            content: 'Cursor assistant reply',
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Cursor assistant reply');
+    });
+
+    test('handles text event type (Cursor-style) using text field', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        capturedCallback!(sessionId, {
+            type: 'text',
+            text: 'Cursor text event reply',
+        } as unknown as ClaudeStreamEvent);
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Cursor text event reply');
+    });
+
+    test('message_stop saves buffer to lastTurnResponse for multi-turn capture', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        // Turn 1: assistant text then message_stop (common SDK pattern)
+        capturedCallback!(sessionId, {
+            type: 'assistant',
+            message: { role: 'assistant', content: 'Turn response' },
+        });
+        capturedCallback!(sessionId, { type: 'message_stop' });
+        // Buffer is now empty; lastTurnResponse = 'Turn response'
+        // result arrives with no new buffer content
+        capturedCallback!(sessionId, { type: 'result', total_cost_usd: 0 });
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('completed');
+        expect(msg!.response).toBe('Turn response');
+    });
+
+    test('marks EMPTY_RESPONSE when no text or shadow was captured', async () => {
+        const { messageId, sessionId } = await invokeAndCapture();
+
+        // Session exits immediately with no output
+        capturedCallback!(sessionId, { type: 'session_exited' });
+
+        await wait();
+
+        const msg = getAgentMessage(db, messageId);
+        expect(msg!.status).toBe('failed');
+        expect(msg!.errorCode).toBe('EMPTY_RESPONSE');
+    });
+
+    test('prompt includes [REPLY WITH TEXT ONLY] prefix', async () => {
+        await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Check prompt shape',
+            projectId,
+        });
+
+        // startProcess is called with (session, prompt, opts) — inspect the prompt arg
+        const calls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const promptArg = calls[calls.length - 1][1] as string;
+        expect(promptArg).toContain('[REPLY WITH TEXT ONLY');
+        expect(promptArg).toContain('Do NOT use corvid_save_memory or corvid_send_message');
+    });
+});
+
+// ─── invokeAndWait() — Cursor/Ollama model event types ───────────────────────
+
+describe('invokeAndWait() — Cursor/Ollama event type coverage', () => {
+    test('resolves from content_block_delta streaming events', async () => {
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                setTimeout(() => {
+                    cb(sessionId, {
+                        type: 'content_block_delta',
+                        delta: { type: 'text_delta', text: 'Delta ' },
+                    } as unknown as ClaudeStreamEvent);
+                    cb(sessionId, {
+                        type: 'content_block_delta',
+                        delta: { type: 'text_delta', text: 'response' },
+                    } as unknown as ClaudeStreamEvent);
+                    cb(sessionId, { type: 'session_exited' });
+                }, 10);
+            },
+        );
+
+        const result = await messenger.invokeAndWait(
+            { fromAgentId: agentA.id, toAgentId: agentB.id, content: 'delta test', projectId },
+            5000,
+        );
+
+        expect(result.response).toBe('Delta response');
+    });
+
+    test('resolves from memoryShadow when model uses corvid_save_memory', async () => {
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                setTimeout(() => {
+                    cb(sessionId, {
+                        type: 'content_block_start',
+                        content_block: { type: 'tool_use', name: 'corvid_save_memory', input: { content: 'Shadow response via memory' } },
+                    } as unknown as ClaudeStreamEvent);
+                    cb(sessionId, { type: 'session_exited' });
+                }, 10);
+            },
+        );
+
+        const result = await messenger.invokeAndWait(
+            { fromAgentId: agentA.id, toAgentId: agentB.id, content: 'memory shadow test', projectId },
+            5000,
+        );
+
+        expect(result.response).toBe('Shadow response via memory');
+    });
+
+    test('resolves from assistant_message event type (Cursor)', async () => {
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                setTimeout(() => {
+                    cb(sessionId, {
+                        type: 'assistant_message',
+                        content: 'Cursor-style reply',
+                    } as unknown as ClaudeStreamEvent);
+                    cb(sessionId, { type: 'session_exited' });
+                }, 10);
+            },
+        );
+
+        const result = await messenger.invokeAndWait(
+            { fromAgentId: agentA.id, toAgentId: agentB.id, content: 'cursor test', projectId },
+            5000,
+        );
+
+        expect(result.response).toBe('Cursor-style reply');
+    });
+});
