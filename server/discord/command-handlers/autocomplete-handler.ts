@@ -5,8 +5,8 @@
  * by querying the database on each keystroke.
  */
 
+import type { Database } from 'bun:sqlite';
 import { listAgents } from '../../db/agents';
-import { listCouncils } from '../../db/councils';
 import { listPersonas } from '../../db/personas';
 import { listProjects } from '../../db/projects';
 import { listBundles } from '../../db/skill-bundles';
@@ -17,6 +17,33 @@ import type { DiscordInteractionData, DiscordInteractionOption } from '../types'
 import { InteractionCallbackType } from '../types';
 
 const log = createLogger('DiscordCommands');
+
+/* ---------- lightweight TTL cache for autocomplete results ---------- */
+const CACHE_TTL_MS = 5_000; // 5 seconds — long enough to absorb keystrokes, short enough to stay fresh
+
+interface CacheEntry<T> {
+  data: T;
+  expires: number;
+}
+
+const cache = new Map<string, CacheEntry<unknown>>();
+
+function cached<T>(key: string, fn: () => T): T {
+  const now = Date.now();
+  const entry = cache.get(key) as CacheEntry<T> | undefined;
+  if (entry && entry.expires > now) return entry.data;
+  const data = fn();
+  cache.set(key, { data, expires: now + CACHE_TTL_MS });
+  return data;
+}
+
+/** Lightweight council listing that skips the N+1 member-id lookup. */
+function listCouncilNames(db: Database): { name: string; description: string }[] {
+  return db.query('SELECT name, description FROM councils ORDER BY updated_at DESC').all() as {
+    name: string;
+    description: string;
+  }[];
+}
 
 /** Depth-first search for the STRING option the user is typing (Discord marks it `focused`). */
 function findFocusedOption(options: DiscordInteractionOption[] | undefined): DiscordInteractionOption | undefined {
@@ -45,8 +72,8 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
 
     const query = focused ? String(focused.value ?? '').toLowerCase() : '';
 
-    if (focused?.name === 'agent' || focused?.name === 'agent_id') {
-      const agents = listAgents(ctx.db);
+    if (focused?.name === 'agent' || focused?.name === 'agent_id' || focused?.name === 'buddy') {
+      const agents = cached('agents', () => listAgents(ctx.db));
       log.debug('Autocomplete agent query', { query, agentCount: agents.length, field: focused.name });
       choices = agents
         .filter((a) => !query || a.name.toLowerCase().includes(query))
@@ -56,7 +83,7 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
           value: a.name,
         }));
     } else if (focused?.name === 'project') {
-      const projects = listProjects(ctx.db);
+      const projects = cached('projects', () => listProjects(ctx.db));
       choices = projects
         .filter(
           (p) => !query || p.name.toLowerCase().includes(query) || (p.description ?? '').toLowerCase().includes(query),
@@ -67,7 +94,7 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
           value: p.name,
         }));
     } else if (focused?.name === 'skill') {
-      const bundles = listBundles(ctx.db);
+      const bundles = cached('skills', () => listBundles(ctx.db));
       choices = bundles
         .filter((b) => !query || b.name.toLowerCase().includes(query) || b.description.toLowerCase().includes(query))
         .slice(0, 25)
@@ -75,17 +102,8 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
           name: `${b.name}${b.description ? ` — ${b.description}` : ''}`.slice(0, 100),
           value: b.name,
         }));
-    } else if (focused?.name === 'buddy') {
-      const agents = listAgents(ctx.db);
-      choices = agents
-        .filter((a) => !query || a.name.toLowerCase().includes(query))
-        .slice(0, 25)
-        .map((a) => ({
-          name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
-          value: a.name,
-        }));
     } else if (focused?.name === 'council_name') {
-      const councils = listCouncils(ctx.db);
+      const councils = cached('councils', () => listCouncilNames(ctx.db));
       choices = councils
         .filter((c) => !query || c.name.toLowerCase().includes(query))
         .slice(0, 25)
@@ -94,7 +112,7 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
           value: c.name,
         }));
     } else if (focused?.name === 'persona') {
-      const personas = listPersonas(ctx.db);
+      const personas = cached('personas', () => listPersonas(ctx.db));
       choices = personas
         .filter((p) => !query || p.name.toLowerCase().includes(query))
         .slice(0, 25)
