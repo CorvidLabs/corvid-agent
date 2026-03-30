@@ -25,7 +25,7 @@ runs:
           ~/.bun/install/cache
           node_modules
           client/node_modules
-        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'client/bun.lock', 'package.json', 'client/package.json') }}
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'client/bun.lock') }}
         restore-keys: |
           bun-${{ runner.os }}-
 
