@@ -65,7 +65,7 @@ const TABS: NavTab[] = [
         route: '/observe',
         matchRoutes: ['/observe', '/library'],
         children: [
-            { label: 'Comms', icon: 'activity', route: '/observe' },
+            { label: 'Comms', icon: 'activity', route: '/observe/comms' },
             { label: 'Memory', icon: 'database', route: '/observe/memory' },
             { label: 'Library', icon: 'book-open', route: '/library' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
