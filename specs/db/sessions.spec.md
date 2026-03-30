@@ -132,13 +132,16 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | initial_prompt | TEXT | DEFAULT '' | First prompt sent |
 | pid | INTEGER | nullable | OS process ID when running |
 | total_cost_usd | REAL | DEFAULT 0 | Cumulative API cost |
-| total_algo_spent | INTEGER | DEFAULT 0 | Cumulative microALGOs spent |
+| total_algo_spent | REAL | DEFAULT 0 | Cumulative microALGOs spent |
 | total_turns | INTEGER | DEFAULT 0 | Number of conversation turns |
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
 | council_role | TEXT | nullable | chairman/member/synthesizer |
 | work_dir | TEXT | nullable | Override working directory (e.g. git worktree) |
 | conversation_summary | TEXT | DEFAULT NULL | Conversation summary for cross-session context carry-over |
-| credits_consumed | INTEGER | DEFAULT 0 | Credits consumed by this session |
+| credits_consumed | REAL | DEFAULT 0 | Credits consumed by this session |
+| restart_pending | INTEGER | NOT NULL, DEFAULT 0 | Whether a restart is pending for this session (boolean) |
+| server_restart_initiated_at | TEXT | DEFAULT NULL | Timestamp when a server restart was initiated for this session |
+| tenant_id | TEXT | NOT NULL, DEFAULT 'default' | Multi-tenant isolation key |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
 

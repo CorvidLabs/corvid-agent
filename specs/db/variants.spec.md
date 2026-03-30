@@ -122,6 +122,8 @@ Data-access layer for agent variant profiles — preset combinations of skill bu
 | variant_id | TEXT | NOT NULL, FK agent_variants(id) ON DELETE CASCADE | Applied variant |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | When the variant was applied |
 
+**Indexes:** `idx_agent_variant_assignments_variant` on `variant_id`
+
 ## Change Log
 
 | Date | Author | Change |

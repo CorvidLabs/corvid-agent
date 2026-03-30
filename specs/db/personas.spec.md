@@ -134,6 +134,8 @@ Data-access and prompt-composition layer for composable agent personas. Personas
 | sort_order | INTEGER | DEFAULT 0 | Order in which personas are composed (lower = first) |
 | | | PRIMARY KEY (agent_id, persona_id) | Composite primary key prevents duplicate assignments |
 
+**Indexes:** `idx_agent_persona_assignments_agent` on `agent_id`
+
 ## Change Log
 
 | Date | Author | Change |

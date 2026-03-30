@@ -10,6 +10,9 @@ db_tables:
   - council_launches
   - council_launch_logs
   - council_discussion_messages
+  - governance_votes
+  - governance_member_votes
+  - governance_proposals
 depends_on:
   - specs/db/schema.spec.md
   - specs/tenant/tenant.spec.md
@@ -142,6 +145,8 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | tenant_id | TEXT | NOT NULL DEFAULT 'default', INDEXED | Tenant isolation identifier (added v56) |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | on_chain_mode | TEXT | DEFAULT 'full' | On-chain mode: 'off', 'metadata', 'full' (added v68) |
+| quorum_type | TEXT | DEFAULT NULL | Quorum type for governance: 'simple_majority', 'supermajority', 'unanimous' |
+| quorum_threshold | REAL | DEFAULT NULL | Quorum threshold as a fraction (e.g. 0.67 for 2/3 majority) |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
 
 ### council_members
@@ -167,11 +172,13 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | current_discussion_round | INTEGER | DEFAULT 0 | Current round number during discussion (added v9) |
 | total_discussion_rounds | INTEGER | DEFAULT 0 | Total planned discussion rounds (added v9) |
 | chat_session_id | TEXT | DEFAULT NULL | Follow-up chat session ID (added v22) |
+| vote_type | TEXT | DEFAULT NULL | Vote type for governance launches (e.g. 'approve_reject') |
+| governance_tier | INTEGER | DEFAULT NULL | Governance tier level (higher = more scrutiny) |
 | synthesis_txid | TEXT | DEFAULT NULL | On-chain transaction ID for the synthesis (added v68) |
 | tenant_id | TEXT | NOT NULL DEFAULT 'default', INDEXED | Tenant isolation identifier (added v56) |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 
-**Indexes:** `idx_council_launches_council` on `council_id`, `idx_council_launches_tenant` on `tenant_id`
+**Indexes:** `idx_council_launches_council` on `council_id`, `idx_council_launches_tenant` on `tenant_id`, `idx_council_launches_council_created` on `(council_id, created_at DESC)`
 
 ### council_launch_logs
 
@@ -201,6 +208,55 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 
 **Indexes:** `idx_cdm_launch` on `launch_id`
+
+### governance_votes
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing identifier |
+| launch_id | TEXT | NOT NULL, FK -> council_launches(id) | Associated council launch |
+| governance_tier | INTEGER | DEFAULT NULL | Governance tier level |
+| affected_paths | TEXT | DEFAULT NULL | JSON array of file paths affected by the proposal |
+| status | TEXT | DEFAULT NULL | Vote status: 'open', 'closed', 'approved', 'rejected' |
+| human_approved | INTEGER | DEFAULT NULL | Whether a human approved the vote (boolean) |
+| human_approved_by | TEXT | DEFAULT NULL | Identifier of the human who approved |
+| human_approved_at | TEXT | DEFAULT NULL | Timestamp of human approval |
+| tenant_id | TEXT | DEFAULT NULL | Tenant isolation identifier |
+| created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
+| resolved_at | TEXT | DEFAULT NULL | When the vote was resolved |
+
+### governance_member_votes
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing identifier |
+| governance_vote_id | INTEGER | NOT NULL, FK -> governance_votes(id) | Parent governance vote |
+| agent_id | TEXT | NOT NULL | Voting agent ID |
+| vote | TEXT | NOT NULL, CHECK(IN 'approve','reject','abstain') | The agent's vote |
+| reason | TEXT | DEFAULT NULL | Explanation for the vote |
+| created_at | TEXT | DEFAULT datetime('now') | When the vote was cast |
+
+### governance_proposals
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | TEXT | PRIMARY KEY | UUID identifier |
+| council_id | TEXT | NOT NULL, FK -> councils(id) | Associated council |
+| title | TEXT | NOT NULL | Proposal title |
+| description | TEXT | DEFAULT NULL | Proposal description |
+| author_id | TEXT | DEFAULT NULL | Agent who authored the proposal |
+| status | TEXT | DEFAULT NULL | Proposal status |
+| decision | TEXT | DEFAULT NULL | Final decision |
+| governance_tier | INTEGER | DEFAULT NULL | Governance tier level |
+| affected_paths | TEXT | DEFAULT NULL | JSON array of affected file paths |
+| quorum_threshold | REAL | DEFAULT NULL | Required quorum threshold |
+| minimum_voters | INTEGER | DEFAULT NULL | Minimum number of voters required |
+| launch_id | TEXT | DEFAULT NULL | Associated council launch |
+| tenant_id | TEXT | DEFAULT NULL | Tenant isolation identifier |
+| created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
+| updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
+| decided_at | TEXT | DEFAULT NULL | When the decision was made |
+| enacted_at | TEXT | DEFAULT NULL | When the decision was enacted |
 
 ## Change Log
 

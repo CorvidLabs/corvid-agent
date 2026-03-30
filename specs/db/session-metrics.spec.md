@@ -117,6 +117,11 @@ Persists structured tool-chain analytics collected during direct-process executi
 | needs_summary | INTEGER | NOT NULL DEFAULT 0 | Whether a summary epilogue was needed |
 | created_at | TEXT | DEFAULT datetime('now') | When metrics were recorded |
 
+**Indexes:**
+- `idx_session_metrics_session` on `session_id`
+- `idx_session_metrics_model` on `model`
+- `idx_session_metrics_created` on `created_at`
+
 ## Configuration
 
 No environment variables. This module is a pure data layer.
