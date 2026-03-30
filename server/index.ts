@@ -368,6 +368,7 @@ const server = Bun.serve<WsData>({
           getSchedulerStats: () => schedulerService.getStats(),
           getMentionPollingStats: () => mentionPollingService.getStats(),
           getWorkflowStats: () => workflowService.getStats(),
+          getAuthConfig: () => authConfig,
         };
 
         const healthResponse = await handleHealthRoutes(req, url, healthDeps, db);

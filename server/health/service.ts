@@ -153,7 +153,10 @@ function checkApiKey(getAuthConfig?: () => AuthConfig | null): DependencyHealth 
         return { status: 'healthy', configured: false };
     }
     const config = getAuthConfig();
-    if (!config || !config.apiKeyExpiresAt) {
+    if (!config || !config.apiKey) {
+        return { status: 'healthy', configured: false };
+    }
+    if (!config.apiKeyExpiresAt) {
         return { status: 'healthy', configured: true, expiry: 'none' };
     }
 
