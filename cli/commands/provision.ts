@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, openSync, closeSync, constants as fsConstants } from 'fs';
+import { writeFileSync, mkdirSync, openSync, closeSync, renameSync, constants as fsConstants } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { c, printError, printSuccess, printWarning, printHeader } from '../render';
@@ -116,10 +116,12 @@ export async function provisionCommand(options: ProvisionOptions): Promise<void>
     }
     printSuccess(`Config written to ${envPath}`);
 
-    // Step 6: Write identity card (non-secret metadata for sharing)
+    // Step 6: Write identity card (non-secret metadata for sharing, atomic write)
     const identityCard = buildIdentityCard({ name, address, network, role, template });
     const cardPath = join(outputDir, 'identity.json');
-    writeFileSync(cardPath, JSON.stringify(identityCard, null, 2) + '\n', { mode: 0o644 });
+    const tmpCardPath = `${cardPath}.${process.pid}.tmp`;
+    writeFileSync(tmpCardPath, JSON.stringify(identityCard, null, 2) + '\n', { mode: 0o644 });
+    renameSync(tmpCardPath, cardPath);
     printSuccess(`Identity card written to ${cardPath}`);
 
     // Step 7: Print next steps

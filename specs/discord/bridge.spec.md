@@ -160,7 +160,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleAutocomplete` | `(ctx, interaction)` | `Promise<void>` | Handle autocomplete interactions — provides live results for agent and project name fields |
-| `clearAutocompleteCache` | `()` | `void` | Clear the TTL cache used by autocomplete lookups (useful for test isolation) |
+| `clearAutocompleteCache` | `()` | `void` | Clear the TTL cache (used by tests to isolate each run) |
 
 ### Exported Functions (from command-handlers/message-commands.ts)
 

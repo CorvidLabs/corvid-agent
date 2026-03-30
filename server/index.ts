@@ -529,14 +529,14 @@ const server = Bun.serve<WsData>({
         return instrumentResponse(apiResponse, route);
       }
 
-      // Serve Angular static files (open directly to avoid TOCTOU race)
+      // Serve Angular static files (read atomically to avoid TOCTOU race)
       {
         const filePath = join(CLIENT_DIST, url.pathname);
         if (!filePath.endsWith('/')) {
           try {
-            const file = Bun.file(filePath);
-            // Bun.file() is lazy — .size triggers the actual stat atomically
-            if (file.size > 0) {
+            // Read file content atomically — no separate existence check
+            const bytes = await Bun.file(filePath).bytes();
+            if (bytes.length > 0) {
               const headers: Record<string, string> = {};
               const basename = url.pathname.split('/').pop() ?? '';
               // Angular outputHashing:"all" produces files like main.abc1234f.js
@@ -547,7 +547,7 @@ const server = Bun.serve<WsData>({
               } else {
                 headers['Cache-Control'] = 'public, max-age=3600';
               }
-              return instrumentResponse(new Response(file, { headers }), '/static');
+              return instrumentResponse(new Response(bytes, { headers }), '/static');
             }
           } catch { /* file not found, fall through */ }
         }
@@ -555,10 +555,11 @@ const server = Bun.serve<WsData>({
         // SPA fallback - serve index.html for unmatched routes
         try {
           const indexPath = join(CLIENT_DIST, 'index.html');
-          const indexFile = Bun.file(indexPath);
-          if (indexFile.size > 0) {
+          // Read atomically — no separate existence check
+          const indexBytes = await Bun.file(indexPath).bytes();
+          if (indexBytes.length > 0) {
             return instrumentResponse(
-              new Response(indexFile, {
+              new Response(indexBytes, {
                 headers: {
                   'Content-Type': 'text/html',
                   'Cache-Control': 'no-cache, no-store, must-revalidate',
