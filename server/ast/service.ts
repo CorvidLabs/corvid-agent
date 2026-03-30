@@ -1,4 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { extname, join } from 'node:path';
 import { ValidationError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
@@ -239,9 +240,9 @@ export class AstParserService {
   }
 
   private async walkRecursive(dir: string, result: string[]): Promise<void> {
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let entries: Dirent<string>[];
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = await readdir(dir, { withFileTypes: true, encoding: 'utf8' });
     } catch {
       return;
     }
