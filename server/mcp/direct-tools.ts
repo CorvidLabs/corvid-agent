@@ -448,7 +448,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         parameters: {
             type: 'object',
             properties: {
-                action: { type: 'string', enum: ['list', 'create', 'update', 'pause', 'resume', 'history'], description: 'What to do' },
+                action: { type: 'string', enum: ['list', 'create', 'update', 'get', 'pause', 'resume', 'history'], description: 'What to do' },
                 name: { type: 'string', description: 'Schedule name (for create/update)' },
                 description: { type: 'string', description: 'Schedule description (for create/update)' },
                 cron_expression: { type: 'string', description: 'Cron expression (for create/update)' },
@@ -472,6 +472,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 },
                 approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve (for create/update)' },
                 max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
+                agent_id: { type: 'string', description: 'Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.' },
                 schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
                 output_destinations: {
                     type: 'array',
