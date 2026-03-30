@@ -291,9 +291,11 @@ export class AgentMessenger {
 
         // Build conversation history for threads with prior messages
         const historyBlock = this.buildThreadHistory(threadId, agentMessage.id);
+        const replyInstruction = '\n\nIMPORTANT: Reply by writing your full response as plain text output. '
+            + 'Do NOT use corvid_save_memory or corvid_send_message to respond — just write your answer directly as text.';
         const prompt = historyBlock
-            ? `${historyBlock}\n\n---\n\nAgent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}`
-            : `Agent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}`;
+            ? `${historyBlock}\n\n---\n\nAgent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}${replyInstruction}`
+            : `Agent "${fromAgent.name}" sent you a message (${(paymentMicro / 1_000_000).toFixed(6)} ALGO):\n\n${content}${replyInstruction}`;
 
         const session = createSession(this.db, {
             projectId: resolvedProjectId,
@@ -335,6 +337,9 @@ export class AgentMessenger {
     ): void {
         let responseBuffer = '';
         let lastTurnResponse = '';
+        // Fallback: if the agent saves to memory instead of replying with text,
+        // capture the memory content so we return *something* instead of EMPTY_RESPONSE.
+        let memoryShadow = '';
         let completed = false;
 
         const finish = () => {
@@ -342,7 +347,7 @@ export class AgentMessenger {
             completed = true;
             this.processManager.unsubscribe(sessionId, callback);
 
-            const response = (responseBuffer.trim() || lastTurnResponse.trim());
+            const response = (responseBuffer.trim() || lastTurnResponse.trim() || memoryShadow.trim());
             if (!response) {
                 updateAgentMessageStatus(this.db, messageId, 'failed', {
                     errorCode: 'EMPTY_RESPONSE',
@@ -395,12 +400,19 @@ export class AgentMessenger {
                 log.info('[subscribeForAgentResponse] event', { type: event.type, sessionId: sessionId.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length, completed });
             }
 
-            // SDK-style assistant events (Claude SDK provider)
+            // SDK-style assistant events (Claude SDK provider).
+            // These contain the FULL turn text — replace (not append) the buffer
+            // to avoid doubling when content_block_delta streaming already captured
+            // the same text incrementally.
             if (event.type === 'assistant' && event.message?.content) {
-                responseBuffer += extractContentText(event.message.content);
+                const text = extractContentText(event.message.content);
+                if (text) {
+                    responseBuffer = text;
+                }
             }
 
             // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
+            // and direct-process streaming. These arrive incrementally during generation.
             if (event.type === 'content_block_delta') {
                 const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
                 if (delta && typeof delta.text === 'string') {
@@ -416,6 +428,20 @@ export class AgentMessenger {
                     const text = raw.content ?? raw.text;
                     if (typeof text === 'string') {
                         responseBuffer += text;
+                    }
+                }
+            }
+
+            // Fallback capture: if the agent calls corvid_save_memory instead of
+            // replying with text, capture the memory content as a shadow response.
+            // This prevents EMPTY_RESPONSE failures for models that misunderstand
+            // the response routing instructions.
+            if (event.type === 'content_block_start') {
+                const block = (event as unknown as Record<string, unknown>).content_block as Record<string, unknown> | undefined;
+                if (block?.type === 'tool_use' && block.name === 'corvid_save_memory') {
+                    const input = block.input as Record<string, unknown> | undefined;
+                    if (input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
                     }
                 }
             }
@@ -438,7 +464,7 @@ export class AgentMessenger {
 
             // Finalize when the session exits, stops, or completes with a result
             if (event.type === 'session_exited' || event.type === 'session_stopped' || event.type === 'result') {
-                log.info('[subscribeForAgentResponse] settling', { sessionId: sessionId.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length });
+                log.info('[subscribeForAgentResponse] settling', { sessionId: sessionId.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length, memoryShadowLen: memoryShadow.length });
                 finish();
             }
         };
@@ -477,6 +503,7 @@ export class AgentMessenger {
         // then replay the ones matching our session once we know the sessionId.
         let responseBuffer = '';
         let lastTurnResponse = '';
+        let memoryShadow = '';
         let settled = false;
         let targetSessionId: string | null = null;
         let resolvePromise: ((value: { response: string; threadId: string }) => void) | null = null;
@@ -513,12 +540,19 @@ export class AgentMessenger {
                 log.info('[invokeAndWait] handleEvent', { type: event.type, sid: sid.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length });
             }
 
-            // SDK-style assistant events (Claude SDK provider)
+            // SDK-style assistant events (Claude SDK provider).
+            // These contain the FULL turn text — replace (not append) the buffer
+            // to avoid doubling when content_block_delta streaming already captured
+            // the same text incrementally.
             if (event.type === 'assistant' && event.message?.content) {
-                responseBuffer += extractContentText(event.message.content);
+                const text = extractContentText(event.message.content);
+                if (text) {
+                    responseBuffer = text;
+                }
             }
 
             // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
+            // and direct-process streaming. These arrive incrementally during generation.
             if (event.type === 'content_block_delta') {
                 const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
                 if (delta && typeof delta.text === 'string') {
@@ -534,6 +568,18 @@ export class AgentMessenger {
                     const text = raw.content ?? raw.text;
                     if (typeof text === 'string') {
                         responseBuffer += text;
+                    }
+                }
+            }
+
+            // Fallback capture: if the agent calls corvid_save_memory instead of
+            // replying with text, capture the memory content as a shadow response.
+            if (event.type === 'content_block_start') {
+                const block = (event as unknown as Record<string, unknown>).content_block as Record<string, unknown> | undefined;
+                if (block?.type === 'tool_use' && block.name === 'corvid_save_memory') {
+                    const input = block.input as Record<string, unknown> | undefined;
+                    if (input && typeof input.content === 'string') {
+                        memoryShadow = input.content;
                     }
                 }
             }
@@ -555,7 +601,7 @@ export class AgentMessenger {
 
             // Resolve when the session exits, stops, or completes with a result
             if (event.type === 'session_exited' || event.type === 'session_stopped' || event.type === 'result') {
-                const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                const response = (responseBuffer.trim() || lastTurnResponse.trim() || memoryShadow.trim());
                 settle(response || null);
             }
         };
@@ -597,7 +643,7 @@ export class AgentMessenger {
         // If events were already captured via global subscription and the
         // session already settled, return immediately.
         if (settled) {
-            const response = (responseBuffer.trim() || lastTurnResponse.trim());
+            const response = (responseBuffer.trim() || lastTurnResponse.trim() || memoryShadow.trim());
             if (response) {
                 return { response, threadId };
             }
@@ -609,7 +655,7 @@ export class AgentMessenger {
             rejectPromise = reject;
 
             timer = setTimeout(() => {
-                const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                const response = (responseBuffer.trim() || lastTurnResponse.trim() || memoryShadow.trim());
                 // Stop the orphaned session so it doesn't run indefinitely
                 if (this.processManager.isRunning(sessionId)) {
                     log.warn('Stopping orphaned agent session on timeout', { sessionId, timeoutMs });
@@ -623,7 +669,7 @@ export class AgentMessenger {
             if (!this.processManager.isRunning(sessionId)) {
                 setTimeout(() => {
                     if (settled) return;
-                    const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                    const response = (responseBuffer.trim() || lastTurnResponse.trim() || memoryShadow.trim());
                     if (response) {
                         settle(response);
                     } else {
