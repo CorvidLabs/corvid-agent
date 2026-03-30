@@ -391,6 +391,9 @@ export class AgentMessenger {
 
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
+            if (event.type === 'result' || event.type === 'session_exited' || event.type === 'session_stopped') {
+                log.info('[subscribeForAgentResponse] event', { type: event.type, sessionId: sessionId.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length, completed });
+            }
 
             // SDK-style assistant events (Claude SDK provider)
             if (event.type === 'assistant' && event.message?.content) {
@@ -417,14 +420,25 @@ export class AgentMessenger {
                 }
             }
 
-            // Each 'result' or 'message_stop' marks end of a turn — save and reset
-            if (event.type === 'result' || event.type === 'message_stop') {
+            // 'message_stop' marks end of a model turn — save and reset
+            if (event.type === 'message_stop') {
                 lastTurnResponse = responseBuffer;
                 responseBuffer = '';
             }
 
-            // Finalize when the session exits or is stopped
-            if (event.type === 'session_exited' || event.type === 'session_stopped') {
+            // 'result' marks the session-level completion. Only overwrite
+            // lastTurnResponse if the buffer has new content (avoids clobbering
+            // a valid response captured at message_stop).
+            if (event.type === 'result') {
+                if (responseBuffer.length > 0) {
+                    lastTurnResponse = responseBuffer;
+                    responseBuffer = '';
+                }
+            }
+
+            // Finalize when the session exits, stops, or completes with a result
+            if (event.type === 'session_exited' || event.type === 'session_stopped' || event.type === 'result') {
+                log.info('[subscribeForAgentResponse] settling', { sessionId: sessionId.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length });
                 finish();
             }
         };
@@ -457,33 +471,144 @@ export class AgentMessenger {
         request: AgentInvokeRequest,
         timeoutMs: number = 5 * 60 * 1000,
     ): Promise<{ response: string; threadId: string }> {
-        const result = await this.invoke(request);
+        // Subscribe globally BEFORE invoke() to avoid a race condition where
+        // fast agents (Ollama cloud models) finish before session-specific
+        // subscription is registered. We buffer ALL events during invoke(),
+        // then replay the ones matching our session once we know the sessionId.
+        let responseBuffer = '';
+        let lastTurnResponse = '';
+        let settled = false;
+        let targetSessionId: string | null = null;
+        let resolvePromise: ((value: { response: string; threadId: string }) => void) | null = null;
+        let rejectPromise: ((reason: Error) => void) | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let threadId = '';
+        let messageId = '';
+        const earlyEvents: Array<{ sid: string; event: ClaudeStreamEvent }> = [];
+
+        const settle = (response: string | null, error?: string) => {
+            if (settled) return;
+            log.info('[invokeAndWait] settling', { hasResponse: !!response, responseLen: response?.length ?? 0, error: error ?? 'none', bufLen: responseBuffer.length, lastLen: lastTurnResponse.length });
+            settled = true;
+            if (timer) clearTimeout(timer);
+            if (targetSessionId) {
+                this.processManager.unsubscribe(targetSessionId, handleEvent);
+            }
+            if (response && resolvePromise) {
+                resolvePromise({ response, threadId });
+            } else if (rejectPromise) {
+                rejectPromise(new Error(error ?? 'Agent returned empty response'));
+            }
+        };
+
+        const handleEvent = (sid: string, event: ClaudeStreamEvent) => {
+            // Before we know the session ID, buffer all events for later replay
+            if (!targetSessionId) {
+                earlyEvents.push({ sid, event });
+                log.debug('[invokeAndWait] buffered early event', { type: event.type, sid: sid.slice(0, 8) });
+                return;
+            }
+            if (sid !== targetSessionId || settled) return;
+            if (event.type === 'result' || event.type === 'session_exited' || event.type === 'session_stopped') {
+                log.info('[invokeAndWait] handleEvent', { type: event.type, sid: sid.slice(0, 8), bufLen: responseBuffer.length, lastLen: lastTurnResponse.length });
+            }
+
+            // SDK-style assistant events (Claude SDK provider)
+            if (event.type === 'assistant' && event.message?.content) {
+                responseBuffer += extractContentText(event.message.content);
+            }
+
+            // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
+            if (event.type === 'content_block_delta') {
+                const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
+                if (delta && typeof delta.text === 'string') {
+                    responseBuffer += delta.text;
+                }
+            }
+
+            // Cursor-style assistant_message / text events (not in ClaudeStreamEvent union)
+            {
+                const rawType = (event as unknown as Record<string, unknown>).type as string;
+                if (rawType === 'assistant_message' || rawType === 'text') {
+                    const raw = event as unknown as Record<string, unknown>;
+                    const text = raw.content ?? raw.text;
+                    if (typeof text === 'string') {
+                        responseBuffer += text;
+                    }
+                }
+            }
+
+            // 'message_stop' marks end of a model turn — save and reset
+            if (event.type === 'message_stop') {
+                lastTurnResponse = responseBuffer;
+                responseBuffer = '';
+            }
+
+            // 'result' marks session-level completion. Only overwrite
+            // lastTurnResponse if the buffer has new content.
+            if (event.type === 'result') {
+                if (responseBuffer.length > 0) {
+                    lastTurnResponse = responseBuffer;
+                    responseBuffer = '';
+                }
+            }
+
+            // Resolve when the session exits, stops, or completes with a result
+            if (event.type === 'session_exited' || event.type === 'session_stopped' || event.type === 'result') {
+                const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                settle(response || null);
+            }
+        };
+
+        // Pre-subscribe globally so we capture events even if the process
+        // completes before invoke() returns.
+        this.processManager.subscribeAll(handleEvent);
+
+        let result: AgentInvokeResult;
+        try {
+            result = await this.invoke(request);
+        } catch (err) {
+            this.processManager.unsubscribeAll(handleEvent);
+            throw err;
+        }
+
         const sessionId = result.sessionId;
         if (!sessionId) {
+            this.processManager.unsubscribeAll(handleEvent);
             throw new ExternalServiceError('AgentMessenger', 'No session created for agent invoke');
         }
 
-        // Retrieve the threadId from the created message
-        const threadId = result.message.threadId ?? request.threadId ?? crypto.randomUUID();
+        targetSessionId = sessionId;
+        threadId = result.message.threadId ?? request.threadId ?? crypto.randomUUID();
+        messageId = result.message.id;
+
+        // Switch from global to session-specific subscription to avoid
+        // processing events from unrelated sessions.
+        this.processManager.subscribe(sessionId, handleEvent);
+        this.processManager.unsubscribeAll(handleEvent);
+
+        // Replay any events that were buffered before we knew the session ID.
+        // handleEvent now has targetSessionId set, so it will process them.
+        for (const { sid, event } of earlyEvents) {
+            handleEvent(sid, event);
+        }
+        earlyEvents.length = 0;
+
+        // If events were already captured via global subscription and the
+        // session already settled, return immediately.
+        if (settled) {
+            const response = (responseBuffer.trim() || lastTurnResponse.trim());
+            if (response) {
+                return { response, threadId };
+            }
+            throw new Error('Agent returned empty response');
+        }
 
         return new Promise<{ response: string; threadId: string }>((resolve, reject) => {
-            let responseBuffer = '';
-            let lastTurnResponse = '';
-            let settled = false;
+            resolvePromise = resolve;
+            rejectPromise = reject;
 
-            const settle = (response: string | null, error?: string) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                this.processManager.unsubscribe(sessionId, callback);
-                if (response) {
-                    resolve({ response, threadId });
-                } else {
-                    reject(new Error(error ?? 'Agent returned empty response'));
-                }
-            };
-
-            const timer = setTimeout(() => {
+            timer = setTimeout(() => {
                 const response = (responseBuffer.trim() || lastTurnResponse.trim());
                 // Stop the orphaned session so it doesn't run indefinitely
                 if (this.processManager.isRunning(sessionId)) {
@@ -493,55 +618,20 @@ export class AgentMessenger {
                 settle(response || null, `Agent invoke timed out after ${timeoutMs}ms`);
             }, timeoutMs);
 
-            const callback = (sid: string, event: ClaudeStreamEvent) => {
-                if (sid !== sessionId || settled) return;
-
-                // SDK-style assistant events (Claude SDK provider)
-                if (event.type === 'assistant' && event.message?.content) {
-                    responseBuffer += extractContentText(event.message.content);
-                }
-
-                // Cursor-style streamed text (content_block_delta from cursor-agent CLI)
-                if (event.type === 'content_block_delta') {
-                    const delta = (event as unknown as Record<string, unknown>).delta as Record<string, unknown> | undefined;
-                    if (delta && typeof delta.text === 'string') {
-                        responseBuffer += delta.text;
-                    }
-                }
-
-                // Cursor-style assistant_message / text events (not in ClaudeStreamEvent union)
-                {
-                    const rawType = (event as unknown as Record<string, unknown>).type as string;
-                    if (rawType === 'assistant_message' || rawType === 'text') {
-                        const raw = event as unknown as Record<string, unknown>;
-                        const text = raw.content ?? raw.text;
-                        if (typeof text === 'string') {
-                            responseBuffer += text;
-                        }
-                    }
-                }
-
-                // Each 'result' or 'message_stop' marks end of a turn — save and reset
-                if (event.type === 'result' || event.type === 'message_stop') {
-                    lastTurnResponse = responseBuffer;
-                    responseBuffer = '';
-                }
-
-                // Resolve when the session exits or is stopped
-                if (event.type === 'session_exited' || event.type === 'session_stopped') {
-                    const response = (responseBuffer.trim() || lastTurnResponse.trim());
-                    settle(response || null);
-                }
-            };
-
-            this.processManager.subscribe(sessionId, callback);
-
-            // Check if the process already finished before we subscribed
+            // If the process already finished (events captured via global subscription),
+            // check if we already have a response.
             if (!this.processManager.isRunning(sessionId)) {
-                // Give a brief grace period for final events
                 setTimeout(() => {
+                    if (settled) return;
                     const response = (responseBuffer.trim() || lastTurnResponse.trim());
-                    settle(response || null, 'Agent session already exited with no response');
+                    if (response) {
+                        settle(response);
+                    } else {
+                        // Last resort: check if subscribeForAgentResponse captured the
+                        // response in the DB (it subscribes before startProcess in invoke()).
+                        const msg = getAgentMessage(this.db, messageId);
+                        settle(msg?.response ?? null, 'Agent session already exited with no response');
+                    }
                 }, 500);
             }
         });
