@@ -227,6 +227,7 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | `outcome_analysis` | Analyze PR outcomes and schedule effectiveness | (none) |
 | `daily_review` | Generate daily activity summary (PRs, executions, health) | (none) |
 | `status_checkin` | Evaluates system state and broadcasts agent status summary to AlgoChat | (none) |
+| `flock_reputation_refresh` | Recompute flock directory reputation scores for all agents | (none) |
 | `custom` | Freeform prompt (owner-only creation) | `prompt` |
 
 ## Change Log
