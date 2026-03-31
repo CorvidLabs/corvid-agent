@@ -148,6 +148,20 @@ describe('runValidation', () => {
         expect(result.output.length).toBeGreaterThan(0);
     }, 30_000);
 
+    test('skips TypeScript check when no tsconfig.json exists (#1767)', async () => {
+        // Create a project without tsconfig.json
+        await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'no-ts', dependencies: {} }));
+
+        // Init git
+        const git = Bun.spawn(['git', 'init'], { cwd: tempDir, stdout: 'pipe', stderr: 'pipe' });
+        await git.exited;
+
+        const result = await runValidation(tempDir);
+        // Should skip TSC gracefully instead of failing with help text
+        expect(result.output).toContain('TypeScript Check Skipped');
+        expect(result.output).not.toContain('TypeScript Check Failed');
+    }, 30_000);
+
     test('runs security scan on git diff and reports Security Scan Passed', async () => {
         await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'test-scan', dependencies: {} }));
         await writeFile(join(tempDir, 'tsconfig.json'), JSON.stringify({
