@@ -43,6 +43,8 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 2. **INSERT OR REPLACE**: `saveThreadSession` upserts — calling it twice for the same thread overwrites the previous mapping.
 3. **Recovery window**: `getRecentThreadSessions` only returns sessions active within the specified hour window (default 48h).
 4. **Prune safety**: `pruneOldThreadSessions` only deletes sessions older than the retention period (default 14 days).
+5. **Timestamp normalization**: `getRecentThreadSessions` appends 'Z' to timestamps if missing for correct UTC parsing.
+6. **Buddy config reconstruction**: `buddyConfig` is reconstructed from individual columns only when both `buddy_agent_id` and `buddy_agent_name` are non-null.
 
 ## Behavioral Examples
 
@@ -51,6 +53,12 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 - **Given** a Discord thread with ID "thread-123"
 - **When** `saveThreadSession(db, "thread-123", info)` is called followed by `getThreadSession(db, "thread-123")`
 - **Then** the returned `ThreadSessionInfo` matches the saved info including buddy config if present
+
+### Scenario: Lookup for unknown thread returns null
+
+- **Given** no rows in `discord_thread_sessions`
+- **When** `getThreadSession(db, "unknown-id")` is called
+- **Then** returns `null`
 
 ### Scenario: Startup recovery loads recent sessions
 
@@ -86,6 +94,7 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 | Module | What is used |
 |--------|-------------|
 | `server/discord/thread-session-map.ts` | All exported functions for persistence and recovery |
+| `server/discord/thread-manager.ts` | `getRecentThreadSessions` for startup recovery |
 
 ## Database Tables
 
@@ -118,4 +127,4 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-30 | corvid-agent | Initial spec (#1754) |
+| 2026-03-30 | corvid-agent | Initial spec (#1754, migration 112) |

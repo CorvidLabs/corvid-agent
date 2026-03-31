@@ -42,6 +42,7 @@ files:
   - server/db/migrations/110_session_conversation_summary.ts
   - server/db/migrations/111_library_title.ts
   - server/db/migrations/112_discord_thread_sessions.ts
+  - server/db/migrations/113_memory_decay.ts
 db_tables:
   - schema_version
 depends_on: []
