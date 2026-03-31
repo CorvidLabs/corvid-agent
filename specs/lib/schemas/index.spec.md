@@ -17,21 +17,21 @@ Barrel file that re-exports all schema modules from the schemas directory, provi
 
 ## Public API
 
-### Re-exported Symbols
+### Exported Symbols
 
 | Symbol | Description |
 |--------|-------------|
-| `CreateListingSchema` | Re-export from `./marketplace` for listing creation validation |
-| `UpdateListingSchema` | Re-export from `./marketplace` for listing update validation |
-| `CreateReviewSchema` | Re-export from `./marketplace` for review creation validation |
-| `RegisterFederationInstanceSchema` | Re-export from `./marketplace` for federation instance registration |
-| `SubscribeSchema` | Re-export from `./marketplace` for subscription creation |
 | `CancelSubscriptionSchema` | Re-export from `./marketplace` for subscription cancellation |
+| `CreateListingSchema` | Re-export from `./marketplace` for listing creation validation |
+| `CreateReviewSchema` | Re-export from `./marketplace` for review creation validation |
 | `CreateTierSchema` | Re-export from `./marketplace` for pricing tier creation |
-| `UpdateTierSchema` | Re-export from `./marketplace` for pricing tier updates |
-| `TierUseSchema` | Re-export from `./marketplace` for metered tier usage events |
-| `TierSubscribeSchema` | Re-export from `./marketplace` for tier subscription requests |
+| `RegisterFederationInstanceSchema` | Re-export from `./marketplace` for federation instance registration |
 | `StartTrialSchema` | Re-export from `./marketplace` for trial start requests |
+| `SubscribeSchema` | Re-export from `./marketplace` for subscription creation |
+| `TierSubscribeSchema` | Re-export from `./marketplace` for tier subscription requests |
+| `TierUseSchema` | Re-export from `./marketplace` for metered tier usage events |
+| `UpdateListingSchema` | Re-export from `./marketplace` for listing update validation |
+| `UpdateTierSchema` | Re-export from `./marketplace` for pricing tier updates |
 
 ## Invariants
 

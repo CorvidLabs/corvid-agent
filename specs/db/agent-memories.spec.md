@@ -39,6 +39,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | Type | Description |
 |------|-------------|
 | (none) | All types are imported from `shared/types` (`AgentMemory`, `MemoryStatus`) |
+| `resolveAsaForKey` | <!-- TODO: describe --> |
 
 ## Invariants
 

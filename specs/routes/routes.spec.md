@@ -208,6 +208,62 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | Type | Description |
 |------|-------------|
 | `OnboardingStatus` | Interface describing wallet, bridge, agent, project setup status and overall completion flag |
+| `handleProjectRoutes` | <!-- TODO: describe --> |
+| `handleAgentRoutes` | <!-- TODO: describe --> |
+| `handleSessionRoutes` | <!-- TODO: describe --> |
+| `handleCouncilRoutes` | <!-- TODO: describe --> |
+| `handleWorkTaskRoutes` | <!-- TODO: describe --> |
+| `handleMcpApiRoutes` | <!-- TODO: describe --> |
+| `handleAllowlistRoutes` | <!-- TODO: describe --> |
+| `handleAnalyticsRoutes` | <!-- TODO: describe --> |
+| `handleSystemLogRoutes` | <!-- TODO: describe --> |
+| `handleSettingsRoutes` | <!-- TODO: describe --> |
+| `handleScheduleRoutes` | <!-- TODO: describe --> |
+| `handleWebhookRoutes` | <!-- TODO: describe --> |
+| `handleMentionPollingRoutes` | <!-- TODO: describe --> |
+| `handleWorkflowRoutes` | <!-- TODO: describe --> |
+| `handleSandboxRoutes` | <!-- TODO: describe --> |
+| `handleMarketplaceRoutes` | <!-- TODO: describe --> |
+| `handleReputationRoutes` | <!-- TODO: describe --> |
+| `handleBillingRoutes` | <!-- TODO: describe --> |
+| `handleAuthFlowRoutes` | <!-- TODO: describe --> |
+| `resetInboundRateLimiter` | <!-- TODO: describe --> |
+| `handleA2ARoutes` | <!-- TODO: describe --> |
+| `handlePluginRoutes` | <!-- TODO: describe --> |
+| `handlePersonaRoutes` | <!-- TODO: describe --> |
+| `handleSkillBundleRoutes` | <!-- TODO: describe --> |
+| `handleMcpServerRoutes` | <!-- TODO: describe --> |
+| `handleExamRoutes` | <!-- TODO: describe --> |
+| `handleOllamaRoutes` | <!-- TODO: describe --> |
+| `AuditQuerySchema` | <!-- TODO: describe --> |
+| `handleAuditRoutes` | <!-- TODO: describe --> |
+| `handleGitHubAllowlistRoutes` | <!-- TODO: describe --> |
+| `handlePerformanceRoutes` | <!-- TODO: describe --> |
+| `handleSlackRoutes` | <!-- TODO: describe --> |
+| `handleTenantRoutes` | <!-- TODO: describe --> |
+| `handleUsageRoutes` | <!-- TODO: describe --> |
+| `handleBridgeDeliveryRoutes` | <!-- TODO: describe --> |
+| `handleDashboardRoutes` | <!-- TODO: describe --> |
+| `handleFeedbackRoutes` | <!-- TODO: describe --> |
+| `handleFlockDirectoryRoutes` | <!-- TODO: describe --> |
+| `handleHealthRoutes` | <!-- TODO: describe --> |
+| `handleLibraryRoutes` | <!-- TODO: describe --> |
+| `handleMarketplaceAnalyticsRoutes` | <!-- TODO: describe --> |
+| `handleOnboardingRoutes` | <!-- TODO: describe --> |
+| `handlePermissionRoutes` | <!-- TODO: describe --> |
+| `handleProposalRoutes` | <!-- TODO: describe --> |
+| `handleRepoBlocklistRoutes` | <!-- TODO: describe --> |
+| `handleSecurityOverviewRoutes` | <!-- TODO: describe --> |
+| `handleContactRoutes` | <!-- TODO: describe --> |
+| `handleDiscordImageRoutes` | <!-- TODO: describe --> |
+| `handleCursorRoutes` | <!-- TODO: describe --> |
+| `handleVariantRoutes` | <!-- TODO: describe --> |
+| `handleBrainViewerRoutes` | <!-- TODO: describe --> |
+| `handleBuddyRoutes` | <!-- TODO: describe --> |
+| `handleFlockTestingRoutes` | <!-- TODO: describe --> |
+| `handleGitHubPRDiffRoutes` | <!-- TODO: describe --> |
+| `handleOpenRouterRoutes` | <!-- TODO: describe --> |
+| `handleToolCatalogRoutes` | <!-- TODO: describe --> |
 
 ## Request Pipeline
 
