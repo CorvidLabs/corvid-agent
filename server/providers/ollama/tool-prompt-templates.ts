@@ -123,12 +123,11 @@ export function getCompactToolInstructionPrompt(
 ${toolList}
 
 Rules:
-1. For questions you can answer directly, respond with plain text. Only use tools when you need to look up data, read files, save memories, or perform actions.
-2. Either respond with text OR make a tool call, not both.
-3. Complete ALL steps. After each tool result, immediately continue.
-4. Pass arguments as proper JSON with correct parameter names.
-5. Only use tools from the available list — do NOT invent tool names.
-6. NEVER write scripts to send messages — only use MCP tools.`);
+1. Either respond with text OR make a tool call, not both.
+2. Complete ALL steps. After each tool result, immediately continue.
+3. Pass arguments as proper JSON with correct parameter names.
+4. Only use tools from the available list.
+5. NEVER write scripts to send messages — only use MCP tools.`);
 
     // Text-based families need schemas and JSON format example
     if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
@@ -155,8 +154,7 @@ export function getCompactResponseRoutingPrompt(): string {
 Reply with text directly — do NOT use corvid_send_message to reply to the sender.
 Do NOT use corvid_save_memory to store your reply — write it as plain text output.
 Use corvid_send_message ONLY to reach a DIFFERENT agent proactively.
-Always respond via the same channel the message came from.
-Respond in first person as yourself. Do NOT narrate in third person or describe what "the agent" did.`;
+Always respond via the same channel the message came from.`;
 }
 
 export function getCompactCodingToolPrompt(): string {
@@ -187,9 +185,7 @@ Do NOT use corvid_save_memory to store your reply. Your answer must be written a
 
 ## Channel Affinity
 
-Always respond via the same channel the message originated from. If a message came from Discord, reply directly so your response goes back to Discord. If a message came from AlgoChat, reply directly so it goes back to AlgoChat. Never use corvid_send_message to "bridge" a reply to a different channel than the one the conversation started on.
-
-Respond in first person as yourself. Do NOT narrate in third person or describe what "the agent" did — you ARE the agent.`;
+Always respond via the same channel the message originated from. If a message came from Discord, reply directly so your response goes back to Discord. If a message came from AlgoChat, reply directly so it goes back to AlgoChat. Never use corvid_send_message to "bridge" a reply to a different channel than the one the conversation started on.`;
 }
 
 /**
@@ -476,12 +472,7 @@ ${textBasedMultiStep}`;
 
         case 'nemotron':
             return `### Nemotron-specific guidance
-${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
-
-**Critical rules:**
-- For simple questions, respond with plain text only. Do NOT make tool calls for questions you can answer directly.
-- Output ONLY the JSON array when calling a tool. No surrounding text, no code blocks.
-- Use the exact tool names from the available tools list. Do NOT invent or shorten tool names.
+- Use the native tool calling format. Process results and continue with follow-up calls as needed.
 - CRITICAL: Do NOT stop after one tool call. If the task needs more steps, keep going.
 - Do NOT narrate between tool calls. Just call the next tool.
 - Provide concise final responses after tool operations complete.
