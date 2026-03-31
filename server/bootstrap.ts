@@ -283,9 +283,12 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── Work orchestration ───────────────────────────────────────────────
     const selfTestService = new SelfTestService(db, processManager);
     const workTaskService = new WorkTaskService(db, processManager, astParserService);
-    workTaskService.recoverInterruptedTasks().catch((err) =>
+    workTaskService.recoverInterruptedTasks().then(() =>
+        workTaskService.pruneStaleWorktrees(),
+    ).catch((err) =>
         log.error('Failed to recover interrupted work tasks', { error: err instanceof Error ? err.message : String(err) }),
     );
+    workTaskService.startPeriodicCleanup();
 
     // TaskQueueService — dispatches pending tasks with concurrency control
     const taskQueueService = new TaskQueueService(db, workTaskService);
