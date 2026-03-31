@@ -199,6 +199,84 @@ describe('extractToolCallsFromContent', () => {
         });
     });
 
+    describe('Pattern 6: XML <tool_call> tags', () => {
+        it('extracts tool call from <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "/src/index.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+            expect(calls[0].arguments).toEqual({ path: '/src/index.ts' });
+        });
+
+        it('extracts from <tool_call> with surrounding text', () => {
+            const content = 'Let me check that file.\n<tool_call>{"name": "read_file", "arguments": {"path": "test.ts"}}</tool_call>\nDone.';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+        });
+
+        it('extracts multiple <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "a.ts"}}</tool_call>\n<tool_call>{"name": "read_file", "arguments": {"path": "b.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(2);
+        });
+
+        it('resolves corvid_ prefix in <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "corvid_list_files", "arguments": {}}</tool_call>';
+            const tools = makeTools('list_files');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('list_files');
+        });
+
+        it('accepts "parameters" as alias in <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "parameters": {"path": "test.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'test.ts' });
+        });
+    });
+
+    describe('Pattern 7: ReAct Action/Action Input format', () => {
+        it('extracts from basic ReAct format', () => {
+            const content = 'Action: read_file\nAction Input: {"path": "/src/index.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+            expect(calls[0].arguments).toEqual({ path: '/src/index.ts' });
+        });
+
+        it('extracts from ReAct with Thought prefix', () => {
+            const content = 'Thought: I need to read the file.\nAction: read_file\nAction Input: {"path": "test.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+        });
+
+        it('resolves corvid_ prefix in ReAct format', () => {
+            const content = 'Action: corvid_save_memory\nAction Input: {"key": "test", "content": "hello"}';
+            const tools = makeTools('save_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('save_memory');
+        });
+
+        it('handles non-JSON Action Input as string arg', () => {
+            const content = 'Action: run_command\nAction Input: git status';
+            const tools = makeTools('run_command');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('run_command');
+            expect(calls[0].arguments).toEqual({ input: 'git status' });
+        });
+    });
+
     describe('Edge cases', () => {
         it('does not extract from content with no matching patterns', () => {
             const content = 'This is just a regular text response with no tool calls.';

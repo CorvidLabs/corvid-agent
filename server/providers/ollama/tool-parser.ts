@@ -76,6 +76,91 @@ export function extractToolCallsFromContent(
         }
     }
 
+    // Pattern 2b: XML-style <tool_call> tags (Hermes/Qwen variants)
+    // Must run before Pattern 3 so the JSON inside tags isn't caught by the generic object matcher.
+    if (calls.length === 0) {
+        const xmlPattern = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+        let xmlMatch;
+        while ((xmlMatch = xmlPattern.exec(content)) !== null) {
+            try {
+                const parsed = JSON.parse(xmlMatch[1].trim());
+                const items = Array.isArray(parsed) ? parsed : [parsed];
+                for (const item of items) {
+                    if (item && typeof item === 'object' && typeof item.name === 'string') {
+                        const itemArgs = item.arguments ?? item.parameters ?? {};
+                        let resolvedName: string | undefined = toolNames.has(item.name) ? item.name : undefined;
+                        if (!resolvedName && item.name.startsWith('corvid_')) {
+                            const bare = item.name.slice(7);
+                            if (toolNames.has(bare)) resolvedName = bare;
+                        }
+                        if (!resolvedName && toolNames.has(`corvid_${item.name}`)) {
+                            resolvedName = `corvid_${item.name}`;
+                        }
+                        if (!resolvedName) {
+                            resolvedName = fuzzyMatchToolName(item.name, itemArgs, tools);
+                        }
+                        if (resolvedName) {
+                            calls.push({
+                                id: crypto.randomUUID().slice(0, 8),
+                                name: resolvedName,
+                                arguments: itemArgs,
+                            });
+                        }
+                    }
+                }
+            } catch {
+                // Not valid JSON inside tags, skip
+            }
+        }
+        if (calls.length > 0) {
+            log.info(`Extracted ${calls.length} tool call(s) from <tool_call> XML tags`, {
+                calls: calls.map(c => ({ name: c.name, args: c.arguments })),
+            });
+        }
+    }
+
+    // Pattern 2c: ReAct-style Action/Action Input format
+    // Some models emit: "Action: tool_name\nAction Input: {"key": "value"}"
+    if (calls.length === 0) {
+        const reactPattern = /Action\s*:\s*(\S+)\s*\n\s*Action\s*Input\s*:\s*([\s\S]*?)(?=\n\s*(?:Action\s*:|Thought\s*:|Observation\s*:)|$)/g;
+        let reactMatch;
+        while ((reactMatch = reactPattern.exec(content)) !== null) {
+            const actionName = reactMatch[1].trim();
+            const inputStr = reactMatch[2].trim();
+            let resolvedName: string | undefined = toolNames.has(actionName) ? actionName : undefined;
+            if (!resolvedName && actionName.startsWith('corvid_')) {
+                const bare = actionName.slice(7);
+                if (toolNames.has(bare)) resolvedName = bare;
+            }
+            if (!resolvedName && toolNames.has(`corvid_${actionName}`)) {
+                resolvedName = `corvid_${actionName}`;
+            }
+            if (!resolvedName) {
+                resolvedName = fuzzyMatchToolName(actionName, {}, tools);
+            }
+            if (resolvedName) {
+                let args: Record<string, unknown> = {};
+                try {
+                    args = JSON.parse(inputStr);
+                } catch {
+                    if (inputStr) {
+                        args = { input: inputStr };
+                    }
+                }
+                calls.push({
+                    id: crypto.randomUUID().slice(0, 8),
+                    name: resolvedName,
+                    arguments: args,
+                });
+            }
+        }
+        if (calls.length > 0) {
+            log.info(`Extracted ${calls.length} tool call(s) from ReAct Action/Action Input format`, {
+                calls: calls.map(c => ({ name: c.name, args: c.arguments })),
+            });
+        }
+    }
+
     // Pattern 3: JSON array of tool calls in content
     // e.g., ```\n[{"name":"tool","arguments":{...}}]\n``` or just [{"name":"tool",...}]
     // Also handles JSON embedded within surrounding text (model may add preamble text)
@@ -215,6 +300,8 @@ export function extractToolCallsFromContent(
             hasCodeFences: content.includes('```'),
             hasBrackets: content.includes('[{'),
             hasPythonTag: content.includes('<|python_tag|>'),
+            hasXmlTags: content.includes('<tool_call>'),
+            hasReactAction: /Action\s*:/i.test(content),
         });
     }
 

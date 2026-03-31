@@ -596,10 +596,23 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 const explorationTools = new Set(['list_files', 'search_files']);
                 const driftCalls = result.toolCalls.filter(tc => explorationTools.has(tc.name));
                 explorationToolCalls += driftCalls.length;
+                const MAX_EXPLORATION_DRIFTS = 3; // Cap cumulative drift triggers
                 if (explorationToolCalls >= 5 && tierConfig.tier !== 'high') {
                     totalExplorationDrifts++;
+                    if (totalExplorationDrifts > MAX_EXPLORATION_DRIFTS) {
+                        log.warn('Exploration drift limit exceeded — terminating', {
+                            totalDrifts: totalExplorationDrifts,
+                            tier: tierConfig.tier,
+                            sessionId: session.id,
+                        });
+                        stallType = 'exploration_drift';
+                        terminationReason = 'stall_exploration';
+                        emitModelTurnEnd();
+                        break;
+                    }
                     log.info('Exploration drift detected — injecting focus reminder', {
                         explorationCalls: explorationToolCalls,
+                        driftCount: totalExplorationDrifts,
                         tier: tierConfig.tier,
                         sessionId: session.id,
                     });
@@ -607,7 +620,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         role: 'user',
                         content: 'FOCUS: You have been exploring many directories. Stop browsing and focus on the specific task. '
                             + 'Only read files that are directly relevant to completing the task. '
-                            + 'If you have enough information, proceed to take action now.',
+                            + 'If you have enough information, proceed to take action now.'
+                            + (totalExplorationDrifts >= 2 ? ' WARNING: This is your last chance to focus before the session is terminated.' : ''),
                     });
                     explorationToolCalls = 0; // Reset so we don't spam
                 }
@@ -762,9 +776,27 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 break;
             }
 
-            // After tools have been called, only allow mid-chain nudges (handled above).
-            // Standard nudges are for initial engagement only.
+            // After tools have been called, check if the model tried to call a tool
+            // but used a format the parser couldn't extract. If the text mentions a
+            // known tool name, treat it as a failed tool call and nudge instead of exiting.
             if (toolsEverCalled) {
+                const mentionedTool = directTools.find(t => responseText.includes(t.name));
+                if (mentionedTool && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
+                    midChainNudgeCount++;
+                    log.warn(`Detected failed tool call attempt in text (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`, {
+                        mentionedTool: mentionedTool.name,
+                        preview: responseText.slice(0, 300),
+                    });
+                    messages.push({
+                        role: 'user',
+                        content: `Your response mentioned "${mentionedTool.name}" but was not formatted as a tool call. `
+                            + 'To call a tool, output ONLY a JSON array like this:\n'
+                            + `[{"name": "${mentionedTool.name}", "arguments": {...}}]\n`
+                            + 'Do NOT wrap it in XML tags, markdown, or explanation text. Just the raw JSON array.',
+                    });
+                    emitModelTurnEnd();
+                    continue;
+                }
                 emitModelTurnEnd();
                 break;
             }

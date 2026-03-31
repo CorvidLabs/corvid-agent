@@ -791,6 +791,10 @@ export class OllamaProvider extends BaseLlmProvider {
                 // Strip JSON array tool calls (Mistral format) - with or without code fences
                 content = content.replace(/\s*```(?:json)?\s*\[[\s\S]*?\]\s*```\s*/g, '').trim();
                 content = stripJsonToolCallArrays(content);
+                // Strip XML <tool_call> tags (Hermes/Qwen format)
+                content = content.replace(/\s*<tool_call>[\s\S]*?<\/tool_call>\s*/g, '').trim();
+                // Strip ReAct Action/Action Input blocks
+                content = content.replace(/\s*(?:Thought\s*:.*\n\s*)?Action\s*:\s*\S+\s*\n\s*Action\s*Input\s*:[\s\S]*?(?=\n\s*(?:Action\s*:|Thought\s*:|$))/g, '').trim();
                 // Also strip plain function calls from content
                 if (params.tools) {
                     for (const tool of params.tools) {
