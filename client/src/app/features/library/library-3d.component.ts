@@ -547,19 +547,19 @@ export class Library3DComponent implements OnDestroy {
         this.centerOrbHitbox = hitbox;
 
         // "CORVID LIBRARY" text label floating above
-        const titleLabel = this.createTextSprite('CORVID LIBRARY', 0x00e5ff, 512, 64, 28);
+        const titleLabel = createTextSprite('CORVID LIBRARY', 0x00e5ff, 512, 64, 28);
         titleLabel.position.set(0, 7.5, 0);
         titleLabel.scale.set(12, 1.5, 1);
         group.add(titleLabel);
 
         // Subtitle
-        const subLabel = this.createTextSprite('Team Alpha Knowledge Commons', 0x8888aa, 512, 48, 18);
+        const subLabel = createTextSprite('Team Alpha Knowledge Commons', 0x8888aa, 512, 48, 18);
         subLabel.position.set(0, 6.5, 0);
         subLabel.scale.set(12, 1.2, 1);
         group.add(subLabel);
 
         // "Click to Search" hint below orb
-        const searchLabel = this.createTextSprite('Click Orb to Search', 0x66aacc, 384, 36, 14);
+        const searchLabel = createTextSprite('Click Orb to Search', 0x66aacc, 384, 36, 14);
         searchLabel.position.set(0, 1.5, 0);
         searchLabel.scale.set(7, 0.7, 1);
         group.add(searchLabel);
@@ -605,7 +605,7 @@ export class Library3DComponent implements OnDestroy {
             this.zoneRings.push(ring);
 
             // Zone label (floating above shelves)
-            const labelSprite = this.createTextSprite(zone.label, zone.color, 256, 48, 24);
+            const labelSprite = createTextSprite(zone.label, zone.color, 256, 48, 24);
             labelSprite.position.copy(zone.position);
             labelSprite.position.y = 7;
             labelSprite.scale.set(10, 2, 1);
@@ -864,7 +864,7 @@ export class Library3DComponent implements OnDestroy {
                             ? `${labelBase}  (${pageCount}p)`
                             : labelBase;
                         const labelColor = isBook ? 0xffd700 : 0xcccccc;
-                        const label = this.createTextSprite(labelText, labelColor, 512, 36, 14);
+                        const label = createTextSprite(labelText, labelColor, 512, 36, 14);
                         label.position.set(x, y + height / 2 + 0.5, z);
                         label.scale.set(5.5, 0.55, 1);
                         this.scene!.add(label);
