@@ -1815,7 +1815,13 @@ describe('Startup recovery with iteration limit', () => {
 // ─── Governance impact classification ────────────────────────────────────────
 
 describe('governance impact classification', () => {
-    test('blocks task referencing Layer 0 file (governance.ts)', async () => {
+    // Pre-flight governance check is ADVISORY only (issue #1766).
+    // Tasks that mention protected files in their description are NOT blocked at creation
+    // time — they proceed and the real enforcement happens in validation.ts on the git diff.
+    // This prevents false positives where a task description mentions a protected file
+    // without actually needing to modify it.
+
+    test('does not block task referencing Layer 0 file in description (governance.ts)', async () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
         queueSuccessfulSpawns(2);
@@ -1826,12 +1832,11 @@ describe('governance impact classification', () => {
             projectId: project.id,
         });
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
-        expect(task.error).toContain('Constitutional');
+        // Pre-flight is advisory — task proceeds; governance enforced on actual git diff
+        expect(task.status).not.toBe('failed');
     });
 
-    test('blocks task referencing Layer 0 file (spending.ts via substring)', async () => {
+    test('does not block task referencing Layer 0 file in description (spending.ts via substring)', async () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
         queueSuccessfulSpawns(2);
@@ -1842,8 +1847,8 @@ describe('governance impact classification', () => {
             projectId: project.id,
         });
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
+        // Pre-flight is advisory — task proceeds; governance enforced on actual git diff
+        expect(task.status).not.toBe('failed');
     });
 
     test('allows task referencing Layer 1 file (proceeds with governance warning)', async () => {
@@ -1874,7 +1879,7 @@ describe('governance impact classification', () => {
         expect(task.status).not.toBe('failed');
     });
 
-    test('blocks task referencing protected-paths.ts (Layer 0 substring)', async () => {
+    test('does not block task referencing protected-paths.ts in description (Layer 0 substring)', async () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
         queueSuccessfulSpawns(2);
@@ -1885,8 +1890,23 @@ describe('governance impact classification', () => {
             projectId: project.id,
         });
 
-        expect(task.status).toBe('failed');
-        expect(task.error).toContain('Layer 0');
+        // Pre-flight is advisory — task proceeds; governance enforced on actual git diff
+        expect(task.status).not.toBe('failed');
+    });
+
+    test('allows task referencing Layer 1 file schema.ts in description (issue #1766)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Add new column to server/db/schema.ts for feature X',
+            projectId: project.id,
+        });
+
+        // schema.ts is Layer 1 (was falsely Layer 0), and pre-flight is advisory
+        expect(task.status).not.toBe('failed');
     });
 
     test('allows task referencing Layer 2 file (server/routes/analytics.ts)', async () => {

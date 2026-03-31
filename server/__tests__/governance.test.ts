@@ -30,11 +30,10 @@ describe('governance tier classification', () => {
         expect(classifyPath('server/process/spending.ts')).toBe(0);
         expect(classifyPath('server/process/sdk-process.ts')).toBe(0);
         expect(classifyPath('server/process/manager.ts')).toBe(0);
-        expect(classifyPath('server/mcp/sdk-tools.ts')).toBe(0);
         expect(classifyPath('server/mcp/tool-handlers.ts')).toBe(0);
-        expect(classifyPath('server/db/schema.ts')).toBe(0);
         expect(classifyPath('server/permissions/broker.ts')).toBe(0);
         expect(classifyPath('server/councils/governance.ts')).toBe(0);
+        // sdk-tools.ts and schema.ts are Layer 1 (Structural), not Layer 0 — see issue #1766
     });
 
     test('classifies Layer 0 paths by substring', () => {
@@ -53,6 +52,9 @@ describe('governance tier classification', () => {
         expect(classifyPath('package.json')).toBe(1);
         expect(classifyPath('CLAUDE.md')).toBe(1);
         expect(classifyPath('tsconfig.json')).toBe(1);
+        // sdk-tools.ts → Layer 1 via server/mcp/ substring; schema.ts → Layer 1 by basename
+        expect(classifyPath('server/mcp/sdk-tools.ts')).toBe(1);
+        expect(classifyPath('server/db/schema.ts')).toBe(1);
     });
 
     test('classifies Layer 1 paths by substring', () => {
