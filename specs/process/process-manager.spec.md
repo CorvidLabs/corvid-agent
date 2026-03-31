@@ -155,7 +155,7 @@ Side effects on construction:
 3. **Persona/skill prompt injection**: If an agent has a persona, `composePersonaPrompt` is called and injected. Skill bundle prompts from both agent-level and project-level are merged
 4. **Tool permission resolution chain**: Agent base permissions -> merge agent skill bundle tools -> merge project skill bundle tools (only if agent has no explicit `mcpToolPermissions`)
 5. **Provider routing**: Resolved by `resolveProviderRouting()`. If agent has cursor provider but binary is missing, fallback to SDK (clearing Cursor-only models). If no provider and no Claude access, auto-fallback to Ollama. SDK process for Claude; direct process for Ollama/other providers
-6. **Context reset**: After `MAX_TURNS_BEFORE_CONTEXT_RESET` (8) user messages, the process is killed and restarted through the resume path with capped message history (last 20 messages)
+6. **Context reset**: After `MAX_TURNS_BEFORE_CONTEXT_RESET` (8) user messages, the process is killed and restarted through the resume path with capped message history (last 20 messages). A conversation summary is saved as a memory observation (`source: 'session'`, `relevanceScore: 2.0`) so it can graduate to long-term memory if accessed again
 7. **Resume prompt construction**: Builds a `<conversation_history>` block from the last 20 messages (each truncated to 2000 chars), then appends the new prompt
 8. **Auto-restart for AlgoChat**: Non-zero exits from AlgoChat sessions trigger auto-restart with exponential backoff (5s * 3^n, max 3 restarts). Restart counter resets after 10 minutes of stability
 9. **API outage handling**: Detected outages pause the session (not counted as restart). Auto-resume with exponential backoff (5min * 3^n, cap 60min, max 10 attempts) after API health check
@@ -184,7 +184,7 @@ Side effects on construction:
 
 - **Given** a running session where `sendMessage` has been called 8 times
 - **When** `resumeProcess(session, "another message")` is called
-- **Then** the existing process is killed, and a new process starts with the resume prompt
+- **Then** the existing process is killed, a conversation summary is recorded as a memory observation with `relevanceScore: 2.0`, and a new process starts with the resume prompt
 
 ### Scenario: AlgoChat session crashes and auto-restarts
 
@@ -240,6 +240,7 @@ Side effects on construction:
 | `server/db/projects.ts` | `getProject` |
 | `server/db/agents.ts` | `getAgent`, `getAlgochatEnabledAgents` |
 | `server/db/mcp-servers.ts` | `getActiveServersForAgent` |
+| `server/db/observations.ts` | `recordObservation` |
 | `server/db/credits.ts` | `deductTurnCredits`, `getCreditConfig` |
 | `server/db/spending.ts` | `recordApiCost` |
 | `server/providers/registry.ts` | `LlmProviderRegistry` |
@@ -295,3 +296,4 @@ Internal constants (not env-configurable):
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Extracted McpServiceContainer and SessionConfigResolver (#453) |
 | 2026-03-13 | corvid-agent | Added session-resilience-manager.ts (SessionResilienceManager: API outage handling, crash restart, orphan pruning) and session-timer-manager.ts (SessionTimerManager: stable timers, inactivity timeouts, fallback checker) |
+| 2026-03-30 | corvid-agent | Context resets now save conversation summaries as memory observations (#1753) |

@@ -16,6 +16,7 @@ import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession, updateSessionSummary } from '../db/sessions';
 import { saveMemory } from '../db/agent-memories';
+import { recordObservation } from '../db/observations';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
@@ -688,6 +689,11 @@ export class ProcessManager {
                         const summary = summarizeConversation(existingMessages, projectContext);
                         meta.contextSummary = summary;
                         log.info(`Generated context summary for session ${session.id} (${summary.length} chars)`);
+
+                        // Save as short-term observation for memory graduation
+                        if (session.agentId) {
+                            this.saveContextSummaryObservation(session, summary);
+                        }
                     }
                 } catch (err) {
                     log.warn(`Failed to generate context summary for session ${session.id}`, { error: err });
@@ -740,6 +746,12 @@ export class ProcessManager {
                     const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
                     const summary = summarizeConversation(recentMessages, projectContext);
                     updateSessionSummary(this.db, session.id, summary);
+
+                    // Save as short-term observation for memory graduation
+                    if (session.agentId) {
+                        this.saveContextSummaryObservation(session, summary);
+                    }
+
                     // Store in meta so buildResumePrompt can inject it
                     const existingMeta = this.sessionMeta.get(session.id);
                     if (existingMeta) {
@@ -1536,6 +1548,34 @@ export class ProcessManager {
         } catch (err) {
             log.warn('Failed to save session summary to memory', {
                 sessionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    /**
+     * Save a context summary as a short-term observation so it enters the
+     * memory graduation pipeline (short-term → long-term → on-chain).
+     */
+    private saveContextSummaryObservation(session: Session, summary: string): void {
+        try {
+            const participant = getParticipantForSession(this.db, session.id);
+            const counterparty = participant ? ` with ${participant}` : '';
+            const content = `Conversation summary (${session.source ?? 'unknown'}${counterparty}, session ${session.id}):\n${summary}`;
+
+            recordObservation(this.db, {
+                agentId: session.agentId!,
+                source: 'session',
+                sourceId: session.id,
+                content,
+                suggestedKey: `conv-summary:${session.id}`,
+                relevanceScore: 2.0,
+            });
+
+            log.info('Saved context summary as observation', { sessionId: session.id });
+        } catch (err) {
+            log.warn('Failed to save context summary observation', {
+                sessionId: session.id,
                 error: err instanceof Error ? err.message : String(err),
             });
         }
