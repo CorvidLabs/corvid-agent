@@ -24,14 +24,10 @@
 // A missing governance module means we cannot verify path safety → block everything.
 
 let classifyPath: typeof import('../server/councils/governance').classifyPath;
-let assessImpact: typeof import('../server/councils/governance').assessImpact;
-let GOVERNANCE_TIERS: typeof import('../server/councils/governance').GOVERNANCE_TIERS;
 
 try {
     const governance = await import('../server/councils/governance');
     classifyPath = governance.classifyPath;
-    assessImpact = governance.assessImpact;
-    GOVERNANCE_TIERS = governance.GOVERNANCE_TIERS;
 } catch (err) {
     console.error(
         '✗ FATAL: Failed to load governance module — fail-closed.\n' +
@@ -85,7 +81,6 @@ function extractChangedFiles(diffOutput: string): string[] {
 const baseRef = process.env.GITHUB_BASE_REF;
 const actor = process.env.GITHUB_ACTOR;
 const headRef = process.env.GITHUB_HEAD_REF;
-const isCI = !!process.env.CI;
 const isAutomatedByActor = isAutomatedActor(actor);
 const isAutomatedByBranch = isAutomatedBranch(headRef);
 const isAutomated = isAutomatedByActor || isAutomatedByBranch;
