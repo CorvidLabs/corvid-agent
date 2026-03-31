@@ -397,7 +397,7 @@ PROJECT=$(curl -s -X POST https://your-corvid-instance.example.com/api/projects 
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-app",
-    "path": "/home/user/projects/my-app"
+    "directory": "/home/user/projects/my-app"
   }')
 
 PROJECT_ID=$(echo "$PROJECT" | jq -r '.id')
