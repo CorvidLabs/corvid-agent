@@ -794,11 +794,18 @@ export class OllamaProvider extends BaseLlmProvider {
                 // Also strip plain function calls from content
                 if (params.tools) {
                     for (const tool of params.tools) {
+                        // Strip function(args) format
                         const stripPattern = new RegExp(
                             `\\s*${tool.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\([\\s\\S]*?\\)\\s*`,
                             'g',
                         );
                         content = content.replace(stripPattern, '').trim();
+                        // Strip split name+JSON format (name on one line, JSON on next)
+                        const splitStripPattern = new RegExp(
+                            `\\s*${tool.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n\\s*\\{[\\s\\S]*?\\}\\s*`,
+                            'g',
+                        );
+                        content = content.replace(splitStripPattern, '').trim();
                     }
                 }
                 log.info(`Extracted ${parsed.length} tool call(s) from content text`, {

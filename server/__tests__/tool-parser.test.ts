@@ -172,6 +172,33 @@ describe('extractToolCallsFromContent', () => {
         });
     });
 
+    describe('Pattern 4b: Split name + JSON on separate lines', () => {
+        it('extracts tool call with name on one line and JSON on next', () => {
+            const content = 'I\'ll recall the memory.\n\ncorvid_recall_memory\n{\n  "key": "project-corvid-agent"\n}';
+            const tools = makeTools('corvid_recall_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('corvid_recall_memory');
+            expect(calls[0].arguments).toEqual({ key: 'project-corvid-agent' });
+        });
+
+        it('extracts tool call with name and JSON on adjacent lines', () => {
+            const content = 'corvid_save_memory\n{"key": "test", "content": "hello"}';
+            const tools = makeTools('corvid_save_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('corvid_save_memory');
+            expect(calls[0].arguments).toEqual({ key: 'test', content: 'hello' });
+        });
+
+        it('does not match name followed by non-JSON', () => {
+            const content = 'corvid_recall_memory\nsome random text';
+            const tools = makeTools('corvid_recall_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(0);
+        });
+    });
+
     describe('Edge cases', () => {
         it('does not extract from content with no matching patterns', () => {
             const content = 'This is just a regular text response with no tool calls.';

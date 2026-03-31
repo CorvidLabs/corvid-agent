@@ -148,7 +148,37 @@ export function extractToolCallsFromContent(
         }
     }
 
-    // Pattern 4: Python-style keyword args without <|python_tag|> prefix
+    // Pattern 4b: Tool name on one line, JSON args on next line(s)
+    // e.g., "corvid_recall_memory\n{\n  \"key\": \"team-agents-alpha\"\n}"
+    // Common with Qwen 3.5 and similar cloud models that split name and args
+    if (calls.length === 0) {
+        for (const toolName of toolNames) {
+            const splitPattern = new RegExp(
+                `${toolName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n\\s*(\\{[\\s\\S]*?\\})`,
+                'g',
+            );
+            let splitMatch;
+            while ((splitMatch = splitPattern.exec(content)) !== null) {
+                try {
+                    const args = JSON.parse(splitMatch[1]);
+                    calls.push({
+                        id: crypto.randomUUID().slice(0, 8),
+                        name: toolName,
+                        arguments: args,
+                    });
+                } catch {
+                    // Not valid JSON, skip
+                }
+            }
+        }
+        if (calls.length > 0) {
+            log.info(`Extracted ${calls.length} tool call(s) from split name+JSON format`, {
+                calls: calls.map(c => ({ name: c.name, args: c.arguments })),
+            });
+        }
+    }
+
+    // Pattern 5: Python-style keyword args without <|python_tag|> prefix
     // e.g., corvid_save_memory(key="value", content="data")
     // Llama3.1 sometimes outputs this format directly in content text
     if (calls.length === 0) {
