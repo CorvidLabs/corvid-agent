@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.60.0] - 2026-03-30
+
+### Added
+- **Memory: short-term default** — all new saves go to SQLite with explicit promote to on-chain (#1741)
+- **Memory: decay & cleanup** — TTL-based expiry, access-count retention, auto-cleanup (#1760, #1722)
+- **Memory: conversation summaries** — save conversation summaries as observations on context reset (#1753)
+- **Discord: thread-session persistence** — persist thread-session mappings to SQLite for restart recovery (#1754)
+- **Discord: mention-session persistence** — persist and recover mention sessions across restarts (#1752)
+- **UI: mobile search button** — add Search button to mobile bottom nav for command palette discovery (#1739)
+- **Ollama/Cursor: cloud model support** — improve cloud model support and Cursor CLI agent (#1738)
+- **Benchmark: Ollama cloud** — Ollama cloud model AlgoChat reliability benchmark (#1744)
+- **Docs: GitHub Pages workflow** — automated GitHub Pages deployment (#1726, #1736, #1737)
+- **Specs: context.md** — add context.md to all 52 spec directories with architectural rationale and design decisions (#1762)
+- **Specs: requirements.md** — fill all 52 requirements.md with user stories, acceptance criteria, constraints (#1761)
+- **Specs: spec-sync v3.2.0** — upgrade from v2.1.0 with stricter parser (#1761)
+- **Specs: DB schema validation** — column validation script for spec-to-schema drift (#1709)
+- **Specs: DB coverage** — add DB specs for 9 uncovered tables (#1708)
+
+### Fixed
+- **Ollama: tool parsing** — XML and ReAct tool call parsing for junior agents (#1748, #1747, #1743)
+- **Agent Messenger: reliability** — inter-agent response reliability improvements (#1715, #1713)
+- **Health: auth config** — wire getAuthConfig into health check deps (#1703, #1704)
+- **Lint: Biome warnings** — clean up Biome lint warnings in scripts and shared code (#1758)
+- **Specs: schema drift** — resolve DB schema drift across 15 spec files (#1699)
+- **Specs: agent-memories** — update agent-memories spec for short_term default (#1756)
+- **Frontend: routing** — move comms to /observe/comms, fix cache-busting regex (#1725)
+
+### Security
+- **path-to-regexp ReDoS** — fix ReDoS vulnerability (#1714)
+- **TOCTOU race conditions** — fix time-of-check/time-of-use races (#1710)
+- **Secure temp dirs** — use secure temporary directories (#1707)
+
+### Dependencies
+- TypeScript 5.9.3 → 6.0.2
+- OpenTelemetry SDK/exporters → 0.214.0
+- Cosign installer → 4.1.1
+- spec-sync → v3.2.0
+
+### CI
+- Exclude build artifacts from CodeQL scanning (#1745)
+- Bump GitHub Actions (cosign, gh-release, spec-sync)
+
 ## [0.59.1] - 2026-03-29
 
 ### Fixed

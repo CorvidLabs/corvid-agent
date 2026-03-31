@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.59.1</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.60.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -473,24 +473,24 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">52 days · 59 releases · 1090 commits</div>
+    <div class="hero-badge">53 days · 60 releases · 1100+ commits</div>
     <h1>CorvidAgent<br>Release Retrospective</h1>
     <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
     <div class="hero-version-range">
       <span class="version">v0.1.0</span>
       <span class="arrow">→</span>
-      <span class="version">v0.59.1</span>
+      <span class="version">v0.60.0</span>
     </div>
   </section>
 
   <!-- Stats bar -->
   <section class="stats-bar">
     <div class="stat-card">
-      <div class="stat-number">59</div>
+      <div class="stat-number">60</div>
       <div class="stat-label">Releases</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">1090</div>
+      <div class="stat-number">1100+</div>
       <div class="stat-label">Commits</div>
     </div>
     <div class="stat-card">
@@ -948,9 +948,9 @@
         <div class="era-icon">&#x1F680;</div>
         <div>
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
-          <div class="era-date">Mar 21 – Mar 29, 2026</div>
+          <div class="era-date">Mar 21 – Mar 30, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.59.1</div>
+        <div class="era-versions">v0.42.0 – v0.60.0</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -994,6 +994,21 @@
             <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
             <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.60.0</span>
+            <span class="release-date">Mar 30</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Memory overhaul</strong> — short-term default (SQLite), TTL-based decay &amp; cleanup, conversation summary observations</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord persistence</strong> — thread-session and mention-session recovery across restarts</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Spec completeness</strong> — context.md added to all 52 specs, all 52 requirements.md filled, spec-sync v3.2.0</li>
+            <li><span class="tag tag-feat">feat</span> <strong>UI &amp; tooling</strong> — mobile search button, Ollama cloud benchmark, GitHub Pages deployment workflow</li>
+            <li><span class="tag tag-fix">fix</span> <strong>Ollama tool parsing</strong> — XML and ReAct tool call parsing for junior agents</li>
+            <li><span class="tag tag-sec">sec</span> ReDoS fix (path-to-regexp), TOCTOU race conditions, secure temp dirs</li>
+            <li><span class="tag tag-chore">deps</span> TypeScript 5.9.3 → 6.0.2, OpenTelemetry → 0.214.0, spec-sync → v3.2.0</li>
           </ul>
         </div>
         <div class="release-card" style="border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.05);">
