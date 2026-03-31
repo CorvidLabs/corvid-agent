@@ -26,6 +26,8 @@ runs:
           node_modules
           client/node_modules
         key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'client/bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
 
     - name: Install dependencies
       shell: bash
