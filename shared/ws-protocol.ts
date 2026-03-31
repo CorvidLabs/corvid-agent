@@ -218,7 +218,8 @@ export type StreamEventType = StreamEvent['eventType'];
 
 export function isClientMessage(data: unknown): data is ClientMessage {
     if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type guard validates each property
+    const msg = data as any;
     if (typeof msg.type !== 'string') return false;
 
     switch (msg.type) {
