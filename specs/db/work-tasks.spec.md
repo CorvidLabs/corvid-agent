@@ -40,6 +40,8 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | `dispatchCandidates` | `db: Database, limit: number` | `WorkTask[]` | Find pending tasks eligible for dispatch whose project has no active task; ordered by priority DESC, created_at ASC |
 | `getActiveTasksByProject` | `db: Database` | `Record<string, string>` | Map each project with an active task to its task ID |
 | `findActiveTasksForIssue` | `db: Database, issueNumber: number` | `WorkTask[]` | Find active/pending tasks whose description references a given issue number; used for duplicate-PR deduplication |
+| `getTerminalTasksWithWorktrees` | `db: Database` | `WorkTask[]` | Find tasks in terminal states (completed/failed) that still have a worktree_dir set; used for stale worktree cleanup |
+| `clearWorktreeDir` | `db: Database, taskId: string` | `void` | Clear the worktree_dir field for a task after the worktree has been cleaned up |
 | `listWorkTasks` | `db: Database, agentId?: string, tenantId?: string` | `WorkTask[]` | Lists work tasks, optionally filtered by agent ID, ordered by created_at DESC |
 
 ### Exported Types
@@ -98,7 +100,8 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 ### Consumed By
 | Module | What is used |
 |--------|-------------|
-| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`, `findActiveTasksForIssue` |
+| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`, `findActiveTasksForIssue`, `getTerminalTasksWithWorktrees`, `clearWorktreeDir` |
+| `server/work/session-lifecycle.ts` | `clearWorktreeDir` |
 | `server/feedback/outcome-tracker.ts` | `listWorkTasks` |
 | `server/routes/work-tasks.ts` (implied) | Work task listing and retrieval via routes |
 
@@ -137,3 +140,4 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | 2026-03-08 | corvid-agent | Documented `resetWorkTaskForRetry` and `getActiveWorkTasks` |
 | 2026-03-09 | corvid-agent | Documented priority queue exports: `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`; added 'paused' and 'queued' statuses |
 | 2026-03-11 | corvid-agent | Added `countActiveTasks`, `countPendingTasks`, `dispatchCandidates`, `getActiveTasksByProject`; added `priority` and `queued_at` columns; added `idx_work_tasks_pending_dispatch` index |
+| 2026-03-30 | corvid-agent | Added `getTerminalTasksWithWorktrees` and `clearWorktreeDir` for stale worktree cleanup |

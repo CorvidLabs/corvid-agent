@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
-import { getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
+import { getWorkTask, updateWorkTaskStatus, clearWorktreeDir } from '../db/work-tasks';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
@@ -254,4 +254,5 @@ export async function cleanupWorktree(db: Database, taskId: string): Promise<voi
     if (!project?.workingDir) return;
 
     await removeWorktree(project.workingDir, task.worktreeDir);
+    clearWorktreeDir(db, taskId);
 }

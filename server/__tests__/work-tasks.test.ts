@@ -10,6 +10,8 @@ import {
     cleanupStaleWorkTasks,
     resetWorkTaskForRetry,
     listWorkTasks,
+    getTerminalTasksWithWorktrees,
+    clearWorktreeDir,
 } from '../db/work-tasks';
 
 let db: Database;
@@ -302,6 +304,60 @@ describe('cleanupStaleWorkTasks', () => {
 
     test('returns empty array when no stale tasks', () => {
         expect(cleanupStaleWorkTasks(db)).toEqual([]);
+    });
+});
+
+// ── getTerminalTasksWithWorktrees ───────────────────────────────────
+
+describe('getTerminalTasksWithWorktrees', () => {
+    test('returns completed/failed tasks that still have a worktree_dir', () => {
+        const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Completed with worktree' });
+        const t2 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Failed with worktree' });
+        const t3 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Running with worktree' });
+        const t4 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Completed no worktree' });
+
+        updateWorkTaskStatus(db, t1.id, 'completed', { worktreeDir: '/tmp/wt1' });
+        updateWorkTaskStatus(db, t2.id, 'failed', { worktreeDir: '/tmp/wt2', error: 'boom' });
+        updateWorkTaskStatus(db, t3.id, 'running', { worktreeDir: '/tmp/wt3' });
+        updateWorkTaskStatus(db, t4.id, 'completed');
+
+        const stale = getTerminalTasksWithWorktrees(db);
+        expect(stale).toHaveLength(2);
+        const ids = stale.map((t) => t.id).sort();
+        expect(ids).toEqual([t1.id, t2.id].sort());
+    });
+
+    test('returns empty array when no terminal tasks have worktrees', () => {
+        const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Completed clean' });
+        updateWorkTaskStatus(db, t1.id, 'completed');
+        expect(getTerminalTasksWithWorktrees(db)).toEqual([]);
+    });
+
+    test('returns empty array when no tasks exist', () => {
+        expect(getTerminalTasksWithWorktrees(db)).toEqual([]);
+    });
+});
+
+// ── clearWorktreeDir ───────────────────────────────────────────────
+
+describe('clearWorktreeDir', () => {
+    test('clears worktree_dir for a task', () => {
+        const task = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Has worktree' });
+        updateWorkTaskStatus(db, task.id, 'completed', { worktreeDir: '/tmp/wt' });
+
+        const before = getWorkTask(db, task.id)!;
+        expect(before.worktreeDir).toBe('/tmp/wt');
+
+        clearWorktreeDir(db, task.id);
+
+        const after = getWorkTask(db, task.id)!;
+        expect(after.worktreeDir).toBeNull();
+    });
+
+    test('is idempotent — clearing an already-null worktree_dir is fine', () => {
+        const task = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'No worktree' });
+        clearWorktreeDir(db, task.id);
+        expect(getWorkTask(db, task.id)!.worktreeDir).toBeNull();
     });
 });
 

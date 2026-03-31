@@ -198,6 +198,31 @@ export function generateChatBranchName(agentName: string, sessionId: string): st
     return `chat/${agentSlug}/${sessionPrefix}`;
 }
 
+/**
+ * Run `git worktree prune` to clean up stale worktree references
+ * where the directory no longer exists on disk.
+ */
+export async function pruneWorktrees(projectWorkingDir: string): Promise<void> {
+    try {
+        const proc = Bun.spawn(
+            ['git', 'worktree', 'prune'],
+            { cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe' },
+        );
+        const stderr = await new Response(proc.stderr).text();
+        const exitCode = await proc.exited;
+
+        if (exitCode !== 0) {
+            log.warn('Failed to prune worktrees', { stderr: stderr.trim() });
+        } else {
+            log.info('Pruned stale worktree references');
+        }
+    } catch (err) {
+        log.warn('Error pruning worktrees', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
 export interface ResolveAndCreateWorktreeResult {
     success: boolean;
     workDir?: string;

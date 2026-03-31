@@ -219,6 +219,36 @@ describe('runValidation', () => {
         expect(result.output).toContain('Governance Tier Violation');
     }, 30_000);
 
+    test('detects default branch as master when no main branch exists', async () => {
+        await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'test-master', dependencies: {} }));
+        await writeFile(join(tempDir, 'tsconfig.json'), JSON.stringify({
+            compilerOptions: { strict: true, noEmit: true, skipLibCheck: true, module: 'esnext', moduleResolution: 'bundler' },
+        }));
+
+        async function gitCmd(...args: string[]) {
+            const p = Bun.spawn(['git', ...args], { cwd: tempDir, stdout: 'pipe', stderr: 'pipe' });
+            await new Response(p.stdout).text();
+            await p.exited;
+        }
+
+        // Init with master as default
+        await gitCmd('init', '-b', 'master');
+        await gitCmd('config', 'user.email', 'test@test.com');
+        await gitCmd('config', 'user.name', 'Test');
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'init');
+
+        // Create feature branch
+        await gitCmd('checkout', '-b', 'feature');
+        await writeFile(join(tempDir, 'safe.ts'), 'export const x = 1;\n');
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'add file');
+
+        const result = await runValidation(tempDir);
+        // Security scan should work — it should detect 'master' as the default branch
+        expect(result.output).toContain('Security Scan Passed');
+    }, 30_000);
+
     test('detects unapproved fetch calls in diff', async () => {
         await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'test-fetch', dependencies: {} }));
         await writeFile(join(tempDir, 'tsconfig.json'), JSON.stringify({

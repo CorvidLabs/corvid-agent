@@ -96,6 +96,9 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `cancelTask` | `(id: string)` | `Promise<WorkTask \| null>` | Stop the session, fail the task, clean up worktree |
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
+| `pruneStaleWorktrees` | `()` | `Promise<void>` | Clean up worktrees for terminal tasks (completed/failed) with leftover worktree_dir; also runs `git worktree prune` |
+| `startPeriodicCleanup` | `()` | `void` | Start a 6-hour interval timer for stale worktree cleanup |
+| `stopPeriodicCleanup` | `()` | `void` | Stop the periodic cleanup timer |
 
 ## MCP Tool Interface
 
@@ -225,7 +228,7 @@ The optional `agent_id` parameter on `corvid_create_work_task` allows the callin
 | `server/db/sessions.ts` | `createSession` |
 | `server/db/agents.ts` | `getAgent` |
 | `server/db/projects.ts` | `getProject` |
-| `server/db/work-tasks.ts` | `createWorkTaskAtomic`, `getWorkTask`, `updateWorkTaskStatus`, `listWorkTasks`, `cleanupStaleWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks` |
+| `server/db/work-tasks.ts` | `createWorkTaskAtomic`, `getWorkTask`, `updateWorkTaskStatus`, `listWorkTasks`, `cleanupStaleWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`, `getTerminalTasksWithWorktrees`, `clearWorktreeDir` |
 | `server/db/audit.ts` | `recordAudit` |
 | `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
 | `server/work/validation.ts` | `runBunInstall`, `runValidation` |

@@ -423,6 +423,25 @@ export function findActiveTasksForIssue(db: Database, issueNumber: number): Work
     return rows.map(rowToWorkTask);
 }
 
+/**
+ * Find tasks in terminal states (completed/failed) that still have a worktree_dir set.
+ */
+export function getTerminalTasksWithWorktrees(db: Database): WorkTask[] {
+    const rows = db.query(
+        `SELECT * FROM work_tasks
+         WHERE status IN ('completed', 'failed')
+         AND worktree_dir IS NOT NULL AND worktree_dir != ''`,
+    ).all() as WorkTaskRow[];
+    return rows.map(rowToWorkTask);
+}
+
+/**
+ * Clear the worktree_dir field for a task (after the worktree has been cleaned up).
+ */
+export function clearWorktreeDir(db: Database, taskId: string): void {
+    db.query('UPDATE work_tasks SET worktree_dir = NULL WHERE id = ?').run(taskId);
+}
+
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
