@@ -94,6 +94,11 @@ export function tryRecoverThread(
             avatarUrl: row.avatar_url ?? undefined,
         };
         threadSessions.set(threadId, info);
+        // Persist to dedicated thread sessions table for future fast recovery
+        try {
+            const { saveThreadSession } = require('../db/discord-thread-sessions') as typeof import('../db/discord-thread-sessions');
+            saveThreadSession(db, threadId, info);
+        } catch { /* non-critical — table may not exist during migration */ }
         log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
         return info;
     } catch (err) {

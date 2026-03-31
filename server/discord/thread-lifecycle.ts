@@ -4,8 +4,10 @@
  * Handles thread creation, archival, and stale thread cleanup via the Discord REST API.
  */
 
+import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
+import { deleteThreadSession } from '../db/discord-thread-sessions';
 import { createLogger } from '../lib/logger';
 import {
     sendEmbedWithButtons,
@@ -85,6 +87,7 @@ export async function archiveStaleThreads(
     threadSessions: Map<string, ThreadSessionInfo>,
     threadCallbacks: Map<string, ThreadCallbackInfo>,
     staleThresholdMs: number,
+    db?: Database,
 ): Promise<void> {
     const now = Date.now();
     const staleThreads: string[] = [];
@@ -109,6 +112,7 @@ export async function archiveStaleThreads(
             await archiveThread(botToken, threadId);
             threadLastActivity.delete(threadId);
             threadSessions.delete(threadId);
+            if (db) deleteThreadSession(db, threadId);
             const cb = threadCallbacks.get(threadId);
             if (cb) {
                 processManager.unsubscribe(cb.sessionId, cb.callback);
