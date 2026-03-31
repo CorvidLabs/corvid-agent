@@ -16,7 +16,7 @@ import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession, updateSessionSummary } from '../db/sessions';
 import { saveMemory } from '../db/agent-memories';
-import { recordObservation } from '../db/observations';
+import { recordObservation, listObservations, boostObservation } from '../db/observations';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
@@ -986,6 +986,14 @@ export class ProcessManager {
             this.db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
         }
 
+        // Load recent active observations for this agent and increment their access count
+        const observations = session.agentId
+            ? listObservations(this.db, session.agentId, { status: 'active', limit: 5 })
+            : [];
+        for (const obs of observations) {
+            boostObservation(this.db, obs.id, 0);
+        }
+
         if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
         const recent = messages.slice(-20);
@@ -1009,6 +1017,21 @@ export class ProcessManager {
                 '<previous_context_summary>',
                 meta.contextSummary,
                 '</previous_context_summary>',
+                '',
+            );
+        }
+
+        // Inject relevant short-term observations to restore per-agent context (#1751)
+        if (observations.length > 0) {
+            const obsLines = observations.map((o) =>
+                `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`
+            );
+            parts.push(
+                '<recent_observations>',
+                'Relevant observations from past sessions with this agent:',
+                '',
+                ...obsLines,
+                '</recent_observations>',
                 '',
             );
         }
