@@ -1050,8 +1050,12 @@ function detectNudgeReason(
     const promisedAction = /\b(i('ll| will) (now |proceed to )?(review|check|analyze|look|fetch|investigate|read|search|run|execute)|let me (start|begin|check|review|look|examine|read)|working on (it|this|that)|one moment|getting (the|that|this))\b/i.test(responseText);
     if (promisedAction && iteration <= 3) return 'promisedAction';
 
-    // (b) Very short early reply — model didn't engage with the task
-    if (responseText.length < 100 && iteration <= 2) return 'tooShort';
+    // (b) Very short early reply — model didn't engage with the task.
+    // Skip if the response is a complete sentence (ends with punctuation) — this
+    // avoids nudging models to use tools for simple conversational replies like
+    // "Yes, I'm online." which don't need tool use.
+    const isCompleteSentence = /[.!?][\s"']*$/.test(responseText.trim());
+    if (responseText.length < 100 && iteration <= 2 && !isCompleteSentence) return 'tooShort';
 
     // (c) Model asked what to do instead of acting (Qwen3 pattern)
     const askedInstead = /\b(would you like me to|shall i|do you want me to|what would you like|which (file|tool|command|approach)|should i)\b/i.test(responseText);
@@ -1355,6 +1359,16 @@ export function buildSystemPrompt(
 
     if (agent?.appendPrompt) {
         parts.push('', agent.appendPrompt);
+    }
+
+    // Inject model identity so agents know what model they're running.
+    // This is especially important for cloud models which skip the verbose
+    // family-specific prompts that local models receive.
+    if (model) {
+        const displayModel = OllamaProvider.isCloudModel(model)
+            ? model.replace(/:cloud$/, '').replace(/:\d+b-cloud$/, '')
+            : model;
+        parts.push('', `You are running on model: ${displayModel}.`);
     }
 
     // Inject persona and skill prompts
