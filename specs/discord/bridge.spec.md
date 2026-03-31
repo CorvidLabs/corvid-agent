@@ -403,6 +403,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `DiscordActionRow` | `{ type, components: DiscordButton[] }` — a row of button components |
 | `InteractionType` | `PING=1, APPLICATION_COMMAND=2, MESSAGE_COMPONENT=3` |
 | `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5, UPDATE_MESSAGE=7` |
+| `recoverActiveMentionSessions` | Restores recent mention sessions from DB into the in-memory map on startup |
+| `recoverActiveThreadSessions` | Restores recent thread sessions from DB into in-memory maps on startup |
 
 ## Invariants
 

@@ -39,6 +39,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | Type | Description |
 |------|-------------|
 | (none) | All types are imported from `shared/types` (`AgentMemory`, `MemoryStatus`) |
+| `resolveAsaForKey` | `(db: Database, agentId: string, key: string)` | `number \| null` | Looks up the ARC-69 ASA ID for a memory by agent and key |
 
 ## Invariants
 

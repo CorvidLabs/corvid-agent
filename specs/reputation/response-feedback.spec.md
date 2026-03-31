@@ -38,7 +38,7 @@ Indexes: `agent_id`, `created_at`.
 
 ## Public API
 
-### Migration Exports (090_response_feedback.ts)
+### Exported Migration Functions (090_response_feedback.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|

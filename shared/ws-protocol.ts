@@ -219,37 +219,37 @@ export type StreamEventType = StreamEvent['eventType'];
 export function isClientMessage(data: unknown): data is ClientMessage {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    if (typeof msg.type !== 'string') return false;
+    if (typeof msg['type'] !== 'string') return false;
 
-    switch (msg.type) {
+    switch (msg['type']) {
         case 'auth':
-            return typeof msg.key === 'string';
+            return typeof msg['key'] === 'string';
         case 'subscribe':
         case 'unsubscribe':
-            return typeof msg.sessionId === 'string';
+            return typeof msg['sessionId'] === 'string';
         case 'send_message':
-            return typeof msg.sessionId === 'string' && typeof msg.content === 'string';
+            return typeof msg['sessionId'] === 'string' && typeof msg['content'] === 'string';
         case 'chat_send':
-            return typeof msg.agentId === 'string' && typeof msg.content === 'string'
-                && (msg.projectId === undefined || typeof msg.projectId === 'string')
-                && (msg.tools === undefined || Array.isArray(msg.tools));
+            return typeof msg['agentId'] === 'string' && typeof msg['content'] === 'string'
+                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string')
+                && (msg['tools'] === undefined || Array.isArray(msg['tools']));
         case 'agent_reward':
-            return typeof msg.agentId === 'string' && typeof msg.microAlgos === 'number';
+            return typeof msg['agentId'] === 'string' && typeof msg['microAlgos'] === 'number';
         case 'agent_invoke':
-            return typeof msg.fromAgentId === 'string' && typeof msg.toAgentId === 'string'
-                && typeof msg.content === 'string';
+            return typeof msg['fromAgentId'] === 'string' && typeof msg['toAgentId'] === 'string'
+                && typeof msg['content'] === 'string';
         case 'approval_response':
-            return typeof msg.requestId === 'string'
-                && (msg.behavior === 'allow' || msg.behavior === 'deny');
+            return typeof msg['requestId'] === 'string'
+                && (msg['behavior'] === 'allow' || msg['behavior'] === 'deny');
         case 'create_work_task':
-            return typeof msg.agentId === 'string' && typeof msg.description === 'string'
-                && (msg.projectId === undefined || typeof msg.projectId === 'string');
+            return typeof msg['agentId'] === 'string' && typeof msg['description'] === 'string'
+                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string');
         case 'schedule_approval':
-            return typeof msg.executionId === 'string' && typeof msg.approved === 'boolean';
+            return typeof msg['executionId'] === 'string' && typeof msg['approved'] === 'boolean';
         case 'pong':
             return true;
         case 'question_response':
-            return typeof msg.questionId === 'string' && typeof msg.answer === 'string';
+            return typeof msg['questionId'] === 'string' && typeof msg['answer'] === 'string';
         default:
             return false;
     }

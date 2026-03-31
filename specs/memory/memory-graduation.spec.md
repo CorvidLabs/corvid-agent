@@ -103,14 +103,14 @@ This module introduces an intermediate layer — **observations** — that captu
 
 ## Public API
 
-### Migration — `server/db/migrations/095_memory_observations.ts`
+### Exported Migration Functions — `server/db/migrations/095_memory_observations.ts`
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Creates the `memory_observations` table, indexes, and FTS5 virtual table |
 | `down` | `(db: Database)` | `void` | Drops the `memory_observations` table and its FTS5 virtual table |
 
-### DB Helpers — `server/db/observations.ts`
+### Exported DB Functions — `server/db/observations.ts`
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
@@ -126,13 +126,13 @@ This module introduces an intermediate layer — **observations** — that captu
 | `purgeOldObservations` | `(db, retentionDays?)` | `number` | Delete old expired/dismissed observations |
 | `countObservations` | `(db, agentId)` | `{ active, graduated, expired, dismissed }` | Stats by status |
 
-### Graduation Service — `server/memory/graduation-service.ts`
+### Exported Classes — `server/memory/graduation-service.ts`
 
 | Export | Type | Description |
 |--------|------|-------------|
 | `MemoryGraduationService` | class | Periodic service that evaluates observations and graduates high-value ones to ARC-69 |
 
-### MCP Tool Handlers — `server/mcp/tool-handlers/observations.ts`
+### Exported Tool Handlers — `server/mcp/tool-handlers/observations.ts`
 
 | Export | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
@@ -151,6 +151,47 @@ This module introduces an intermediate layer — **observations** — that captu
 | `/api/mcp/boost-observation` | POST | `McpBoostObservationSchema` | Boost observation |
 | `/api/mcp/dismiss-observation` | POST | `McpDismissObservationSchema` | Dismiss observation |
 | `/api/mcp/observation-stats` | POST | `McpObservationStatsSchema` | Get stats |
+
+## Exports
+
+### Exported Migration Functions (duplicate ref)
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `up` | function | Creates the `memory_observations` table, indexes, and FTS5 virtual table |
+| `down` | function | Drops the `memory_observations` table and its FTS5 virtual table |
+
+### Exported DB Helper Functions
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `recordObservation` | function | Create a new observation |
+| `getObservation` | function | Fetch observation by ID |
+| `listObservations` | function | List observations with filters |
+| `searchObservations` | function | FTS5 search with LIKE fallback |
+| `boostObservation` | function | Increment score and access count |
+| `markGraduated` | function | Mark observation as graduated with key |
+| `dismissObservation` | function | Mark observation as dismissed |
+| `getGraduationCandidates` | function | Find observations meeting graduation criteria |
+| `expireObservations` | function | Expire past-TTL observations |
+| `purgeOldObservations` | function | Delete old expired/dismissed observations |
+| `countObservations` | function | Get observation statistics by status |
+
+### Exported Graduation Service
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `MemoryGraduationService` | class | Periodic service that evaluates observations and graduates high-value ones to ARC-69 |
+
+### Exported MCP Tool Handlers
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `handleRecordObservation` | function | Record a short-term observation |
+| `handleListObservations` | function | List/search observations |
+| `handleBoostObservation` | function | Boost observation relevance score |
+| `handleDismissObservation` | function | Dismiss an observation |
+| `handleObservationStats` | function | Get observation statistics |
 
 ## Graduation Criteria
 

@@ -36,7 +36,7 @@ Persists structured tool-chain analytics collected during direct-process executi
 | `SessionMetrics` | Domain object returned by all queries |
 | `SessionMetricsRow` | Raw SQLite row shape |
 
-### Migration Exports (087_session_metrics.ts)
+### Exported Migration Functions (087_session_metrics.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
