@@ -199,6 +199,206 @@ describe('extractToolCallsFromContent', () => {
         });
     });
 
+    describe('Pattern 6: XML <tool_call> tags', () => {
+        it('extracts tool call from <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "/src/index.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+            expect(calls[0].arguments).toEqual({ path: '/src/index.ts' });
+        });
+
+        it('extracts from <tool_call> with surrounding text', () => {
+            const content = 'Let me check that file.\n<tool_call>{"name": "read_file", "arguments": {"path": "test.ts"}}</tool_call>\nDone.';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+        });
+
+        it('extracts multiple <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "a.ts"}}</tool_call>\n<tool_call>{"name": "read_file", "arguments": {"path": "b.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(2);
+        });
+
+        it('resolves corvid_ prefix in <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "corvid_list_files", "arguments": {}}</tool_call>';
+            const tools = makeTools('list_files');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('list_files');
+        });
+
+        it('accepts "parameters" as alias in <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "read_file", "parameters": {"path": "test.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'test.ts' });
+        });
+
+        it('skips invalid JSON inside <tool_call> tags', () => {
+            const content = '<tool_call>{not valid json}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(0);
+        });
+
+        it('skips <tool_call> with unknown tool name and no fuzzy match', () => {
+            const content = '<tool_call>{"name": "teleport_to_moon", "arguments": {}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(0);
+        });
+
+        it('adds corvid_ prefix when needed in <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "save_memory", "arguments": {"key": "test"}}</tool_call>';
+            const tools = makeTools('corvid_save_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('corvid_save_memory');
+        });
+
+        it('handles array of calls inside single <tool_call> tag', () => {
+            const content = '<tool_call>[{"name": "read_file", "arguments": {"path": "a.ts"}}, {"name": "read_file", "arguments": {"path": "b.ts"}}]</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(2);
+        });
+
+        it('handles <tool_call> with whitespace/newlines inside', () => {
+            const content = '<tool_call>\n  {"name": "read_file", "arguments": {"path": "test.ts"}}\n</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'test.ts' });
+        });
+
+        it('fuzzy-matches hallucinated tool name inside <tool_call> tags', () => {
+            const content = '<tool_call>{"name": "bash", "arguments": {"command": "ls -la"}}</tool_call>';
+            const tools = makeTools('run_command');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('run_command');
+        });
+    });
+
+    describe('Pattern 7: ReAct Action/Action Input format', () => {
+        it('extracts from basic ReAct format', () => {
+            const content = 'Action: read_file\nAction Input: {"path": "/src/index.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+            expect(calls[0].arguments).toEqual({ path: '/src/index.ts' });
+        });
+
+        it('extracts from ReAct with Thought prefix', () => {
+            const content = 'Thought: I need to read the file.\nAction: read_file\nAction Input: {"path": "test.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('read_file');
+        });
+
+        it('resolves corvid_ prefix in ReAct format', () => {
+            const content = 'Action: corvid_save_memory\nAction Input: {"key": "test", "content": "hello"}';
+            const tools = makeTools('save_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('save_memory');
+        });
+
+        it('handles non-JSON Action Input as string arg', () => {
+            const content = 'Action: run_command\nAction Input: git status';
+            const tools = makeTools('run_command');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('run_command');
+            expect(calls[0].arguments).toEqual({ input: 'git status' });
+        });
+
+        it('adds corvid_ prefix in ReAct format', () => {
+            const content = 'Action: recall_memory\nAction Input: {"key": "my-role"}';
+            const tools = makeTools('corvid_recall_memory');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('corvid_recall_memory');
+        });
+
+        it('ignores unknown tool in ReAct format', () => {
+            const content = 'Action: teleport\nAction Input: {"dest": "moon"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(0);
+        });
+
+        it('handles ReAct with empty Action Input', () => {
+            const content = 'Action: list_files\nAction Input: {}';
+            const tools = makeTools('list_files');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({});
+        });
+
+        it('handles multiple ReAct Action/Action Input pairs', () => {
+            const content = 'Thought: I need to read two files.\nAction: read_file\nAction Input: {"path": "a.ts"}\nObservation: done\nAction: read_file\nAction Input: {"path": "b.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(2);
+            expect(calls[0].arguments).toEqual({ path: 'a.ts' });
+            expect(calls[1].arguments).toEqual({ path: 'b.ts' });
+        });
+
+        it('fuzzy-matches hallucinated tool name in ReAct format', () => {
+            const content = 'Action: bash\nAction Input: {"command": "pwd"}';
+            const tools = makeTools('run_command');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('run_command');
+        });
+    });
+
+    describe('Pattern priority and interaction', () => {
+        it('XML tags take priority over JSON array pattern', () => {
+            // Content has both <tool_call> and a JSON array — XML should win (Pattern 2b before Pattern 3)
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "from-xml.ts"}}</tool_call>\n[{"name": "read_file", "arguments": {"path": "from-json.ts"}}]';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'from-xml.ts' });
+        });
+
+        it('JSON-style func({}) takes priority over XML tags', () => {
+            // Pattern 2 runs before Pattern 2b
+            const content = 'read_file({"path": "from-func.ts"})\n<tool_call>{"name": "read_file", "arguments": {"path": "from-xml.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'from-func.ts' });
+        });
+
+        it('ReAct takes priority over split name+JSON pattern', () => {
+            // Pattern 2c (ReAct) runs before Pattern 4b (split name+JSON)
+            const content = 'Action: read_file\nAction Input: {"path": "from-react.ts"}';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: 'from-react.ts' });
+        });
+
+        it('python_tag takes priority over all other patterns', () => {
+            const content = '<|python_tag|>read_file(path="/from-python.ts")\n<tool_call>{"name": "read_file", "arguments": {"path": "from-xml.ts"}}</tool_call>';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].arguments).toEqual({ path: '/from-python.ts' });
+        });
+    });
+
     describe('Edge cases', () => {
         it('does not extract from content with no matching patterns', () => {
             const content = 'This is just a regular text response with no tool calls.';
@@ -212,6 +412,52 @@ describe('extractToolCallsFromContent', () => {
             const tools = makeTools('read_file');
             const calls = extractToolCallsFromContent(content, tools);
             expect(calls.length).toBe(0);
+        });
+
+        it('does not false-positive on tool name mentioned in prose', () => {
+            const content = 'You can use the read_file tool to read files from the disk.';
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(0);
+        });
+
+        it('handles empty content', () => {
+            const tools = makeTools('read_file');
+            expect(extractToolCallsFromContent('', tools)).toEqual([]);
+        });
+
+        it('handles content with only whitespace', () => {
+            const tools = makeTools('read_file');
+            expect(extractToolCallsFromContent('   \n\n  ', tools)).toEqual([]);
+        });
+
+        it('handles malformed XML tags gracefully', () => {
+            const content = '<tool_call>{"name": "read_file", "arguments": {"path": "test.ts"}';  // missing closing tag
+            const tools = makeTools('read_file');
+            const calls = extractToolCallsFromContent(content, tools);
+            // Should not crash — may or may not extract depending on fallback patterns
+            expect(Array.isArray(calls)).toBe(true);
+        });
+
+        it('handles deeply nested JSON in arguments', () => {
+            const content = '[{"name": "run_command", "arguments": {"command": "echo {\\"a\\": {\\"b\\": 1}}"}}]';
+            const tools = makeTools('run_command');
+            const calls = extractToolCallsFromContent(content, tools);
+            expect(calls.length).toBe(1);
+            expect(calls[0].name).toBe('run_command');
+        });
+
+        it('normalizeToolArgs maps content_text to content', () => {
+            const tool = makeToolWithParams(
+                'corvid_save_memory',
+                {
+                    key: { type: 'string', description: 'Memory key' },
+                    content: { type: 'string', description: 'Memory content' },
+                },
+                ['key', 'content'],
+            );
+            const result = normalizeToolArgs({ key: 'test', content_text: 'hello' }, tool);
+            expect(result.content).toBe('hello');
         });
     });
 });

@@ -19,7 +19,7 @@ export interface SessionMetricsInput {
     explorationDriftCount: number;
     stallDetected: boolean;
     stallType: string | null;
-    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'stall_repetitive' | 'max_iterations' | 'abort' | 'error';
+    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'stall_repetitive_loop' | 'stall_quality_exhausted' | 'stall_repetitive' | 'stall_exploration' | 'max_iterations' | 'abort' | 'error';
     durationMs: number;
     needsSummary: boolean;
 }
