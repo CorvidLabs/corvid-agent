@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createProject } from '../db/projects';
 import { createAgent } from '../db/agents';
-import { getWorkTask, updateWorkTaskStatus, getActiveWorkTasks, getTerminalTasksWithWorktrees } from '../db/work-tasks';
+import { getWorkTask, updateWorkTaskStatus, getActiveWorkTasks } from '../db/work-tasks';
 import { WorkTaskService } from '../work/service';
 import type { ProcessManager } from '../process/manager';
 
