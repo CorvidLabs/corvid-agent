@@ -136,6 +136,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 23. **Access-based decay resistance**: `recallMemory()` increments `access_count` for `short_term` memories. When `access_count` reaches 3, the TTL is extended to `max(expires_at, datetime('now', '+14 days'))`, resisting automatic expiry.
 24. **Automatic expiry**: `expireShortTermMemories()` archives (`archived=1`) all `short_term` memories where `expires_at < datetime('now')`. Only `short_term` status memories are affected — promoted memories are never auto-archived.
 25. **Purge after retention**: `purgeOldArchivedMemories()` deletes archived `short_term` memories whose `updated_at` is older than 30 days (configurable). Archived promoted memories are excluded.
+26. **Permanent write gate**: On testnet/mainnet, `corvid_promote_memory` writes plain self-to-self Algorand transactions which are immutable forever. If `confirmed` is not explicitly `true`, the handler returns a warning message and does NOT execute the write. The agent must call again with `confirmed: true` to proceed. This gate does not apply on localnet (uses mutable ARC-69 ASAs instead).
 
 ## Behavioral Examples
 

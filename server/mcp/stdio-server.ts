@@ -190,14 +190,17 @@ server.tool(
 server.tool(
     'corvid_promote_memory',
     'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). ' +
-    'Use after corvid_save_memory when you want to make a memory permanent.',
+    'Use after corvid_save_memory when you want to make a memory permanent. ' +
+    'On testnet/mainnet, plain-transaction writes are immutable forever — you will be prompted to confirm before the write executes.',
     {
         key: z.string().describe('Memory key to promote to long-term on-chain storage'),
+        confirmed: z.boolean().optional().describe('Set to true to confirm a permanent plain-transaction write on testnet/mainnet.'),
     },
     async (args) => {
         const data = await callApi('/api/mcp/promote-memory', {
             agentId,
             key: args.key,
+            confirmed: args.confirmed,
         });
         return {
             content: [{ type: 'text' as const, text: data.response }],

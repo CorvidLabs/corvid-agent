@@ -63,7 +63,7 @@ import {
 import { buildDirectTools } from '../mcp/direct-tools';
 import { getSchedule } from '../db/schedules';
 import { grantCredits } from '../db/credits';
-import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
+import { saveMemory, recallMemory, updateMemoryTxid } from '../db/agent-memories';
 const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
 /** Set the agent's wallet address in the DB. */
@@ -1182,11 +1182,26 @@ describe('handlePromoteMemory', () => {
         expect(text).toContain('ARC-69 write error');
     });
 
-    test('queues promotion on testnet', async () => {
+    test('returns confirmation warning on testnet without confirmed flag', async () => {
         const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
         saveMemory(db, { agentId, key: 'promote-testnet', content: 'data' });
 
         const result = await handlePromoteMemory(ctx, { key: 'promote-testnet' });
+        expect(result.isError).toBeFalsy();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('WARNING');
+        expect(text).toContain('immutable');
+        expect(text).toContain('confirmed: true');
+        // Must NOT write to chain yet
+        const memory = recallMemory(db, agentId, 'promote-testnet');
+        expect(memory?.status).toBe('short_term');
+    });
+
+    test('queues promotion on testnet when confirmed: true', async () => {
+        const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
+        saveMemory(db, { agentId, key: 'promote-testnet-confirmed', content: 'data' });
+
+        const result = await handlePromoteMemory(ctx, { key: 'promote-testnet-confirmed', confirmed: true });
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
         expect(text).toContain('queued for promotion');
