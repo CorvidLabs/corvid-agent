@@ -5,6 +5,7 @@ import { createAgent } from '../db/agents';
 import { createSession, addSessionMessage, getSessionMessages } from '../db/sessions';
 import { saveMemory, recallMemory, searchMemories } from '../db/agent-memories';
 import { summarizeConversation } from '../process/direct-process';
+import { recordObservation, listObservations } from '../db/observations';
 
 /**
  * Tests for two-tier memory: session summary auto-save on exit.
@@ -134,6 +135,46 @@ describe('session summary auto-save', () => {
 
         // The auto-save logic should skip when there are no user messages
         expect(userMsgs.length).toBe(0);
+    });
+
+    test('context summary is saved as observation on context reset', () => {
+        const session = createSession(db, {
+            agentId,
+            name: 'Long Session',
+            source: 'discord',
+        });
+
+        // Simulate what saveContextSummaryObservation does
+        const messages = [
+            { role: 'user', content: 'Help me refactor the auth module' },
+            { role: 'assistant', content: 'I will restructure the auth flow...' },
+            { role: 'user', content: 'Also update the tests' },
+            { role: 'assistant', content: 'Tests updated in auth.test.ts' },
+        ];
+
+        const summary = summarizeConversation(messages);
+        const content = `Conversation summary (discord, session ${session.id}):\n${summary}`;
+
+        const obs = recordObservation(db, {
+            agentId,
+            source: 'session',
+            sourceId: session.id,
+            content,
+            suggestedKey: `conv-summary:${session.id}`,
+            relevanceScore: 2.0,
+        });
+
+        expect(obs.source).toBe('session');
+        expect(obs.sourceId).toBe(session.id);
+        expect(obs.relevanceScore).toBe(2.0);
+        expect(obs.suggestedKey).toBe(`conv-summary:${session.id}`);
+        expect(obs.content).toContain('[Context Summary]');
+        expect(obs.content).toContain('refactor the auth module');
+        expect(obs.status).toBe('active');
+
+        // Verify it shows up in agent's observations
+        const all = listObservations(db, agentId);
+        expect(all.some(o => o.sourceId === session.id)).toBe(true);
     });
 
     test('summarizeConversation handles single-turn conversations', () => {
