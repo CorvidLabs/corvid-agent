@@ -4,8 +4,8 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleRecordObservation, handleListObservations, handleBoostObservation, handleDismissObservation, handleObservationStats } from '../mcp/tool-handlers';
-import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema, McpRecordObservationSchema, McpListObservationsSchema, McpBoostObservationSchema, McpDismissObservationSchema, McpObservationStatsSchema } from '../lib/validation';
+import { handleSendMessage, handleSaveMemory, handlePromoteMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleRecordObservation, handleListObservations, handleBoostObservation, handleDismissObservation, handleObservationStats } from '../mcp/tool-handlers';
+import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpPromoteMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema, McpRecordObservationSchema, McpListObservationsSchema, McpBoostObservationSchema, McpDismissObservationSchema, McpObservationStatsSchema } from '../lib/validation';
 import { checkInjection } from '../lib/injection-guard';
 import { json, handleRouteError } from '../lib/response';
 
@@ -66,6 +66,10 @@ export function handleMcpApiRoutes(
 
     if (url.pathname === '/api/mcp/delete-memory' && req.method === 'POST') {
         return handleDeleteMemoryRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/promote-memory' && req.method === 'POST') {
+        return handlePromoteMemoryRoute(req, deps);
     }
 
     if (url.pathname === '/api/mcp/list-agents' && req.method === 'GET') {
@@ -166,6 +170,18 @@ async function handleDeleteMemoryRoute(req: Request, deps: McpApiDeps): Promise<
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleDeleteMemory(ctx, { key: data.key, mode: data.mode });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handlePromoteMemoryRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpPromoteMemorySchema);
+
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handlePromoteMemory(ctx, { key: data.key });
         return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);

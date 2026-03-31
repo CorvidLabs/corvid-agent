@@ -17,7 +17,7 @@ import {
     archiveMemory,
     listMemories,
 } from '../db/agent-memories';
-import { resolveAsaForKey } from '../memory/arc69-store';
+import { resolveAsaForKey } from '../db/agent-memories';
 
 let db: Database;
 let agentId: string;
@@ -137,7 +137,7 @@ describe('saveMemory with ASA integration', () => {
         // Upsert with new content
         const updated = saveMemory(db, { agentId, key: 'updatable', content: 'v2' });
         expect(updated.content).toBe('v2');
-        expect(updated.status).toBe('pending'); // Reset to pending for re-sync
+        expect(updated.status).toBe('short_term'); // Reset to short_term — needs explicit re-promotion
         // asaId should be preserved by the upsert (ON CONFLICT only updates content/status/txid)
         expect(updated.asaId).toBe(200);
     });

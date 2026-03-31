@@ -35,10 +35,10 @@ export function saveMemory(
     const id = crypto.randomUUID();
     db.query(
         `INSERT INTO agent_memories (id, agent_id, key, content, status)
-         VALUES (?, ?, ?, ?, 'pending')
+         VALUES (?, ?, ?, ?, 'short_term')
          ON CONFLICT(agent_id, key) DO UPDATE SET
              content = excluded.content,
-             status = 'pending',
+             status = 'short_term',
              txid = NULL,
              updated_at = datetime('now')`
     ).run(id, params.agentId, params.key, params.content);
@@ -55,7 +55,7 @@ export function saveMemory(
         content: params.content,
         txid: null,
         asa_id: null,
-        status: 'pending',
+        status: 'short_term',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     });
@@ -221,4 +221,18 @@ export function archiveMemory(
         "UPDATE agent_memories SET archived = 1, updated_at = datetime('now') WHERE agent_id = ? AND key = ?"
     ).run(agentId, key);
     return (result as unknown as { changes: number }).changes > 0;
+}
+
+/**
+ * Look up the ASA ID for a given memory key from the local DB mapping.
+ */
+export function resolveAsaForKey(
+    db: Database,
+    agentId: string,
+    key: string,
+): number | null {
+    const row = db.query(
+        'SELECT asa_id FROM agent_memories WHERE agent_id = ? AND key = ? AND asa_id IS NOT NULL'
+    ).get(agentId, key) as { asa_id: number } | null;
+    return row?.asa_id ?? null;
 }

@@ -73,23 +73,44 @@ export async function handleSaveMemory(
     args: { key: string; content: string },
 ): Promise<CallToolResult> {
     try {
-        const memory = saveMemory(ctx.db, {
+        saveMemory(ctx.db, {
             agentId: ctx.agentId,
             key: args.key,
             content: args.content,
         });
 
+        return textResult(
+            `Memory saved with key "${args.key}" (short-term, SQLite only). ` +
+            `Use corvid_promote_memory to promote it to long-term on-chain storage.`,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP save_memory failed', { error: message });
+        return errorResult(`Failed to save memory: ${message}`);
+    }
+}
+
+export async function handlePromoteMemory(
+    ctx: McpToolContext,
+    args: { key: string },
+): Promise<CallToolResult> {
+    try {
+        const memory = recallMemory(ctx.db, ctx.agentId, args.key);
+        if (!memory) {
+            return errorResult(`No memory found with key "${args.key}".`);
+        }
+
+        if (memory.status === 'confirmed' && memory.asaId) {
+            return textResult(`Memory "${args.key}" is already on-chain (ASA: ${memory.asaId}).`);
+        }
+
         const isLocalnet = ctx.network === 'localnet' || !ctx.network;
 
         if (isLocalnet) {
-            // Localnet: memories MUST use ARC-69 ASA storage.
-            // Plain transactions are for AlgoChat messages only, never for memories.
             const arc69Ctx = await buildArc69Context(ctx);
             if (!arc69Ctx) {
-                updateMemoryStatus(ctx.db, memory.id, 'failed');
                 return errorResult(
-                    'Cannot save memory: ARC-69 context unavailable (missing indexer or chat account). ' +
-                    'Memories require ARC-69 ASA storage — plain transactions are only for AlgoChat messages.',
+                    'Cannot promote memory: ARC-69 context unavailable (missing indexer or chat account).',
                 );
             }
 
@@ -98,46 +119,57 @@ export async function handleSaveMemory(
                 const existingAsaId = resolveAsaForKey(ctx.db, ctx.agentId, args.key);
 
                 if (existingAsaId) {
-                    const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, args.content);
+                    const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, memory.content);
                     updateMemoryTxid(ctx.db, memory.id, txid);
-                    return textResult(`Memory saved with key "${args.key}" (ASA: ${existingAsaId}).`);
+                    updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+                    return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${existingAsaId}).`);
                 } else {
-                    const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, args.content);
+                    const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, memory.content);
                     updateMemoryTxid(ctx.db, memory.id, txid);
                     updateMemoryAsaId(ctx.db, memory.id, asaId);
-                    return textResult(`Memory saved with key "${args.key}" (ASA: ${asaId}).`);
+                    updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+                    return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${asaId}).`);
                 }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                log.error('ARC-69 memory save failed', { key: args.key, error: message });
+                log.error('ARC-69 memory promote failed', { key: args.key, error: message });
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
-                return errorResult(`Failed to save memory via ARC-69: ${message}`);
+                return errorResult(`Failed to promote memory to ARC-69: ${message}`);
             }
         } else {
             // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
-            encryptMemoryContent(args.content, ctx.serverMnemonic, ctx.network).then((encrypted) => {
+            updateMemoryStatus(ctx.db, memory.id, 'pending');
+            encryptMemoryContent(memory.content, ctx.serverMnemonic, ctx.network).then((encrypted) => {
                 return ctx.agentMessenger.sendOnChainToSelf(
                     ctx.agentId,
                     `[MEMORY:${args.key}] ${encrypted}`,
                 );
             }).then((txid) => {
                 if (txid) {
-                    updateMemoryTxid(ctx.db, memory.id, txid);
+                    try {
+                        updateMemoryTxid(ctx.db, memory.id, txid);
+                    } catch {
+                        // DB may be closed during test teardown — safe to ignore
+                    }
                 }
             }).catch((err) => {
-                log.warn('On-chain memory send failed', {
+                log.warn('On-chain memory promote failed', {
                     key: args.key,
                     error: err instanceof Error ? err.message : String(err),
                 });
-                updateMemoryStatus(ctx.db, memory.id, 'failed');
+                try {
+                    updateMemoryStatus(ctx.db, memory.id, 'failed');
+                } catch {
+                    // DB may be closed during test teardown — safe to ignore
+                }
             });
 
-            return textResult(`Memory saved with key "${args.key}".`);
+            return textResult(`Memory "${args.key}" queued for promotion to long-term on-chain storage.`);
         }
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        log.error('MCP save_memory failed', { error: message });
-        return errorResult(`Failed to save memory: ${message}`);
+        log.error('MCP promote_memory failed', { error: message });
+        return errorResult(`Failed to promote memory: ${message}`);
     }
 }
 

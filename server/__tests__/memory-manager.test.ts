@@ -32,7 +32,7 @@ describe('MemoryManager.save', () => {
         expect(result.key).toBe('greeting');
         expect(result.content).toBe('Hello World');
         expect(result.agentId).toBe(agentId);
-        expect(result.status).toBe('pending');
+        expect(result.status).toBe('short_term');
     });
 
     test('auto-categorizes on save', () => {

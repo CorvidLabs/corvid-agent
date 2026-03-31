@@ -13,7 +13,7 @@ export { type McpToolContext, textResult, errorResult } from './types';
 export { handleSendMessage, handleListAgents } from './messaging';
 
 // ─── Memory ──────────────────────────────────────────────────────────────────
-export { handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories } from './memory';
+export { handleSaveMemory, handlePromoteMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories } from './memory';
 
 // ─── Session ─────────────────────────────────────────────────────────────────
 export { handleExtendTimeout } from './session';

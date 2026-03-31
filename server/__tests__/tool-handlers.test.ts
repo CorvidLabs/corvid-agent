@@ -16,6 +16,20 @@ const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1
 /** Dynamic owner-address set controlled by `setOwnerAddresses()` in each test. */
 let _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
 
+// Mock arc69-store so handlePromoteMemory's dynamic import resolves to controllable fakes
+const _mockCreateMemoryAsa = mock(() => Promise.resolve({ asaId: 100, txid: 'TX-CREATE' }));
+const _mockUpdateMemoryAsa = mock(() => Promise.resolve({ txid: 'TX-UPDATE' }));
+const _mockResolveAsaForKey = mock((): number | null => null);
+
+mock.module('../memory/arc69-store', () => ({
+    createMemoryAsa: _mockCreateMemoryAsa,
+    updateMemoryAsa: _mockUpdateMemoryAsa,
+    resolveAsaForKey: _mockResolveAsaForKey,
+    deleteMemoryAsa: mock(() => Promise.resolve({ txid: 'TX-DEL' })),
+    listMemoryAsas: mock(() => Promise.resolve([])),
+    readMemoryAsa: mock(() => Promise.resolve(null)),
+}));
+
 mock.module('../algochat/config', () => ({
     loadAlgoChatConfig: () => ({
         mnemonic: null,
@@ -41,6 +55,8 @@ import {
     handleCheckWorkStatus,
     handleListWorkTasks,
     handleRecallMemory,
+    handlePromoteMemory,
+    handleSaveMemory,
     handleListAgents,
     type McpToolContext,
 } from '../mcp/tool-handlers';
@@ -1060,6 +1076,119 @@ describe('handleRecallMemory', () => {
         const result = await handleRecallMemory(ctx, { query: 'searchable' });
         const text = (result.content[0] as { text: string }).text;
         expect(text).toContain('FULLTXIDINSEARCH');
+    });
+});
+
+// ─── handleSaveMemory (short-term default) ──────────────────────────────────
+
+describe('handleSaveMemory', () => {
+    test('saves memory as short-term and returns guidance', async () => {
+        const ctx = createMockContext();
+        const result = await handleSaveMemory(ctx, { key: 'test-save', content: 'hello' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(result.isError).toBeFalsy();
+        expect(text).toContain('short-term');
+        expect(text).toContain('corvid_promote_memory');
+    });
+});
+
+// ─── handlePromoteMemory ────────────────────────────────────────────────────
+
+/** Create a context where buildArc69Context succeeds (has indexer + chat account). */
+function createArc69Context(overrides?: Partial<McpToolContext>): McpToolContext {
+    return createMockContext({
+        network: 'localnet',
+        agentWalletService: {
+            getAlgoChatService: () => ({
+                algodClient: {} as any,
+                indexerClient: {} as any,
+            }),
+            getAgentChatAccount: mock(() => Promise.resolve({ account: {} as any })),
+        } as unknown as McpToolContext['agentWalletService'],
+        ...overrides,
+    });
+}
+
+describe('handlePromoteMemory', () => {
+    test('returns error when memory not found', async () => {
+        const ctx = createMockContext();
+        const result = await handlePromoteMemory(ctx, { key: 'nonexistent' });
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('No memory found');
+    });
+
+    test('returns already on-chain when memory is confirmed with asaId', async () => {
+        const ctx = createMockContext();
+        const mem = saveMemory(db, { agentId, key: 'already-onchain', content: 'data' });
+        updateMemoryTxid(db, mem.id, 'TX123');
+        // Manually set asaId and status to confirmed
+        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(42, 'confirmed', mem.id);
+
+        const result = await handlePromoteMemory(ctx, { key: 'already-onchain' });
+        expect(result.isError).toBeFalsy();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('already on-chain');
+        expect(text).toContain('42');
+    });
+
+    test('returns error when ARC-69 context unavailable on localnet', async () => {
+        const ctx = createMockContext({ network: 'localnet' });
+        saveMemory(db, { agentId, key: 'promote-no-arc69', content: 'data' });
+
+        const result = await handlePromoteMemory(ctx, { key: 'promote-no-arc69' });
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Cannot promote memory');
+    });
+
+    test('creates new ASA when no existing ASA found on localnet', async () => {
+        const ctx = createArc69Context();
+        saveMemory(db, { agentId, key: 'new-asa', content: 'new data' });
+        _mockResolveAsaForKey.mockImplementation(() => null);
+        _mockCreateMemoryAsa.mockImplementation(() => Promise.resolve({ asaId: 200, txid: 'TX-NEW' }));
+
+        const result = await handlePromoteMemory(ctx, { key: 'new-asa' });
+        expect(result.isError).toBeFalsy();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('promoted to long-term storage');
+        expect(text).toContain('200');
+    });
+
+    test('updates existing ASA when one already exists on localnet', async () => {
+        const ctx = createArc69Context();
+        saveMemory(db, { agentId, key: 'existing-asa', content: 'updated data' });
+        _mockResolveAsaForKey.mockImplementation(() => 55);
+        _mockUpdateMemoryAsa.mockImplementation(() => Promise.resolve({ txid: 'TX-UPD' }));
+
+        const result = await handlePromoteMemory(ctx, { key: 'existing-asa' });
+        expect(result.isError).toBeFalsy();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('promoted to long-term storage');
+        expect(text).toContain('55');
+    });
+
+    test('returns error and sets status to failed when ARC-69 write throws', async () => {
+        const ctx = createArc69Context();
+        saveMemory(db, { agentId, key: 'arc69-fail', content: 'data' });
+        _mockResolveAsaForKey.mockImplementation(() => null);
+        _mockCreateMemoryAsa.mockImplementation(() => Promise.reject(new Error('ARC-69 write error')));
+
+        const result = await handlePromoteMemory(ctx, { key: 'arc69-fail' });
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Failed to promote memory to ARC-69');
+        expect(text).toContain('ARC-69 write error');
+    });
+
+    test('queues promotion on testnet', async () => {
+        const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
+        saveMemory(db, { agentId, key: 'promote-testnet', content: 'data' });
+
+        const result = await handlePromoteMemory(ctx, { key: 'promote-testnet' });
+        expect(result.isError).toBeFalsy();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('queued for promotion');
     });
 });
 

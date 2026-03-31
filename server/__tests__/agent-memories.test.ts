@@ -37,7 +37,7 @@ describe('Save and Recall', () => {
         expect(mem.agentId).toBe(agentId);
         expect(mem.key).toBe('greeting');
         expect(mem.content).toBe('Hello World');
-        expect(mem.status).toBe('pending');
+        expect(mem.status).toBe('short_term');
         expect(mem.txid).toBeNull();
         expect(mem.createdAt).toBeTruthy();
         expect(mem.updatedAt).toBeTruthy();
@@ -65,7 +65,7 @@ describe('Save and Recall', () => {
         const updated = saveMemory(db, { agentId, key: 'config', content: 'v2' });
 
         expect(updated.content).toBe('v2');
-        expect(updated.status).toBe('pending'); // reset to pending on update
+        expect(updated.status).toBe('short_term'); // reset to short_term on update
 
         // Should only be one row
         const all = listMemories(db, agentId);
@@ -84,7 +84,7 @@ describe('Save and Recall', () => {
         saveMemory(db, { agentId, key: 'sync', content: 'updated' });
         const after = recallMemory(db, agentId, 'sync');
         expect(after!.txid).toBeNull();
-        expect(after!.status).toBe('pending');
+        expect(after!.status).toBe('short_term');
     });
 });
 
@@ -269,38 +269,44 @@ describe('Status and Txid Updates', () => {
 
     test('updateMemoryStatus changes status', () => {
         const mem = saveMemory(db, { agentId, key: 'status-test', content: 'data' });
-        expect(mem.status).toBe('pending');
+        expect(mem.status).toBe('short_term');
 
         updateMemoryStatus(db, mem.id, 'failed');
         const found = recallMemory(db, agentId, 'status-test');
         expect(found!.status).toBe('failed');
     });
 
-    test('status transition: pending → confirmed → pending (on re-save)', () => {
+    test('status transition: short_term → confirmed → short_term (on re-save)', () => {
         const mem = saveMemory(db, { agentId, key: 'lifecycle', content: 'v1' });
+        expect(mem.status).toBe('short_term');
         updateMemoryTxid(db, mem.id, 'TX1');
 
         const confirmed = recallMemory(db, agentId, 'lifecycle');
         expect(confirmed!.status).toBe('confirmed');
 
-        // Re-save with new content resets to pending
+        // Re-save with new content resets to short_term (needs re-promotion)
         saveMemory(db, { agentId, key: 'lifecycle', content: 'v2' });
-        const pending = recallMemory(db, agentId, 'lifecycle');
-        expect(pending!.status).toBe('pending');
-        expect(pending!.txid).toBeNull();
+        const afterUpdate = recallMemory(db, agentId, 'lifecycle');
+        expect(afterUpdate!.status).toBe('short_term');
+        expect(afterUpdate!.txid).toBeNull();
     });
 });
 
 // ─── Pending Memories ────────────────────────────────────────────────────────
 
 describe('Pending Memories', () => {
+    // Note: saveMemory now creates short_term memories by default.
+    // getPendingMemories returns memories with status 'pending' or 'failed' —
+    // these are set explicitly by the promotion flow (corvid_promote_memory).
+
     test('getPendingMemories returns pending and failed', () => {
-        saveMemory(db, { agentId, key: 'pending-1', content: 'data' });
+        const m1 = saveMemory(db, { agentId, key: 'pending-1', content: 'data' });
         const m2 = saveMemory(db, { agentId, key: 'pending-2', content: 'data' });
         const m3 = saveMemory(db, { agentId, key: 'confirmed', content: 'data' });
 
-        updateMemoryTxid(db, m3.id, 'TX1'); // confirmed
-        updateMemoryStatus(db, m2.id, 'failed');
+        updateMemoryStatus(db, m1.id, 'pending'); // simulates promotion-in-progress
+        updateMemoryStatus(db, m2.id, 'failed');  // simulates failed promotion
+        updateMemoryTxid(db, m3.id, 'TX1');       // confirmed
 
         const pending = getPendingMemories(db);
         expect(pending).toHaveLength(2);
@@ -311,14 +317,17 @@ describe('Pending Memories', () => {
 
     test('getPendingMemories respects limit', () => {
         for (let i = 0; i < 5; i++) {
-            saveMemory(db, { agentId, key: `p-${i}`, content: 'data' });
+            const m = saveMemory(db, { agentId, key: `p-${i}`, content: 'data' });
+            updateMemoryStatus(db, m.id, 'pending');
         }
         expect(getPendingMemories(db, 3)).toHaveLength(3);
     });
 
     test('getPendingMemories ordered by updated_at ASC (oldest first)', () => {
-        saveMemory(db, { agentId, key: 'old', content: 'data' });
-        saveMemory(db, { agentId, key: 'new', content: 'data' });
+        const m1 = saveMemory(db, { agentId, key: 'old', content: 'data' });
+        const m2 = saveMemory(db, { agentId, key: 'new', content: 'data' });
+        updateMemoryStatus(db, m1.id, 'pending');
+        updateMemoryStatus(db, m2.id, 'pending');
 
         const pending = getPendingMemories(db);
         expect(pending[0].key).toBe('old');
@@ -328,20 +337,27 @@ describe('Pending Memories', () => {
     test('countPendingMemories returns correct count', () => {
         expect(countPendingMemories(db)).toBe(0);
 
-        saveMemory(db, { agentId, key: 'a', content: 'data' });
-        saveMemory(db, { agentId, key: 'b', content: 'data' });
+        const ma = saveMemory(db, { agentId, key: 'a', content: 'data' });
+        const mb = saveMemory(db, { agentId, key: 'b', content: 'data' });
+        // short_term memories are NOT counted as pending
+        expect(countPendingMemories(db)).toBe(0);
+
+        // Promote both to pending
+        updateMemoryStatus(db, ma.id, 'pending');
+        updateMemoryStatus(db, mb.id, 'pending');
         expect(countPendingMemories(db)).toBe(2);
 
         // Confirm one
-        const mem = recallMemory(db, agentId, 'a');
-        updateMemoryTxid(db, mem!.id, 'TX1');
+        updateMemoryTxid(db, ma.id, 'TX1');
         expect(countPendingMemories(db)).toBe(1);
     });
 
     test('getPendingMemories spans across agents', () => {
         const agent2 = createAgent(db, { name: 'Agent 2' });
-        saveMemory(db, { agentId, key: 'a', content: 'data' });
-        saveMemory(db, { agentId: agent2.id, key: 'b', content: 'data' });
+        const ma = saveMemory(db, { agentId, key: 'a', content: 'data' });
+        const mb = saveMemory(db, { agentId: agent2.id, key: 'b', content: 'data' });
+        updateMemoryStatus(db, ma.id, 'pending');
+        updateMemoryStatus(db, mb.id, 'pending');
 
         // getPendingMemories is not agent-scoped
         expect(getPendingMemories(db)).toHaveLength(2);

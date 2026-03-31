@@ -72,6 +72,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 |----------|-----------|---------|-------------|
 | `handleSendMessage` | `(ctx, { to_agent, message, thread? })` | `Promise<CallToolResult>` | Send agent-to-agent message with dedup and depth check |
 | `handleSaveMemory` | `(ctx, { key, content })` | `Promise<CallToolResult>` | Save/update an agent memory (encrypts if mnemonic available) |
+| `handlePromoteMemory` | `(ctx, { key })` | `Promise<CallToolResult>` | Promote a short-term memory to on-chain ARC-69 storage |
 | `handleRecallMemory` | `(ctx, { query, limit? })` | `Promise<CallToolResult>` | FTS search of agent memories |
 | `handleReadOnChainMemories` | `(ctx, { search?, limit? })` | `Promise<CallToolResult>` | Read memories directly from on-chain storage via indexer |
 | `handleSyncOnChainMemories` | `(ctx, { limit? })` | `Promise<CallToolResult>` | Sync on-chain memories back to local SQLite cache |

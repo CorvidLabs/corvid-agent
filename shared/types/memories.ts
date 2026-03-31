@@ -1,4 +1,4 @@
-export type MemoryStatus = 'pending' | 'confirmed' | 'failed';
+export type MemoryStatus = 'short_term' | 'pending' | 'confirmed' | 'failed';
 
 export interface AgentMemory {
     id: string;

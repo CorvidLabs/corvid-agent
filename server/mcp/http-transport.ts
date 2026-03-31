@@ -155,7 +155,7 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
     });
 
     // ── Memory ─────────────────────────────────────────────────────
-    server.tool('corvid_save_memory', 'Save a memory to long-term storage (on-chain) with short-term SQLite cache.', {
+    server.tool('corvid_save_memory', 'Save a memory to short-term local storage (SQLite). Use corvid_promote_memory to promote to long-term on-chain storage.', {
         key: z.string().describe('A short descriptive key'),
         content: z.string().describe('The content to remember'),
     }, async ({ key, content }) => {
@@ -200,6 +200,15 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
     }, async ({ key, mode }) => {
         try {
             const data = await callApi(baseUrl, '/api/mcp/delete-memory', { agentId, key, mode });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
+    server.tool('corvid_promote_memory', 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA).', {
+        key: z.string().describe('Memory key to promote to long-term on-chain storage'),
+    }, async ({ key }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/promote-memory', { agentId, key });
             return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
         } catch (err) { return handleError(err); }
     });
