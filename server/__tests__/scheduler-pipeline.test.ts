@@ -154,7 +154,7 @@ describe('Pipeline Templates', () => {
             'send_message', 'github_suggest', 'codebase_review', 'dependency_audit',
             'improvement_loop', 'memory_maintenance', 'reputation_attestation',
             'outcome_analysis', 'daily_review', 'status_checkin', 'marketplace_billing',
-            'flock_testing', 'discord_post', 'custom',
+            'flock_testing', 'flock_reputation_refresh', 'discord_post', 'custom',
         ];
         const templates = listPipelineTemplates();
         for (const tmpl of templates) {

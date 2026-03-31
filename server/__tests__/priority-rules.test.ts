@@ -62,6 +62,10 @@ describe('getActionCategory', () => {
         expect(getActionCategory('star_repo')).toBe('lightweight');
     });
 
+    test('maps flock_reputation_refresh to lightweight', () => {
+        expect(getActionCategory('flock_reputation_refresh')).toBe('lightweight');
+    });
+
     test('maps custom to feature_work', () => {
         expect(getActionCategory('custom')).toBe('feature_work');
     });
