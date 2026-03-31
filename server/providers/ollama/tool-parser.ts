@@ -127,6 +127,17 @@ export function extractToolCallsFromContent(
         while ((reactMatch = reactPattern.exec(content)) !== null) {
             const actionName = reactMatch[1].trim();
             const inputStr = reactMatch[2].trim();
+
+            // Parse args first so fuzzy matching can use them (e.g. "bash" + {command:...} → run_command)
+            let args: Record<string, unknown> = {};
+            try {
+                args = JSON.parse(inputStr);
+            } catch {
+                if (inputStr) {
+                    args = { input: inputStr };
+                }
+            }
+
             let resolvedName: string | undefined = toolNames.has(actionName) ? actionName : undefined;
             if (!resolvedName && actionName.startsWith('corvid_')) {
                 const bare = actionName.slice(7);
@@ -136,17 +147,9 @@ export function extractToolCallsFromContent(
                 resolvedName = `corvid_${actionName}`;
             }
             if (!resolvedName) {
-                resolvedName = fuzzyMatchToolName(actionName, {}, tools);
+                resolvedName = fuzzyMatchToolName(actionName, args, tools);
             }
             if (resolvedName) {
-                let args: Record<string, unknown> = {};
-                try {
-                    args = JSON.parse(inputStr);
-                } catch {
-                    if (inputStr) {
-                        args = { input: inputStr };
-                    }
-                }
                 calls.push({
                     id: crypto.randomUUID().slice(0, 8),
                     name: resolvedName,
