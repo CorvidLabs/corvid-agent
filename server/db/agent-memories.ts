@@ -222,3 +222,17 @@ export function archiveMemory(
     ).run(agentId, key);
     return (result as unknown as { changes: number }).changes > 0;
 }
+
+/**
+ * Look up the ASA ID for a given memory key from the local DB mapping.
+ */
+export function resolveAsaForKey(
+    db: Database,
+    agentId: string,
+    key: string,
+): number | null {
+    const row = db.query(
+        'SELECT asa_id FROM agent_memories WHERE agent_id = ? AND key = ? AND asa_id IS NOT NULL'
+    ).get(agentId, key) as { asa_id: number } | null;
+    return row?.asa_id ?? null;
+}

@@ -17,7 +17,7 @@ import {
     archiveMemory,
     listMemories,
 } from '../db/agent-memories';
-import { resolveAsaForKey } from '../memory/arc69-store';
+import { resolveAsaForKey } from '../db/agent-memories';
 
 let db: Database;
 let agentId: string;
