@@ -25,6 +25,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | `removeWorktree` | `(projectWorkingDir: string, worktreeDir: string, options?: RemoveWorktreeOptions)` | `Promise<void>` | Removes a git worktree. With `cleanBranch: true`, auto-deletes branches with zero commits ahead of main. Idempotent |
 | `generateChatBranchName` | `(agentName: string, sessionId: string)` | `string` | Generates a branch name for chat session worktrees: `chat/{agentSlug}/{sessionIdPrefix}` |
 | `resolveAndCreateWorktree` | `(project: Project, agentName: string, sessionId: string)` | `Promise<ResolveAndCreateWorktreeResult>` | Resolves project dir (handling clone_on_demand/ephemeral) then creates a worktree. Ensures repo is cloned before worktree creation |
+| `pruneWorktrees` | `(projectWorkingDir: string)` | `Promise<void>` | Runs `git worktree prune` to clean up stale worktree references where the directory no longer exists on disk |
 
 ### Exported Types
 
@@ -134,7 +135,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 
 | Module | What is used |
 |--------|-------------|
-| `server/work/service.ts` | `getWorktreeBaseDir`, `createWorktree`, `removeWorktree` for work task isolation |
+| `server/work/service.ts` | `getWorktreeBaseDir`, `createWorktree`, `removeWorktree`, `pruneWorktrees` for work task isolation |
 | `server/discord/message-handler.ts` | `resolveAndCreateWorktree` for chat session isolation |
 | `server/discord/command-handlers/session-commands.ts` | `resolveAndCreateWorktree` for slash-command chat session isolation |
 | `server/algochat/message-router.ts` | `resolveAndCreateWorktree`, `generateChatBranchName` for AlgoChat session isolation |
@@ -154,3 +155,4 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | 2026-03-18 | corvid-agent | Mandatory worktree isolation (invariants #7-#8); branch isolation prompt; session fails on worktree error |
 | 2026-03-15 | corvid-agent | Added `RemoveWorktreeOptions` / `cleanBranch` for smart branch cleanup; AlgoChat consumer |
 | 2026-03-12 | corvid-agent | Initial spec — extracted from WorkTaskService |
+| 2026-03-30 | corvid-agent | Added `pruneWorktrees` for stale worktree reference cleanup |
