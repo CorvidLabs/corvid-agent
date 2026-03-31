@@ -157,7 +157,7 @@
 
     .nav-logo span { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-    .nav-links { display: flex; gap: 2rem; align-items: center; }
+    .nav-links { display: flex; gap: 1.25rem; align-items: center; }
     .nav-links a {
       color: var(--text-dim);
       text-decoration: none;
@@ -1111,7 +1111,7 @@
 
 
     /* Responsive */
-    @media (max-width: 768px) {
+    @media (max-width: 1024px) {
       .nav-links { display: none; }
       .hamburger { display: flex; }
       .stats { grid-template-columns: repeat(3, 1fr); }
@@ -1145,10 +1145,7 @@
     <div class="nav-links">
       <a href="#who-is-this-for">Who Is This For?</a>
       <a href="#showcase">Showcase</a>
-      <a href="#mac-apps">Mac Apps</a>
       <a href="#features">Features</a>
-      <a href="#ecosystem">Infrastructure</a>
-      <a href="#packages">Packages</a>
       <a href="/corvid-agent/docs.html">Docs</a>
       <a href="/corvid-agent/blog.html">Blog</a>
       <a href="#run-your-own" class="nav-cta">Get Started</a>
@@ -1257,28 +1254,28 @@
   <section id="who-is-this-for">
     <div class="section-header reveal">
       <h2>Who Is This For?</h2>
-      <p>Whether you're a creator with an idea or an enterprise scaling operations, corvid-agent meets you where you are.</p>
+      <p>From solo hackers to teams running production infrastructure &mdash; corvid-agent scales with you.</p>
     </div>
     <div class="audience-grid">
       <a href="https://corvidlabs.github.io/corvid-agent/getting-started.html#creators" class="audience-card audience-card--cyan reveal-stagger">
         <div class="audience-icon">&#x1F3A8;</div>
-        <div class="audience-title">Creators</div>
-        <div class="audience-desc">Have an idea but don't code? Describe what you want in plain English and the agent builds it.</div>
+        <div class="audience-title">Creators &amp; Tinkerers</div>
+        <div class="audience-desc">You have ideas, not a CS degree. Describe what you want in plain English &mdash; the agent writes code, runs tests, and deploys it. Every app in our <a href="#showcase" style="color:var(--accent)">Showcase</a> was built this way, zero human-written code.</div>
       </a>
       <a href="https://corvidlabs.github.io/corvid-agent/getting-started.html#developers" class="audience-card audience-card--magenta reveal-stagger">
         <div class="audience-icon">&#x1F4BB;</div>
         <div class="audience-title">Developers</div>
-        <div class="audience-desc">Supercharge your workflow. The agent writes tests, reviews code, ships PRs, and handles boilerplate.</div>
+        <div class="audience-desc">Skip the grunt work. The agent handles PR reviews, test scaffolding, dependency upgrades, and boilerplate while you focus on architecture. Works in isolated git worktrees &mdash; your main branch stays clean.</div>
       </a>
       <a href="https://corvidlabs.github.io/corvid-agent/business-guide.html" class="audience-card audience-card--green reveal-stagger">
         <div class="audience-icon">&#x1F3E2;</div>
-        <div class="audience-title">Businesses</div>
-        <div class="audience-desc">Automate customer support, internal tools, and workflows. Deploy on your infrastructure.</div>
+        <div class="audience-title">Teams &amp; Businesses</div>
+        <div class="audience-desc">Deploy a fleet of specialized agents on your own infrastructure. Automate support workflows, internal tooling, and ops &mdash; with full audit trails and no vendor lock-in. Self-hosted, air-gappable, yours.</div>
       </a>
       <a href="https://corvidlabs.github.io/corvid-agent/enterprise.html" class="audience-card audience-card--orange reveal-stagger">
         <div class="audience-icon">&#x1F30D;</div>
-        <div class="audience-title">Enterprise</div>
-        <div class="audience-desc">Multi-agent orchestration, governance councils, audit trails, and on-chain identity verification.</div>
+        <div class="audience-title">Enterprise &amp; Web3</div>
+        <div class="audience-desc">Multi-agent councils with on-chain identity, encrypted messaging via AlgoChat, and verifiable reputation on Algorand. Governance built in &mdash; not bolted on. Run sovereign AI infrastructure you actually own.</div>
       </a>
     </div>
   </section>
