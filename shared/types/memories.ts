@@ -10,6 +10,10 @@ export interface AgentMemory {
     status: MemoryStatus;
     createdAt: string;
     updatedAt: string;
+    /** ISO timestamp after which a short_term memory is eligible for archival. NULL for promoted memories. */
+    expiresAt: string | null;
+    /** Number of times this memory has been recalled. Used for TTL extension. */
+    accessCount: number;
 }
 
 // ─── Memory Observations (short-term → graduation candidates) ───────────────

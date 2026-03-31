@@ -437,6 +437,9 @@ interface AgentMemoryRow {
     status: string;
     created_at: string;
     updated_at: string;
+    // Added by migration 112 — optional until migration is applied
+    expires_at?: string | null;
+    access_count?: number;
 }
 
 function rowToAgentMemory(row: AgentMemoryRow): AgentMemory {
@@ -450,6 +453,8 @@ function rowToAgentMemory(row: AgentMemoryRow): AgentMemory {
         status: row.status as AgentMemory['status'],
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        expiresAt: row.expires_at ?? null,
+        accessCount: row.access_count ?? 0,
     };
 }
 

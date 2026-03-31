@@ -9,6 +9,8 @@
  * Also handles:
  *   - Expiring stale observations (default TTL: 7 days)
  *   - Purging old expired/dismissed observations (30 days)
+ *   - Expiring short_term agent_memories past their expires_at TTL (migration 112)
+ *   - Purging archived short_term memories after 30 days (migration 112)
  */
 
 import type { Database } from 'bun:sqlite';
@@ -21,7 +23,13 @@ import {
     purgeOldObservations,
     countObservations,
 } from '../db/observations';
-import { saveMemory, updateMemoryTxid, updateMemoryAsaId } from '../db/agent-memories';
+import {
+    saveMemory,
+    updateMemoryTxid,
+    updateMemoryAsaId,
+    expireShortTermMemories,
+    purgeOldArchivedMemories,
+} from '../db/agent-memories';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('MemoryGraduation');
@@ -105,7 +113,19 @@ export class MemoryGraduationService {
                 log.info('Purged old observations', { count: purged });
             }
 
-            // 3. Find all agents with active observations and process each
+            // 3. Expire short_term agent memories past their TTL
+            const expiredMemories = expireShortTermMemories(this.db);
+            if (expiredMemories > 0) {
+                log.info('Expired short-term memories', { count: expiredMemories });
+            }
+
+            // 4. Purge old archived short_term memories (30 days after archival)
+            const purgedMemories = purgeOldArchivedMemories(this.db);
+            if (purgedMemories > 0) {
+                log.info('Purged old archived short-term memories', { count: purgedMemories });
+            }
+
+            // 5. Find all agents with active observations and process each
             const agentRows = this.db.query(
                 `SELECT DISTINCT agent_id FROM memory_observations WHERE status = 'active'`,
             ).all() as { agent_id: string }[];

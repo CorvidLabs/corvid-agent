@@ -132,6 +132,10 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 19. **Short-term default**: Every new memory save writes to SQLite only with `status: 'short_term'`. On-chain promotion (ARC-69 ASA) requires an explicit `corvid_promote_memory` call. Updating an existing confirmed memory resets its status to `short_term` and clears txid until re-promoted.
 20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which saves to SQLite short-term storage. Channel of origin does not affect storage behavior. Promotion to on-chain is a separate explicit step via `corvid_promote_memory`.
 21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
+22. **Short-term TTL on save**: When migration 112 is applied, every new `saveMemory()` call for a `short_term` memory sets `expires_at = datetime('now', '+7 days')` (configurable via `ttlDays` param). Promoted memories (`pending`, `confirmed`) always have `expires_at = NULL`.
+23. **Access-based TTL extension**: When migration 112 is applied, each `recallMemory()` call on a `short_term` memory increments `access_count`. Once `access_count >= 3`, `expires_at` is extended to `datetime('now', '+14 days')` — unless it is already beyond 90 days from now (cap).
+24. **Decay archival**: `expireShortTermMemories()` archives (sets `archived = 1`) all `short_term` memories whose `expires_at < datetime('now')`. It is a no-op if migration 112 has not been applied. Called by `MemoryGraduationService.tick()` every 5 minutes.
+25. **Decay purge**: `purgeOldArchivedMemories()` hard-deletes archived `short_term` memories whose `updated_at < datetime('now', '-30 days')`. Called by `MemoryGraduationService.tick()` every 5 minutes after archival.
 
 ## Behavioral Examples
 
@@ -240,10 +244,12 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | key | TEXT | NOT NULL | Memory key (unique per agent) |
 | content | TEXT | NOT NULL | Memory content |
 | txid | TEXT | DEFAULT NULL | On-chain transaction ID |
-| status | TEXT | DEFAULT 'pending' | `pending` or `confirmed` |
-| archived | INTEGER | NOT NULL DEFAULT 0 | 1 = archived by summarizer |
+| status | TEXT | DEFAULT 'pending' | `short_term`, `pending`, `confirmed`, or `failed` |
+| archived | INTEGER | NOT NULL DEFAULT 0 | 1 = archived by summarizer or TTL expiry |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last update timestamp |
+| expires_at | TEXT | DEFAULT NULL | ISO timestamp for TTL expiry (short_term only; added by migration 112) |
+| access_count | INTEGER | NOT NULL DEFAULT 0 | Recall hit count for TTL extension (added by migration 112) |
 
 ### memory_categories
 
@@ -282,6 +288,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-30 | corvid-agent | Add TTL-based decay columns, access-count extension, expire/purge functions (invariants 22-25, #1722) |
 | 2026-03-17 | corvid-agent | Add session exit auto-save (invariant 21), behavioral scenarios (#1186) |
 | 2026-03-17 | corvid-agent | Add two-tier memory architecture (invariants 19-20), update purpose section (#1186) |
 | 2026-02-27 | corvid-agent | Initial spec |

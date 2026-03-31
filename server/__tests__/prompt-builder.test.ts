@@ -146,7 +146,7 @@ describe('buildImprovementPrompt', () => {
     test('formats past attempts', () => {
         const memories: ScoredMemory[] = [
             {
-                memory: { id: 'm-1', agentId: 'agent-1', key: 'improvement_loop:outcome:2026-01-01', content: 'Fixed 3 type errors in billing module', txid: null, asaId: null, status: 'confirmed', createdAt: '', updatedAt: '' },
+                memory: { id: 'm-1', agentId: 'agent-1', key: 'improvement_loop:outcome:2026-01-01', content: 'Fixed 3 type errors in billing module', txid: null, asaId: null, status: 'confirmed', createdAt: '', updatedAt: '', expiresAt: null, accessCount: 0 },
                 score: 0.9,
                 source: 'fts5',
             },
