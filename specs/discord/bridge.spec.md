@@ -242,6 +242,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
+| `recoverActiveMentionSessions` | `(db, mentionSessions, trackFn?)` | `void` | Recover mention sessions from DB into memory on startup for reply-based session resumption |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
 | `archiveThread` | `(botToken, threadId)` | `Promise<void>` | Archive a single thread via the Discord API |
 | `createStandaloneThread` | `(botToken, channelId, name)` | `Promise<string \| null>` | Create a standalone Discord thread |

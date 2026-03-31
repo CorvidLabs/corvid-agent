@@ -25,6 +25,7 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `saveMentionSession` | `db: Database, botMessageId: string, info: MentionSessionInfo` | `void` | Persists a mention-reply session mapping using INSERT OR REPLACE |
 | `getMentionSession` | `db: Database, botMessageId: string` | `MentionSessionInfo \| null` | Looks up a session by bot message ID; returns null if not found |
 | `deleteMentionSessionsBySessionId` | `db: Database, sessionId: string` | `void` | Removes all mention session entries for a given session ID |
+| `getRecentMentionSessions` | `db: Database, maxAgeHours?: number` | `Array<{ botMessageId: string; info: MentionSessionInfo; createdAt: string }>` | Loads recent mention sessions from the database for recovery after restart (default: 24 hours) |
 | `pruneOldMentionSessions` | `db: Database, maxAgeDays?: number` | `number` | Deletes rows older than the specified age (default 7 days); returns the number of deleted rows |
 
 ## Invariants
@@ -35,6 +36,8 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 4. `pruneOldMentionSessions` defaults to a 7-day retention window if `maxAgeDays` is not provided.
 5. `pruneOldMentionSessions` returns the actual number of rows deleted (may be 0).
 6. An index on `session_id` exists to make `deleteMentionSessionsBySessionId` efficient.
+7. `getRecentMentionSessions` defaults to a 24-hour lookback window if `maxAgeHours` is not provided.
+8. `getRecentMentionSessions` returns results ordered by `created_at` descending (most recent first).
 
 ## Behavioral Examples
 
@@ -90,6 +93,7 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | Module | What is used |
 |--------|-------------|
 | `server/discord/message-handler.ts` | `saveMentionSession` on mention reply, `getMentionSession` on incoming reply, `deleteMentionSessionsBySessionId` on session end |
+| `server/discord/thread-manager.ts` | `getRecentMentionSessions` for recovering mention sessions on startup |
 
 ## Database Tables
 
