@@ -9,6 +9,7 @@ export { execImprovementLoop } from './improvement';
 export {
     execMemoryMaintenance,
     execReputationAttestation,
+    execFlockReputationRefresh,
     execOutcomeAnalysis,
     execDailyReview,
     execStatusCheckin,

@@ -18,6 +18,7 @@ export type ScheduleActionType =
     | 'status_checkin'
     | 'marketplace_billing'
     | 'flock_testing'
+    | 'flock_reputation_refresh'
     | 'discord_post'
     | 'custom';
 
