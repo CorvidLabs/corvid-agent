@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createLogger } from '../lib/logger';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
@@ -36,9 +38,38 @@ export async function runBunInstall(cwd: string): Promise<void> {
 }
 
 /**
+ * Detect the default branch of a git repository (usually 'main' or 'master').
+ * Falls back to 'main' if detection fails.
+ */
+async function detectDefaultBranch(cwd: string): Promise<string> {
+    try {
+        const proc = Bun.spawn(['git', 'rev-parse', '--verify', 'main'], {
+            cwd,
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
+        await new Response(proc.stdout).text();
+        const exitCode = await proc.exited;
+        if (exitCode === 0) return 'main';
+
+        const masterProc = Bun.spawn(['git', 'rev-parse', '--verify', 'master'], {
+            cwd,
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
+        await new Response(masterProc.stdout).text();
+        const masterExit = await masterProc.exited;
+        if (masterExit === 0) return 'master';
+    } catch {
+        // Fall through to default
+    }
+    return 'main';
+}
+
+/**
  * Run the full validation pipeline on a working directory:
  * 1. `bun install` (ensure deps)
- * 2. `tsc --noEmit --skipLibCheck`
+ * 2. `tsc --noEmit --skipLibCheck` (if tsconfig.json exists)
  * 3. `bun test`
  * 4. Security/governance scans on git diff
  *
@@ -56,27 +87,38 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
         // Non-fatal — if install fails, tsc/tests will report the real errors
     }
 
-    // Run TypeScript check
-    try {
-        const tscProc = Bun.spawn(['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck'], {
-            cwd: workingDir,
-            stdout: 'pipe',
-            stderr: 'pipe',
-        });
-        const tscStdout = await new Response(tscProc.stdout).text();
-        const tscStderr = await new Response(tscProc.stderr).text();
-        const tscExit = await tscProc.exited;
+    // Run TypeScript check — only if the project has a tsconfig.json.
+    // Without one, tsc prints help text and exits non-zero, which would
+    // incorrectly fail validation for non-TypeScript projects (#1767).
+    const tsconfigPath = resolve(workingDir, 'tsconfig.json');
+    if (existsSync(tsconfigPath)) {
+        try {
+            const tscProc = Bun.spawn(
+                ['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck', '--project', tsconfigPath],
+                {
+                    cwd: workingDir,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                },
+            );
+            const tscStdout = await new Response(tscProc.stdout).text();
+            const tscStderr = await new Response(tscProc.stderr).text();
+            const tscExit = await tscProc.exited;
 
-        const tscOutput = (tscStdout + tscStderr).trim();
-        if (tscExit !== 0) {
+            const tscOutput = (tscStdout + tscStderr).trim();
+            if (tscExit !== 0) {
+                passed = false;
+                outputs.push(`=== TypeScript Check Failed (exit ${tscExit}) ===\n${tscOutput}`);
+            } else {
+                outputs.push('=== TypeScript Check Passed ===');
+            }
+        } catch (err) {
             passed = false;
-            outputs.push(`=== TypeScript Check Failed (exit ${tscExit}) ===\n${tscOutput}`);
-        } else {
-            outputs.push('=== TypeScript Check Passed ===');
+            outputs.push(`=== TypeScript Check Error ===\n${err instanceof Error ? err.message : String(err)}`);
         }
-    } catch (err) {
-        passed = false;
-        outputs.push(`=== TypeScript Check Error ===\n${err instanceof Error ? err.message : String(err)}`);
+    } else {
+        log.info('Skipping TypeScript check — no tsconfig.json found', { workingDir });
+        outputs.push('=== TypeScript Check Skipped (no tsconfig.json) ===');
     }
 
     // Run tests
@@ -104,7 +146,9 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
 
     // Security scan: check git diff for unapproved external fetch calls and malicious patterns
     try {
-        const diffProc = Bun.spawn(['git', 'diff', 'main...HEAD'], {
+        // Detect the default branch — not all projects use 'main' (#1767)
+        const defaultBranch = await detectDefaultBranch(workingDir);
+        const diffProc = Bun.spawn(['git', 'diff', `${defaultBranch}...HEAD`], {
             cwd: workingDir,
             stdout: 'pipe',
             stderr: 'pipe',
