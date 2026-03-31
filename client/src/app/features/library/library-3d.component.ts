@@ -12,48 +12,16 @@ import {
 } from '@angular/core';
 import * as THREE from 'three';
 import type { LibraryEntry, LibraryCategory } from '../../core/services/library.service';
-
-/* ── Category config ──────────────────────────────────── */
-
-interface CategoryZone {
-    category: LibraryCategory;
-    label: string;
-    color: number;
-    angle: number; // radians, position in pentagon
-    position: THREE.Vector3;
-}
-
-const CATEGORY_COLORS: Record<LibraryCategory, number> = {
-    guide: 0x00e5ff,
-    reference: 0xa78bfa,
-    decision: 0xf59e0b,
-    standard: 0x10b981,
-    runbook: 0xf43f5e,
-};
-
-const CATEGORY_LABELS: Record<LibraryCategory, string> = {
-    guide: 'Guides',
-    reference: 'Reference',
-    decision: 'Decisions',
-    standard: 'Standards',
-    runbook: 'Runbooks',
-};
-
-const ALL_CATEGORIES: LibraryCategory[] = ['guide', 'reference', 'decision', 'standard', 'runbook'];
-const ZONE_RADIUS = 40; // Distance from center for each zone
-const BOOK_SPREAD = 12; // Spread of books within a zone
-
-/* ── Internal 3D types ──────────────────────────────────── */
-
-interface BookNode3D {
-    entry: LibraryEntry;
-    mesh: THREE.Mesh;
-    glowMesh: THREE.Mesh;
-    label: THREE.Sprite;
-    position: THREE.Vector3;
-    baseY: number;
-    pulsePhase: number;
-}
+import {
+    type CategoryZone,
+    type BookNode3D,
+    CATEGORY_COLORS,
+    CATEGORY_LABELS,
+    ALL_CATEGORIES,
+    ZONE_RADIUS,
+    BOOK_SPREAD,
+} from './library-3d.types';
+import { createTextSprite } from './library-3d.utils';
 
 @Component({
     selector: 'app-library-3d',
@@ -914,24 +882,6 @@ export class Library3DComponent implements OnDestroy {
                 }
             }
         }
-    }
-
-    private createTextSprite(text: string, color: number, w: number, h: number, fontSize: number): THREE.Sprite {
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d')!;
-        ctx.clearRect(0, 0, w, h);
-        ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const hex = `#${color.toString(16).padStart(6, '0')}`;
-        ctx.fillStyle = hex;
-        ctx.fillText(text, w / 2, h / 2);
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.needsUpdate = true;
-        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-        return new THREE.Sprite(mat);
     }
 
     /* ── Animation loop ────────────────────────────────── */
