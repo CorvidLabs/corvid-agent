@@ -26,6 +26,8 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `getMentionSession` | `db: Database, botMessageId: string` | `MentionSessionInfo \| null` | Looks up a session by bot message ID; returns null if not found |
 | `deleteMentionSessionsBySessionId` | `db: Database, sessionId: string` | `void` | Removes all mention session entries for a given session ID |
 | `pruneOldMentionSessions` | `db: Database, maxAgeDays?: number` | `number` | Deletes rows older than the specified age (default 7 days); returns the number of deleted rows |
+| `getRecentMentionSessions` | `db: Database, maxAgeHours?: number` | `Array<{ botMessageId: string; info: MentionSessionInfo; createdAt: string }>` | Load recent mention sessions from the database for recovery after restart. Default max age is 24 hours |
+| `updateMentionSessionActivity` | `db: Database, botMessageId: string` | `void` | Update the `last_activity_at` timestamp for a mention session to current time |
 
 ## Invariants
 

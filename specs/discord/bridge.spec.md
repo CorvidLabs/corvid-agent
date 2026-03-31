@@ -250,6 +250,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `normalizeTimestamp` | `(ts: string)` | `string` | Append 'Z' to SQLite UTC timestamps lacking timezone indicator |
 | `formatDuration` | `(ms: number)` | `string` | Format milliseconds as human-readable "Xm Ys" or "Xs" string |
 | `sessionErrorEmbed` | `(errorType: string, fallbackMessage?: string)` | `{ title: string; description: string; color: number }` | Map an error type (context_exhausted, credits_exhausted, timeout, crash) to a user-facing embed |
+| `recoverActiveMentionSessions` | `(db, mentionSessions, trackFn?)` | `void` | Recover mention sessions from DB after server restart, populating the in-memory map |
+| `recoverActiveThreadSessions` | `(db, threadSessions, threadLastActivity)` | `number` | Bulk-recover thread sessions from `discord_thread_sessions` table on startup |
 
 ### Exported Functions (from message-formatter.ts)
 

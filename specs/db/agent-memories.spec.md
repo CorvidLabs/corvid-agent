@@ -35,6 +35,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | `archiveMemory` | `(db: Database, agentId: string, key: string)` | `boolean` | Soft-delete by setting `archived = 1`. Returns true if a row was updated |
 | `expireShortTermMemories` | `(db: Database)` | `number` | Archive all non-archived `short_term` memories whose `expires_at` is in the past. Returns count of archived memories |
 | `purgeOldArchivedMemories` | `(db: Database, daysAfterArchive?: number)` | `number` | Hard-delete archived `short_term` memories whose `updated_at` is older than `daysAfterArchive` days (default 30). Returns count deleted |
+| `resolveAsaForKey` | `(db: Database, agentId: string, key: string)` | `number \| null` | Look up the ASA ID for a given memory key. Returns null if not found or no ASA assigned |
 
 ### Exported Types
 
