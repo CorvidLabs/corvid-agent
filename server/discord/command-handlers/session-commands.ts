@@ -9,6 +9,7 @@ import type { DiscordInteractionData } from '../types';
 import { PermissionLevel, ButtonStyle } from '../types';
 import type { SessionSource } from '../../../shared/types';
 import { listAgents } from '../../db/agents';
+import { saveThreadSession } from '../../db/discord-thread-sessions';
 import { createSession } from '../../db/sessions';
 import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
@@ -143,7 +144,7 @@ export async function handleSessionCommand(
         workDir,
     });
 
-    ctx.threadSessions.set(threadId, {
+    const threadInfo = {
         sessionId: session.id,
         agentName: agent.name,
         agentModel: agent.model || 'unknown',
@@ -159,8 +160,10 @@ export async function handleSessionCommand(
             buddyAgentName: buddyAgent.name,
             maxRounds: buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined,
         } : undefined,
-    });
+    };
+    ctx.threadSessions.set(threadId, threadInfo);
     ctx.threadLastActivity.set(threadId, Date.now());
+    saveThreadSession(ctx.db, threadId, threadInfo);
 
     ctx.processManager.startProcess(session, topic);
     ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name, agent.displayColor, agent.displayIcon, agent.avatarUrl);

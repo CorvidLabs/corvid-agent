@@ -10,6 +10,7 @@ import type { DiscordInteractionData } from '../types';
 import { PermissionLevel } from '../types';
 import type { ThreadSessionInfo } from '../thread-manager';
 import { archiveThread } from '../thread-manager';
+import { deleteThreadSession, updateThreadSessionActivity } from '../../db/discord-thread-sessions';
 import { createLogger } from '../../lib/logger';
 import {
     respondToInteraction,
@@ -63,6 +64,7 @@ export async function handleComponentInteraction(
             // Subscribing now would start the zombie-detection timer against a
             // non-running process, triggering a false "session ended unexpectedly" embed.
             ctx.threadLastActivity.set(threadId, Date.now());
+            updateThreadSessionActivity(ctx.db, threadId);
 
             await acknowledgeButton(interaction, 'Session resumed — send a message to continue.');
             break;
@@ -89,6 +91,7 @@ export async function handleComponentInteraction(
             }
             ctx.threadSessions.delete(threadId);
             ctx.threadLastActivity.delete(threadId);
+            deleteThreadSession(ctx.db, threadId);
 
             // Stop the process if still running
             if (info && ctx.processManager.isRunning(info.sessionId)) {
@@ -185,6 +188,9 @@ function tryRecoverThreadFromCtx(
             projectName: row.project_name || undefined,
         };
         ctx.threadSessions.set(threadId, info);
+        // Persist to dedicated thread sessions table for future fast recovery
+        const { saveThreadSession } = require('../../db/discord-thread-sessions') as typeof import('../../db/discord-thread-sessions');
+        saveThreadSession(ctx.db, threadId, info);
         return info;
     } catch (err) {
         log.error('Failed to recover thread session from DB', {

@@ -10,7 +10,8 @@ import type { SessionSource } from '../../shared/types';
 import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
-import { getMentionSession, saveMentionSession } from '../db/discord-mention-sessions';
+import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
+import { saveThreadSession, updateThreadSessionActivity, deleteThreadSession } from '../db/discord-thread-sessions';
 import { listProjects } from '../db/projects';
 import { createSession, getSession, getPreviousThreadSessionSummary } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
@@ -358,6 +359,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
       }
     }
     if (existingSession) {
+      updateMentionSessionActivity(ctx.db, refId);
       await handleMentionReplyResume(
         ctx,
         channelId,
@@ -847,7 +849,7 @@ async function resumeExpiredThreadSession(
     workDir,
   });
 
-  ctx.threadSessions.set(threadId, {
+  const threadInfo = {
     sessionId: newSession.id,
     agentName: agent.name,
     agentModel: agent.model || 'unknown',
@@ -858,8 +860,10 @@ async function resumeExpiredThreadSession(
     displayIcon: agent.displayIcon,
     avatarUrl: agent.avatarUrl,
     creatorPermLevel: previousInfo.creatorPermLevel,
-  });
+  };
+  ctx.threadSessions.set(threadId, threadInfo);
   ctx.threadLastActivity.set(threadId, Date.now());
+  saveThreadSession(ctx.db, threadId, threadInfo);
 
   // Carry over context from the previous session in this thread (if any)
   const previousSummary = getPreviousThreadSessionSummary(ctx.db, threadId);
@@ -915,12 +919,15 @@ async function routeToThread(
   attachments?: DiscordAttachment[],
 ): Promise<void> {
   ctx.threadLastActivity.set(threadId, Date.now());
+  updateThreadSessionActivity(ctx.db, threadId);
 
   let threadInfo = ctx.threadSessions.get(threadId);
 
   if (!threadInfo) {
     threadInfo = tryRecoverThread(ctx.db, ctx.threadSessions, threadId) ?? undefined;
     if (!threadInfo) return;
+    // Persist legacy-recovered session to dedicated table
+    saveThreadSession(ctx.db, threadId, threadInfo);
   }
 
   // Thread permission isolation: BASIC users cannot interact with threads
@@ -958,6 +965,7 @@ async function routeToThread(
   const session = getSession(ctx.db, sessionId);
   if (!session) {
     ctx.threadSessions.delete(threadId);
+    deleteThreadSession(ctx.db, threadId);
     // Automatically resume: create a new session in the same thread
     const resumed = await resumeExpiredThreadSession(
       ctx,
@@ -1012,6 +1020,7 @@ async function routeToThread(
       log.warn('resumeProcess did not start — creating fresh session in thread', { sessionId, threadId });
       // Clear stale mapping and create a brand new session, same as expired sessions
       ctx.threadSessions.delete(threadId);
+      deleteThreadSession(ctx.db, threadId);
       const resumed = await resumeExpiredThreadSession(
         ctx,
         threadId,

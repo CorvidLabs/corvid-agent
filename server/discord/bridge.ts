@@ -24,6 +24,7 @@
 import type { Database } from 'bun:sqlite';
 import { getAgent } from '../db/agents';
 import { getDiscordConfig } from '../db/discord-config';
+import { saveThreadSession, pruneOldThreadSessions } from '../db/discord-thread-sessions';
 import { getSession } from '../db/sessions';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
@@ -49,6 +50,7 @@ import { handleReaction as handleReactionImpl, type ReactionHandlerContext } fro
 import {
   archiveStaleThreads as archiveStaleThreadsImpl,
   createStandaloneThread as createStandaloneThreadImpl,
+  recoverActiveThreadSessions,
   recoverActiveThreadSubscriptions,
   subscribeForAdaptiveInlineResponse,
   subscribeForResponseWithEmbed as subscribeImpl,
@@ -141,6 +143,11 @@ export class DiscordBridge {
           this.botUserId = botUserId;
         }
         log.info('Discord bridge received gateway ready', { sessionId, botUserId });
+        recoverActiveThreadSessions(
+          this.db,
+          this.tsm.threadSessions,
+          this.tsm.threadLastActivity,
+        );
         recoverActiveThreadSubscriptions(
           this.db,
           this.processManager,
@@ -195,9 +202,12 @@ export class DiscordBridge {
           this.tsm.threadSessions,
           this.tsm.threadCallbacks,
           this.STALE_THREAD_MS,
+          this.db,
         ).catch((err) => {
           log.warn('Stale thread check failed', { error: err instanceof Error ? err.message : String(err) });
         });
+        // Prune old thread session DB entries (>14 days)
+        try { pruneOldThreadSessions(this.db); } catch { /* non-critical */ }
       },
       10 * 60 * 1000,
     );
@@ -240,7 +250,7 @@ export class DiscordBridge {
       const displayColor = agent?.displayColor;
       const displayIcon = agent?.displayIcon;
       const avatarUrl = agent?.avatarUrl;
-      this.tsm.threadSessions.set(threadId, {
+      const threadInfo = {
         sessionId,
         agentName,
         agentModel,
@@ -249,7 +259,9 @@ export class DiscordBridge {
         displayColor,
         displayIcon,
         avatarUrl,
-      });
+      };
+      this.tsm.threadSessions.set(threadId, threadInfo);
+      saveThreadSession(this.db, threadId, threadInfo);
       this.subscribeForResponseWithEmbed(
         sessionId,
         threadId,

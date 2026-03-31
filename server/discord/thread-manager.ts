@@ -1150,7 +1150,7 @@ export function recoverActiveThreadSubscriptions(
             if (!threadId || threadCallbacks.has(threadId)) continue;
 
             if (!threadSessions.has(threadId)) {
-                threadSessions.set(threadId, {
+                const info = {
                     sessionId: row.id,
                     agentName: row.agent_name || 'Agent',
                     agentModel: row.agent_model || 'unknown',
@@ -1159,7 +1159,11 @@ export function recoverActiveThreadSubscriptions(
                     displayColor: row.display_color ?? undefined,
                     displayIcon: row.display_icon ?? undefined,
                     avatarUrl: row.avatar_url ?? undefined,
-                });
+                };
+                threadSessions.set(threadId, info);
+                // Persist to dedicated table for future fast recovery
+                const { saveThreadSession } = require('../db/discord-thread-sessions') as typeof import('../db/discord-thread-sessions');
+                saveThreadSession(db, threadId, info);
             }
 
             subscribeForResponseWithEmbed(
@@ -1176,6 +1180,39 @@ export function recoverActiveThreadSubscriptions(
         }
     } catch (err) {
         log.warn('Failed to recover thread subscriptions', { error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+/**
+ * Bulk-recover thread sessions from the discord_thread_sessions table on startup.
+ * Populates the in-memory threadSessions and threadLastActivity maps so threads
+ * are immediately available without lazy recovery.
+ */
+export function recoverActiveThreadSessions(
+    db: Database,
+    threadSessions: Map<string, ThreadSessionInfo>,
+    threadLastActivity: Map<string, number>,
+): number {
+    try {
+        const { getRecentThreadSessions } = require('../db/discord-thread-sessions') as typeof import('../db/discord-thread-sessions');
+        const rows = getRecentThreadSessions(db, 48);
+
+        let recovered = 0;
+        for (const { threadId, info, lastActivityAt } of rows) {
+            if (!threadSessions.has(threadId)) {
+                threadSessions.set(threadId, info);
+                threadLastActivity.set(threadId, lastActivityAt);
+                recovered++;
+            }
+        }
+
+        if (recovered > 0) {
+            log.info('Recovered thread sessions from DB', { count: recovered });
+        }
+        return recovered;
+    } catch (err) {
+        log.warn('Failed to recover thread sessions', { error: err instanceof Error ? err.message : String(err) });
+        return 0;
     }
 }
 

@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 111;
+const SCHEMA_VERSION = 112;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -182,6 +182,12 @@ const MIGRATIONS: Record<number, string[]> = {
     111: [
         // Library entry titles
         `ALTER TABLE agent_library ADD COLUMN title TEXT DEFAULT NULL`,
+    ],
+    112: [
+        // Thread session persistence: dedicated table + unified activity tracking
+        ...discord.tables.filter((s) => s.includes('discord_thread_sessions')),
+        ...discord.indexes.filter((s) => s.includes('discord_thread_sessions')),
+        `ALTER TABLE discord_mention_sessions ADD COLUMN last_activity_at TEXT DEFAULT (datetime('now'))`,
     ],
 };
 
