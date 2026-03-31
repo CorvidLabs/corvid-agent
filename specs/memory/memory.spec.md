@@ -132,6 +132,10 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 19. **Short-term default**: Every new memory save writes to SQLite only with `status: 'short_term'`. On-chain promotion (ARC-69 ASA) requires an explicit `corvid_promote_memory` call. Updating an existing confirmed memory resets its status to `short_term` and clears txid until re-promoted.
 20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which saves to SQLite short-term storage. Channel of origin does not affect storage behavior. Promotion to on-chain is a separate explicit step via `corvid_promote_memory`.
 21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
+22. **Short-term TTL**: Every `saveMemory()` call sets `expires_at = datetime('now', '+7 days')` (configurable via `ttlDays` param) for short-term memories. Promoted memories (`pending`, `confirmed`) have `expires_at = NULL`.
+23. **Access-based decay resistance**: `recallMemory()` increments `access_count` for `short_term` memories. When `access_count` reaches 3, the TTL is extended to `max(expires_at, datetime('now', '+14 days'))`, resisting automatic expiry.
+24. **Automatic expiry**: `expireShortTermMemories()` archives (`archived=1`) all `short_term` memories where `expires_at < datetime('now')`. Only `short_term` status memories are affected — promoted memories are never auto-archived.
+25. **Purge after retention**: `purgeOldArchivedMemories()` deletes archived `short_term` memories whose `updated_at` is older than 30 days (configurable). Archived promoted memories are excluded.
 
 ## Behavioral Examples
 
@@ -240,8 +244,10 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | key | TEXT | NOT NULL | Memory key (unique per agent) |
 | content | TEXT | NOT NULL | Memory content |
 | txid | TEXT | DEFAULT NULL | On-chain transaction ID |
-| status | TEXT | DEFAULT 'pending' | `pending` or `confirmed` |
-| archived | INTEGER | NOT NULL DEFAULT 0 | 1 = archived by summarizer |
+| status | TEXT | DEFAULT 'short_term' | `short_term`, `pending`, `confirmed`, or `failed` |
+| archived | INTEGER | NOT NULL DEFAULT 0 | 1 = archived by summarizer or TTL expiry |
+| expires_at | TEXT | DEFAULT NULL | TTL for short_term memories (+7d from save); NULL for promoted |
+| access_count | INTEGER | NOT NULL DEFAULT 0 | Recall count — high-access memories resist decay |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 | updated_at | TEXT | DEFAULT datetime('now') | Last update timestamp |
 

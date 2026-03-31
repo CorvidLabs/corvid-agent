@@ -33,8 +33,11 @@ function createTestDb(): Database {
             txid TEXT,
             asa_id INTEGER,
             status TEXT NOT NULL DEFAULT 'pending',
+            archived INTEGER NOT NULL DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now')),
+            expires_at TEXT DEFAULT NULL,
+            access_count INTEGER NOT NULL DEFAULT 0,
             UNIQUE(agent_id, key)
         )
     `);

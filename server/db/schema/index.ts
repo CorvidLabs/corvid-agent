@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 112;
+const SCHEMA_VERSION = 113;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -188,6 +188,13 @@ const MIGRATIONS: Record<number, string[]> = {
         ...discord.tables.filter((s) => s.includes('discord_thread_sessions')),
         ...discord.indexes.filter((s) => s.includes('discord_thread_sessions')),
         `ALTER TABLE discord_mention_sessions ADD COLUMN last_activity_at TEXT DEFAULT (datetime('now'))`,
+    ],
+    113: [
+        // Short-term memory decay: TTL and access-count tracking on agent_memories
+        `ALTER TABLE agent_memories ADD COLUMN expires_at TEXT DEFAULT NULL`,
+        `UPDATE agent_memories SET expires_at = datetime(updated_at, '+7 days') WHERE status = 'short_term'`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_memories_expires ON agent_memories(expires_at) WHERE expires_at IS NOT NULL`,
+        `ALTER TABLE agent_memories ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`,
     ],
 };
 

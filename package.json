@@ -53,7 +53,10 @@
     "lint:fix": "biome check --fix .",
     "format": "biome format .",
     "format:fix": "biome format --fix .",
-    "localnet:fund": "bun scripts/localnet-fund.ts"
+    "localnet:fund": "bun scripts/localnet-fund.ts",
+    "spec:hooks": "bash scripts/specsync.sh hooks",
+    "spec:hooks:install": "bash scripts/specsync.sh hooks install",
+    "spec:add": "bash scripts/specsync.sh add-spec"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.4.1"

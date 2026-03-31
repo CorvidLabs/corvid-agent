@@ -69,13 +69,14 @@ Provides unified observability for the corvid-agent server: distributed tracing 
 | `agentRateLimitRejections` | `Counter` | Agent messaging rejections by circuit breaker or rate limiter (labels: reason, agent_id). |
 | `endpointRateLimitRejections` | `Counter` | Per-endpoint rate limit rejections (labels: method, path, tier). |
 
-### Re-exported from `@opentelemetry/api`
+### Exported Re-exports from `@opentelemetry/api`
 
 | Symbol | Description |
 |--------|-------------|
-| `trace` | OpenTelemetry trace API. |
-| `context` | OpenTelemetry context API. |
-| `SpanStatusCode` | Enum for span status codes. |
+| `trace` | OpenTelemetry trace API for creating and managing spans. Provides tracer singleton access via `getTracer()`. |
+| `context` | OpenTelemetry context API for managing context propagation across async boundaries. |
+| `SpanStatusCode` | Enum for span status codes: `UNSET`, `OK`, `ERROR`. Used to mark span completion status. |
+| `Span` | Type representing a single operation within a trace. Re-exported for type safety when working with tracer spans. |
 
 ## Invariants
 

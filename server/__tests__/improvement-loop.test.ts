@@ -63,6 +63,8 @@ function makeMemory(key: string, content: string): ScoredMemory {
             status: 'confirmed',
             createdAt: '2026-02-15T03:00:00.000Z',
             updatedAt: '2026-02-15T03:00:00.000Z',
+            expiresAt: null,
+            accessCount: 0,
         },
         score: 0.8,
         source: 'fts5',
