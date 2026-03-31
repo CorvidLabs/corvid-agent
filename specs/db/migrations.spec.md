@@ -41,6 +41,7 @@ files:
   - server/db/migrations/109_discord_processed_messages.ts
   - server/db/migrations/110_session_conversation_summary.ts
   - server/db/migrations/111_library_title.ts
+  - server/db/migrations/112_discord_thread_sessions.ts
 db_tables:
   - schema_version
 depends_on: []

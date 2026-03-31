@@ -33,6 +33,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | `getMemoryByAsaId` | `(db: Database, agentId: string, asaId: number)` | `AgentMemory \| null` | Look up a memory by its ASA ID |
 | `deleteMemoryRow` | `(db: Database, agentId: string, key: string)` | `boolean` | Hard-delete a memory row. Returns true if a row was deleted |
 | `archiveMemory` | `(db: Database, agentId: string, key: string)` | `boolean` | Soft-delete by setting `archived = 1`. Returns true if a row was updated |
+| `resolveAsaForKey` | `(db: Database, agentId: string, key: string)` | `number \| null` | Look up the ASA ID for a given memory key from the local DB mapping; returns null if not found or no ASA assigned |
 
 ### Exported Types
 

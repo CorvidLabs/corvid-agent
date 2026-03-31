@@ -243,6 +243,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
 | `recoverActiveMentionSessions` | `(db, mentionSessions, trackFn?)` | `void` | Recover mention sessions from DB into memory on startup for reply-based session resumption |
+| `recoverActiveThreadSessions` | `(db: Database, threadSessions: Map<string, ThreadSessionInfo>, threadLastActivity: Map<string, number>)` | `number` | Bulk-recover thread sessions from the `discord_thread_sessions` table on startup; populates the in-memory maps and returns the number of sessions recovered |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
 | `archiveThread` | `(botToken, threadId)` | `Promise<void>` | Archive a single thread via the Discord API |
 | `createStandaloneThread` | `(botToken, channelId, name)` | `Promise<string \| null>` | Create a standalone Discord thread |
