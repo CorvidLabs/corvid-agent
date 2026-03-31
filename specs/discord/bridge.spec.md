@@ -241,6 +241,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
 | `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?, displayColor?, displayIcon?, avatarUrl?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
+| `recoverActiveMentionSessions` | `(db, mentionSessions, trackFn?)` | `void` | Bulk-recover mention sessions from DB into the in-memory map on startup |
+| `recoverActiveThreadSessions` | `(db, threadSessions, threadLastActivity)` | `number` | Bulk-recover thread sessions from DB into in-memory maps on startup; returns count recovered |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
 | `archiveThread` | `(botToken, threadId)` | `Promise<void>` | Archive a single thread via the Discord API |
