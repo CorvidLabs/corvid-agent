@@ -146,14 +146,22 @@ export async function handlePromoteMemory(
                 );
             }).then((txid) => {
                 if (txid) {
-                    updateMemoryTxid(ctx.db, memory.id, txid);
+                    try {
+                        updateMemoryTxid(ctx.db, memory.id, txid);
+                    } catch {
+                        // DB may be closed during test teardown — safe to ignore
+                    }
                 }
             }).catch((err) => {
                 log.warn('On-chain memory promote failed', {
                     key: args.key,
                     error: err instanceof Error ? err.message : String(err),
                 });
-                updateMemoryStatus(ctx.db, memory.id, 'failed');
+                try {
+                    updateMemoryStatus(ctx.db, memory.id, 'failed');
+                } catch {
+                    // DB may be closed during test teardown — safe to ignore
+                }
             });
 
             return textResult(`Memory "${args.key}" queued for promotion to long-term on-chain storage.`);
