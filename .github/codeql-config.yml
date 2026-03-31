@@ -1,2 +1,5 @@
 paths-ignore:
   - "server/flock-directory/contract/*.generated.ts"
+  - "server/public/**"
+  - "docs/**"
+  - "client/node_modules/**"
