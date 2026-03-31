@@ -60,6 +60,7 @@ import {
     handleListAgents,
     type McpToolContext,
 } from '../mcp/tool-handlers';
+import { buildDirectTools } from '../mcp/direct-tools';
 import { getSchedule } from '../db/schedules';
 import { grantCredits } from '../db/credits';
 import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
@@ -1189,6 +1190,14 @@ describe('handlePromoteMemory', () => {
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
         expect(text).toContain('queued for promotion');
+    });
+
+    test('corvid_promote_memory is registered in buildDirectTools', () => {
+        const ctx = createMockContext();
+        const tools = buildDirectTools(ctx);
+        const promTool = tools.find(t => t.name === 'corvid_promote_memory');
+        expect(promTool).toBeDefined();
+        expect(promTool!.parameters.required).toContain('key');
     });
 });
 
