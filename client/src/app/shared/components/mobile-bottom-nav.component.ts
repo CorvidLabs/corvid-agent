@@ -42,6 +42,16 @@ const NAV_ITEMS: BottomNavItem[] = [
                     <span class="bottom-nav__label">{{ item.label }}</span>
                 </a>
             }
+            <button
+                class="bottom-nav__item bottom-nav__item--search"
+                (click)="openCommandPalette()"
+                type="button"
+                aria-label="Search and commands">
+                <span class="bottom-nav__icon-wrapper">
+                    <app-icon name="search" [size]="20" />
+                </span>
+                <span class="bottom-nav__label">Search</span>
+            </button>
         </nav>
     `,
     styles: `
@@ -157,6 +167,23 @@ const NAV_ITEMS: BottomNavItem[] = [
         .bottom-nav__item:active .bottom-nav__icon-wrapper {
             transform: scale(0.9);
         }
+
+        /* Search button — reset button styles, match nav item appearance */
+        button.bottom-nav__item {
+            background: none;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0;
+        }
+        .bottom-nav__item--search {
+            color: var(--text-tertiary);
+            transition: color 0.15s;
+        }
+        .bottom-nav__item--search:hover,
+        .bottom-nav__item--search:active {
+            color: var(--accent-cyan);
+        }
     `,
 })
 export class MobileBottomNavComponent {
@@ -165,4 +192,8 @@ export class MobileBottomNavComponent {
     protected readonly activeSessionCount = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running' || s.status === 'thinking' || s.status === 'tool_use').length,
     );
+
+    protected openCommandPalette(): void {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+    }
 }
