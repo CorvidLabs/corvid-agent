@@ -23,6 +23,7 @@ export const TOOL_CATEGORIES: Record<string, readonly string[]> = {
     ],
     memory: [
         'corvid_save_memory',
+        'corvid_promote_memory',
         'corvid_recall_memory',
         'corvid_delete_memory',
         'corvid_read_on_chain_memories',

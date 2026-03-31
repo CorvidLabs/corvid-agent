@@ -4,7 +4,9 @@ version: 1
 status: draft
 files:
   - server/discord/thread-session-map.ts
-db_tables: []
+  - server/db/discord-thread-sessions.ts
+db_tables:
+  - discord_thread_sessions
 depends_on: []
 ---
 
@@ -31,6 +33,17 @@ Owns the in-memory state types for thread-based Discord conversations and the DB
 | `formatDuration` | `(ms: number)` | `string` | Formats a duration in milliseconds to a human-readable string. |
 | `tryRecoverThread` | `(db: Database, threadSessions: Map, threadId: string)` | `ThreadSessionInfo \| null` | Attempts to recover a thread-to-session mapping from the database when not found in memory. Returns the recovered info or null. |
 
+### Exported Functions (discord-thread-sessions.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `saveThreadSession` | `(db: Database, threadId: string, info: ThreadSessionInfo)` | `void` | Persists a thread session mapping to the database (INSERT OR REPLACE). |
+| `getThreadSession` | `(db: Database, threadId: string)` | `ThreadSessionInfo \| null` | Looks up a thread session by Discord thread ID. Returns null if not found. |
+| `updateThreadSessionActivity` | `(db: Database, threadId: string)` | `void` | Updates the `last_activity_at` timestamp for a thread session. |
+| `getRecentThreadSessions` | `(db: Database, maxAgeHours?: number)` | `Array<{ threadId, info, lastActivityAt }>` | Bulk-loads recent thread sessions for startup recovery (default: 48 hours). |
+| `deleteThreadSession` | `(db: Database, threadId: string)` | `void` | Deletes a thread session (e.g. on archival). |
+| `pruneOldThreadSessions` | `(db: Database, maxAgeDays?: number)` | `number` | Removes thread session entries older than the specified age (default: 14 days). Returns count of deleted rows. |
+
 ## Invariants
 
 - ThreadSessionInfo always contains sessionId, agentName, agentModel, and ownerUserId.
@@ -52,8 +65,32 @@ Owns the in-memory state types for thread-based Discord conversations and the DB
 - `bun:sqlite` — database access
 - `server/lib/logger.ts` — structured logging
 
+## Database Tables
+
+### discord_thread_sessions
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| thread_id | TEXT | PRIMARY KEY | Discord thread ID |
+| session_id | TEXT | NOT NULL | Agent session ID |
+| agent_name | TEXT | NOT NULL | Name of the agent handling the thread |
+| agent_model | TEXT | NOT NULL | Model used by the agent |
+| owner_user_id | TEXT | NOT NULL DEFAULT '' | Discord user who created the thread |
+| topic | TEXT | | Thread topic |
+| project_name | TEXT | | Associated project name |
+| display_color | TEXT | | Agent display color |
+| display_icon | TEXT | | Agent display icon |
+| avatar_url | TEXT | | Agent avatar URL |
+| creator_perm_level | INTEGER | | Creator permission level |
+| buddy_agent_id | TEXT | | Buddy agent ID (if buddy mode) |
+| buddy_agent_name | TEXT | | Buddy agent name |
+| buddy_max_rounds | INTEGER | | Max buddy interaction rounds |
+| last_activity_at | TEXT | NOT NULL DEFAULT datetime('now') | Last activity timestamp |
+| created_at | TEXT | NOT NULL DEFAULT datetime('now') | Creation timestamp |
+
 ## Change Log
 
 | Version | Change |
 |---------|--------|
+| 2 | Add discord-thread-sessions.ts DB persistence layer and discord_thread_sessions table |
 | 1 | Initial spec |

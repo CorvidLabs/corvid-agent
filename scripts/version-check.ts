@@ -8,7 +8,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 

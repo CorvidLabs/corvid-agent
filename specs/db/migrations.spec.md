@@ -565,10 +565,22 @@ Adds a `conversation_summary` column to the sessions table. Used to carry conver
 | `up` | `(db: Database)` | `void` | Adds `conversation_summary TEXT DEFAULT NULL` column to `sessions` table |
 | `down` | `(db: Database)` | `void` | Drops `conversation_summary` column from `sessions` table |
 
+### 112_discord_thread_sessions.ts
+
+Creates the `discord_thread_sessions` table for persisting thread-based Discord session mappings across server restarts. Includes indexes on `session_id` and `last_activity_at`, and adds a `last_activity_at` column to `discord_mention_sessions` for unified activity tracking.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `discord_thread_sessions` table with `thread_id` as primary key, indexes on `session_id` and `last_activity_at`, and adds `last_activity_at` column to `discord_mention_sessions` |
+| `down` | `(db: Database)` | `void` | Drops the `discord_thread_sessions` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-30 | corvid-agent | Add migration 112 to spec coverage |
 | 2026-03-29 | corvid-agent | Add migration 110 to spec coverage |
 | 2026-03-28 | corvid-agent | Add migrations 108, 109 to spec coverage |
 | 2026-03-27 | corvid-agent | Add migration 107 to spec coverage |
