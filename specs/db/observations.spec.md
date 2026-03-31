@@ -97,6 +97,7 @@ Internal types (`MemoryObservation`, `RecordObservationInput`, `ListObservationO
 | Module | What is used |
 |--------|-------------|
 | `server/mcp/tool-handlers/memory.ts` | Observation CRUD via MCP tools |
+| `server/process/manager.ts` | `recordObservation` — saves conversation summaries as observations on context reset |
 
 ## Database Tables
 
@@ -142,3 +143,4 @@ Kept in sync via `observations_ai` (INSERT), `observations_ad` (DELETE), and `ob
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-29 | jackdaw | Initial spec (migration 095) |
+| 2026-03-30 | corvid-agent | Added process-manager as consumer (context reset observation recording, #1753) |
