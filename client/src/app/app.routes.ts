@@ -30,6 +30,11 @@ export const routes: Routes = [
                     import('./features/flock-directory/flock-directory.component').then((m) => m.FlockDirectoryComponent),
             },
             {
+                path: 'flock-challenges',
+                loadComponent: () =>
+                    import('./features/flock-challenges/flock-challenges.component').then((m) => m.FlockChallengesComponent),
+            },
+            {
                 path: 'projects',
                 loadComponent: () =>
                     import('./features/projects/project-list.component').then((m) => m.ProjectListComponent),

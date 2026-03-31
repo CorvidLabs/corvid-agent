@@ -7,6 +7,7 @@ import { updateExecutionStatus } from '../../db/schedules';
 import { getAgent } from '../../db/agents';
 import { createSession } from '../../db/sessions';
 import { summarizeOldMemories } from '../../memory/summarizer';
+import { FlockDirectoryService } from '../../flock-directory/service';
 import type { HandlerContext } from './types';
 import { resolveProjectId } from './utils';
 
@@ -174,6 +175,23 @@ export async function execStatusCheckin(
         }
 
         updateExecutionStatus(ctx.db, executionId, 'completed', { result: summary });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });
+    }
+}
+
+export async function execFlockReputationRefresh(
+    ctx: HandlerContext,
+    executionId: string,
+    _schedule: AgentSchedule,
+): Promise<void> {
+    try {
+        const flockService = new FlockDirectoryService(ctx.db);
+        const updated = flockService.recomputeAllReputations();
+        updateExecutionStatus(ctx.db, executionId, 'completed', {
+            result: `Flock reputation refresh completed: ${updated} agents updated.`,
+        });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });

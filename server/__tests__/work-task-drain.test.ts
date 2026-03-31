@@ -327,3 +327,80 @@ describe('recoverInterruptedTasks', () => {
         await service.recoverInterruptedTasks();
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. pruneStaleWorktrees
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('pruneStaleWorktrees', () => {
+    test('clears worktree_dir for completed/failed tasks', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // Insert completed and failed tasks with worktree dirs
+        const completedId = insertTaskWithStatus(agent.id, project.id, 'completed', {
+            worktreeDir: '/tmp/stale-wt-1',
+        });
+        const failedId = insertTaskWithStatus(agent.id, project.id, 'failed', {
+            worktreeDir: '/tmp/stale-wt-2',
+        });
+
+        // Queue spawns for removeWorktree (git worktree remove) + pruneWorktrees (git worktree prune)
+        queueSpawn(0); // git worktree remove for completed task
+        queueSpawn(0); // git worktree remove for failed task
+        queueSpawn(0); // git worktree prune
+
+        await service.pruneStaleWorktrees();
+
+        // Both tasks should have worktree_dir cleared
+        const completed = getWorkTask(db, completedId)!;
+        const failed = getWorkTask(db, failedId)!;
+        expect(completed.worktreeDir).toBeNull();
+        expect(failed.worktreeDir).toBeNull();
+    });
+
+    test('does nothing when no terminal tasks have worktrees', async () => {
+        // No tasks at all — should complete without errors
+        await service.pruneStaleWorktrees();
+    });
+
+    test('handles removeWorktree failure gracefully', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        const taskId = insertTaskWithStatus(agent.id, project.id, 'completed', {
+            worktreeDir: '/tmp/bad-wt',
+        });
+
+        // Queue a failing removeWorktree
+        queueSpawn(1, '', 'fatal: not a git repository');
+
+        await service.pruneStaleWorktrees();
+
+        // Should not throw — task worktree_dir may or may not be cleared
+        // depending on whether the error is caught, but the service survives
+        const task = getWorkTask(db, taskId);
+        expect(task).not.toBeNull();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. startPeriodicCleanup / stopPeriodicCleanup
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('periodic cleanup', () => {
+    test('startPeriodicCleanup is idempotent', () => {
+        service.startPeriodicCleanup();
+        service.startPeriodicCleanup(); // second call should be a no-op
+        service.stopPeriodicCleanup();
+    });
+
+    test('stopPeriodicCleanup is safe to call without start', () => {
+        service.stopPeriodicCleanup(); // should not throw
+    });
+
+    test('stopPeriodicCleanup clears the interval', () => {
+        service.startPeriodicCleanup();
+        service.stopPeriodicCleanup();
+        // Calling stop again should be safe
+        service.stopPeriodicCleanup();
+    });
+});

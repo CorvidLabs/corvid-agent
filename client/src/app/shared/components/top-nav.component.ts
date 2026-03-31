@@ -82,6 +82,7 @@ const TABS: NavTab[] = [
         children: [
             { label: 'All Agents', icon: 'agents', route: '/agents' },
             { label: 'Flock Directory', icon: 'globe', route: '/agents/flock-directory' },
+            { label: 'Challenges', icon: 'zap', route: '/agents/flock-challenges' },
             { label: 'Projects', icon: 'code', route: '/agents/projects' },
             { label: 'Models', icon: 'zap', route: '/agents/models' },
         ],

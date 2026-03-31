@@ -25,6 +25,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
     star_repo: 'lightweight',
     marketplace_billing: 'maintenance',
     flock_testing: 'maintenance',
+    flock_reputation_refresh: 'lightweight',
     discord_post: 'lightweight',
     custom: 'feature_work',
 };

@@ -12,48 +12,16 @@ import {
 } from '@angular/core';
 import * as THREE from 'three';
 import type { LibraryEntry, LibraryCategory } from '../../core/services/library.service';
-
-/* ── Category config ──────────────────────────────────── */
-
-interface CategoryZone {
-    category: LibraryCategory;
-    label: string;
-    color: number;
-    angle: number; // radians, position in pentagon
-    position: THREE.Vector3;
-}
-
-const CATEGORY_COLORS: Record<LibraryCategory, number> = {
-    guide: 0x00e5ff,
-    reference: 0xa78bfa,
-    decision: 0xf59e0b,
-    standard: 0x10b981,
-    runbook: 0xf43f5e,
-};
-
-const CATEGORY_LABELS: Record<LibraryCategory, string> = {
-    guide: 'Guides',
-    reference: 'Reference',
-    decision: 'Decisions',
-    standard: 'Standards',
-    runbook: 'Runbooks',
-};
-
-const ALL_CATEGORIES: LibraryCategory[] = ['guide', 'reference', 'decision', 'standard', 'runbook'];
-const ZONE_RADIUS = 40; // Distance from center for each zone
-const BOOK_SPREAD = 12; // Spread of books within a zone
-
-/* ── Internal 3D types ──────────────────────────────────── */
-
-interface BookNode3D {
-    entry: LibraryEntry;
-    mesh: THREE.Mesh;
-    glowMesh: THREE.Mesh;
-    label: THREE.Sprite;
-    position: THREE.Vector3;
-    baseY: number;
-    pulsePhase: number;
-}
+import {
+    type CategoryZone,
+    type BookNode3D,
+    CATEGORY_COLORS,
+    CATEGORY_LABELS,
+    ALL_CATEGORIES,
+    ZONE_RADIUS,
+    BOOK_SPREAD,
+} from './library-3d.types';
+import { createTextSprite } from './library-3d.utils';
 
 @Component({
     selector: 'app-library-3d',
@@ -579,19 +547,19 @@ export class Library3DComponent implements OnDestroy {
         this.centerOrbHitbox = hitbox;
 
         // "CORVID LIBRARY" text label floating above
-        const titleLabel = this.createTextSprite('CORVID LIBRARY', 0x00e5ff, 512, 64, 28);
+        const titleLabel = createTextSprite('CORVID LIBRARY', 0x00e5ff, 512, 64, 28);
         titleLabel.position.set(0, 7.5, 0);
         titleLabel.scale.set(12, 1.5, 1);
         group.add(titleLabel);
 
         // Subtitle
-        const subLabel = this.createTextSprite('Team Alpha Knowledge Commons', 0x8888aa, 512, 48, 18);
+        const subLabel = createTextSprite('Team Alpha Knowledge Commons', 0x8888aa, 512, 48, 18);
         subLabel.position.set(0, 6.5, 0);
         subLabel.scale.set(12, 1.2, 1);
         group.add(subLabel);
 
         // "Click to Search" hint below orb
-        const searchLabel = this.createTextSprite('Click Orb to Search', 0x66aacc, 384, 36, 14);
+        const searchLabel = createTextSprite('Click Orb to Search', 0x66aacc, 384, 36, 14);
         searchLabel.position.set(0, 1.5, 0);
         searchLabel.scale.set(7, 0.7, 1);
         group.add(searchLabel);
@@ -637,7 +605,7 @@ export class Library3DComponent implements OnDestroy {
             this.zoneRings.push(ring);
 
             // Zone label (floating above shelves)
-            const labelSprite = this.createTextSprite(zone.label, zone.color, 256, 48, 24);
+            const labelSprite = createTextSprite(zone.label, zone.color, 256, 48, 24);
             labelSprite.position.copy(zone.position);
             labelSprite.position.y = 7;
             labelSprite.scale.set(10, 2, 1);
@@ -896,7 +864,7 @@ export class Library3DComponent implements OnDestroy {
                             ? `${labelBase}  (${pageCount}p)`
                             : labelBase;
                         const labelColor = isBook ? 0xffd700 : 0xcccccc;
-                        const label = this.createTextSprite(labelText, labelColor, 512, 36, 14);
+                        const label = createTextSprite(labelText, labelColor, 512, 36, 14);
                         label.position.set(x, y + height / 2 + 0.5, z);
                         label.scale.set(5.5, 0.55, 1);
                         this.scene!.add(label);
@@ -914,24 +882,6 @@ export class Library3DComponent implements OnDestroy {
                 }
             }
         }
-    }
-
-    private createTextSprite(text: string, color: number, w: number, h: number, fontSize: number): THREE.Sprite {
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d')!;
-        ctx.clearRect(0, 0, w, h);
-        ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const hex = `#${color.toString(16).padStart(6, '0')}`;
-        ctx.fillStyle = hex;
-        ctx.fillText(text, w / 2, h / 2);
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.needsUpdate = true;
-        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-        return new THREE.Sprite(mat);
     }
 
     /* ── Animation loop ────────────────────────────────── */

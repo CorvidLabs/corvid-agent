@@ -34,6 +34,7 @@ import {
     execImprovementLoop,
     execMemoryMaintenance,
     execReputationAttestation,
+    execFlockReputationRefresh,
     execOutcomeAnalysis,
     execDailyReview,
     execStatusCheckin,
@@ -72,8 +73,9 @@ async function dispatchAction(
         case 'dependency_audit':       await execDependencyAudit(hctx, executionId, schedule, action); break;
         case 'improvement_loop':       await execImprovementLoop(hctx, executionId, schedule, action); break;
         case 'memory_maintenance':     await execMemoryMaintenance(hctx, executionId, schedule); break;
-        case 'reputation_attestation': await execReputationAttestation(hctx, executionId, schedule); break;
-        case 'outcome_analysis':       await execOutcomeAnalysis(hctx, executionId, schedule); break;
+        case 'reputation_attestation':      await execReputationAttestation(hctx, executionId, schedule); break;
+        case 'flock_reputation_refresh':    await execFlockReputationRefresh(hctx, executionId, schedule); break;
+        case 'outcome_analysis':            await execOutcomeAnalysis(hctx, executionId, schedule); break;
         case 'daily_review':           await execDailyReview(hctx, executionId, schedule); break;
         case 'status_checkin':         await execStatusCheckin(hctx, executionId, schedule); break;
         case 'marketplace_billing':    execMarketplaceBilling(hctx, executionId); break;

@@ -22,6 +22,8 @@ import {
     getPendingTasksForProject,
     countQueuedTasks,
     findActiveTasksForIssue,
+    getTerminalTasksWithWorktrees,
+    clearWorktreeDir,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -33,7 +35,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { FlockConflictResolver } from '../flock-directory/conflict-resolver';
 import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
-import { createWorktree } from '../lib/worktree';
+import { createWorktree, removeWorktree, pruneWorktrees } from '../lib/worktree';
 import { assessImpact, GOVERNANCE_TIERS, type GovernanceImpact } from '../councils/governance';
 import {
     StallDetector,
@@ -94,6 +96,9 @@ export class WorkTaskService {
      * Used to release flock claims when tasks complete.
      */
     private _activeClaimMap = new Map<string, string>();
+
+    /** Interval handle for periodic stale worktree cleanup. */
+    private _cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
     /** True when the service is draining — no new tasks accepted. */
     get shuttingDown(): boolean {
@@ -345,6 +350,71 @@ export class WorkTaskService {
     }
 
     /**
+     * Clean up worktrees for tasks in terminal states (completed/failed) that
+     * were not properly cleaned up. Also runs `git worktree prune` to clear
+     * stale git-internal worktree references.
+     */
+    async pruneStaleWorktrees(): Promise<void> {
+        const stale = getTerminalTasksWithWorktrees(this.db);
+        if (stale.length > 0) {
+            log.info('Pruning stale worktrees from terminal tasks', { count: stale.length });
+        }
+
+        const projectDirs = new Set<string>();
+
+        for (const task of stale) {
+            try {
+                const project = getProject(this.db, task.projectId);
+                if (project?.workingDir) {
+                    projectDirs.add(project.workingDir);
+                    await removeWorktree(project.workingDir, task.worktreeDir!);
+                }
+                clearWorktreeDir(this.db, task.id);
+            } catch (err) {
+                log.warn('Failed to prune stale worktree', {
+                    taskId: task.id,
+                    worktreeDir: task.worktreeDir,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        // Run git worktree prune on each affected project to clean up
+        // git-internal references for directories already deleted on disk.
+        for (const dir of projectDirs) {
+            await pruneWorktrees(dir);
+        }
+
+        if (stale.length > 0) {
+            log.info('Stale worktree pruning complete', { cleaned: stale.length });
+        }
+    }
+
+    /** Start the periodic stale worktree cleanup timer (every 6 hours). */
+    startPeriodicCleanup(): void {
+        if (this._cleanupInterval) return;
+        const SIX_HOURS = 6 * 60 * 60 * 1000;
+        this._cleanupInterval = setInterval(() => {
+            this.pruneStaleWorktrees().catch((err) => {
+                log.error('Periodic worktree cleanup failed', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }, SIX_HOURS);
+        if (this._cleanupInterval.unref) {
+            this._cleanupInterval.unref();
+        }
+    }
+
+    /** Stop the periodic cleanup timer. */
+    stopPeriodicCleanup(): void {
+        if (this._cleanupInterval) {
+            clearInterval(this._cleanupInterval);
+            this._cleanupInterval = null;
+        }
+    }
+
+    /**
      * Drain running tasks during graceful shutdown.
      * Sets the shuttingDown flag to block new task creation, then waits
      * up to DRAIN_TIMEOUT_MS for all active tasks to complete, polling
@@ -352,6 +422,7 @@ export class WorkTaskService {
      */
     async drainRunningTasks(pollIntervalMs: number = DRAIN_POLL_INTERVAL_MS): Promise<void> {
         this._shuttingDown = true;
+        this.stopPeriodicCleanup();
 
         const activeTasks = getActiveWorkTasks(this.db);
         if (activeTasks.length === 0) {
@@ -377,7 +448,7 @@ export class WorkTaskService {
             await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         }
 
-        // Timeout reached — mark remaining active tasks as failed
+        // Timeout reached — mark remaining active tasks as failed and clean up worktrees
         const timedOut = getActiveWorkTasks(this.db);
         if (timedOut.length > 0) {
             log.warn('Drain timeout reached, marking remaining tasks as failed', { count: timedOut.length });
@@ -385,6 +456,9 @@ export class WorkTaskService {
                 updateWorkTaskStatus(this.db, task.id, 'failed', {
                     error: 'Interrupted by server shutdown (drain timeout)',
                 });
+                if (task.worktreeDir) {
+                    await this.cleanupWorktree(task.id);
+                }
             }
         }
     }
