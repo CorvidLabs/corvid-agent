@@ -208,62 +208,62 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | Type | Description |
 |------|-------------|
 | `OnboardingStatus` | Interface describing wallet, bridge, agent, project setup status and overall completion flag |
-| `handleProjectRoutes` | <!-- TODO: describe --> |
-| `handleAgentRoutes` | <!-- TODO: describe --> |
-| `handleSessionRoutes` | <!-- TODO: describe --> |
-| `handleCouncilRoutes` | <!-- TODO: describe --> |
-| `handleWorkTaskRoutes` | <!-- TODO: describe --> |
-| `handleMcpApiRoutes` | <!-- TODO: describe --> |
-| `handleAllowlistRoutes` | <!-- TODO: describe --> |
-| `handleAnalyticsRoutes` | <!-- TODO: describe --> |
-| `handleSystemLogRoutes` | <!-- TODO: describe --> |
-| `handleSettingsRoutes` | <!-- TODO: describe --> |
-| `handleScheduleRoutes` | <!-- TODO: describe --> |
-| `handleWebhookRoutes` | <!-- TODO: describe --> |
-| `handleMentionPollingRoutes` | <!-- TODO: describe --> |
-| `handleWorkflowRoutes` | <!-- TODO: describe --> |
-| `handleSandboxRoutes` | <!-- TODO: describe --> |
-| `handleMarketplaceRoutes` | <!-- TODO: describe --> |
-| `handleReputationRoutes` | <!-- TODO: describe --> |
-| `handleBillingRoutes` | <!-- TODO: describe --> |
-| `handleAuthFlowRoutes` | <!-- TODO: describe --> |
-| `resetInboundRateLimiter` | <!-- TODO: describe --> |
-| `handleA2ARoutes` | <!-- TODO: describe --> |
-| `handlePluginRoutes` | <!-- TODO: describe --> |
-| `handlePersonaRoutes` | <!-- TODO: describe --> |
-| `handleSkillBundleRoutes` | <!-- TODO: describe --> |
-| `handleMcpServerRoutes` | <!-- TODO: describe --> |
-| `handleExamRoutes` | <!-- TODO: describe --> |
-| `handleOllamaRoutes` | <!-- TODO: describe --> |
-| `AuditQuerySchema` | <!-- TODO: describe --> |
-| `handleAuditRoutes` | <!-- TODO: describe --> |
-| `handleGitHubAllowlistRoutes` | <!-- TODO: describe --> |
-| `handlePerformanceRoutes` | <!-- TODO: describe --> |
-| `handleSlackRoutes` | <!-- TODO: describe --> |
-| `handleTenantRoutes` | <!-- TODO: describe --> |
-| `handleUsageRoutes` | <!-- TODO: describe --> |
-| `handleBridgeDeliveryRoutes` | <!-- TODO: describe --> |
-| `handleDashboardRoutes` | <!-- TODO: describe --> |
-| `handleFeedbackRoutes` | <!-- TODO: describe --> |
-| `handleFlockDirectoryRoutes` | <!-- TODO: describe --> |
-| `handleHealthRoutes` | <!-- TODO: describe --> |
-| `handleLibraryRoutes` | <!-- TODO: describe --> |
-| `handleMarketplaceAnalyticsRoutes` | <!-- TODO: describe --> |
-| `handleOnboardingRoutes` | <!-- TODO: describe --> |
-| `handlePermissionRoutes` | <!-- TODO: describe --> |
-| `handleProposalRoutes` | <!-- TODO: describe --> |
-| `handleRepoBlocklistRoutes` | <!-- TODO: describe --> |
-| `handleSecurityOverviewRoutes` | <!-- TODO: describe --> |
-| `handleContactRoutes` | <!-- TODO: describe --> |
-| `handleDiscordImageRoutes` | <!-- TODO: describe --> |
-| `handleCursorRoutes` | <!-- TODO: describe --> |
-| `handleVariantRoutes` | <!-- TODO: describe --> |
-| `handleBrainViewerRoutes` | <!-- TODO: describe --> |
-| `handleBuddyRoutes` | <!-- TODO: describe --> |
-| `handleFlockTestingRoutes` | <!-- TODO: describe --> |
-| `handleGitHubPRDiffRoutes` | <!-- TODO: describe --> |
-| `handleOpenRouterRoutes` | <!-- TODO: describe --> |
-| `handleToolCatalogRoutes` | <!-- TODO: describe --> |
+| `handleProjectRoutes` | Project CRUD and directory browsing |
+| `handleAgentRoutes` | Agent CRUD, balance, invocation |
+| `handleSessionRoutes` | Session CRUD, messages, start/stop |
+| `handleCouncilRoutes` | Council CRUD, launch, deliberation |
+| `handleWorkTaskRoutes` | Work task CRUD and cancellation |
+| `handleMcpApiRoutes` | Agent-to-agent MCP messaging |
+| `handleAllowlistRoutes` | Address allowlist management |
+| `handleAnalyticsRoutes` | Overview, spending, session stats |
+| `handleSystemLogRoutes` | System logs and credit transactions |
+| `handleSettingsRoutes` | Settings, credits config, API key |
+| `handleScheduleRoutes` | Schedule CRUD, executions, triggers |
+| `handleWebhookRoutes` | Webhook registration and deliveries |
+| `handleMentionPollingRoutes` | Mention polling config and stats |
+| `handleWorkflowRoutes` | Workflow CRUD, runs, actions |
+| `handleSandboxRoutes` | Sandbox pool and policy management |
+| `handleMarketplaceRoutes` | Marketplace listings and federation |
+| `handleReputationRoutes` | Reputation scores, events, attestations |
+| `handleBillingRoutes` | Billing subscriptions and usage |
+| `handleAuthFlowRoutes` | Device authorization flow |
+| `resetInboundRateLimiter` | Reset the inbound A2A rate limiter (for testing) |
+| `handleA2ARoutes` | Agent-to-agent task protocol |
+| `handlePluginRoutes` | Plugin load/unload/capabilities |
+| `handlePersonaRoutes` | Agent persona CRUD |
+| `handleSkillBundleRoutes` | Skill bundle CRUD and assignment |
+| `handleMcpServerRoutes` | MCP server config management |
+| `handleExamRoutes` | Live model exams |
+| `handleOllamaRoutes` | Ollama model management |
+| `AuditQuerySchema` | Zod schema for audit log query validation |
+| `handleAuditRoutes` | Immutable audit log queries |
+| `handleGitHubAllowlistRoutes` | GitHub username allowlist |
+| `handlePerformanceRoutes` | Performance metrics and reports |
+| `handleSlackRoutes` | Slack events API handler |
+| `handleTenantRoutes` | Tenant registration and members |
+| `handleUsageRoutes` | Usage summaries and anomalies |
+| `handleBridgeDeliveryRoutes` | Bridge delivery receipt metrics |
+| `handleDashboardRoutes` | Dashboard summary aggregation |
+| `handleFeedbackRoutes` | PR outcome tracking and analysis |
+| `handleFlockDirectoryRoutes` | Flock Directory agent registry CRUD and search |
+| `handleHealthRoutes` | Health checks (liveness, readiness, history) |
+| `handleLibraryRoutes` | Shared agent library entries |
+| `handleMarketplaceAnalyticsRoutes` | Marketplace seller analytics and buyer usage |
+| `handleOnboardingRoutes` | Onboarding setup progress status |
+| `handlePermissionRoutes` | Permission broker capability grants |
+| `handleProposalRoutes` | Governance proposal CRUD and evaluation |
+| `handleRepoBlocklistRoutes` | Repository blocklist management |
+| `handleSecurityOverviewRoutes` | Security configuration overview |
+| `handleContactRoutes` | Contact identity CRUD and cross-platform lookup |
+| `handleDiscordImageRoutes` | Send images to Discord channels |
+| `handleCursorRoutes` | Cursor CLI status and model discovery endpoints |
+| `handleVariantRoutes` | Agent variant profile CRUD and assignment |
+| `handleBrainViewerRoutes` | Brain Viewer dashboard for agent memory inspection |
+| `handleBuddyRoutes` | Buddy pairing management and buddy session CRUD |
+| `handleFlockTestingRoutes` | Flock agent test results, stats, and test trigger |
+| `handleGitHubPRDiffRoutes` | GitHub PR diff retrieval for agents |
+| `handleOpenRouterRoutes` | OpenRouter model discovery with pricing |
+| `handleToolCatalogRoutes` | Discoverable MCP tool catalog listing |
 
 ## Request Pipeline
 
