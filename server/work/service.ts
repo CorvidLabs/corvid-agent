@@ -846,35 +846,22 @@ export class WorkTaskService {
             ? extractRelevantSymbols(this.astParserService, worktreeDir, task.description)
             : null;
 
-        // Assess governance impact of the task
+        // Assess governance impact of the task based on paths mentioned in the description.
+        // This is ADVISORY only — a task description may mention protected files without
+        // actually modifying them. The real governance enforcement happens in validation.ts
+        // which inspects the actual git diff. Blocking here on description text produces
+        // false positives (e.g. a task that says "reads from schema.ts" gets killed even
+        // though it never modifies the file). See: https://github.com/CorvidLabs/corvid-agent/issues/1766
         const governanceImpact = this.assessGovernanceImpact(task.description);
-        if (governanceImpact) {
-            log.info('Work task governance impact assessed', {
+        if (governanceImpact && governanceImpact.tier < 2) {
+            log.warn('Work task description references protected paths (advisory — actual enforcement is on git diff)', {
                 taskId: task.id,
                 tier: governanceImpact.tier,
                 tierLabel: governanceImpact.tierLabel,
-                blockedFromAutomation: governanceImpact.blockedFromAutomation,
-                affectedPaths: governanceImpact.affectedPaths.map((p) => `${p.path} (Layer ${p.tier})`),
+                affectedPaths: governanceImpact.affectedPaths
+                    .filter((p) => p.tier < 2)
+                    .map((p) => `${p.path} (Layer ${p.tier})`),
             });
-
-            // Hard-block tasks that explicitly target Layer 0 files
-            if (governanceImpact.tier === 0) {
-                updateWorkTaskStatus(this.db, task.id, 'failed', {
-                    error: `Blocked: task references Layer 0 (Constitutional) files that require human-only commits — ${governanceImpact.affectedPaths.filter((p) => p.tier === 0).map((p) => p.path).join(', ')}`,
-                });
-                recordAudit(
-                    this.db,
-                    'work_task_governance_blocked',
-                    `agent:${agent.id}`,
-                    'work_task',
-                    task.id,
-                    `Layer 0 governance block: ${governanceImpact.affectedPaths.filter((p) => p.tier === 0).map((p) => p.path).join(', ')}`,
-                );
-                // Clean up the worktree that was already created
-                await this.cleanupWorktree(task.id);
-                const failed = getWorkTask(this.db, task.id);
-                return failed ?? task;
-            }
         }
 
         // Build work prompt (includes governance warnings for Layer 1 paths)

@@ -64,16 +64,23 @@ export const GOVERNANCE_TIERS: Record<GovernanceTier, GovernanceTierInfo> = {
 /**
  * Layer 0 paths — constitutional, NO council jurisdiction.
  * Matched by basename (exact) or substring.
+ *
+ * Keep this list narrow — only files whose modification could break the
+ * governance system itself or bypass security controls. Files that are
+ * modified as part of normal feature work (schema, MCP tool registrations)
+ * belong at Layer 1, not Layer 0.
  */
 export const LAYER_0_BASENAMES = new Set([
     'spending.ts',        // Spending limit enforcement
     'sdk-process.ts',     // Session execution engine
     'manager.ts',         // Process manager
-    'sdk-tools.ts',       // MCP tool permission filtering
     'tool-handlers.ts',   // Tool handler implementations
-    'schema.ts',          // Database schema
     'broker.ts',          // Permission broker
     'governance.ts',      // This file (self-referential protection)
+    // NOTE: sdk-tools.ts and schema.ts are NOT listed here.
+    // sdk-tools.ts is covered by server/mcp/ → Layer 1.
+    // schema.ts is covered by LAYER_1_BASENAMES → Layer 1.
+    // Both are modified routinely for feature work and must not be Layer 0.
 ]);
 
 export const LAYER_0_SUBSTRINGS = [
@@ -95,6 +102,7 @@ export const LAYER_1_BASENAMES = new Set([
     'package.json',       // Dependency changes
     'CLAUDE.md',          // Agent system instructions
     'tsconfig.json',      // TypeScript config
+    'schema.ts',          // Database schema (regular feature work — Layer 1, not Layer 0)
 ]);
 
 export const LAYER_1_SUBSTRINGS = [
