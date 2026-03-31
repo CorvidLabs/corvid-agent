@@ -41,7 +41,7 @@ async function main() {
 
   // Get dispenser account from KMD
   const parsed = new URL(KMD_URL);
-  const kmd = new algosdk.Kmd(KMD_TOKEN, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002'));
+  const kmd = new algosdk.Kmd(KMD_TOKEN, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002', 10));
   const wallets = await kmd.listWallets();
   const defaultWallet = wallets.wallets.find((w: { name: string }) => w.name === 'unencrypted-default-wallet');
   if (!defaultWallet) {

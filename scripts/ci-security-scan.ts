@@ -11,8 +11,8 @@
  *   3. SQL injection  — string interpolation in SQL queries
  */
 
-import { scanDiff as scanCode, formatScanReport as formatCodeReport } from '../server/lib/code-scanner';
-import { scanDiff as scanFetch, formatScanReport as formatFetchReport } from '../server/lib/fetch-detector';
+import { formatScanReport as formatCodeReport, scanDiff as scanCode } from '../server/lib/code-scanner';
+import { formatScanReport as formatFetchReport, scanDiff as scanFetch } from '../server/lib/fetch-detector';
 
 let failed = false;
 
@@ -119,7 +119,7 @@ try {
 
 // ── Summary ────────────────────────────────────────────────────────────
 
-console.log('\n' + '='.repeat(50));
+console.log(`\n${'='.repeat(50)}`);
 if (failed) {
     console.log('SECURITY SCAN FAILED — see findings above.');
     process.exit(1);

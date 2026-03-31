@@ -18,9 +18,9 @@
  * Output: prints JSON with screenshot paths for programmatic consumption.
  */
 
-import { chromium, type Browser, type Page } from 'playwright';
-import { mkdirSync, rmSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { type Browser, chromium, type Page } from 'playwright';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
