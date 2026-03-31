@@ -145,8 +145,8 @@ describe('ThreadSessionManager — TTL cleanup', () => {
         expect(mgr.processedMessageIds.size).toBe(1000);
     });
 
-    test('runCleanup removes expired mention sessions (older than 30 min)', () => {
-        const expiredTs = Date.now() - 31 * 60 * 1000;
+    test('runCleanup removes expired mention sessions (older than 6 hours)', () => {
+        const expiredTs = Date.now() - 6.1 * 60 * 60 * 1000; // 6h 6m ago
         const freshTs = Date.now() - 5 * 60 * 1000;
 
         mgr.trackMentionSession('old-msg', makeMentionInfo({ sessionId: 'old' }), expiredTs);
@@ -160,14 +160,14 @@ describe('ThreadSessionManager — TTL cleanup', () => {
     });
 
     test('runCleanup does not remove mention sessions exactly at TTL boundary', () => {
-        // Exactly 30 minutes ago — should NOT be expired (condition is strictly >)
-        const borderTs = Date.now() - 30 * 60 * 1000;
+        // Exactly 6 hours ago — should NOT be expired (condition is strictly >)
+        const borderTs = Date.now() - 6 * 60 * 60 * 1000;
         mgr.trackMentionSession('border-msg', makeMentionInfo(), borderTs);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mgr as any).runCleanup();
 
-        // 30 min exactly: `now - ts > MENTION_TTL_MS` is false so session survives
+        // 6h exactly: `now - ts > MENTION_TTL_MS` is false so session survives
         expect(mgr.mentionSessions.has('border-msg')).toBe(true);
     });
 });

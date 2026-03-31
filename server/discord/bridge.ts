@@ -50,6 +50,7 @@ import { handleReaction as handleReactionImpl, type ReactionHandlerContext } fro
 import {
   archiveStaleThreads as archiveStaleThreadsImpl,
   createStandaloneThread as createStandaloneThreadImpl,
+  recoverActiveMentionSessions,
   recoverActiveThreadSessions,
   recoverActiveThreadSubscriptions,
   subscribeForAdaptiveInlineResponse,
@@ -155,6 +156,9 @@ export class DiscordBridge {
           this.config.botToken,
           this.tsm.threadSessions,
           this.tsm.threadCallbacks,
+        );
+        recoverActiveMentionSessions(this.db, this.tsm.mentionSessions, (botMessageId, info, createdAt) =>
+          this.tsm.trackMentionSession(botMessageId, info, createdAt),
         );
       },
     });

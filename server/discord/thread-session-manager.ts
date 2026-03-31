@@ -10,7 +10,7 @@ import type { ThreadCallbackInfo, ThreadSessionInfo } from './thread-session-map
 
 export type { ThreadCallbackInfo, ThreadSessionInfo };
 
-const MENTION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MENTION_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const PROCESSED_IDS_CAP = 1000;
 
