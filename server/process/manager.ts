@@ -57,7 +57,7 @@ export interface RoutingDecision {
     /** Which provider to use (sdk, cursor, ollama). */
     provider: string;
     /** Why this provider was selected. */
-    reason: 'default' | 'agent_config' | 'no_claude_access' | 'cursor_binary_missing';
+    reason: 'default' | 'agent_config' | 'no_claude_access' | 'cursor_binary_missing' | 'ollama_via_claude_proxy';
     /** Whether this was a fallback from the original intent. */
     fallback: boolean;
     /** Model to use (may be cleared if original model is incompatible with the fallback provider). */
