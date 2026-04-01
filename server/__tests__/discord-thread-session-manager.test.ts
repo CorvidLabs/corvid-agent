@@ -4,40 +4,19 @@
  * Covers: trackMentionSession, cleanupMentionSession, startTtlCleanup (TTL expiry),
  * processedMessageIds cap, basic map accessors, subscribeThread, recoverSessions,
  * and autoSubscribeSession.
+ *
+ * Uses a real in-memory DB instead of mock.module for db/* modules to avoid
+ * polluting global state. mock.module replaces modules process-wide, breaking
+ * other test files that import ../db/agents, ../db/sessions, etc.
  */
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-
-// ── Mock thread-manager before importing ThreadSessionManager ──────────────
-const mockSubscribeForResponseWithEmbed = mock(() => {});
-const mockRecoverActiveThreadSessions = mock(() => {});
-const mockRecoverActiveThreadSubscriptions = mock(() => {});
-const mockRecoverActiveMentionSessions = mock(() => {});
-
-mock.module('../discord/thread-manager', () => ({
-    subscribeForResponseWithEmbed: mockSubscribeForResponseWithEmbed,
-    recoverActiveThreadSessions: mockRecoverActiveThreadSessions,
-    recoverActiveThreadSubscriptions: mockRecoverActiveThreadSubscriptions,
-    recoverActiveMentionSessions: mockRecoverActiveMentionSessions,
-    // re-export originals that aren't relevant to these tests
-    archiveStaleThreads: mock(() => {}),
-    createStandaloneThread: mock(() => {}),
-    subscribeForAdaptiveInlineResponse: mock(() => {}),
-}));
-
-// ── Mock db modules used by autoSubscribeSession ───────────────────────────
-const mockGetSession = mock(() => null as any);
-const mockGetAgent = mock(() => null as any);
-const mockSaveThreadSession = mock(() => {});
-
-mock.module('../db/sessions', () => ({ getSession: mockGetSession }));
-mock.module('../db/agents', () => ({ getAgent: mockGetAgent }));
-mock.module('../db/discord-thread-sessions', () => ({
-    saveThreadSession: mockSaveThreadSession,
-    pruneOldThreadSessions: mock(() => 0),
-    getRecentThreadSessions: mock(() => []),
-}));
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { Database } from 'bun:sqlite';
 
 import type { MentionSessionInfo } from '../discord/message-handler';
+import * as threadManager from '../discord/thread-manager';
+import { createAgent } from '../db/agents';
+import { createSession } from '../db/sessions';
+import { runMigrations } from '../db/schema';
 import { ThreadSessionManager } from '../discord/thread-session-manager';
 
 function makeMentionInfo(overrides: Partial<MentionSessionInfo> = {}): MentionSessionInfo {
@@ -49,7 +28,7 @@ function makeMentionInfo(overrides: Partial<MentionSessionInfo> = {}): MentionSe
     };
 }
 
-/** Minimal stubs so the ThreadSessionManager constructor is satisfied without real deps. */
+/** Minimal stubs for tests that don't need a real DB. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stubDb = {} as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,6 +36,13 @@ const stubProcessManager = {} as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stubDelivery = {} as any;
 const stubBotToken = 'test-token';
+
+/** Seed a project row and return its ID. */
+function seedProject(db: Database, name = 'Test Project'): string {
+    const id = crypto.randomUUID();
+    db.query('INSERT INTO projects (id, name, working_dir, tenant_id) VALUES (?, ?, ?, ?)').run(id, name, '/tmp/test', 'default');
+    return id;
+}
 
 describe('ThreadSessionManager — basic maps', () => {
     let mgr: ThreadSessionManager;
@@ -217,17 +203,22 @@ describe('ThreadSessionManager — TTL cleanup', () => {
 
 describe('ThreadSessionManager — subscribeThread', () => {
     let mgr: ThreadSessionManager;
+    let spySubscribe: ReturnType<typeof spyOn>;
 
     beforeEach(() => {
-        mockSubscribeForResponseWithEmbed.mockClear();
+        spySubscribe = spyOn(threadManager, 'subscribeForResponseWithEmbed').mockImplementation(() => {});
         mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
+    });
+
+    afterEach(() => {
+        spySubscribe.mockRestore();
     });
 
     test('delegates to subscribeForResponseWithEmbed with correct args', () => {
         mgr.subscribeThread('sess-1', 'thread-1', 'Bot', 'model-1', 'proj', '#fff', ':icon:', 'http://avatar');
 
-        expect(mockSubscribeForResponseWithEmbed).toHaveBeenCalledTimes(1);
-        const args = mockSubscribeForResponseWithEmbed.mock.calls[0];
+        expect(threadManager.subscribeForResponseWithEmbed).toHaveBeenCalledTimes(1);
+        const args = (threadManager.subscribeForResponseWithEmbed as ReturnType<typeof mock>).mock.calls[0] as any[];
         expect(args[0]).toBe(stubProcessManager);
         expect(args[1]).toBe(stubDelivery);
         expect(args[2]).toBe(stubBotToken);
@@ -242,7 +233,7 @@ describe('ThreadSessionManager — subscribeThread', () => {
 
     test('passes optional display params through', () => {
         mgr.subscribeThread('s', 't', 'A', 'M');
-        const args = mockSubscribeForResponseWithEmbed.mock.calls[0];
+        const args = (threadManager.subscribeForResponseWithEmbed as ReturnType<typeof mock>).mock.calls[0] as any[];
         expect(args[9]).toBeUndefined(); // projectName
         expect(args[10]).toBeUndefined(); // displayColor
     });
@@ -252,26 +243,35 @@ describe('ThreadSessionManager — subscribeThread', () => {
 
 describe('ThreadSessionManager — recoverSessions', () => {
     let mgr: ThreadSessionManager;
+    let spySessions: ReturnType<typeof spyOn>;
+    let spySubscriptions: ReturnType<typeof spyOn>;
+    let spyMentions: ReturnType<typeof spyOn>;
 
     beforeEach(() => {
-        mockRecoverActiveThreadSessions.mockClear();
-        mockRecoverActiveThreadSubscriptions.mockClear();
-        mockRecoverActiveMentionSessions.mockClear();
+        spySessions = spyOn(threadManager, 'recoverActiveThreadSessions').mockImplementation(() => {});
+        spySubscriptions = spyOn(threadManager, 'recoverActiveThreadSubscriptions').mockImplementation(() => {});
+        spyMentions = spyOn(threadManager, 'recoverActiveMentionSessions').mockImplementation(() => {});
         mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
+    });
+
+    afterEach(() => {
+        spySessions.mockRestore();
+        spySubscriptions.mockRestore();
+        spyMentions.mockRestore();
     });
 
     test('calls all three recovery functions', () => {
         mgr.recoverSessions();
 
-        expect(mockRecoverActiveThreadSessions).toHaveBeenCalledTimes(1);
-        expect(mockRecoverActiveThreadSubscriptions).toHaveBeenCalledTimes(1);
-        expect(mockRecoverActiveMentionSessions).toHaveBeenCalledTimes(1);
+        expect(threadManager.recoverActiveThreadSessions).toHaveBeenCalledTimes(1);
+        expect(threadManager.recoverActiveThreadSubscriptions).toHaveBeenCalledTimes(1);
+        expect(threadManager.recoverActiveMentionSessions).toHaveBeenCalledTimes(1);
     });
 
     test('passes correct maps to recoverActiveThreadSessions', () => {
         mgr.recoverSessions();
 
-        const args = mockRecoverActiveThreadSessions.mock.calls[0];
+        const args = (threadManager.recoverActiveThreadSessions as ReturnType<typeof mock>).mock.calls[0] as any[];
         expect(args[0]).toBe(stubDb);
         expect(args[1]).toBe(mgr.threadSessions);
         expect(args[2]).toBe(mgr.threadLastActivity);
@@ -280,7 +280,7 @@ describe('ThreadSessionManager — recoverSessions', () => {
     test('passes correct deps to recoverActiveThreadSubscriptions', () => {
         mgr.recoverSessions();
 
-        const args = mockRecoverActiveThreadSubscriptions.mock.calls[0];
+        const args = (threadManager.recoverActiveThreadSubscriptions as ReturnType<typeof mock>).mock.calls[0] as any[];
         expect(args[0]).toBe(stubDb);
         expect(args[1]).toBe(stubProcessManager);
         expect(args[2]).toBe(stubDelivery);
@@ -292,7 +292,7 @@ describe('ThreadSessionManager — recoverSessions', () => {
     test('passes trackMentionSession callback to recoverActiveMentionSessions', () => {
         mgr.recoverSessions();
 
-        const args = mockRecoverActiveMentionSessions.mock.calls[0];
+        const args = (threadManager.recoverActiveMentionSessions as ReturnType<typeof mock>).mock.calls[0] as any[];
         expect(args[0]).toBe(stubDb);
         expect(args[1]).toBe(mgr.mentionSessions);
         expect(typeof args[2]).toBe('function');
@@ -302,14 +302,29 @@ describe('ThreadSessionManager — recoverSessions', () => {
 // ─── autoSubscribeSession ─────────────────────────────────────────────────────
 
 describe('ThreadSessionManager — autoSubscribeSession', () => {
+    let db: Database;
     let mgr: ThreadSessionManager;
+    let projectId: string;
+    let spySubscribe: ReturnType<typeof spyOn>;
+
+    beforeAll(() => {
+        db = new Database(':memory:');
+        db.exec('PRAGMA foreign_keys = ON');
+        runMigrations(db);
+        projectId = seedProject(db);
+    });
+
+    afterAll(() => {
+        db.close();
+    });
 
     beforeEach(() => {
-        mockGetSession.mockClear();
-        mockGetAgent.mockClear();
-        mockSubscribeForResponseWithEmbed.mockClear();
-        mockSaveThreadSession.mockClear();
-        mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
+        spySubscribe = spyOn(threadManager, 'subscribeForResponseWithEmbed').mockImplementation(() => {});
+        mgr = new ThreadSessionManager(db, stubProcessManager, stubDelivery, stubBotToken);
+    });
+
+    afterEach(() => {
+        spySubscribe.mockRestore();
     });
 
     test('returns false if session is already subscribed via threadCallbacks', () => {
@@ -318,84 +333,91 @@ describe('ThreadSessionManager — autoSubscribeSession', () => {
         const result = mgr.autoSubscribeSession('sess-already');
 
         expect(result).toBe(false);
-        expect(mockGetSession).not.toHaveBeenCalled();
+        expect(threadManager.subscribeForResponseWithEmbed).not.toHaveBeenCalled();
     });
 
     test('returns false if session is not found in db', () => {
-        mockGetSession.mockReturnValueOnce(null);
-
         const result = mgr.autoSubscribeSession('sess-missing');
 
         expect(result).toBe(false);
     });
 
     test('returns false if session source is not discord', () => {
-        mockGetSession.mockReturnValueOnce({ source: 'web', name: 'Discord thread:t1' });
+        const session = createSession(db, {
+            name: 'Discord thread:t1',
+            source: 'web',
+            projectId,
+        });
 
-        const result = mgr.autoSubscribeSession('sess-web');
+        const result = mgr.autoSubscribeSession(session.id);
 
         expect(result).toBe(false);
     });
 
     test('returns false if session name does not start with Discord thread:', () => {
-        mockGetSession.mockReturnValueOnce({ source: 'discord', name: 'Some other session' });
+        const session = createSession(db, {
+            source: 'discord',
+            name: 'Some other session',
+            projectId,
+        });
 
-        const result = mgr.autoSubscribeSession('sess-other');
+        const result = mgr.autoSubscribeSession(session.id);
 
         expect(result).toBe(false);
     });
 
     test('returns false if threadId is already in threadCallbacks', () => {
-        mgr.threadCallbacks.set('thread-abc', { sessionId: 'different-sess', callback: () => {} });
-        mockGetSession.mockReturnValueOnce({
+        const threadId = `thread-${crypto.randomUUID().slice(0, 8)}`;
+        mgr.threadCallbacks.set(threadId, { sessionId: 'different-sess', callback: () => {} });
+        const session = createSession(db, {
             source: 'discord',
-            name: 'Discord thread:thread-abc',
-            agentId: null,
-            projectId: null,
+            name: `Discord thread:${threadId}`,
+            projectId,
         });
 
-        const result = mgr.autoSubscribeSession('sess-dup');
+        const result = mgr.autoSubscribeSession(session.id);
 
         expect(result).toBe(false);
     });
 
     test('returns true and subscribes when session is valid discord thread', () => {
-        mockGetSession.mockReturnValueOnce({
-            source: 'discord',
-            name: 'Discord thread:thread-new',
-            agentId: 'agent-1',
-            projectId: null,
-        });
-        mockGetAgent.mockReturnValueOnce({
+        const agent = createAgent(db, {
             name: 'TestAgent',
             model: 'claude-sonnet-4-6',
             displayColor: '#00f',
             displayIcon: ':bird:',
             avatarUrl: 'http://img',
         });
+        const threadId = `thread-${crypto.randomUUID().slice(0, 8)}`;
+        const session = createSession(db, {
+            source: 'discord',
+            name: `Discord thread:${threadId}`,
+            agentId: agent.id,
+            projectId,
+        });
 
-        const result = mgr.autoSubscribeSession('sess-new');
+        const result = mgr.autoSubscribeSession(session.id);
 
         expect(result).toBe(true);
-        expect(mgr.threadSessions.has('thread-new')).toBe(true);
-        const info = mgr.threadSessions.get('thread-new')!;
-        expect(info.sessionId).toBe('sess-new');
+        expect(mgr.threadSessions.has(threadId)).toBe(true);
+        const info = mgr.threadSessions.get(threadId)!;
+        expect(info.sessionId).toBe(session.id);
         expect(info.agentName).toBe('TestAgent');
         expect(info.agentModel).toBe('claude-sonnet-4-6');
-        expect(mockSubscribeForResponseWithEmbed).toHaveBeenCalledTimes(1);
+        expect(threadManager.subscribeForResponseWithEmbed).toHaveBeenCalledTimes(1);
     });
 
     test('uses fallback agent name/model when agentId is null', () => {
-        mockGetSession.mockReturnValueOnce({
+        const threadId = `thread-${crypto.randomUUID().slice(0, 8)}`;
+        const session = createSession(db, {
             source: 'discord',
-            name: 'Discord thread:thread-noagent',
-            agentId: null,
-            projectId: null,
+            name: `Discord thread:${threadId}`,
+            projectId,
         });
 
-        mgr.autoSubscribeSession('sess-noagent');
+        mgr.autoSubscribeSession(session.id);
 
-        const info = mgr.threadSessions.get('thread-noagent')!;
+        const info = mgr.threadSessions.get(threadId)!;
         expect(info.agentName).toBe('Agent');
         expect(info.agentModel).toBe('unknown');
     });
