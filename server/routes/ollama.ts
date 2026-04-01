@@ -705,6 +705,9 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                 const sse = (event: string, data: unknown) =>
                     encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
+                // Track if slot was already released to prevent double-release
+                let released = false;
+
                 return new Response(
                     new ReadableStream({
                         async start(controller) {
@@ -767,11 +770,17 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                                 }));
                                 controller.close();
                             } finally {
-                                provider.releaseSlot(ollamaModel);
+                                if (!released) {
+                                    released = true;
+                                    provider.releaseSlot(ollamaModel);
+                                }
                             }
                         },
                         cancel() {
-                            provider.releaseSlot(ollamaModel);
+                            if (!released) {
+                                released = true;
+                                provider.releaseSlot(ollamaModel);
+                            }
                         },
                     }),
                     {
