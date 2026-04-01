@@ -414,6 +414,7 @@ export const McpDeleteMemorySchema = z.object({
 export const McpPromoteMemorySchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
     key: z.string().min(1, 'key is required'),
+    confirmed: z.boolean().optional(),
 });
 
 // ─── Observation routes ──────────────────────────────────────────────────────

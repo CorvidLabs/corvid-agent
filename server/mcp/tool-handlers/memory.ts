@@ -90,9 +90,16 @@ export async function handleSaveMemory(
     }
 }
 
+const PERMANENT_WRITE_WARNING =
+    'WARNING: This will write a permanent, immutable record to the Algorand blockchain ' +
+    'that can NEVER be modified or deleted. ' +
+    'Permanent plain-transaction memories are reserved for attestations, verified facts, ' +
+    'signed commitments, and audit-trail entries — not for general memories. ' +
+    'To proceed, call corvid_promote_memory again with confirmed: true.';
+
 export async function handlePromoteMemory(
     ctx: McpToolContext,
-    args: { key: string },
+    args: { key: string; confirmed?: boolean },
 ): Promise<CallToolResult> {
     try {
         const memory = recallMemory(ctx.db, ctx.agentId, args.key);
@@ -137,7 +144,13 @@ export async function handlePromoteMemory(
                 return errorResult(`Failed to promote memory to ARC-69: ${message}`);
             }
         } else {
-            // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
+            // Testnet/mainnet: plain txn (immutable). Require explicit confirmation.
+            if (!args.confirmed) {
+                log.warn('Permanent memory write blocked — confirmation required', { key: args.key, agentId: ctx.agentId });
+                return textResult(PERMANENT_WRITE_WARNING);
+            }
+
+            // fire-and-forget (costs ALGO, may be slow)
             updateMemoryStatus(ctx.db, memory.id, 'pending');
             encryptMemoryContent(memory.content, ctx.serverMnemonic, ctx.network).then((encrypted) => {
                 return ctx.agentMessenger.sendOnChainToSelf(
