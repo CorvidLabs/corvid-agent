@@ -1,7 +1,7 @@
 /**
  * Tests for authentication middleware — HTTP auth, WS auth, CORS, key rotation, expiry.
  */
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import {
     loadAuthConfig,
     checkHttpAuth,
@@ -117,6 +117,25 @@ describe('checkHttpAuth', () => {
         const resp = checkHttpAuth(req, url, config);
         expect(resp).not.toBeNull();
         expect(resp!.status).toBe(403);
+    });
+
+    test('logs warning when audit recording throws on invalid key rejection', () => {
+        const audit = require('../db/audit');
+        const spy = spyOn(audit, 'recordAudit').mockImplementation(() => {
+            throw new Error('DB connection lost');
+        });
+        try {
+            const config = makeConfig();
+            const { req, url } = makeRequest('/api/agents', {
+                headers: { Authorization: 'Bearer wrong-key' },
+            });
+            const resp = checkHttpAuth(req, url, config);
+            // Should still return 403 despite audit failure
+            expect(resp).not.toBeNull();
+            expect(resp!.status).toBe(403);
+        } finally {
+            spy.mockRestore();
+        }
     });
 
     test('accepts valid API key', () => {
