@@ -5,11 +5,11 @@
  * External dependencies (AgentMessenger, GitHub, etc.) are mocked.
  */
 
-import { test, expect, beforeEach, afterEach, describe, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+import { runMigrations } from '../db/schema';
 
 const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234';
 
@@ -22,61 +22,60 @@ const _mockUpdateMemoryAsa = mock(() => Promise.resolve({ txid: 'TX-UPDATE' }));
 const _mockResolveAsaForKey = mock((): number | null => null);
 
 mock.module('../memory/arc69-store', () => ({
-    createMemoryAsa: _mockCreateMemoryAsa,
-    updateMemoryAsa: _mockUpdateMemoryAsa,
-    resolveAsaForKey: _mockResolveAsaForKey,
-    deleteMemoryAsa: mock(() => Promise.resolve({ txid: 'TX-DEL' })),
-    listMemoryAsas: mock(() => Promise.resolve([])),
-    readMemoryAsa: mock(() => Promise.resolve(null)),
+  createMemoryAsa: _mockCreateMemoryAsa,
+  updateMemoryAsa: _mockUpdateMemoryAsa,
+  resolveAsaForKey: _mockResolveAsaForKey,
+  deleteMemoryAsa: mock(() => Promise.resolve({ txid: 'TX-DEL' })),
+  listMemoryAsas: mock(() => Promise.resolve([])),
+  readMemoryAsa: mock(() => Promise.resolve(null)),
 }));
 
 mock.module('../algochat/config', () => ({
-    loadAlgoChatConfig: () => ({
-        mnemonic: null,
-        network: 'localnet' as const,
-        agentNetwork: 'localnet' as const,
-        syncInterval: 30000,
-        defaultAgentId: null,
-        enabled: false,
-        pskContact: null,
-        ownerAddresses: _mockOwnerAddresses,
-    }),
-    _resetConfigCache: () => {},
+  loadAlgoChatConfig: () => ({
+    mnemonic: null,
+    network: 'localnet' as const,
+    agentNetwork: 'localnet' as const,
+    syncInterval: 30000,
+    defaultAgentId: null,
+    enabled: false,
+    pskContact: null,
+    ownerAddresses: _mockOwnerAddresses,
+  }),
+  _resetConfigCache: () => {},
 }));
 
-import {
-    handleSendMessage,
-    handleExtendTimeout,
-    handleCheckCredits,
-    handleGrantCredits,
-    handleCreditConfig,
-    handleManageSchedule,
-    handleCreateWorkTask,
-    handleCheckWorkStatus,
-    handleListWorkTasks,
-    handleRecallMemory,
-    handlePromoteMemory,
-    handleDeleteMemory,
-    handleSaveMemory,
-    handleListAgents,
-    type McpToolContext,
-} from '../mcp/tool-handlers';
-import { buildDirectTools } from '../mcp/direct-tools';
-import { getSchedule } from '../db/schedules';
+import { recallMemory, saveMemory, updateMemoryStatus, updateMemoryTxid } from '../db/agent-memories';
 import { grantCredits } from '../db/credits';
-import { saveMemory, recallMemory, updateMemoryTxid, updateMemoryStatus } from '../db/agent-memories';
+import { getSchedule } from '../db/schedules';
+import { buildDirectTools } from '../mcp/direct-tools';
+import {
+  handleCheckCredits,
+  handleCheckWorkStatus,
+  handleCreateWorkTask,
+  handleCreditConfig,
+  handleDeleteMemory,
+  handleExtendTimeout,
+  handleGrantCredits,
+  handleListAgents,
+  handleListWorkTasks,
+  handleManageSchedule,
+  handlePromoteMemory,
+  handleRecallMemory,
+  handleSaveMemory,
+  handleSendMessage,
+  type McpToolContext,
+} from '../mcp/tool-handlers';
+
 const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
 /** Set the agent's wallet address in the DB. */
 function setAgentWallet(database: Database, id: string, wallet: string): void {
-    database.query(`UPDATE agents SET wallet_address = ? WHERE id = ?`).run(wallet, id);
+  database.query(`UPDATE agents SET wallet_address = ? WHERE id = ?`).run(wallet, id);
 }
 
 /** Configure the mock owner-address set used by loadAlgoChatConfig. */
 function setOwnerAddresses(addresses: string): void {
-    _mockOwnerAddresses = new Set(
-        addresses ? addresses.split(',').map(a => a.trim().toUpperCase()) : [],
-    );
+  _mockOwnerAddresses = new Set(addresses ? addresses.split(',').map((a) => a.trim().toUpperCase()) : []);
 }
 
 let db: Database;
@@ -85,1304 +84,1345 @@ let agentId: string;
 // ─── Mock helpers ────────────────────────────────────────────────────────────
 
 function createMockContext(overrides?: Partial<McpToolContext>): McpToolContext {
-    return {
-        agentId,
-        db,
-        agentMessenger: {
-            invokeAndWait: mock(() => Promise.resolve({ response: 'mock response', threadId: 'thread-1' })),
-            sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
-            sendNotificationToAddress: mock(() => Promise.resolve()),
-            readOnChainMemories: mock(() => Promise.resolve([])),
-        } as unknown as McpToolContext['agentMessenger'],
-        agentDirectory: {
-            listAvailable: mock(() => Promise.resolve([
-                { agentId, agentName: 'Self', walletAddress: null },
-                { agentId: 'other-agent', agentName: 'OtherBot', walletAddress: 'OTHERADDR' },
-            ])),
-        } as unknown as McpToolContext['agentDirectory'],
-        agentWalletService: {} as McpToolContext['agentWalletService'],
-        ...overrides,
-    };
+  return {
+    agentId,
+    db,
+    agentMessenger: {
+      invokeAndWait: mock(() => Promise.resolve({ response: 'mock response', threadId: 'thread-1' })),
+      sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
+      sendNotificationToAddress: mock(() => Promise.resolve()),
+      readOnChainMemories: mock(() => Promise.resolve([])),
+    } as unknown as McpToolContext['agentMessenger'],
+    agentDirectory: {
+      listAvailable: mock(() =>
+        Promise.resolve([
+          { agentId, agentName: 'Self', walletAddress: null },
+          { agentId: 'other-agent', agentName: 'OtherBot', walletAddress: 'OTHERADDR' },
+        ]),
+      ),
+    } as unknown as McpToolContext['agentDirectory'],
+    agentWalletService: {} as McpToolContext['agentWalletService'],
+    ...overrides,
+  };
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    runMigrations(db);
-    const agent = createAgent(db, { name: 'TestAgent', model: 'sonnet' });
-    agentId = agent.id;
-    db.query('UPDATE agents SET wallet_address = ? WHERE id = ?').run(TEST_OWNER_WALLET, agentId);
+  db = new Database(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  runMigrations(db);
+  const agent = createAgent(db, { name: 'TestAgent', model: 'sonnet' });
+  agentId = agent.id;
+  db.query('UPDATE agents SET wallet_address = ? WHERE id = ?').run(TEST_OWNER_WALLET, agentId);
 });
 
 afterEach(() => {
-    db.close();
-    _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
+  db.close();
+  _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
 });
 
 // ─── Send Message Guards ─────────────────────────────────────────────────────
 
 describe('handleSendMessage', () => {
-    test('rejects when depth exceeds MAX_INVOKE_DEPTH (3)', async () => {
-        const ctx = createMockContext({ depth: 4 });
-        const result = await handleSendMessage(ctx, {
-            to_agent: 'OtherBot',
-            message: 'hello',
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('invocation depth');
+  test('rejects when depth exceeds MAX_INVOKE_DEPTH (3)', async () => {
+    const ctx = createMockContext({ depth: 4 });
+    const result = await handleSendMessage(ctx, {
+      to_agent: 'OtherBot',
+      message: 'hello',
+    });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('invocation depth');
+  });
+
+  test('allows at exactly MAX_INVOKE_DEPTH (3)', async () => {
+    const ctx = createMockContext({ depth: 3 });
+    const result = await handleSendMessage(ctx, {
+      to_agent: 'OtherBot',
+      message: 'hello from depth 3',
+    });
+    // Should succeed (depth 3 is allowed, > 3 is rejected)
+    expect(result.isError).toBeUndefined();
+  });
+
+  test('rejects sending to self', async () => {
+    const ctx = createMockContext();
+    const result = await handleSendMessage(ctx, {
+      to_agent: agentId,
+      message: 'talking to myself',
+    });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('yourself');
+  });
+
+  test('rejects unknown agent', async () => {
+    const ctx = createMockContext();
+    const result = await handleSendMessage(ctx, {
+      to_agent: 'NonExistentBot',
+      message: 'hello?',
+    });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not found');
+  });
+
+  test('resolves agent by name case-insensitively', async () => {
+    const ctx = createMockContext();
+    const result = await handleSendMessage(ctx, {
+      to_agent: 'otherbot', // lowercase, should match 'OtherBot'
+      message: `unique-msg-case-test-${Date.now()}`,
+    });
+    expect(result.isError).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toContain('mock response');
+  });
+
+  test('suppresses duplicate sends within dedup window', async () => {
+    const ctx = createMockContext();
+    const msg = `unique-dedup-test-${Date.now()}`;
+
+    const first = await handleSendMessage(ctx, { to_agent: 'OtherBot', message: msg });
+    expect(first.isError).toBeUndefined();
+
+    // Second send with same content should be suppressed
+    const second = await handleSendMessage(ctx, { to_agent: 'OtherBot', message: msg });
+    expect((second.content[0] as { text: string }).text).toContain('duplicate suppressed');
+  });
+
+  test('allows same message to different agents', async () => {
+    const ctx = createMockContext({
+      agentDirectory: {
+        listAvailable: mock(() =>
+          Promise.resolve([
+            { agentId, agentName: 'Self', walletAddress: null },
+            { agentId: 'bot-a', agentName: 'BotA', walletAddress: null },
+            { agentId: 'bot-b', agentName: 'BotB', walletAddress: null },
+          ]),
+        ),
+      } as unknown as McpToolContext['agentDirectory'],
     });
 
-    test('allows at exactly MAX_INVOKE_DEPTH (3)', async () => {
-        const ctx = createMockContext({ depth: 3 });
-        const result = await handleSendMessage(ctx, {
-            to_agent: 'OtherBot',
-            message: 'hello from depth 3',
-        });
-        // Should succeed (depth 3 is allowed, > 3 is rejected)
-        expect(result.isError).toBeUndefined();
+    const msg = `unique-multi-agent-${Date.now()}`;
+    const r1 = await handleSendMessage(ctx, { to_agent: 'BotA', message: msg });
+    const r2 = await handleSendMessage(ctx, { to_agent: 'BotB', message: msg });
+    expect(r1.isError).toBeUndefined();
+    expect(r2.isError).toBeUndefined();
+  });
+
+  test('default depth is 1 when not specified', async () => {
+    const ctx = createMockContext(); // no depth set
+    const result = await handleSendMessage(ctx, {
+      to_agent: 'OtherBot',
+      message: `default-depth-${Date.now()}`,
     });
-
-    test('rejects sending to self', async () => {
-        const ctx = createMockContext();
-        const result = await handleSendMessage(ctx, {
-            to_agent: agentId,
-            message: 'talking to myself',
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('yourself');
-    });
-
-    test('rejects unknown agent', async () => {
-        const ctx = createMockContext();
-        const result = await handleSendMessage(ctx, {
-            to_agent: 'NonExistentBot',
-            message: 'hello?',
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not found');
-    });
-
-    test('resolves agent by name case-insensitively', async () => {
-        const ctx = createMockContext();
-        const result = await handleSendMessage(ctx, {
-            to_agent: 'otherbot', // lowercase, should match 'OtherBot'
-            message: 'unique-msg-case-test-' + Date.now(),
-        });
-        expect(result.isError).toBeUndefined();
-        expect((result.content[0] as { text: string }).text).toContain('mock response');
-    });
-
-    test('suppresses duplicate sends within dedup window', async () => {
-        const ctx = createMockContext();
-        const msg = 'unique-dedup-test-' + Date.now();
-
-        const first = await handleSendMessage(ctx, { to_agent: 'OtherBot', message: msg });
-        expect(first.isError).toBeUndefined();
-
-        // Second send with same content should be suppressed
-        const second = await handleSendMessage(ctx, { to_agent: 'OtherBot', message: msg });
-        expect((second.content[0] as { text: string }).text).toContain('duplicate suppressed');
-    });
-
-    test('allows same message to different agents', async () => {
-        const ctx = createMockContext({
-            agentDirectory: {
-                listAvailable: mock(() => Promise.resolve([
-                    { agentId, agentName: 'Self', walletAddress: null },
-                    { agentId: 'bot-a', agentName: 'BotA', walletAddress: null },
-                    { agentId: 'bot-b', agentName: 'BotB', walletAddress: null },
-                ])),
-            } as unknown as McpToolContext['agentDirectory'],
-        });
-
-        const msg = 'unique-multi-agent-' + Date.now();
-        const r1 = await handleSendMessage(ctx, { to_agent: 'BotA', message: msg });
-        const r2 = await handleSendMessage(ctx, { to_agent: 'BotB', message: msg });
-        expect(r1.isError).toBeUndefined();
-        expect(r2.isError).toBeUndefined();
-    });
-
-    test('default depth is 1 when not specified', async () => {
-        const ctx = createMockContext(); // no depth set
-        const result = await handleSendMessage(ctx, {
-            to_agent: 'OtherBot',
-            message: 'default-depth-' + Date.now(),
-        });
-        // Should succeed — default depth 1 < MAX 3
-        expect(result.isError).toBeUndefined();
-    });
+    // Should succeed — default depth 1 < MAX 3
+    expect(result.isError).toBeUndefined();
+  });
 });
 
 // ─── Extend Timeout ──────────────────────────────────────────────────────────
 
 describe('handleExtendTimeout', () => {
-    test('returns error when extendTimeout not available', async () => {
-        const ctx = createMockContext({ extendTimeout: undefined });
-        const result = await handleExtendTimeout(ctx, { minutes: 30 });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not available');
-    });
+  test('returns error when extendTimeout not available', async () => {
+    const ctx = createMockContext({ extendTimeout: undefined });
+    const result = await handleExtendTimeout(ctx, { minutes: 30 });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not available');
+  });
 
-    test('clamps to minimum of 1 minute', async () => {
-        let receivedMs = 0;
-        const ctx = createMockContext({
-            extendTimeout: (ms: number) => { receivedMs = ms; return true; },
-        });
-        await handleExtendTimeout(ctx, { minutes: -10 });
-        expect(receivedMs).toBe(60_000); // 1 minute
+  test('clamps to minimum of 1 minute', async () => {
+    let receivedMs = 0;
+    const ctx = createMockContext({
+      extendTimeout: (ms: number) => {
+        receivedMs = ms;
+        return true;
+      },
     });
+    await handleExtendTimeout(ctx, { minutes: -10 });
+    expect(receivedMs).toBe(60_000); // 1 minute
+  });
 
-    test('clamps to maximum of 120 minutes', async () => {
-        let receivedMs = 0;
-        const ctx = createMockContext({
-            extendTimeout: (ms: number) => { receivedMs = ms; return true; },
-        });
-        await handleExtendTimeout(ctx, { minutes: 999 });
-        expect(receivedMs).toBe(120 * 60_000);
+  test('clamps to maximum of 120 minutes', async () => {
+    let receivedMs = 0;
+    const ctx = createMockContext({
+      extendTimeout: (ms: number) => {
+        receivedMs = ms;
+        return true;
+      },
     });
+    await handleExtendTimeout(ctx, { minutes: 999 });
+    expect(receivedMs).toBe(120 * 60_000);
+  });
 
-    test('returns success on valid extension', async () => {
-        const ctx = createMockContext({
-            extendTimeout: () => true,
-        });
-        const result = await handleExtendTimeout(ctx, { minutes: 30 });
-        expect(result.isError).toBeUndefined();
-        expect((result.content[0] as { text: string }).text).toContain('30 minutes');
+  test('returns success on valid extension', async () => {
+    const ctx = createMockContext({
+      extendTimeout: () => true,
     });
+    const result = await handleExtendTimeout(ctx, { minutes: 30 });
+    expect(result.isError).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toContain('30 minutes');
+  });
 
-    test('returns error when extendTimeout returns false', async () => {
-        const ctx = createMockContext({
-            extendTimeout: () => false,
-        });
-        const result = await handleExtendTimeout(ctx, { minutes: 30 });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Failed');
+  test('returns error when extendTimeout returns false', async () => {
+    const ctx = createMockContext({
+      extendTimeout: () => false,
     });
+    const result = await handleExtendTimeout(ctx, { minutes: 30 });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Failed');
+  });
 });
 
 // ─── Credits ─────────────────────────────────────────────────────────────────
 
 describe('handleCheckCredits', () => {
-    test('returns error when no wallet address', async () => {
-        const ctx = createMockContext();
-        const result = await handleCheckCredits(ctx, {});
-        expect(result.isError).toBe(true);
-    });
+  test('returns error when no wallet address', async () => {
+    const ctx = createMockContext();
+    const result = await handleCheckCredits(ctx, {});
+    expect(result.isError).toBe(true);
+  });
 
-    test('returns balance info for valid wallet', async () => {
-        const wallet = 'TESTWALLETCHECK123';
-        grantCredits(db, wallet, 100);
-        const ctx = createMockContext();
-        const result = await handleCheckCredits(ctx, { wallet_address: wallet });
-        expect(result.isError).toBeUndefined();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('100');
-        expect(text).toContain('Available');
-    });
+  test('returns balance info for valid wallet', async () => {
+    const wallet = 'TESTWALLETCHECK123';
+    grantCredits(db, wallet, 100);
+    const ctx = createMockContext();
+    const result = await handleCheckCredits(ctx, { wallet_address: wallet });
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('100');
+    expect(text).toContain('Available');
+  });
 });
 
 describe('handleGrantCredits', () => {
-    test('rejects non-owner caller', async () => {
-        setOwnerAddresses('');
-        const ctx = createMockContext();
-        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
-    });
+  test('rejects non-owner caller', async () => {
+    setOwnerAddresses('');
+    const ctx = createMockContext();
+    const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+  });
 
-    test('rejects caller with no wallet address', async () => {
-        setOwnerAddresses(OWNER_WALLET);
-        // Agent has no wallet set
-        const ctx = createMockContext();
-        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
-    });
+  test('rejects caller with no wallet address', async () => {
+    setOwnerAddresses(OWNER_WALLET);
+    // Agent has no wallet set
+    const ctx = createMockContext();
+    const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+  });
 
-    test('rejects amount <= 0 (owner caller)', async () => {
-        setOwnerAddresses(OWNER_WALLET);
-        setAgentWallet(db, agentId, OWNER_WALLET);
-        const ctx = createMockContext();
-        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 0 });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('between 1');
-    });
+  test('rejects amount <= 0 (owner caller)', async () => {
+    setOwnerAddresses(OWNER_WALLET);
+    setAgentWallet(db, agentId, OWNER_WALLET);
+    const ctx = createMockContext();
+    const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 0 });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('between 1');
+  });
 
-    test('rejects amount > 1,000,000 (owner caller)', async () => {
-        setOwnerAddresses(OWNER_WALLET);
-        setAgentWallet(db, agentId, OWNER_WALLET);
-        const ctx = createMockContext();
-        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 1_000_001 });
-        expect(result.isError).toBe(true);
-    });
+  test('rejects amount > 1,000,000 (owner caller)', async () => {
+    setOwnerAddresses(OWNER_WALLET);
+    setAgentWallet(db, agentId, OWNER_WALLET);
+    const ctx = createMockContext();
+    const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 1_000_001 });
+    expect(result.isError).toBe(true);
+  });
 
-    test('grants credits successfully (owner caller)', async () => {
-        setOwnerAddresses(OWNER_WALLET);
-        setAgentWallet(db, agentId, OWNER_WALLET);
-        const ctx = createMockContext();
-        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50, reason: 'test' });
-        expect(result.isError).toBeUndefined();
-        expect((result.content[0] as { text: string }).text).toContain('50');
-    });
+  test('grants credits successfully (owner caller)', async () => {
+    setOwnerAddresses(OWNER_WALLET);
+    setAgentWallet(db, agentId, OWNER_WALLET);
+    const ctx = createMockContext();
+    const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50, reason: 'test' });
+    expect(result.isError).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toContain('50');
+  });
 });
 
 describe('handleCreditConfig', () => {
-    test('returns config when no key/value (no owner check needed)', async () => {
-        setOwnerAddresses('');
-        const ctx = createMockContext();
-        const result = await handleCreditConfig(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('creditsPerAlgo');
-        expect(text).toContain('1000');
-    });
+  test('returns config when no key/value (no owner check needed)', async () => {
+    setOwnerAddresses('');
+    const ctx = createMockContext();
+    const result = await handleCreditConfig(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('creditsPerAlgo');
+    expect(text).toContain('1000');
+  });
 
-    test('rejects non-owner write', async () => {
-        setOwnerAddresses('');
-        const ctx = createMockContext();
-        const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
-    });
+  test('rejects non-owner write', async () => {
+    setOwnerAddresses('');
+    const ctx = createMockContext();
+    const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+  });
 
-    test('updates config with key and value (owner caller)', async () => {
-        setOwnerAddresses(OWNER_WALLET);
-        setAgentWallet(db, agentId, OWNER_WALLET);
-        const ctx = createMockContext();
-        const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
-        expect((result.content[0] as { text: string }).text).toContain('updated');
-    });
+  test('updates config with key and value (owner caller)', async () => {
+    setOwnerAddresses(OWNER_WALLET);
+    setAgentWallet(db, agentId, OWNER_WALLET);
+    const ctx = createMockContext();
+    const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
+    expect((result.content[0] as { text: string }).text).toContain('updated');
+  });
 });
 
 // ─── Manage Schedule ─────────────────────────────────────────────────────────
 
 describe('handleManageSchedule', () => {
-    test('list returns empty for new agent', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'list' });
-        expect((result.content[0] as { text: string }).text).toContain('No schedules');
+  test('list returns empty for new agent', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'list' });
+    expect((result.content[0] as { text: string }).text).toContain('No schedules');
+  });
+
+  test('create requires name and actions', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      cron_expression: '@daily',
     });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('name');
+  });
 
-    test('create requires name and actions', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            cron_expression: '@daily',
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('name');
+  test('create requires cron or interval', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Test',
+      schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
     });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('cron_expression or interval_minutes');
+  });
 
-    test('create requires cron or interval', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Test',
-            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('cron_expression or interval_minutes');
+  test('create validates frequency (rejects too-frequent cron)', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'TooFrequent',
+      schedule_actions: [{ type: 'star_repo' }],
+      cron_expression: '* * * * *', // every minute
     });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('fires every');
+  });
 
-    test('create validates frequency (rejects too-frequent cron)', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'TooFrequent',
-            schedule_actions: [{ type: 'star_repo' }],
-            cron_expression: '* * * * *', // every minute
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('fires every');
+  test('create validates frequency (rejects short interval)', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'TooFrequent',
+      schedule_actions: [{ type: 'star_repo' }],
+      interval_minutes: 1, // 1 minute = 60000ms < 300000ms
     });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('too short');
+  });
 
-    test('create validates frequency (rejects short interval)', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'TooFrequent',
-            schedule_actions: [{ type: 'star_repo' }],
-            interval_minutes: 1, // 1 minute = 60000ms < 300000ms
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('too short');
+  test('create succeeds with valid params', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Daily Stars',
+      schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
+      cron_expression: '@daily',
     });
+    expect(result.isError).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toContain('Schedule created');
+  });
 
-    test('create succeeds with valid params', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Daily Stars',
-            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
-            cron_expression: '@daily',
-        });
-        expect(result.isError).toBeUndefined();
-        expect((result.content[0] as { text: string }).text).toContain('Schedule created');
+  test('create with cron sets next_run_at', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Cron Next Run',
+      schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
+      cron_expression: '@daily',
     });
+    const text = (result.content[0] as { text: string }).text;
+    const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
+    expect(idMatch).not.toBeNull();
+    // Verify next_run_at was persisted in DB
+    const schedule = getSchedule(db, idMatch![1]);
+    expect(schedule).not.toBeNull();
+    expect(schedule!.nextRunAt).not.toBeNull();
+    // The output should show the computed next run, not 'pending calculation'
+    expect(text).not.toContain('pending calculation');
+  });
 
-    test('create with cron sets next_run_at', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Cron Next Run',
-            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
-            cron_expression: '@daily',
-        });
-        const text = (result.content[0] as { text: string }).text;
-        const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
-        expect(idMatch).not.toBeNull();
-        // Verify next_run_at was persisted in DB
-        const schedule = getSchedule(db, idMatch![1]);
-        expect(schedule).not.toBeNull();
-        expect(schedule!.nextRunAt).not.toBeNull();
-        // The output should show the computed next run, not 'pending calculation'
-        expect(text).not.toContain('pending calculation');
+  test('create with interval sets next_run_at', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Interval Next Run',
+      schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
+      interval_minutes: 60,
     });
+    const text = (result.content[0] as { text: string }).text;
+    const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
+    expect(idMatch).not.toBeNull();
+    const schedule = getSchedule(db, idMatch![1]);
+    expect(schedule).not.toBeNull();
+    expect(schedule!.nextRunAt).not.toBeNull();
+    expect(text).not.toContain('pending calculation');
+  });
 
-    test('create with interval sets next_run_at', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Interval Next Run',
-            schedule_actions: [{ type: 'star_repo', repos: ['test/repo'] }],
-            interval_minutes: 60,
-        });
-        const text = (result.content[0] as { text: string }).text;
-        const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
-        expect(idMatch).not.toBeNull();
-        const schedule = getSchedule(db, idMatch![1]);
-        expect(schedule).not.toBeNull();
-        expect(schedule!.nextRunAt).not.toBeNull();
-        expect(text).not.toContain('pending calculation');
+  test('update with cron_expression recomputes next_run_at', async () => {
+    const ctx = createMockContext();
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Update Cron',
+      schedule_actions: [{ type: 'star_repo' }],
+      cron_expression: '@daily',
     });
+    const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+    const scheduleId = idMatch![1];
 
-    test('update with cron_expression recomputes next_run_at', async () => {
-        const ctx = createMockContext();
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Update Cron',
-            schedule_actions: [{ type: 'star_repo' }],
-            cron_expression: '@daily',
-        });
-        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
-        const scheduleId = idMatch![1];
-
-        const result = await handleManageSchedule(ctx, {
-            action: 'update',
-            schedule_id: scheduleId,
-            cron_expression: '@hourly',
-        });
-        expect(result.isError).toBeUndefined();
-        const schedule = getSchedule(db, scheduleId);
-        expect(schedule!.nextRunAt).not.toBeNull();
+    const result = await handleManageSchedule(ctx, {
+      action: 'update',
+      schedule_id: scheduleId,
+      cron_expression: '@hourly',
     });
+    expect(result.isError).toBeUndefined();
+    const schedule = getSchedule(db, scheduleId);
+    expect(schedule!.nextRunAt).not.toBeNull();
+  });
 
-    test('update with interval_minutes recomputes next_run_at', async () => {
-        const ctx = createMockContext();
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Update Interval',
-            schedule_actions: [{ type: 'star_repo' }],
-            interval_minutes: 60,
-        });
-        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
-        const scheduleId = idMatch![1];
-
-        const result = await handleManageSchedule(ctx, {
-            action: 'update',
-            schedule_id: scheduleId,
-            interval_minutes: 120,
-        });
-        expect(result.isError).toBeUndefined();
-        const schedule = getSchedule(db, scheduleId);
-        expect(schedule!.nextRunAt).not.toBeNull();
+  test('update with interval_minutes recomputes next_run_at', async () => {
+    const ctx = createMockContext();
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Update Interval',
+      schedule_actions: [{ type: 'star_repo' }],
+      interval_minutes: 60,
     });
+    const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+    const scheduleId = idMatch![1];
 
-    test('pause requires schedule_id', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'pause' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('schedule_id');
+    const result = await handleManageSchedule(ctx, {
+      action: 'update',
+      schedule_id: scheduleId,
+      interval_minutes: 120,
     });
+    expect(result.isError).toBeUndefined();
+    const schedule = getSchedule(db, scheduleId);
+    expect(schedule!.nextRunAt).not.toBeNull();
+  });
 
-    test('resume requires schedule_id', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'resume' });
-        expect(result.isError).toBe(true);
+  test('pause requires schedule_id', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'pause' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('schedule_id');
+  });
+
+  test('resume requires schedule_id', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'resume' });
+    expect(result.isError).toBe(true);
+  });
+
+  test('pause and resume flow', async () => {
+    const ctx = createMockContext();
+    // Create first
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'PauseResume',
+      schedule_actions: [{ type: 'star_repo' }],
+      cron_expression: '@daily',
     });
+    const text = (createResult.content[0] as { text: string }).text;
+    const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
+    expect(idMatch).not.toBeNull();
+    const scheduleId = idMatch![1];
 
-    test('pause and resume flow', async () => {
-        const ctx = createMockContext();
-        // Create first
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'PauseResume',
-            schedule_actions: [{ type: 'star_repo' }],
-            cron_expression: '@daily',
-        });
-        const text = (createResult.content[0] as { text: string }).text;
-        const idMatch = text.match(/ID:\s*([a-f0-9-]+)/);
-        expect(idMatch).not.toBeNull();
-        const scheduleId = idMatch![1];
+    // Pause
+    const pauseResult = await handleManageSchedule(ctx, { action: 'pause', schedule_id: scheduleId });
+    expect((pauseResult.content[0] as { text: string }).text).toContain('paused');
 
-        // Pause
-        const pauseResult = await handleManageSchedule(ctx, { action: 'pause', schedule_id: scheduleId });
-        expect((pauseResult.content[0] as { text: string }).text).toContain('paused');
+    // Resume
+    const resumeResult = await handleManageSchedule(ctx, { action: 'resume', schedule_id: scheduleId });
+    expect((resumeResult.content[0] as { text: string }).text).toContain('resumed');
+  });
 
-        // Resume
-        const resumeResult = await handleManageSchedule(ctx, { action: 'resume', schedule_id: scheduleId });
-        expect((resumeResult.content[0] as { text: string }).text).toContain('resumed');
+  test('update requires schedule_id', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'update', name: 'New Name' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('schedule_id');
+  });
+
+  test('update requires at least one field to change', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'fake-id' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('No fields to update');
+  });
+
+  test('update returns error for nonexistent schedule', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'nonexistent', name: 'X' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not found');
+  });
+
+  test('update modifies name and description', async () => {
+    const ctx = createMockContext();
+    // Create first
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'Original',
+      description: 'Old desc',
+      schedule_actions: [{ type: 'star_repo' }],
+      cron_expression: '@daily',
     });
+    const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+    const scheduleId = idMatch![1];
 
-    test('update requires schedule_id', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'update', name: 'New Name' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('schedule_id');
+    // Update
+    const result = await handleManageSchedule(ctx, {
+      action: 'update',
+      schedule_id: scheduleId,
+      name: 'Renamed',
+      description: 'New desc',
     });
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('updated');
+    expect(text).toContain('name');
+    expect(text).toContain('description');
+  });
 
-    test('update requires at least one field to change', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'fake-id' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('No fields to update');
+  test('update validates frequency when timing changes', async () => {
+    const ctx = createMockContext();
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'FreqTest',
+      schedule_actions: [{ type: 'star_repo' }],
+      cron_expression: '@daily',
     });
+    const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+    const scheduleId = idMatch![1];
 
-    test('update returns error for nonexistent schedule', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'nonexistent', name: 'X' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not found');
+    const result = await handleManageSchedule(ctx, {
+      action: 'update',
+      schedule_id: scheduleId,
+      interval_minutes: 1,
     });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('too short');
+  });
 
-    test('update modifies name and description', async () => {
-        const ctx = createMockContext();
-        // Create first
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'Original',
-            description: 'Old desc',
-            schedule_actions: [{ type: 'star_repo' }],
-            cron_expression: '@daily',
-        });
-        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
-        const scheduleId = idMatch![1];
-
-        // Update
-        const result = await handleManageSchedule(ctx, {
-            action: 'update',
-            schedule_id: scheduleId,
-            name: 'Renamed',
-            description: 'New desc',
-        });
-        expect(result.isError).toBeUndefined();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('updated');
-        expect(text).toContain('name');
-        expect(text).toContain('description');
+  test('update modifies schedule_actions', async () => {
+    const ctx = createMockContext();
+    const createResult = await handleManageSchedule(ctx, {
+      action: 'create',
+      name: 'ActionTest',
+      schedule_actions: [{ type: 'star_repo', repos: ['old/repo'] }],
+      cron_expression: '@daily',
     });
+    const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+    const scheduleId = idMatch![1];
 
-    test('update validates frequency when timing changes', async () => {
-        const ctx = createMockContext();
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'FreqTest',
-            schedule_actions: [{ type: 'star_repo' }],
-            cron_expression: '@daily',
-        });
-        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
-        const scheduleId = idMatch![1];
-
-        const result = await handleManageSchedule(ctx, {
-            action: 'update',
-            schedule_id: scheduleId,
-            interval_minutes: 1,
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('too short');
+    const result = await handleManageSchedule(ctx, {
+      action: 'update',
+      schedule_id: scheduleId,
+      schedule_actions: [{ type: 'review_prs', repos: ['new/repo'] }],
     });
+    expect(result.isError).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toContain('schedule_actions');
+  });
 
-    test('update modifies schedule_actions', async () => {
-        const ctx = createMockContext();
-        const createResult = await handleManageSchedule(ctx, {
-            action: 'create',
-            name: 'ActionTest',
-            schedule_actions: [{ type: 'star_repo', repos: ['old/repo'] }],
-            cron_expression: '@daily',
-        });
-        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
-        const scheduleId = idMatch![1];
+  test('history returns empty when no executions', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'history' });
+    expect((result.content[0] as { text: string }).text).toContain('No executions');
+  });
 
-        const result = await handleManageSchedule(ctx, {
-            action: 'update',
-            schedule_id: scheduleId,
-            schedule_actions: [{ type: 'review_prs', repos: ['new/repo'] }],
-        });
-        expect(result.isError).toBeUndefined();
-        expect((result.content[0] as { text: string }).text).toContain('schedule_actions');
-    });
-
-    test('history returns empty when no executions', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'history' });
-        expect((result.content[0] as { text: string }).text).toContain('No executions');
-    });
-
-    test('unknown action returns error', async () => {
-        const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'delete' as unknown as 'list' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Unknown action');
-    });
+  test('unknown action returns error', async () => {
+    const ctx = createMockContext();
+    const result = await handleManageSchedule(ctx, { action: 'delete' as unknown as 'list' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Unknown action');
+  });
 });
 
 // ─── Create Work Task ────────────────────────────────────────────────────────
 
 describe('handleCreateWorkTask', () => {
-    test('returns error when service not available', async () => {
-        const ctx = createMockContext({ workTaskService: undefined });
-        const result = await handleCreateWorkTask(ctx, { description: 'fix bug' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not available');
-    });
+  test('returns error when service not available', async () => {
+    const ctx = createMockContext({ workTaskService: undefined });
+    const result = await handleCreateWorkTask(ctx, { description: 'fix bug' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not available');
+  });
 
-    test('rate limits after max tasks per day', async () => {
-        // WORK_TASK_MAX_PER_DAY defaults to 100; fill up to the limit
-        const maxPerDay = parseInt(process.env.WORK_TASK_MAX_PER_DAY ?? '100', 10);
-        const project = createProject(db, { name: 'RateLimitProject', workingDir: '/tmp' });
-        for (let i = 0; i < maxPerDay; i++) {
-            db.query(
-                `INSERT INTO work_tasks (id, agent_id, project_id, description) VALUES (?, ?, ?, ?)`
-            ).run(crypto.randomUUID(), agentId, project.id, `task-${i}`);
-        }
+  test('rate limits after max tasks per day', async () => {
+    // WORK_TASK_MAX_PER_DAY defaults to 100; fill up to the limit
+    const maxPerDay = parseInt(process.env.WORK_TASK_MAX_PER_DAY ?? '100', 10);
+    const project = createProject(db, { name: 'RateLimitProject', workingDir: '/tmp' });
+    for (let i = 0; i < maxPerDay; i++) {
+      db.query(`INSERT INTO work_tasks (id, agent_id, project_id, description) VALUES (?, ?, ?, ?)`).run(
+        crypto.randomUUID(),
+        agentId,
+        project.id,
+        `task-${i}`,
+      );
+    }
 
-        const ctx = createMockContext({
-            workTaskService: {
-                create: mock(() => Promise.resolve({ id: 'wt-new', status: 'pending' })),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCreateWorkTask(ctx, { description: 'one more' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Rate limit');
+    const ctx = createMockContext({
+      workTaskService: {
+        create: mock(() => Promise.resolve({ id: 'wt-new', status: 'pending' })),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCreateWorkTask(ctx, { description: 'one more' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Rate limit');
+  });
 
-    test('delegates to valid agent_id', async () => {
-        const delegateAgent = createAgent(db, { name: 'DelegateAgent', model: 'haiku' });
-        const mockCreate = mock(() => Promise.resolve({ id: 'wt-delegated', status: 'pending', branch: 'fix/delegated' }));
-        const ctx = createMockContext({
-            workTaskService: {
-                create: mockCreate,
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'delegated task',
-            agent_id: delegateAgent.id,
-        });
-        expect(result.isError).toBeUndefined();
-        expect(mockCreate).toHaveBeenCalledTimes(1);
-        // Verify the task was created with the delegate agent's ID, not the caller's
-        const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
-        expect(createArgs[0].agentId).toBe(delegateAgent.id);
+  test('delegates to valid agent_id', async () => {
+    const delegateAgent = createAgent(db, { name: 'DelegateAgent', model: 'haiku' });
+    const mockCreate = mock(() => Promise.resolve({ id: 'wt-delegated', status: 'pending', branch: 'fix/delegated' }));
+    const ctx = createMockContext({
+      workTaskService: {
+        create: mockCreate,
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'delegated task',
+      agent_id: delegateAgent.id,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    // Verify the task was created with the delegate agent's ID, not the caller's
+    const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
+    expect(createArgs[0].agentId).toBe(delegateAgent.id);
+  });
 
-    test('returns error for invalid agent_id', async () => {
-        const ctx = createMockContext({
-            workTaskService: {
-                create: mock(() => Promise.resolve({ id: 'wt-x', status: 'pending' })),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'bad delegation',
-            agent_id: 'nonexistent-agent-id',
-        });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('Agent not found');
+  test('returns error for invalid agent_id', async () => {
+    const ctx = createMockContext({
+      workTaskService: {
+        create: mock(() => Promise.resolve({ id: 'wt-x', status: 'pending' })),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'bad delegation',
+      agent_id: 'nonexistent-agent-id',
+    });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Agent not found');
+  });
 
-    test('uses calling agent when agent_id omitted', async () => {
-        const mockCreate = mock(() => Promise.resolve({ id: 'wt-self', status: 'pending', branch: 'fix/self' }));
-        const ctx = createMockContext({
-            workTaskService: {
-                create: mockCreate,
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCreateWorkTask(ctx, { description: 'self task' });
-        expect(result.isError).toBeUndefined();
-        const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
-        expect(createArgs[0].agentId).toBe(agentId);
+  test('uses calling agent when agent_id omitted', async () => {
+    const mockCreate = mock(() => Promise.resolve({ id: 'wt-self', status: 'pending', branch: 'fix/self' }));
+    const ctx = createMockContext({
+      workTaskService: {
+        create: mockCreate,
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCreateWorkTask(ctx, { description: 'self task' });
+    expect(result.isError).toBeUndefined();
+    const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
+    expect(createArgs[0].agentId).toBe(agentId);
+  });
 });
 
 // ─── Check Work Status ───────────────────────────────────────────────────────
 
 describe('handleCheckWorkStatus', () => {
-    test('returns error when service not available', async () => {
-        const ctx = createMockContext({ workTaskService: undefined });
-        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-123' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not available');
-    });
+  test('returns error when service not available', async () => {
+    const ctx = createMockContext({ workTaskService: undefined });
+    const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-123' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not available');
+  });
 
-    test('returns error for nonexistent task', async () => {
-        const ctx = createMockContext({
-            workTaskService: {
-                getTask: mock(() => null),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-nonexistent' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not found');
+  test('returns error for nonexistent task', async () => {
+    const ctx = createMockContext({
+      workTaskService: {
+        getTask: mock(() => null),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-nonexistent' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not found');
+  });
 
-    test('returns task details for existing task', async () => {
-        const mockTask = {
-            id: 'wt-abc',
-            status: 'running',
-            projectId: 'proj-1',
-            branchName: 'fix/bug-42',
-            iterationCount: 2,
-            createdAt: '2026-03-14T10:00:00Z',
-            prUrl: null,
-            error: null,
-            completedAt: null,
-        };
-        const ctx = createMockContext({
-            workTaskService: {
-                getTask: mock(() => mockTask),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-abc' });
-        expect(result.isError).toBeUndefined();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('wt-abc');
-        expect(text).toContain('running');
-        expect(text).toContain('fix/bug-42');
-        expect(text).toContain('Iteration: 2');
+  test('returns task details for existing task', async () => {
+    const mockTask = {
+      id: 'wt-abc',
+      status: 'running',
+      projectId: 'proj-1',
+      branchName: 'fix/bug-42',
+      iterationCount: 2,
+      createdAt: '2026-03-14T10:00:00Z',
+      prUrl: null,
+      error: null,
+      completedAt: null,
+    };
+    const ctx = createMockContext({
+      workTaskService: {
+        getTask: mock(() => mockTask),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-abc' });
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('wt-abc');
+    expect(text).toContain('running');
+    expect(text).toContain('fix/bug-42');
+    expect(text).toContain('Iteration: 2');
+  });
 
-    test('includes PR url and error when present', async () => {
-        const mockTask = {
-            id: 'wt-def',
-            status: 'failed',
-            projectId: 'proj-1',
-            branchName: 'fix/crash',
-            iterationCount: 1,
-            createdAt: '2026-03-14T10:00:00Z',
-            prUrl: 'https://github.com/org/repo/pull/99',
-            error: 'Branch creation failed',
-            completedAt: '2026-03-14T11:00:00Z',
-        };
-        const ctx = createMockContext({
-            workTaskService: {
-                getTask: mock(() => mockTask),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-def' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('PR: https://github.com/org/repo/pull/99');
-        expect(text).toContain('Error: Branch creation failed');
-        expect(text).toContain('Completed:');
+  test('includes PR url and error when present', async () => {
+    const mockTask = {
+      id: 'wt-def',
+      status: 'failed',
+      projectId: 'proj-1',
+      branchName: 'fix/crash',
+      iterationCount: 1,
+      createdAt: '2026-03-14T10:00:00Z',
+      prUrl: 'https://github.com/org/repo/pull/99',
+      error: 'Branch creation failed',
+      completedAt: '2026-03-14T11:00:00Z',
+    };
+    const ctx = createMockContext({
+      workTaskService: {
+        getTask: mock(() => mockTask),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-def' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('PR: https://github.com/org/repo/pull/99');
+    expect(text).toContain('Error: Branch creation failed');
+    expect(text).toContain('Completed:');
+  });
 });
 
 // ─── List Work Tasks ─────────────────────────────────────────────────────────
 
 describe('handleListWorkTasks', () => {
-    test('returns error when service not available', async () => {
-        const ctx = createMockContext({ workTaskService: undefined });
-        const result = await handleListWorkTasks(ctx, {});
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('not available');
-    });
+  test('returns error when service not available', async () => {
+    const ctx = createMockContext({ workTaskService: undefined });
+    const result = await handleListWorkTasks(ctx, {});
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('not available');
+  });
 
-    test('returns empty message when no tasks exist', async () => {
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => []),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('No work tasks found');
+  test('returns empty message when no tasks exist', async () => {
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => []),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No work tasks found');
+  });
 
-    test('returns empty message with status filter', async () => {
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => []),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, { status: 'running' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('No work tasks with status "running"');
+  test('returns empty message with status filter', async () => {
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => []),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, { status: 'running' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No work tasks with status "running"');
+  });
 
-    test('lists tasks with details', async () => {
-        const mockTasks = [
-            { id: 'wt-1', status: 'completed', description: 'Fix login bug', prUrl: 'https://github.com/org/repo/pull/1', error: null },
-            { id: 'wt-2', status: 'running', description: 'Add search feature', prUrl: null, error: null },
-        ];
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => mockTasks),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Work tasks (2)');
-        expect(text).toContain('wt-1');
-        expect(text).toContain('completed');
-        expect(text).toContain('Fix login bug');
-        expect(text).toContain('PR: https://github.com/org/repo/pull/1');
-        expect(text).toContain('wt-2');
-        expect(text).toContain('Add search feature');
+  test('lists tasks with details', async () => {
+    const mockTasks = [
+      {
+        id: 'wt-1',
+        status: 'completed',
+        description: 'Fix login bug',
+        prUrl: 'https://github.com/org/repo/pull/1',
+        error: null,
+      },
+      { id: 'wt-2', status: 'running', description: 'Add search feature', prUrl: null, error: null },
+    ];
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => mockTasks),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Work tasks (2)');
+    expect(text).toContain('wt-1');
+    expect(text).toContain('completed');
+    expect(text).toContain('Fix login bug');
+    expect(text).toContain('PR: https://github.com/org/repo/pull/1');
+    expect(text).toContain('wt-2');
+    expect(text).toContain('Add search feature');
+  });
 
-    test('filters by status', async () => {
-        const mockTasks = [
-            { id: 'wt-1', status: 'completed', description: 'Done task', prUrl: null, error: null },
-            { id: 'wt-2', status: 'running', description: 'Active task', prUrl: null, error: null },
-        ];
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => mockTasks),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, { status: 'running' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Work tasks (1)');
-        expect(text).toContain('wt-2');
-        expect(text).not.toContain('wt-1');
+  test('filters by status', async () => {
+    const mockTasks = [
+      { id: 'wt-1', status: 'completed', description: 'Done task', prUrl: null, error: null },
+      { id: 'wt-2', status: 'running', description: 'Active task', prUrl: null, error: null },
+    ];
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => mockTasks),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, { status: 'running' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Work tasks (1)');
+    expect(text).toContain('wt-2');
+    expect(text).not.toContain('wt-1');
+  });
 
-    test('respects limit parameter', async () => {
-        const mockTasks = Array.from({ length: 10 }, (_, i) => ({
-            id: `wt-${i}`, status: 'pending', description: `Task ${i}`, prUrl: null, error: null,
-        }));
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => mockTasks),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, { limit: 3 });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Work tasks (3)');
-        expect(text).toContain('wt-0');
-        expect(text).toContain('wt-2');
-        expect(text).not.toContain('wt-3');
+  test('respects limit parameter', async () => {
+    const mockTasks = Array.from({ length: 10 }, (_, i) => ({
+      id: `wt-${i}`,
+      status: 'pending',
+      description: `Task ${i}`,
+      prUrl: null,
+      error: null,
+    }));
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => mockTasks),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, { limit: 3 });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Work tasks (3)');
+    expect(text).toContain('wt-0');
+    expect(text).toContain('wt-2');
+    expect(text).not.toContain('wt-3');
+  });
 
-    test('caps limit at 50', async () => {
-        const mockTasks = Array.from({ length: 60 }, (_, i) => ({
-            id: `wt-${i}`, status: 'pending', description: `Task ${i}`, prUrl: null, error: null,
-        }));
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => mockTasks),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, { limit: 100 });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Work tasks (50)');
+  test('caps limit at 50', async () => {
+    const mockTasks = Array.from({ length: 60 }, (_, i) => ({
+      id: `wt-${i}`,
+      status: 'pending',
+      description: `Task ${i}`,
+      prUrl: null,
+      error: null,
+    }));
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => mockTasks),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, { limit: 100 });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Work tasks (50)');
+  });
 
-    test('includes error snippet in task listing', async () => {
-        const mockTasks = [
-            { id: 'wt-fail', status: 'failed', description: 'Broken task', prUrl: null, error: 'Something went very wrong with the branch checkout' },
-        ];
-        const ctx = createMockContext({
-            workTaskService: {
-                listTasks: mock(() => mockTasks),
-            } as unknown as McpToolContext['workTaskService'],
-        });
-        const result = await handleListWorkTasks(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Error: Something went very wrong');
+  test('includes error snippet in task listing', async () => {
+    const mockTasks = [
+      {
+        id: 'wt-fail',
+        status: 'failed',
+        description: 'Broken task',
+        prUrl: null,
+        error: 'Something went very wrong with the branch checkout',
+      },
+    ];
+    const ctx = createMockContext({
+      workTaskService: {
+        listTasks: mock(() => mockTasks),
+      } as unknown as McpToolContext['workTaskService'],
     });
+    const result = await handleListWorkTasks(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Error: Something went very wrong');
+  });
 });
 
 // ─── model_tier validation (handleCreateWorkTask) ────────────────────────────
 
 describe('handleCreateWorkTask model_tier validation', () => {
-    function createWorkCtx(): McpToolContext {
-        return createMockContext({
-            workTaskService: {
-                create: mock(() => Promise.resolve({
-                    id: 'wt-new',
-                    status: 'pending',
-                    projectId: 'proj-1',
-                    branchName: null,
-                })),
-            } as unknown as McpToolContext['workTaskService'],
-        });
+  function createWorkCtx(): McpToolContext {
+    return createMockContext({
+      workTaskService: {
+        create: mock(() =>
+          Promise.resolve({
+            id: 'wt-new',
+            status: 'pending',
+            projectId: 'proj-1',
+            branchName: null,
+          }),
+        ),
+      } as unknown as McpToolContext['workTaskService'],
+    });
+  }
+
+  test('rejects invalid model_tier value', async () => {
+    const ctx = createWorkCtx();
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'fix bug',
+      model_tier: 'turbo',
+    });
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Invalid model_tier');
+    expect(text).toContain('turbo');
+  });
+
+  test('accepts "heavy" as valid model_tier', async () => {
+    const ctx = createWorkCtx();
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'refactor auth',
+      model_tier: 'heavy',
+    });
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Model tier: heavy');
+  });
+
+  test('accepts "standard" as valid model_tier', async () => {
+    const ctx = createWorkCtx();
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'update docs',
+      model_tier: 'standard',
+    });
+    expect(result.isError).toBeUndefined();
+  });
+
+  test('accepts "light" as valid model_tier', async () => {
+    const ctx = createWorkCtx();
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'lint fix',
+      model_tier: 'light',
+    });
+    expect(result.isError).toBeUndefined();
+  });
+
+  test('accepts raw tier names (opus, sonnet, haiku)', async () => {
+    const ctx = createWorkCtx();
+    for (const tier of ['opus', 'sonnet', 'haiku']) {
+      const result = await handleCreateWorkTask(ctx, {
+        description: `test ${tier}`,
+        model_tier: tier,
+      });
+      expect(result.isError).toBeUndefined();
     }
+  });
 
-    test('rejects invalid model_tier value', async () => {
-        const ctx = createWorkCtx();
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'fix bug',
-            model_tier: 'turbo',
-        });
-        expect(result.isError).toBe(true);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Invalid model_tier');
-        expect(text).toContain('turbo');
+  test('omitting model_tier defaults to auto', async () => {
+    const ctx = createWorkCtx();
+    const result = await handleCreateWorkTask(ctx, {
+      description: 'auto tier task',
     });
-
-    test('accepts "heavy" as valid model_tier', async () => {
-        const ctx = createWorkCtx();
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'refactor auth',
-            model_tier: 'heavy',
-        });
-        expect(result.isError).toBeUndefined();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Model tier: heavy');
-    });
-
-    test('accepts "standard" as valid model_tier', async () => {
-        const ctx = createWorkCtx();
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'update docs',
-            model_tier: 'standard',
-        });
-        expect(result.isError).toBeUndefined();
-    });
-
-    test('accepts "light" as valid model_tier', async () => {
-        const ctx = createWorkCtx();
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'lint fix',
-            model_tier: 'light',
-        });
-        expect(result.isError).toBeUndefined();
-    });
-
-    test('accepts raw tier names (opus, sonnet, haiku)', async () => {
-        const ctx = createWorkCtx();
-        for (const tier of ['opus', 'sonnet', 'haiku']) {
-            const result = await handleCreateWorkTask(ctx, {
-                description: `test ${tier}`,
-                model_tier: tier,
-            });
-            expect(result.isError).toBeUndefined();
-        }
-    });
-
-    test('omitting model_tier defaults to auto', async () => {
-        const ctx = createWorkCtx();
-        const result = await handleCreateWorkTask(ctx, {
-            description: 'auto tier task',
-        });
-        expect(result.isError).toBeUndefined();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Model tier: auto');
-    });
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Model tier: auto');
+  });
 });
 
 // ─── Recall Memory ───────────────────────────────────────────────────────────
 
 describe('handleRecallMemory', () => {
-    test('recall by key returns content', async () => {
-        saveMemory(db, { agentId, key: 'test-key', content: 'test-value' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'test-key' });
-        expect((result.content[0] as { text: string }).text).toContain('test-value');
-    });
+  test('recall by key returns content', async () => {
+    saveMemory(db, { agentId, key: 'test-key', content: 'test-value' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'test-key' });
+    expect((result.content[0] as { text: string }).text).toContain('test-value');
+  });
 
-    test('recall nonexistent key returns not found', async () => {
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'nonexistent' });
-        expect((result.content[0] as { text: string }).text).toContain('No memory found');
-    });
+  test('recall nonexistent key returns not found', async () => {
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'nonexistent' });
+    expect((result.content[0] as { text: string }).text).toContain('No memory found');
+  });
 
-    test('search by query returns matches', async () => {
-        saveMemory(db, { agentId, key: 'project-notes', content: 'Use TypeScript strictly' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { query: 'TypeScript' });
-        expect((result.content[0] as { text: string }).text).toContain('TypeScript');
-    });
+  test('search by query returns matches', async () => {
+    saveMemory(db, { agentId, key: 'project-notes', content: 'Use TypeScript strictly' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { query: 'TypeScript' });
+    expect((result.content[0] as { text: string }).text).toContain('TypeScript');
+  });
 
-    test('no args lists recent memories', async () => {
-        saveMemory(db, { agentId, key: 'mem-a', content: 'data-a' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, {});
-        expect((result.content[0] as { text: string }).text).toContain('mem-a');
-    });
+  test('no args lists recent memories', async () => {
+    saveMemory(db, { agentId, key: 'mem-a', content: 'data-a' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, {});
+    expect((result.content[0] as { text: string }).text).toContain('mem-a');
+  });
 
-    test('no args with empty memories', async () => {
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, {});
-        expect((result.content[0] as { text: string }).text).toContain('No memories');
-    });
+  test('no args with empty memories', async () => {
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, {});
+    expect((result.content[0] as { text: string }).text).toContain('No memories');
+  });
 
-    test('recall by key shows full txid when confirmed', async () => {
-        const mem = saveMemory(db, { agentId, key: 'full-txid-key', content: 'txid-content' });
-        updateMemoryTxid(db, mem.id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'full-txid-key' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
-    });
+  test('recall by key shows full txid when confirmed', async () => {
+    const mem = saveMemory(db, { agentId, key: 'full-txid-key', content: 'txid-content' });
+    updateMemoryTxid(db, mem.id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'full-txid-key' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+  });
 
-    test('recall nonexistent key falls back to on-chain', async () => {
-        const ctx = createMockContext({
-            agentMessenger: {
-                invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
-                sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
-                sendNotificationToAddress: mock(() => Promise.resolve()),
-                readOnChainMemories: mock(() => Promise.resolve([{
-                    key: 'on-chain-only',
-                    content: 'found on chain',
-                    txid: 'ONCHAINTXID123',
-                    timestamp: '2026-03-18T00:00:00Z',
-                    confirmedRound: 100,
-                }])),
-            } as unknown as McpToolContext['agentMessenger'],
-        });
-        const result = await handleRecallMemory(ctx, { key: 'on-chain-only' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('found on chain');
-        expect(text).toContain('ONCHAINTXID123');
-        expect(text).toContain('on-chain but missing from local cache');
+  test('recall nonexistent key falls back to on-chain', async () => {
+    const ctx = createMockContext({
+      agentMessenger: {
+        invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
+        sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
+        sendNotificationToAddress: mock(() => Promise.resolve()),
+        readOnChainMemories: mock(() =>
+          Promise.resolve([
+            {
+              key: 'on-chain-only',
+              content: 'found on chain',
+              txid: 'ONCHAINTXID123',
+              timestamp: '2026-03-18T00:00:00Z',
+              confirmedRound: 100,
+            },
+          ]),
+        ),
+      } as unknown as McpToolContext['agentMessenger'],
     });
+    const result = await handleRecallMemory(ctx, { key: 'on-chain-only' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('found on chain');
+    expect(text).toContain('ONCHAINTXID123');
+    expect(text).toContain('on-chain but missing from local cache');
+  });
 
-    test('recall query falls back to on-chain when no local results', async () => {
-        const ctx = createMockContext({
-            agentMessenger: {
-                invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
-                sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
-                sendNotificationToAddress: mock(() => Promise.resolve()),
-                readOnChainMemories: mock(() => Promise.resolve([{
-                    key: 'chain-search-result',
-                    content: 'blockchain data',
-                    txid: 'SEARCHTXID456',
-                    timestamp: '2026-03-18T01:00:00Z',
-                    confirmedRound: 200,
-                }])),
-            } as unknown as McpToolContext['agentMessenger'],
-        });
-        const result = await handleRecallMemory(ctx, { query: 'blockchain' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('No local results');
-        expect(text).toContain('on-chain');
-        expect(text).toContain('blockchain data');
-        expect(text).toContain('SEARCHTXID456');
+  test('recall query falls back to on-chain when no local results', async () => {
+    const ctx = createMockContext({
+      agentMessenger: {
+        invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
+        sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
+        sendNotificationToAddress: mock(() => Promise.resolve()),
+        readOnChainMemories: mock(() =>
+          Promise.resolve([
+            {
+              key: 'chain-search-result',
+              content: 'blockchain data',
+              txid: 'SEARCHTXID456',
+              timestamp: '2026-03-18T01:00:00Z',
+              confirmedRound: 200,
+            },
+          ]),
+        ),
+      } as unknown as McpToolContext['agentMessenger'],
     });
+    const result = await handleRecallMemory(ctx, { query: 'blockchain' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No local results');
+    expect(text).toContain('on-chain');
+    expect(text).toContain('blockchain data');
+    expect(text).toContain('SEARCHTXID456');
+  });
 
-    test('search results include txid when confirmed', async () => {
-        const mem = saveMemory(db, { agentId, key: 'search-txid', content: 'searchable content' });
-        updateMemoryTxid(db, mem.id, 'FULLTXIDINSEARCH');
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { query: 'searchable' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('FULLTXIDINSEARCH');
-    });
+  test('search results include txid when confirmed', async () => {
+    const mem = saveMemory(db, { agentId, key: 'search-txid', content: 'searchable content' });
+    updateMemoryTxid(db, mem.id, 'FULLTXIDINSEARCH');
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { query: 'searchable' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('FULLTXIDINSEARCH');
+  });
 
-    test('recall by key shows (short-term, SQLite only) for short_term memory', async () => {
-        saveMemory(db, { agentId, key: 'short-term-key', content: 'short-term-value' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'short-term-key' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('(short-term, SQLite only)');
-    });
+  test('recall by key shows (short-term, SQLite only) for short_term memory', async () => {
+    saveMemory(db, { agentId, key: 'short-term-key', content: 'short-term-value' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'short-term-key' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('(short-term, SQLite only)');
+  });
 
-    test('recall by key shows (long-term, ASA: X) for ARC-69 memory', async () => {
-        const mem = saveMemory(db, { agentId, key: 'long-term-key', content: 'arc69-value' });
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(999, 'confirmed', mem.id);
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'long-term-key' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('(long-term, ASA: 999)');
-    });
+  test('recall by key shows (long-term, ASA: X) for ARC-69 memory', async () => {
+    const mem = saveMemory(db, { agentId, key: 'long-term-key', content: 'arc69-value' });
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(999, 'confirmed', mem.id);
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'long-term-key' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('(long-term, ASA: 999)');
+  });
 
-    test('recall by key shows (pending promotion to on-chain) for pending memory', async () => {
-        const mem = saveMemory(db, { agentId, key: 'pending-key', content: 'pending-value' });
-        updateMemoryStatus(db, mem.id, 'pending');
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { key: 'pending-key' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('(pending promotion to on-chain)');
-    });
+  test('recall by key shows (pending promotion to on-chain) for pending memory', async () => {
+    const mem = saveMemory(db, { agentId, key: 'pending-key', content: 'pending-value' });
+    updateMemoryStatus(db, mem.id, 'pending');
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { key: 'pending-key' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('(pending promotion to on-chain)');
+  });
 
-    test('search results show [short-term] tag for short_term memories', async () => {
-        saveMemory(db, { agentId, key: 'short-search', content: 'short term searchable data' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { query: 'short term searchable' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[short-term]');
-    });
+  test('search results show [short-term] tag for short_term memories', async () => {
+    saveMemory(db, { agentId, key: 'short-search', content: 'short term searchable data' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { query: 'short term searchable' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[short-term]');
+  });
 
-    test('search results show [long-term, ASA: X] tag for ARC-69 memories', async () => {
-        const mem = saveMemory(db, { agentId, key: 'long-search', content: 'long term searchable data' });
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(777, 'confirmed', mem.id);
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, { query: 'long term searchable' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[long-term, ASA: 777]');
-    });
+  test('search results show [long-term, ASA: X] tag for ARC-69 memories', async () => {
+    const mem = saveMemory(db, { agentId, key: 'long-search', content: 'long term searchable data' });
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(777, 'confirmed', mem.id);
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, { query: 'long term searchable' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[long-term, ASA: 777]');
+  });
 
-    test('list shows [short-term] tag for short_term memories', async () => {
-        saveMemory(db, { agentId, key: 'list-short', content: 'list-value' });
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[short-term]');
-    });
+  test('list shows [short-term] tag for short_term memories', async () => {
+    saveMemory(db, { agentId, key: 'list-short', content: 'list-value' });
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[short-term]');
+  });
 
-    test('list shows [long-term, ASA: X] tag for ARC-69 memories', async () => {
-        const mem = saveMemory(db, { agentId, key: 'list-long', content: 'list-arc69' });
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(888, 'confirmed', mem.id);
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[long-term, ASA: 888]');
-    });
+  test('list shows [long-term, ASA: X] tag for ARC-69 memories', async () => {
+    const mem = saveMemory(db, { agentId, key: 'list-long', content: 'list-arc69' });
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(888, 'confirmed', mem.id);
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[long-term, ASA: 888]');
+  });
 
-    test('list shows [permanent] tag for confirmed plain-txn memories', async () => {
-        const mem = saveMemory(db, { agentId, key: 'list-permanent', content: 'permanent data' });
-        updateMemoryTxid(db, mem.id, 'PERMANENT-TXID-XYZ');
-        // updateMemoryTxid sets status to confirmed with no asaId — this is a plain txn
-        const ctx = createMockContext();
-        const result = await handleRecallMemory(ctx, {});
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[permanent]');
-    });
+  test('list shows [permanent] tag for confirmed plain-txn memories', async () => {
+    const mem = saveMemory(db, { agentId, key: 'list-permanent', content: 'permanent data' });
+    updateMemoryTxid(db, mem.id, 'PERMANENT-TXID-XYZ');
+    // updateMemoryTxid sets status to confirmed with no asaId — this is a plain txn
+    const ctx = createMockContext();
+    const result = await handleRecallMemory(ctx, {});
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[permanent]');
+  });
 });
 
 // ─── handleSaveMemory (short-term default) ──────────────────────────────────
 
 describe('handleSaveMemory', () => {
-    test('saves memory as short-term and returns guidance', async () => {
-        const ctx = createMockContext();
-        const result = await handleSaveMemory(ctx, { key: 'test-save', content: 'hello' });
-        const text = (result.content[0] as { text: string }).text;
-        expect(result.isError).toBeFalsy();
-        expect(text).toContain('short-term');
-        expect(text).toContain('corvid_promote_memory');
-    });
+  test('saves memory as short-term and returns guidance', async () => {
+    const ctx = createMockContext();
+    const result = await handleSaveMemory(ctx, { key: 'test-save', content: 'hello' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain('short-term');
+    expect(text).toContain('corvid_promote_memory');
+  });
 });
 
 // ─── handlePromoteMemory ────────────────────────────────────────────────────
 
 /** Create a context where buildArc69Context succeeds (has indexer + chat account). */
 function createArc69Context(overrides?: Partial<McpToolContext>): McpToolContext {
-    return createMockContext({
-        network: 'localnet',
-        agentWalletService: {
-            getAlgoChatService: () => ({
-                algodClient: {} as any,
-                indexerClient: {} as any,
-            }),
-            getAgentChatAccount: mock(() => Promise.resolve({ account: {} as any })),
-        } as unknown as McpToolContext['agentWalletService'],
-        ...overrides,
-    });
+  return createMockContext({
+    network: 'localnet',
+    agentWalletService: {
+      getAlgoChatService: () => ({
+        algodClient: {} as any,
+        indexerClient: {} as any,
+      }),
+      getAgentChatAccount: mock(() => Promise.resolve({ account: {} as any })),
+    } as unknown as McpToolContext['agentWalletService'],
+    ...overrides,
+  });
 }
 
 describe('handlePromoteMemory', () => {
-    test('returns error when memory not found', async () => {
-        const ctx = createMockContext();
-        const result = await handlePromoteMemory(ctx, { key: 'nonexistent' });
-        expect(result.isError).toBe(true);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('No memory found');
-    });
+  test('returns error when memory not found', async () => {
+    const ctx = createMockContext();
+    const result = await handlePromoteMemory(ctx, { key: 'nonexistent' });
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No memory found');
+  });
 
-    test('returns already on-chain when memory is confirmed with asaId', async () => {
-        const ctx = createMockContext();
-        const mem = saveMemory(db, { agentId, key: 'already-onchain', content: 'data' });
-        updateMemoryTxid(db, mem.id, 'TX123');
-        // Manually set asaId and status to confirmed
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(42, 'confirmed', mem.id);
+  test('returns already on-chain when memory is confirmed with asaId', async () => {
+    const ctx = createMockContext();
+    const mem = saveMemory(db, { agentId, key: 'already-onchain', content: 'data' });
+    updateMemoryTxid(db, mem.id, 'TX123');
+    // Manually set asaId and status to confirmed
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(42, 'confirmed', mem.id);
 
-        const result = await handlePromoteMemory(ctx, { key: 'already-onchain' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('already on-chain');
-        expect(text).toContain('42');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'already-onchain' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('already on-chain');
+    expect(text).toContain('42');
+  });
 
-    test('returns error when ARC-69 context unavailable on localnet', async () => {
-        const ctx = createMockContext({ network: 'localnet' });
-        saveMemory(db, { agentId, key: 'promote-no-arc69', content: 'data' });
+  test('returns error when ARC-69 context unavailable on localnet', async () => {
+    const ctx = createMockContext({ network: 'localnet' });
+    saveMemory(db, { agentId, key: 'promote-no-arc69', content: 'data' });
 
-        const result = await handlePromoteMemory(ctx, { key: 'promote-no-arc69' });
-        expect(result.isError).toBe(true);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Cannot promote memory');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'promote-no-arc69' });
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Cannot promote memory');
+  });
 
-    test('creates new ASA when no existing ASA found on localnet', async () => {
-        const ctx = createArc69Context();
-        saveMemory(db, { agentId, key: 'new-asa', content: 'new data' });
-        _mockResolveAsaForKey.mockImplementation(() => null);
-        _mockCreateMemoryAsa.mockImplementation(() => Promise.resolve({ asaId: 200, txid: 'TX-NEW' }));
+  test('creates new ASA when no existing ASA found on localnet', async () => {
+    const ctx = createArc69Context();
+    saveMemory(db, { agentId, key: 'new-asa', content: 'new data' });
+    _mockResolveAsaForKey.mockImplementation(() => null);
+    _mockCreateMemoryAsa.mockImplementation(() => Promise.resolve({ asaId: 200, txid: 'TX-NEW' }));
 
-        const result = await handlePromoteMemory(ctx, { key: 'new-asa' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('promoted to long-term storage');
-        expect(text).toContain('200');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'new-asa' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('promoted to long-term storage');
+    expect(text).toContain('200');
+  });
 
-    test('updates existing ASA when one already exists on localnet', async () => {
-        const ctx = createArc69Context();
-        saveMemory(db, { agentId, key: 'existing-asa', content: 'updated data' });
-        _mockResolveAsaForKey.mockImplementation(() => 55);
-        _mockUpdateMemoryAsa.mockImplementation(() => Promise.resolve({ txid: 'TX-UPD' }));
+  test('updates existing ASA when one already exists on localnet', async () => {
+    const ctx = createArc69Context();
+    saveMemory(db, { agentId, key: 'existing-asa', content: 'updated data' });
+    _mockResolveAsaForKey.mockImplementation(() => 55);
+    _mockUpdateMemoryAsa.mockImplementation(() => Promise.resolve({ txid: 'TX-UPD' }));
 
-        const result = await handlePromoteMemory(ctx, { key: 'existing-asa' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('promoted to long-term storage');
-        expect(text).toContain('55');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'existing-asa' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('promoted to long-term storage');
+    expect(text).toContain('55');
+  });
 
-    test('returns error and sets status to failed when ARC-69 write throws', async () => {
-        const ctx = createArc69Context();
-        saveMemory(db, { agentId, key: 'arc69-fail', content: 'data' });
-        _mockResolveAsaForKey.mockImplementation(() => null);
-        _mockCreateMemoryAsa.mockImplementation(() => Promise.reject(new Error('ARC-69 write error')));
+  test('returns error and sets status to failed when ARC-69 write throws', async () => {
+    const ctx = createArc69Context();
+    saveMemory(db, { agentId, key: 'arc69-fail', content: 'data' });
+    _mockResolveAsaForKey.mockImplementation(() => null);
+    _mockCreateMemoryAsa.mockImplementation(() => Promise.reject(new Error('ARC-69 write error')));
 
-        const result = await handlePromoteMemory(ctx, { key: 'arc69-fail' });
-        expect(result.isError).toBe(true);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('Failed to promote memory to ARC-69');
-        expect(text).toContain('ARC-69 write error');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'arc69-fail' });
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Failed to promote memory to ARC-69');
+    expect(text).toContain('ARC-69 write error');
+  });
 
-    test('returns confirmation warning on testnet without confirmed flag', async () => {
-        const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
-        saveMemory(db, { agentId, key: 'promote-testnet', content: 'data' });
+  test('returns confirmation warning on testnet without confirmed flag', async () => {
+    const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
+    saveMemory(db, { agentId, key: 'promote-testnet', content: 'data' });
 
-        const result = await handlePromoteMemory(ctx, { key: 'promote-testnet' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('WARNING');
-        expect(text).toContain('immutable');
-        expect(text).toContain('confirmed: true');
-        // Must NOT write to chain yet
-        const memory = recallMemory(db, agentId, 'promote-testnet');
-        expect(memory?.status).toBe('short_term');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'promote-testnet' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('WARNING');
+    expect(text).toContain('immutable');
+    expect(text).toContain('confirmed: true');
+    // Must NOT write to chain yet
+    const memory = recallMemory(db, agentId, 'promote-testnet');
+    expect(memory?.status).toBe('short_term');
+  });
 
-    test('queues promotion on testnet when confirmed: true', async () => {
-        const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
-        saveMemory(db, { agentId, key: 'promote-testnet-confirmed', content: 'data' });
+  test('queues promotion on testnet when confirmed: true', async () => {
+    const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
+    saveMemory(db, { agentId, key: 'promote-testnet-confirmed', content: 'data' });
 
-        const result = await handlePromoteMemory(ctx, { key: 'promote-testnet-confirmed', confirmed: true });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('queued for promotion');
-    });
+    const result = await handlePromoteMemory(ctx, { key: 'promote-testnet-confirmed', confirmed: true });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('queued for promotion');
+  });
 
-    test('corvid_promote_memory is registered in buildDirectTools', () => {
-        const ctx = createMockContext();
-        const tools = buildDirectTools(ctx);
-        const promTool = tools.find(t => t.name === 'corvid_promote_memory');
-        expect(promTool).toBeDefined();
-        expect(promTool!.parameters.required).toContain('key');
-    });
+  test('corvid_promote_memory is registered in buildDirectTools', () => {
+    const ctx = createMockContext();
+    const tools = buildDirectTools(ctx);
+    const promTool = tools.find((t) => t.name === 'corvid_promote_memory');
+    expect(promTool).toBeDefined();
+    expect(promTool!.parameters.required).toContain('key');
+  });
 });
 
 // ─── handleDeleteMemory ──────────────────────────────────────────────────────
 
 describe('handleDeleteMemory', () => {
-    test('returns error when memory not found', async () => {
-        const ctx = createArc69Context();
-        const result = await handleDeleteMemory(ctx, { key: 'nonexistent-del' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('No memory found');
-    });
+  test('returns error when memory not found', async () => {
+    const ctx = createArc69Context();
+    const result = await handleDeleteMemory(ctx, { key: 'nonexistent-del' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('No memory found');
+  });
 
-    test('returns error when memory has no asaId (plain txn or short-term)', async () => {
-        saveMemory(db, { agentId, key: 'plain-txn-del', content: 'permanent data' });
-        const ctx = createArc69Context();
-        const result = await handleDeleteMemory(ctx, { key: 'plain-txn-del' });
-        expect(result.isError).toBe(true);
-        expect((result.content[0] as { text: string }).text).toContain('permanent');
-    });
+  test('returns error when memory has no asaId (plain txn or short-term)', async () => {
+    saveMemory(db, { agentId, key: 'plain-txn-del', content: 'permanent data' });
+    const ctx = createArc69Context();
+    const result = await handleDeleteMemory(ctx, { key: 'plain-txn-del' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('permanent');
+  });
 
-    test('soft deletes (archives) an ARC-69 memory by default', async () => {
-        const mem = saveMemory(db, { agentId, key: 'soft-del', content: 'soft delete me' });
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(300, 'confirmed', mem.id);
-        const ctx = createArc69Context();
-        const result = await handleDeleteMemory(ctx, { key: 'soft-del' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('soft-deleted');
-        expect(text).toContain('300');
-    });
+  test('soft deletes (archives) an ARC-69 memory by default', async () => {
+    const mem = saveMemory(db, { agentId, key: 'soft-del', content: 'soft delete me' });
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(300, 'confirmed', mem.id);
+    const ctx = createArc69Context();
+    const result = await handleDeleteMemory(ctx, { key: 'soft-del' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('soft-deleted');
+    expect(text).toContain('300');
+  });
 
-    test('hard deletes an ARC-69 memory when mode is hard', async () => {
-        const mem = saveMemory(db, { agentId, key: 'hard-del', content: 'hard delete me' });
-        db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(400, 'confirmed', mem.id);
-        const ctx = createArc69Context();
-        const result = await handleDeleteMemory(ctx, { key: 'hard-del', mode: 'hard' });
-        expect(result.isError).toBeFalsy();
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('permanently deleted');
-        expect(text).toContain('400');
-    });
+  test('hard deletes an ARC-69 memory when mode is hard', async () => {
+    const mem = saveMemory(db, { agentId, key: 'hard-del', content: 'hard delete me' });
+    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(400, 'confirmed', mem.id);
+    const ctx = createArc69Context();
+    const result = await handleDeleteMemory(ctx, { key: 'hard-del', mode: 'hard' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('permanently deleted');
+    expect(text).toContain('400');
+  });
 });
 
 // ─── List Agents ─────────────────────────────────────────────────────────────
 
 describe('handleListAgents', () => {
-    test('excludes self from list', async () => {
-        const ctx = createMockContext();
-        const result = await handleListAgents(ctx);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('OtherBot');
-        expect(text).not.toContain('Self');
-    });
+  test('excludes self from list', async () => {
+    const ctx = createMockContext();
+    const result = await handleListAgents(ctx);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('OtherBot');
+    expect(text).not.toContain('Self');
+  });
 
-    test('returns empty message when only self exists', async () => {
-        const ctx = createMockContext({
-            agentDirectory: {
-                listAvailable: mock(() => Promise.resolve([
-                    { agentId, agentName: 'Self', walletAddress: null },
-                ])),
-            } as unknown as McpToolContext['agentDirectory'],
-        });
-        const result = await handleListAgents(ctx);
-        expect((result.content[0] as { text: string }).text).toContain('No other agents');
+  test('returns empty message when only self exists', async () => {
+    const ctx = createMockContext({
+      agentDirectory: {
+        listAvailable: mock(() => Promise.resolve([{ agentId, agentName: 'Self', walletAddress: null }])),
+      } as unknown as McpToolContext['agentDirectory'],
     });
+    const result = await handleListAgents(ctx);
+    expect((result.content[0] as { text: string }).text).toContain('No other agents');
+  });
 
-    test('shows wallet address when available', async () => {
-        const ctx = createMockContext();
-        const result = await handleListAgents(ctx);
-        expect((result.content[0] as { text: string }).text).toContain('OTHERADDR');
-    });
+  test('shows wallet address when available', async () => {
+    const ctx = createMockContext();
+    const result = await handleListAgents(ctx);
+    expect((result.content[0] as { text: string }).text).toContain('OTHERADDR');
+  });
 
-    test('shows capabilities from Flock Directory when available', async () => {
-        const ctx = createMockContext({
-            flockDirectoryService: {
-                getByAddress: mock((addr: string) => {
-                    if (addr === 'OTHERADDR') {
-                        return {
-                            capabilities: ['code', 'review'],
-                            reputationScore: 85,
-                        };
-                    }
-                    return null;
-                }),
-            } as unknown as McpToolContext['flockDirectoryService'],
-        });
-        const result = await handleListAgents(ctx);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('[code, review]');
-        expect(text).toContain('rep: 85');
+  test('shows capabilities from Flock Directory when available', async () => {
+    const ctx = createMockContext({
+      flockDirectoryService: {
+        getByAddress: mock((addr: string) => {
+          if (addr === 'OTHERADDR') {
+            return {
+              capabilities: ['code', 'review'],
+              reputationScore: 85,
+            };
+          }
+          return null;
+        }),
+      } as unknown as McpToolContext['flockDirectoryService'],
     });
+    const result = await handleListAgents(ctx);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[code, review]');
+    expect(text).toContain('rep: 85');
+  });
 
-    test('omits flock data gracefully when service unavailable', async () => {
-        const ctx = createMockContext({ flockDirectoryService: undefined });
-        const result = await handleListAgents(ctx);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain('OtherBot');
-        // Should not crash, just show basic info
-        expect(result.isError).toBeFalsy();
-    });
+  test('omits flock data gracefully when service unavailable', async () => {
+    const ctx = createMockContext({ flockDirectoryService: undefined });
+    const result = await handleListAgents(ctx);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('OtherBot');
+    // Should not crash, just show basic info
+    expect(result.isError).toBeFalsy();
+  });
 });
