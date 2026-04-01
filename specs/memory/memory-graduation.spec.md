@@ -236,6 +236,7 @@ The memory key is determined by:
 3. **TTL is advisory.** The graduation service expires observations, but expiry is checked on tick, not real-time.
 4. **Scores only increase.** `boostObservation` only adds — there is no negative scoring.
 5. **Sources are validated.** Only the six defined source types are accepted.
+6. **Session resume observation injection.** When `buildResumePrompt` is called for a session with a non-null `agentId`, the top 5 active observations for that agent (ordered by `relevance_score DESC`) are fetched via `listObservations(db, agentId, { status: 'active', limit: 5 })`, injected as a `<recent_observations>` XML block positioned after `<previous_context_summary>` and before `<conversation_history>`, and each observation's `access_count` is incremented via `boostObservation(db, id, 0)` (passive read — score unchanged). Observations with `status = 'graduated'` or `status = 'dismissed'` are NOT included. If `agentId` is null or no active observations exist, the block is omitted entirely.
 
 ## Error Cases
 
@@ -271,3 +272,4 @@ The memory key is determined by:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-19 | corvid-agent | Initial spec — memory graduation pipeline |
+| 2026-03-31 | jackdaw | Add invariant #6 — session resume observation injection (#1751) |

@@ -235,18 +235,19 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
         {
             name: 'corvid_promote_memory',
-            description: 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). Use after corvid_save_memory to make a memory permanent.',
+            description: 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). Use after corvid_save_memory to make a memory permanent. On testnet/mainnet, plain-transaction writes are immutable forever — you will be prompted to confirm before the write executes.',
             parameters: {
                 type: 'object',
                 properties: {
                     key: { type: 'string', description: 'Memory key to promote to long-term on-chain storage' },
+                    confirmed: { type: 'boolean', description: 'Set to true to confirm a permanent plain-transaction write on testnet/mainnet.' },
                 },
                 required: ['key'],
             },
             handler: async (args) => {
                 const err = validateRequired('corvid_promote_memory', args, ['key']);
                 if (err) return err;
-                return unwrapResult(await handlePromoteMemory(ctx, args as { key: string }));
+                return unwrapResult(await handlePromoteMemory(ctx, args as { key: string; confirmed?: boolean }));
             },
         },
         // ── Shared Library (CRVLIB) ──────────────────────────────────────

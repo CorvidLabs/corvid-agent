@@ -181,7 +181,7 @@ async function handlePromoteMemoryRoute(req: Request, deps: McpApiDeps): Promise
         const data = await parseBodyOrThrow(req, McpPromoteMemorySchema);
 
         const ctx = buildContext(deps, data.agentId);
-        const result = await handlePromoteMemory(ctx, { key: data.key });
+        const result = await handlePromoteMemory(ctx, { key: data.key, confirmed: data.confirmed });
         return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);
