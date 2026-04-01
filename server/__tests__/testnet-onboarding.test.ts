@@ -2,10 +2,17 @@ import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleOnboardingRoutes, type OnboardingStatus } from '../routes/onboarding';
+import type { RequestContext } from '../middleware/guards';
 import { createProject } from '../db/projects';
 import { createAgent } from '../db/agents';
 
 let db: Database;
+
+const mockContext: RequestContext = {
+    authenticated: true,
+    tenantId: 'default',
+    rateLimitHeaders: {},
+};
 
 beforeEach(() => {
     db = new Database(':memory:');
@@ -115,21 +122,21 @@ describe('GET /api/onboarding/status', () => {
     it('returns null for non-matching routes', () => {
         const req = new Request('http://localhost/api/agents', { method: 'GET' });
         const url = new URL(req.url);
-        const result = handleOnboardingRoutes(req, url, db, null, null);
+        const result = handleOnboardingRoutes(req, url, db, null, null, mockContext);
         expect(result).toBeNull();
     });
 
     it('returns null for POST method', () => {
         const req = new Request('http://localhost/api/onboarding/status', { method: 'POST' });
         const url = new URL(req.url);
-        const result = handleOnboardingRoutes(req, url, db, null, null);
+        const result = handleOnboardingRoutes(req, url, db, null, null, mockContext);
         expect(result).toBeNull();
     });
 
     it('returns incomplete status when no services configured', async () => {
         const req = new Request('http://localhost/api/onboarding/status', { method: 'GET' });
         const url = new URL(req.url);
-        const response = handleOnboardingRoutes(req, url, db, null, null);
+        const response = handleOnboardingRoutes(req, url, db, null, null, mockContext);
         expect(response).not.toBeNull();
 
         const resolved = response instanceof Promise ? await response : response;
@@ -152,7 +159,7 @@ describe('GET /api/onboarding/status', () => {
 
         const req = new Request('http://localhost/api/onboarding/status', { method: 'GET' });
         const url = new URL(req.url);
-        const response = handleOnboardingRoutes(req, url, db, null, null);
+        const response = handleOnboardingRoutes(req, url, db, null, null, mockContext);
         const resolved = response instanceof Promise ? await response : response;
         const body: OnboardingStatus = await resolved!.json();
 

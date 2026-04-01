@@ -7,6 +7,7 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
+import type { RequestContext } from '../middleware/guards';
 import { listProjects } from '../db/projects';
 import { listAgents } from '../db/agents';
 import { json } from '../lib/response';
@@ -30,15 +31,17 @@ export function handleOnboardingRoutes(
     db: Database,
     algochatBridge: AlgoChatBridge | null,
     _agentWalletService: AgentWalletService | null,
+    context: RequestContext,
 ): Response | Promise<Response> | null {
     if (url.pathname !== '/api/onboarding/status' || req.method !== 'GET') return null;
 
-    return handleOnboardingStatus(db, algochatBridge);
+    return handleOnboardingStatus(db, algochatBridge, context);
 }
 
 async function handleOnboardingStatus(
     db: Database,
     algochatBridge: AlgoChatBridge | null,
+    context: RequestContext,
 ): Promise<Response> {
     // Wallet status
     let walletConfigured = false;
@@ -59,12 +62,12 @@ async function handleOnboardingStatus(
         : null;
 
     // Agent status
-    const agents = listAgents(db);
+    const agents = listAgents(db, context.tenantId);
     const agentExists = agents.length > 0;
     const agentWalletConfigured = agents.some((a) => !!a.walletAddress);
 
     // Project status
-    const projects = listProjects(db);
+    const projects = listProjects(db, context.tenantId);
     const projectExists = projects.length > 0;
 
     const complete = walletConfigured && walletFunded && bridgeRunning && agentExists && projectExists;

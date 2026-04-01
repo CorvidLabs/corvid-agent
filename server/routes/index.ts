@@ -357,7 +357,7 @@ async function handleRoutes(
   if (tenantResponse) return tenantResponse;
 
   // Onboarding status (lightweight, no auth dependency on services)
-  const onboardingResponse = handleOnboardingRoutes(req, url, db, algochatBridge, agentWalletService ?? null);
+  const onboardingResponse = handleOnboardingRoutes(req, url, db, algochatBridge, agentWalletService ?? null, context);
   if (onboardingResponse) return onboardingResponse;
 
   const projectResponse = handleProjectRoutes(req, url, db, context);
