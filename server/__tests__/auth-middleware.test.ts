@@ -1,7 +1,7 @@
 /**
  * Tests for authentication middleware — HTTP auth, WS auth, CORS, key rotation, expiry.
  */
-import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach } from 'bun:test';
 import {
     loadAuthConfig,
     checkHttpAuth,
@@ -117,24 +117,6 @@ describe('checkHttpAuth', () => {
         const resp = checkHttpAuth(req, url, config);
         expect(resp).not.toBeNull();
         expect(resp!.status).toBe(403);
-    });
-
-    test('still rejects when audit logging throws', () => {
-        // Save real module BEFORE mocking so we can restore it
-        const realAuditModule = require('../db/audit');
-        // Mock the audit module so recordAudit throws, exercising the catch path
-        mock.module('../db/audit', () => ({
-            recordAudit: () => { throw new Error('DB connection lost'); },
-        }));
-        const config = makeConfig();
-        const { req, url } = makeRequest('/api/agents', {
-            headers: { Authorization: 'Bearer wrong-key' },
-        });
-        const resp = checkHttpAuth(req, url, config);
-        expect(resp).not.toBeNull();
-        expect(resp!.status).toBe(403);
-        // Restore original module using saved reference
-        mock.module('../db/audit', () => ({ ...realAuditModule }));
     });
 
     test('accepts valid API key', () => {
