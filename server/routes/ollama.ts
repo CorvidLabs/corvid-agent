@@ -5,12 +5,16 @@
  * Ollama models. Pull progress is streamed via WebSocket events.
  */
 
+import type { Database } from 'bun:sqlite';
 import { OllamaProvider } from '../providers/ollama/provider';
 import type { ModelPullStatus } from '../providers/ollama/provider';
 import { LlmProviderRegistry } from '../providers/registry';
 import { parseBodyOrThrow, ValidationError, OllamaPullModelSchema, OllamaDeleteModelSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json } from '../lib/response';
+import { createSession } from '../db/sessions';
+import { createProject, getProjectByName, updateProject } from '../db/projects';
+import type { ProcessManager } from '../process/manager';
 
 const log = createLogger('OllamaRoutes');
 
@@ -29,6 +33,8 @@ function getOllamaProvider(): OllamaProvider | null {
 export function handleOllamaRoutes(
     req: Request,
     url: URL,
+    db: Database,
+    processManager: ProcessManager,
     onPullProgress?: (status: ModelPullStatus) => void,
 ): Response | Promise<Response> | null {
 
@@ -69,7 +75,7 @@ export function handleOllamaRoutes(
 
     // POST /api/ollama/launch-claude — Launch Claude Code with an Ollama cloud model
     if (url.pathname === '/api/ollama/launch-claude' && req.method === 'POST') {
-        return handleLaunchClaude(req);
+        return handleLaunchClaude(req, db, processManager);
     }
 
     // Anthropic API proxy for Claude Code → Ollama cloud models
@@ -486,84 +492,101 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
  * to Ollama cloud model requests, then launches Claude Code pointing at
  * that proxy.
  */
-async function handleLaunchClaude(req: Request): Promise<Response> {
+async function handleLaunchClaude(req: Request, db: Database, processManager: ProcessManager): Promise<Response> {
     const provider = getOllamaProvider();
     if (!provider) {
         return json({ error: 'Ollama provider not registered' }, 503);
     }
 
     try {
-        const body = await req.json() as { model?: string };
+        const body = await req.json() as { model?: string; agentId?: string; prompt?: string; workDir?: string };
         const model = body.model ?? 'qwen3.5:cloud';
 
         // Validate it's a cloud model
-        if (!model.includes('cloud')) {
+        if (!OllamaProvider.isCloudModel(model)) {
             return json({
                 error: 'Model must be an Ollama cloud model (e.g., kimi-k2.5:cloud, qwen3.5:cloud)',
                 example: 'kimi-k2.5:cloud',
             }, 400);
         }
 
-        // Check if model is available
+        // Check if Ollama is reachable and model is available
+        const available = await provider.isAvailable();
+        if (!available) {
+            return json({ error: 'Ollama is not running. Start it with: ollama serve' }, 503);
+        }
+
         const details = await provider.getModelDetails();
         const hasModel = details.some((m) => m.name === model);
-
         if (!hasModel) {
             return json({
-                error: `Model ${model} not found in available models. Try pulling it first.`,
-                available: details.filter((m) => m.name.includes('cloud')).map((m) => m.name),
+                error: `Model ${model} not found. Pull it first: ollama pull ${model}`,
+                available: details.filter((m) => OllamaProvider.isCloudModel(m.name)).map((m) => m.name),
             }, 400);
         }
 
-        // Build the launch command for the user
+        // Build the proxy URL that Claude Code will use instead of api.anthropic.com
         const port = process.env.PORT ?? '3000';
-        const host = `http://localhost:${port}`;
-        const proxyUrl = `${host}/api/ollama/claude-proxy`;
+        const proxyUrl = `http://localhost:${port}/api/ollama/claude-proxy`;
 
-        // Map cloud model to Anthropic-style ID
-        const anthropicModel = mapCloudModelToAnthropicId(model);
+        // Create a project with ANTHROPIC_BASE_URL in envVars so the spawned
+        // Claude Code process talks to our local Ollama proxy instead of
+        // api.anthropic.com. Project envVars are passed to the subprocess via
+        // buildSafeEnv and persist across async spawn — no race condition.
+        // Reuse existing Ollama proxy project or create one.
+        // Project name is unique per tenant — look up first.
+        const projectName = `Ollama: ${model}`;
+        let ollamaProject = getProjectByName(db, projectName);
+        if (ollamaProject) {
+            // Update envVars in case proxy URL changed (e.g. different port)
+            ollamaProject = updateProject(db, ollamaProject.id, {
+                envVars: {
+                    ANTHROPIC_BASE_URL: proxyUrl,
+                    // Dummy API key so Claude Code uses key auth (which respects BASE_URL)
+                    // instead of OAuth (which always talks to Anthropic directly).
+                    ANTHROPIC_API_KEY: 'ollama-proxy',
+                },
+                workingDir: body.workDir ?? process.cwd(),
+            }) ?? ollamaProject;
+        } else {
+            ollamaProject = createProject(db, {
+                name: projectName,
+                description: `Claude Code backed by Ollama cloud model ${model}`,
+                workingDir: body.workDir ?? process.cwd(),
+                envVars: {
+                    ANTHROPIC_BASE_URL: proxyUrl,
+                    ANTHROPIC_API_KEY: 'ollama-proxy',
+                },
+            });
+        }
 
-        const command = `ANTHROPIC_API_URL="${proxyUrl}" CLAUDE_MODEL="${anthropicModel}" claude`;
+        const session = createSession(db, {
+            projectId: ollamaProject.id,
+            agentId: body.agentId,
+            name: `Claude Code (Ollama: ${model})`,
+            initialPrompt: body.prompt ?? '',
+            source: 'web',
+        });
+
+        // Start the process — SDK reads ANTHROPIC_BASE_URL from the project's
+        // envVars and passes it to the spawned Claude Code subprocess.
+        processManager.startProcess(session);
+
+        log.info('Launched Claude Code with Ollama backend', {
+            sessionId: session.id,
+            model,
+            proxyUrl,
+        });
 
         return json({
-            message: 'Run this command to launch Claude Code with Ollama cloud model',
-            command,
-            model: {
-                ollama: model,
-                anthropic_id: anthropicModel,
-            },
+            session,
+            model,
             proxy_url: proxyUrl,
-            instructions: [
-                '1. Ensure Ollama is running with the cloud model available',
-                '2. Run the command above in your terminal',
-                '3. Claude Code will use the Ollama cloud model as its backend',
-            ],
-            note: 'The ANTHROPIC_API_URL tells Claude Code to use the Ollama proxy instead of Anthropic. If Ollama fails, the request FAILS - no fallback to Claude API.',
-        });
+        }, 201);
     } catch (err) {
         log.error('Launch claude error', { error: err instanceof Error ? err.message : String(err) });
-        return json({ error: 'Failed to generate launch command' }, 500);
+        return json({ error: 'Failed to launch Claude Code with Ollama' }, 500);
     }
-}
-
-/**
- * Map Ollama cloud model names to Anthropic-compatible IDs.
- */
-function mapCloudModelToAnthropicId(ollamaModel: string): string {
-    const map: Record<string, string> = {
-        'kimi-k2.5:cloud': 'claude-opus-4-6-ollama',
-        'qwen3.5:cloud': 'claude-opus-4-6-ollama',
-        'deepseek-v3.2:cloud': 'claude-opus-4-6-ollama',
-        'minimax-m2.5:cloud': 'claude-opus-4-6-ollama',
-        'qwen3-coder:480b-cloud': 'claude-sonnet-4-6-ollama',
-        'qwen3-coder-next:cloud': 'claude-sonnet-4-6-ollama',
-        'devstral-small-2:cloud': 'claude-sonnet-4-6-ollama',
-        'deepseek-v3.1:671b-cloud': 'claude-opus-4-6-ollama',
-        'glm-5:cloud': 'claude-sonnet-4-6-ollama',
-        'nemotron-3-nano:cloud': 'claude-haiku-4-5-ollama',
-        'gpt-oss:120b-cloud': 'claude-sonnet-4-6-ollama',
-    };
-    return map[ollamaModel] ?? 'claude-sonnet-4-6-ollama';
 }
 
 // ── Claude API Proxy Handlers ───────────────────────────────────────────────
@@ -618,8 +641,8 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
     try {
         const body = await req.json() as {
             model?: string;
-            messages?: Array<{ role: string; content: string }>;
-            system?: string;
+            messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string; source?: unknown }> }>;
+            system?: string | Array<{ type: string; text?: string }>;
             max_tokens?: number;
             temperature?: number;
             stream?: boolean;
@@ -639,14 +662,32 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
             }, 400);
         }
 
-        // Build system prompt
-        const systemPrompt = body.system ?? 'You are a helpful assistant.';
+        // Build system prompt — Anthropic sends system as string or content block array
+        const systemPrompt = typeof body.system === 'string'
+            ? body.system
+            : Array.isArray(body.system)
+                ? body.system.filter(b => b.type === 'text').map(b => b.text ?? '').join('\n')
+                : 'You are a helpful assistant.';
 
-        // Convert messages
-        const ollamaMessages = (body.messages ?? []).map((msg) => ({
-            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: msg.content,
-        }));
+        // Convert Anthropic messages to Ollama format.
+        // Anthropic content can be a string OR an array of content blocks.
+        const ollamaMessages = (body.messages ?? []).map((msg) => {
+            let text: string;
+            if (typeof msg.content === 'string') {
+                text = msg.content;
+            } else if (Array.isArray(msg.content)) {
+                text = msg.content
+                    .filter(block => block.type === 'text' && block.text)
+                    .map(block => block.text!)
+                    .join('\n');
+            } else {
+                text = String(msg.content);
+            }
+            return {
+                role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                content: text,
+            };
+        });
 
         // Acquire slot
         const slotAcquired = await provider.acquireSlot(ollamaModel);
@@ -654,15 +695,38 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
             return json({ error: 'Model is busy - try again later' }, 503);
         }
 
+        const msgId = `msg_${Date.now()}`;
+        const effectiveModel = body.model ?? 'claude-sonnet-4-6-20250514';
+
         try {
             if (body.stream) {
-                // Streaming response
+                // Streaming response — emit Anthropic SSE format so the SDK can parse it
                 const encoder = new TextEncoder();
+                const sse = (event: string, data: unknown) =>
+                    encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
                 return new Response(
                     new ReadableStream({
                         async start(controller) {
-                            let content = '';
                             try {
+                                // message_start
+                                controller.enqueue(sse('message_start', {
+                                    type: 'message_start',
+                                    message: {
+                                        id: msgId, type: 'message', role: 'assistant',
+                                        content: [], model: effectiveModel,
+                                        stop_reason: null, stop_sequence: null,
+                                        usage: { input_tokens: 0, output_tokens: 0 },
+                                    },
+                                }));
+
+                                // content_block_start
+                                controller.enqueue(sse('content_block_start', {
+                                    type: 'content_block_start', index: 0,
+                                    content_block: { type: 'text', text: '' },
+                                }));
+
+                                let outputTokens = 0;
                                 await provider.complete({
                                     model: ollamaModel,
                                     systemPrompt,
@@ -670,16 +734,37 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                                     maxTokens: body.max_tokens ?? 4096,
                                     temperature: body.temperature ?? 0.7,
                                     onStream: (token) => {
-                                        content += token;
-                                        controller.enqueue(encoder.encode(token));
+                                        outputTokens++;
+                                        controller.enqueue(sse('content_block_delta', {
+                                            type: 'content_block_delta', index: 0,
+                                            delta: { type: 'text_delta', text: token },
+                                        }));
                                     },
                                 });
+
+                                // content_block_stop
+                                controller.enqueue(sse('content_block_stop', {
+                                    type: 'content_block_stop', index: 0,
+                                }));
+
+                                // message_delta
+                                controller.enqueue(sse('message_delta', {
+                                    type: 'message_delta',
+                                    delta: { stop_reason: 'end_turn', stop_sequence: null },
+                                    usage: { output_tokens: outputTokens },
+                                }));
+
+                                // message_stop
+                                controller.enqueue(sse('message_stop', { type: 'message_stop' }));
                                 controller.close();
                             } catch (err) {
-                                // Ollama failed - send error marker but don't fall back
                                 const errorMsg = err instanceof Error ? err.message : String(err);
                                 log.error('Ollama streaming failed', { model: ollamaModel, error: errorMsg });
-                                controller.enqueue(encoder.encode(`\n[OLLAMA_ERROR: ${errorMsg}]`));
+                                // Send error as an SSE event the SDK can handle
+                                controller.enqueue(sse('error', {
+                                    type: 'error',
+                                    error: { type: 'api_error', message: `Ollama: ${errorMsg}` },
+                                }));
                                 controller.close();
                             } finally {
                                 provider.releaseSlot(ollamaModel);
@@ -691,13 +776,14 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                     }),
                     {
                         headers: {
-                            'Content-Type': 'text/plain; charset=utf-8',
+                            'Content-Type': 'text/event-stream',
                             'Cache-Control': 'no-cache',
+                            'Connection': 'keep-alive',
                         },
                     }
                 );
             } else {
-                // Non-streaming
+                // Non-streaming — return full Anthropic message format
                 let content = '';
                 await provider.complete({
                     model: ollamaModel,
@@ -712,11 +798,14 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                 provider.releaseSlot(ollamaModel);
 
                 return json({
-                    id: `msg_${Date.now()}`,
+                    id: msgId,
                     type: 'message',
                     role: 'assistant',
                     content: [{ type: 'text', text: content }],
-                    model: body.model ?? 'claude-opus-4-6-ollama',
+                    model: effectiveModel,
+                    stop_reason: 'end_turn',
+                    stop_sequence: null,
+                    usage: { input_tokens: 0, output_tokens: 0 },
                 });
             }
         } catch (err) {
