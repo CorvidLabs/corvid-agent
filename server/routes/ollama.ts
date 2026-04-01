@@ -571,7 +571,7 @@ function mapCloudModelToAnthropicId(ollamaModel: string): string {
 /**
  * Map Anthropic model IDs back to Ollama cloud model names.
  */
-function mapAnthropicToOllamaModel(anthropicId: string): string {
+function mapAnthropicToOllamaModel(_anthropicId: string): string {
     // Extract the cloud model from the anthropic ID
     // claude-*-ollama is just a placeholder - we use the CLAUDE_MODEL env var
     // to determine which model to actually use
@@ -644,7 +644,7 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
 
         // Convert messages
         const ollamaMessages = (body.messages ?? []).map((msg) => ({
-            role: msg.role === 'user' ? 'user' : 'assistant' as const,
+            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
             content: msg.content,
         }));
 
