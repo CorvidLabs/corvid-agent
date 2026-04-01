@@ -95,6 +95,17 @@ export function resolveProviderRouting(opts: {
 
     // No explicit provider + no cloud access → try Ollama
     if (!providerType && !hasCloud && hasOllamaProvider) {
+        // Check if Ollama should use Claude Code proxy for better tool/reasoning support
+        if (process.env.OLLAMA_USE_CLAUDE_PROXY === 'true') {
+            log.info('OLLAMA_USE_CLAUDE_PROXY enabled — routing Ollama through SDK (Claude Code)');
+            const isOllamaModel = !agentModel || agentModel.includes(':') || agentModel.startsWith('qwen') || agentModel.startsWith('llama');
+            return {
+                provider: 'sdk',
+                reason: 'ollama_via_claude_proxy',
+                fallback: true,
+                effectiveModel: isOllamaModel ? agentModel : (ollamaDefaultModel ?? ''),
+            };
+        }
         const isOllamaModel = !agentModel || agentModel.includes(':') || agentModel.startsWith('qwen') || agentModel.startsWith('llama');
         return {
             provider: 'ollama',
@@ -288,6 +299,17 @@ export class ProcessManager {
                     log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model -- will use Ollama default`, { agentId: effectiveAgent.id });
                     effectiveAgent = { ...effectiveAgent, model: routingDecision.effectiveModel };
                 }
+            } else if (routingDecision.reason === 'ollama_via_claude_proxy') {
+                // Ollama routed through SDK (Claude Code) for better tool/reasoning support
+                log.info(`Routing Ollama through Claude Code proxy for session ${session.id}`, {
+                    model: routingDecision.effectiveModel,
+                });
+                // Clear provider to use SDK mode
+                provider = undefined;
+                // Set model override for the Ollama cloud model
+                if (effectiveAgent && routingDecision.effectiveModel) {
+                    effectiveAgent = { ...effectiveAgent, model: routingDecision.effectiveModel };
+                }
             } else if (routingDecision.reason === 'cursor_binary_missing') {
                 log.warn(`Agent configured for cursor but cursor-agent binary not found — falling back to SDK`, {
                     sessionId: session.id,
@@ -315,7 +337,18 @@ export class ProcessManager {
             updatedAt: new Date().toISOString(),
         };
 
-        const baseProject = project ?? defaultProject;
+        // Inject Ollama proxy env vars when routing through Claude Code
+        const ollamaProxyUrl = process.env.OLLAMA_CLAUDE_PROXY_URL ?? `http://localhost:${process.env.PORT ?? '3000'}/api/ollama/claude-proxy`;
+        const baseProject = routingDecision.reason === 'ollama_via_claude_proxy'
+            ? {
+                ...(project ?? defaultProject),
+                envVars: {
+                    ...(project?.envVars ?? {}),
+                    ANTHROPIC_BASE_URL: ollamaProxyUrl,
+                    ANTHROPIC_API_KEY: 'ollama-proxy',
+                },
+            }
+            : (project ?? defaultProject);
 
         // Resolve project directory for non-persistent strategies (async)
         if (baseProject.dirStrategy !== 'persistent' && baseProject.dirStrategy !== 'worktree') {
