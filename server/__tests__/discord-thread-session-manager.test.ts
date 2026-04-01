@@ -17,11 +17,20 @@ function makeMentionInfo(overrides: Partial<MentionSessionInfo> = {}): MentionSe
     };
 }
 
+/** Minimal stubs so the ThreadSessionManager constructor is satisfied without real deps. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stubDb = {} as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stubProcessManager = {} as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stubDelivery = {} as any;
+const stubBotToken = 'test-token';
+
 describe('ThreadSessionManager — basic maps', () => {
     let mgr: ThreadSessionManager;
 
     beforeEach(() => {
-        mgr = new ThreadSessionManager();
+        mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
     });
 
     test('threadSessions, threadCallbacks, threadLastActivity, mentionSessions, processedMessageIds start empty', () => {
@@ -37,7 +46,7 @@ describe('ThreadSessionManager — trackMentionSession', () => {
     let mgr: ThreadSessionManager;
 
     beforeEach(() => {
-        mgr = new ThreadSessionManager();
+        mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
     });
 
     test('stores session info in mentionSessions', () => {
@@ -66,7 +75,7 @@ describe('ThreadSessionManager — cleanupMentionSession', () => {
     let mgr: ThreadSessionManager;
 
     beforeEach(() => {
-        mgr = new ThreadSessionManager();
+        mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
     });
 
     test('removes session from mentionSessions', () => {
@@ -86,7 +95,7 @@ describe('ThreadSessionManager — TTL cleanup', () => {
     let stopCleanup: (() => void) | null = null;
 
     beforeEach(() => {
-        mgr = new ThreadSessionManager();
+        mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
     });
 
     afterEach(() => {
