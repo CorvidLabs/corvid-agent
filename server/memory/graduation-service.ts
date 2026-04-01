@@ -197,6 +197,8 @@ export class MemoryGraduationService {
           source: obs.source,
           relevanceScore: obs.relevanceScore,
           accessCount: obs.accessCount,
+          from: 'short_term',
+          to: 'long_term',
         });
       } catch (err) {
         log.error('Failed to graduate observation', {

@@ -137,6 +137,8 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 24. **Automatic expiry**: `expireShortTermMemories()` archives (`archived=1`) all `short_term` memories where `expires_at < datetime('now')`. Only `short_term` status memories are affected — promoted memories are never auto-archived.
 25. **Purge after retention**: `purgeOldArchivedMemories()` deletes archived `short_term` memories whose `updated_at` is older than 30 days (configurable). Archived promoted memories are excluded.
 26. **Permanent write gate**: On testnet/mainnet, `corvid_promote_memory` writes plain self-to-self Algorand transactions which are immutable forever. If `confirmed` is not explicitly `true`, the handler returns a warning message and does NOT execute the write. The agent must call again with `confirmed: true` to proceed. This gate does not apply on localnet (uses mutable ARC-69 ASAs instead).
+27. **Tier label accuracy**: Memory recall, search, and list responses label each memory with its correct tier: `short-term` (SQLite only), `long-term` (ARC-69 ASA), `permanent` (plain txn), `pending` (queued for promotion), or `failed` (promotion failed). The label `sync-failed` is never shown for `short_term` memories.
+28. **Tier transition audit log**: Every tier transition (short-term → long-term, short-term → permanent, long-term → archived, long-term → deleted) emits a structured `log.info('Memory tier transition', { agentId, key, from, to, ... })` event.
 
 ## Behavioral Examples
 

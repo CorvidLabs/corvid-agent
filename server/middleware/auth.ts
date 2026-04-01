@@ -244,7 +244,9 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
             const { recordAudit: audit } = require('../db/audit');
             const { getDb: getDbConn } = require('../db/connection');
             audit(getDbConn(), 'auth_failed', ip, 'http', null, `path=${url.pathname}`, null, ip);
-        } catch { /* audit logging is best-effort */ }
+        } catch (err) {
+            log.warn('Audit log failed for rejected auth attempt', { path: url.pathname, error: String(err) });
+        }
 
         return new Response(JSON.stringify({ error: 'Invalid API key' }), {
             status: 403,
