@@ -248,7 +248,7 @@ describe('ThreadSessionManager — recoverSessions', () => {
     let spyMentions: ReturnType<typeof spyOn>;
 
     beforeEach(() => {
-        spySessions = spyOn(threadManager, 'recoverActiveThreadSessions').mockImplementation(() => {});
+        spySessions = spyOn(threadManager, 'recoverActiveThreadSessions').mockImplementation(() => 0);
         spySubscriptions = spyOn(threadManager, 'recoverActiveThreadSubscriptions').mockImplementation(() => {});
         spyMentions = spyOn(threadManager, 'recoverActiveMentionSessions').mockImplementation(() => {});
         mgr = new ThreadSessionManager(stubDb, stubProcessManager, stubDelivery, stubBotToken);
