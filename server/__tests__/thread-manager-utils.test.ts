@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { normalizeTimestamp, formatDuration, sessionErrorEmbed } from '../discord/thread-manager';
+import { visibleEmbedParts } from '../discord/thread-response/utils';
 
 describe('normalizeTimestamp', () => {
     test('appends Z to bare SQLite timestamp', () => {
@@ -53,6 +54,27 @@ describe('formatDuration', () => {
 
     test('exactly one minute', () => {
         expect(formatDuration(60000)).toBe('1m 0s');
+    });
+});
+
+describe('visibleEmbedParts', () => {
+    test('filters out whitespace-only chunks', () => {
+        const result = visibleEmbedParts('hello world');
+        expect(result.length).toBeGreaterThan(0);
+        expect(result[0]).toBe('hello world');
+    });
+
+    test('returns empty array for whitespace-only input', () => {
+        expect(visibleEmbedParts('   \n  ')).toEqual([]);
+    });
+
+    test('trims leading and trailing whitespace from parts', () => {
+        const result = visibleEmbedParts('  trimmed  ');
+        expect(result[0]).toBe('trimmed');
+    });
+
+    test('returns empty array for empty string', () => {
+        expect(visibleEmbedParts('')).toEqual([]);
     });
 });
 
