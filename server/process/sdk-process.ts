@@ -45,6 +45,8 @@ export const ENV_ALLOWLIST = new Set([
     'VISUAL',
     // Ollama
     'OLLAMA_HOST',
+    // Ollama cloud proxy — set when launching Claude Code backed by Ollama
+    'ANTHROPIC_BASE_URL',
 ]);
 
 export function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, string> {
@@ -238,6 +240,15 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     const sdkPermissionMode = SDK_MODE_MAP[permissionMode] ?? permissionMode as import('@anthropic-ai/claude-agent-sdk').PermissionMode;
     const needsBypass = sdkPermissionMode === 'bypassPermissions';
 
+    // Build environment and log if proxying via Ollama
+    const safeEnv = buildSafeEnv(project.envVars);
+    if (safeEnv.ANTHROPIC_BASE_URL) {
+        log.info('SDK env passing ANTHROPIC_BASE_URL to child', {
+            url: safeEnv.ANTHROPIC_BASE_URL,
+            hasApiKey: !!safeEnv.ANTHROPIC_API_KEY,
+        });
+    }
+
     const sdkOptions: import('@anthropic-ai/claude-agent-sdk').Options = {
         abortController,
         cwd: project.workingDir,
@@ -245,7 +256,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         permissionMode: sdkPermissionMode,
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
-        env: buildSafeEnv(project.envVars),
+        env: safeEnv,
         // Chrome extension bridge does not work from SDK-spawned subprocesses.
         // Browser automation is provided by corvid_browser (Playwright) instead.
         // Do NOT pass extraArgs: { chrome: null } — it injects non-functional
