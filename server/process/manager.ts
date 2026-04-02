@@ -377,8 +377,26 @@ export class ProcessManager {
 
         // Route: direct providers (cursor, ollama) go through startDirectProcessWrapped;
         // cursor no longer has a special case — it flows through the standard path.
-        if (provider && provider.executionMode === 'direct') {
+        // Check if Ollama should use Claude Code proxy even when explicitly configured
+        const ollamaProxyEnabled = process.env.OLLAMA_USE_CLAUDE_PROXY === 'true';
+        const isOllamaProvider = provider?.type === 'ollama';
+        if (provider && provider.executionMode === 'direct' && !(isOllamaProvider && ollamaProxyEnabled)) {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
+        } else if (isOllamaProvider && ollamaProxyEnabled) {
+            // Ollama via Claude Code proxy
+            log.info(`Routing explicit Ollama agent through Claude Code proxy for session ${session.id}`, {
+                model: effectiveAgent?.model,
+            });
+            const proxyUrl = process.env.OLLAMA_CLAUDE_PROXY_URL ?? `http://localhost:${process.env.PORT ?? '3000'}/api/ollama/claude-proxy`;
+            const projectWithProxy = {
+                ...effectiveProject,
+                envVars: {
+                    ...(effectiveProject.envVars ?? {}),
+                    ANTHROPIC_BASE_URL: proxyUrl,
+                    ANTHROPIC_API_KEY: 'ollama-proxy',
+                },
+            };
+            this.startSdkProcessWrapped(session, projectWithProxy, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         } else {
             this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType, options?.conversationOnly, options?.toolAllowList, options?.mcpToolAllowList);
         }
