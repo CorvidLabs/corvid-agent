@@ -11,9 +11,9 @@ import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
-import { saveThreadSession, updateThreadSessionActivity, deleteThreadSession } from '../db/discord-thread-sessions';
+import { deleteThreadSession, saveThreadSession, updateThreadSessionActivity } from '../db/discord-thread-sessions';
 import { listProjects } from '../db/projects';
-import { createSession, getSession, getPreviousThreadSessionSummary } from '../db/sessions';
+import { createSession, getPreviousThreadSessionSummary, getSession } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
@@ -766,7 +766,17 @@ async function handleMentionReplyResume(
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
     if (!ctx.processManager.isRunning(sessionId)) {
       log.warn('Mention resumeProcess did not start — creating new mention session', { sessionId, channelId });
-      await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
+      await handleMentionReply(
+        ctx,
+        channelId,
+        _userId,
+        messageId,
+        text,
+        mentions,
+        authorId,
+        authorUsername,
+        attachments,
+      );
       return;
     }
   }
@@ -826,9 +836,23 @@ async function resumeExpiredThreadSession(
   if (!agent) return false;
 
   const projects = listProjects(ctx.db);
-  const project = agent.defaultProjectId
-    ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
-    : projects[0];
+  if (!projects.length) return false;
+
+  let project =
+    previousInfo.projectName !== undefined && previousInfo.projectName !== ''
+      ? projects.find((p) => p.name.toLowerCase() === previousInfo.projectName!.toLowerCase())
+      : undefined;
+  if (!project) {
+    if (previousInfo.projectName) {
+      log.warn('Thread resume: stored projectName not found, using agent default', {
+        threadId,
+        previousProjectName: previousInfo.projectName,
+      });
+    }
+    project = agent.defaultProjectId
+      ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
+      : projects[0];
+  }
   if (!project) return false;
 
   // Create an isolated worktree for the new session

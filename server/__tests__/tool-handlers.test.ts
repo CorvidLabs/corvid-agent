@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
+import { createSession } from '../db/sessions';
 
 const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234';
 
@@ -723,6 +724,28 @@ describe('handleCreateWorkTask', () => {
     expect(result.isError).toBeUndefined();
     const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string }];
     expect(createArgs[0].agentId).toBe(agentId);
+  });
+
+  test('uses session projectId when project args omitted', async () => {
+    const wp = createProject(db, { name: 'SessionProject', workingDir: '/tmp/wp' });
+    const session = createSession(db, {
+      projectId: wp.id,
+      agentId,
+      name: 'test-session',
+      source: 'discord',
+      initialPrompt: '',
+    });
+    const mockCreate = mock(() => Promise.resolve({ id: 'wt-sess', status: 'pending', branch: 'fix/sess' }));
+    const ctx = createMockContext({
+      sessionId: session.id,
+      workTaskService: {
+        create: mockCreate,
+      } as unknown as McpToolContext['workTaskService'],
+    });
+    const result = await handleCreateWorkTask(ctx, { description: 'from session project' });
+    expect(result.isError).toBeUndefined();
+    const createArgs = mockCreate.mock.calls[0] as unknown as [{ agentId: string; projectId?: string }];
+    expect(createArgs[0].projectId).toBe(wp.id);
   });
 });
 

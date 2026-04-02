@@ -439,7 +439,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 17. **Thread auto-archive**: Threads auto-archive after 24 hours of inactivity
 18. **Shared thread sessions**: Any user can reply in a thread to participate in the conversation. Thread sessions are tracked by thread ID, not user ID
 19. **Thread-scoped agent**: Each thread is bound to the agent selected at creation time. The agent cannot be changed mid-thread — start a new session for a different agent
-20. **Thread message routing**: All messages in a bridge-created thread are routed to the thread's agent session. The bot responds automatically within threads it owns (no @mention required)
+20. **Thread message routing**: All messages in a bridge-created thread are routed to the thread's agent session. The bot responds automatically within threads it owns (no @mention required). When a thread session must be recreated (`resumeExpiredThreadSession` — expired DB session or failed process resume), the new session's project is resolved from the thread's stored **project name** (case-insensitive) when present, then the agent's `defaultProjectId`, then the first project — so a thread started with a specific `/session` project does not silently switch to the agent default on resume
 
 ### Security & Rate Limiting
 
