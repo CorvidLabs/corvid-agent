@@ -20,7 +20,7 @@ function fakeReq(method: string, path: string, body?: unknown): { req: Request; 
 describe('Ollama Routes', () => {
     it('GET /api/ollama/status returns 503 when provider not registered', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/status');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(503);
         const data = await res!.json();
@@ -30,21 +30,21 @@ describe('Ollama Routes', () => {
 
     it('GET /api/ollama/models returns 503 when provider not registered', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/models');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(503);
     });
 
     it('GET /api/ollama/models/running returns 503 when provider not registered', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/models/running');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(503);
     });
 
     it('GET /api/ollama/library returns curated model list', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/library');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
@@ -63,7 +63,7 @@ describe('Ollama Routes', () => {
 
     it('GET /api/ollama/library?category=coding filters by category', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/library?category=coding');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
@@ -74,7 +74,7 @@ describe('Ollama Routes', () => {
 
     it('GET /api/ollama/library?q=qwen filters by search query', async () => {
         const { req, url } = fakeReq('GET', '/api/ollama/library?q=qwen');
-        const res = await handleOllamaRoutes(req, url);
+        const res = await handleOllamaRoutes(req, url, null as any, null as any);
         const data = await res!.json();
         expect(data.models.length).toBeGreaterThan(0);
         for (const model of data.models) {
@@ -85,7 +85,7 @@ describe('Ollama Routes', () => {
 
     it('returns null for unmatched paths', async () => {
         const { req, url } = fakeReq('GET', '/api/other');
-        const res = handleOllamaRoutes(req, url);
+        const res = handleOllamaRoutes(req, url, null as any, null as any);
         expect(res).toBeNull();
     });
 });

@@ -486,7 +486,7 @@ const server = Bun.serve<WsData>({
       if (openApiResponse) return instrumentResponse(openApiResponse, url.pathname);
 
       // Ollama model management routes
-      const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
+      const ollamaResponse = await handleOllamaRoutes(req, url, db, processManager, (status) => {
         const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
         publishToTenant(server, 'ollama', msg); // Ollama is system-wide, no tenant scoping
       });
