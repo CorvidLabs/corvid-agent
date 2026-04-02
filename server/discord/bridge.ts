@@ -22,10 +22,8 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { getAgent } from '../db/agents';
 import { getDiscordConfig } from '../db/discord-config';
-import { saveThreadSession, pruneOldThreadSessions } from '../db/discord-thread-sessions';
-import { getSession } from '../db/sessions';
+import { pruneOldThreadSessions } from '../db/discord-thread-sessions';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import type { EventCallback } from '../process/interfaces';
@@ -50,11 +48,7 @@ import { handleReaction as handleReactionImpl, type ReactionHandlerContext } fro
 import {
   archiveStaleThreads as archiveStaleThreadsImpl,
   createStandaloneThread as createStandaloneThreadImpl,
-  recoverActiveMentionSessions,
-  recoverActiveThreadSessions,
-  recoverActiveThreadSubscriptions,
   subscribeForAdaptiveInlineResponse,
-  subscribeForResponseWithEmbed as subscribeImpl,
 } from './thread-manager';
 import { ThreadSessionManager } from './thread-session-manager';
 import type { DiscordBridgeConfig, DiscordInteractionData, DiscordMessageData, DiscordReactionData } from './types';
@@ -72,8 +66,8 @@ export class DiscordBridge {
   private botUserId: string | null = null;
   private running = false;
 
-  /** Owns thread/session/mention Maps and TTL cleanup. */
-  private tsm: ThreadSessionManager = new ThreadSessionManager();
+  /** Owns thread/session/mention Maps and lifecycle (subscribe, recover, auto-detect). */
+  private tsm: ThreadSessionManager;
   private tsmCleanup: (() => void) | null = null;
 
   // Per-user rate limiting: userId → timestamps of recent messages
@@ -125,6 +119,7 @@ export class DiscordBridge {
     this.config = config;
     this.workTaskService = workTaskService ?? null;
     this.buddyService = buddyService ?? null;
+    this.tsm = new ThreadSessionManager(db, processManager, this.delivery, config.botToken);
     this.gateway = new DiscordGateway(config, {
       onMessage: (data) => {
         this.handleMessage(data).catch((err) => {
@@ -144,22 +139,7 @@ export class DiscordBridge {
           this.botUserId = botUserId;
         }
         log.info('Discord bridge received gateway ready', { sessionId, botUserId });
-        recoverActiveThreadSessions(
-          this.db,
-          this.tsm.threadSessions,
-          this.tsm.threadLastActivity,
-        );
-        recoverActiveThreadSubscriptions(
-          this.db,
-          this.processManager,
-          this.delivery,
-          this.config.botToken,
-          this.tsm.threadSessions,
-          this.tsm.threadCallbacks,
-        );
-        recoverActiveMentionSessions(this.db, this.tsm.mentionSessions, (botMessageId, info, createdAt) =>
-          this.tsm.trackMentionSession(botMessageId, info, createdAt),
-        );
+        this.tsm.recoverSessions();
       },
     });
   }
@@ -232,51 +212,9 @@ export class DiscordBridge {
     // Watch for Discord sessions that start producing events without a thread subscription.
     this.globalEventCallback = (sessionId, event) => {
       if (event.type !== 'assistant') return;
-      for (const [, cb] of this.tsm.threadCallbacks) {
-        if (cb.sessionId === sessionId) return;
+      if (this.tsm.autoSubscribeSession(sessionId)) {
+        log.info('Auto-subscribed Discord thread for resumed session', { sessionId });
       }
-      const session = getSession(this.db, sessionId);
-      if (!session || session.source !== 'discord' || !session.name?.startsWith('Discord thread:')) return;
-      const threadId = session.name.replace('Discord thread:', '');
-      if (!threadId || this.tsm.threadCallbacks.has(threadId)) return;
-
-      const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
-      const agentName = agent?.name || 'Agent';
-      const agentModel = agent?.model || 'unknown';
-      // Look up project name for footer metadata
-      let projectName: string | undefined;
-      if (session.projectId) {
-        const projectRow = this.db
-          .query<{ name: string }, [string]>('SELECT name FROM projects WHERE id = ?')
-          .get(session.projectId);
-        projectName = projectRow?.name;
-      }
-      const displayColor = agent?.displayColor;
-      const displayIcon = agent?.displayIcon;
-      const avatarUrl = agent?.avatarUrl;
-      const threadInfo = {
-        sessionId,
-        agentName,
-        agentModel,
-        ownerUserId: '',
-        projectName,
-        displayColor,
-        displayIcon,
-        avatarUrl,
-      };
-      this.tsm.threadSessions.set(threadId, threadInfo);
-      saveThreadSession(this.db, threadId, threadInfo);
-      this.subscribeForResponseWithEmbed(
-        sessionId,
-        threadId,
-        agentName,
-        agentModel,
-        projectName,
-        displayColor,
-        displayIcon,
-        avatarUrl,
-      );
-      log.info('Auto-subscribed Discord thread for resumed session', { threadId, sessionId });
     };
     this.processManager.subscribeAll(this.globalEventCallback);
   }
@@ -417,7 +355,7 @@ export class DiscordBridge {
       guildCache: this.guildCache,
       createStandaloneThread: (channelId, name) => createStandaloneThreadImpl(this.config.botToken, channelId, name),
       subscribeForResponseWithEmbed: (sid, tid, an, am, pn, dc, di, au) =>
-        this.subscribeForResponseWithEmbed(sid, tid, an, am, pn, dc, di, au),
+        this.tsm.subscribeThread(sid, tid, an, am, pn, dc, di, au),
       sendTaskResult: (cid, task, uid) => this.sendTaskResult(cid, task, uid),
       muteUser: (uid) => this.muteUser(uid),
       unmuteUser: (uid) => this.unmuteUser(uid),
@@ -468,33 +406,6 @@ export class DiscordBridge {
       processedMessageIds: this.tsm.processedMessageIds,
     };
     await handleMessageImpl(ctx, data);
-  }
-
-  private subscribeForResponseWithEmbed(
-    sessionId: string,
-    threadId: string,
-    agentName: string,
-    agentModel: string,
-    projectName?: string,
-    displayColor?: string | null,
-    displayIcon?: string | null,
-    avatarUrl?: string | null,
-  ): void {
-    subscribeImpl(
-      this.processManager,
-      this.delivery,
-      this.config.botToken,
-      this.db,
-      this.tsm.threadCallbacks,
-      sessionId,
-      threadId,
-      agentName,
-      agentModel,
-      projectName,
-      displayColor,
-      displayIcon,
-      avatarUrl,
-    );
   }
 
   private async sendTaskResult(
