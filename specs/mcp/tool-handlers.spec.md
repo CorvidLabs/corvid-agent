@@ -85,7 +85,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleManageSchedule` | `(ctx, { action, ... })` | `Promise<CallToolResult>` | CRUD + approve/deny for agent schedules |
 | `handleListProjects` | `(ctx)` | `Promise<CallToolResult>` | List all available projects with IDs, names, and working directories |
 | `handleCurrentProject` | `(ctx)` | `Promise<CallToolResult>` | Show the current agent's default project |
-| `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. `agent_id` delegates execution and attribution to a specific agent |
+| `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. If both are omitted and `ctx.sessionId` is set, uses that session's `projectId` before falling back to the agent's `defaultProjectId` in `WorkTaskService`. `agent_id` delegates execution and attribution to a specific agent |
 | `handleCheckWorkStatus` | `(ctx, { task_id })` | `Promise<CallToolResult>` | Check the status of a work task by ID |
 | `handleListWorkTasks` | `(ctx, { status?, limit? })` | `Promise<CallToolResult>` | List work tasks for the calling agent, optionally filtered by status |
 | `handleWebSearch` | `(ctx, { query, count? })` | `Promise<CallToolResult>` | Web search via Brave API |
