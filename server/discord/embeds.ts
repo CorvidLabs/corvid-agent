@@ -33,11 +33,17 @@ export function getRateLimitWaitMs(): number {
  * Prevents Cloudflare IP bans from rapid 429 retries.
  */
 export async function discordFetch(url: string, init: RequestInit): Promise<Response> {
-    // Wait if we're globally rate-limited
-    const waitMs = getRateLimitWaitMs();
-    if (waitMs > 0) {
-        log.debug(`Discord rate-limited, waiting ${waitMs}ms before request`);
-        await new Promise(r => setTimeout(r, waitMs));
+    // Interaction callbacks (/interactions/{id}/{token}/callback) are on a separate
+    // rate-limit bucket and have a hard 3-second deadline from Discord.
+    // Delaying them with the global rate limiter causes dropdowns/autocomplete to fail.
+    const isInteractionCallback = url.includes('/interactions/') && url.endsWith('/callback');
+
+    if (!isInteractionCallback) {
+        const waitMs = getRateLimitWaitMs();
+        if (waitMs > 0) {
+            log.debug(`Discord rate-limited, waiting ${waitMs}ms before request`);
+            await new Promise(r => setTimeout(r, waitMs));
+        }
     }
 
     const response = await globalThis.fetch(url, init);
