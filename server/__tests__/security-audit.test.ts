@@ -367,6 +367,10 @@ describe('Privilege Escalation Prevention', () => {
         expect(requiresAdminRole('/api/algochat/network')).toBe(true);
     });
 
+    test('requiresAdminRole returns true for /api/security/overview', () => {
+        expect(requiresAdminRole('/api/security/overview')).toBe(true);
+    });
+
     test('requiresAdminRole returns false for normal API paths', () => {
         expect(requiresAdminRole('/api/agents')).toBe(false);
         expect(requiresAdminRole('/api/sessions')).toBe(false);
