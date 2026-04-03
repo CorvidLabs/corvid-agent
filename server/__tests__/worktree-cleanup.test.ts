@@ -1,10 +1,24 @@
 /**
  * Tests for stale-state cleanup in createWorktree().
  *
- * These tests exercise the REAL worktree module (no mock.module) to ensure
- * codecov covers the new branchExists / deleteBranch / forceRemoveWorktree
- * paths added for stale-state recovery.
+ * These tests exercise the REAL worktree module to ensure codecov covers the
+ * new branchExists / deleteBranch / forceRemoveWorktree paths added for
+ * stale-state recovery.
+ *
+ * IMPORTANT: In Bun 1.x, mock.module() leaks across test files. Seven other
+ * test files mock '../lib/worktree' with simplified implementations that lack
+ * stale-cleanup logic. We must re-provide the real module here to override
+ * any leaked mocks before our imports resolve.
  */
+import { mock } from 'bun:test';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Re-provide the real worktree module to override leaked mocks.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const realModulePath = resolve(__dirname, '../lib/worktree.ts');
+mock.module('../lib/worktree', () => import(realModulePath));
+
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
