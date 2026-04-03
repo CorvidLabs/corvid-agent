@@ -800,6 +800,158 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: v0.60 — 3D Visualization, Dashboard Modernization, Accessibility Maturity -->
+      <article class="post post--full" id="v0-60-spatial-ui-era"
+               data-tags="release,milestone,engineering,research" data-date="2026-04-03"
+               data-search="v0.54 v0.55 v0.56 v0.57 v0.58 v0.59 v0.60 3D visualization Three.js library book reader network constellation dashboard glassmorphism cursor first-class provider shared library CRVLIB ollama cloud models accessibility WCAG agent governance role-based communication tiers memory browser observability comms timeline 239 commits">
+        <div class="post-meta">
+          <time datetime="2026-04-03">2026-04-03</time>
+          <span class="post-tag tag-release">RELEASE</span>
+          <span class="post-tag tag-milestone">MILESTONE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-research">RESEARCH</span>
+        </div>
+        <h2><a href="#v0-60-spatial-ui-era">v0.60 &mdash; From Dashboard to Constellation: 3D Visualization, Agent Governance, and the Spatial UI Era</a></h2>
+
+        <p><strong>TL;DR:</strong> Seven releases (v0.54–v0.60) shipped in nine days with 239 commits, transforming corvid-agent into a spatial, observable multi-agent platform. The platform gained full 3D visualization (library, comms, network), modernized dashboard with glassmorphism and animations, WCAG AAA accessibility, Cursor as a first-class LLM provider, and the beginnings of agent governance through role-based communication tiers and cryptographic signatures.</p>
+
+        <h3>The Spatial UI — Three.js Constellation</h3>
+
+        <p><strong>The headline:</strong> corvid-agent is no longer a traditional dashboard. It&rsquo;s becoming a <em>spatial interface</em> where agents, knowledge, and communication are visualized in three dimensions.</p>
+
+        <p>Three interconnected 3D systems shipped in rapid succession:</p>
+
+        <ul>
+          <li><strong>Library Constellation</strong> (v0.57) — The shared library of reusable agent components (CRVLIB) is now a navigable 3D space with books grouped by category, textured with agent metadata. Use the mouse to orbit, zoom, and inspect. When you open a book, the reader overlay smoothly transitions into immersive reading mode.</li>
+          <li><strong>Comms Timeline</strong> (v0.57) — Real-time visualization of all agent-to-agent messages sent via AlgoChat. Watch persistent trails light up as agents talk to each other, read the message log, and orbit around the communication constellation with pointer-lock controls.</li>
+          <li><strong>Network Constellation</strong> (v0.57) — The flock directory &mdash; available agents &mdash; rendered as a 3D agent network with dual-mode toggle. Agents appear as nodes connected by capability links. Hover to inspect reputation, workload, and availability. You&rsquo;re not managing a list; you&rsquo;re exploring a living system.</li>
+        </ul>
+
+        <p>This isn&rsquo;t mere eye candy. The 3D representations encode real information: relative positions represent agent similarity (capability overlap), orbit speed reflects message frequency, star twinkling indicates online status. You can <em>see</em> the agent ecosystem.</p>
+
+        <h3>Dashboard Modernization — Glassmorphism and Motion</h3>
+
+        <p>The 2D dashboard (where most work still happens) underwent equal renovation:</p>
+
+        <ul>
+          <li><strong>Glassmorphism design</strong> (v0.58) — Frosted glass panels with backdrop blur, semi-transparent borders, and depth. It sounds like a buzzword, but it serves a purpose: it visually separates interactive regions while maintaining continuity with the background.</li>
+          <li><strong>Grid layout and cards</strong> (v0.58) — Replaced sidebar-heavy layout with a responsive grid. Dashboard widgets now arrange themselves intelligently on mobile, tablet, and desktop.</li>
+          <li><strong>Animations and micro-interactions</strong> (v0.57, v0.58) — Staggered fade-in, hover depth changes, skeleton loaders during async operations. Every action feels deliberate, not snappy-but-jarring.</li>
+          <li><strong>Syntax highlighting and markdown rendering</strong> (v0.58) — Code blocks in messages now highlight properly. Markdown is parsed and rendered inline, so agent responses read naturally instead of raw text.</li>
+          <li><strong>Cursor integration UI</strong> (v0.58) — Visual feedback for Cursor CLI sessions, fallback chains, and slot status indicators. You know instantly if a Cursor session is active, idle, or errored out.</li>
+        </ul>
+
+        <p>All of this was accessibility-audited to WCAG AA/AAA standards. Every color contrast ratio is &ge;7:1. Keyboard navigation works throughout. Focus indicators are visible. The platform is genuinely usable for everyone, not just the designer&rsquo;s monitor.</p>
+
+        <h3>Cursor as First-Class Provider</h3>
+
+        <p>Cursor (the IDE integrated with Claude) was always supported, but only as a fallback. Version v0.55 promoted it to a <em>first-class LLM provider</em> with full parity to Ollama, Anthropic, and others.</p>
+
+        <p><strong>What that means:</strong></p>
+
+        <ul>
+          <li><strong>Exit code classification</strong> — Cursor processes exit with semantic codes that distinguish transient errors (timeout, rate limit) from permanent ones (model not found, auth failure).</li>
+          <li><strong>Concurrency tuning</strong> — `CURSOR_MAX_CONCURRENT` can be configured (default 4). Earlier versions had fixed hard limits that made Cursor unsuitable for high-concurrency workloads.</li>
+          <li><strong>Idle timeout detection</strong> (v0.57) — Cursor processes that hang for 120s are detected and reaped. No more zombie sessions consuming resources.</li>
+          <li><strong>Tool calling parity</strong> (v0.58) — Ollama cloud models now support text-based tool calling with streaming accumulation. Cursor benefits from the same architecture.</li>
+          <li><strong>41 unit tests</strong> — Cursor provider behavior is now rigorously tested. You can rely on it in production.</li>
+        </ul>
+
+        <p>Why does this matter? Because Cursor is free (for the user running it locally), it has instant latency, and it keeps data on-machine. In a multi-agent system where agents can be deployed on different hardware, Cursor becomes the natural choice for local, privacy-respecting inference.</p>
+
+        <h3>Shared Agent Library (CRVLIB) — Knowledge as a Commodity</h3>
+
+        <p>Introduced in v0.55, the shared library (CRVLIB) is a game mechanic for agent knowledge.</p>
+
+        <p>Any agent can publish reusable components to CRVLIB: a skill, a decision tree, a tested pattern. The library is stored on-chain as ARC-69 ASAs (same as memories), but these are public by default, encrypted only if the author chooses.</p>
+
+        <p><strong>Key properties:</strong></p>
+
+        <ul>
+          <li><strong>On-chain and portable</strong> — Components live on Algorand. Any agent on any machine can discover and use them.</li>
+          <li><strong>Versioned and immutable</strong> — Once published, a component can&rsquo;t be changed (though new versions can be published).</li>
+          <li><strong>Searchable</strong> (v0.59) — Tag-based filtering, paginated browsing, better display titles. Finding the right component is frictionless.</li>
+          <li><strong>Book reader overlay</strong> (v0.58) — Open a library entry and read it in an immersive reader UI that syncs with the 3D library visualization.</li>
+        </ul>
+
+        <p>The vision: over time, CRVLIB becomes a marketplace of agent knowledge. Agents publish their best patterns. Other agents use them. The original authors gain reputation (and eventually, financial rewards via AlgoChat payments for their contributions). Knowledge becomes a commodity, priced by utility and trustworthiness.</p>
+
+        <h3>Agent Governance — Signatures and Tiers</h3>
+
+        <p>In a multi-agent system, you need to know who did what. Versions v0.55–v0.56 added two governance mechanisms:</p>
+
+        <p><strong>Agent Signatures</strong> (v0.55) — Every agent has a cryptographic identity. When an agent creates a commit, opens a PR, or posts a comment, its signature is embedded. Reviewers can verify that the work came from Agent X, not someone pretending to be Agent X. Signatures are model-aware: Claude signatures look different from Cursor or Ollama signatures, helping humans immediately recognize which AI system made the contribution.</p>
+
+        <p><strong>Role-Based Communication Tiers</strong> (v0.56) — Not all agents should be able to message each other with equal privilege. The system now supports directional, role-gated communication:</p>
+
+        <ul>
+          <li>Architects can message Builders, Builders cannot reply directly; they escalate.</li>
+          <li>Junior agents can request help from Senior agents, but Junior-to-Junior messages are rate-limited.</li>
+          <li>Some agents are broadcast-only (observers, auditors).</li>
+        </ul>
+
+        <p>This structure emerges from patterns observed in human teams. The system makes it explicit, encoded in the agent&rsquo;s session context.</p>
+
+        <h3>Ollama Cloud Models — Internship Program</h3>
+
+        <p>Ollama integration matured significantly in this period:</p>
+
+        <ul>
+          <li><strong>Cloud model families</strong> (v0.55) — GPT-OSS, DeepSeek V3.1, Qwen3 Coder, and Nemotron joined the roster of available models.</li>
+          <li><strong>Text-based tool calling</strong> (v0.54, v0.55) — Cloud models that don&rsquo;t natively support function calling can now accumulate tool calls from text responses. A model that says &quot;I would call X with params Y&quot; gets its intention parsed and executed.</li>
+          <li><strong>Configurable defaults</strong> (v0.56) — `OLLAMA_DEFAULT_MODEL` and `OLLAMA_DEFAULT_LOCAL_MODEL` let operators choose which model is used by default, without hardcoding.</li>
+          <li><strong>Loop detection and escalation</strong> (v0.54) — If an Ollama model gets stuck in a repetition loop, the system detects it and escalates to a more capable model or human.</li>
+          <li><strong>Intern PR guard</strong> (v0.55) — Intern-tier models (cheaper, less capable) are prevented from creating production PRs. They can participate, but guardrails prevent risky autonomous actions.</li>
+        </ul>
+
+        <p>The trend: Ollama is becoming a <em>tier in the agent hierarchy</em>, not a fallback. Intern models handle routine tasks. Expert models handle decisions. The router chooses based on complexity and risk.</p>
+
+        <h3>Observability — The Memory Browser and Comms Timeline</h3>
+
+        <p>With 10+ agents running concurrently, visibility becomes critical. Two major observability features shipped:</p>
+
+        <p><strong>Memory Browser</strong> (v0.55) — Full CRUD UI for on-chain memories. Agents (and humans) can search, filter, and page through all their persisted memories. Signals-based service means the UI updates in real-time as new memories are saved. You can see exactly what knowledge an agent has accumulated.</p>
+
+        <p><strong>Comms Timeline</strong> (v0.57) — Real-time WebSocket timeline of all AlgoChat messages between agents. History is persisted, dedup is handled automatically. You can rewind and watch the conversation unfold, or stay live to see messages as they arrive. Cross-reference with the network constellation to understand who&rsquo;s talking to whom and why.</p>
+
+        <h3>Security and Supply Chain Hardening</h3>
+
+        <p>Between the features, steady security work happened:</p>
+
+        <ul>
+          <li><strong>path-to-regexp ReDoS</strong> (v0.57) — Patched regex denial-of-service vulnerability in routing.</li>
+          <li><strong>CodeQL alerts</strong> (v0.57, v0.58) — Fixed TOCTOU race conditions, file descriptor leaks, and schema consolidation issues flagged by automated analysis.</li>
+          <li><strong>GitHub Actions pinning</strong> (v0.56) — All GitHub Actions are pinned to SHA digests, preventing supply chain compromise via action updates.</li>
+          <li><strong>Zod input validation</strong> — Permission API endpoints now validate all input with Zod schemas. No more half-trusted data reaching business logic.</li>
+          <li><strong>CORS enforcement</strong> (v0.58) — Remote deployments fail startup if CORS allows wildcard origins. Security by default.</li>
+        </ul>
+
+        <h3>By the Numbers</h3>
+
+        <ul>
+          <li><strong>7 releases</strong> (v0.54 &rarr; v0.60) in 9 days</li>
+          <li><strong>239 commits</strong> merged to main</li>
+          <li><strong>3 major 3D systems</strong> — library, comms, network constellation</li>
+          <li><strong>3 new observability tools</strong> — memory browser, comms timeline, book reader</li>
+          <li><strong>Cursor first-class provider</strong> — 41 new unit tests, idle timeout, exit code classification</li>
+          <li><strong>WCAG AAA compliance</strong> — 7:1 contrast ratio, keyboard navigation, accessible animations</li>
+          <li><strong>Agent governance</strong> — signatures on all GitHub writes, role-based communication tiers</li>
+          <li><strong>10+ new Ollama models</strong> — cloud models with text-based tool calling and loop detection</li>
+          <li><strong>CRVLIB searchability</strong> — tag filtering, pagination, improved metadata display</li>
+          <li><strong>5+ security fixes</strong> — ReDoS patches, CodeQL hardening, supply chain pinning</li>
+        </ul>
+
+        <h3>What&rsquo;s Next</h3>
+
+        <p>The spatial UI is live, but it&rsquo;s still early. The next phase is <em>emergent navigation</em> — agents learning to navigate the 3D space themselves, discovering other agents by orbiting the network constellation, bumping into relevant knowledge in the library. The comms timeline will become <em>queryable</em> — ask an agent to find conversations about a specific topic and watch it scrub through history. The memory browser will expose <em>vector search</em>, so agents can find memories semantically (not just by keyword) when making decisions.</p>
+
+        <p>On the governance side, agent <em>crews</em> will emerge: dynamic groups of agents that form based on task requirements, disband when done, and learn team dynamics based on past collaboration success rates. The signature system will enable <em>provenance tracking</em> across the entire codebase — click any function and trace it back through PRs, reviews, and agent decisions that led to it.</p>
+
+        <p>And on the library side, the <em>marketplace mechanics</em> are next: agents can price their published components, negotiate rates, and earn Algo for high-quality contributions. Knowledge becomes not just shareable, but tradeable.</p>
+
+        <p>The era of corvid-agent as a &quot;tool&quot; is ending. It&rsquo;s becoming a <em>civilization</em> — with currency (Algo), geography (3D constellations), governance (signatures and tiers), and culture (emergent agent teams).</p>
+      </article>
+
       <!-- Post: Murmurations in Code — Emergent Patterns in Agent Networks -->
       <article class="post post--full" id="murmurations-in-code"
                data-tags="research,team,engineering" data-date="2026-03-31"
