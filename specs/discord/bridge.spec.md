@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 21
+version: 22
 status: active
 files:
   - server/discord/bridge.ts
@@ -476,6 +476,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 39. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
 40. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 41. **`/admin` command**: Admin-only configuration management with subcommand groups. All changes persist to `discord_config` DB table and hot-reload within 30s. Subcommands: `channels add/remove/list` (manage monitored channels via #channel mentions), `users add/remove/list` (manage allowed users via @user mentions), `roles set/remove/list` (manage role→permission mappings via @role mentions with level dropdown), `mode` (set bridge mode), `public` (toggle public mode), `show` (display full config summary). Every mutation is audit-logged. Responses use rich embeds with clear confirmation/status
+42. **Autocomplete deadline guard**: The gateway stamps `receivedAt = Date.now()` on every `INTERACTION_CREATE` payload. In `handleAutocomplete`, if `Date.now() - receivedAt >= 2500ms` before posting the callback, the response is silently skipped. Discord rejects autocomplete responses arriving after its 3-second window with "Unknown interaction" (404); a skipped response is silent on the user side and avoids false-positive error logs. If `receivedAt` is absent (e.g. tests injecting interactions without the field), the guard is skipped
 
 ## Behavioral Examples
 
@@ -673,3 +674,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-04-04 | corvid-agent | v19 (Phase 2): Replaced custom WebSocket gateway (`DiscordGateway`) with discord.js `Client`. Gateway now uses `GatewayIntentBits`, `Client` events (`messageCreate`, `interactionCreate`, `messageReactionAdd`, `ready`), and discord.js built-in reconnection/heartbeat. Removed raw protocol types `DiscordGatewayPayload`, `DiscordHelloData`, `DiscordReadyData`, `GatewayOp`, `GatewayIntent` — these were gateway internals now handled by discord.js. Public interface (`GatewayDispatchHandlers`, `DiscordGateway.start/stop/updatePresence/running/botToken`) is unchanged. Discord message/interaction/reaction types are mapped to existing internal types for downstream compatibility. Closes #1792 |
 | 2026-04-04 | corvid-agent | v20 (Phase 3 Part 1): Migrated slash command registration from raw JSON objects to `SlashCommandBuilder` from `@discordjs/builders`. Replaced `discordFetch` PUT call with `DiscordRestClient.putCommands()`. Added `putCommands(appId, guildId, commands)` method to `DiscordRestClient`. All 18 commands re-expressed as type-safe builder chains: options use explicit type methods (`addStringOption`, `addIntegerOption`, `addBooleanOption`, `addUserOption`, `addChannelOption`, `addRoleOption`), permissions use `PermissionFlagsBits.Administrator` instead of hardcoded `'8'`. Test updated to mock `DiscordRestClient` via `_setRestClientForTesting`. Part of #1793 |
 | 2026-04-04 | corvid-agent | v21: Declarative permission middleware — `COMMAND_HANDLERS` map entries now declare `minPermission`. Dispatcher enforces it before calling handlers. Per-handler redundant permission checks removed. Closes #1581 |
+| 2026-04-04 | corvid-agent | v22: Autocomplete deadline guard — `handleAutocomplete` skips stale responses (≥2500ms elapsed since `receivedAt`) to avoid Discord "Unknown interaction" 404 errors. Added invariant #42. Refs #1800 |

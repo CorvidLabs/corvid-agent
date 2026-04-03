@@ -80,6 +80,12 @@ export interface DiscordInteractionData {
     token: string; // interaction token for responding
     /** The message the component was attached to (for component interactions) */
     message?: { id: string; channel_id: string };
+    /**
+     * Timestamp (ms since epoch) set by the gateway when the INTERACTION_CREATE event
+     * is received. Used to enforce Discord's 3-second interaction response deadline —
+     * stale autocomplete responses are skipped rather than sending a guaranteed 404.
+     */
+    receivedAt?: number;
 }
 
 // Interaction types

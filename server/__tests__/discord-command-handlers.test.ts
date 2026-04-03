@@ -456,6 +456,54 @@ describe('handleAutocomplete', () => {
     expect(choices).toHaveLength(1);
     expect(choices[0].value).toBe('Friendly Helper');
   });
+
+  // ── Timing guard (deadline exceeded) ───────────────────────────────────
+
+  test('skips response when receivedAt exceeds 2500ms deadline', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'LateBotAgent', model: 'test-model' });
+
+    const interaction = {
+      ...makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]),
+      receivedAt: Date.now() - 3000, // 3 seconds ago — past the 2500ms deadline
+    } as DiscordInteractionData;
+
+    await handleAutocomplete(ctx, interaction);
+
+    // Response should NOT have been sent — capturedResponse stays null
+    expect(capturedResponse).toBeNull();
+  });
+
+  test('sends response when receivedAt is within 2500ms deadline', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'FastBotAgent', model: 'test-model' });
+
+    const interaction = {
+      ...makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]),
+      receivedAt: Date.now() - 100, // 100ms ago — well within deadline
+    } as DiscordInteractionData;
+
+    await handleAutocomplete(ctx, interaction);
+
+    // Response should have been sent normally
+    expect(capturedResponse).not.toBeNull();
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices.some((c) => c.value === 'FastBotAgent')).toBe(true);
+  });
+
+  test('sends response when receivedAt is absent (guard skipped)', async () => {
+    const ctx = createTestContext();
+    createAgent(db, { name: 'NoTimestampAgent', model: 'test-model' });
+
+    // No receivedAt field — interactions injected without timestamp should pass through
+    const interaction = makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]);
+
+    await handleAutocomplete(ctx, interaction);
+
+    expect(capturedResponse).not.toBeNull();
+    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    expect(choices.some((c) => c.value === 'NoTimestampAgent')).toBe(true);
+  });
 });
 
 // ── Component (Button) Handlers ─────────────────────────────────────
