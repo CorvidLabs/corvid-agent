@@ -81,7 +81,7 @@ export function handleAuthFlowRoutes(
 
     // Verify page (shows user code input)
     if (path === '/api/auth/verify' && method === 'GET') {
-        return handleVerifyPage(url, context?.tenantId ?? 'default');
+        return handleVerifyPage(req, url, context?.tenantId ?? 'default');
     }
 
     return null;
@@ -215,12 +215,40 @@ function escapeHtml(str: string): string {
         .replace(/'/g, '&#39;');
 }
 
-function handleVerifyPage(url: URL, tenantId: string): Response {
+/** Runtime check — evaluated on each request so tests can toggle via process.env. */
+function isTrustProxy(): boolean {
+    return process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
+}
+
+/** Basic email format check — must contain exactly one @ with non-empty local and domain parts. */
+function isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function handleVerifyPage(req: Request, url: URL, tenantId: string): Response {
     const rawCode = url.searchParams.get('code') ?? '';
     // Validate: user codes are uppercase alphanumeric only
     const code = /^[A-Z0-9]{0,16}$/.test(rawCode) ? rawCode : '';
     const safeCode = escapeHtml(code);
     const safeTenantId = JSON.stringify(tenantId);
+
+    // When behind a trusted proxy, read the email the OAuth provider resolved.
+    // Otherwise leave empty — the user fills it in on the form.
+    let proxyEmail = '';
+    if (isTrustProxy()) {
+        const forwarded = req.headers.get('x-forwarded-email') ?? '';
+        if (isValidEmail(forwarded)) {
+            proxyEmail = forwarded;
+        }
+    }
+    const safeProxyEmail = escapeHtml(proxyEmail);
+
+    // Whether email is locked (proxy-supplied) or editable (manual entry)
+    const emailReadonly = proxyEmail ? 'readonly' : '';
+    const emailPlaceholder = proxyEmail ? '' : 'your@email.com';
+    const proxyNote = proxyEmail
+        ? '<p class="info">Identity confirmed by your login provider.</p>'
+        : '<p class="info">Enter your email to identify yourself for this authorization.</p>';
 
     const html = `<!DOCTYPE html>
 <html><head><title>CorvidAgent - Device Authorization</title>
@@ -230,22 +258,32 @@ function handleVerifyPage(url: URL, tenantId: string): Response {
   .code { font-size: 2rem; font-weight: bold; letter-spacing: 0.3em; text-align: center;
           padding: 20px; background: #f5f5f5; border-radius: 8px; margin: 20px 0; }
   .info { color: #666; font-size: 0.9rem; }
+  input[type=email] { width:100%;padding:10px;font-size:1rem;margin:8px 0 16px;
+                      border:1px solid #ccc;border-radius:6px;box-sizing:border-box; }
+  input[readonly] { background:#f5f5f5;color:#555; }
 </style>
 </head><body>
 <h1>Device Authorization</h1>
 <p>Confirm this code matches what's shown in your terminal:</p>
 <div class="code">${safeCode || '--------'}</div>
-<p class="info">If this code matches, click Authorize below to grant access to the CLI.</p>
+${proxyNote}
+<label for="email-input" style="font-size:0.9rem;font-weight:600;">Email</label>
+<input id="email-input" type="email" value="${safeProxyEmail}" placeholder="${emailPlaceholder}" ${emailReadonly} />
 <button onclick="authorize()" style="width:100%;padding:12px;font-size:1rem;cursor:pointer;
   background:#2563eb;color:white;border:none;border-radius:6px;">Authorize</button>
 <script>
 async function authorize() {
   const code = document.querySelector('.code').textContent.trim();
   if (!code || code === '--------') return;
+  const email = document.getElementById('email-input').value.trim();
+  if (!email || !email.includes('@')) {
+    alert('Please enter a valid email address.');
+    return;
+  }
   const resp = await fetch('/api/auth/device/authorize', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({userCode:code,tenantId:${safeTenantId},email:'owner@localhost',approve:true})
+    body: JSON.stringify({userCode:code,tenantId:${safeTenantId},email:email,approve:true})
   });
   if (resp.ok) { document.body.innerHTML = '<h1>Authorized!</h1><p>You can close this window.</p>'; }
   else { document.body.innerHTML = '<h1>Error</h1><p>Authorization failed.</p>'; }
