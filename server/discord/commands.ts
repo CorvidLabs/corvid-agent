@@ -572,61 +572,120 @@ type CommandHandler = (
 ) => Promise<void>;
 
 /**
+ * Command registration entry — pairs a handler with a declarative minimum permission level.
+ *
+ * When `minPermission` is set, the dispatcher rejects callers below that level before
+ * invoking the handler. Handlers do not need to repeat the check internally.
+ * Commands with no `minPermission` are available to all non-blocked users.
+ * Commands with mixed sub-command permissions (e.g. /schedule) keep those checks in the handler.
+ */
+type CommandEntry = {
+  handler: CommandHandler;
+  minPermission?: number;
+};
+
+/**
  * Map-based slash command dispatcher.
  *
  * Adding a new command: add one entry here. No other file needs to change.
  * O(1) lookup replaces the previous linear switch statement.
+ *
+ * Declare `minPermission` to enforce a permission floor before the handler runs.
  */
-const COMMAND_HANDLERS = new Map<string, CommandHandler>([
+const COMMAND_HANDLERS = new Map<string, CommandEntry>([
   [
     'session',
-    (ctx, interaction, permLevel, getOption, userId) =>
-      handleSessionCommand(ctx, interaction, permLevel, getOption, userId),
+    {
+      handler: (ctx, interaction, permLevel, getOption, userId) =>
+        handleSessionCommand(ctx, interaction, permLevel, getOption, userId),
+      minPermission: PermissionLevel.STANDARD,
+    },
   ],
   [
     'message',
-    (ctx, interaction, permLevel, getOption, userId) =>
-      handleMessageCommand(ctx, interaction, permLevel, getOption, userId),
+    {
+      handler: (ctx, interaction, permLevel, getOption, userId) =>
+        handleMessageCommand(ctx, interaction, permLevel, getOption, userId),
+      minPermission: PermissionLevel.BASIC,
+    },
   ],
   [
     'work',
-    (ctx, interaction, permLevel, getOption, userId) =>
-      handleWorkCommand(ctx, interaction, permLevel, getOption, userId),
-  ],
-  ['agents', (ctx, interaction) => handleAgentsCommand(ctx, interaction)],
-  ['status', (ctx, interaction) => handleStatusCommand(ctx, interaction)],
-  ['dashboard', (ctx, interaction) => handleDashboardCommand(ctx, interaction)],
-  ['tasks', (ctx, interaction) => handleTasksCommand(ctx, interaction)],
-  ['schedule', (ctx, interaction, permLevel) => handleScheduleCommand(ctx, interaction, permLevel)],
-  ['config', (ctx, interaction, permLevel) => handleConfigCommand(ctx, interaction, permLevel)],
-  ['council', (ctx, interaction, permLevel, getOption) => handleCouncilCommand(ctx, interaction, permLevel, getOption)],
-  ['quickstart', (ctx, interaction) => handleQuickstartCommand(ctx, interaction)],
-  ['help', (_ctx, interaction) => handleHelpCommand(interaction)],
-  ['tools', (_ctx, interaction, _permLevel, getOption) => handleToolsCommand(interaction, getOption)],
-  ['mute', (ctx, interaction, permLevel, getOption) => handleMuteCommand(ctx, interaction, permLevel, getOption)],
-  ['unmute', (ctx, interaction, permLevel, getOption) => handleUnmuteCommand(ctx, interaction, permLevel, getOption)],
-  [
-    'admin',
-    async (ctx, interaction, permLevel) => {
-      if (permLevel < PermissionLevel.ADMIN) {
-        await respondEphemeral(interaction, 'Only admins can use `/admin` commands.');
-        return;
-      }
-      const options = interaction.data?.options ?? [];
-      await handleAdminCommand(
-        ctx.db,
-        ctx.config,
-        ctx.mutedUsers,
-        ctx.threadSessions.size,
-        interaction,
-        options,
-        ctx.guildCache,
-        ctx.syncGuildData,
-      );
+    {
+      handler: (ctx, interaction, permLevel, getOption, userId) =>
+        handleWorkCommand(ctx, interaction, permLevel, getOption, userId),
+      minPermission: PermissionLevel.STANDARD,
     },
   ],
-  ['agent-skill', (ctx, interaction, permLevel) => handleAgentSkillCommand(ctx, interaction, permLevel)],
-  ['agent-persona', (ctx, interaction, permLevel) => handleAgentPersonaCommand(ctx, interaction, permLevel)],
+  ['agents', { handler: (ctx, interaction) => handleAgentsCommand(ctx, interaction) }],
+  ['status', { handler: (ctx, interaction) => handleStatusCommand(ctx, interaction) }],
+  ['dashboard', { handler: (ctx, interaction) => handleDashboardCommand(ctx, interaction) }],
+  ['tasks', { handler: (ctx, interaction) => handleTasksCommand(ctx, interaction) }],
+  ['schedule', { handler: (ctx, interaction, permLevel) => handleScheduleCommand(ctx, interaction, permLevel) }],
+  [
+    'config',
+    {
+      handler: (ctx, interaction, permLevel) => handleConfigCommand(ctx, interaction, permLevel),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'council',
+    {
+      handler: (ctx, interaction, permLevel, getOption) => handleCouncilCommand(ctx, interaction, permLevel, getOption),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  ['quickstart', { handler: (ctx, interaction) => handleQuickstartCommand(ctx, interaction) }],
+  ['help', { handler: (_ctx, interaction) => handleHelpCommand(interaction) }],
+  ['tools', { handler: (_ctx, interaction, _permLevel, getOption) => handleToolsCommand(interaction, getOption) }],
+  [
+    'mute',
+    {
+      handler: (ctx, interaction, permLevel, getOption) => handleMuteCommand(ctx, interaction, permLevel, getOption),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'unmute',
+    {
+      handler: (ctx, interaction, permLevel, getOption) => handleUnmuteCommand(ctx, interaction, permLevel, getOption),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'admin',
+    {
+      handler: async (ctx, interaction, _permLevel) => {
+        const options = interaction.data?.options ?? [];
+        await handleAdminCommand(
+          ctx.db,
+          ctx.config,
+          ctx.mutedUsers,
+          ctx.threadSessions.size,
+          interaction,
+          options,
+          ctx.guildCache,
+          ctx.syncGuildData,
+        );
+      },
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'agent-skill',
+    {
+      handler: (ctx, interaction, permLevel) => handleAgentSkillCommand(ctx, interaction, permLevel),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'agent-persona',
+    {
+      handler: (ctx, interaction, permLevel) => handleAgentPersonaCommand(ctx, interaction, permLevel),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
 ]);
 
 export async function handleInteraction(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
@@ -682,10 +741,17 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
   const options = interaction.data?.options ?? [];
   const getOption = (name: string) => options.find((o) => o.name === name)?.value as string | undefined;
 
-  const handler = COMMAND_HANDLERS.get(commandName);
-  if (!handler) {
+  const entry = COMMAND_HANDLERS.get(commandName);
+  if (!entry) {
     await respondToInteraction(interaction, `Unknown command: ${commandName}`);
     return;
   }
-  await handler(ctx, interaction, permLevel, getOption, userId);
+
+  // Declarative permission middleware — rejects before the handler runs
+  if (entry.minPermission !== undefined && permLevel < entry.minPermission) {
+    await respondEphemeral(interaction, 'You do not have permission to use this command.');
+    return;
+  }
+
+  await entry.handler(ctx, interaction, permLevel, getOption, userId);
 }

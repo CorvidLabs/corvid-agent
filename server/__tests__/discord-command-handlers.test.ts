@@ -987,14 +987,6 @@ describe('handleConfigCommand', () => {
     expect(channelField!.value).toContain('500000000000000001');
   });
 
-  test('denies non-admin', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('config');
-    await handleConfigCommand(ctx, interaction, PermissionLevel.STANDARD);
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('Only admins');
-  });
 });
 
 // ── Moderation Commands ─────────────────────────────────────────────
@@ -1010,17 +1002,6 @@ describe('handleMuteCommand', () => {
     const content = capturedResponse!.data?.content as string;
     expect(content).toContain('muted');
     expect(ctx.muteUser).toHaveBeenCalledWith('999000000000000001');
-  });
-
-  test('denies non-admin', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('mute');
-    const getOption = (name: string) => (name === 'user' ? '999000000000000001' : undefined);
-
-    await handleMuteCommand(ctx, interaction, PermissionLevel.STANDARD, getOption);
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('Only admins');
   });
 
   test('requires user parameter', async () => {
@@ -1048,17 +1029,6 @@ describe('handleUnmuteCommand', () => {
     expect(ctx.unmuteUser).toHaveBeenCalledWith('999000000000000001');
   });
 
-  test('denies non-admin', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('unmute');
-    const getOption = (name: string) => (name === 'user' ? '999000000000000001' : undefined);
-
-    await handleUnmuteCommand(ctx, interaction, PermissionLevel.STANDARD, getOption);
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('Only admins');
-  });
-
   test('requires user parameter', async () => {
     const ctx = createTestContext();
     const interaction = makeInteraction('unmute');
@@ -1072,17 +1042,6 @@ describe('handleUnmuteCommand', () => {
 });
 
 describe('handleCouncilCommand', () => {
-  test('denies non-admin', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('council');
-    const getOption = (name: string) => (name === 'topic' ? 'Test topic' : undefined);
-
-    await handleCouncilCommand(ctx, interaction, PermissionLevel.STANDARD, getOption);
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('admin permissions');
-  });
-
   test('requires topic', async () => {
     const ctx = createTestContext();
     const interaction = makeInteraction('council');
@@ -1123,21 +1082,6 @@ describe('handleCouncilCommand', () => {
 // ── Session Commands ────────────────────────────────────────────────
 
 describe('handleSessionCommand', () => {
-  test('denies low permission users', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('session');
-    const getOption = (name: string) => {
-      if (name === 'agent') return 'TestAgent';
-      if (name === 'topic') return 'Hello';
-      return undefined;
-    };
-
-    await handleSessionCommand(ctx, interaction, PermissionLevel.BASIC, getOption, '200000000000000001');
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('higher role');
-  });
-
   test('requires both agent and topic', async () => {
     const ctx = createTestContext();
     const interaction = makeInteraction('session');
@@ -1279,17 +1223,6 @@ describe('handleSessionCommand', () => {
 });
 
 describe('handleWorkCommand', () => {
-  test('denies low permission users', async () => {
-    const ctx = createTestContext();
-    const interaction = makeInteraction('work');
-    const getOption = (name: string) => (name === 'description' ? 'Fix bug' : undefined);
-
-    await handleWorkCommand(ctx, interaction, PermissionLevel.BASIC, getOption, '200000000000000001');
-
-    const content = capturedResponse!.data?.content as string;
-    expect(content).toContain('higher role');
-  });
-
   test('handles no work task service', async () => {
     const ctx = createTestContext();
     ctx.workTaskService = null;
@@ -1542,5 +1475,118 @@ describe('handleInteraction dispatch', () => {
 
     await handleInteraction(ctx, interaction);
     expect(capturedResponse).toBeNull();
+  });
+});
+
+// ── Permission middleware ────────────────────────────────────────────
+// Verifies that minPermission declared in COMMAND_HANDLERS is enforced
+// by the dispatcher before calling any handler.
+
+describe('handleInteraction permission middleware', () => {
+  test('rejects BASIC user from /session (requires STANDARD)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 1 }); // BASIC
+    const interaction = makeInteraction('session', [
+      { name: 'agent', value: 'TestAgent' },
+      { name: 'topic', value: 'Hello' },
+    ]);
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects BASIC user from /work (requires STANDARD)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 1 }); // BASIC
+    const interaction = makeInteraction('work', [{ name: 'description', value: 'task' }]);
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /config (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('config');
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /council (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('council', [{ name: 'topic', value: 'Test' }]);
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /mute (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('mute', [{ name: 'user', value: '999000000000000001' }]);
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /unmute (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('unmute', [{ name: 'user', value: '999000000000000001' }]);
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /admin (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('admin');
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('rejects STANDARD user from /agent-skill (requires ADMIN)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('agent-skill');
+
+    await handleInteraction(ctx, interaction);
+
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('do not have permission');
+  });
+
+  test('allows ADMIN user to reach /config', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 3 }); // ADMIN
+    const interaction = makeInteraction('config');
+
+    await handleInteraction(ctx, interaction);
+
+    const embeds = capturedResponse!.data?.embeds as Array<{ title: string }>;
+    expect(embeds[0].title).toBe('Bot Configuration');
+  });
+
+  test('allows STANDARD user to reach /session (partial — no agents)', async () => {
+    const ctx = createTestContext({ defaultPermissionLevel: 2 }); // STANDARD
+    const interaction = makeInteraction('session', [
+      { name: 'agent', value: 'TestAgent' },
+      { name: 'topic', value: 'Hello' },
+    ]);
+
+    await handleInteraction(ctx, interaction);
+
+    // Permission passed, handler runs and rejects because no agents are configured
+    const content = capturedResponse!.data?.content as string;
+    expect(content).toContain('No agents configured');
   });
 });
