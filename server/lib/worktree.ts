@@ -9,6 +9,7 @@ import { resolve, dirname } from 'node:path';
 import { createLogger } from './logger';
 import { resolveProjectDir } from './project-dir';
 import type { Project } from '../../shared/types';
+import { cleanStaleWorktreeState } from './worktree-cleanup';
 
 const log = createLogger('Worktree');
 
@@ -38,6 +39,11 @@ export interface CreateWorktreeResult {
 
 /**
  * Create a git worktree with a new branch, isolated from the main working tree.
+ *
+ * Handles stale state automatically: prunes dead worktree references, removes
+ * leftover directories, and deletes conflicting branches before creation.
+ * This prevents `fatal` errors when retrying tasks that previously failed
+ * during worktree setup.
  */
 export async function createWorktree(options: CreateWorktreeOptions): Promise<CreateWorktreeResult> {
     const { projectWorkingDir, branchName, worktreeId } = options;
@@ -45,6 +51,10 @@ export async function createWorktree(options: CreateWorktreeOptions): Promise<Cr
     const worktreeDir = resolve(worktreeBase, worktreeId);
 
     try {
+        // Clean stale worktree state (prune refs, remove dirs, delete branches)
+        // before attempting creation. Prevents `fatal` errors on task retry.
+        await cleanStaleWorktreeState(projectWorkingDir, worktreeDir, branchName, pruneWorktrees);
+
         const proc = Bun.spawn(
             ['git', 'worktree', 'add', '-b', branchName, worktreeDir],
             {

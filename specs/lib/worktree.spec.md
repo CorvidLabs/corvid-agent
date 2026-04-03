@@ -4,6 +4,7 @@ version: 2
 status: active
 files:
   - server/lib/worktree.ts
+  - server/lib/worktree-cleanup.ts
 db_tables: []
 depends_on: []
 ---
@@ -26,6 +27,10 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | `generateChatBranchName` | `(agentName: string, sessionId: string)` | `string` | Generates a branch name for chat session worktrees: `chat/{agentSlug}/{sessionIdPrefix}` |
 | `resolveAndCreateWorktree` | `(project: Project, agentName: string, sessionId: string)` | `Promise<ResolveAndCreateWorktreeResult>` | Resolves project dir (handling clone_on_demand/ephemeral) then creates a worktree. Ensures repo is cloned before worktree creation |
 | `pruneWorktrees` | `(projectWorkingDir: string)` | `Promise<void>` | Runs `git worktree prune` to clean up stale worktree references where the directory no longer exists on disk |
+| `branchExists` | `(projectWorkingDir: string, branchName: string)` | `Promise<boolean>` | Checks if a git branch exists locally via `git rev-parse` |
+| `deleteBranch` | `(projectWorkingDir: string, branchName: string)` | `Promise<void>` | Force-deletes a local git branch. Non-fatal on failure |
+| `forceRemoveWorktree` | `(projectWorkingDir: string, worktreeDir: string, pruneAfter: Function)` | `Promise<void>` | Force-removes a worktree directory via git, falling back to manual cleanup. Non-fatal on failure |
+| `cleanStaleWorktreeState` | `(projectWorkingDir: string, worktreeDir: string, branchName: string, pruneWorktrees: Function)` | `Promise<void>` | Cleans stale worktree state: prunes refs, removes dirs, deletes conflicting branches |
 
 ### Exported Types
 
@@ -44,8 +49,9 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 4. **Smart branch cleanup**: `removeWorktree` with `cleanBranch: true` deletes branches with zero commits ahead of main; branches with actual commits are preserved for PRs/review. Without the option, branches are always kept
 5. **Idempotent removal**: Calling `removeWorktree` on an already-removed worktree logs a warning but does not throw
 6. **Graceful failure**: `createWorktree` returns `{ success: false, error }` on failure rather than throwing
-7. **Mandatory isolation**: All session creation paths (Discord mention, /session command, AlgoChat) MUST fail the session if worktree creation fails, rather than silently falling through to the shared main working directory. No isolation = no session.
-8. **Branch isolation prompt**: Sessions running in worktrees receive a `## Git Branch Isolation` system prompt section instructing the agent to only interact with its own branch and ignore other `chat/*` branches
+7. **Stale state cleanup**: `createWorktree` automatically prunes dead worktree references, removes leftover directories, and deletes conflicting branches before creation — preventing `fatal` errors on task retry
+8. **Mandatory isolation**: All session creation paths (Discord mention, /session command, AlgoChat) MUST fail the session if worktree creation fails, rather than silently falling through to the shared main working directory. No isolation = no session.
+9. **Branch isolation prompt**: Sessions running in worktrees receive a `## Git Branch Isolation` system prompt section instructing the agent to only interact with its own branch and ignore other `chat/*` branches
 
 ## Behavioral Examples
 
@@ -113,6 +119,27 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 - **When** `generateChatBranchName("Corvid Agent", "abc123def456-rest")` is called
 - **Then** returns `"chat/corvid-agent/abc123def456"`
 
+### Scenario: Stale worktree directory blocks creation
+
+- **Given** a previous task left behind worktree directory `{baseDir}/{worktreeId}` on disk
+- **When** `createWorktree(...)` is called with the same `worktreeId`
+- **Then** the stale directory is force-removed before attempting `git worktree add`
+- **And** the worktree is created successfully
+
+### Scenario: Stale branch blocks creation
+
+- **Given** a previous task created branch `agent/corvid/fix-xyz-abc123` but the task failed before cleanup
+- **When** `createWorktree(...)` is called with the same `branchName`
+- **Then** the stale branch is deleted before attempting `git worktree add -b`
+- **And** the worktree is created successfully with a fresh branch
+
+### Scenario: Stale git worktree references block creation
+
+- **Given** git's worktree metadata references a path that no longer exists on disk
+- **When** `createWorktree(...)` is called
+- **Then** `git worktree prune` is run before creation to clean stale references
+- **And** the worktree is created successfully
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -121,6 +148,9 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | Git worktree creation throws | Returns `{ success: false, error: message }` |
 | Git worktree removal fails | Logs warning, does not throw |
 | Git worktree removal throws | Logs warning, does not throw |
+| Stale worktree directory exists | Auto-removed before creation attempt |
+| Stale branch exists | Auto-deleted before creation attempt |
+| Stale worktree git references | Auto-pruned before creation attempt |
 
 ## Dependencies
 
@@ -155,4 +185,5 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | 2026-03-18 | corvid-agent | Mandatory worktree isolation (invariants #7-#8); branch isolation prompt; session fails on worktree error |
 | 2026-03-15 | corvid-agent | Added `RemoveWorktreeOptions` / `cleanBranch` for smart branch cleanup; AlgoChat consumer |
 | 2026-03-12 | corvid-agent | Initial spec — extracted from WorkTaskService |
+| 2026-04-02 | corvid-agent | `createWorktree` now auto-cleans stale state (prune refs, remove dirs, delete branches) before creation — fixes #1802 |
 | 2026-03-30 | corvid-agent | Added `pruneWorktrees` for stale worktree reference cleanup |
