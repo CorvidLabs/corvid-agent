@@ -90,16 +90,9 @@ export async function handleSaveMemory(
     }
 }
 
-const PERMANENT_WRITE_WARNING =
-    'WARNING: This will write a permanent, immutable record to the Algorand blockchain ' +
-    'that can NEVER be modified or deleted. ' +
-    'Permanent plain-transaction memories are reserved for attestations, verified facts, ' +
-    'signed commitments, and audit-trail entries — not for general memories. ' +
-    'To proceed, call corvid_promote_memory again with confirmed: true.';
-
 export async function handlePromoteMemory(
     ctx: McpToolContext,
-    args: { key: string; confirmed?: boolean },
+    args: { key: string },
 ): Promise<CallToolResult> {
     try {
         const memory = recallMemory(ctx.db, ctx.agentId, args.key);
@@ -129,14 +122,12 @@ export async function handlePromoteMemory(
                     const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, memory.content);
                     updateMemoryTxid(ctx.db, memory.id, txid);
                     updateMemoryStatus(ctx.db, memory.id, 'confirmed');
-                    log.info('Memory tier transition', { agentId: ctx.agentId, key: args.key, from: 'short_term', to: 'long_term', asaId: existingAsaId });
                     return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${existingAsaId}).`);
                 } else {
                     const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, memory.content);
                     updateMemoryTxid(ctx.db, memory.id, txid);
                     updateMemoryAsaId(ctx.db, memory.id, asaId);
                     updateMemoryStatus(ctx.db, memory.id, 'confirmed');
-                    log.info('Memory tier transition', { agentId: ctx.agentId, key: args.key, from: 'short_term', to: 'long_term', asaId });
                     return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${asaId}).`);
                 }
             } catch (err) {
@@ -146,13 +137,7 @@ export async function handlePromoteMemory(
                 return errorResult(`Failed to promote memory to ARC-69: ${message}`);
             }
         } else {
-            // Testnet/mainnet: plain txn (immutable). Require explicit confirmation.
-            if (!args.confirmed) {
-                log.warn('Permanent memory write blocked — confirmation required', { key: args.key, agentId: ctx.agentId });
-                return textResult(PERMANENT_WRITE_WARNING);
-            }
-
-            // fire-and-forget (costs ALGO, may be slow)
+            // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
             updateMemoryStatus(ctx.db, memory.id, 'pending');
             encryptMemoryContent(memory.content, ctx.serverMnemonic, ctx.network).then((encrypted) => {
                 return ctx.agentMessenger.sendOnChainToSelf(
@@ -179,7 +164,6 @@ export async function handlePromoteMemory(
                 }
             });
 
-            log.info('Memory tier transition', { agentId: ctx.agentId, key: args.key, from: 'short_term', to: 'permanent', network: ctx.network });
             return textResult(`Memory "${args.key}" queued for promotion to long-term on-chain storage.`);
         }
     } catch (err) {
@@ -206,18 +190,16 @@ export async function handleRecallMemory(
                 return textResult(`No memory found with key "${args.key}".`);
             }
 
-            // Show correct tier label for each memory status
+            // ARC-69 memories show ASA ID instead of raw txid
             let chainTag: string;
-            if (memory.status === 'short_term') {
-                chainTag = '(short-term, SQLite only)';
-            } else if (memory.asaId) {
-                chainTag = `(long-term, ASA: ${memory.asaId})`;
+            if (memory.asaId) {
+                chainTag = `(on-chain, ASA: ${memory.asaId})`;
             } else if (memory.status === 'confirmed' && memory.txid) {
-                chainTag = `(permanent, txid: ${memory.txid})`;
+                chainTag = `(on-chain, txid: ${memory.txid})`;
             } else if (memory.status === 'pending') {
-                chainTag = '(pending promotion to on-chain)';
+                chainTag = '(pending sync to on-chain)';
             } else {
-                chainTag = '(promotion failed — will retry)';
+                chainTag = '(sync-failed — will retry)';
             }
             return textResult(`[${memory.key}] ${memory.content}\n(saved: ${memory.updatedAt}) ${chainTag}`);
         }
@@ -236,15 +218,9 @@ export async function handleRecallMemory(
                 return textResult(`No memories found matching "${args.query}".`);
             }
             const lines = memories.map((m) => {
-                const tag = m.status === 'short_term'
-                    ? '[short-term]'
-                    : m.asaId
-                        ? `[long-term, ASA: ${m.asaId}]`
-                        : m.status === 'confirmed' && m.txid
-                            ? `[permanent, txid: ${m.txid}]`
-                            : m.status === 'pending'
-                                ? '[pending]'
-                                : '[failed]';
+                const tag = m.asaId
+                    ? `[ASA: ${m.asaId}]`
+                    : m.status === 'confirmed' && m.txid ? `[on-chain: ${m.txid}]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
                 return `${tag} [${m.key}] ${m.content}`;
             });
             return textResult(`Found ${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -256,15 +232,9 @@ export async function handleRecallMemory(
             return textResult('No memories saved yet.');
         }
         const lines = memories.map((m) => {
-            const tag = m.status === 'short_term'
-                ? '[short-term]'
-                : m.asaId
-                    ? `[long-term, ASA: ${m.asaId}]`
-                    : m.status === 'confirmed'
-                        ? '[permanent]'
-                        : m.status === 'pending'
-                            ? '[pending]'
-                            : '[failed]';
+            const tag = m.asaId
+                ? `[ASA: ${m.asaId}]`
+                : m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
             return `${tag} [${m.key}] ${m.content}`;
         });
         return textResult(`Your ${memories.length} most recent memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -304,10 +274,8 @@ export async function handleDeleteMemory(
 
         if (mode === 'hard') {
             deleteMemoryRow(ctx.db, ctx.agentId, args.key);
-            log.info('Memory tier transition', { agentId: ctx.agentId, key: args.key, from: 'long_term', to: 'deleted', mode: 'hard', asaId: memory.asaId });
         } else {
             archiveMemory(ctx.db, ctx.agentId, args.key);
-            log.info('Memory tier transition', { agentId: ctx.agentId, key: args.key, from: 'long_term', to: 'archived', mode: 'soft', asaId: memory.asaId });
         }
 
         const modeLabel = mode === 'hard' ? 'permanently deleted' : 'soft-deleted (archived)';
