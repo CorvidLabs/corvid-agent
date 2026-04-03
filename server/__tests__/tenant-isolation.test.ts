@@ -5,7 +5,8 @@ import { TENANT_SCOPED_TABLES } from '../tenant/db-filter';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { TenantService } from '../tenant/context';
 import { withTenantFilter, validateTenantOwnership, enableMultiTenantGuard, resetMultiTenantGuard } from '../tenant/db-filter';
-import { extractTenantId, registerApiKey } from '../tenant/middleware';
+import { extractTenantId, registerApiKey, registerMemberByEmail } from '../tenant/middleware';
+import { roleGuard } from '../middleware/guards';
 import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
 import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
 import { createProject, listProjects, getProject } from '../db/projects';
@@ -1223,5 +1224,177 @@ describe('Default tenant backwards compatibility', () => {
             const indexNames = indexes.map((i) => i.name);
             expect(indexNames.some(n => n.includes('tenant'))).toBe(true);
         }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Tenant role → context.role mapping (#1549 Phase 2, item 3)
+// ---------------------------------------------------------------------------
+
+describe('tenantGuard maps tenantRole to context.role', () => {
+    function makeTenantWithMember(role: 'owner' | 'operator' | 'viewer') {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Role Test Tenant',
+            slug: `role-test-${role}-${Date.now()}`,
+            ownerEmail: `owner-${role}@example.com`,
+        });
+        const apiKey = `test-key-${role}-${Date.now()}`;
+        registerApiKey(db, tenant.id, apiKey);
+        const hasher = new Bun.CryptoHasher('sha256');
+        hasher.update(apiKey);
+        const keyHash = hasher.digest('hex');
+        db.query('INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)')
+            .run(tenant.id, keyHash, role);
+        return { tenant, tenantService, apiKey };
+    }
+
+    test('owner tenant member maps to context.role = admin', () => {
+        const { tenantService, apiKey } = makeTenantWithMember('owner');
+        const req = new Request('http://localhost/', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const ctx = createRequestContext();
+        ctx.authenticated = true;
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        expect(result).toBeNull();
+        expect(ctx.tenantRole).toBe('owner');
+        expect(ctx.role).toBe('admin');
+    });
+
+    test('operator tenant member maps to context.role = user', () => {
+        const { tenantService, apiKey } = makeTenantWithMember('operator');
+        const req = new Request('http://localhost/', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const ctx = createRequestContext();
+        ctx.authenticated = true;
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        expect(result).toBeNull();
+        expect(ctx.tenantRole).toBe('operator');
+        expect(ctx.role).toBe('user');
+    });
+
+    test('viewer tenant member maps to context.role = viewer and roleGuard blocks admin', () => {
+        const { tenantService, apiKey } = makeTenantWithMember('viewer');
+        const req = new Request('http://localhost/', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const ctx = createRequestContext();
+        ctx.authenticated = true;
+        const guard = tenantGuard(db, tenantService);
+        guard(req, new URL('http://localhost/'), ctx);
+        expect(ctx.tenantRole).toBe('viewer');
+        expect(ctx.role).toBe('viewer');
+
+        // roleGuard('admin') should block viewer
+        const blocked = roleGuard('admin')(req, new URL('http://localhost/admin'), ctx);
+        expect(blocked).not.toBeNull();
+        expect(blocked!.status).toBe(403);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Proxy trust mode: X-Forwarded-Email (#1549 Phase 2, item 5)
+// ---------------------------------------------------------------------------
+
+describe('tenantGuard proxy trust mode (TRUST_PROXY=1)', () => {
+    const savedTrustProxy = process.env.TRUST_PROXY;
+
+    afterEach(() => {
+        if (savedTrustProxy === undefined) {
+            delete process.env.TRUST_PROXY;
+        } else {
+            process.env.TRUST_PROXY = savedTrustProxy;
+        }
+    });
+
+    function makeTenantWithEmailMember(email: string, role: 'owner' | 'operator' | 'viewer' = 'operator') {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Proxy Trust Tenant',
+            slug: `proxy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            ownerEmail: email,
+        });
+        registerMemberByEmail(db, tenant.id, email, role);
+        return { tenant, tenantService };
+    }
+
+    test('TRUST_PROXY=1 with valid X-Forwarded-Email resolves tenant member', () => {
+        process.env.TRUST_PROXY = '1';
+        const email = 'alice@example.com';
+        const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
+        const req = new Request('http://localhost/', {
+            headers: {
+                'x-forwarded-email': email,
+                'x-tenant-id': tenant.id,
+            },
+        });
+        const ctx = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        expect(result).toBeNull();
+        expect(ctx.tenantRole).toBe('owner');
+        expect(ctx.role).toBe('admin');
+        expect(ctx.authenticated).toBe(true);
+    });
+
+    test('TRUST_PROXY=1 with unregistered email returns 401', () => {
+        process.env.TRUST_PROXY = '1';
+        const { tenant, tenantService } = makeTenantWithEmailMember('registered@example.com', 'operator');
+        const req = new Request('http://localhost/', {
+            headers: {
+                'x-forwarded-email': 'unknown@example.com',
+                'x-tenant-id': tenant.id,
+            },
+        });
+        const ctx = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        expect(result).not.toBeNull();
+        expect(result!.status).toBe(401);
+    });
+
+    test('TRUST_PROXY not set: X-Forwarded-Email header is ignored', () => {
+        delete process.env.TRUST_PROXY;
+        const email = 'alice@example.com';
+        const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
+        const req = new Request('http://localhost/', {
+            headers: {
+                'x-forwarded-email': email,
+                'x-tenant-id': tenant.id,
+            },
+        });
+        const ctx = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        // No API key and TRUST_PROXY not set — no 401 (guard doesn't enforce auth)
+        expect(result).toBeNull();
+        expect(ctx.tenantRole).toBeUndefined();
+    });
+
+    test('TRUST_PROXY=1 with malformed email is ignored (no lookup attempt)', () => {
+        process.env.TRUST_PROXY = '1';
+        const { tenant, tenantService } = makeTenantWithEmailMember('valid@example.com', 'owner');
+        const req = new Request('http://localhost/', {
+            headers: {
+                'x-forwarded-email': 'not-an-email',
+                'x-tenant-id': tenant.id,
+            },
+        });
+        const ctx = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        const result = guard(req, new URL('http://localhost/'), ctx);
+        // Malformed email passes through without setting role or returning error
+        expect(result).toBeNull();
+        expect(ctx.tenantRole).toBeUndefined();
+    });
+
+    test('tenant_members email column exists after migration', () => {
+        const cols = db.query('PRAGMA table_info(tenant_members)').all() as { name: string }[];
+        const colNames = cols.map((c) => c.name);
+        expect(colNames).toContain('email');
     });
 });

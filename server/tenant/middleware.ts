@@ -94,6 +94,46 @@ export function registerApiKey(
 }
 
 /**
+ * Register a tenant member by email address (for proxy-trust mode).
+ * Used when oauth2-proxy provides X-Forwarded-Email and the backend
+ * maps the email to a tenant member role.
+ *
+ * The `key_hash` is derived from the email so the primary key constraint
+ * is satisfied without requiring an actual API key.
+ */
+export function registerMemberByEmail(
+    db: Database,
+    tenantId: string,
+    email: string,
+    role: 'owner' | 'operator' | 'viewer' = 'viewer',
+): void {
+    // Use a deterministic key_hash from tenantId+email so upsert is idempotent
+    const keyHash = hashKey(`email:${tenantId}:${email}`);
+    db.query(`
+        INSERT INTO tenant_members (tenant_id, key_hash, role, email)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(tenant_id, key_hash) DO UPDATE SET role = excluded.role, email = excluded.email, updated_at = datetime('now')
+    `).run(tenantId, keyHash, role, email);
+
+    log.info('Registered tenant member by email', { tenantId, email, role });
+}
+
+/**
+ * Look up a tenant member by email address within a tenant.
+ * Returns the role, or null if the email is not registered.
+ */
+export function getMemberRoleByEmail(
+    db: Database,
+    tenantId: string,
+    email: string,
+): string | null {
+    const row = db.query(
+        'SELECT role FROM tenant_members WHERE tenant_id = ? AND email = ?',
+    ).get(tenantId, email) as { role: string } | null;
+    return row?.role ?? null;
+}
+
+/**
  * Revoke an API key.
  */
 export function revokeApiKey(db: Database, key: string): boolean {

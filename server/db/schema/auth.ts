@@ -48,10 +48,13 @@ export const tables: string[] = [
         tenant_id  TEXT NOT NULL,
         key_hash   TEXT NOT NULL,
         role       TEXT NOT NULL DEFAULT 'viewer',
+        email      TEXT DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (tenant_id, key_hash)
     )`,
+
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`,
 
     `CREATE TABLE IF NOT EXISTS tenants (
         id                      TEXT PRIMARY KEY,
