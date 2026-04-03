@@ -45,7 +45,7 @@ mock.module('../algochat/config', () => ({
   _resetConfigCache: () => {},
 }));
 
-import { recallMemory, saveMemory, updateMemoryStatus, updateMemoryTxid } from '../db/agent-memories';
+import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
 import { grantCredits } from '../db/credits';
 import { getSchedule } from '../db/schedules';
 import { buildDirectTools } from '../mcp/direct-tools';
@@ -1145,75 +1145,6 @@ describe('handleRecallMemory', () => {
     expect(text).toContain('FULLTXIDINSEARCH');
   });
 
-  test('recall by key shows (short-term, SQLite only) for short_term memory', async () => {
-    saveMemory(db, { agentId, key: 'short-term-key', content: 'short-term-value' });
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, { key: 'short-term-key' });
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('(short-term, SQLite only)');
-  });
-
-  test('recall by key shows (long-term, ASA: X) for ARC-69 memory', async () => {
-    const mem = saveMemory(db, { agentId, key: 'long-term-key', content: 'arc69-value' });
-    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(999, 'confirmed', mem.id);
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, { key: 'long-term-key' });
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('(long-term, ASA: 999)');
-  });
-
-  test('recall by key shows (pending promotion to on-chain) for pending memory', async () => {
-    const mem = saveMemory(db, { agentId, key: 'pending-key', content: 'pending-value' });
-    updateMemoryStatus(db, mem.id, 'pending');
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, { key: 'pending-key' });
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('(pending promotion to on-chain)');
-  });
-
-  test('search results show [short-term] tag for short_term memories', async () => {
-    saveMemory(db, { agentId, key: 'short-search', content: 'short term searchable data' });
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, { query: 'short term searchable' });
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('[short-term]');
-  });
-
-  test('search results show [long-term, ASA: X] tag for ARC-69 memories', async () => {
-    const mem = saveMemory(db, { agentId, key: 'long-search', content: 'long term searchable data' });
-    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(777, 'confirmed', mem.id);
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, { query: 'long term searchable' });
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('[long-term, ASA: 777]');
-  });
-
-  test('list shows [short-term] tag for short_term memories', async () => {
-    saveMemory(db, { agentId, key: 'list-short', content: 'list-value' });
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, {});
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('[short-term]');
-  });
-
-  test('list shows [long-term, ASA: X] tag for ARC-69 memories', async () => {
-    const mem = saveMemory(db, { agentId, key: 'list-long', content: 'list-arc69' });
-    db.query('UPDATE agent_memories SET asa_id = ?, status = ? WHERE id = ?').run(888, 'confirmed', mem.id);
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, {});
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('[long-term, ASA: 888]');
-  });
-
-  test('list shows [permanent] tag for confirmed plain-txn memories', async () => {
-    const mem = saveMemory(db, { agentId, key: 'list-permanent', content: 'permanent data' });
-    updateMemoryTxid(db, mem.id, 'PERMANENT-TXID-XYZ');
-    // updateMemoryTxid sets status to confirmed with no asaId — this is a plain txn
-    const ctx = createMockContext();
-    const result = await handleRecallMemory(ctx, {});
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('[permanent]');
-  });
 });
 
 // ─── handleSaveMemory (short-term default) ──────────────────────────────────
@@ -1316,31 +1247,6 @@ describe('handlePromoteMemory', () => {
     const text = (result.content[0] as { text: string }).text;
     expect(text).toContain('Failed to promote memory to ARC-69');
     expect(text).toContain('ARC-69 write error');
-  });
-
-  test('returns confirmation warning on testnet without confirmed flag', async () => {
-    const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
-    saveMemory(db, { agentId, key: 'promote-testnet', content: 'data' });
-
-    const result = await handlePromoteMemory(ctx, { key: 'promote-testnet' });
-    expect(result.isError).toBeFalsy();
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('WARNING');
-    expect(text).toContain('immutable');
-    expect(text).toContain('confirmed: true');
-    // Must NOT write to chain yet
-    const memory = recallMemory(db, agentId, 'promote-testnet');
-    expect(memory?.status).toBe('short_term');
-  });
-
-  test('queues promotion on testnet when confirmed: true', async () => {
-    const ctx = createMockContext({ network: 'testnet', serverMnemonic: 'test mnemonic words here' });
-    saveMemory(db, { agentId, key: 'promote-testnet-confirmed', content: 'data' });
-
-    const result = await handlePromoteMemory(ctx, { key: 'promote-testnet-confirmed', confirmed: true });
-    expect(result.isError).toBeFalsy();
-    const text = (result.content[0] as { text: string }).text;
-    expect(text).toContain('queued for promotion');
   });
 
   test('corvid_promote_memory is registered in buildDirectTools', () => {

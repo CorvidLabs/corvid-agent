@@ -90,11 +90,9 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'corvid_promote_memory',
             'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). ' +
             'After promotion the memory is durable, encrypted, and stored on the Algorand blockchain. ' +
-            'Use this after corvid_save_memory when you want to make a memory permanent. ' +
-            'On testnet/mainnet, plain-transaction writes are immutable forever — you will be prompted to confirm before the write executes.',
+            'Use this after corvid_save_memory when you want to make a memory permanent.',
             {
                 key: z.string().describe('Memory key to promote to long-term on-chain storage'),
-                confirmed: z.boolean().optional().describe('Set to true to confirm a permanent plain-transaction write on testnet/mainnet. Required when the previous call returned a confirmation warning.'),
             },
             async (args) => handlePromoteMemory(ctx, args),
         ),
