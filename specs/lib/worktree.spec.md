@@ -4,6 +4,7 @@ version: 2
 status: active
 files:
   - server/lib/worktree.ts
+  - server/lib/worktree-cleanup.ts
 db_tables: []
 depends_on: []
 ---

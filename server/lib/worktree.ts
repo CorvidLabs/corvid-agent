@@ -5,11 +5,11 @@
  * can create isolated worktrees without duplicating logic.
  */
 
-import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { Project } from '../../shared/types';
 import { createLogger } from './logger';
 import { resolveProjectDir } from './project-dir';
+import { cleanStaleWorktreeState } from './worktree-cleanup';
 
 const log = createLogger('Worktree');
 
@@ -50,24 +50,9 @@ export async function createWorktree(options: CreateWorktreeOptions): Promise<Cr
   const worktreeDir = resolve(worktreeBase, worktreeId);
 
   try {
-    // Clean stale worktree references before attempting creation.
-    // This resolves "directory already registered" errors from previous
-    // failed runs where the directory was removed but git metadata remains.
-    await pruneWorktrees(projectWorkingDir);
-
-    // If the worktree directory already exists on disk (leftover from a
-    // crash), force-remove it so `git worktree add` can succeed.
-    if (existsSync(worktreeDir)) {
-      log.info('Removing stale worktree directory before creation', { worktreeDir });
-      await forceRemoveWorktree(projectWorkingDir, worktreeDir);
-    }
-
-    // If the branch already exists (leftover from a failed task that never
-    // committed), delete it so `-b` doesn't fail with "branch already exists".
-    if (await branchExists(projectWorkingDir, branchName)) {
-      log.info('Deleting stale branch before worktree creation', { branchName });
-      await deleteBranch(projectWorkingDir, branchName);
-    }
+    // Clean stale worktree state (prune refs, remove dirs, delete branches)
+    // before attempting creation. Prevents `fatal` errors on task retry.
+    await cleanStaleWorktreeState(projectWorkingDir, worktreeDir, branchName, pruneWorktrees);
 
     const proc = Bun.spawn(['git', 'worktree', 'add', '-b', branchName, worktreeDir], {
       cwd: projectWorkingDir,
@@ -88,64 +73,6 @@ export async function createWorktree(options: CreateWorktreeOptions): Promise<Cr
     const message = err instanceof Error ? err.message : String(err);
     log.warn('Error creating worktree', { branchName, worktreeDir, error: message });
     return { success: false, worktreeDir, error: `Failed to create worktree: ${message}` };
-  }
-}
-
-/**
- * Check if a git branch exists locally.
- */
-async function branchExists(projectWorkingDir: string, branchName: string): Promise<boolean> {
-  try {
-    const proc = Bun.spawn(['git', 'rev-parse', '--verify', `refs/heads/${branchName}`], {
-      cwd: projectWorkingDir,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await new Response(proc.stderr).text();
-    return (await proc.exited) === 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Force-delete a local git branch. Non-fatal on failure.
- */
-async function deleteBranch(projectWorkingDir: string, branchName: string): Promise<void> {
-  try {
-    const proc = Bun.spawn(['git', 'branch', '-D', branchName], {
-      cwd: projectWorkingDir,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await new Response(proc.stderr).text();
-    await proc.exited;
-  } catch {
-    // Non-fatal — creation will report the real error if the branch still blocks.
-  }
-}
-
-/**
- * Force-remove a worktree directory via git, then prune. Non-fatal on failure.
- */
-async function forceRemoveWorktree(projectWorkingDir: string, worktreeDir: string): Promise<void> {
-  try {
-    const proc = Bun.spawn(['git', 'worktree', 'remove', '--force', worktreeDir], {
-      cwd: projectWorkingDir,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await new Response(proc.stderr).text();
-    await proc.exited;
-  } catch {
-    // If git worktree remove fails, try manual cleanup + prune
-    try {
-      const { rmSync } = await import('node:fs');
-      rmSync(worktreeDir, { recursive: true, force: true });
-      await pruneWorktrees(projectWorkingDir);
-    } catch {
-      // Non-fatal — creation will report the real error
-    }
   }
 }
 
