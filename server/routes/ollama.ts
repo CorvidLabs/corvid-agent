@@ -15,6 +15,9 @@ import { json } from '../lib/response';
 import { createSession } from '../db/sessions';
 import { createProject, getProjectByName, updateProject } from '../db/projects';
 import type { ProcessManager } from '../process/manager';
+import type { LlmToolDefinition } from '../providers/types';
+import { extractToolCallsFromContent } from '../providers/ollama/tool-parser';
+import { detectModelFamily, getCompactToolInstructionPrompt } from '../providers/ollama/tool-prompt-templates';
 
 const log = createLogger('OllamaRoutes');
 
@@ -641,11 +644,12 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
     try {
         const body = await req.json() as {
             model?: string;
-            messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string; source?: unknown }> }>;
+            messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; tool_use_id?: string; content?: string | Array<{ type: string; text?: string }> }> }>;
             system?: string | Array<{ type: string; text?: string }>;
             max_tokens?: number;
             temperature?: number;
             stream?: boolean;
+            tools?: Array<{ name: string; description?: string; input_schema?: { type?: string; properties?: Record<string, unknown>; required?: string[] } }>;
         };
 
         // Get the actual Ollama cloud model to use
@@ -662,32 +666,93 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
             }, 400);
         }
 
+        // Convert Anthropic tools to LlmToolDefinition format for text-based parsing
+        const toolDefs: LlmToolDefinition[] = (body.tools ?? []).map((t) => {
+            // Ensure properties have required 'type' field for JsonSchemaProperty compatibility
+            const rawProps = t.input_schema?.properties ?? {};
+            const properties: Record<string, { type: string; description?: string }> = {};
+            for (const [key, val] of Object.entries(rawProps)) {
+                const prop = val as { type?: string; description?: string };
+                properties[key] = { type: prop.type ?? 'string', description: prop.description };
+            }
+            return {
+                name: t.name,
+                description: t.description ?? '',
+                parameters: {
+                    type: t.input_schema?.type ?? 'object',
+                    properties,
+                    required: t.input_schema?.required,
+                },
+            };
+        });
+        const toolNames = toolDefs.map(t => t.name);
+
         // Build system prompt — Anthropic sends system as string or content block array
-        const systemPrompt = typeof body.system === 'string'
+        let systemPrompt = typeof body.system === 'string'
             ? body.system
             : Array.isArray(body.system)
                 ? body.system.filter(b => b.type === 'text').map(b => b.text ?? '').join('\n')
                 : 'You are a helpful assistant.';
 
+        // Inject tool instructions into system prompt so the model knows how to call tools
+        if (toolDefs.length > 0) {
+            const family = detectModelFamily(ollamaModel);
+            const toolPrompt = getCompactToolInstructionPrompt(family, toolNames, toolDefs);
+            systemPrompt = `${systemPrompt}\n\n${toolPrompt}`;
+        }
+
         // Convert Anthropic messages to Ollama format.
-        // Anthropic content can be a string OR an array of content blocks.
-        const ollamaMessages = (body.messages ?? []).map((msg) => {
-            let text: string;
+        // Handles text, tool_use (assistant requesting tool), and tool_result (user providing result).
+        const ollamaMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+        for (const msg of (body.messages ?? [])) {
             if (typeof msg.content === 'string') {
-                text = msg.content;
+                ollamaMessages.push({
+                    role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                    content: msg.content,
+                });
             } else if (Array.isArray(msg.content)) {
-                text = msg.content
-                    .filter(block => block.type === 'text' && block.text)
-                    .map(block => block.text!)
-                    .join('\n');
+                const textParts: string[] = [];
+                const toolUseParts: string[] = [];
+                const toolResultParts: string[] = [];
+
+                for (const block of msg.content) {
+                    if (block.type === 'text' && block.text) {
+                        textParts.push(block.text);
+                    } else if (block.type === 'tool_use' && block.name) {
+                        // Assistant's tool call — convert to text-based format
+                        const args = block.input ?? {};
+                        toolUseParts.push(JSON.stringify([{ name: block.name, arguments: args }]));
+                    } else if (block.type === 'tool_result') {
+                        // Tool result — wrap in delimiters the model recognizes
+                        const resultContent = typeof block.content === 'string'
+                            ? block.content
+                            : Array.isArray(block.content)
+                                ? block.content.filter((b: { type: string; text?: string }) => b.type === 'text').map((b: { type: string; text?: string }) => b.text ?? '').join('\n')
+                                : '';
+                        toolResultParts.push(`«tool_output»\n${resultContent}\n«/tool_output»`);
+                    }
+                }
+
+                if (msg.role === 'assistant') {
+                    // Combine text and tool_use parts for assistant messages
+                    const combined = [...textParts, ...toolUseParts].filter(Boolean).join('\n');
+                    if (combined) {
+                        ollamaMessages.push({ role: 'assistant', content: combined });
+                    }
+                } else {
+                    // User messages may contain tool_result blocks
+                    const combined = [...textParts, ...toolResultParts].filter(Boolean).join('\n');
+                    if (combined) {
+                        ollamaMessages.push({ role: 'user', content: combined });
+                    }
+                }
             } else {
-                text = String(msg.content);
+                ollamaMessages.push({
+                    role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                    content: String(msg.content),
+                });
             }
-            return {
-                role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-                content: text,
-            };
-        });
+        }
 
         // Acquire slot
         const slotAcquired = await provider.acquireSlot(ollamaModel);
@@ -700,7 +765,9 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
 
         try {
             if (body.stream) {
-                // Streaming response — emit Anthropic SSE format so the SDK can parse it
+                // Streaming response — emit Anthropic SSE format so the SDK can parse it.
+                // We accumulate the full response, then parse for tool calls at the end,
+                // because text-based tool calls can only be detected after full generation.
                 const encoder = new TextEncoder();
                 const sse = (event: string, data: unknown) =>
                     encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -723,21 +790,24 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                                     },
                                 }));
 
-                                // content_block_start
+                                // Stream text into a text content block first
                                 controller.enqueue(sse('content_block_start', {
                                     type: 'content_block_start', index: 0,
                                     content_block: { type: 'text', text: '' },
                                 }));
 
                                 let outputTokens = 0;
+                                let fullContent = '';
                                 await provider.complete({
                                     model: ollamaModel,
                                     systemPrompt,
                                     messages: ollamaMessages,
+                                    tools: toolDefs.length > 0 ? toolDefs : undefined,
                                     maxTokens: body.max_tokens ?? 4096,
                                     temperature: body.temperature ?? 0.7,
                                     onStream: (token) => {
                                         outputTokens++;
+                                        fullContent += token;
                                         controller.enqueue(sse('content_block_delta', {
                                             type: 'content_block_delta', index: 0,
                                             delta: { type: 'text_delta', text: token },
@@ -745,15 +815,62 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                                     },
                                 });
 
-                                // content_block_stop
+                                // Close the text content block
                                 controller.enqueue(sse('content_block_stop', {
                                     type: 'content_block_stop', index: 0,
                                 }));
 
-                                // message_delta
+                                // Parse tool calls from the accumulated response text
+                                const parsedToolCalls = toolDefs.length > 0
+                                    ? extractToolCallsFromContent(fullContent, toolDefs)
+                                    : [];
+
+                                // If tool calls were found, emit them as tool_use content blocks
+                                if (parsedToolCalls.length > 0) {
+                                    log.info(`Proxy extracted ${parsedToolCalls.length} tool call(s) from response`, {
+                                        model: ollamaModel,
+                                        tools: parsedToolCalls.map(tc => tc.name),
+                                    });
+
+                                    for (let i = 0; i < parsedToolCalls.length; i++) {
+                                        const tc = parsedToolCalls[i];
+                                        const blockIndex = i + 1; // text block is index 0
+
+                                        // content_block_start for tool_use
+                                        controller.enqueue(sse('content_block_start', {
+                                            type: 'content_block_start',
+                                            index: blockIndex,
+                                            content_block: {
+                                                type: 'tool_use',
+                                                id: `toolu_${tc.id}`,
+                                                name: tc.name,
+                                                input: {},
+                                            },
+                                        }));
+
+                                        // Send the full input as a single delta
+                                        controller.enqueue(sse('content_block_delta', {
+                                            type: 'content_block_delta',
+                                            index: blockIndex,
+                                            delta: {
+                                                type: 'input_json_delta',
+                                                partial_json: JSON.stringify(tc.arguments),
+                                            },
+                                        }));
+
+                                        // content_block_stop
+                                        controller.enqueue(sse('content_block_stop', {
+                                            type: 'content_block_stop',
+                                            index: blockIndex,
+                                        }));
+                                    }
+                                }
+
+                                // message_delta — tool_use means stop_reason is 'tool_use'
+                                const stopReason = parsedToolCalls.length > 0 ? 'tool_use' : 'end_turn';
                                 controller.enqueue(sse('message_delta', {
                                     type: 'message_delta',
-                                    delta: { stop_reason: 'end_turn', stop_sequence: null },
+                                    delta: { stop_reason: stopReason, stop_sequence: null },
                                     usage: { output_tokens: outputTokens },
                                 }));
 
@@ -798,6 +915,7 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                     model: ollamaModel,
                     systemPrompt,
                     messages: ollamaMessages,
+                    tools: toolDefs.length > 0 ? toolDefs : undefined,
                     maxTokens: body.max_tokens ?? 4096,
                     temperature: body.temperature ?? 0.7,
                     onStream: (token) => {
@@ -806,13 +924,35 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
                 });
                 provider.releaseSlot(ollamaModel);
 
+                // Parse tool calls from response text
+                const parsedToolCalls = toolDefs.length > 0
+                    ? extractToolCallsFromContent(content, toolDefs)
+                    : [];
+
+                const contentBlocks: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }> = [];
+
+                // Always include text block (may be empty if model only output tool calls)
+                contentBlocks.push({ type: 'text', text: content });
+
+                // Add tool_use blocks if parsed
+                for (const tc of parsedToolCalls) {
+                    contentBlocks.push({
+                        type: 'tool_use',
+                        id: `toolu_${tc.id}`,
+                        name: tc.name,
+                        input: tc.arguments,
+                    });
+                }
+
+                const stopReason = parsedToolCalls.length > 0 ? 'tool_use' : 'end_turn';
+
                 return json({
                     id: msgId,
                     type: 'message',
                     role: 'assistant',
-                    content: [{ type: 'text', text: content }],
+                    content: contentBlocks,
                     model: effectiveModel,
-                    stop_reason: 'end_turn',
+                    stop_reason: stopReason,
                     stop_sequence: null,
                     usage: { input_tokens: 0, output_tokens: 0 },
                 });
