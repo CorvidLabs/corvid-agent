@@ -315,5 +315,7 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname.startsWith('/api/plugins')) return true;
     // Discord image sending is an outbound action — admin-only
     if (pathname === '/api/discord/send-image') return true;
+    // Security overview exposes protected paths, scanner patterns, governance bypass paths, and approved domains — admin-only
+    if (pathname === '/api/security/overview') return true;
     return false;
 }

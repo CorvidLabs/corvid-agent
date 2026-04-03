@@ -278,7 +278,13 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 
 ### Admin-Protected Paths
 
-`/metrics`, `/api/audit-log`, `/api/operational-mode`, `/api/backup`, `/api/memories/backfill`, `/api/selftest/run`, `/api/escalation-queue/*`, `/api/algochat/network`
+`/metrics`, `/api/audit-log`, `/api/operational-mode`, `/api/backup`, `/api/memories/backfill`, `/api/selftest/run`, `/api/escalation-queue/*`, `/api/algochat/network`, `/api/security/overview`
+
+The `/api/security/overview` endpoint is admin-protected because it exposes sensitive governance and security information:
+- Protected filenames and patterns (reveals evasion strategies)
+- Code scanner rules and categories (reveals bypass tactics)
+- Approved domains for fetch operations (reveals SSRF targets)
+- Governance tier paths (reveals which changes bypass council review)
 
 ## Change Log
 
