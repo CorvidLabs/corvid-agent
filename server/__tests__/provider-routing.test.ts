@@ -203,6 +203,21 @@ describe('resolveProviderRouting', () => {
     });
 
     describe('Ollama fallback (no cloud access)', () => {
+        let savedOllamaProxyEnv: string | undefined;
+
+        beforeEach(() => {
+            savedOllamaProxyEnv = process.env.OLLAMA_USE_CLAUDE_PROXY;
+            delete process.env.OLLAMA_USE_CLAUDE_PROXY;
+        });
+
+        afterEach(() => {
+            if (savedOllamaProxyEnv !== undefined) {
+                process.env.OLLAMA_USE_CLAUDE_PROXY = savedOllamaProxyEnv;
+            } else {
+                delete process.env.OLLAMA_USE_CLAUDE_PROXY;
+            }
+        });
+
         test('falls back to Ollama when no cloud access and Ollama available', () => {
             const result = resolveProviderRouting({
                 providerType: undefined,
@@ -214,6 +229,21 @@ describe('resolveProviderRouting', () => {
             });
             expect(result.provider).toBe('ollama');
             expect(result.reason).toBe('no_claude_access');
+            expect(result.fallback).toBe(true);
+        });
+
+        test('routes through SDK proxy when OLLAMA_USE_CLAUDE_PROXY is enabled', () => {
+            process.env.OLLAMA_USE_CLAUDE_PROXY = 'true';
+            const result = resolveProviderRouting({
+                providerType: undefined,
+                agentModel: '',
+                hasCursorBinary: false,
+                hasClaudeAccess: false,
+                hasOllamaProvider: true,
+                ollamaDefaultModel: 'qwen3',
+            });
+            expect(result.provider).toBe('sdk');
+            expect(result.reason).toBe('ollama_via_claude_proxy');
             expect(result.fallback).toBe(true);
         });
 
