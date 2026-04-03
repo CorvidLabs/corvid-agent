@@ -12,7 +12,12 @@ permissions:
 
 # E2E tests temporarily disabled to conserve CI minutes.
 # Uncomment the job below when GitHub Actions credits are replenished.
-jobs: {}
+jobs:
+  skip:
+    name: E2E (skipped)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "E2E tests temporarily disabled — see #1436"
   # e2e:
   #   name: E2E Tests
   #   runs-on: ubuntu-latest
