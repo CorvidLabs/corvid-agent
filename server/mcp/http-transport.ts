@@ -204,12 +204,11 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
         } catch (err) { return handleError(err); }
     });
 
-    server.tool('corvid_promote_memory', 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). On testnet/mainnet, plain-transaction writes are immutable forever — you will be prompted to confirm before the write executes.', {
+    server.tool('corvid_promote_memory', 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA).', {
         key: z.string().describe('Memory key to promote to long-term on-chain storage'),
-        confirmed: z.boolean().optional().describe('Set to true to confirm a permanent plain-transaction write on testnet/mainnet.'),
-    }, async ({ key, confirmed }) => {
+    }, async ({ key }) => {
         try {
-            const data = await callApi(baseUrl, '/api/mcp/promote-memory', { agentId, key, confirmed });
+            const data = await callApi(baseUrl, '/api/mcp/promote-memory', { agentId, key });
             return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
         } catch (err) { return handleError(err); }
     });
