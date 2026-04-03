@@ -7,23 +7,17 @@
  *
  * IMPORTANT: In Bun 1.x, mock.module() leaks across test files. Seven other
  * test files mock '../lib/worktree' with simplified implementations that lack
- * stale-cleanup logic. We must re-provide the real module here to override
- * any leaked mocks before our imports resolve.
+ * stale-cleanup logic. We use require() to bypass the ESM mock registry and
+ * load the real module.
  */
-import { mock } from 'bun:test';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// Re-provide the real worktree module to override leaked mocks.
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const realModulePath = resolve(__dirname, '../lib/worktree.ts');
-mock.module('../lib/worktree', () => import(realModulePath));
-
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createWorktree, pruneWorktrees } from '../lib/worktree';
+
+// Use require() to bypass mock.module leakage from other test files.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { createWorktree, pruneWorktrees } = require('../lib/worktree') as typeof import('../lib/worktree');
 
 const IS_WINDOWS = process.platform === 'win32';
 
