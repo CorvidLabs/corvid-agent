@@ -241,6 +241,47 @@ describe('checkWsAuth', () => {
         const url = makeUrl('/ws');
         expect(checkWsAuth(req, url, AUTH_ENABLED)).toBe(false);
     });
+
+    it('returns false for valid ?key= query param when DISABLE_WS_KEY_PARAM=true', () => {
+        const originalVal = process.env.DISABLE_WS_KEY_PARAM;
+        process.env.DISABLE_WS_KEY_PARAM = 'true';
+        try {
+            const req = makeRequest('/ws');
+            const url = makeUrl('/ws', { key: AUTH_ENABLED.apiKey! });
+            expect(checkWsAuth(req, url, AUTH_ENABLED)).toBe(false);
+        } finally {
+            if (originalVal === undefined) delete process.env.DISABLE_WS_KEY_PARAM;
+            else process.env.DISABLE_WS_KEY_PARAM = originalVal;
+        }
+    });
+
+    it('returns false for valid ?key= query param when DISABLE_WS_KEY_PARAM=1', () => {
+        const originalVal = process.env.DISABLE_WS_KEY_PARAM;
+        process.env.DISABLE_WS_KEY_PARAM = '1';
+        try {
+            const req = makeRequest('/ws');
+            const url = makeUrl('/ws', { key: AUTH_ENABLED.apiKey! });
+            expect(checkWsAuth(req, url, AUTH_ENABLED)).toBe(false);
+        } finally {
+            if (originalVal === undefined) delete process.env.DISABLE_WS_KEY_PARAM;
+            else process.env.DISABLE_WS_KEY_PARAM = originalVal;
+        }
+    });
+
+    it('Authorization: Bearer still works when DISABLE_WS_KEY_PARAM=true', () => {
+        const originalVal = process.env.DISABLE_WS_KEY_PARAM;
+        process.env.DISABLE_WS_KEY_PARAM = 'true';
+        try {
+            const req = makeRequest('/ws', {
+                headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
+            });
+            const url = makeUrl('/ws');
+            expect(checkWsAuth(req, url, AUTH_ENABLED)).toBe(true);
+        } finally {
+            if (originalVal === undefined) delete process.env.DISABLE_WS_KEY_PARAM;
+            else process.env.DISABLE_WS_KEY_PARAM = originalVal;
+        }
+    });
 });
 
 // --- buildCorsHeaders -------------------------------------------------------
