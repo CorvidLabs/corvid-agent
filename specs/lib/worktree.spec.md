@@ -27,6 +27,10 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 | `generateChatBranchName` | `(agentName: string, sessionId: string)` | `string` | Generates a branch name for chat session worktrees: `chat/{agentSlug}/{sessionIdPrefix}` |
 | `resolveAndCreateWorktree` | `(project: Project, agentName: string, sessionId: string)` | `Promise<ResolveAndCreateWorktreeResult>` | Resolves project dir (handling clone_on_demand/ephemeral) then creates a worktree. Ensures repo is cloned before worktree creation |
 | `pruneWorktrees` | `(projectWorkingDir: string)` | `Promise<void>` | Runs `git worktree prune` to clean up stale worktree references where the directory no longer exists on disk |
+| `branchExists` | `(projectWorkingDir: string, branchName: string)` | `Promise<boolean>` | Checks if a git branch exists locally via `git rev-parse` |
+| `deleteBranch` | `(projectWorkingDir: string, branchName: string)` | `Promise<void>` | Force-deletes a local git branch. Non-fatal on failure |
+| `forceRemoveWorktree` | `(projectWorkingDir: string, worktreeDir: string, pruneAfter: Function)` | `Promise<void>` | Force-removes a worktree directory via git, falling back to manual cleanup. Non-fatal on failure |
+| `cleanStaleWorktreeState` | `(projectWorkingDir: string, worktreeDir: string, branchName: string, pruneWorktrees: Function)` | `Promise<void>` | Cleans stale worktree state: prunes refs, removes dirs, deletes conflicting branches |
 
 ### Exported Types
 
