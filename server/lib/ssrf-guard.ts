@@ -7,6 +7,7 @@
  */
 
 import { createLogger } from './logger';
+import { ValidationError } from './errors';
 
 const log = createLogger('SSRFGuard');
 
@@ -97,6 +98,57 @@ export function isPrivateIPv6(ip: string): boolean {
 export function isPrivateIP(ip: string): boolean {
     if (ip.includes(':')) return isPrivateIPv6(ip);
     return isPrivateIPv4(ip);
+}
+
+const BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '[::1]']);
+const ZERO_PREFIX_RE = /^0\./;
+
+/**
+ * Synchronously validate a URL is safe to fetch.
+ *
+ * Catches: private/loopback hostnames, private IPv4/IPv6 ranges,
+ * decimal-encoded IPs (2130706433), hex-encoded IPs (0x7f000001),
+ * 0.-prefix IPs, and non-http/https schemes.
+ *
+ * Throws ValidationError if the URL is unsafe or malformed.
+ */
+export function validateUrl(urlString: string): void {
+    let url: URL;
+    try {
+        url = new URL(urlString);
+    } catch {
+        throw new ValidationError(`Invalid URL: ${urlString}`);
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new ValidationError(`Blocked URL scheme: ${url.protocol} — only http and https are allowed`);
+    }
+
+    const hostname = url.hostname;
+
+    if (BLOCKED_HOSTNAMES.has(hostname)) {
+        throw new ValidationError(`Blocked URL: ${hostname} is not allowed`);
+    }
+
+    if (isPrivateIP(hostname)) {
+        throw new ValidationError(`Blocked URL: ${hostname} is a private/reserved IP address`);
+    }
+
+    if (ZERO_PREFIX_RE.test(hostname)) {
+        throw new ValidationError(`Blocked URL: ${hostname} resolves to a private/reserved IP range`);
+    }
+
+    if (/^\d+$/.test(hostname)) {
+        throw new ValidationError(`Blocked URL: numeric IP address ${hostname} is not allowed`);
+    }
+
+    if (/^0x/i.test(hostname)) {
+        throw new ValidationError(`Blocked URL: hex IP address ${hostname} is not allowed`);
+    }
+
+    if (hostname.endsWith('.local')) {
+        throw new ValidationError(`Blocked URL: ${hostname} is a local network hostname`);
+    }
 }
 
 /**
