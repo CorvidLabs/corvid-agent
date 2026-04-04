@@ -207,15 +207,12 @@ describe('resolveProviderRouting', () => {
 
         beforeEach(() => {
             savedOllamaProxyEnv = process.env.OLLAMA_USE_CLAUDE_PROXY;
-            delete process.env.OLLAMA_USE_CLAUDE_PROXY;
+            // Use '' not delete — Bun ignores delete for .env-loaded vars
+            process.env.OLLAMA_USE_CLAUDE_PROXY = '';
         });
 
         afterEach(() => {
-            if (savedOllamaProxyEnv !== undefined) {
-                process.env.OLLAMA_USE_CLAUDE_PROXY = savedOllamaProxyEnv;
-            } else {
-                delete process.env.OLLAMA_USE_CLAUDE_PROXY;
-            }
+            process.env.OLLAMA_USE_CLAUDE_PROXY = savedOllamaProxyEnv ?? '';
         });
 
         test('falls back to Ollama when no cloud access and Ollama available', () => {
