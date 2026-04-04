@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { extractTenantId, registerApiKey, revokeApiKey } from '../tenant/middleware';
+import { extractTenantId, registerApiKey, revokeApiKey, registerMemberByEmail, getMemberRoleByEmail } from '../tenant/middleware';
 import { TenantService } from '../tenant/context';
 
 function createTestDb(): Database {
@@ -39,6 +39,19 @@ function createTestDb(): Database {
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     `);
+
+    db.exec(`
+        CREATE TABLE tenant_members (
+            tenant_id  TEXT NOT NULL,
+            key_hash   TEXT NOT NULL,
+            role       TEXT NOT NULL DEFAULT 'viewer',
+            email      TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (tenant_id, key_hash)
+        )
+    `);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`);
 
     return db;
 }
@@ -212,6 +225,40 @@ describe('tenant/middleware', () => {
             const result = extractTenantId(req, db, service);
             // Should fall through to default since key is revoked
             expect((result as any).tenantId).toBe('default');
+        });
+    });
+
+    describe('registerMemberByEmail', () => {
+        it('registers a member by email', () => {
+            registerMemberByEmail(db, 'tenant-a', 'alice@example.com', 'operator');
+            const role = getMemberRoleByEmail(db, 'tenant-a', 'alice@example.com');
+            expect(role).toBe('operator');
+        });
+
+        it('defaults to viewer role', () => {
+            registerMemberByEmail(db, 'tenant-b', 'bob@example.com');
+            const role = getMemberRoleByEmail(db, 'tenant-b', 'bob@example.com');
+            expect(role).toBe('viewer');
+        });
+
+        it('upserts on re-register with different role', () => {
+            registerMemberByEmail(db, 'tenant-c', 'carol@example.com', 'viewer');
+            registerMemberByEmail(db, 'tenant-c', 'carol@example.com', 'owner');
+            const role = getMemberRoleByEmail(db, 'tenant-c', 'carol@example.com');
+            expect(role).toBe('owner');
+        });
+    });
+
+    describe('getMemberRoleByEmail', () => {
+        it('returns null for unregistered email', () => {
+            const role = getMemberRoleByEmail(db, 'tenant-x', 'nobody@example.com');
+            expect(role).toBeNull();
+        });
+
+        it('returns null for email in different tenant', () => {
+            registerMemberByEmail(db, 'tenant-d', 'dave@example.com', 'operator');
+            const role = getMemberRoleByEmail(db, 'tenant-e', 'dave@example.com');
+            expect(role).toBeNull();
         });
     });
 });
