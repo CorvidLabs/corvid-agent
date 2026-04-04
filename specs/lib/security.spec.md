@@ -43,6 +43,7 @@ Provides a layered defense system for the corvid-agent platform: bash command an
 | `isPrivateIPv4` | `ip: string` | `boolean` | Checks whether an IPv4 address falls in a private/reserved range (RFC1918, loopback, link-local, CGN, multicast, etc.). |
 | `isPrivateIPv6` | `ip: string` | `boolean` | Checks whether an IPv6 address falls in a private/reserved range. Handles IPv4-mapped IPv6 addresses. |
 | `isPrivateIP` | `ip: string` | `boolean` | Checks whether an IP address (v4 or v6) is private/reserved. Dispatches to isPrivateIPv4 or isPrivateIPv6 based on format. |
+| `validateUrl` | `urlString: string` | `void` | Synchronously validates a URL is safe to fetch. Blocks private/loopback hostnames, private IPv4/IPv6 ranges, decimal/hex-encoded IPs, 0.-prefix IPs, .local domains, and non-http/https schemes. Throws ValidationError if unsafe or malformed. |
 | `validateUrlTarget` | `url: string` | `Promise<string \| null>` | Resolves a hostname via DNS and checks if any resulting IPs are private. Returns blocking reason string if blocked, null if safe. |
 | `sanitizeAgentInput` | `text: string, source?: string` | `SanitizationResult` | Sanitizes external content before feeding to local/Ollama agents. Neutralizes injection patterns (role overrides, jailbreaks, credential probes, external fetches, prompt leakage, Unicode direction overrides, zero-width characters) without blocking. Logs matched patterns. |
 | `wrapExternalContent` | `text: string, label: string` | `string` | Wraps external content with boundary markers reminding the agent the content is user-provided data, not instructions. Additional defense layer beyond regex sanitization. |
@@ -186,6 +187,7 @@ Provides a layered defense system for the corvid-agent platform: bash command an
 | Module | What is used |
 |--------|-------------|
 | `lib/logger` | `createLogger` for structured logging in ssrf-guard, agent-input-sanitizer, injection-guard |
+| `lib/errors` | `ValidationError` used by ssrf-guard `validateUrl` |
 | `lib/prompt-injection` | `scanForInjection` used by injection-guard for route-level scanning |
 | `db/audit` | `recordAudit` used by injection-guard for audit logging on blocked requests |
 | `middleware/rate-limit` | `getClientIp` used by injection-guard for client IP extraction |
@@ -201,6 +203,8 @@ Provides a layered defense system for the corvid-agent platform: bash command an
 | `routes/*` | `validateUrlTarget` for SSRF protection on user-supplied URLs; `checkInjection` for route-level injection scanning |
 | `process/sdk-process`, `process/ollama-process` | `sanitizeAgentInput`, `wrapExternalContent` for sanitizing external content before agent processing |
 | `server/index.ts`, `middleware/*` | `applySecurityHeaders` for HTTP response security headers |
+| `marketplace/federation` | `validateUrl` for SSRF protection on federation URLs |
+| `a2a/client` | `validateUrl` (re-exported) for SSRF protection on A2A agent card fetches |
 
 ## Change Log
 
