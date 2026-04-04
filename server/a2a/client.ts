@@ -10,6 +10,8 @@
 import type { A2AAgentCard } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { ExternalServiceError, ValidationError } from '../lib/errors';
+import { validateUrl } from '../lib/ssrf-guard';
+export { validateUrl };
 
 const log = createLogger('A2AClient');
 
@@ -44,49 +46,6 @@ function getCached(url: string): A2AAgentCard | null {
         return null;
     }
     return entry.card;
-}
-
-// ---------------------------------------------------------------------------
-// SSRF Prevention
-// ---------------------------------------------------------------------------
-
-const BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '[::1]']);
-const PRIVATE_IPV4_RE = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/;
-const ZERO_PREFIX_RE = /^0\./;
-
-/**
- * Validate a URL is safe to fetch (not targeting internal/private networks).
- * Throws ValidationError if the URL is unsafe.
- */
-export function validateUrl(urlString: string): void {
-    let url: URL;
-    try {
-        url = new URL(urlString);
-    } catch {
-        throw new ValidationError(`Invalid URL: ${urlString}`);
-    }
-
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        throw new ValidationError(`Blocked URL scheme: ${url.protocol} — only http and https are allowed`);
-    }
-
-    const hostname = url.hostname;
-
-    if (BLOCKED_HOSTNAMES.has(hostname)) {
-        throw new ValidationError(`Blocked URL: ${hostname} is not allowed`);
-    }
-
-    if (PRIVATE_IPV4_RE.test(hostname) || ZERO_PREFIX_RE.test(hostname)) {
-        throw new ValidationError(`Blocked URL: ${hostname} resolves to a private/reserved IP range`);
-    }
-
-    // Block numeric IP forms that resolve to private addresses (DNS rebinding)
-    if (/^\d+$/.test(hostname)) {
-        throw new ValidationError(`Blocked URL: numeric IP address ${hostname} is not allowed`);
-    }
-    if (/^0x/i.test(hostname)) {
-        throw new ValidationError(`Blocked URL: hex IP address ${hostname} is not allowed`);
-    }
 }
 
 // ---------------------------------------------------------------------------

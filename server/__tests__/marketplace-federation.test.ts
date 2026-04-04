@@ -39,64 +39,63 @@ afterEach(() => {
 describe('SSRF Protection', () => {
     it('blocks localhost', () => {
         expect(() => federation.registerInstance('http://localhost:3000', 'local')).toThrow(
-            'Federation URLs must not point to private or loopback addresses',
+            'Blocked URL: localhost is not allowed',
         );
     });
 
     it('blocks 127.0.0.1', () => {
         expect(() => federation.registerInstance('http://127.0.0.1:3000', 'loopback')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
-    it('does not block IPv6 bracket notation (hostname includes brackets)', () => {
-        // URL parser gives hostname "[::1]" with brackets, not matching "::1" check.
-        // This documents a known limitation of the SSRF check.
-        const instance = federation.registerInstance('http://[::1]:3000', 'ipv6loop');
-        expect(instance.url).toBe('http://[::1]:3000');
+    it('blocks IPv6 loopback [::1]', () => {
+        expect(() => federation.registerInstance('http://[::1]:3000', 'ipv6loop')).toThrow(
+            'Blocked URL',
+        );
     });
 
     it('blocks 0.0.0.0', () => {
         expect(() => federation.registerInstance('http://0.0.0.0:3000', 'all-ifaces')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('blocks 10.x.x.x private IPs', () => {
         expect(() => federation.registerInstance('http://10.0.0.1:3000', 'private10')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('blocks 192.168.x.x private IPs', () => {
         expect(() => federation.registerInstance('http://192.168.1.1:3000', 'private192')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('blocks 172.16-31.x.x private IPs', () => {
         expect(() => federation.registerInstance('http://172.16.0.1:3000', 'private172-16')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
         expect(() => federation.registerInstance('http://172.31.255.255:3000', 'private172-31')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('blocks 169.254.x.x link-local', () => {
         expect(() => federation.registerInstance('http://169.254.1.1:3000', 'link-local')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('blocks .local domains', () => {
         expect(() => federation.registerInstance('http://myhost.local:3000', 'local-domain')).toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 
     it('rejects invalid URLs', () => {
-        expect(() => federation.registerInstance('not-a-url', 'bad')).toThrow('Invalid federation URL');
+        expect(() => federation.registerInstance('not-a-url', 'bad')).toThrow('Invalid URL');
     });
 
     it('allows valid public HTTPS URLs', () => {
@@ -252,7 +251,7 @@ describe('Sync', () => {
     it('syncInstance throws on private URL', async () => {
         // validateFederationUrl is called at the top of syncInstance and throws
         await expect(federation.syncInstance('http://localhost:3000')).rejects.toThrow(
-            'private or loopback',
+            'Blocked URL',
         );
     });
 

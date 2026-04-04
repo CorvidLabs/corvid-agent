@@ -3,6 +3,7 @@ import {
     isPrivateIPv4,
     isPrivateIPv6,
     isPrivateIP,
+    validateUrl,
     validateUrlTarget,
 } from '../lib/ssrf-guard';
 
@@ -112,6 +113,67 @@ describe('isPrivateIP', () => {
     test('dispatches IPv6', () => {
         expect(isPrivateIP('::1')).toBe(true);
         expect(isPrivateIP('2001:4860:4860::8888')).toBe(false);
+    });
+});
+
+// ── validateUrl ──────────────────────────────────────────────────────
+
+describe('validateUrl', () => {
+    test('blocks localhost', () => {
+        expect(() => validateUrl('http://localhost/foo')).toThrow();
+    });
+
+    test('blocks 127.0.0.1', () => {
+        expect(() => validateUrl('http://127.0.0.1/foo')).toThrow();
+    });
+
+    test('blocks [::1] IPv6 loopback', () => {
+        expect(() => validateUrl('http://[::1]/foo')).toThrow();
+    });
+
+    test('blocks 0.0.0.0', () => {
+        expect(() => validateUrl('http://0.0.0.0/')).toThrow();
+    });
+
+    test('blocks private 10.x range', () => {
+        expect(() => validateUrl('http://10.0.0.1/')).toThrow();
+    });
+
+    test('blocks private 172.16-31.x range', () => {
+        expect(() => validateUrl('http://172.16.0.1/')).toThrow();
+    });
+
+    test('blocks private 192.168.x range', () => {
+        expect(() => validateUrl('http://192.168.1.1/')).toThrow();
+    });
+
+    test('blocks link-local 169.254.x (cloud metadata)', () => {
+        expect(() => validateUrl('http://169.254.169.254/')).toThrow();
+    });
+
+    test('blocks non-http schemes', () => {
+        expect(() => validateUrl('ftp://example.com/')).toThrow();
+        expect(() => validateUrl('file:///etc/passwd')).toThrow();
+    });
+
+    test('blocks hex IP bypass (0x7f000001 = 127.0.0.1)', () => {
+        expect(() => validateUrl('http://0x7f000001/')).toThrow();
+    });
+
+    test('blocks decimal IP bypass (2130706433 = 127.0.0.1)', () => {
+        expect(() => validateUrl('http://2130706433/')).toThrow();
+    });
+
+    test('blocks 0.-prefix IPs', () => {
+        expect(() => validateUrl('http://0.0.0.1/')).toThrow();
+    });
+
+    test('allows public HTTPS URLs', () => {
+        expect(() => validateUrl('https://agent.example.com')).not.toThrow();
+    });
+
+    test('allows public HTTP URLs', () => {
+        expect(() => validateUrl('http://8.8.8.8/')).not.toThrow();
     });
 });
 

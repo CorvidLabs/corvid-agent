@@ -7,7 +7,8 @@
 import type { Database } from 'bun:sqlite';
 import type { FederatedInstance, FederatedListing, MarketplaceListing } from './types';
 import { createLogger } from '../lib/logger';
-import { ValidationError, ExternalServiceError } from '../lib/errors';
+import { ExternalServiceError } from '../lib/errors';
+import { validateUrl } from '../lib/ssrf-guard';
 
 const log = createLogger('MarketplaceFederation');
 
@@ -38,40 +39,10 @@ export class MarketplaceFederation {
     }
 
     /**
-     * Validate that a URL is safe for federation (HTTPS only, no private IPs).
-     */
-    private validateFederationUrl(url: string): void {
-        let parsed: URL;
-        try {
-            parsed = new URL(url);
-        } catch {
-            throw new ValidationError('Invalid federation URL', { url });
-        }
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-            throw new ValidationError('Federation URLs must use http or https protocol', { url });
-        }
-        // Block private/loopback IPs to prevent SSRF
-        const hostname = parsed.hostname;
-        if (
-            hostname === 'localhost' ||
-            hostname === '127.0.0.1' ||
-            hostname === '::1' ||
-            hostname === '0.0.0.0' ||
-            hostname.startsWith('10.') ||
-            hostname.startsWith('192.168.') ||
-            /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-            hostname.startsWith('169.254.') ||
-            hostname.endsWith('.local')
-        ) {
-            throw new ValidationError('Federation URLs must not point to private or loopback addresses', { url, hostname });
-        }
-    }
-
-    /**
      * Register a remote instance for federation.
      */
     registerInstance(url: string, name: string): FederatedInstance {
-        this.validateFederationUrl(url);
+        validateUrl(url);
         // Normalize URL (remove trailing slash)
         const normalizedUrl = url.replace(/\/+$/, '');
 
@@ -124,7 +95,7 @@ export class MarketplaceFederation {
      * Fetches published listings from the remote's marketplace API.
      */
     async syncInstance(url: string): Promise<number> {
-        this.validateFederationUrl(url);
+        validateUrl(url);
         const normalizedUrl = url.replace(/\/+$/, '');
         let synced = 0;
 

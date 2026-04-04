@@ -10,6 +10,7 @@ db_tables:
 depends_on:
   - specs/marketplace/service.spec.md
   - specs/db/schema.spec.md
+  - specs/lib/security.spec.md
 ---
 
 # Marketplace Federation
@@ -70,15 +71,15 @@ Enables cross-instance marketplace discovery by syncing published listings from 
 
 - **Given** a caller tries to register `http://192.168.1.1/api`
 - **When** `registerInstance('http://192.168.1.1/api', 'Internal')` is called
-- **Then** throws Error: "Federation URLs must not point to private or loopback addresses"
+- **Then** throws ValidationError: "Blocked URL: 192.168.1.1 is a private/reserved IP address"
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| Invalid URL format | Throws `Error('Invalid URL')` |
-| Private/loopback address | Throws `Error('Federation URLs must not point to private or loopback addresses')` |
-| Non-http(s) protocol | Throws `Error('Federation URLs must use http or https protocol')` |
+| Invalid URL format | Throws `ValidationError('Invalid URL: ...')` |
+| Private/loopback address | Throws `ValidationError('Blocked URL: ... is a private/reserved IP address')` |
+| Non-http(s) protocol | Throws `ValidationError('Blocked URL scheme: ... — only http and https are allowed')` |
 | Remote instance unreachable | Sets status to `'unreachable'`, logs warning, returns 0 |
 | Instance not found on remove | Returns false |
 
@@ -90,6 +91,7 @@ Enables cross-instance marketplace discovery by syncing published listings from 
 |--------|-------------|
 | `bun:sqlite` | Database queries |
 | `server/lib/logger.ts` | `createLogger()` |
+| `server/lib/ssrf-guard.ts` | `validateUrl` for SSRF protection on federation URLs |
 | Global `fetch` | HTTP requests to remote instances |
 
 ### Consumed By
