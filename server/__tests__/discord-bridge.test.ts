@@ -12,12 +12,12 @@ mock.module('../lib/worktree', () => ({
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { DiscordBridge } from '../discord/bridge';
-import { GatewayOp } from '../discord/types';
 import type { DiscordBridgeConfig } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { withAuthorContext } from '../discord/message-handler';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 function createMockProcessManager() {
     return {
@@ -103,14 +103,6 @@ describe('DiscordBridge', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
         expect(bridge).toBeDefined();
-    });
-
-    test('gateway opcodes are correct', () => {
-        expect(GatewayOp.DISPATCH).toBe(0);
-        expect(GatewayOp.HEARTBEAT).toBe(1);
-        expect(GatewayOp.IDENTIFY).toBe(2);
-        expect(GatewayOp.HELLO).toBe(10);
-        expect(GatewayOp.HEARTBEAT_ACK).toBe(11);
     });
 
     test('ignores bot messages', async () => {
@@ -1016,12 +1008,7 @@ describe('DiscordBridge onboarding', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
@@ -1042,7 +1029,7 @@ describe('DiscordBridge onboarding', () => {
             expect(fieldNames).toContain('Information');
             expect(fieldNames).toContain('Advanced');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -1058,12 +1045,7 @@ describe('DiscordBridge onboarding', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
@@ -1083,7 +1065,7 @@ describe('DiscordBridge onboarding', () => {
             expect(body.data.embeds[0].fields[0].value).toContain('AlphaAgent');
             expect(body.data.embeds[0].fields[0].value).toContain('BetaAgent');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 

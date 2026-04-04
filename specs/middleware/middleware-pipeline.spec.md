@@ -127,6 +127,8 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 23. **Admin API key comparison uses timingSafeEqual()**: Never plain `===` — prevents timing oracle attacks on the admin key.
 24. **POST /api/algochat/network requires admin role**: The network switch endpoint is gated via `requiresAdminRole()` in the `ADMIN_PATHS` set.
 25. **Wallet query param validated**: `authGuard` only sets `context.walletAddress` from the `?wallet` query parameter if the value passes `isAlgorandAddressFormat()` (58 uppercase base32 chars). Invalid or malformed values are silently ignored.
+26. **Tenant role threads to context.role**: When `tenantGuard` resolves a tenant member role (via API key hash or proxy email), it maps that role to `context.role`: `owner` → `'admin'`, `operator` → `'user'`, `viewer` → `'viewer'`. This ensures `roleGuard` enforces correct access control in multi-tenant deployments.
+27. **Proxy trust mode (TRUST_PROXY=1)**: When `TRUST_PROXY` environment variable is `'1'` or `'true'`, `tenantGuard` accepts the `X-Forwarded-Email` header from an upstream authenticating proxy (e.g. oauth2-proxy) and resolves the tenant member by email address. If the email is registered, sets `context.tenantRole`, `context.role`, and `context.authenticated = true`. If the email is not registered, returns 401. Malformed email addresses (failing basic regex) are silently ignored. API key lookup takes precedence — proxy email is only checked when no API key member was found.
 
 ## Behavioral Examples
 
@@ -293,3 +295,4 @@ The `/api/security/overview` endpoint is admin-protected because it exposes sens
 | 2026-02-26 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Admin key comparison changed from === to timingSafeEqual(). Network switch endpoint added to requiresAdminRole(). |
 | 2026-03-17 | corvid-agent | Added invariant 25 (wallet query param validation), two behavioral examples, and validation.ts dependency for authGuard wallet format check. |
+| 2026-04-03 | corvid-agent | Added invariants 26 (tenant role threads to context.role) and 27 (proxy trust mode via TRUST_PROXY + X-Forwarded-Email). |

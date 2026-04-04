@@ -1,16 +1,9 @@
 /**
- * Bidirectional Discord bridge using raw WebSocket gateway.
- * No external Discord library dependencies.
+ * Bidirectional Discord bridge backed by discord.js Client (Phase 2).
  *
  * Supports two modes:
  * - `chat` (default): Messages route to persistent agent sessions.
  * - `work_intake`: Messages create async work tasks via WorkTaskService.
- *
- * Security note: This bridge authenticates via the Discord Gateway WebSocket API
- * using a bot token — it does NOT use the HTTP-based Interactions endpoint.
- * Therefore, Ed25519 request signature validation (X-Signature-Ed25519) is not
- * applicable here. If Discord Interactions support is added in the future,
- * Ed25519 verification must be implemented for that endpoint.
  *
  * This file is a thin orchestration layer. Domain logic is in:
  * - commands.ts — slash command registration & handling
@@ -19,6 +12,8 @@
  * - message-handler.ts — message routing & dispatch
  * - permissions.ts — role-based access control
  * - thread-manager.ts — thread lifecycle & streaming
+ * - gateway.ts — discord.js Client wrapper (WebSocket, heartbeat, reconnect)
+ * - rest-client.ts — discord.js REST adapter (Phase 1)
  */
 
 import type { Database } from 'bun:sqlite';
@@ -33,6 +28,7 @@ import type { WorkTaskService } from '../work/service';
 import type { InteractionContext } from './commands';
 // Extracted modules
 import { handleInteraction as handleInteractionImpl, registerSlashCommands } from './commands';
+import { initializeRestClient } from './rest-client';
 import {
   addReaction as addReactionImpl,
   removeReaction as removeReactionImpl,
@@ -119,6 +115,8 @@ export class DiscordBridge {
     this.config = config;
     this.workTaskService = workTaskService ?? null;
     this.buddyService = buddyService ?? null;
+    // Initialize discord.js REST client for API calls
+    initializeRestClient(config.botToken);
     this.tsm = new ThreadSessionManager(db, processManager, this.delivery, config.botToken);
     this.gateway = new DiscordGateway(config, {
       onMessage: (data) => {

@@ -3,31 +3,24 @@
  *
  * Covers list, create, pause, resume, delete, and templates subcommands.
  */
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleScheduleCommand } from '../discord/command-handlers/schedule-commands';
 import { createSchedule, getSchedule, listSchedules } from '../db/schedules';
 import type { InteractionContext } from '../discord/commands';
 import type { DiscordInteractionData } from '../discord/types';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 // ─── Mock Discord API calls ─────────────────────────────────────────────────
 
-const capturedResponses: Array<{ type: number; data: { embeds?: any[]; content?: string } }> = [];
-const originalFetch = globalThis.fetch;
+let fetchBodies: unknown[];
+let restCleanup: () => void;
 
 /** Extract the response data from captured Discord API calls. */
 function lastResponse(): { embeds?: any[]; content?: string } {
-    const last = capturedResponses[capturedResponses.length - 1];
-    return last?.data ?? {};
-}
-
-function mockFetch() {
-    globalThis.fetch = mock(async (_input: any, init?: any) => {
-        const body = init?.body ? JSON.parse(init.body) : {};
-        capturedResponses.push(body);
-        return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 });
-    }) as any;
+    const last = fetchBodies[fetchBodies.length - 1] as any;
+    return last?.data ?? last ?? {};
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -99,12 +92,11 @@ const USER = 1;
 beforeEach(() => {
     db = new Database(':memory:');
     runMigrations(db);
-    capturedResponses.length = 0;
-    mockFetch();
+    ({ fetchBodies, cleanup: restCleanup } = mockDiscordRest());
 });
 
 afterEach(() => {
-    globalThis.fetch = originalFetch;
+    restCleanup();
     db.close();
 });
 
@@ -116,7 +108,7 @@ describe('/schedule list', () => {
             { name: 'list', type: 1 },
         ]), USER);
 
-        expect(capturedResponses.length).toBe(1);
+        expect(fetchBodies.length).toBe(1);
         expect(lastResponse().content).toContain('No schedules');
     });
 

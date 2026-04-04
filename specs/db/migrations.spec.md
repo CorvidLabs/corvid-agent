@@ -43,6 +43,7 @@ files:
   - server/db/migrations/111_library_title.ts
   - server/db/migrations/112_discord_thread_sessions.ts
   - server/db/migrations/113_memory_decay.ts
+  - server/db/migrations/114_proxy_trust_email.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -576,10 +577,33 @@ Creates the `discord_thread_sessions` table for persisting thread-based Discord 
 | `up` | `(db: Database)` | `void` | Creates `discord_thread_sessions` table with `thread_id` as primary key, indexes on `session_id` and `last_activity_at`, and adds `last_activity_at` column to `discord_mention_sessions` |
 | `down` | `(db: Database)` | `void` | Drops the `discord_thread_sessions` table |
 
+### 113_memory_decay.ts
+
+Adds memory decay support columns to `agent_memories` for time-based relevance scoring.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds memory decay columns to `agent_memories` |
+| `down` | `(db: Database)` | `void` | Removes memory decay columns from `agent_memories` |
+
+### 114_proxy_trust_email.ts
+
+Adds `email` column to `tenant_members` table for proxy trust email verification. Creates a unique partial index on `(tenant_id, email)` where email is not null, ensuring no duplicate email addresses per tenant.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `email` TEXT column to `tenant_members` (idempotent — checks column existence first) and creates unique partial index `idx_tenant_members_email` |
+| `down` | `(db: Database)` | `void` | Drops the index and `email` column from `tenant_members` |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-04-03 | corvid-agent | Add migrations 113, 114 to spec coverage |
 | 2026-03-30 | corvid-agent | Add migration 112 to spec coverage |
 | 2026-03-29 | corvid-agent | Add migration 110 to spec coverage |
 | 2026-03-28 | corvid-agent | Add migrations 108, 109 to spec coverage |

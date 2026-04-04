@@ -15,10 +15,18 @@ import {
     handleAgentSkillCommand,
     handleAgentPersonaCommand,
 } from '../discord/command-handlers/agent-config-commands';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 let db: Database;
-let capturedResponse: { type: number; data: Record<string, unknown> } | null = null;
-const originalFetch = globalThis.fetch;
+let fetchBodies: unknown[] = [];
+let cleanup: () => void = () => {};
+
+// Typed accessor for the last captured response body.
+// Shape is { type: number; data: { content?: string; embeds?: ... } }
+// matching what respondToInteraction receives from the command handlers.
+function capturedResponse(): { type: number; data: Record<string, unknown> } | null {
+    return (fetchBodies.length > 0 ? fetchBodies[fetchBodies.length - 1] : null) as { type: number; data: Record<string, unknown> } | null;
+}
 
 function createTestConfig(overrides: Partial<DiscordBridgeConfig> = {}): DiscordBridgeConfig {
     return {
@@ -98,21 +106,15 @@ beforeEach(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
-    capturedResponse = null;
 
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-        if (init?.body) {
-            try {
-                capturedResponse = JSON.parse(String(init.body));
-            } catch { /* non-json body */ }
-        }
-        return new Response(JSON.stringify({ id: '500000000000000001' }), { status: 200 });
-    }) as unknown as typeof fetch;
+    const result = mockDiscordRest();
+    fetchBodies = result.fetchBodies;
+    cleanup = result.cleanup;
 });
 
 afterEach(() => {
     db.close();
-    globalThis.fetch = originalFetch;
+    cleanup();
 });
 
 // ── /agent-skill ─────────────────────────────────────────────────────────────
@@ -127,8 +129,8 @@ describe('handleAgentSkillCommand', () => {
 
         await handleAgentSkillCommand(ctx, interaction, PermissionLevel.STANDARD);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        expect(capturedResponse()).not.toBeNull();
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('admin permissions');
     });
 
@@ -141,8 +143,8 @@ describe('handleAgentSkillCommand', () => {
 
         await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        expect(capturedResponse).not.toBeNull();
-        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        expect(capturedResponse()).not.toBeNull();
+        const embed = (capturedResponse()!.data?.embeds as Array<{ description: string }>)?.[0];
         expect(embed?.description).toContain('No skill bundles assigned');
     });
 
@@ -164,8 +166,8 @@ describe('handleAgentSkillCommand', () => {
         expect(bundles[0].name).toBe('WebSearch');
 
         // Verify embed response
-        expect(capturedResponse).not.toBeNull();
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; description: string; color: number }>)?.[0];
+        expect(capturedResponse()).not.toBeNull();
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string; description: string; color: number }>)?.[0];
         expect(embed?.title).toContain('Skill Added');
         expect(embed?.description).toContain('WebSearch');
         expect(embed?.color).toBe(0x57f287);
@@ -233,7 +235,7 @@ describe('handleAgentSkillCommand', () => {
         expect(getAgentBundles(db, agent.id)).toHaveLength(1);
 
         // Now remove
-        capturedResponse = null;
+        fetchBodies.length = 0;
         const removeInteraction = makeSubcommandInteraction('agent-skill', 'remove', [
             { name: 'agent', value: 'TestBot' },
             { name: 'skill', value: 'WebSearch' },
@@ -241,7 +243,7 @@ describe('handleAgentSkillCommand', () => {
         await handleAgentSkillCommand(ctx, removeInteraction, PermissionLevel.ADMIN);
 
         expect(getAgentBundles(db, agent.id)).toHaveLength(0);
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
         expect(embed?.title).toContain('Skill Removed');
         expect(embed?.color).toBe(0xed4245);
     });
@@ -258,7 +260,7 @@ describe('handleAgentSkillCommand', () => {
 
         await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('was not assigned');
     });
 
@@ -272,7 +274,7 @@ describe('handleAgentSkillCommand', () => {
 
         await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('Agent not found');
         expect(content).toContain('TestBot');
     });
@@ -288,7 +290,7 @@ describe('handleAgentSkillCommand', () => {
 
         await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('Skill bundle not found');
     });
 
@@ -306,13 +308,13 @@ describe('handleAgentSkillCommand', () => {
             await handleAgentSkillCommand(ctx, interaction, PermissionLevel.ADMIN);
         }
 
-        capturedResponse = null;
+        fetchBodies.length = 0;
         const listInteraction = makeSubcommandInteraction('agent-skill', 'list', [
             { name: 'agent', value: 'TestBot' },
         ]);
         await handleAgentSkillCommand(ctx, listInteraction, PermissionLevel.ADMIN);
 
-        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        const embed = (capturedResponse()!.data?.embeds as Array<{ description: string }>)?.[0];
         expect(embed?.description).toContain('WebSearch');
         expect(embed?.description).toContain('CodeTools');
         expect(getAgentBundles(db, agent.id)).toHaveLength(2);
@@ -331,7 +333,7 @@ describe('handleAgentPersonaCommand', () => {
 
         await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.STANDARD);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('admin permissions');
     });
 
@@ -344,7 +346,7 @@ describe('handleAgentPersonaCommand', () => {
 
         await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const embed = (capturedResponse!.data?.embeds as Array<{ description: string }>)?.[0];
+        const embed = (capturedResponse()!.data?.embeds as Array<{ description: string }>)?.[0];
         expect(embed?.description).toContain('No personas assigned');
     });
 
@@ -364,7 +366,7 @@ describe('handleAgentPersonaCommand', () => {
         expect(personas).toHaveLength(1);
         expect(personas[0].name).toBe('FriendlyHelper');
 
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
         expect(embed?.title).toContain('Persona Added');
         expect(embed?.color).toBe(0x57f287);
     });
@@ -398,7 +400,7 @@ describe('handleAgentPersonaCommand', () => {
         expect(getAgentPersonas(db, agent.id)).toHaveLength(1);
 
         // Now remove
-        capturedResponse = null;
+        fetchBodies.length = 0;
         const removeInteraction = makeSubcommandInteraction('agent-persona', 'remove', [
             { name: 'agent', value: 'TestBot' },
             { name: 'persona', value: 'FriendlyHelper' },
@@ -406,7 +408,7 @@ describe('handleAgentPersonaCommand', () => {
         await handleAgentPersonaCommand(ctx, removeInteraction, PermissionLevel.ADMIN);
 
         expect(getAgentPersonas(db, agent.id)).toHaveLength(0);
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string; color: number }>)?.[0];
         expect(embed?.title).toContain('Persona Removed');
         expect(embed?.color).toBe(0xed4245);
     });
@@ -423,7 +425,7 @@ describe('handleAgentPersonaCommand', () => {
 
         await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('was not assigned');
     });
 
@@ -437,7 +439,7 @@ describe('handleAgentPersonaCommand', () => {
 
         await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('Agent not found');
     });
 
@@ -452,7 +454,7 @@ describe('handleAgentPersonaCommand', () => {
 
         await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.ADMIN);
 
-        const content = capturedResponse!.data?.content as string;
+        const content = capturedResponse()!.data?.content as string;
         expect(content).toContain('Persona not found');
     });
 });
@@ -470,8 +472,8 @@ describe('handleInteraction dispatch', () => {
 
         await handleInteraction(ctx, interaction);
 
-        expect(capturedResponse).not.toBeNull();
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string }>)?.[0];
+        expect(capturedResponse()).not.toBeNull();
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string }>)?.[0];
         expect(embed?.title).toContain('Skills: TestBot');
     });
 
@@ -485,8 +487,8 @@ describe('handleInteraction dispatch', () => {
 
         await handleInteraction(ctx, interaction);
 
-        expect(capturedResponse).not.toBeNull();
-        const embed = (capturedResponse!.data?.embeds as Array<{ title: string }>)?.[0];
+        expect(capturedResponse()).not.toBeNull();
+        const embed = (capturedResponse()!.data?.embeds as Array<{ title: string }>)?.[0];
         expect(embed?.title).toContain('Personas: TestBot');
     });
 });

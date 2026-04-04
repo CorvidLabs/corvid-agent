@@ -12,7 +12,7 @@ import { resolveTier } from './endpoint-rate-limit';
 import type { TenantService } from '../tenant/context';
 import type { TenantContext, TenantRole } from '../tenant/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { extractTenantId } from '../tenant/middleware';
+import { extractTenantId, getMemberRoleByEmail } from '../tenant/middleware';
 import { createLogger } from '../lib/logger';
 import { isAlgorandAddressFormat } from '../lib/validation';
 
@@ -182,6 +182,39 @@ export function tenantGuard(db: Database, tenantService: TenantService | null): 
 
             if (member) {
                 context.tenantRole = member.role as TenantRole;
+                context.role =
+                    member.role === 'owner'
+                        ? 'admin'
+                        : member.role === 'operator'
+                          ? 'user'
+                          : 'viewer';
+            }
+        }
+
+        // Proxy trust mode: when TRUST_PROXY=1, accept X-Forwarded-Email from oauth2-proxy
+        // and resolve the tenant member by email. Only applies if role not already set by API key.
+        if (
+            !context.tenantRole &&
+            (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true')
+        ) {
+            const forwardedEmail = req.headers.get('x-forwarded-email');
+            if (forwardedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forwardedEmail)) {
+                const role = getMemberRoleByEmail(db, tenantCtx.tenantId, forwardedEmail);
+                if (role) {
+                    context.tenantRole = role as TenantRole;
+                    context.role =
+                        role === 'owner' ? 'admin' : role === 'operator' ? 'user' : 'viewer';
+                    context.authenticated = true;
+                } else {
+                    log.warn('Proxy trust: email not registered for tenant', {
+                        tenantId: tenantCtx.tenantId,
+                        email: forwardedEmail,
+                    });
+                    return new Response(
+                        JSON.stringify({ error: 'Unauthorized: email not registered for this tenant' }),
+                        { status: 401, headers: { 'Content-Type': 'application/json' } },
+                    );
+                }
             }
         }
 

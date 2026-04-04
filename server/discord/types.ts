@@ -127,23 +127,6 @@ export interface DiscordActionRow {
     components: DiscordButton[];
 }
 
-export interface DiscordGatewayPayload {
-    op: number;
-    d: unknown;
-    s: number | null;
-    t: string | null;
-}
-
-export interface DiscordHelloData {
-    heartbeat_interval: number;
-}
-
-export interface DiscordReadyData {
-    session_id: string;
-    resume_gateway_url: string;
-    user?: { id: string; username: string };
-}
-
 /** A file attached to a Discord message. */
 export interface DiscordAttachment {
     id: string;
@@ -202,28 +185,6 @@ export interface DiscordAuthor {
     username: string;
     bot?: boolean;
 }
-
-// Gateway opcodes
-export const GatewayOp = {
-    DISPATCH: 0,
-    HEARTBEAT: 1,
-    IDENTIFY: 2,
-    PRESENCE_UPDATE: 3,
-    RESUME: 6,
-    RECONNECT: 7,
-    INVALID_SESSION: 9,
-    HELLO: 10,
-    HEARTBEAT_ACK: 11,
-} as const;
-
-// Gateway intents
-export const GatewayIntent = {
-    GUILDS: 1 << 0,
-    GUILD_MEMBERS: 1 << 1,
-    GUILD_MESSAGES: 1 << 9,
-    GUILD_MESSAGE_REACTIONS: 1 << 10,
-    MESSAGE_CONTENT: 1 << 15,
-} as const;
 
 /** Payload received from Discord MESSAGE_REACTION_ADD dispatch event. */
 export interface DiscordReactionData {

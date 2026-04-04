@@ -6,6 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { _setRestClientForTesting } from '../discord/rest-client';
 
 // Mock worktree creation — git is not available in test environments.
 mock.module('../lib/worktree', () => ({
@@ -191,11 +192,35 @@ beforeEach(() => {
     }
     return new Response(JSON.stringify({ id: '500000000000000001' }), { status: 200 });
   }) as unknown as typeof fetch;
+
+  _setRestClientForTesting({
+    respondToInteraction: async (_id: string, _token: string, data: unknown) => {
+      capturedResponse = data as Record<string, unknown>;
+      return {} as never;
+    },
+    deferInteraction: async () => {},
+    editDeferredResponse: async (_appId: string, _token: string, data: unknown) => {
+      capturedResponse = data as Record<string, unknown>;
+      return {} as never;
+    },
+    sendMessage: async (_channelId: string, data: unknown) => {
+      capturedResponse = data as Record<string, unknown>;
+      return { id: 'mock-msg-1' } as never;
+    },
+    editMessage: async (_channelId: string, _messageId: string, data: unknown) => {
+      capturedResponse = data as Record<string, unknown>;
+      return { id: 'mock-msg-1' } as never;
+    },
+    deleteMessage: async () => {},
+    addReaction: async () => {},
+    sendTypingIndicator: async () => {},
+  } as unknown as import('../discord/rest-client').DiscordRestClient);
 });
 
 afterEach(() => {
   db.close();
   globalThis.fetch = originalFetch;
+  _setRestClientForTesting(null);
   if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
   else delete process.env.DISCORD_APP_ID;
 });

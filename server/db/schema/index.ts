@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 113;
+const SCHEMA_VERSION = 114;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -195,6 +195,13 @@ const MIGRATIONS: Record<number, string[]> = {
         `UPDATE agent_memories SET expires_at = datetime(updated_at, '+7 days') WHERE status = 'short_term'`,
         `CREATE INDEX IF NOT EXISTS idx_agent_memories_expires ON agent_memories(expires_at) WHERE expires_at IS NOT NULL`,
         `ALTER TABLE agent_memories ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`,
+    ],
+    114: [
+        // Proxy trust mode: email-based tenant member lookup for oauth2-proxy deployments.
+        // Allows X-Forwarded-Email header (when TRUST_PROXY=1) to identify tenant members
+        // without requiring an API key (the proxy already authenticated the user).
+        `ALTER TABLE tenant_members ADD COLUMN email TEXT DEFAULT NULL`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`,
     ],
 };
 
