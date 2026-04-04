@@ -20,7 +20,6 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const ROOT = resolve(import.meta.dir, '..');
 const jsonMode = process.argv.includes('--json');
@@ -54,15 +53,14 @@ function warn(category: string, name: string, detail = '') {
 }
 
 function exec(cmd: string): { stdout: string; stderr: string; exitCode: number } {
-    const result = spawnSync('bash', ['-c', cmd], {
+    const result = Bun.spawnSync(['bash', '-c', cmd], {
         cwd: ROOT,
-        encoding: 'utf-8',
         timeout: 300_000,
     });
     return {
-        stdout: (result.stdout ?? '').trim(),
-        stderr: (result.stderr ?? '').trim(),
-        exitCode: result.status ?? 1,
+        stdout: (result.stdout?.toString() ?? '').trim(),
+        stderr: (result.stderr?.toString() ?? '').trim(),
+        exitCode: result.exitCode ?? 1,
     };
 }
 
@@ -72,6 +70,9 @@ function readFile(rel: string): string | null {
     return readFileSync(full, 'utf-8');
 }
 
+// NOTE: grepFiles performs textual pattern matching — it is a heuristic, not a
+// structural proof. Patterns using variables, helpers, or spread may not be
+// detected. Results are adequate for a preflight checklist but not a formal audit.
 function grepFiles(pattern: string, dirs: string[], extensions = ['ts']): string[] {
     const includes = extensions.map((e) => `--include='*.${e}'`).join(' ');
     const cmd = `grep -rn '${pattern}' ${dirs.join(' ')} ${includes} 2>/dev/null || true`;
@@ -147,6 +148,8 @@ console.log('\n=== 1. Testnet-Only Bypass Scan ===\n');
 console.log('=== 2. RBAC & Guard Chain ===\n');
 
 {
+    // NOTE: string-searches routes/index.ts for guard names — adequate for a
+    // checklist but may miss guards registered via variables or helpers.
     const indexTs = readFile('server/routes/index.ts') ?? '';
 
     const hasAuthGuard = indexTs.includes('authGuard(config)');
