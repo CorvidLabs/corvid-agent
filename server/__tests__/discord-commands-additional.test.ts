@@ -196,7 +196,7 @@ describe('Discord /config command', () => {
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('Only admins');
+        expect(content).toContain('do not have permission');
     });
 });
 

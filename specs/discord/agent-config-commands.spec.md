@@ -29,7 +29,7 @@ are unaffected.
 
 ## Invariants
 
-1. Both commands require `PermissionLevel.ADMIN` — rejects with permission error otherwise.
+1. Both commands require `PermissionLevel.ADMIN` — enforced by the `COMMAND_HANDLERS` dispatcher middleware via `minPermission: PermissionLevel.ADMIN` before the handler runs. Handlers do not repeat this check.
 2. Agent name matching is case-insensitive and strips model suffixes like ` (claude-opus-4-6)`.
 3. Skill bundle name matching strips autocomplete suffixes (` — description`) and is case-insensitive.
 4. Persona name matching strips archetype suffixes (` (archetype)`) and is case-insensitive.
@@ -60,14 +60,14 @@ are unaffected.
 ### Scenario: Insufficient permissions
 
 - **Given** a user with permission level below ADMIN
-- **When** either command is called
-- **Then** responds with "Managing agent skills/personas requires admin permissions."
+- **When** either command is called via the dispatcher
+- **Then** the `handleInteraction` middleware rejects with "You do not have permission to use this command." before the handler runs.
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| `permLevel < ADMIN` | Responds with permission denied message |
+| `permLevel < ADMIN` | Rejected by dispatcher middleware before handler runs |
 | Missing `agent` option | Responds with "Please specify an agent." |
 | No agents configured | Responds with "No agents configured." |
 | Agent name not found | Lists available agent names |
@@ -105,3 +105,4 @@ are unaffected.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-22 | corvid-agent | Initial spec — closes #989 |
+| 2026-04-03 | corvid-agent | v2: Permission check moved to dispatcher middleware (minPermission on COMMAND_HANDLERS). Handlers no longer check permLevel at entry. Closes #1581 |

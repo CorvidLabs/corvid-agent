@@ -120,20 +120,6 @@ afterEach(() => {
 // ── /agent-skill ─────────────────────────────────────────────────────────────
 
 describe('handleAgentSkillCommand', () => {
-    test('rejects non-admin permission level', async () => {
-        const ctx = createTestContext();
-        const agent = createAgent(db, { name: 'TestBot', model: 'test-model' });
-        const interaction = makeSubcommandInteraction('agent-skill', 'list', [
-            { name: 'agent', value: agent.name },
-        ]);
-
-        await handleAgentSkillCommand(ctx, interaction, PermissionLevel.STANDARD);
-
-        expect(capturedResponse()).not.toBeNull();
-        const content = capturedResponse()!.data?.content as string;
-        expect(content).toContain('admin permissions');
-    });
-
     test('list returns "no bundles" embed when none assigned', async () => {
         const ctx = createTestContext();
         createAgent(db, { name: 'TestBot', model: 'test-model' });
@@ -324,19 +310,6 @@ describe('handleAgentSkillCommand', () => {
 // ── /agent-persona ────────────────────────────────────────────────────────────
 
 describe('handleAgentPersonaCommand', () => {
-    test('rejects non-admin permission level', async () => {
-        const ctx = createTestContext();
-        createAgent(db, { name: 'TestBot', model: 'test-model' });
-        const interaction = makeSubcommandInteraction('agent-persona', 'list', [
-            { name: 'agent', value: 'TestBot' },
-        ]);
-
-        await handleAgentPersonaCommand(ctx, interaction, PermissionLevel.STANDARD);
-
-        const content = capturedResponse()!.data?.content as string;
-        expect(content).toContain('admin permissions');
-    });
-
     test('list returns "no personas" embed when none assigned', async () => {
         const ctx = createTestContext();
         createAgent(db, { name: 'TestBot', model: 'test-model' });

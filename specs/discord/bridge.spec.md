@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 20
+version: 21
 status: active
 files:
   - server/discord/bridge.ts
@@ -441,7 +441,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 21. **Role-based access control**: Permission levels (BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3). In legacy mode, `allowedUserIds` grants ADMIN level. In `publicMode`, permissions are resolved from Discord roles via `rolePermissions` config. Highest matching role wins. Muted users are always BLOCKED
 22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50). Rate limiting applies to **both channel messages and slash command interactions** — they share the same `userMessageTimestamps` map on `DiscordBridge`, so commands and messages count against the same per-user quota
 23. **Prompt injection scanning**: All incoming messages (channel @mentions and thread messages) are scanned via `scanForInjection()`. Blocked messages are audited and rejected
-24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute`, `/admin`, `/config` require ADMIN. `/agents`, `/status`, `/tasks`, `/schedule`, `/help` require BASIC
+24. **Permission-gated commands**: Permissions are enforced declaratively via `minPermission` on each entry in `COMMAND_HANDLERS` — the dispatcher rejects calls before the handler runs. Minimum levels: BASIC → `/message`; STANDARD → `/session`, `/work`; ADMIN → `/config`, `/council`, `/mute`, `/unmute`, `/admin`, `/agent-skill`, `/agent-persona`. Commands with no `minPermission` (e.g. `/agents`, `/status`, `/tasks`, `/schedule`, `/help`) are available to all non-blocked users. Commands with mixed sub-command permissions (e.g. `/schedule create` vs `/schedule list`) keep those checks inside the handler
 25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions. Mutes are persisted in the `discord_muted_users` DB table and restored on bridge start
 
 ### Response Formatting
@@ -672,3 +672,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-23 | corvid-agent | v17: Renamed `extractMentionsFromEmbed` → `extractContentFromEmbed`. v18: Discord won't auto-unfurl URLs in `content` when rich embeds are present — URLs are now stripped from embed description via `stripUrlsFromEmbed` and sent as a separate follow-up message (no embeds) so Discord renders link previews. Added `extractUrlsFromEmbed` and `stripUrlsFromEmbed` helpers |
 | 2026-04-04 | corvid-agent | v19 (Phase 2): Replaced custom WebSocket gateway (`DiscordGateway`) with discord.js `Client`. Gateway now uses `GatewayIntentBits`, `Client` events (`messageCreate`, `interactionCreate`, `messageReactionAdd`, `ready`), and discord.js built-in reconnection/heartbeat. Removed raw protocol types `DiscordGatewayPayload`, `DiscordHelloData`, `DiscordReadyData`, `GatewayOp`, `GatewayIntent` — these were gateway internals now handled by discord.js. Public interface (`GatewayDispatchHandlers`, `DiscordGateway.start/stop/updatePresence/running/botToken`) is unchanged. Discord message/interaction/reaction types are mapped to existing internal types for downstream compatibility. Closes #1792 |
 | 2026-04-04 | corvid-agent | v20 (Phase 3 Part 1): Migrated slash command registration from raw JSON objects to `SlashCommandBuilder` from `@discordjs/builders`. Replaced `discordFetch` PUT call with `DiscordRestClient.putCommands()`. Added `putCommands(appId, guildId, commands)` method to `DiscordRestClient`. All 18 commands re-expressed as type-safe builder chains: options use explicit type methods (`addStringOption`, `addIntegerOption`, `addBooleanOption`, `addUserOption`, `addChannelOption`, `addRoleOption`), permissions use `PermissionFlagsBits.Administrator` instead of hardcoded `'8'`. Test updated to mock `DiscordRestClient` via `_setRestClientForTesting`. Part of #1793 |
+| 2026-04-04 | corvid-agent | v21: Declarative permission middleware — `COMMAND_HANDLERS` map entries now declare `minPermission`. Dispatcher enforces it before calling handlers. Per-handler redundant permission checks removed. Closes #1581 |

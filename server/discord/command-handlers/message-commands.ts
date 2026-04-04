@@ -17,7 +17,7 @@ import { listProjects } from '../../db/projects';
 import { createSession } from '../../db/sessions';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
-import { buildFooterText, respondEphemeral, respondToInteraction, sendEmbed, sendTypingIndicator } from '../embeds';
+import { buildFooterText, respondToInteraction, sendEmbed, sendTypingIndicator } from '../embeds';
 import { withAuthorContext } from '../message-handler';
 import type { DiscordBridgeConfig, DiscordInteractionData } from '../types';
 import { PermissionLevel } from '../types';
@@ -105,12 +105,6 @@ export async function handleMessageCommand(
   getOption: (name: string) => string | undefined,
   userId: string,
 ): Promise<void> {
-  // /message is available at BASIC level — the first command for external users
-  if (permLevel < PermissionLevel.BASIC) {
-    await respondEphemeral(interaction, 'You do not have permission to use this command.');
-    return;
-  }
-
   const agentName = getOption('agent');
   // Option was renamed from `message` → `text` to avoid clashing with command name `/message` in some clients.
   const message = getOption('text') ?? getOption('message');
