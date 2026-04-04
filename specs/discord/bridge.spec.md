@@ -268,7 +268,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Export | Kind | Description |
 |--------|------|-------------|
 | `GatewayDispatchHandlers` | Interface | Callbacks for gateway dispatch events: `onMessage`, `onInteraction`, `onReady`, `onReactionAdd?` |
-| `DiscordGateway` | Class | Manages the Discord Gateway WebSocket connection, heartbeat, identify/resume lifecycle, and reconnection. Dispatch events are forwarded to the bridge via `GatewayDispatchHandlers` |
+| `DiscordGateway` | Class | Discord.js Client wrapper. Handles WebSocket lifecycle, heartbeat, identify/resume, and reconnection internally via discord.js. Dispatches events to bridge via `GatewayDispatchHandlers`. (Phase 2 migration — formerly custom WebSocket implementation) |
 
 #### DiscordGateway Constructor
 
@@ -389,17 +389,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |------|-------------|
 | `DiscordBridgeMode` | `'chat' \| 'work_intake'` — operational mode for the bridge |
 | `DiscordBridgeConfig` | `{ botToken, channelId, additionalChannelIds?, allowedUserIds, mode?, defaultAgentId?, appId?, guildId?, botRoleId?, publicMode?, rolePermissions?, defaultPermissionLevel?, rateLimitByLevel? }` |
-| `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
-| `DiscordHelloData` | `{ heartbeat_interval: number }` |
-| `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
 | `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], mention_roles?: string[], member?: { roles: string[] }, message_reference?, referenced_message?, attachments?: DiscordAttachment[] }` |
 | `DiscordAttachment` | `{ id, filename, content_type?, size, url, proxy_url, width?, height? }` — file attached to a Discord message |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
 | `DiscordInteractionOption` | `{ name, type, value?, options?: DiscordInteractionOption[] }` — recursive option type for subcommands and subcommand groups |
 | `DiscordInteractionData` | Slash command interaction payload from gateway |
-| `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, PRESENCE_UPDATE=3, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
-| `GatewayIntent` | Bit flags: `GUILDS` (1<<0), `GUILD_MEMBERS` (1<<1), `GUILD_MESSAGES` (1<<9), `GUILD_MESSAGE_REACTIONS` (1<<10), `MESSAGE_CONTENT` (1<<15) |
-| `DiscordReactionData` | `{ user_id, channel_id, message_id, guild_id?, emoji: { id, name } }` — payload from MESSAGE_REACTION_ADD |
+| `DiscordReactionData` | `{ user_id, channel_id, message_id, guild_id?, emoji: { id, name } }` — payload from messageReactionAdd event |
 | `PermissionLevel` | Constants: `BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3` |
 | `ComponentType` | Constants for Discord component types: `ACTION_ROW=1, BUTTON=2` |
 | `ButtonStyle` | Constants for Discord button styles: `PRIMARY=1, SECONDARY=2, SUCCESS=3, DANGER=4` |
@@ -675,3 +670,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-18 | corvid-agent | v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |
 | 2026-03-20 | corvid-agent | v16: File attachment support via `sendEmbedWithFiles` and `sendMessageWithFiles` (multipart/form-data, 25MB limit). Simplified embed footer to `agentName · status`. Added `image` and `thumbnail` fields to `DiscordEmbed`. `DiscordFileAttachment` interface |
 | 2026-03-23 | corvid-agent | v17: Renamed `extractMentionsFromEmbed` → `extractContentFromEmbed`. v18: Discord won't auto-unfurl URLs in `content` when rich embeds are present — URLs are now stripped from embed description via `stripUrlsFromEmbed` and sent as a separate follow-up message (no embeds) so Discord renders link previews. Added `extractUrlsFromEmbed` and `stripUrlsFromEmbed` helpers |
+| 2026-04-04 | corvid-agent | v19 (Phase 2): Replaced custom WebSocket gateway (`DiscordGateway`) with discord.js `Client`. Gateway now uses `GatewayIntentBits`, `Client` events (`messageCreate`, `interactionCreate`, `messageReactionAdd`, `ready`), and discord.js built-in reconnection/heartbeat. Removed raw protocol types `DiscordGatewayPayload`, `DiscordHelloData`, `DiscordReadyData`, `GatewayOp`, `GatewayIntent` — these were gateway internals now handled by discord.js. Public interface (`GatewayDispatchHandlers`, `DiscordGateway.start/stop/updatePresence/running/botToken`) is unchanged. Discord message/interaction/reaction types are mapped to existing internal types for downstream compatibility. Closes #1792 |
