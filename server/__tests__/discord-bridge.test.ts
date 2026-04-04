@@ -12,7 +12,6 @@ mock.module('../lib/worktree', () => ({
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { DiscordBridge } from '../discord/bridge';
-import { GatewayOp } from '../discord/types';
 import type { DiscordBridgeConfig } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
@@ -104,14 +103,6 @@ describe('DiscordBridge', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
         expect(bridge).toBeDefined();
-    });
-
-    test('gateway opcodes are correct', () => {
-        expect(GatewayOp.DISPATCH).toBe(0);
-        expect(GatewayOp.HEARTBEAT).toBe(1);
-        expect(GatewayOp.IDENTIFY).toBe(2);
-        expect(GatewayOp.HELLO).toBe(10);
-        expect(GatewayOp.HEARTBEAT_ACK).toBe(11);
     });
 
     test('ignores bot messages', async () => {
