@@ -3,6 +3,13 @@ import { Database } from 'bun:sqlite';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+// Load the REAL agent-memories module so we can pass-through when this test's
+// mocks aren't active.  mock.module is process-wide in Bun and leaks into other
+// test files (like agent-memories.test.ts), so the mock must delegate to real
+// implementations by default.
+// @ts-expect-error Bun supports query-string imports; TS does not resolve them
+const _realAgentMemories = await import('../db/agent-memories?real');
+
 const mockGetPendingMemories = mock(() => [] as Array<{
     id: string; agentId: string; key: string; content: string;
     status: string; updatedAt: string; asaId: number | null;
@@ -13,6 +20,7 @@ const mockUpdateMemoryAsaId = mock(() => undefined);
 const mockCountPendingMemories = mock(() => 0);
 
 mock.module('../db/agent-memories', () => ({
+    ..._realAgentMemories,
     getPendingMemories: mockGetPendingMemories,
     updateMemoryTxid: mockUpdateMemoryTxid,
     updateMemoryStatus: mockUpdateMemoryStatus,
@@ -81,6 +89,22 @@ beforeEach(() => {
 
 afterEach(() => {
     service.stop();
+    // Restore pass-through so agent-memories.test.ts (which may run later) gets real behavior
+    mockGetPendingMemories.mockImplementation(
+        (...args: any[]) => (_realAgentMemories.getPendingMemories as Function)(...args),
+    );
+    mockUpdateMemoryTxid.mockImplementation(
+        (...args: any[]) => (_realAgentMemories.updateMemoryTxid as Function)(...args),
+    );
+    mockUpdateMemoryStatus.mockImplementation(
+        (...args: any[]) => (_realAgentMemories.updateMemoryStatus as Function)(...args),
+    );
+    mockUpdateMemoryAsaId.mockImplementation(
+        (...args: any[]) => (_realAgentMemories.updateMemoryAsaId as Function)(...args),
+    );
+    mockCountPendingMemories.mockImplementation(
+        (...args: any[]) => (_realAgentMemories.countPendingMemories as Function)(...args),
+    );
     // Restore pass-through so crypto.test.ts (which may run later) gets real behavior
     mockEncryptMemoryContent.mockImplementation(
         (...args: any[]) => (_realCrypto.encryptMemoryContent as Function)(...args),
