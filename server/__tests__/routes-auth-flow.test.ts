@@ -97,7 +97,7 @@ describe('Auth Flow Routes', () => {
         expect(data.email).toBe('test@example.com');
     });
 
-    it('GET /api/auth/verify returns HTML page', async () => {
+    it('GET /api/auth/verify returns HTML page with email input', async () => {
         const { req, url } = fakeReq('GET', '/api/auth/verify?code=ABCD1234');
         const res = await Promise.resolve(handleAuthFlowRoutes(req, url, db));
         expect(res).not.toBeNull();
@@ -106,6 +106,71 @@ describe('Auth Flow Routes', () => {
         const html = await res!.text();
         expect(html).toContain('ABCD1234');
         expect(html).toContain('Device Authorization');
+        // Email input must be present (not hardcoded)
+        expect(html).toContain('email-input');
+        expect(html).toContain('type="email"');
+        // Hardcoded owner@localhost must not appear
+        expect(html).not.toContain('owner@localhost');
+    });
+
+    it('GET /api/auth/verify pre-populates email from X-Forwarded-Email when TRUST_PROXY=1', async () => {
+        const originalTrustProxy = process.env.TRUST_PROXY;
+        process.env.TRUST_PROXY = '1';
+        try {
+            const url = new URL('http://localhost:3000/api/auth/verify?code=EFGH5678');
+            const req = new Request(url.toString(), {
+                method: 'GET',
+                headers: { 'x-forwarded-email': 'alice@example.com' },
+            });
+            const res = await Promise.resolve(handleAuthFlowRoutes(req, url, db));
+            expect(res).not.toBeNull();
+            const html = await res!.text();
+            expect(html).toContain('alice@example.com');
+            expect(html).toContain('readonly');
+            expect(html).toContain('Identity confirmed by your login provider');
+        } finally {
+            if (originalTrustProxy === undefined) delete process.env.TRUST_PROXY;
+            else process.env.TRUST_PROXY = originalTrustProxy;
+        }
+    });
+
+    it('GET /api/auth/verify ignores X-Forwarded-Email without TRUST_PROXY', async () => {
+        const originalTrustProxy = process.env.TRUST_PROXY;
+        delete process.env.TRUST_PROXY;
+        try {
+            const url = new URL('http://localhost:3000/api/auth/verify?code=IJKL9012');
+            const req = new Request(url.toString(), {
+                method: 'GET',
+                headers: { 'x-forwarded-email': 'attacker@evil.com' },
+            });
+            const res = await Promise.resolve(handleAuthFlowRoutes(req, url, db));
+            expect(res).not.toBeNull();
+            const html = await res!.text();
+            // Proxy email must NOT appear when TRUST_PROXY is off
+            expect(html).not.toContain('attacker@evil.com');
+        } finally {
+            if (originalTrustProxy === undefined) delete process.env.TRUST_PROXY;
+            else process.env.TRUST_PROXY = originalTrustProxy;
+        }
+    });
+
+    it('GET /api/auth/verify rejects malformed X-Forwarded-Email even with TRUST_PROXY=1', async () => {
+        const originalTrustProxy = process.env.TRUST_PROXY;
+        process.env.TRUST_PROXY = '1';
+        try {
+            const url = new URL('http://localhost:3000/api/auth/verify?code=MNOP3456');
+            const req = new Request(url.toString(), {
+                method: 'GET',
+                headers: { 'x-forwarded-email': 'not-an-email' },
+            });
+            const res = await Promise.resolve(handleAuthFlowRoutes(req, url, db));
+            expect(res).not.toBeNull();
+            const html = await res!.text();
+            expect(html).not.toContain('not-an-email');
+        } finally {
+            if (originalTrustProxy === undefined) delete process.env.TRUST_PROXY;
+            else process.env.TRUST_PROXY = originalTrustProxy;
+        }
     });
 
     it('returns null for unmatched paths', async () => {
