@@ -17,7 +17,6 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { withAuthorContext } from '../discord/message-handler';
-import { mockDiscordRest } from './helpers/mock-discord-rest';
 import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
 
 function createMockProcessManager() {
