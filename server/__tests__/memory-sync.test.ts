@@ -20,9 +20,16 @@ mock.module('../db/agent-memories', () => ({
     countPendingMemories: mockCountPendingMemories,
 }));
 
+// Load the REAL crypto module so we can pass-through when this test's mocks
+// aren't active.  mock.module is process-wide in Bun and leaks into other
+// test files (like crypto.test.ts), so the mock must delegate to real
+// implementations by default.
+// @ts-expect-error Bun supports query-string imports; TS does not resolve them
+const _realCrypto = await import('../lib/crypto?real');
 const mockEncryptMemoryContent = mock(async (content: string) => `encrypted:${content}`);
 
 mock.module('../lib/crypto', () => ({
+    ..._realCrypto,
     encryptMemoryContent: mockEncryptMemoryContent,
 }));
 
@@ -74,6 +81,10 @@ beforeEach(() => {
 
 afterEach(() => {
     service.stop();
+    // Restore pass-through so crypto.test.ts (which may run later) gets real behavior
+    mockEncryptMemoryContent.mockImplementation(
+        (...args: any[]) => (_realCrypto.encryptMemoryContent as Function)(...args),
+    );
 });
 
 describe('MemorySyncService constructor + getStats', () => {

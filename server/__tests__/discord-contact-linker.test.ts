@@ -1,13 +1,21 @@
-import { test, expect, describe, mock, beforeEach } from 'bun:test';
+import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockFindContactByPlatformId = mock(() => null as { id: string; name: string } | null);
-const mockCreateContact = mock((_db: unknown, _tenantId: string, name: string) => ({ id: `contact-${name}`, name }));
-const mockAddPlatformLink = mock(() => undefined);
+// Load the REAL implementations first so we can delegate to them when this
+// test file's mocks aren't active.  mock.module is process-wide in Bun and
+// leaks into other test files (like contact-auto-link.test.ts), so the mock
+// must pass-through by default and only intercept during our own tests.
+// @ts-expect-error Bun supports query-string imports; TS does not resolve them
+const _realContacts = await import('../db/contacts?real');
+
+const mockFindContactByPlatformId = mock((...args: any[]) => (_realContacts.findContactByPlatformId as Function)(...args));
+const mockCreateContact = mock((...args: any[]) => (_realContacts.createContact as Function)(...args));
+const mockAddPlatformLink = mock((...args: any[]) => (_realContacts.addPlatformLink as Function)(...args));
 
 mock.module('../db/contacts', () => ({
+    ..._realContacts,
     findContactByPlatformId: mockFindContactByPlatformId,
     createContact: mockCreateContact,
     addPlatformLink: mockAddPlatformLink,
@@ -26,13 +34,22 @@ let db: Database;
 beforeEach(() => {
     db = new Database(':memory:');
     contactCache.clear();
+    // Reset call counts, then override with test-specific stubs
     mockFindContactByPlatformId.mockReset();
     mockCreateContact.mockReset();
     mockAddPlatformLink.mockReset();
-    // Restore defaults after reset
     mockFindContactByPlatformId.mockImplementation(() => null);
     mockCreateContact.mockImplementation((_db: unknown, _tenantId: string, name: string) => ({ id: `contact-${name}`, name }));
     mockAddPlatformLink.mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+    db.close();
+    // Restore pass-through to real implementations so other test files
+    // that import ../db/contacts get real behavior.
+    mockFindContactByPlatformId.mockImplementation((...args: any[]) => (_realContacts.findContactByPlatformId as Function)(...args));
+    mockCreateContact.mockImplementation((...args: any[]) => (_realContacts.createContact as Function)(...args));
+    mockAddPlatformLink.mockImplementation((...args: any[]) => (_realContacts.addPlatformLink as Function)(...args));
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

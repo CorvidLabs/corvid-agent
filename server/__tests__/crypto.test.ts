@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import {
-    encryptMnemonic,
-    decryptMnemonic,
-    encryptMemoryContent,
-    decryptMemoryContent,
-    getEncryptionPassphrase,
-} from '../lib/crypto';
+// Import via query-string to bypass mock.module('../lib/crypto') leakage
+// from memory-sync.test.ts, which replaces encryptMemoryContent with a mock
+// that returns non-base64 strings and strips all other exports.
+// @ts-expect-error Bun supports query-string imports; TS does not resolve them
+const _crypto = await import('../lib/crypto?real');
+const { encryptMnemonic, decryptMnemonic, encryptMemoryContent, decryptMemoryContent, getEncryptionPassphrase } = _crypto as typeof import('../lib/crypto');
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
