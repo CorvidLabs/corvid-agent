@@ -5,6 +5,7 @@
  * `/quickstart`, `/dashboard`, `/help`, and `/tools` commands.
  */
 
+import type { ChatInputCommandInteraction } from 'discord.js';
 import { listAgents } from '../../db/agents';
 import { listActiveSchedules } from '../../db/schedules';
 import { countActiveTasks, countPendingTasks, getActiveWorkTasks } from '../../db/work-tasks';
@@ -16,9 +17,11 @@ import {
   respondToInteractionEmbed,
   respondToInteractionEmbeds,
 } from '../embeds';
-import type { DiscordInteractionData } from '../types';
 
-export async function handleAgentsCommand(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
+export async function handleAgentsCommand(
+  ctx: InteractionContext,
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
   const agents = listAgents(ctx.db);
   if (agents.length === 0) {
     await respondToInteraction(interaction, 'No agents configured.');
@@ -54,7 +57,10 @@ function getVersion(): string {
   }
 }
 
-export async function handleStatusCommand(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
+export async function handleStatusCommand(
+  ctx: InteractionContext,
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
   const version = getVersion();
   const uptimeSeconds = Math.floor(process.uptime());
   const dbLatency = measureDbLatency(ctx.db);
@@ -88,7 +94,10 @@ export async function handleStatusCommand(ctx: InteractionContext, interaction: 
   });
 }
 
-export async function handleTasksCommand(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
+export async function handleTasksCommand(
+  ctx: InteractionContext,
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
   const active = getActiveWorkTasks(ctx.db);
   const pendingCount = countPendingTasks(ctx.db);
   const activeCount = countActiveTasks(ctx.db);
@@ -133,7 +142,7 @@ export async function handleTasksCommand(ctx: InteractionContext, interaction: D
 
 export async function handleConfigCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
 ): Promise<void> {
   const configFields: Array<{ name: string; value: string; inline?: boolean }> = [
@@ -166,7 +175,7 @@ export async function handleConfigCommand(
 
 export async function handleQuickstartCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
 ): Promise<void> {
   const agents = listAgents(ctx.db);
   const agentCount = agents.length;
@@ -209,7 +218,7 @@ export async function handleQuickstartCommand(
 
 export async function handleDashboardCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
 ): Promise<void> {
   const version = getVersion();
   const uptimeSeconds = Math.floor(process.uptime());
@@ -301,7 +310,7 @@ export async function handleDashboardCommand(
   await respondToInteractionEmbeds(interaction, [overviewEmbed, agentEmbed, workEmbed, scheduleEmbed]);
 }
 
-export async function handleHelpCommand(interaction: DiscordInteractionData): Promise<void> {
+export async function handleHelpCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   await respondToInteractionEmbed(interaction, {
     title: 'CorvidAgent Commands',
     color: 0x5865f2,
@@ -355,11 +364,8 @@ export async function handleHelpCommand(interaction: DiscordInteractionData): Pr
   });
 }
 
-export async function handleToolsCommand(
-  interaction: DiscordInteractionData,
-  getOption: (name: string) => string | undefined,
-): Promise<void> {
-  const category = getOption('category');
+export async function handleToolsCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const category = interaction.options.getString('category') ?? undefined;
 
   if (category) {
     // Single category — show detailed tool list

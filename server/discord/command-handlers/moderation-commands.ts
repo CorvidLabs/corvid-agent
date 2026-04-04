@@ -4,6 +4,7 @@
  * Handles `/council`, `/mute`, and `/unmute` commands.
  */
 
+import type { ChatInputCommandInteraction } from 'discord.js';
 import { launchCouncil, onCouncilStageChange } from '../../councils/discussion';
 import { listAgents } from '../../db/agents';
 import { createCouncil, getCouncilLaunch, listCouncils } from '../../db/councils';
@@ -11,25 +12,24 @@ import { listProjects } from '../../db/projects';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
 import { respondEphemeral, respondToInteraction, sendEmbed } from '../embeds';
-import type { DiscordInteractionData } from '../types';
 
 const log = createLogger('DiscordCommands');
 
 export async function handleCouncilCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
-  getOption: (name: string) => string | undefined,
+  _userId: string,
 ): Promise<void> {
-  const topic = getOption('topic');
+  const topic = interaction.options.getString('topic');
   if (!topic) {
     await respondToInteraction(interaction, 'Please provide a topic.');
     return;
   }
 
   // Resolve council: by name, by ad-hoc agents, or fallback to first
-  const councilNameOpt = getOption('council_name');
-  const agentsOpt = getOption('agents');
+  const councilNameOpt = interaction.options.getString('council_name');
+  const agentsOpt = interaction.options.getString('agents');
 
   let councilId: string;
   let councilLabel: string;
@@ -101,7 +101,7 @@ export async function handleCouncilCommand(
   }
 
   // Resolve project: by name or fallback to first
-  const projectOpt = getOption('project');
+  const projectOpt = interaction.options.getString('project');
   const projects = listProjects(ctx.db);
   let projectId: string;
 
@@ -124,7 +124,7 @@ export async function handleCouncilCommand(
   try {
     const result = launchCouncil(ctx.db, ctx.processManager, councilId, projectId, topic, null);
 
-    const councilChannelId = interaction.channel_id;
+    const councilChannelId = interaction.channelId;
 
     await respondToInteraction(
       interaction,
@@ -160,11 +160,11 @@ export async function handleCouncilCommand(
 
 export async function handleMuteCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
-  getOption: (name: string) => string | undefined,
+  _userId: string,
 ): Promise<void> {
-  const targetUser = getOption('user');
+  const targetUser = interaction.options.getUser('user')?.id;
   if (!targetUser) {
     await respondToInteraction(interaction, 'Please specify a user.');
     return;
@@ -175,11 +175,11 @@ export async function handleMuteCommand(
 
 export async function handleUnmuteCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
-  getOption: (name: string) => string | undefined,
+  _userId: string,
 ): Promise<void> {
-  const targetUser = getOption('user');
+  const targetUser = interaction.options.getUser('user')?.id;
   if (!targetUser) {
     await respondToInteraction(interaction, 'Please specify a user.');
     return;

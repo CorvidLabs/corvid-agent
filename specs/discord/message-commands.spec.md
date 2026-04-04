@@ -41,7 +41,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | `getBuddyStatusLabel` | `(role: string, round: number, approved: boolean)` | `string` | Compute a human-readable status label for a buddy round event (e.g. "Initial Response", "Review & Feedback", "Approved") |
 | `getBuddyRoleIcon` | `(role: string, approved: boolean)` | `string` | Compute the role icon emoji for a buddy round event (💬 for lead, ✅ for approved buddy, 🔍 for reviewing buddy) |
 | `resolveMessageToolPolicy` | `(config: DiscordBridgeConfig, permLevel: number, channelId: string)` | `MessageToolPolicy` | Resolves session naming and tool allow-lists based on caller tier + trusted channel policy |
-| `handleMessageCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number, getOption: (name: string) => string \| undefined, userId: string)` | `Promise<void>` | Handles the `/message` slash command with permission-tiered tool access |
+| `handleMessageCommand` | `(ctx: InteractionContext, interaction: ChatInputCommandInteraction, permLevel: number, userId: string)` | `Promise<void>` | Handles the `/message` slash command with permission-tiered tool access |
 
 ## Invariants
 
@@ -122,7 +122,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | Module | What is used |
 |--------|-------------|
 | `server/discord/commands` | `InteractionContext` type |
-| `server/discord/types` | `DiscordInteractionData`, `PermissionLevel` |
+| `server/discord/types` | `PermissionLevel` |
 | `server/db/agents` | `listAgents` |
 | `server/db/sessions` | `createSession` |
 | `server/db/projects` | `listProjects` |

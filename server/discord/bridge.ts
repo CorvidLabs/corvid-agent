@@ -47,7 +47,8 @@ import {
   subscribeForAdaptiveInlineResponse,
 } from './thread-manager';
 import { ThreadSessionManager } from './thread-session-manager';
-import type { DiscordBridgeConfig, DiscordInteractionData, DiscordMessageData, DiscordReactionData } from './types';
+import type { BaseInteraction } from 'discord.js';
+import type { DiscordBridgeConfig, DiscordMessageData, DiscordReactionData } from './types';
 
 const log = createLogger('DiscordBridge');
 
@@ -339,7 +340,7 @@ export class DiscordBridge {
     handleReactionImpl(ctx, data);
   }
 
-  private async handleInteraction(interaction: DiscordInteractionData): Promise<void> {
+  private async handleInteraction(interaction: BaseInteraction): Promise<void> {
     const ctx: InteractionContext = {
       db: this.db,
       config: this.config,

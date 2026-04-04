@@ -9,19 +9,7 @@ import { runMigrations } from '../db/schema';
 import { handleScheduleCommand } from '../discord/command-handlers/schedule-commands';
 import { createSchedule, getSchedule, listSchedules } from '../db/schedules';
 import type { InteractionContext } from '../discord/commands';
-import type { DiscordInteractionData } from '../discord/types';
-import { mockDiscordRest } from './helpers/mock-discord-rest';
-
-// ─── Mock Discord API calls ─────────────────────────────────────────────────
-
-let fetchBodies: unknown[];
-let restCleanup: () => void;
-
-/** Extract the response data from captured Discord API calls. */
-function lastResponse(): { embeds?: any[]; content?: string } {
-    const last = fetchBodies[fetchBodies.length - 1] as any;
-    return last?.data ?? last ?? {};
-}
+import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -53,25 +41,6 @@ function makeCtx(): InteractionContext {
     };
 }
 
-function makeInteraction(options: any[] = []): DiscordInteractionData {
-    return {
-        id: '400000000000000001',
-        type: 2,
-        token: 'test-interaction-token',
-        application_id: '400000000000000002',
-        channel_id: '100000000000000001',
-        member: {
-            user: { id: '200000000000000001', username: 'testuser' },
-            roles: [],
-        },
-        data: {
-            id: '400000000000000003',
-            name: 'schedule',
-            options,
-        },
-    } as unknown as DiscordInteractionData;
-}
-
 function seedAgent() {
     db.query(`INSERT INTO agents (id, name, wallet_address) VALUES ('agent-1', 'TestAgent', 'addr1')`).run();
 }
@@ -92,11 +61,9 @@ const USER = 1;
 beforeEach(() => {
     db = new Database(':memory:');
     runMigrations(db);
-    ({ fetchBodies, cleanup: restCleanup } = mockDiscordRest());
 });
 
 afterEach(() => {
-    restCleanup();
     db.close();
 });
 
@@ -104,12 +71,11 @@ afterEach(() => {
 
 describe('/schedule list', () => {
     it('shows empty state when no schedules exist', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'list', type: 1 },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', { subcommand: 'list' });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        expect(fetchBodies.length).toBe(1);
-        expect(lastResponse().content).toContain('No schedules');
+        expect(interaction._responses.length).toBe(1);
+        expect(interaction.getContent()).toContain('No schedules');
     });
 
     it('lists schedules with status and metadata', async () => {
@@ -117,53 +83,53 @@ describe('/schedule list', () => {
         seedSchedule('Morning Digest');
         seedSchedule('Nightly Review');
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'list', type: 1 },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', { subcommand: 'list' });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedules');
-        expect(embed.description).toContain('Morning Digest');
-        expect(embed.description).toContain('Nightly Review');
-        expect(embed.footer.text).toContain('2 schedules');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedules');
+        expect(embed!.description).toContain('Morning Digest');
+        expect(embed!.description).toContain('Nightly Review');
+        expect((embed!.footer as any).text).toContain('2 schedules');
     });
 
     it('works with no subcommand (backwards compat)', async () => {
         seedAgent();
         seedSchedule('Test');
 
-        await handleScheduleCommand(makeCtx(), makeInteraction(), USER);
+        const interaction = makeMockChatInteraction('schedule', {});
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedules');
-        expect(embed.description).toContain('Test');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedules');
+        expect(embed!.description).toContain('Test');
     });
 });
 
 describe('/schedule create', () => {
     it('requires admin permissions', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [{ name: 'name', value: 'Test', type: 3 }] },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'create',
+            strings: { name: 'Test' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        expect(lastResponse().content).toContain('admin permissions');
+        expect(interaction.getContent()).toContain('admin permissions');
     });
 
     it('creates a simple schedule', async () => {
         seedAgent();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [
-                { name: 'name', value: 'Daily Digest', type: 3 },
-                { name: 'cron', value: '0 9 * * *', type: 3 },
-                { name: 'action_type', value: 'daily_review', type: 3 },
-            ]},
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'create',
+            strings: { name: 'Daily Digest', cron: '0 9 * * *', action_type: 'daily_review' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Created');
-        expect(embed.description).toContain('Daily Digest');
-        expect(embed.description).toContain('daily_review');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Created');
+        expect(embed!.description).toContain('Daily Digest');
+        expect(embed!.description).toContain('daily_review');
 
         const schedules = listSchedules(db);
         expect(schedules.length).toBe(1);
@@ -173,17 +139,15 @@ describe('/schedule create', () => {
     it('creates schedule from template', async () => {
         seedAgent();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [
-                { name: 'name', value: 'PR Digest', type: 3 },
-                { name: 'template', value: 'github-digest-discord', type: 3 },
-                { name: 'channel', value: '12345', type: 3 },
-            ]},
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'create',
+            strings: { name: 'PR Digest', template: 'github-digest-discord', channel: '12345' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Created');
-        expect(embed.description).toContain('github-digest-discord');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Created');
+        expect(embed!.description).toContain('github-digest-discord');
 
         const schedules = listSchedules(db);
         expect(schedules[0].executionMode).toBe('pipeline');
@@ -192,56 +156,58 @@ describe('/schedule create', () => {
     it('rejects unknown template', async () => {
         seedAgent();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [
-                { name: 'name', value: 'Bad', type: 3 },
-                { name: 'template', value: 'nonexistent', type: 3 },
-            ]},
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'create',
+            strings: { name: 'Bad', template: 'nonexistent' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('Unknown template');
+        expect(interaction.getContent()).toContain('Unknown template');
     });
 
     it('requires cron when not using template', async () => {
         seedAgent();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [
-                { name: 'name', value: 'No Cron', type: 3 },
-            ]},
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'create',
+            strings: { name: 'No Cron' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('cron expression');
+        expect(interaction.getContent()).toContain('cron expression');
     });
 
     it('requires name', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'create', type: 1, options: [] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', { subcommand: 'create' });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('name');
+        expect(interaction.getContent()).toContain('name');
     });
 });
 
 describe('/schedule pause', () => {
     it('requires admin permissions', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'pause', type: 1, options: [{ name: 'schedule', value: 'xxx', type: 3 }] },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'pause',
+            strings: { schedule: 'xxx' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        expect(lastResponse().content).toContain('admin permissions');
+        expect(interaction.getContent()).toContain('admin permissions');
     });
 
     it('pauses an active schedule', async () => {
         seedAgent();
         const sched = seedSchedule();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'pause', type: 1, options: [{ name: 'schedule', value: sched.id, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'pause',
+            strings: { schedule: sched.id },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Paused');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Paused');
 
         const updated = getSchedule(db, sched.id);
         expect(updated!.status).toBe('paused');
@@ -252,19 +218,23 @@ describe('/schedule pause', () => {
         const sched = seedSchedule();
         db.query(`UPDATE agent_schedules SET status = 'paused' WHERE id = ?`).run(sched.id);
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'pause', type: 1, options: [{ name: 'schedule', value: sched.id, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'pause',
+            strings: { schedule: sched.id },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('already paused');
+        expect(interaction.getContent()).toContain('already paused');
     });
 
     it('handles not-found schedule', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'pause', type: 1, options: [{ name: 'schedule', value: 'bad-id', type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'pause',
+            strings: { schedule: 'bad-id' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('not found');
+        expect(interaction.getContent()).toContain('not found');
     });
 });
 
@@ -274,12 +244,14 @@ describe('/schedule resume', () => {
         const sched = seedSchedule();
         db.query(`UPDATE agent_schedules SET status = 'paused' WHERE id = ?`).run(sched.id);
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'resume', type: 1, options: [{ name: 'schedule', value: sched.id, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'resume',
+            strings: { schedule: sched.id },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Resumed');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Resumed');
 
         const updated = getSchedule(db, sched.id);
         expect(updated!.status).toBe('active');
@@ -289,11 +261,13 @@ describe('/schedule resume', () => {
         seedAgent();
         const sched = seedSchedule();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'resume', type: 1, options: [{ name: 'schedule', value: sched.id, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'resume',
+            strings: { schedule: sched.id },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        expect(lastResponse().content).toContain('already active');
+        expect(interaction.getContent()).toContain('already active');
     });
 });
 
@@ -302,37 +276,40 @@ describe('/schedule delete', () => {
         seedAgent();
         const sched = seedSchedule();
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'delete', type: 1, options: [{ name: 'schedule', value: sched.id, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'delete',
+            strings: { schedule: sched.id },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Deleted');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Deleted');
 
         const deleted = getSchedule(db, sched.id);
         expect(deleted).toBeNull();
     });
 
     it('requires admin permissions', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'delete', type: 1, options: [{ name: 'schedule', value: 'xxx', type: 3 }] },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'delete',
+            strings: { schedule: 'xxx' },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        expect(lastResponse().content).toContain('admin permissions');
+        expect(interaction.getContent()).toContain('admin permissions');
     });
 });
 
 describe('/schedule templates', () => {
     it('lists available pipeline templates', async () => {
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'templates', type: 1 },
-        ]), USER);
+        const interaction = makeMockChatInteraction('schedule', { subcommand: 'templates' });
+        await handleScheduleCommand(makeCtx(), interaction as any, USER);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Pipeline Templates');
-        expect(embed.description).toContain('github-digest-discord');
-        expect(embed.description).toContain('daily-digest-discord');
-        expect(embed.description).toContain('release-announcement');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Pipeline Templates');
+        expect(embed!.description).toContain('github-digest-discord');
+        expect(embed!.description).toContain('daily-digest-discord');
+        expect(embed!.description).toContain('release-announcement');
     });
 });
 
@@ -342,11 +319,13 @@ describe('/schedule prefix resolution', () => {
         const sched = seedSchedule();
         const prefix = sched.id.slice(0, 8);
 
-        await handleScheduleCommand(makeCtx(), makeInteraction([
-            { name: 'pause', type: 1, options: [{ name: 'schedule', value: prefix, type: 3 }] },
-        ]), ADMIN);
+        const interaction = makeMockChatInteraction('schedule', {
+            subcommand: 'pause',
+            strings: { schedule: prefix },
+        });
+        await handleScheduleCommand(makeCtx(), interaction as any, ADMIN);
 
-        const embed = lastResponse().embeds?.[0];
-        expect(embed.title).toBe('Schedule Paused');
+        const embed = interaction.getEmbed();
+        expect(embed!.title).toBe('Schedule Paused');
     });
 });

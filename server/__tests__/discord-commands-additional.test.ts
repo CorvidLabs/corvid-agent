@@ -12,23 +12,15 @@ mock.module('../lib/worktree', () => ({
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleInteraction, type InteractionContext } from '../discord/commands';
-import { InteractionType } from '../discord/types';
-import type { DiscordBridgeConfig, DiscordInteractionData } from '../discord/types';
+import type { DiscordBridgeConfig } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { mockDiscordRest } from './helpers/mock-discord-rest';
+import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
 
 let db: Database;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let capturedResponse: Record<string, any> | null = null;
-let fetchBodies: unknown[];
 let cleanup: () => void;
 const originalAppId = process.env.DISCORD_APP_ID;
-
-/** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
-function getContent(): string {
-    return (capturedResponse?.data?.content ?? capturedResponse?.content) as string;
-}
 
 function createTestConfig(): DiscordBridgeConfig {
     return {
@@ -72,31 +64,13 @@ function createTestContext(config?: Partial<DiscordBridgeConfig>): InteractionCo
     };
 }
 
-function makeInteraction(commandName: string, options: Array<{ name: string; value: string | number }> = []): DiscordInteractionData {
-    return {
-        id: '400000000000000001',
-        type: InteractionType.APPLICATION_COMMAND,
-        token: 'test-interaction-token',
-        channel_id: '100000000000000001',
-        member: {
-            user: { id: '200000000000000001', username: 'testuser' },
-            roles: [],
-        },
-        data: {
-            name: commandName,
-            options: options.map(o => ({ ...o, type: typeof o.value === 'number' ? 4 : 3 })),
-        },
-    } as unknown as DiscordInteractionData;
-}
-
 beforeEach(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
-    capturedResponse = null;
     process.env.DISCORD_APP_ID = 'test-app-id';
 
-    ({ fetchBodies, cleanup } = mockDiscordRest());
+    ({ cleanup } = mockDiscordRest());
 });
 
 afterEach(() => {
@@ -109,12 +83,10 @@ afterEach(() => {
 describe('Discord /tasks command', () => {
     test('shows empty state when no tasks', async () => {
         const ctx = createTestContext();
-        await handleInteraction(ctx, makeInteraction('tasks'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('tasks');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('No active or pending work tasks');
+        expect(interaction.getContent()).toContain('No active or pending work tasks');
     });
 
     test('shows active tasks as embed', async () => {
@@ -127,11 +99,10 @@ describe('Discord /tasks command', () => {
             VALUES (?, ?, ?, ?, 'running', 'web', '{}', datetime('now'))
         `).run('task-1', agent.id, project.id, 'Fix the bug in authentication');
 
-        await handleInteraction(ctx, makeInteraction('tasks'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('tasks');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
+        const embeds = interaction.getEmbeds() as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
         expect(embeds).toBeDefined();
         expect(embeds[0].title).toBe('Work Tasks');
         const activeField = embeds[0].fields.find((f: { name: string }) => f.name === 'Active');
@@ -142,12 +113,10 @@ describe('Discord /tasks command', () => {
 describe('Discord /schedule command', () => {
     test('shows empty state when no schedules', async () => {
         const ctx = createTestContext();
-        await handleInteraction(ctx, makeInteraction('schedule'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('schedule');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('No schedules');
+        expect(interaction.getContent()).toContain('No schedules');
     });
 
     test('shows active schedules', async () => {
@@ -163,11 +132,10 @@ describe('Discord /schedule command', () => {
             new Date(Date.now() + 3600000).toISOString(),
         );
 
-        await handleInteraction(ctx, makeInteraction('schedule'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('schedule');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
+        const embeds = interaction.getEmbeds() as Array<{ title: string; description: string }>;
         expect(embeds).toBeDefined();
         expect(embeds[0].title).toBe('Schedules');
         expect(embeds[0].description).toContain('Nightly Review');
@@ -177,11 +145,10 @@ describe('Discord /schedule command', () => {
 describe('Discord /config command', () => {
     test('shows config for admin users', async () => {
         const ctx = createTestContext({ defaultPermissionLevel: 3 });
-        await handleInteraction(ctx, makeInteraction('config'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('config');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
+        const embeds = interaction.getEmbeds() as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
         expect(embeds).toBeDefined();
         expect(embeds[0].title).toBe('Bot Configuration');
 
@@ -191,12 +158,10 @@ describe('Discord /config command', () => {
 
     test('denies non-admin users', async () => {
         const ctx = createTestContext({ defaultPermissionLevel: 2 });
-        await handleInteraction(ctx, makeInteraction('config'));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('config');
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('do not have permission');
+        expect(interaction.getContent()).toContain('do not have permission');
     });
 });
 
@@ -206,14 +171,12 @@ describe('Discord /session model suffix stripping', () => {
         createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'claude-opus-4-6' });
         createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'TestAgent (claude-opus-4-6)' },
-            { name: 'topic', value: 'Test topic' },
-        ]));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('session', {
+            strings: { agent: 'TestAgent (claude-opus-4-6)', topic: 'Test topic' },
+        });
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = getContent();
+        const content = interaction.getContent();
         // Should succeed and mention the agent, not show "Agent not found"
         expect(content).toContain('TestAgent');
         expect(content).not.toContain('Agent not found');
@@ -224,14 +187,12 @@ describe('Discord /session model suffix stripping', () => {
         createAgent(db, { name: 'MyAssistant', systemPrompt: 'test', model: 'some-model' });
         createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'MyAssistant (some-model)' },
-            { name: 'topic', value: 'Debug issue' },
-        ]));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('session', {
+            strings: { agent: 'MyAssistant (some-model)', topic: 'Debug issue' },
+        });
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = getContent();
+        const content = interaction.getContent();
         expect(content).toContain('MyAssistant');
         expect(content).not.toContain('Agent not found');
     });
@@ -240,14 +201,12 @@ describe('Discord /session model suffix stripping', () => {
         const ctx = createTestContext();
         createAgent(db, { name: 'RealAgent', systemPrompt: 'test', model: 'test-model' });
 
-        await handleInteraction(ctx, makeInteraction('session', [
-            { name: 'agent', value: 'FakeAgent (claude-opus-4-6)' },
-            { name: 'topic', value: 'Test topic' },
-        ]));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('session', {
+            strings: { agent: 'FakeAgent (claude-opus-4-6)', topic: 'Test topic' },
+        });
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        const content = interaction.getContent();
         expect(content).toContain('Agent not found');
         expect(content).toContain('FakeAgent');
     });
@@ -270,14 +229,12 @@ describe('Discord /work model suffix stripping', () => {
             })),
         } as unknown as InteractionContext['workTaskService'];
 
-        await handleInteraction(ctx, makeInteraction('work', [
-            { name: 'description', value: 'Fix the tests' },
-            { name: 'agent', value: 'WorkerBot (claude-opus-4-6)' },
-        ]));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('work', {
+            strings: { description: 'Fix the tests', agent: 'WorkerBot (claude-opus-4-6)' },
+        });
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        const content = interaction.getContent();
         // Should succeed — mentions the agent name, not "Agent not found"
         expect(content).toContain('WorkerBot');
         expect(content).not.toContain('Agent not found');
@@ -291,14 +248,12 @@ describe('Discord /work model suffix stripping', () => {
             create: mock(async () => ({})),
         } as unknown as InteractionContext['workTaskService'];
 
-        await handleInteraction(ctx, makeInteraction('work', [
-            { name: 'description', value: 'Do something' },
-            { name: 'agent', value: 'GhostAgent (claude-opus-4-6)' },
-        ]));
-        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
+        const interaction = makeMockChatInteraction('work', {
+            strings: { description: 'Do something', agent: 'GhostAgent (claude-opus-4-6)' },
+        });
+        await handleInteraction(ctx, interaction as any);
 
-        expect(capturedResponse).not.toBeNull();
-        const content = capturedResponse!.data?.content as string;
+        const content = interaction.getContent();
         expect(content).toContain('Agent not found');
         expect(content).toContain('GhostAgent');
     });
