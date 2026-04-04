@@ -10,6 +10,7 @@ import { InteractionCallbackType, ComponentType, ButtonStyle } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { splitMessage } from './message-formatter';
 import { createLogger } from '../lib/logger';
+import { getRestClient } from './rest-client';
 
 const log = createLogger('DiscordEmbeds');
 
@@ -273,23 +274,15 @@ export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): st
 export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.CHANNEL_MESSAGE,
-                data: { content: content.slice(0, MAX_MESSAGE_LENGTH) },
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
+    try {
+        const restClient = getRestClient();
+        await restClient.respondToInteraction(interaction.id, interaction.token, {
+            type: InteractionCallbackType.CHANNEL_MESSAGE,
+            data: { content: content.slice(0, MAX_MESSAGE_LENGTH) },
+        });
+    } catch (error) {
         log.error('Failed to respond to Discord interaction', {
-            status: response.status,
-            error: error.slice(0, 200),
+            error: error instanceof Error ? error.message : String(error),
         });
     }
 }
@@ -301,26 +294,18 @@ export async function respondToInteractionEmbed(
 ): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.CHANNEL_MESSAGE,
-                data: {
-                    embeds: [embed],
-                    ...(ephemeral ? { flags: 64 } : {}),
-                },
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
+    try {
+        const restClient = getRestClient();
+        await restClient.respondToInteraction(interaction.id, interaction.token, {
+            type: InteractionCallbackType.CHANNEL_MESSAGE,
+            data: {
+                embeds: [embed],
+                ...(ephemeral ? { flags: 64 } : {}),
+            },
+        });
+    } catch (error) {
         log.error('Failed to respond to Discord interaction with embed', {
-            status: response.status,
-            error: error.slice(0, 200),
+            error: error instanceof Error ? error.message : String(error),
         });
     }
 }
@@ -332,26 +317,18 @@ export async function respondToInteractionEmbeds(
 ): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.CHANNEL_MESSAGE,
-                data: {
-                    embeds,
-                    ...(ephemeral ? { flags: 64 } : {}),
-                },
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
+    try {
+        const restClient = getRestClient();
+        await restClient.respondToInteraction(interaction.id, interaction.token, {
+            type: InteractionCallbackType.CHANNEL_MESSAGE,
+            data: {
+                embeds,
+                ...(ephemeral ? { flags: 64 } : {}),
+            },
+        });
+    } catch (error) {
         log.error('Failed to respond to Discord interaction with embeds', {
-            status: response.status,
-            error: error.slice(0, 200),
+            error: error instanceof Error ? error.message : String(error),
         });
     }
 }
@@ -363,21 +340,13 @@ export async function respondToInteractionEmbeds(
 export async function deferInteraction(interaction: DiscordInteractionData, ephemeral = false): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.DEFERRED_CHANNEL_MESSAGE,
-                data: ephemeral ? { flags: 64 } : {},
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
-        log.error('Failed to defer interaction', { status: response.status, error: error.slice(0, 200) });
+    try {
+        const restClient = getRestClient();
+        await restClient.deferInteraction(interaction.id, interaction.token, ephemeral);
+    } catch (error) {
+        log.error('Failed to defer interaction', {
+            error: error instanceof Error ? error.message : String(error),
+        });
     }
 }
 
@@ -395,22 +364,17 @@ export async function editDeferredResponse(
         log.error('DISCORD_APP_ID not set — cannot edit deferred response');
         return;
     }
-    const body: Record<string, unknown> = {};
-    if (content) body.content = content.slice(0, MAX_MESSAGE_LENGTH);
-    if (embeds) body.embeds = embeds;
+    try {
+        const body: Record<string, unknown> = {};
+        if (content) body.content = content.slice(0, MAX_MESSAGE_LENGTH);
+        if (embeds) body.embeds = embeds;
 
-    const response = await discordFetch(
-        `https://discord.com/api/v10/webhooks/${appId}/${interaction.token}/messages/@original`,
-        {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
-        log.error('Failed to edit deferred response', { status: response.status, error: error.slice(0, 200) });
+        const restClient = getRestClient();
+        await restClient.editDeferredResponse(appId, interaction.token, body);
+    } catch (error) {
+        log.error('Failed to edit deferred response', {
+            error: error instanceof Error ? error.message : String(error),
+        });
     }
 }
 
@@ -420,42 +384,32 @@ export async function editDeferredResponse(
 export async function respondEphemeral(interaction: DiscordInteractionData, content: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.CHANNEL_MESSAGE,
-                data: { content: content.slice(0, MAX_MESSAGE_LENGTH), flags: 64 },
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
-        log.error('Failed to send ephemeral response', { status: response.status, error: error.slice(0, 200) });
+    try {
+        const restClient = getRestClient();
+        await restClient.respondToInteraction(interaction.id, interaction.token, {
+            type: InteractionCallbackType.CHANNEL_MESSAGE,
+            data: { content: content.slice(0, MAX_MESSAGE_LENGTH), flags: 64 },
+        });
+    } catch (error) {
+        log.error('Failed to send ephemeral response', {
+            error: error instanceof Error ? error.message : String(error),
+        });
     }
 }
 
 export async function acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
-    const response = await discordFetch(
-        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: InteractionCallbackType.CHANNEL_MESSAGE,
-                data: { content: message, flags: 64 }, // 64 = ephemeral
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const error = await response.text();
-        log.error('Failed to acknowledge button', { status: response.status, error: error.slice(0, 200) });
+    try {
+        const restClient = getRestClient();
+        await restClient.respondToInteraction(interaction.id, interaction.token, {
+            type: InteractionCallbackType.CHANNEL_MESSAGE,
+            data: { content: message, flags: 64 }, // 64 = ephemeral
+        });
+    } catch (error) {
+        log.error('Failed to acknowledge button', {
+            error: error instanceof Error ? error.message : String(error),
+        });
     }
 }
 

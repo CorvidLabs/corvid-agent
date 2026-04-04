@@ -33,6 +33,7 @@ import type { WorkTaskService } from '../work/service';
 import type { InteractionContext } from './commands';
 // Extracted modules
 import { handleInteraction as handleInteractionImpl, registerSlashCommands } from './commands';
+import { initializeRestClient } from './rest-client';
 import {
   addReaction as addReactionImpl,
   removeReaction as removeReactionImpl,
@@ -119,6 +120,8 @@ export class DiscordBridge {
     this.config = config;
     this.workTaskService = workTaskService ?? null;
     this.buddyService = buddyService ?? null;
+    // Initialize discord.js REST client for API calls
+    initializeRestClient(config.botToken);
     this.tsm = new ThreadSessionManager(db, processManager, this.delivery, config.botToken);
     this.gateway = new DiscordGateway(config, {
       onMessage: (data) => {
