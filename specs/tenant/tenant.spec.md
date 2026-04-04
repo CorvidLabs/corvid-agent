@@ -35,6 +35,8 @@ Provides multi-tenant isolation for the corvid-agent platform, including tenant 
 | `validateTenantOwnership` | `db: Database, table: string, resourceId: string, tenantId: string, idColumn?: string` | `boolean` | Validates that a resource belongs to the given tenant. Throws if `table` is not in `TENANT_SCOPED_TABLES` or `idColumn` fails identifier validation. Returns `true` unconditionally for `DEFAULT_TENANT_ID`. |
 | `extractTenantId` | `req: Request, db: Database, tenantService: TenantService` | `TenantContext \| Response` | Extracts tenant ID from a request using API key (Bearer token), X-Tenant-ID header, or default. Returns a 403 Response if API key tenant and header tenant disagree. |
 | `registerApiKey` | `db: Database, tenantId: string, key: string, label?: string` | `void` | Registers (or replaces) an API key for a tenant by storing its SHA-256 hash. |
+| `registerMemberByEmail` | `db: Database, tenantId: string, email: string, role?: TenantRole` | `void` | Registers (or upserts) a tenant member by email with a deterministic key hash. Defaults role to `'viewer'`. |
+| `getMemberRoleByEmail` | `db: Database, tenantId: string, email: string` | `string \| null` | Looks up a tenant member's role by email. Returns `null` if not registered. |
 | `revokeApiKey` | `db: Database, key: string` | `boolean` | Revokes an API key by deleting its hash. Returns `true` if a key was deleted. |
 
 ### Exported Constants

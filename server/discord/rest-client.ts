@@ -198,3 +198,8 @@ export function getRestClient(): DiscordRestClient {
 	}
 	return restClient;
 }
+
+/** @internal Test-only: inject a mock client (pass `null` to reset). */
+export function _setRestClientForTesting(client: DiscordRestClient | null): void {
+	restClient = client;
+}

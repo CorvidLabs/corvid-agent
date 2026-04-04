@@ -1,4 +1,5 @@
 import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { DiscordBridge } from '../discord/bridge';
@@ -18,24 +19,21 @@ function createMockProcessManager() {
 }
 
 let db: Database;
-let originalFetch: typeof globalThis.fetch;
 let fetchBodies: unknown[];
+let cleanup: () => void;
 
 beforeEach(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
 
-    fetchBodies = [];
-    originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-        if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-        return new Response(JSON.stringify({}), { status: 200 });
-    }) as unknown as typeof fetch;
+    const result = mockDiscordRest();
+    fetchBodies = result.fetchBodies;
+    cleanup = result.cleanup;
 });
 
 afterEach(() => {
-    globalThis.fetch = originalFetch;
+    cleanup();
     db.close();
 });
 
@@ -48,7 +46,13 @@ function createBridge(overrides?: Partial<DiscordBridgeConfig>) {
         appId: '800000000000000001',
         ...overrides,
     };
-    return new DiscordBridge(db, pm, config);
+    const bridge = new DiscordBridge(db, pm, config);
+    // DiscordBridge constructor calls initializeRestClient() which overwrites the mock,
+    // so reinstall the mock after construction.
+    const result = mockDiscordRest();
+    fetchBodies = result.fetchBodies;
+    cleanup = result.cleanup;
+    return bridge;
 }
 
 function callInteraction(bridge: DiscordBridge, data: unknown) {

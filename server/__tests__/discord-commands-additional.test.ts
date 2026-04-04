@@ -16,11 +16,13 @@ import { InteractionType } from '../discord/types';
 import type { DiscordBridgeConfig, DiscordInteractionData } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 let db: Database;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let capturedResponse: Record<string, any> | null = null;
-const originalFetch = globalThis.fetch;
+let fetchBodies: unknown[];
+let cleanup: () => void;
 const originalAppId = process.env.DISCORD_APP_ID;
 
 /** Extract content from either respondToInteraction ({type,data:{content}}) or editDeferredResponse ({content}) */
@@ -94,20 +96,12 @@ beforeEach(() => {
     capturedResponse = null;
     process.env.DISCORD_APP_ID = 'test-app-id';
 
-    // Mock fetch to capture interaction responses
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-        if (init?.body) {
-            try {
-                capturedResponse = JSON.parse(String(init.body));
-            } catch { /* non-json body */ }
-        }
-        return new Response(JSON.stringify({}), { status: 200 });
-    }) as unknown as typeof fetch;
+    ({ fetchBodies, cleanup } = mockDiscordRest());
 });
 
 afterEach(() => {
     db.close();
-    globalThis.fetch = originalFetch;
+    cleanup();
     if (originalAppId !== undefined) process.env.DISCORD_APP_ID = originalAppId;
     else delete process.env.DISCORD_APP_ID;
 });
@@ -116,6 +110,7 @@ describe('Discord /tasks command', () => {
     test('shows empty state when no tasks', async () => {
         const ctx = createTestContext();
         await handleInteraction(ctx, makeInteraction('tasks'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
@@ -133,6 +128,7 @@ describe('Discord /tasks command', () => {
         `).run('task-1', agent.id, project.id, 'Fix the bug in authentication');
 
         await handleInteraction(ctx, makeInteraction('tasks'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
@@ -147,6 +143,7 @@ describe('Discord /schedule command', () => {
     test('shows empty state when no schedules', async () => {
         const ctx = createTestContext();
         await handleInteraction(ctx, makeInteraction('schedule'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
@@ -167,6 +164,7 @@ describe('Discord /schedule command', () => {
         );
 
         await handleInteraction(ctx, makeInteraction('schedule'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
@@ -180,6 +178,7 @@ describe('Discord /config command', () => {
     test('shows config for admin users', async () => {
         const ctx = createTestContext({ defaultPermissionLevel: 3 });
         await handleInteraction(ctx, makeInteraction('config'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const embeds = capturedResponse!.data?.embeds as Array<{ title: string; fields: Array<{ name: string; value: string }> }>;
@@ -193,6 +192,7 @@ describe('Discord /config command', () => {
     test('denies non-admin users', async () => {
         const ctx = createTestContext({ defaultPermissionLevel: 2 });
         await handleInteraction(ctx, makeInteraction('config'));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
@@ -210,6 +210,7 @@ describe('Discord /session model suffix stripping', () => {
             { name: 'agent', value: 'TestAgent (claude-opus-4-6)' },
             { name: 'topic', value: 'Test topic' },
         ]));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = getContent();
@@ -227,6 +228,7 @@ describe('Discord /session model suffix stripping', () => {
             { name: 'agent', value: 'MyAssistant (some-model)' },
             { name: 'topic', value: 'Debug issue' },
         ]));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = getContent();
@@ -242,6 +244,7 @@ describe('Discord /session model suffix stripping', () => {
             { name: 'agent', value: 'FakeAgent (claude-opus-4-6)' },
             { name: 'topic', value: 'Test topic' },
         ]));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
@@ -271,6 +274,7 @@ describe('Discord /work model suffix stripping', () => {
             { name: 'description', value: 'Fix the tests' },
             { name: 'agent', value: 'WorkerBot (claude-opus-4-6)' },
         ]));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
@@ -291,6 +295,7 @@ describe('Discord /work model suffix stripping', () => {
             { name: 'description', value: 'Do something' },
             { name: 'agent', value: 'GhostAgent (claude-opus-4-6)' },
         ]));
+        capturedResponse = (fetchBodies[0] as Record<string, unknown>) ?? null;
 
         expect(capturedResponse).not.toBeNull();
         const content = capturedResponse!.data?.content as string;
