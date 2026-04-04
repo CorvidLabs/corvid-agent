@@ -6,7 +6,6 @@ import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { TenantService } from '../tenant/context';
 import { withTenantFilter, validateTenantOwnership, enableMultiTenantGuard, resetMultiTenantGuard } from '../tenant/db-filter';
 import { extractTenantId, registerApiKey, registerMemberByEmail } from '../tenant/middleware';
-import { roleGuard } from '../middleware/guards';
 import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
 import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
 import { createProject, listProjects, getProject } from '../db/projects';
@@ -17,7 +16,7 @@ import { listWorkflows, getWorkflow, createWorkflow, updateWorkflow, deleteWorkf
 import { listWebhookRegistrations, getWebhookRegistration, createWebhookRegistration, updateWebhookRegistration, deleteWebhookRegistration } from '../db/webhooks';
 import { listMentionPollingConfigs, getMentionPollingConfig, createMentionPollingConfig, updateMentionPollingConfig, deleteMentionPollingConfig } from '../db/mention-polling';
 import { listMcpServerConfigs, getMcpServerConfig, createMcpServerConfig, updateMcpServerConfig, deleteMcpServerConfig } from '../db/mcp-servers';
-import { tenantGuard, tenantRoleGuard, createRequestContext } from '../middleware/guards';
+import { tenantGuard, tenantRoleGuard, roleGuard, createRequestContext } from '../middleware/guards';
 import { tenantTopic } from '../ws/handler';
 import { validateUrl } from '../a2a/client';
 
@@ -390,6 +389,89 @@ describe('RBAC', () => {
         ).get(tenantId, unknownHash) as { role: string } | null;
 
         expect(member).toBeNull();
+    });
+
+    // ── Tenant role → context.role mapping (invariant #26) ─────────────────
+
+    test('tenantGuard maps owner → context.role=admin', () => {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Owner Role Tenant',
+            slug: 'owner-role-tenant',
+            ownerEmail: 'owner@example.com',
+        });
+        const apiKey = 'owner-role-api-key';
+        // Hash the key ourselves (mirrors tenantGuard's SHA-256)
+        const hasher = new Bun.CryptoHasher('sha256');
+        hasher.update(apiKey);
+        const keyHash = hasher.digest('hex');
+        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'owner');
+
+        const req = new Request('http://localhost/api/agents', {
+            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
+        });
+        const context = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        guard(req, new URL(req.url), context);
+
+        expect(context.tenantRole).toBe('owner');
+        expect(context.role).toBe('admin');
+    });
+
+    test('tenantGuard maps operator → context.role=user', () => {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Operator Role Tenant',
+            slug: 'operator-role-tenant',
+            ownerEmail: 'operator@example.com',
+        });
+        const apiKey = 'operator-role-api-key';
+        const hasher = new Bun.CryptoHasher('sha256');
+        hasher.update(apiKey);
+        const keyHash = hasher.digest('hex');
+        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'operator');
+
+        const req = new Request('http://localhost/api/agents', {
+            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
+        });
+        const context = createRequestContext();
+        const guard = tenantGuard(db, tenantService);
+        guard(req, new URL(req.url), context);
+
+        expect(context.tenantRole).toBe('operator');
+        expect(context.role).toBe('user');
+    });
+
+    test('tenantGuard maps viewer → context.role=viewer, and roleGuard blocks write paths', () => {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Viewer Role Tenant',
+            slug: 'viewer-role-tenant',
+            ownerEmail: 'viewer@example.com',
+        });
+        const apiKey = 'viewer-role-api-key';
+        const hasher = new Bun.CryptoHasher('sha256');
+        hasher.update(apiKey);
+        const keyHash = hasher.digest('hex');
+        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'viewer');
+
+        const req = new Request('http://localhost/api/agents', {
+            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
+        });
+        const context = createRequestContext();
+        context.authenticated = true; // simulate prior authGuard pass
+        const tGuard = tenantGuard(db, tenantService);
+        tGuard(req, new URL(req.url), context);
+
+        // tenantGuard should set both fields
+        expect(context.tenantRole).toBe('viewer');
+        expect(context.role).toBe('viewer');
+
+        // roleGuard('admin','user') should now block this viewer
+        const rGuard = roleGuard('admin', 'user');
+        const result = rGuard(req, new URL(req.url), context);
+        expect(result).not.toBeNull();
+        expect(result!.status).toBe(403);
     });
 });
 

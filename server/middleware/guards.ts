@@ -182,6 +182,10 @@ export function tenantGuard(db: Database, tenantService: TenantService | null): 
 
             if (member) {
                 context.tenantRole = member.role as TenantRole;
+                // Map tenant role → context.role so roleGuard() enforces it correctly:
+                //   owner    → 'admin'  (full access, matches roleGuard('admin'))
+                //   operator → 'user'   (standard access, matches roleGuard('admin','user'))
+                //   viewer   → 'viewer' (read-only; roleGuard('admin','user') will reject)
                 context.role =
                     member.role === 'owner'
                         ? 'admin'
