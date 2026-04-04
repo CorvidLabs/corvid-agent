@@ -51,7 +51,7 @@ const mockClientInstance = {
 mock.module('discord.js', () => ({
     Client: class MockClient {
         constructor(_opts: unknown) {
-            return mockClientInstance as unknown;
+            return mockClientInstance as any;
         }
     },
     GatewayIntentBits: {
