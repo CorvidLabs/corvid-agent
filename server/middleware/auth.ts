@@ -278,13 +278,22 @@ export function checkWsAuth(req: Request, url: URL, config: AuthConfig): boolean
         if (match && isValidApiKey(match[1], config)) return true;
     }
 
-    // Check query parameter (deprecated — tokens in URLs leak via logs and referrers)
+    // Check query parameter (deprecated — tokens in URLs leak via proxy logs, CDN logs, and browser history).
+    // When DISABLE_WS_KEY_PARAM=true the query param is rejected entirely; use Authorization: Bearer instead.
     const key = url.searchParams.get('key');
-    if (key && isValidApiKey(key, config)) {
-        log.warn('WebSocket auth via query string is deprecated — use Authorization: Bearer header instead', {
-            ip: req.headers.get('x-forwarded-for') ?? 'unknown',
-        });
-        return true;
+    if (key) {
+        if (process.env.DISABLE_WS_KEY_PARAM === 'true' || process.env.DISABLE_WS_KEY_PARAM === '1') {
+            log.warn('WebSocket auth via ?key= query param is disabled (DISABLE_WS_KEY_PARAM=true)', {
+                ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+            });
+            return false;
+        }
+        if (isValidApiKey(key, config)) {
+            log.warn('WebSocket auth via query string is deprecated — use Authorization: Bearer header instead', {
+                ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+            });
+            return true;
+        }
     }
 
     log.warn('Rejected WebSocket connection: invalid or missing auth', { ip: req.headers.get('x-forwarded-for') ?? 'unknown' });

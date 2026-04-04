@@ -47,7 +47,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 3. **Public path bypass**: `/api/health` and `/.well-known/agent-card.json` bypass HTTP authentication regardless of API key configuration
 4. **OPTIONS bypass**: HTTP OPTIONS requests bypass authentication (CORS preflight)
 5. **No-key mode**: When `apiKey` is null (localhost-only), `checkHttpAuth` returns null and `checkWsAuth` returns true for all requests
-6. **WebSocket auth via Bearer or query param**: `checkWsAuth` checks `Authorization: Bearer <key>` header first, then `?key=<key>` query parameter
+6. **WebSocket auth via Bearer or query param**: `checkWsAuth` checks `Authorization: Bearer <key>` header first, then `?key=<key>` query parameter. When `DISABLE_WS_KEY_PARAM=true` (or `1`), the query parameter is rejected (returns false) even if the key is valid — this eliminates token leakage via proxy logs, CDN logs, and browser history. Set this in remote/production deployments.
 7. **CORS origin reflection with Vary**: When `allowedOrigins` is configured, the request origin is reflected if it matches the allowlist; `Vary: Origin` is set when the reflected origin is not `*`
 8. **Disallowed origin**: When `allowedOrigins` is set and the request origin is not in the list, `Access-Control-Allow-Origin` is set to empty string (browser blocks the response)
 9. **CORS secure default on public deployments**: When `allowedOrigins` is empty and `bindHost` is not localhost, cross-origin requests (those with an `Origin` header) receive `Access-Control-Allow-Origin: ''` (browser blocks). Non-browser requests (no `Origin` header) receive `Access-Control-Allow-Origin: *`.
@@ -123,9 +123,11 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | `API_KEY` | `null` | API key for authentication. Null disables auth (localhost-only) |
 | `BIND_HOST` | `127.0.0.1` | Server bind address. Non-localhost requires API_KEY |
 | `ALLOWED_ORIGINS` | `""` (block cross-origin on non-localhost) | Comma-separated list of allowed CORS origins. Empty = allow all on localhost, block all cross-origin on public deployments. |
+| `DISABLE_WS_KEY_PARAM` | `false` | Set to `true` or `1` to reject WebSocket `?key=` query param auth. Recommended for remote deployments behind a proxy. |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-04-03 | corvid-agent | Added `DISABLE_WS_KEY_PARAM` env guard to `checkWsAuth` — rejects `?key=` query param when set. Updated invariant #6 and configuration table. Part of #1549 (Phase 2, item 3). |
