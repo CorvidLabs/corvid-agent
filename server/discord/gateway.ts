@@ -124,7 +124,11 @@ export class DiscordGateway {
         this.client.on('interactionCreate', (interaction: BaseInteraction) => {
             if (!this._running) return;
             const data = mapInteraction(interaction);
-            if (data) this.handlers.onInteraction(data);
+            if (data) {
+                // Stamp the receive time for deadline-sensitive handlers (e.g. autocomplete).
+                data.receivedAt = Date.now();
+                this.handlers.onInteraction(data);
+            }
         });
 
         this.client.on('messageReactionAdd', (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {

@@ -18,6 +18,14 @@ import { InteractionCallbackType } from '../types';
 
 const log = createLogger('DiscordCommands');
 
+/**
+ * Discord requires autocomplete responses within 3 seconds of the interaction being created.
+ * If we exceed this deadline (e.g. due to event-loop backlog), posting the callback returns
+ * a "Unknown interaction" 404. A skipped response is silent on the user side — far better than
+ * a logged error for a stale interaction that Discord has already discarded.
+ */
+const AUTOCOMPLETE_DEADLINE_MS = 2500;
+
 /* ---------- lightweight TTL cache for autocomplete results ---------- */
 const CACHE_TTL_MS = 5_000; // 5 seconds — long enough to absorb keystrokes, short enough to stay fresh
 
@@ -134,6 +142,16 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
       error: err instanceof Error ? err.message : String(err),
     });
     choices = [];
+  }
+
+  // Guard: skip the response if we're past Discord's 3-second interaction deadline.
+  // Sending a stale response results in a 404 "Unknown interaction" error — silence is better.
+  if (interaction.receivedAt !== undefined && Date.now() - interaction.receivedAt >= AUTOCOMPLETE_DEADLINE_MS) {
+    log.warn('Autocomplete: skipping stale interaction (deadline exceeded)', {
+      command: interaction.data?.name,
+      elapsedMs: Date.now() - interaction.receivedAt,
+    });
+    return;
   }
 
   const response = await discordFetch(
