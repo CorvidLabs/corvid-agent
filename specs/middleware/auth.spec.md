@@ -124,6 +124,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | `BIND_HOST` | `127.0.0.1` | Server bind address. Non-localhost requires API_KEY |
 | `ALLOWED_ORIGINS` | `""` (block cross-origin on non-localhost) | Comma-separated list of allowed CORS origins. Empty = allow all on localhost, block all cross-origin on public deployments. |
 | `DISABLE_WS_KEY_PARAM` | `false` | Set to `true` or `1` to reject WebSocket `?key=` query param auth. Recommended for remote deployments behind a proxy. |
+| `TRUST_PROXY` | `false` | Set to `true` or `1` to enable proxy trust mode. When set, `validateStartupSecurity` logs a security warning if `BIND_HOST` is not localhost (X-Forwarded-* headers are spoofable on public interfaces). Proxy identity is resolved in `authGuard` + `tenantGuard` — see `guards.ts`. |
 
 ## Change Log
 
@@ -131,3 +132,4 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-04-03 | corvid-agent | Added `DISABLE_WS_KEY_PARAM` env guard to `checkWsAuth` — rejects `?key=` query param when set. Updated invariant #6 and configuration table. Part of #1549 (Phase 2, item 3). |
+| 2026-04-05 | corvid-agent | Added `TRUST_PROXY` startup warning in `validateStartupSecurity` — emits security warning when `TRUST_PROXY=true` and `BIND_HOST` is not localhost. Updated configuration table. Part of #1549 (Phase 2, item 5). |

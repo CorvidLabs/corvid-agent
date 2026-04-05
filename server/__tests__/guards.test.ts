@@ -1,648 +1,755 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import {
-    authGuard,
-    roleGuard,
-    rateLimitGuard,
-    contentLengthGuard,
-    applyGuards,
-    createRequestContext,
-    requiresAdminRole,
-    type RequestContext,
-    type Guard,
-} from '../middleware/guards';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { AuthConfig } from '../middleware/auth';
 import { checkHttpAuth } from '../middleware/auth';
+import {
+  applyGuards,
+  authGuard,
+  contentLengthGuard,
+  createRequestContext,
+  type Guard,
+  type RequestContext,
+  rateLimitGuard,
+  requiresAdminRole,
+  roleGuard,
+} from '../middleware/guards';
 import { RateLimiter } from '../middleware/rate-limit';
 
 // --- Helpers ----------------------------------------------------------------
 
 function makeRequest(path: string, options?: RequestInit & { headers?: Record<string, string> }): Request {
-    return new Request(`http://localhost:3000${path}`, options);
+  return new Request(`http://localhost:3000${path}`, options);
 }
 
 function makeUrl(path: string, params?: Record<string, string>): URL {
-    const url = new URL(`http://localhost:3000${path}`);
-    if (params) {
-        for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-    }
-    return url;
+  const url = new URL(`http://localhost:3000${path}`);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  }
+  return url;
 }
 
 const AUTH_ENABLED: AuthConfig = {
-    apiKey: 'test-secret-key-12345',
-    allowedOrigins: [],
-    bindHost: '0.0.0.0',
+  apiKey: 'test-secret-key-12345',
+  allowedOrigins: [],
+  bindHost: '0.0.0.0',
 };
 
 const AUTH_DISABLED: AuthConfig = {
-    apiKey: null,
-    allowedOrigins: [],
-    bindHost: '127.0.0.1',
+  apiKey: null,
+  allowedOrigins: [],
+  bindHost: '127.0.0.1',
 };
 
 // --- authGuard --------------------------------------------------------------
 
 describe('authGuard', () => {
-    it('allows authenticated requests and sets context', () => {
-        const guard = authGuard(AUTH_ENABLED);
-        const req = makeRequest('/api/sessions', {
-            headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
-        });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
-
-        const result = guard(req, url, context);
-        expect(result).toBeNull();
-        expect(context.authenticated).toBe(true);
-        expect(context.role).toBe('user');
+  it('allows authenticated requests and sets context', () => {
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions', {
+      headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
     });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('denies unauthenticated requests', () => {
-        const guard = authGuard(AUTH_ENABLED);
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+    const result = guard(req, url, context);
+    expect(result).toBeNull();
+    expect(context.authenticated).toBe(true);
+    expect(context.role).toBe('user');
+  });
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(401);
-    });
+  it('denies unauthenticated requests', () => {
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('grants admin role in dev mode (no API key)', () => {
-        const guard = authGuard(AUTH_DISABLED);
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
 
-        const result = guard(req, url, context);
-        expect(result).toBeNull();
-        expect(context.authenticated).toBe(true);
-        expect(context.role).toBe('admin');
-    });
+  it('grants admin role in dev mode (no API key)', () => {
+    const guard = authGuard(AUTH_DISABLED);
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('extracts valid Algorand wallet address from query param', () => {
-        const validAddr = 'A'.repeat(58); // valid format: 58 uppercase A-Z2-7 chars
-        const guard = authGuard(AUTH_DISABLED);
-        const req = makeRequest(`/api/sessions?wallet=${validAddr}`);
-        const url = makeUrl('/api/sessions', { wallet: validAddr });
-        const context = createRequestContext();
+    const result = guard(req, url, context);
+    expect(result).toBeNull();
+    expect(context.authenticated).toBe(true);
+    expect(context.role).toBe('admin');
+  });
 
-        guard(req, url, context);
-        expect(context.walletAddress).toBe(validAddr);
-    });
+  it('extracts valid Algorand wallet address from query param', () => {
+    const validAddr = 'A'.repeat(58); // valid format: 58 uppercase A-Z2-7 chars
+    const guard = authGuard(AUTH_DISABLED);
+    const req = makeRequest(`/api/sessions?wallet=${validAddr}`);
+    const url = makeUrl('/api/sessions', { wallet: validAddr });
+    const context = createRequestContext();
 
-    it('ignores wallet query param with invalid format', () => {
-        const guard = authGuard(AUTH_DISABLED);
-        const req = makeRequest('/api/sessions?wallet=INVALID');
-        const url = makeUrl('/api/sessions', { wallet: 'INVALID' });
-        const context = createRequestContext();
+    guard(req, url, context);
+    expect(context.walletAddress).toBe(validAddr);
+  });
 
-        guard(req, url, context);
-        expect(context.walletAddress).toBeUndefined();
-    });
+  it('ignores wallet query param with invalid format', () => {
+    const guard = authGuard(AUTH_DISABLED);
+    const req = makeRequest('/api/sessions?wallet=INVALID');
+    const url = makeUrl('/api/sessions', { wallet: 'INVALID' });
+    const context = createRequestContext();
 
-    it('ignores wallet query param with injection attempt', () => {
-        const guard = authGuard(AUTH_DISABLED);
-        const malicious = "'; DROP TABLE sessions; --";
-        const req = makeRequest(`/api/sessions?wallet=${encodeURIComponent(malicious)}`);
-        const url = makeUrl('/api/sessions', { wallet: malicious });
-        const context = createRequestContext();
+    guard(req, url, context);
+    expect(context.walletAddress).toBeUndefined();
+  });
 
-        guard(req, url, context);
-        expect(context.walletAddress).toBeUndefined();
-    });
+  it('ignores wallet query param with injection attempt', () => {
+    const guard = authGuard(AUTH_DISABLED);
+    const malicious = "'; DROP TABLE sessions; --";
+    const req = makeRequest(`/api/sessions?wallet=${encodeURIComponent(malicious)}`);
+    const url = makeUrl('/api/sessions', { wallet: malicious });
+    const context = createRequestContext();
+
+    guard(req, url, context);
+    expect(context.walletAddress).toBeUndefined();
+  });
 });
 
 // --- roleGuard --------------------------------------------------------------
 
 describe('roleGuard', () => {
-    it('allows requests with matching role', () => {
-        const guard = roleGuard('admin');
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'admin', tenantId: 'default' };
+  it('allows requests with matching role', () => {
+    const guard = roleGuard('admin');
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context: RequestContext = { authenticated: true, role: 'admin', tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).toBeNull();
-    });
+    const result = guard(req, url, context);
+    expect(result).toBeNull();
+  });
 
-    it('allows requests matching any of multiple roles', () => {
-        const guard = roleGuard('admin', 'user');
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
+  it('allows requests matching any of multiple roles', () => {
+    const guard = roleGuard('admin', 'user');
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).toBeNull();
-    });
+    const result = guard(req, url, context);
+    expect(result).toBeNull();
+  });
 
-    it('denies requests with wrong role', () => {
-        const guard = roleGuard('admin');
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
+  it('denies requests with wrong role', () => {
+    const guard = roleGuard('admin');
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(403);
-    });
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(403);
+  });
 
-    it('denies unauthenticated requests', () => {
-        const guard = roleGuard('admin');
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: false, tenantId: 'default' };
+  it('denies unauthenticated requests', () => {
+    const guard = roleGuard('admin');
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context: RequestContext = { authenticated: false, tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(401);
-    });
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
 
-    it('denies requests with no role set', () => {
-        const guard = roleGuard('admin');
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, tenantId: 'default' };
+  it('denies requests with no role set', () => {
+    const guard = roleGuard('admin');
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(403);
-    });
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(403);
+  });
 
-    it('returns JSON error body with required roles', async () => {
-        const guard = roleGuard('admin');
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
+  it('returns JSON error body with required roles', async () => {
+    const guard = roleGuard('admin');
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        const body = await result!.json();
-        expect(body.error).toBe('Forbidden: insufficient role');
-        expect(body.requiredRoles).toEqual(['admin']);
-    });
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    const body = await result!.json();
+    expect(body.error).toBe('Forbidden: insufficient role');
+    expect(body.requiredRoles).toEqual(['admin']);
+  });
 });
 
 // --- rateLimitGuard ---------------------------------------------------------
 
 describe('rateLimitGuard', () => {
-    let limiter: RateLimiter;
+  let limiter: RateLimiter;
 
-    beforeEach(() => {
-        limiter = new RateLimiter({ maxGet: 2, maxMutation: 1, windowMs: 1000 });
-    });
+  beforeEach(() => {
+    limiter = new RateLimiter({ maxGet: 2, maxMutation: 1, windowMs: 1000 });
+  });
 
-    afterEach(() => {
-        limiter.stop();
-    });
+  afterEach(() => {
+    limiter.stop();
+  });
 
-    it('uses wallet address as rate limit key when available', () => {
-        const guard = rateLimitGuard(limiter);
-        const req = makeRequest('/api/agents');
-        const url = makeUrl('/api/agents');
-        const walletContext: RequestContext = { authenticated: true, walletAddress: 'WALLET123', tenantId: 'default' };
-        const ipContext: RequestContext = { authenticated: true, tenantId: 'default' };
+  it('uses wallet address as rate limit key when available', () => {
+    const guard = rateLimitGuard(limiter);
+    const req = makeRequest('/api/agents');
+    const url = makeUrl('/api/agents');
+    const walletContext: RequestContext = { authenticated: true, walletAddress: 'WALLET123', tenantId: 'default' };
+    const ipContext: RequestContext = { authenticated: true, tenantId: 'default' };
 
-        // Exhaust rate limit for wallet
-        guard(req, url, walletContext);
-        guard(req, url, walletContext);
-        const blocked = guard(req, url, walletContext);
-        expect(blocked).not.toBeNull();
-        expect(blocked!.status).toBe(429);
+    // Exhaust rate limit for wallet
+    guard(req, url, walletContext);
+    guard(req, url, walletContext);
+    const blocked = guard(req, url, walletContext);
+    expect(blocked).not.toBeNull();
+    expect(blocked!.status).toBe(429);
 
-        // IP-based context should still work (different key)
-        const allowed = guard(req, url, ipContext);
-        expect(allowed).toBeNull();
-    });
+    // IP-based context should still work (different key)
+    const allowed = guard(req, url, ipContext);
+    expect(allowed).toBeNull();
+  });
 
-    it('falls back to IP when no wallet address', () => {
-        const guard = rateLimitGuard(limiter);
-        const req = makeRequest('/api/agents');
-        const url = makeUrl('/api/agents');
-        const context: RequestContext = { authenticated: true, tenantId: 'default' };
+  it('falls back to IP when no wallet address', () => {
+    const guard = rateLimitGuard(limiter);
+    const req = makeRequest('/api/agents');
+    const url = makeUrl('/api/agents');
+    const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
-        guard(req, url, context);
-        guard(req, url, context);
-        const blocked = guard(req, url, context);
-        expect(blocked).not.toBeNull();
-        expect(blocked!.status).toBe(429);
-    });
+    guard(req, url, context);
+    guard(req, url, context);
+    const blocked = guard(req, url, context);
+    expect(blocked).not.toBeNull();
+    expect(blocked!.status).toBe(429);
+  });
 
-    it('exempts /api/health from rate limiting', () => {
-        const guard = rateLimitGuard(limiter);
-        const req = makeRequest('/api/health');
-        const url = makeUrl('/api/health');
-        const context: RequestContext = { authenticated: true, tenantId: 'default' };
+  it('exempts /api/health from rate limiting', () => {
+    const guard = rateLimitGuard(limiter);
+    const req = makeRequest('/api/health');
+    const url = makeUrl('/api/health');
+    const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
-        // Should never be blocked
-        for (let i = 0; i < 10; i++) {
-            expect(guard(req, url, context)).toBeNull();
-        }
-    });
+    // Should never be blocked
+    for (let i = 0; i < 10; i++) {
+      expect(guard(req, url, context)).toBeNull();
+    }
+  });
 
-    it('exempts /ws from rate limiting', () => {
-        const guard = rateLimitGuard(limiter);
-        const req = makeRequest('/ws');
-        const url = makeUrl('/ws');
-        const context: RequestContext = { authenticated: true, tenantId: 'default' };
+  it('exempts /ws from rate limiting', () => {
+    const guard = rateLimitGuard(limiter);
+    const req = makeRequest('/ws');
+    const url = makeUrl('/ws');
+    const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
-        for (let i = 0; i < 10; i++) {
-            expect(guard(req, url, context)).toBeNull();
-        }
-    });
+    for (let i = 0; i < 10; i++) {
+      expect(guard(req, url, context)).toBeNull();
+    }
+  });
 });
 
 // --- contentLengthGuard -----------------------------------------------------
 
 describe('contentLengthGuard', () => {
-    it('allows GET requests regardless of Content-Length', () => {
-        const guard = contentLengthGuard(100);
-        const req = makeRequest('/api/sessions', {
-            method: 'GET',
-            headers: { 'Content-Length': '999999' },
-        });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
-
-        expect(guard(req, url, context)).toBeNull();
+  it('allows GET requests regardless of Content-Length', () => {
+    const guard = contentLengthGuard(100);
+    const req = makeRequest('/api/sessions', {
+      method: 'GET',
+      headers: { 'Content-Length': '999999' },
     });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('allows POST with small Content-Length', () => {
-        const guard = contentLengthGuard(1000);
-        const req = makeRequest('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Length': '500' },
-        });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+    expect(guard(req, url, context)).toBeNull();
+  });
 
-        expect(guard(req, url, context)).toBeNull();
+  it('allows POST with small Content-Length', () => {
+    const guard = contentLengthGuard(1000);
+    const req = makeRequest('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Length': '500' },
     });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('rejects POST with oversized Content-Length', async () => {
-        const guard = contentLengthGuard(1000);
-        const req = makeRequest('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Length': '2000' },
-        });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+    expect(guard(req, url, context)).toBeNull();
+  });
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(413);
-        const body = await result!.json();
-        expect(body.error).toBe('Payload too large');
+  it('rejects POST with oversized Content-Length', async () => {
+    const guard = contentLengthGuard(1000);
+    const req = makeRequest('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Length': '2000' },
     });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-    it('allows POST without Content-Length header', () => {
-        const guard = contentLengthGuard(1000);
-        const req = makeRequest('/api/sessions', { method: 'POST' });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(413);
+    const body = await result!.json();
+    expect(body.error).toBe('Payload too large');
+  });
 
-        expect(guard(req, url, context)).toBeNull();
+  it('allows POST without Content-Length header', () => {
+    const guard = contentLengthGuard(1000);
+    const req = makeRequest('/api/sessions', { method: 'POST' });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
+
+    expect(guard(req, url, context)).toBeNull();
+  });
+
+  it('allows DELETE regardless of Content-Length', () => {
+    const guard = contentLengthGuard(100);
+    const req = makeRequest('/api/sessions/123', {
+      method: 'DELETE',
+      headers: { 'Content-Length': '999999' },
     });
+    const url = makeUrl('/api/sessions/123');
+    const context = createRequestContext();
 
-    it('allows DELETE regardless of Content-Length', () => {
-        const guard = contentLengthGuard(100);
-        const req = makeRequest('/api/sessions/123', {
-            method: 'DELETE',
-            headers: { 'Content-Length': '999999' },
-        });
-        const url = makeUrl('/api/sessions/123');
-        const context = createRequestContext();
+    expect(guard(req, url, context)).toBeNull();
+  });
 
-        expect(guard(req, url, context)).toBeNull();
+  it('uses default 1MB limit', () => {
+    const guard = contentLengthGuard();
+    // Just under 1MB — should pass
+    const req = makeRequest('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Length': '1048576' },
     });
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
+    expect(guard(req, url, context)).toBeNull();
 
-    it('uses default 1MB limit', () => {
-        const guard = contentLengthGuard();
-        // Just under 1MB — should pass
-        const req = makeRequest('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Length': '1048576' },
-        });
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
-        expect(guard(req, url, context)).toBeNull();
-
-        // Over 1MB — should block
-        const req2 = makeRequest('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Length': '1048577' },
-        });
-        expect(guard(req2, url, createRequestContext())).not.toBeNull();
+    // Over 1MB — should block
+    const req2 = makeRequest('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Length': '1048577' },
     });
+    expect(guard(req2, url, createRequestContext())).not.toBeNull();
+  });
 });
 
 // --- applyGuards ------------------------------------------------------------
 
 describe('applyGuards', () => {
-    it('returns null when all guards pass', () => {
-        const passGuard: Guard = () => null;
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+  it('returns null when all guards pass', () => {
+    const passGuard: Guard = () => null;
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-        const result = applyGuards(req, url, context, passGuard, passGuard, passGuard);
-        expect(result).toBeNull();
-    });
+    const result = applyGuards(req, url, context, passGuard, passGuard, passGuard);
+    expect(result).toBeNull();
+  });
 
-    it('returns first denial', () => {
-        const passGuard: Guard = () => null;
-        const denyGuard: Guard = () => new Response('Denied', { status: 403 });
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+  it('returns first denial', () => {
+    const passGuard: Guard = () => null;
+    const denyGuard: Guard = () => new Response('Denied', { status: 403 });
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-        const result = applyGuards(req, url, context, passGuard, denyGuard, passGuard);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(403);
-    });
+    const result = applyGuards(req, url, context, passGuard, denyGuard, passGuard);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(403);
+  });
 
-    it('short-circuits on first denial', () => {
-        let thirdGuardCalled = false;
-        const denyGuard: Guard = () => new Response('Denied', { status: 401 });
-        const trackGuard: Guard = () => { thirdGuardCalled = true; return null; };
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+  it('short-circuits on first denial', () => {
+    let thirdGuardCalled = false;
+    const denyGuard: Guard = () => new Response('Denied', { status: 401 });
+    const trackGuard: Guard = () => {
+      thirdGuardCalled = true;
+      return null;
+    };
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-        applyGuards(req, url, context, denyGuard, trackGuard);
-        expect(thirdGuardCalled).toBe(false);
-    });
+    applyGuards(req, url, context, denyGuard, trackGuard);
+    expect(thirdGuardCalled).toBe(false);
+  });
 
-    it('returns null for empty guard list', () => {
-        const req = makeRequest('/api/sessions');
-        const url = makeUrl('/api/sessions');
-        const context = createRequestContext();
+  it('returns null for empty guard list', () => {
+    const req = makeRequest('/api/sessions');
+    const url = makeUrl('/api/sessions');
+    const context = createRequestContext();
 
-        const result = applyGuards(req, url, context);
-        expect(result).toBeNull();
-    });
+    const result = applyGuards(req, url, context);
+    expect(result).toBeNull();
+  });
 });
 
 // --- Full pipeline integration test -----------------------------------------
 
 describe('full guard pipeline', () => {
-    let limiter: RateLimiter;
+  let limiter: RateLimiter;
 
-    beforeEach(() => {
-        limiter = new RateLimiter({ maxGet: 100, maxMutation: 50, windowMs: 60_000 });
+  beforeEach(() => {
+    limiter = new RateLimiter({ maxGet: 100, maxMutation: 50, windowMs: 60_000 });
+  });
+
+  afterEach(() => {
+    limiter.stop();
+  });
+
+  it('rate limit → auth → role → handler (all pass)', () => {
+    const req = makeRequest('/metrics', {
+      headers: { Authorization: `Bearer ${AUTH_DISABLED.apiKey}` },
     });
+    const url = makeUrl('/metrics');
+    const context = createRequestContext();
 
-    afterEach(() => {
-        limiter.stop();
+    // In dev mode (no API key), all guards should pass
+    const denied = applyGuards(
+      req,
+      url,
+      context,
+      rateLimitGuard(limiter),
+      authGuard(AUTH_DISABLED),
+      roleGuard('admin'),
+    );
+    expect(denied).toBeNull();
+    expect(context.authenticated).toBe(true);
+    expect(context.role).toBe('admin');
+  });
+
+  it('rate limit → auth → role (auth fails)', () => {
+    const req = makeRequest('/metrics');
+    const url = makeUrl('/metrics');
+    const context = createRequestContext();
+
+    const denied = applyGuards(req, url, context, rateLimitGuard(limiter), authGuard(AUTH_ENABLED), roleGuard('admin'));
+    expect(denied).not.toBeNull();
+    expect(denied!.status).toBe(401);
+  });
+
+  it('rate limit → auth → role (role fails)', () => {
+    const req = makeRequest('/metrics', {
+      headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
     });
+    const url = makeUrl('/metrics');
+    const context = createRequestContext();
 
-    it('rate limit → auth → role → handler (all pass)', () => {
-        const req = makeRequest('/metrics', {
-            headers: { Authorization: `Bearer ${AUTH_DISABLED.apiKey}` },
-        });
-        const url = makeUrl('/metrics');
-        const context = createRequestContext();
-
-        // In dev mode (no API key), all guards should pass
-        const denied = applyGuards(
-            req, url, context,
-            rateLimitGuard(limiter),
-            authGuard(AUTH_DISABLED),
-            roleGuard('admin'),
-        );
-        expect(denied).toBeNull();
-        expect(context.authenticated).toBe(true);
-        expect(context.role).toBe('admin');
-    });
-
-    it('rate limit → auth → role (auth fails)', () => {
-        const req = makeRequest('/metrics');
-        const url = makeUrl('/metrics');
-        const context = createRequestContext();
-
-        const denied = applyGuards(
-            req, url, context,
-            rateLimitGuard(limiter),
-            authGuard(AUTH_ENABLED),
-            roleGuard('admin'),
-        );
-        expect(denied).not.toBeNull();
-        expect(denied!.status).toBe(401);
-    });
-
-    it('rate limit → auth → role (role fails)', () => {
-        const req = makeRequest('/metrics', {
-            headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
-        });
-        const url = makeUrl('/metrics');
-        const context = createRequestContext();
-
-        const denied = applyGuards(
-            req, url, context,
-            rateLimitGuard(limiter),
-            authGuard(AUTH_ENABLED),
-            roleGuard('admin'), // user role won't match 'admin'
-        );
-        // Standard API key gives 'user' role, not 'admin'
-        expect(denied).not.toBeNull();
-        expect(denied!.status).toBe(403);
-    });
+    const denied = applyGuards(
+      req,
+      url,
+      context,
+      rateLimitGuard(limiter),
+      authGuard(AUTH_ENABLED),
+      roleGuard('admin'), // user role won't match 'admin'
+    );
+    // Standard API key gives 'user' role, not 'admin'
+    expect(denied).not.toBeNull();
+    expect(denied!.status).toBe(403);
+  });
 });
 
 // --- requiresAdminRole ------------------------------------------------------
 
 describe('requiresAdminRole', () => {
-    it('returns true for /metrics', () => {
-        expect(requiresAdminRole('/metrics')).toBe(true);
-    });
+  it('returns true for /metrics', () => {
+    expect(requiresAdminRole('/metrics')).toBe(true);
+  });
 
-    it('returns true for /api/audit-log', () => {
-        expect(requiresAdminRole('/api/audit-log')).toBe(true);
-    });
+  it('returns true for /api/audit-log', () => {
+    expect(requiresAdminRole('/api/audit-log')).toBe(true);
+  });
 
-    it('returns true for /api/operational-mode', () => {
-        expect(requiresAdminRole('/api/operational-mode')).toBe(true);
-    });
+  it('returns true for /api/operational-mode', () => {
+    expect(requiresAdminRole('/api/operational-mode')).toBe(true);
+  });
 
-    it('returns true for /api/backup', () => {
-        expect(requiresAdminRole('/api/backup')).toBe(true);
-    });
+  it('returns true for /api/backup', () => {
+    expect(requiresAdminRole('/api/backup')).toBe(true);
+  });
 
-    it('returns true for /api/escalation-queue paths', () => {
-        expect(requiresAdminRole('/api/escalation-queue')).toBe(true);
-        expect(requiresAdminRole('/api/escalation-queue/1/resolve')).toBe(true);
-    });
+  it('returns true for /api/escalation-queue paths', () => {
+    expect(requiresAdminRole('/api/escalation-queue')).toBe(true);
+    expect(requiresAdminRole('/api/escalation-queue/1/resolve')).toBe(true);
+  });
 
-    it('returns false for normal API paths', () => {
-        expect(requiresAdminRole('/api/sessions')).toBe(false);
-        expect(requiresAdminRole('/api/agents')).toBe(false);
-        expect(requiresAdminRole('/api/projects')).toBe(false);
-    });
+  it('returns false for normal API paths', () => {
+    expect(requiresAdminRole('/api/sessions')).toBe(false);
+    expect(requiresAdminRole('/api/agents')).toBe(false);
+    expect(requiresAdminRole('/api/projects')).toBe(false);
+  });
 
-    it('returns true for /api/settings/credits', () => {
-        expect(requiresAdminRole('/api/settings/credits')).toBe(true);
-    });
+  it('returns true for /api/settings/credits', () => {
+    expect(requiresAdminRole('/api/settings/credits')).toBe(true);
+  });
 
-    it('returns true for credit grant endpoint', () => {
-        expect(requiresAdminRole('/api/wallets/ABCDEFGH1234567890ABCDEFGH1234567890ABCDEFGH1234567890ABCDEF/credits')).toBe(true);
-    });
+  it('returns true for credit grant endpoint', () => {
+    expect(requiresAdminRole('/api/wallets/ABCDEFGH1234567890ABCDEFGH1234567890ABCDEFGH1234567890ABCDEF/credits')).toBe(
+      true,
+    );
+  });
 
-    it('returns false for wallet paths that are not credit grants', () => {
-        expect(requiresAdminRole('/api/wallets')).toBe(false);
-        expect(requiresAdminRole('/api/wallets/ABCD1234')).toBe(false);
-    });
+  it('returns false for wallet paths that are not credit grants', () => {
+    expect(requiresAdminRole('/api/wallets')).toBe(false);
+    expect(requiresAdminRole('/api/wallets/ABCD1234')).toBe(false);
+  });
 
-    it('returns true for /api/system-logs', () => {
-        expect(requiresAdminRole('/api/system-logs')).toBe(true);
-    });
+  it('returns true for /api/system-logs', () => {
+    expect(requiresAdminRole('/api/system-logs')).toBe(true);
+  });
 
-    it('returns true for /api/system-logs/credit-transactions', () => {
-        expect(requiresAdminRole('/api/system-logs/credit-transactions')).toBe(true);
-    });
+  it('returns true for /api/system-logs/credit-transactions', () => {
+    expect(requiresAdminRole('/api/system-logs/credit-transactions')).toBe(true);
+  });
 
-    it('returns true for /api/wallets/summary', () => {
-        expect(requiresAdminRole('/api/wallets/summary')).toBe(true);
-    });
+  it('returns true for /api/wallets/summary', () => {
+    expect(requiresAdminRole('/api/wallets/summary')).toBe(true);
+  });
 
-    it('returns true for /api/github-allowlist paths', () => {
-        expect(requiresAdminRole('/api/github-allowlist')).toBe(true);
-        expect(requiresAdminRole('/api/github-allowlist/someuser')).toBe(true);
-    });
+  it('returns true for /api/github-allowlist paths', () => {
+    expect(requiresAdminRole('/api/github-allowlist')).toBe(true);
+    expect(requiresAdminRole('/api/github-allowlist/someuser')).toBe(true);
+  });
 
-    it('returns true for /api/repo-blocklist paths', () => {
-        expect(requiresAdminRole('/api/repo-blocklist')).toBe(true);
-        expect(requiresAdminRole('/api/repo-blocklist/owner/repo')).toBe(true);
-    });
+  it('returns true for /api/repo-blocklist paths', () => {
+    expect(requiresAdminRole('/api/repo-blocklist')).toBe(true);
+    expect(requiresAdminRole('/api/repo-blocklist/owner/repo')).toBe(true);
+  });
 
-    it('returns true for /api/performance paths', () => {
-        expect(requiresAdminRole('/api/performance/snapshot')).toBe(true);
-        expect(requiresAdminRole('/api/performance/trends')).toBe(true);
-        expect(requiresAdminRole('/api/performance/regressions')).toBe(true);
-        expect(requiresAdminRole('/api/performance/report')).toBe(true);
-        expect(requiresAdminRole('/api/performance/metrics')).toBe(true);
-        expect(requiresAdminRole('/api/performance/collect')).toBe(true);
-    });
+  it('returns true for /api/performance paths', () => {
+    expect(requiresAdminRole('/api/performance/snapshot')).toBe(true);
+    expect(requiresAdminRole('/api/performance/trends')).toBe(true);
+    expect(requiresAdminRole('/api/performance/regressions')).toBe(true);
+    expect(requiresAdminRole('/api/performance/report')).toBe(true);
+    expect(requiresAdminRole('/api/performance/metrics')).toBe(true);
+    expect(requiresAdminRole('/api/performance/collect')).toBe(true);
+  });
 });
 
 // --- expired API key rejection -----------------------------------------------
 
 describe('expired API key rejection', () => {
-    it('rejects valid key when API key is expired', async () => {
-        const config: AuthConfig = {
-            apiKey: 'test-key-123',
-            allowedOrigins: [],
-            bindHost: '0.0.0.0',
-            apiKeyExpiresAt: Date.now() - 1000, // expired 1 second ago
-        };
-        const req = makeRequest('/api/sessions', {
-            headers: { Authorization: 'Bearer test-key-123' },
-        });
-        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(401);
-        const body = await result!.json();
-        expect(body.error).toContain('expired');
+  it('rejects valid key when API key is expired', async () => {
+    const config: AuthConfig = {
+      apiKey: 'test-key-123',
+      allowedOrigins: [],
+      bindHost: '0.0.0.0',
+      apiKeyExpiresAt: Date.now() - 1000, // expired 1 second ago
+    };
+    const req = makeRequest('/api/sessions', {
+      headers: { Authorization: 'Bearer test-key-123' },
     });
+    const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+    const body = await result!.json();
+    expect(body.error).toContain('expired');
+  });
 
-    it('allows valid key when API key is not expired', () => {
-        const config: AuthConfig = {
-            apiKey: 'test-key-123',
-            allowedOrigins: [],
-            bindHost: '0.0.0.0',
-            apiKeyExpiresAt: Date.now() + 60_000, // expires in 1 minute
-        };
-        const req = makeRequest('/api/sessions', {
-            headers: { Authorization: 'Bearer test-key-123' },
-        });
-        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
-        expect(result).toBeNull();
+  it('allows valid key when API key is not expired', () => {
+    const config: AuthConfig = {
+      apiKey: 'test-key-123',
+      allowedOrigins: [],
+      bindHost: '0.0.0.0',
+      apiKeyExpiresAt: Date.now() + 60_000, // expires in 1 minute
+    };
+    const req = makeRequest('/api/sessions', {
+      headers: { Authorization: 'Bearer test-key-123' },
     });
+    const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+    expect(result).toBeNull();
+  });
 
-    it('allows valid key when no expiry is configured', () => {
-        const config: AuthConfig = {
-            apiKey: 'test-key-123',
-            allowedOrigins: [],
-            bindHost: '0.0.0.0',
-        };
-        const req = makeRequest('/api/sessions', {
-            headers: { Authorization: 'Bearer test-key-123' },
-        });
-        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
-        expect(result).toBeNull();
+  it('allows valid key when no expiry is configured', () => {
+    const config: AuthConfig = {
+      apiKey: 'test-key-123',
+      allowedOrigins: [],
+      bindHost: '0.0.0.0',
+    };
+    const req = makeRequest('/api/sessions', {
+      headers: { Authorization: 'Bearer test-key-123' },
     });
+    const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+    expect(result).toBeNull();
+  });
 });
 
 // --- requiresAdminRole includes api-key paths --------------------------------
 
 describe('requiresAdminRole api-key paths', () => {
-    it('returns true for /api/settings/api-key/rotate', () => {
-        expect(requiresAdminRole('/api/settings/api-key/rotate')).toBe(true);
-    });
+  it('returns true for /api/settings/api-key/rotate', () => {
+    expect(requiresAdminRole('/api/settings/api-key/rotate')).toBe(true);
+  });
 
-    it('returns true for /api/settings/api-key/status', () => {
-        expect(requiresAdminRole('/api/settings/api-key/status')).toBe(true);
-    });
+  it('returns true for /api/settings/api-key/status', () => {
+    expect(requiresAdminRole('/api/settings/api-key/status')).toBe(true);
+  });
 });
 
 // --- requiresAdminRole includes permission broker paths ----------------------
 
 describe('requiresAdminRole permission paths', () => {
-    it('returns true for /api/permissions/grant', () => {
-        expect(requiresAdminRole('/api/permissions/grant')).toBe(true);
-    });
+  it('returns true for /api/permissions/grant', () => {
+    expect(requiresAdminRole('/api/permissions/grant')).toBe(true);
+  });
 
-    it('returns true for /api/permissions/revoke', () => {
-        expect(requiresAdminRole('/api/permissions/revoke')).toBe(true);
-    });
+  it('returns true for /api/permissions/revoke', () => {
+    expect(requiresAdminRole('/api/permissions/revoke')).toBe(true);
+  });
 
-    it('returns true for /api/permissions/emergency-revoke', () => {
-        expect(requiresAdminRole('/api/permissions/emergency-revoke')).toBe(true);
-    });
+  it('returns true for /api/permissions/emergency-revoke', () => {
+    expect(requiresAdminRole('/api/permissions/emergency-revoke')).toBe(true);
+  });
 
-    it('returns true for /api/permissions/check', () => {
-        expect(requiresAdminRole('/api/permissions/check')).toBe(true);
-    });
+  it('returns true for /api/permissions/check', () => {
+    expect(requiresAdminRole('/api/permissions/check')).toBe(true);
+  });
 
-    it('returns true for /api/permissions/:agentId', () => {
-        expect(requiresAdminRole('/api/permissions/agent-123')).toBe(true);
-    });
+  it('returns true for /api/permissions/:agentId', () => {
+    expect(requiresAdminRole('/api/permissions/agent-123')).toBe(true);
+  });
 
-    it('returns true for /api/permissions/actions', () => {
-        expect(requiresAdminRole('/api/permissions/actions')).toBe(true);
-    });
+  it('returns true for /api/permissions/actions', () => {
+    expect(requiresAdminRole('/api/permissions/actions')).toBe(true);
+  });
 });
 
 describe('requiresAdminRole new security-hardening paths', () => {
-    it('classifies Ollama model pull as admin', () => {
-        expect(requiresAdminRole('/api/ollama/models/pull')).toBe(true);
-    });
-    it('classifies Ollama model list as admin', () => {
-        expect(requiresAdminRole('/api/ollama/models')).toBe(true);
-    });
-    it('classifies exam run as admin', () => {
-        expect(requiresAdminRole('/api/exam/run')).toBe(true);
-    });
-    it('classifies plugins paths as admin', () => {
-        expect(requiresAdminRole('/api/plugins')).toBe(true);
-        expect(requiresAdminRole('/api/plugins/load')).toBe(true);
-    });
-    it('classifies discord send-image as admin', () => {
-        expect(requiresAdminRole('/api/discord/send-image')).toBe(true);
-    });
+  it('classifies Ollama model pull as admin', () => {
+    expect(requiresAdminRole('/api/ollama/models/pull')).toBe(true);
+  });
+  it('classifies Ollama model list as admin', () => {
+    expect(requiresAdminRole('/api/ollama/models')).toBe(true);
+  });
+  it('classifies exam run as admin', () => {
+    expect(requiresAdminRole('/api/exam/run')).toBe(true);
+  });
+  it('classifies plugins paths as admin', () => {
+    expect(requiresAdminRole('/api/plugins')).toBe(true);
+    expect(requiresAdminRole('/api/plugins/load')).toBe(true);
+  });
+  it('classifies discord send-image as admin', () => {
+    expect(requiresAdminRole('/api/discord/send-image')).toBe(true);
+  });
 });
 
 // --- createRequestContext ---------------------------------------------------
 
 describe('createRequestContext', () => {
-    it('creates unauthenticated context by default', () => {
-        const ctx = createRequestContext();
-        expect(ctx.authenticated).toBe(false);
-        expect(ctx.walletAddress).toBeUndefined();
-        expect(ctx.role).toBeUndefined();
-    });
+  it('creates unauthenticated context by default', () => {
+    const ctx = createRequestContext();
+    expect(ctx.authenticated).toBe(false);
+    expect(ctx.walletAddress).toBeUndefined();
+    expect(ctx.role).toBeUndefined();
+  });
 
-    it('sets wallet address when provided', () => {
-        const ctx = createRequestContext('WALLET_ADDR');
-        expect(ctx.walletAddress).toBe('WALLET_ADDR');
+  it('sets wallet address when provided', () => {
+    const ctx = createRequestContext('WALLET_ADDR');
+    expect(ctx.walletAddress).toBe('WALLET_ADDR');
+  });
+});
+
+// --- authGuard proxy trust bypass -------------------------------------------
+
+describe('authGuard TRUST_PROXY bypass', () => {
+  const savedTrustProxy = process.env.TRUST_PROXY;
+
+  afterEach(() => {
+    if (savedTrustProxy === undefined) delete process.env.TRUST_PROXY;
+    else process.env.TRUST_PROXY = savedTrustProxy;
+  });
+
+  it('bypasses API key when TRUST_PROXY=1 and valid X-Forwarded-Email is present', () => {
+    process.env.TRUST_PROXY = '1';
+    const guard = authGuard(AUTH_ENABLED);
+    // No Authorization header — would normally be rejected
+    const req = makeRequest('/api/sessions', {
+      headers: { 'x-forwarded-email': 'alice@example.com' },
     });
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    // authGuard should allow through; tenantGuard will complete authentication
+    expect(result).toBeNull();
+    // authenticated is NOT set here — tenantGuard does that
+    expect(context.authenticated).toBe(false);
+  });
+
+  it('bypasses API key when TRUST_PROXY=true and valid X-Forwarded-Email is present', () => {
+    process.env.TRUST_PROXY = 'true';
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions', {
+      headers: { 'x-forwarded-email': 'bob@example.com' },
+    });
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    expect(result).toBeNull();
+  });
+
+  it('does NOT bypass API key when TRUST_PROXY is not set', () => {
+    delete process.env.TRUST_PROXY;
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions', {
+      headers: { 'x-forwarded-email': 'alice@example.com' },
+    });
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    // Without TRUST_PROXY, X-Forwarded-Email is ignored and API key is required
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
+
+  it('does NOT bypass API key when X-Forwarded-Email is malformed', () => {
+    process.env.TRUST_PROXY = '1';
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions', {
+      headers: { 'x-forwarded-email': 'not-an-email' },
+    });
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
+
+  it('does NOT bypass API key when X-Forwarded-Email is absent', () => {
+    process.env.TRUST_PROXY = '1';
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions');
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
+
+  it('still authenticates normally with Bearer token when TRUST_PROXY=1 but no email header', () => {
+    process.env.TRUST_PROXY = '1';
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest('/api/sessions', {
+      headers: { Authorization: `Bearer ${AUTH_ENABLED.apiKey}` },
+    });
+    const context = createRequestContext();
+
+    const result = guard(req, makeUrl('/api/sessions'), context);
+    expect(result).toBeNull();
+    expect(context.authenticated).toBe(true);
+  });
+
+  it('extracts wallet address in proxy trust bypass path', () => {
+    process.env.TRUST_PROXY = '1';
+    const validAddr = 'A'.repeat(58);
+    const guard = authGuard(AUTH_ENABLED);
+    const req = makeRequest(`/api/sessions?wallet=${validAddr}`, {
+      headers: { 'x-forwarded-email': 'alice@example.com' },
+    });
+    const context = createRequestContext();
+
+    guard(req, makeUrl('/api/sessions', { wallet: validAddr }), context);
+    expect(context.walletAddress).toBe(validAddr);
+  });
 });
