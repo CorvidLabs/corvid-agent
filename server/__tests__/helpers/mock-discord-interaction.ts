@@ -96,19 +96,22 @@ export function makeMockChatInteraction(
 /**
  * Create a mock AutocompleteInteraction.
  *
- * @param commandName  The slash command name that triggered autocomplete
- * @param focusedName  The option field currently focused
- * @param focusedValue The value the user has typed so far
+ * @param commandName     The slash command name that triggered autocomplete
+ * @param focusedName     The option field currently focused
+ * @param focusedValue    The value the user has typed so far
+ * @param createdTimestamp Override createdTimestamp (ms epoch). Defaults to Date.now().
  */
 export function makeMockAutocompleteInteraction(
     commandName: string,
     focusedName: string,
     focusedValue = '',
+    createdTimestamp = Date.now(),
 ) {
     const responded: Array<{ name: string; value: string }[]> = [];
 
     return {
         commandName,
+        createdTimestamp,
         isAutocomplete: () => true as const,
         isChatInputCommand: () => false as const,
         isMessageComponent: () => false as const,
@@ -133,6 +136,7 @@ export function makeMockAutocompleteNoFocus(commandName: string) {
 
     return {
         commandName,
+        createdTimestamp: Date.now(),
         isAutocomplete: () => true as const,
         isChatInputCommand: () => false as const,
         isMessageComponent: () => false as const,

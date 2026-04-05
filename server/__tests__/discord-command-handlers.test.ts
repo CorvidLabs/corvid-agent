@@ -323,49 +323,44 @@ describe('handleAutocomplete', () => {
 
   // ── Timing guard (deadline exceeded) ───────────────────────────────────
 
-  test('skips response when receivedAt exceeds 2500ms deadline', async () => {
+  test('skips response when createdTimestamp exceeds 2500ms deadline', async () => {
     const ctx = createTestContext();
     createAgent(db, { name: 'LateBotAgent', model: 'test-model' });
 
-    const interaction = {
-      ...makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]),
-      receivedAt: Date.now() - 3000, // 3 seconds ago — past the 2500ms deadline
-    } as DiscordInteractionData;
+    // createdTimestamp 3 seconds ago — past the 2500ms deadline
+    const interaction = makeMockAutocompleteInteraction('session', 'agent', '', Date.now() - 3000);
 
-    await handleAutocomplete(ctx, interaction);
+    await handleAutocomplete(ctx, interaction as any);
 
-    // Response should NOT have been sent — capturedResponse stays null
-    expect(capturedResponse).toBeNull();
+    // Response should NOT have been sent
+    expect(interaction.getChoices()).toHaveLength(0);
+    expect(interaction._responded).toHaveLength(0);
   });
 
-  test('sends response when receivedAt is within 2500ms deadline', async () => {
+  test('sends response when createdTimestamp is within 2500ms deadline', async () => {
     const ctx = createTestContext();
     createAgent(db, { name: 'FastBotAgent', model: 'test-model' });
 
-    const interaction = {
-      ...makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]),
-      receivedAt: Date.now() - 100, // 100ms ago — well within deadline
-    } as DiscordInteractionData;
+    // createdTimestamp 100ms ago — well within deadline
+    const interaction = makeMockAutocompleteInteraction('session', 'agent', '', Date.now() - 100);
 
-    await handleAutocomplete(ctx, interaction);
+    await handleAutocomplete(ctx, interaction as any);
 
     // Response should have been sent normally
-    expect(capturedResponse).not.toBeNull();
-    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    const choices = interaction.getChoices();
     expect(choices.some((c) => c.value === 'FastBotAgent')).toBe(true);
   });
 
-  test('sends response when receivedAt is absent (guard skipped)', async () => {
+  test('sends response when createdTimestamp is recent (guard passes)', async () => {
     const ctx = createTestContext();
     createAgent(db, { name: 'NoTimestampAgent', model: 'test-model' });
 
-    // No receivedAt field — interactions injected without timestamp should pass through
-    const interaction = makeAutocompleteInteraction('session', [{ name: 'agent', value: '', focused: true }]);
+    // Default createdTimestamp (now) — well within deadline
+    const interaction = makeMockAutocompleteInteraction('session', 'agent', '');
 
-    await handleAutocomplete(ctx, interaction);
+    await handleAutocomplete(ctx, interaction as any);
 
-    expect(capturedResponse).not.toBeNull();
-    const choices = (capturedResponse!.data as { choices: Array<{ name: string; value: string }> }).choices;
+    const choices = interaction.getChoices();
     expect(choices.some((c) => c.value === 'NoTimestampAgent')).toBe(true);
   });
 });
