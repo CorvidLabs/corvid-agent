@@ -69,6 +69,26 @@ describe('getActionCategory', () => {
     test('maps custom to feature_work', () => {
         expect(getActionCategory('custom')).toBe('feature_work');
     });
+
+    test('maps daily_review to review', () => {
+        expect(getActionCategory('daily_review')).toBe('review');
+    });
+
+    test('maps status_checkin to lightweight', () => {
+        expect(getActionCategory('status_checkin')).toBe('lightweight');
+    });
+
+    test('maps marketplace_billing to maintenance', () => {
+        expect(getActionCategory('marketplace_billing')).toBe('maintenance');
+    });
+
+    test('maps flock_testing to maintenance', () => {
+        expect(getActionCategory('flock_testing')).toBe('maintenance');
+    });
+
+    test('maps discord_post to lightweight', () => {
+        expect(getActionCategory('discord_post')).toBe('lightweight');
+    });
 });
 
 // ── evaluateAction ───────────────────────────────────────────────────
@@ -160,6 +180,44 @@ describe('evaluateAction', () => {
         const result = evaluateAction('work_task', ['healthy']);
         expect(result.decision).toBe('run');
         expect(result.reasons).toEqual([]);
+    });
+
+    test('server_degraded skips maintenance', () => {
+        const result = evaluateAction('codebase_review', ['server_degraded']);
+        expect(result.decision).toBe('skip');
+    });
+
+    test('server_degraded skips review', () => {
+        const result = evaluateAction('review_prs', ['server_degraded']);
+        expect(result.decision).toBe('skip');
+    });
+
+    test('server_degraded boosts daily_review as review', () => {
+        // daily_review maps to 'review', which server_degraded skips
+        const result = evaluateAction('daily_review', ['server_degraded']);
+        expect(result.decision).toBe('skip');
+    });
+
+    test('ci_broken runs communication normally', () => {
+        // ci_broken only skips feature_work, boosts maintenance/review — communication is unaffected
+        const result = evaluateAction('send_message', ['ci_broken']);
+        expect(result.decision).toBe('run');
+    });
+
+    test('p0_open runs communication normally', () => {
+        const result = evaluateAction('council_launch', ['p0_open']);
+        expect(result.decision).toBe('run');
+    });
+
+    test('p0_open boosts review', () => {
+        const result = evaluateAction('review_prs', ['p0_open']);
+        expect(result.decision).toBe('boost');
+    });
+
+    test('decision carries reason from active state rule', () => {
+        const result = evaluateAction('work_task', ['ci_broken']);
+        expect(result.decision).toBe('skip');
+        expect(result.reasons[0]).toContain('CI');
     });
 });
 
