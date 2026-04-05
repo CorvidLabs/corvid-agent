@@ -269,7 +269,7 @@ export async function cleanupWorktree(db: Database, taskId: string): Promise<voi
  * If missing, look up the project's gitUrl and add it.
  * Returns true if origin exists (or was successfully added), false otherwise.
  */
-async function ensureOriginRemote(db: Database, projectId: string, cwd: string): Promise<boolean> {
+export async function ensureOriginRemote(db: Database, projectId: string, cwd: string): Promise<boolean> {
     // Check if origin already exists
     const checkProc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], { cwd, stdout: 'pipe', stderr: 'pipe' });
     const checkExit = await checkProc.exited;
