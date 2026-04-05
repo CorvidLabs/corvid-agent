@@ -3,7 +3,6 @@ import {
     DiscordRestClient,
     initializeRestClient,
     getRestClient,
-    createRestClient,
     _setRestClientForTesting,
 } from '../discord/rest-client';
 
@@ -399,9 +398,3 @@ describe('DiscordRestClient methods', () => {
     });
 });
 
-describe('createRestClient', () => {
-    test('returns a new DiscordRestClient instance', () => {
-        const client = createRestClient('some-token');
-        expect(client).toBeInstanceOf(DiscordRestClient);
-    });
-});
