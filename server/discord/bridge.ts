@@ -179,8 +179,6 @@ export class DiscordBridge {
       () => {
         archiveStaleThreadsImpl(
           this.processManager,
-          this.delivery,
-          this.config.botToken,
           this.tsm.threadLastActivity,
           this.tsm.threadSessions,
           this.tsm.threadCallbacks,
@@ -352,7 +350,7 @@ export class DiscordBridge {
       threadCallbacks: this.tsm.threadCallbacks,
       threadLastActivity: this.tsm.threadLastActivity,
       guildCache: this.guildCache,
-      createStandaloneThread: (channelId, name) => createStandaloneThreadImpl(this.config.botToken, channelId, name),
+      createStandaloneThread: (channelId, name) => createStandaloneThreadImpl(channelId, name),
       subscribeForResponseWithEmbed: (sid, tid, an, am, pn, dc, di, au) =>
         this.tsm.subscribeThread(sid, tid, an, am, pn, dc, di, au),
       sendTaskResult: (cid, task, uid) => this.sendTaskResult(cid, task, uid),

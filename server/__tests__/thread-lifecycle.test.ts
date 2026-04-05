@@ -2,13 +2,12 @@
  * Tests for thread-lifecycle.ts
  *
  * Covers: archiveThread, createStandaloneThread, archiveStaleThreads
- * All Discord REST calls are mocked via globalThis.fetch.
+ * All Discord REST calls are mocked via _setRestClientForTesting.
  */
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 
-// Mock embeds module — we only need sendEmbedWithButtons and buildActionRow to not throw.
+// Mock embeds module — we only need buildActionRow and assertSnowflake.
 mock.module('../discord/embeds', () => ({
-    sendEmbedWithButtons: mock(async () => {}),
     buildActionRow: mock((..._args: unknown[]) => ({ type: 1, components: [] })),
     assertSnowflake: (value: string, label: string) => {
         if (!/^\d{17,20}$/.test(value)) {
@@ -22,74 +21,53 @@ import {
     createStandaloneThread,
     archiveStaleThreads,
 } from '../discord/thread-lifecycle';
+import { _setRestClientForTesting, type DiscordRestClient } from '../discord/rest-client';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from '../discord/thread-session-map';
 
-const BOT_TOKEN = 'Bot.test.token';
 const VALID_THREAD_ID = '123456789012345678';
 const VALID_CHANNEL_ID = '987654321098765432';
 
-// ─── fetch helpers ────────────────────────────────────────────────────────────
+// ─── REST client mock helpers ─────────────────────────────────────────────────
 
-const originalFetch = globalThis.fetch;
+function makeRestClient(overrides: Partial<Record<string, ReturnType<typeof mock>>> = {}): DiscordRestClient {
+    return {
+        modifyChannel: overrides.modifyChannel ?? mock(async () => ({})),
+        createThread: overrides.createThread ?? mock(async () => ({ id: '111222333444555666' })),
+        sendMessage: overrides.sendMessage ?? mock(async () => ({})),
+    } as unknown as DiscordRestClient;
+}
 
 afterEach(() => {
-    globalThis.fetch = originalFetch;
+    _setRestClientForTesting(null);
 });
-
-function mockFetchOk(body: unknown = {}) {
-    globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(body), { status: 200 })),
-    ) as unknown as typeof globalThis.fetch;
-}
-
-function mockFetchFail(status = 403, body = 'Forbidden') {
-    globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(body, { status })),
-    ) as unknown as typeof globalThis.fetch;
-}
 
 // ─── archiveThread ────────────────────────────────────────────────────────────
 
 describe('archiveThread', () => {
-    test('sends PATCH to correct Discord endpoint with archived: true', async () => {
-        let capturedUrl = '';
-        let capturedBody: unknown;
-        globalThis.fetch = mock(async (url: string, opts?: RequestInit) => {
-            capturedUrl = url;
-            capturedBody = JSON.parse(opts?.body as string);
-            return new Response('{}', { status: 200 });
-        }) as unknown as typeof globalThis.fetch;
+    test('calls modifyChannel with archived: true', async () => {
+        const modifyChannel = mock(async () => ({}));
+        _setRestClientForTesting(makeRestClient({ modifyChannel }));
 
-        await archiveThread(BOT_TOKEN, VALID_THREAD_ID);
+        await archiveThread(VALID_THREAD_ID);
 
-        expect(capturedUrl).toContain(`/channels/${VALID_THREAD_ID}`);
-        expect((capturedBody as { archived: boolean }).archived).toBe(true);
+        expect(modifyChannel).toHaveBeenCalledWith(VALID_THREAD_ID, { archived: true });
     });
 
-    test('includes Authorization header with bot token', async () => {
-        let capturedHeaders: HeadersInit | undefined;
-        globalThis.fetch = mock(async (_url: string, opts?: RequestInit) => {
-            capturedHeaders = opts?.headers;
-            return new Response('{}', { status: 200 });
-        }) as unknown as typeof globalThis.fetch;
+    test('does not throw on REST error', async () => {
+        const modifyChannel = mock(async () => { throw new Error('Forbidden'); });
+        _setRestClientForTesting(makeRestClient({ modifyChannel }));
 
-        await archiveThread(BOT_TOKEN, VALID_THREAD_ID);
-
-        const headers = capturedHeaders as Record<string, string>;
-        expect(headers['Authorization']).toBe(`Bot ${BOT_TOKEN}`);
-    });
-
-    test('logs warning on non-ok response but does not throw', async () => {
-        mockFetchFail(403, 'Missing Permissions');
-        await expect(archiveThread(BOT_TOKEN, VALID_THREAD_ID)).resolves.toBeUndefined();
+        await expect(archiveThread(VALID_THREAD_ID)).resolves.toBeUndefined();
     });
 
     test('throws on invalid thread ID (non-snowflake)', async () => {
-        await expect(archiveThread(BOT_TOKEN, 'not-a-snowflake')).rejects.toThrow('snowflake');
+        _setRestClientForTesting(makeRestClient());
+        await expect(archiveThread('not-a-snowflake')).rejects.toThrow('snowflake');
     });
 
     test('throws on empty thread ID', async () => {
-        await expect(archiveThread(BOT_TOKEN, '')).rejects.toThrow('snowflake');
+        _setRestClientForTesting(makeRestClient());
+        await expect(archiveThread('')).rejects.toThrow('snowflake');
     });
 });
 
@@ -97,54 +75,58 @@ describe('archiveThread', () => {
 
 describe('createStandaloneThread', () => {
     test('returns thread ID on success', async () => {
-        mockFetchOk({ id: '111222333444555666' });
-        const result = await createStandaloneThread(BOT_TOKEN, VALID_CHANNEL_ID, 'My Topic');
+        _setRestClientForTesting(makeRestClient());
+
+        const result = await createStandaloneThread(VALID_CHANNEL_ID, 'My Topic');
         expect(result).toBe('111222333444555666');
     });
 
-    test('sends POST to /channels/{id}/threads', async () => {
-        let capturedUrl = '';
-        globalThis.fetch = mock(async (url: string) => {
-            capturedUrl = url;
-            return new Response(JSON.stringify({ id: '111222333444555666' }), { status: 200 });
-        }) as unknown as typeof globalThis.fetch;
+    test('calls createThread with correct params', async () => {
+        const createThread = mock(async () => ({ id: '111222333444555666' }));
+        _setRestClientForTesting(makeRestClient({ createThread }));
 
-        await createStandaloneThread(BOT_TOKEN, VALID_CHANNEL_ID, 'Topic');
-        expect(capturedUrl).toContain(`/channels/${VALID_CHANNEL_ID}/threads`);
+        await createStandaloneThread(VALID_CHANNEL_ID, 'Topic');
+
+        expect(createThread).toHaveBeenCalledWith(VALID_CHANNEL_ID, {
+            name: 'Topic',
+            type: 11,
+            auto_archive_duration: 1440,
+        });
     });
 
     test('truncates thread name to 100 characters', async () => {
-        let capturedBody: Record<string, unknown> = {};
-        globalThis.fetch = mock(async (_url: string, opts?: RequestInit) => {
-            capturedBody = JSON.parse(opts?.body as string);
-            return new Response(JSON.stringify({ id: '111222333444555666' }), { status: 200 });
-        }) as unknown as typeof globalThis.fetch;
+        const createThread = mock(async (_channelId: string, _data: { name: string }) => ({ id: 'x'.repeat(18) }));
+        _setRestClientForTesting(makeRestClient({ createThread }));
 
         const longName = 'x'.repeat(150);
-        await createStandaloneThread(BOT_TOKEN, VALID_CHANNEL_ID, longName);
-        expect((capturedBody.name as string).length).toBe(100);
+        await createStandaloneThread(VALID_CHANNEL_ID, longName);
+
+        const callArgs = (createThread as ReturnType<typeof mock>).mock.calls[0] as [string, { name: string }];
+        expect(callArgs[1].name.length).toBe(100);
     });
 
-    test('returns null on API failure', async () => {
-        mockFetchFail(500, 'Internal Server Error');
-        const result = await createStandaloneThread(BOT_TOKEN, VALID_CHANNEL_ID, 'Topic');
+    test('returns null on REST failure', async () => {
+        const createThread = mock(async () => { throw new Error('Internal Server Error'); });
+        _setRestClientForTesting(makeRestClient({ createThread }));
+
+        const result = await createStandaloneThread(VALID_CHANNEL_ID, 'Topic');
         expect(result).toBeNull();
     });
 
     test('throws on invalid channel ID', async () => {
-        await expect(createStandaloneThread(BOT_TOKEN, 'bad-id', 'Topic')).rejects.toThrow('snowflake');
+        _setRestClientForTesting(makeRestClient());
+        await expect(createStandaloneThread('bad-id', 'Topic')).rejects.toThrow('snowflake');
     });
 
     test('sets type to GUILD_PUBLIC_THREAD (11) and auto_archive_duration to 1440', async () => {
-        let capturedBody: Record<string, unknown> = {};
-        globalThis.fetch = mock(async (_url: string, opts?: RequestInit) => {
-            capturedBody = JSON.parse(opts?.body as string);
-            return new Response(JSON.stringify({ id: '111222333444555666' }), { status: 200 });
-        }) as unknown as typeof globalThis.fetch;
+        const createThread = mock(async (_channelId: string, _data: { type: number; auto_archive_duration: number }) => ({ id: '111222333444555666' }));
+        _setRestClientForTesting(makeRestClient({ createThread }));
 
-        await createStandaloneThread(BOT_TOKEN, VALID_CHANNEL_ID, 'Topic');
-        expect(capturedBody.type).toBe(11);
-        expect(capturedBody.auto_archive_duration).toBe(1440);
+        await createStandaloneThread(VALID_CHANNEL_ID, 'Topic');
+
+        const callArgs = (createThread as ReturnType<typeof mock>).mock.calls[0] as [string, { type: number; auto_archive_duration: number }];
+        expect(callArgs[1].type).toBe(11);
+        expect(callArgs[1].auto_archive_duration).toBe(1440);
     });
 });
 
@@ -157,10 +139,6 @@ describe('archiveStaleThreads', () => {
         } as unknown as import('../process/manager').ProcessManager;
     }
 
-    function makeDelivery() {
-        return {} as unknown as import('../lib/delivery-tracker').DeliveryTracker;
-    }
-
     const SESSION_INFO: ThreadSessionInfo = {
         sessionId: 'sess-1',
         agentName: 'Bot',
@@ -169,21 +147,17 @@ describe('archiveStaleThreads', () => {
     };
 
     beforeEach(() => {
-        // Default: fetch succeeds for archive PATCH
-        globalThis.fetch = mock(() =>
-            Promise.resolve(new Response('{}', { status: 200 })),
-        ) as unknown as typeof globalThis.fetch;
+        _setRestClientForTesting(makeRestClient());
     });
 
     test('archives thread that exceeded stale threshold', async () => {
         const pm = makeProcessManager();
-        const delivery = makeDelivery();
         const now = Date.now();
         const threadLastActivity = new Map([[VALID_THREAD_ID, now - 10_000]]);
         const threadSessions = new Map([[VALID_THREAD_ID, SESSION_INFO]]);
         const threadCallbacks = new Map<string, ThreadCallbackInfo>();
 
-        await archiveStaleThreads(pm, delivery, BOT_TOKEN, threadLastActivity, threadSessions, threadCallbacks, 5_000);
+        await archiveStaleThreads(pm, threadLastActivity, threadSessions, threadCallbacks, 5_000);
 
         // Maps cleaned up after archival
         expect(threadLastActivity.has(VALID_THREAD_ID)).toBe(false);
@@ -192,13 +166,12 @@ describe('archiveStaleThreads', () => {
 
     test('does not archive thread within stale threshold', async () => {
         const pm = makeProcessManager();
-        const delivery = makeDelivery();
         const now = Date.now();
         const threadLastActivity = new Map([[VALID_THREAD_ID, now - 1_000]]);
         const threadSessions = new Map([[VALID_THREAD_ID, SESSION_INFO]]);
         const threadCallbacks = new Map<string, ThreadCallbackInfo>();
 
-        await archiveStaleThreads(pm, delivery, BOT_TOKEN, threadLastActivity, threadSessions, threadCallbacks, 5_000);
+        await archiveStaleThreads(pm, threadLastActivity, threadSessions, threadCallbacks, 5_000);
 
         // Thread should remain
         expect(threadLastActivity.has(VALID_THREAD_ID)).toBe(true);
@@ -208,42 +181,39 @@ describe('archiveStaleThreads', () => {
     test('unsubscribes callback when callback exists for stale thread', async () => {
         const unsubscribeMock = mock(() => {});
         const pm = makeProcessManager(unsubscribeMock);
-        const delivery = makeDelivery();
         const now = Date.now();
         const threadLastActivity = new Map([[VALID_THREAD_ID, now - 10_000]]);
         const threadSessions = new Map([[VALID_THREAD_ID, SESSION_INFO]]);
         const cb: ThreadCallbackInfo = { sessionId: 'sess-1', callback: () => {} };
         const threadCallbacks = new Map([[VALID_THREAD_ID, cb]]);
 
-        await archiveStaleThreads(pm, delivery, BOT_TOKEN, threadLastActivity, threadSessions, threadCallbacks, 5_000);
+        await archiveStaleThreads(pm, threadLastActivity, threadSessions, threadCallbacks, 5_000);
 
         expect(unsubscribeMock).toHaveBeenCalledWith('sess-1', cb.callback);
         expect(threadCallbacks.has(VALID_THREAD_ID)).toBe(false);
     });
 
     test('does not throw when archival fails for a stale thread', async () => {
-        globalThis.fetch = mock(() =>
-            Promise.reject(new Error('Network error')),
-        ) as unknown as typeof globalThis.fetch;
+        const modifyChannel = mock(async () => { throw new Error('Network error'); });
+        const sendMessage = mock(async () => { throw new Error('Network error'); });
+        _setRestClientForTesting(makeRestClient({ modifyChannel, sendMessage }));
 
         const pm = makeProcessManager();
-        const delivery = makeDelivery();
         const now = Date.now();
         const threadLastActivity = new Map([[VALID_THREAD_ID, now - 10_000]]);
         const threadSessions = new Map([[VALID_THREAD_ID, SESSION_INFO]]);
         const threadCallbacks = new Map<string, ThreadCallbackInfo>();
 
         await expect(
-            archiveStaleThreads(pm, delivery, BOT_TOKEN, threadLastActivity, threadSessions, threadCallbacks, 5_000),
+            archiveStaleThreads(pm, threadLastActivity, threadSessions, threadCallbacks, 5_000),
         ).resolves.toBeUndefined();
     });
 
     test('handles empty maps without error', async () => {
         const pm = makeProcessManager();
-        const delivery = makeDelivery();
         await expect(
             archiveStaleThreads(
-                pm, delivery, BOT_TOKEN,
+                pm,
                 new Map(), new Map(), new Map(),
                 5_000,
             ),
