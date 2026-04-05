@@ -12,7 +12,7 @@ import { listProjects } from '../../db/projects';
 import { listBundles } from '../../db/skill-bundles';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
-import { discordFetch } from '../embeds';
+import { getRestClient } from '../rest-client';
 import type { DiscordInteractionData, DiscordInteractionOption } from '../types';
 import { InteractionCallbackType } from '../types';
 
@@ -154,23 +154,15 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
     return;
   }
 
-  const response = await discordFetch(
-    `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: InteractionCallbackType.AUTOCOMPLETE_RESULT,
-        data: { choices },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
+  try {
+    const rest = getRestClient();
+    await rest.respondToInteraction(interaction.id, interaction.token, {
+      type: InteractionCallbackType.AUTOCOMPLETE_RESULT,
+      data: { choices },
+    });
+  } catch (err) {
     log.error('Failed to respond to autocomplete', {
-      status: response.status,
-      error: error.slice(0, 200),
+      error: err instanceof Error ? err.message : String(err),
     });
   }
 }

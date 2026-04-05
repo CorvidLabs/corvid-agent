@@ -191,6 +191,76 @@ export class DiscordRestClient {
       throw error;
     }
   }
+
+  /**
+   * Fetch all roles in a guild.
+   */
+  async getGuildRoles(guildId: string): Promise<unknown[]> {
+    try {
+      const result = await this.rest.get(Routes.guildRoles(guildId));
+      return result as unknown[];
+    } catch (error) {
+      log.error('Failed to fetch guild roles', {
+        guildId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch all channels in a guild.
+   */
+  async getGuildChannels(guildId: string): Promise<unknown[]> {
+    try {
+      const result = await this.rest.get(Routes.guildChannels(guildId));
+      return result as unknown[];
+    } catch (error) {
+      log.error('Failed to fetch guild channels', {
+        guildId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch guild metadata (info, member count, etc).
+   */
+  async getGuild(guildId: string, withCounts?: boolean): Promise<Record<string, unknown>> {
+    try {
+      let result: unknown;
+      if (withCounts) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result = await (this.rest.get as any)(`/guilds/${guildId}?with_counts=true`);
+      } else {
+        result = await this.rest.get(Routes.guild(guildId));
+      }
+      return result as Record<string, unknown>;
+    } catch (error) {
+      log.error('Failed to fetch guild', {
+        guildId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Modify a channel (e.g., unarchive a thread).
+   */
+  async modifyChannel(channelId: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
+    try {
+      const result = await this.rest.patch(Routes.channel(channelId), { body: data });
+      return result as Record<string, unknown>;
+    } catch (error) {
+      log.error('Failed to modify channel', {
+        channelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
 }
 
 /**
@@ -208,6 +278,14 @@ export function getRestClient(): DiscordRestClient {
     throw new Error('REST client not initialized. Call initializeRestClient() first.');
   }
   return restClient;
+}
+
+/**
+ * Create a temporary REST client with a custom token.
+ * Useful for modules that receive their own bot token (e.g., guild-api.ts).
+ */
+export function createRestClient(token: string): DiscordRestClient {
+  return new DiscordRestClient({ token });
 }
 
 /** @internal Test-only: inject a mock client (pass `null` to reset). */

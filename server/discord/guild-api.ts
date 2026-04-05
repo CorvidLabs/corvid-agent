@@ -6,7 +6,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { discordFetch } from './embeds';
+import { createRestClient } from './rest-client';
 import { updateDiscordConfig } from '../db/discord-config';
 import { createLogger } from '../lib/logger';
 
@@ -65,78 +65,72 @@ const ADMINISTRATOR = 1n << 3n;
 
 // ─── REST API calls ──────────────────────────────────────────────────────
 
-async function fetchJson<T>(botToken: string, path: string): Promise<T | null> {
+/** Fetch all roles in the guild. */
+export async function fetchGuildRoles(botToken: string, guildId: string): Promise<GuildRole[] | null> {
     try {
-        const response = await discordFetch(
-            `https://discord.com/api/v10${path}`,
-            {
-                method: 'GET',
-                headers: { 'Authorization': `Bot ${botToken}` },
-            },
-        );
-        if (!response.ok) {
-            const error = await response.text().catch(() => '');
-            log.warn(`Discord API ${path} failed`, { status: response.status, error: error.slice(0, 200) });
-            return null;
-        }
-        return await response.json() as T;
+        const rest = createRestClient(botToken);
+        const raw = (await rest.getGuildRoles(guildId)) as Array<{
+            id: string; name: string; color: number; position: number;
+            managed: boolean; hoist: boolean; permissions: string;
+        }>;
+        return raw.map(r => ({
+            id: r.id,
+            name: r.name,
+            color: r.color,
+            position: r.position,
+            managed: r.managed,
+            hoist: r.hoist,
+            permissions: r.permissions,
+        }));
     } catch (err) {
-        log.warn(`Discord API ${path} error`, { error: err instanceof Error ? err.message : String(err) });
+        log.warn(`Failed to fetch guild roles`, { guildId, error: err instanceof Error ? err.message : String(err) });
         return null;
     }
 }
 
-/** Fetch all roles in the guild. */
-export async function fetchGuildRoles(botToken: string, guildId: string): Promise<GuildRole[] | null> {
-    const raw = await fetchJson<Array<{
-        id: string; name: string; color: number; position: number;
-        managed: boolean; hoist: boolean; permissions: string;
-    }>>(botToken, `/guilds/${encodeURIComponent(guildId)}/roles`);
-    if (!raw) return null;
-    return raw.map(r => ({
-        id: r.id,
-        name: r.name,
-        color: r.color,
-        position: r.position,
-        managed: r.managed,
-        hoist: r.hoist,
-        permissions: r.permissions,
-    }));
-}
-
 /** Fetch all channels in the guild. */
 export async function fetchGuildChannels(botToken: string, guildId: string): Promise<GuildChannel[] | null> {
-    const raw = await fetchJson<Array<{
-        id: string; name: string; type: number; position: number; parent_id: string | null;
-    }>>(botToken, `/guilds/${encodeURIComponent(guildId)}/channels`);
-    if (!raw) return null;
-    return raw.map(c => ({
-        id: c.id,
-        name: c.name,
-        type: c.type,
-        position: c.position,
-        parentId: c.parent_id,
-    }));
+    try {
+        const rest = createRestClient(botToken);
+        const raw = (await rest.getGuildChannels(guildId)) as Array<{
+            id: string; name: string; type: number; position: number; parent_id: string | null;
+        }>;
+        return raw.map(c => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            position: c.position,
+            parentId: c.parent_id,
+        }));
+    } catch (err) {
+        log.warn(`Failed to fetch guild channels`, { guildId, error: err instanceof Error ? err.message : String(err) });
+        return null;
+    }
 }
 
 /** Fetch guild metadata (name, description, rules channel, etc.). */
 export async function fetchGuildInfo(botToken: string, guildId: string): Promise<GuildInfo | null> {
-    const raw = await fetchJson<{
-        id: string; name: string; description: string | null;
-        rules_channel_id: string | null; system_channel_id: string | null;
-        approximate_member_count?: number; icon: string | null;
-    }>(botToken, `/guilds/${encodeURIComponent(guildId)}?with_counts=true`);
-    if (!raw) return null;
-    return {
-        id: raw.id,
-        name: raw.name,
-        description: raw.description,
-        rulesChannelId: raw.rules_channel_id,
-        systemChannelId: raw.system_channel_id,
-        memberCount: raw.approximate_member_count,
-        icon: raw.icon,
-        fetchedAt: new Date().toISOString(),
-    };
+    try {
+        const rest = createRestClient(botToken);
+        const raw = (await rest.getGuild(guildId, true)) as {
+            id: string; name: string; description: string | null;
+            rules_channel_id: string | null; system_channel_id: string | null;
+            approximate_member_count?: number; icon: string | null;
+        };
+        return {
+            id: raw.id,
+            name: raw.name,
+            description: raw.description,
+            rulesChannelId: raw.rules_channel_id,
+            systemChannelId: raw.system_channel_id,
+            memberCount: raw.approximate_member_count,
+            icon: raw.icon,
+            fetchedAt: new Date().toISOString(),
+        };
+    } catch (err) {
+        log.warn(`Failed to fetch guild info`, { guildId, error: err instanceof Error ? err.message : String(err) });
+        return null;
+    }
 }
 
 // ─── Cache management ────────────────────────────────────────────────────
