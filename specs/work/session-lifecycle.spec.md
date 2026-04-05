@@ -32,6 +32,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 | `createPrFallback` | `(db: Database, taskId: string, sessionOutput: string)` | `Promise<string \| null>` | Push branch and run `gh pr create` when agent output lacks a PR URL |
 | `buildIterationPrompt` | `(branchName: string, validationOutput: string)` | `string` | Build the prompt for a follow-up iteration session with validation errors |
 | `cleanupWorktree` | `(db: Database, taskId: string)` | `Promise<void>` | Remove the git worktree for a task while preserving the branch |
+| `ensureOriginRemote` | `(db: Database, projectId: string, cwd: string)` | `Promise<boolean>` | Ensure git repo has an `origin` remote, adding one from project `gitUrl` if missing |
 
 ## Invariants
 
