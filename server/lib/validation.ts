@@ -169,14 +169,14 @@ export const UpdateProjectSchema = z.object({
 const VoicePresetSchema = z.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
 
 export const CreateAgentSchema = z.object({
-    name: z.string().min(1, 'name is required').max(255),
-    description: z.string().max(4096).optional(),
-    model: z.string().max(128).optional(),
-    provider: z.string().max(128).optional(),
-    systemPrompt: z.string().max(65536).optional(),
-    appendPrompt: z.string().max(65536).optional(),
-    allowedTools: z.string().max(4096).optional(),        // Comma-separated string, not array
-    disallowedTools: z.string().max(4096).optional(),     // Comma-separated string, not array
+    name: z.string().min(1, 'name is required'),
+    description: z.string().optional(),
+    model: z.string().optional(),
+    provider: z.string().optional(),
+    systemPrompt: z.string().optional(),
+    appendPrompt: z.string().optional(),
+    allowedTools: z.string().optional(),        // Comma-separated string, not array
+    disallowedTools: z.string().optional(),     // Comma-separated string, not array
     permissionMode: z.enum(['default', 'plan', 'auto-edit', 'full-auto']).optional(),
     maxBudgetUsd: z.number().nullable().optional(),
     algochatEnabled: z.boolean().optional(),
@@ -192,14 +192,14 @@ export const CreateAgentSchema = z.object({
 });
 
 export const UpdateAgentSchema = z.object({
-    name: z.string().min(1).max(255).optional(),
-    description: z.string().max(4096).optional(),
-    model: z.string().max(128).optional(),
-    provider: z.string().max(128).optional(),
-    systemPrompt: z.string().max(65536).optional(),
-    appendPrompt: z.string().max(65536).optional(),
-    allowedTools: z.string().max(4096).optional(),
-    disallowedTools: z.string().max(4096).optional(),
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    model: z.string().optional(),
+    provider: z.string().optional(),
+    systemPrompt: z.string().optional(),
+    appendPrompt: z.string().optional(),
+    allowedTools: z.string().optional(),
+    disallowedTools: z.string().optional(),
     permissionMode: z.enum(['default', 'plan', 'auto-edit', 'full-auto']).optional(),
     maxBudgetUsd: z.number().nullable().optional(),
     algochatEnabled: z.boolean().optional(),
@@ -234,21 +234,21 @@ export const InvokeAgentSchema = z.object({
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 export const CreateSessionSchema = z.object({
-    projectId: z.string().min(1, 'projectId is required').max(128),
-    agentId: z.string().max(128).optional(),
-    name: z.string().max(255).optional(),
-    initialPrompt: z.string().max(65536).optional(),
-    councilLaunchId: z.string().max(128).optional(),
+    projectId: z.string().min(1, 'projectId is required'),
+    agentId: z.string().optional(),
+    name: z.string().optional(),
+    initialPrompt: z.string().optional(),
+    councilLaunchId: z.string().optional(),
     councilRole: z.enum(['member', 'reviewer', 'chairman', 'discusser']).optional(),
 });
 
 export const UpdateSessionSchema = z.object({
-    name: z.string().max(255).optional(),
+    name: z.string().optional(),
     status: z.enum(['idle', 'loading', 'running', 'paused', 'stopped', 'error']).optional(),
 });
 
 export const ResumeSessionSchema = z.object({
-    prompt: z.string().max(65536).optional(),
+    prompt: z.string().optional(),
 }).optional().default({});
 
 // ─── Councils ──────────────────────────────────────────────────────────────────
