@@ -2,10 +2,10 @@
  * Tests for A2A remote agent invocation client.
  *
  * Validates invokeRemoteAgent: task submission, polling, success/failure
- * handling, taskId propagation, and timeout behaviour.
+ * handling, taskId propagation, timeout behaviour, and SSRF blocking.
  */
 import { describe, it, expect, mock, afterEach } from 'bun:test';
-import { invokeRemoteAgent } from '../a2a/client';
+import { invokeRemoteAgent, fetchAgentCard } from '../a2a/client';
 
 const BASE_URL = 'https://remote-agent.example.com';
 const originalFetch = globalThis.fetch;
@@ -162,5 +162,71 @@ describe('invokeRemoteAgent', () => {
         expect(result.responseText).toBeNull();
         expect(result.error).toContain('Timed out');
         expect(result.error).toContain('100');
+    });
+});
+
+// ─── SSRF blocking ───────────────────────────────────────────────────────────
+
+describe('invokeRemoteAgent SSRF blocking', () => {
+    it('throws ValidationError for localhost URL', async () => {
+        await expect(
+            invokeRemoteAgent('http://localhost/agent', 'hello'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for 127.0.0.1', async () => {
+        await expect(
+            invokeRemoteAgent('http://127.0.0.1:3000', 'hello'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for 10.x private IP', async () => {
+        await expect(
+            invokeRemoteAgent('http://10.0.0.1/agent', 'hello'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for 192.168.x.x private IP', async () => {
+        await expect(
+            invokeRemoteAgent('http://192.168.1.1/agent', 'hello'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for non-http scheme', async () => {
+        await expect(
+            invokeRemoteAgent('ftp://remote-agent.example.com', 'hello'),
+        ).rejects.toThrow(/Blocked URL scheme/);
+    });
+
+    it('throws ValidationError for malformed URL', async () => {
+        await expect(
+            invokeRemoteAgent('not-a-url', 'hello'),
+        ).rejects.toThrow(/Invalid URL/);
+    });
+});
+
+describe('fetchAgentCard SSRF blocking', () => {
+    it('throws ValidationError for localhost URL', async () => {
+        await expect(
+            fetchAgentCard('http://localhost'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for 172.16.x.x private IP', async () => {
+        await expect(
+            fetchAgentCard('https://172.16.0.1'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for .local hostname', async () => {
+        await expect(
+            fetchAgentCard('http://my-server.local'),
+        ).rejects.toThrow(/Blocked URL/);
+    });
+
+    it('throws ValidationError for non-http scheme', async () => {
+        await expect(
+            fetchAgentCard('file:///etc/passwd'),
+        ).rejects.toThrow(/Blocked URL scheme/);
     });
 });
