@@ -155,6 +155,13 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
     const coAuthor = formatCoAuthoredBy(agent);
 
     try {
+        // Ensure origin remote exists — projects with persistent strategy may lack it (#1829)
+        const hasOrigin = await ensureOriginRemote(db, task.projectId, cwd);
+        if (!hasOrigin) {
+            log.warn('Fallback: no origin remote and no gitUrl configured', { taskId, projectId: task.projectId });
+            return null;
+        }
+
         // Ensure all changes are committed (agent may have left unstaged changes)
         const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
         await statusProc.exited;
@@ -255,4 +262,28 @@ export async function cleanupWorktree(db: Database, taskId: string): Promise<voi
 
     await removeWorktree(project.workingDir, task.worktreeDir);
     clearWorktreeDir(db, taskId);
+}
+
+/**
+ * Ensure the git repo at `cwd` has an `origin` remote.
+ * If missing, look up the project's gitUrl and add it.
+ * Returns true if origin exists (or was successfully added), false otherwise.
+ */
+async function ensureOriginRemote(db: Database, projectId: string, cwd: string): Promise<boolean> {
+    // Check if origin already exists
+    const checkProc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+    const checkExit = await checkProc.exited;
+    if (checkExit === 0) return true;
+
+    // Origin missing — try to add from project's gitUrl
+    const project = getProject(db, projectId);
+    if (!project?.gitUrl) return false;
+
+    log.info('Adding missing origin remote from project gitUrl', { projectId, gitUrl: project.gitUrl });
+    const addProc = Bun.spawn(
+        ['git', 'remote', 'add', 'origin', project.gitUrl],
+        { cwd, stdout: 'pipe', stderr: 'pipe' },
+    );
+    const addExit = await addProc.exited;
+    return addExit === 0;
 }

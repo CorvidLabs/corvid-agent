@@ -66,8 +66,16 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 - **Given** a completed session with no PR URL in the output
 - **When** `createPrFallback` is called
-- **Then** it commits any unstaged changes, pushes the branch, and runs `gh pr create`
+- **Then** it ensures an `origin` remote exists (adding one from the project's `gitUrl` if missing)
+- **And** commits any unstaged changes, pushes the branch, and runs `gh pr create`
 - **And** returns the PR URL on success or `null` on failure
+
+### Scenario: Fallback PR creation with missing origin remote
+
+- **Given** a project with `gitUrl` set but no `origin` remote configured in the worktree
+- **When** `createPrFallback` is called
+- **Then** it adds the project's `gitUrl` as the `origin` remote before pushing
+- **And** proceeds with push and PR creation normally
 
 ## Error Cases
 
@@ -77,6 +85,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 | No validation directory available | Skips validation, proceeds directly to `finalizeTask` |
 | PR URL not in output and fallback fails | Task marked `failed` with descriptive error |
 | `createPrFallback` with no branch or worktree | Returns `null` immediately |
+| No origin remote and no project `gitUrl` | Logs warning, returns `null` |
 | Git push fails during fallback | Logs warning, returns `null` |
 | `gh pr create` fails during fallback | Logs warning, returns `null` |
 
