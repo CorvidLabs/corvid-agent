@@ -3,6 +3,7 @@ import {
     DiscordRestClient,
     initializeRestClient,
     getRestClient,
+    createRestClient,
     _setRestClientForTesting,
 } from '../discord/rest-client';
 
@@ -30,11 +31,15 @@ function createMockClient(): {
         },
         put: async (route: string, options?: unknown) => {
             calls.push({ method: 'put', route, options });
-            return undefined;
+            return [{ name: 'test-cmd' }];
         },
         delete: async (route: string, options?: unknown) => {
             calls.push({ method: 'delete', route, options });
             return undefined;
+        },
+        get: async (route: string, options?: unknown) => {
+            calls.push({ method: 'get', route, options });
+            return { id: 'mock-result' };
         },
     };
 
@@ -56,6 +61,7 @@ function createErrorClient(errorMessage = 'Discord API error'): {
         patch: async () => { throw new Error(errorMessage); },
         put: async () => { throw new Error(errorMessage); },
         delete: async () => { throw new Error(errorMessage); },
+        get: async () => { throw new Error(errorMessage); },
     };
     (client as any).rest = mockRest;
     return { client };
@@ -264,5 +270,138 @@ describe('DiscordRestClient methods', () => {
                 client.sendTypingIndicator('chan-1'),
             ).rejects.toThrow('Discord API error');
         });
+    });
+
+    describe('putCommands', () => {
+        test('registers guild-scoped commands and clears global', async () => {
+            const { client, calls } = createMockClient();
+            const commands = [{ name: 'ping', description: 'Ping' }];
+
+            const result = await client.putCommands('app-1', 'guild-1', commands);
+
+            // First call: register guild commands
+            expect(calls[0].method).toBe('put');
+            expect(calls[0].route).toContain('/applications/app-1/guilds/guild-1/commands');
+            expect(calls[0].options).toEqual({ body: commands });
+            // Second call: clear stale global commands
+            expect(calls[1].method).toBe('put');
+            expect(calls[1].route).toContain('/applications/app-1/commands');
+            expect(calls[1].options).toEqual({ body: [] });
+            expect(result).toEqual([{ name: 'test-cmd' }]);
+        });
+
+        test('registers global commands when no guildId', async () => {
+            const { client, calls } = createMockClient();
+            const commands = [{ name: 'ping', description: 'Ping' }];
+
+            await client.putCommands('app-1', undefined, commands);
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('put');
+            expect(calls[0].route).toContain('/applications/app-1/commands');
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.putCommands('app-1', 'guild-1', []),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+
+    describe('getGuildRoles', () => {
+        test('fetches roles for guild', async () => {
+            const { client, calls } = createMockClient();
+
+            await client.getGuildRoles('guild-1');
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('get');
+            expect(calls[0].route).toContain('/guilds/guild-1/roles');
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.getGuildRoles('guild-1'),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+
+    describe('getGuildChannels', () => {
+        test('fetches channels for guild', async () => {
+            const { client, calls } = createMockClient();
+
+            await client.getGuildChannels('guild-1');
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('get');
+            expect(calls[0].route).toContain('/guilds/guild-1/channels');
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.getGuildChannels('guild-1'),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+
+    describe('getGuild', () => {
+        test('fetches guild without counts', async () => {
+            const { client, calls } = createMockClient();
+
+            await client.getGuild('guild-1');
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('get');
+            expect(calls[0].route).toContain('/guilds/guild-1');
+        });
+
+        test('fetches guild with counts', async () => {
+            const { client, calls } = createMockClient();
+
+            await client.getGuild('guild-1', true);
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('get');
+            expect(calls[0].route).toContain('guild-1');
+            expect(calls[0].route).toContain('with_counts=true');
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.getGuild('guild-1'),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+
+    describe('modifyChannel', () => {
+        test('patches channel data', async () => {
+            const { client, calls } = createMockClient();
+            const data = { archived: false };
+
+            await client.modifyChannel('chan-1', data);
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('patch');
+            expect(calls[0].route).toContain('/channels/chan-1');
+            expect(calls[0].options).toEqual({ body: data });
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.modifyChannel('chan-1', {}),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+});
+
+describe('createRestClient', () => {
+    test('returns a new DiscordRestClient instance', () => {
+        const client = createRestClient('some-token');
+        expect(client).toBeInstanceOf(DiscordRestClient);
     });
 });
