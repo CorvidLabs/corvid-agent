@@ -100,7 +100,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleWorkTaskRoutes` | work-tasks.ts | Work task CRUD and cancellation |
 | `handleMcpApiRoutes` | mcp-api.ts | Agent-to-agent MCP messaging |
 | `handleAllowlistRoutes` | allowlist.ts | Address allowlist management |
-| `handleAnalyticsRoutes` | analytics.ts | Overview, spending, session stats |
+| `handleAnalyticsRoutes` | analytics.ts | Overview, spending, session stats, weekly recap |
 | `handleSystemLogRoutes` | system-logs.ts | System logs and credit transactions |
 | `handleSettingsRoutes` | settings.ts | Settings, credits config, API key |
 | `handleScheduleRoutes` | schedules.ts | Schedule CRUD, executions, triggers |
@@ -555,6 +555,7 @@ Every request passes through these stages in order:
 | GET | `/api/analytics/sessions` | analytics.ts | Session statistics |
 | GET | `/api/analytics/session-metrics` | analytics.ts | Aggregate tool-chain metrics (filterable by model, tier, days) |
 | GET | `/api/analytics/session-metrics/:id` | analytics.ts | Per-session tool-chain metrics |
+| GET | `/api/analytics/weekly-recap` | analytics.ts | 7-day activity summary (work tasks, sessions, messages, spending). Optional `?days=N` param (1–90, default 7). |
 | GET | `/api/system-logs` | system-logs.ts | Aggregated system logs |
 | GET | `/api/system-logs/credit-transactions` | system-logs.ts | Credit transaction ledger |
 

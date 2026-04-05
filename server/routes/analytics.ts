@@ -72,6 +72,12 @@ export function handleAnalyticsRoutes(req: Request, url: URL, db: Database, cont
         return handleSessionMetricsById(db, metricsMatch[1]);
     }
 
+    // GET /api/analytics/weekly-recap — 7-day activity summary
+    if (url.pathname === '/api/analytics/weekly-recap' && req.method === 'GET') {
+        const days = safeNumParam(url.searchParams.get('days'), 7);
+        return handleWeeklyRecap(db, tenantId, days);
+    }
+
     return null;
 }
 
@@ -263,4 +269,74 @@ function handleSessionMetrics(db: Database, url: URL): Response {
 function handleSessionMetricsById(db: Database, sessionId: string): Response {
     const metrics = getSessionMetrics(db, sessionId);
     return json({ metrics });
+}
+
+function handleWeeklyRecap(db: Database, tenantId: string, days: number): Response {
+    const clampedDays = Math.max(1, Math.min(days, 90));
+    const isDefault = tenantId === 'default';
+    const tenantFilter = isDefault ? '' : ' AND wt.tenant_id = ?';
+    const tenantBinding = isDefault ? [] : [tenantId];
+
+    // Work tasks started and completed in period
+    const workTaskStats = db.query(`
+        SELECT
+            COUNT(*) as total_started,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as total_completed,
+            SUM(CASE WHEN pr_url IS NOT NULL THEN 1 ELSE 0 END) as prs_created
+        FROM work_tasks wt
+        WHERE created_at >= datetime('now', ? || ' days')${tenantFilter}
+    `).get(`-${clampedDays}`, ...tenantBinding) as {
+        total_started: number;
+        total_completed: number;
+        prs_created: number;
+    };
+
+    // Sessions started in period
+    const sessionStats = db.query(`
+        SELECT
+            COUNT(*) as sessions_started,
+            SUM(total_cost_usd) as total_cost_usd,
+            SUM(total_algo_spent) as total_algo_spent,
+            SUM(total_turns) as total_turns
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE s.created_at >= datetime('now', ? || ' days')${isDefault ? '' : ' AND a.tenant_id = ?'}
+    `).get(`-${clampedDays}`, ...(isDefault ? [] : [tenantId])) as {
+        sessions_started: number;
+        total_cost_usd: number | null;
+        total_algo_spent: number | null;
+        total_turns: number | null;
+    };
+
+    // Agent messages in period
+    const agentMsgCount = db.query(`
+        SELECT COUNT(*) as count FROM agent_messages
+        WHERE created_at >= datetime('now', ? || ' days')
+    `).get(`-${clampedDays}`) as { count: number };
+
+    // AlgoChat messages in period
+    const algochatMsgCount = db.query(`
+        SELECT COUNT(*) as count FROM algochat_messages
+        WHERE created_at >= datetime('now', ? || ' days')
+    `).get(`-${clampedDays}`) as { count: number };
+
+    return json({
+        periodDays: clampedDays,
+        generatedAt: new Date().toISOString(),
+        workTasks: {
+            started: workTaskStats?.total_started ?? 0,
+            completed: workTaskStats?.total_completed ?? 0,
+            prsCreated: workTaskStats?.prs_created ?? 0,
+        },
+        sessions: {
+            started: sessionStats?.sessions_started ?? 0,
+            totalTurns: sessionStats?.total_turns ?? 0,
+            costUsd: sessionStats?.total_cost_usd ?? 0,
+            algoSpent: sessionStats?.total_algo_spent ?? 0,
+        },
+        messages: {
+            agentToAgent: agentMsgCount?.count ?? 0,
+            algochat: algochatMsgCount?.count ?? 0,
+        },
+    });
 }
