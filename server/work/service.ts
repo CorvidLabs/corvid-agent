@@ -9,6 +9,7 @@ import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import type { WorkTaskPriority } from '../../shared/types';
 import {
+    createWorkTask,
     createWorkTaskAtomic,
     getWorkTask,
     getActiveWorkTasks,
@@ -601,8 +602,10 @@ export class WorkTaskService {
         const activePriority = activeTask ? this.getTaskPriority(activeTask.id) : 3;
 
         if (activeTask && activePriority <= priority) {
-            // Active task has equal or higher priority — queue the new task
-            const task = createWorkTaskAtomic(this.db, {
+            // Active task has equal or higher priority — queue the new task.
+            // Use non-atomic insert since we've already verified the active task
+            // and intend to queue, not run immediately.
+            const task = createWorkTask(this.db, {
                 agentId: input.agentId,
                 projectId,
                 description: input.description,
@@ -612,9 +615,6 @@ export class WorkTaskService {
                 priority,
                 tenantId,
             });
-            if (!task) {
-                throw new ConflictError('Another task is already active on project', { projectId });
-            }
 
             // Mark as queued (waiting for active task to finish)
             updateWorkTaskStatus(this.db, task.id, 'queued');
@@ -650,7 +650,6 @@ export class WorkTaskService {
             }
 
             // Create new task (we bypass atomic check since we're handling concurrency ourselves)
-            const { createWorkTask } = await import('../db/work-tasks');
             const task = createWorkTask(this.db, {
                 agentId: input.agentId,
                 projectId,

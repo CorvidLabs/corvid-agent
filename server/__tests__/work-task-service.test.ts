@@ -911,25 +911,26 @@ describe('Task creation validation', () => {
         ).rejects.toThrow('has no workingDir');
     });
 
-    test('throws when concurrent active task exists on same project', async () => {
+    test('queues task when concurrent active task exists on same project', async () => {
         const { agent, project } = createTestAgentAndProject();
         queueSuccessfulSpawns(2);
 
         // Create first task successfully
-        await service.create({
+        const first = await service.create({
             agentId: agent.id,
             description: 'First task',
             projectId: project.id,
         });
 
-        // Second task on same project should fail
-        await expect(
-            service.create({
-                agentId: agent.id,
-                description: 'Second task',
-                projectId: project.id,
-            })
-        ).rejects.toThrow('Another task is already active');
+        // Second task on same project should be queued, not rejected
+        const second = await service.create({
+            agentId: agent.id,
+            description: 'Second task',
+            projectId: project.id,
+        });
+
+        expect(first.status).toBe('running');
+        expect(second.status).toBe('queued');
     });
 });
 
