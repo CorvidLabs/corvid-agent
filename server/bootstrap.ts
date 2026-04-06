@@ -374,6 +374,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const dailyReviewService = new DailyReviewService(db, memoryManager);
 
     // ── Cross-dependency wiring ──────────────────────────────────────────
+    workTaskService.setReputationScorer(reputationScorer);
     schedulerService.setImprovementLoopService(improvementLoopService);
     schedulerService.setReputationServices(reputationScorer, reputationAttestation);
     schedulerService.setNotificationService(notificationService);

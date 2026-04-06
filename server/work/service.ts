@@ -46,6 +46,8 @@ import {
     logEscalation,
     type ModelTier,
 } from './chain-continuation';
+import { checkReputationForWorkTask } from './reputation-guard';
+import type { ReputationScorer } from '../reputation/scorer';
 import {
     handleSessionEnd as _handleSessionEnd,
     cleanupWorktree as _cleanupWorktree,
@@ -129,6 +131,13 @@ export class WorkTaskService {
 
     setBuddyService(buddyService: import('../buddy/service').BuddyService): void {
         this._buddyService = buddyService;
+    }
+
+    /** Reputation scorer — set after bootstrap init. Used to gate work task creation. */
+    private _reputationScorer: ReputationScorer | null = null;
+
+    setReputationScorer(scorer: ReputationScorer): void {
+        this._reputationScorer = scorer;
     }
 
     /** TaskQueueService reference — set by bootstrap after both are created. */
@@ -472,6 +481,19 @@ export class WorkTaskService {
         const agent = getAgent(this.db, input.agentId, tenantId);
         if (!agent) {
             throw new NotFoundError('Agent', input.agentId);
+        }
+
+        // Reputation gate: block blacklisted/untrusted agents from creating work tasks
+        const repGuard = checkReputationForWorkTask(
+            this._reputationScorer,
+            input.agentId,
+            input.description.slice(0, 100),
+        );
+        if (repGuard.blocked) {
+            throw new ValidationError(repGuard.reason ?? 'Agent reputation too low to create work tasks', {
+                agentId: input.agentId,
+                trustLevel: repGuard.trustLevel,
+            });
         }
 
         // Resolve projectId
