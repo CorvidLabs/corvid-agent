@@ -2,6 +2,64 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.61.0] - 2026-04-05
+
+### Added
+- **Discord: Phase 3 SlashCommandBuilder migration** — migrate command registration to SlashCommandBuilder (#1822)
+- **Discord: Phase 2 discord.js integration** — replace custom WebSocket gateway with discord.js Client (#1818)
+- **Auth: proxy trust mode** — oauth2-proxy email-based tenant authentication via TRUST_PROXY (#1813)
+- **Mainnet: preflight checks** — mainnet launch readiness validation script (#1816)
+- **Discord: permission middleware** — declarative permission enforcement for command dispatcher (#1808)
+- **Ollama: Claude Code proxy** — add Claude Code proxy for Ollama cloud models (#1787)
+- **UI: Flock Challenges dashboard** — new dashboard at /agents/flock-challenges for Flock Directory (#1777)
+- **Memory: short-term decay** — TTL-based cleanup and retention policies for SQLite memories (#1760)
+- **Memory: confirmation gates** — user confirmation required for permanent on-chain (plain txn) writes (#1780, #1805)
+- **Sessions: short-term observations** — load relevant observations when resuming a session (#1779)
+
+### Fixed
+- **Security: SSRF validator** — replace weak federation URL validator with shared ssrf-guard (#1817)
+- **Security: API access gates** — /api/security/overview now requires admin role (#1798)
+- **Security: scope enforcement** — scope onboarding status and thread viewer roles to caller's tenant (#1784, #1811)
+- **Security: WS auth guard** — add DISABLE_WS_KEY_PARAM to reject ?key= WebSocket auth (#1812)
+- **Security: CVE GHSA-5474-4w2j-mq4c** — update Anthropic SDK versions to fix reported vulnerability (#1804)
+- **Auth: device authorize page** — replace hardcoded identity with caller's tenant (#1810)
+- **Discord: autocomplete** — skip stale autocomplete responses past 3-second deadline (#1809)
+- **Discord: rate limiting** — bypass global rate limiter for interaction callbacks (#1801)
+- **Ollama: tool translation** — add tool translation to Claude Code proxy (#1799)
+- **Ollama: double-release bug** — prevent double slot release in streaming response (#1790)
+- **Ollama: OLLAMA_USE_CLAUDE_PROXY** — apply proxy setting to explicit Ollama agents (#1796)
+- **DB: migration 114** — add missing migration for proxy trust email column (#1814)
+- **Work: governance validator** — resolve false positives blocking legitimate work tasks (#1775)
+- **Work: TSC validation** — skip TypeScript check for projects without tsconfig.json (#1768)
+- **Work: worktree cleanup** — clean stale state and block creation on lingering worktrees (#1803, #1769)
+- **Tests: env isolation** — use empty string instead of delete for Bun env var isolation (#1820)
+- **Tests: coverage** — add coverage for discord guild-api, contact-linker, memory-sync, session-heartbeat (#1821)
+- **Docs: testnet-onboarding** — correct project field name in onboarding guide (#1771)
+- **Docs: HTML validation** — replace nested anchor tag with span in audience card (#1764)
+
+### Security
+- Credential confirmation gate for permanent on-chain memory writes (#1780, #1805)
+- Stricter SSRF validation for federation URL parsing (#1817)
+- Scope enforcement for multi-tenant API surface (#1784, #1811, #1798)
+- Disallow unauthenticated WebSocket key parameter (#1812)
+
+### Maintenance
+- **Discord: refactor** — split thread-manager.ts into focused modules (lifecycle, session, permissions) (#1786)
+- **Client: refactor** — split library-3d into types and utils modules (#1772)
+- **CI/CD: supply chain** — pin unpinned GitHub Actions and spec-sync to SHA digests (#1770, #1785)
+- **Spec-sync upgrade** — v3.2.0 with stricter parser and validation (#1761)
+- **Specs: documentation** — add context.md to all 52 spec directories with design rationale (#1762)
+- **Docs: releases page** — add v0.60.0 release notes and releases archive (#1763)
+
+### Testing
+- **Memory: deepSearch** — add coverage for deepSearch, search dispatch, LibrarySyncService (#1807)
+- **Scheduler: flock_reputation_refresh** — add coverage for flock reputation refresh action (#1778)
+- **Session: audit logging** — audit logging, tier transitions, and state machine tests (#1797, #1783)
+
+### Dependencies
+- @anthropic-ai/claude-agent-sdk → 0.2.92
+- spec-sync → v3.2.0 (with stricter validation)
+
 ## [0.60.0] - 2026-03-30
 
 ### Added
