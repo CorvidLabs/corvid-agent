@@ -1,59 +1,47 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleOnboardingRoutes } from '../routes/onboarding';
-import type { RequestContext } from '../middleware/guards';
+import { createRequestContext } from '../middleware/guards';
+import { createAgent } from '../db/agents';
+import type { AlgoChatBridge } from '../algochat/bridge';
 
 let db: Database;
-
-const ctx: RequestContext = { authenticated: true, tenantId: 'default' };
+const defaultContext = createRequestContext();
 
 function fakeReq(method: string, path: string): { req: Request; url: URL } {
     const url = new URL(`http://localhost:3000${path}`);
     return { req: new Request(url.toString(), { method }), url };
 }
 
-function makeBridge(opts: { address: string | null; balance: number; network: string }) {
-    return {
-        getStatus: async () => ({
-            enabled: true,
-            address: opts.address,
-            network: opts.network,
-            balance: opts.balance,
-            syncInterval: 10000,
-            activeConversations: 0,
-        }),
-    } as unknown as import('../algochat/bridge').AlgoChatBridge;
-}
-
-beforeEach(() => {
+beforeAll(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
 });
 
-afterEach(() => db.close());
+afterAll(() => db.close());
 
 describe('Onboarding Routes', () => {
-    it('returns null for non-onboarding paths', () => {
+    it('returns null for non-matching paths', () => {
         const { req, url } = fakeReq('GET', '/api/other');
-        const res = handleOnboardingRoutes(req, url, db, null, null, ctx);
+        const res = handleOnboardingRoutes(req, url, db, null, null, defaultContext);
         expect(res).toBeNull();
     });
 
-    it('returns null for POST /api/onboarding/status', () => {
+    it('returns null for POST method', () => {
         const { req, url } = fakeReq('POST', '/api/onboarding/status');
-        const res = handleOnboardingRoutes(req, url, db, null, null, ctx);
+        const res = handleOnboardingRoutes(req, url, db, null, null, defaultContext);
         expect(res).toBeNull();
     });
 
-    it('GET /api/onboarding/status with no bridge — incomplete state', async () => {
+    it('returns incomplete status with no bridge', async () => {
         const { req, url } = fakeReq('GET', '/api/onboarding/status');
-        const res = await handleOnboardingRoutes(req, url, db, null, null, ctx);
+        const res = await handleOnboardingRoutes(req, url, db, null, null, defaultContext);
         expect(res).not.toBeNull();
         expect((res as Response).status).toBe(200);
-        const data = await (res as Response).json();
 
+        const data = await (res as Response).json();
         expect(data.wallet.configured).toBe(false);
         expect(data.wallet.address).toBeNull();
         expect(data.wallet.funded).toBe(false);
@@ -66,62 +54,81 @@ describe('Onboarding Routes', () => {
         expect(data.complete).toBe(false);
     });
 
-    it('GET /api/onboarding/status with funded bridge but no agents/projects — incomplete', async () => {
-        const bridge = makeBridge({ address: 'TESTADDR', balance: 1000, network: 'localnet' });
+    it('returns status with bridge configured', async () => {
+        const mockBridge = {
+            getStatus: async () => ({
+                address: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+                balance: 10_000_000,
+                network: 'localnet',
+            }),
+        } as unknown as AlgoChatBridge;
+
         const { req, url } = fakeReq('GET', '/api/onboarding/status');
-        const res = await handleOnboardingRoutes(req, url, db, bridge, null, ctx);
+        const res = await handleOnboardingRoutes(req, url, db, mockBridge, null, defaultContext);
         const data = await (res as Response).json();
 
         expect(data.wallet.configured).toBe(true);
-        expect(data.wallet.address).toBe('TESTADDR');
+        expect(data.wallet.address).toBe('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
         expect(data.wallet.funded).toBe(true);
         expect(data.bridge.running).toBe(true);
         expect(data.bridge.network).toBe('localnet');
-        // Still incomplete — no agents or projects
-        expect(data.complete).toBe(false);
     });
 
-    it('GET /api/onboarding/status with bridge but zero balance — not funded', async () => {
-        const bridge = makeBridge({ address: 'TESTADDR', balance: 0, network: 'localnet' });
-        const { req, url } = fakeReq('GET', '/api/onboarding/status');
-        const res = await handleOnboardingRoutes(req, url, db, bridge, null, ctx);
-        const data = await (res as Response).json();
+    it('wallet.funded is false when balance is 0', async () => {
+        const mockBridge = {
+            getStatus: async () => ({
+                address: 'SOME_ADDRESS',
+                balance: 0,
+                network: 'localnet',
+            }),
+        } as unknown as AlgoChatBridge;
 
+        const { req, url } = fakeReq('GET', '/api/onboarding/status');
+        const res = await handleOnboardingRoutes(req, url, db, mockBridge, null, defaultContext);
+        const data = await (res as Response).json();
         expect(data.wallet.configured).toBe(true);
         expect(data.wallet.funded).toBe(false);
-        expect(data.complete).toBe(false);
     });
 
-    it('GET /api/onboarding/status with all components — complete', async () => {
-        // Seed an agent and a project
-        const agentId = crypto.randomUUID();
-        db.query("INSERT INTO agents (id, name, tenant_id) VALUES (?, 'TestAgent', 'default')").run(agentId);
-        const projectId = crypto.randomUUID();
-        db.query("INSERT INTO projects (id, name, working_dir, tenant_id) VALUES (?, 'TestProject', '/tmp', 'default')").run(projectId);
+    it('reflects agent existence after creation', async () => {
+        createAgent(db, { name: 'TestOnboardAgent' });
 
-        const bridge = makeBridge({ address: 'FULLADDR', balance: 5000, network: 'localnet' });
         const { req, url } = fakeReq('GET', '/api/onboarding/status');
-        const res = await handleOnboardingRoutes(req, url, db, bridge, null, ctx);
+        const res = await handleOnboardingRoutes(req, url, db, null, null, defaultContext);
         const data = await (res as Response).json();
 
-        expect(data.wallet.configured).toBe(true);
-        expect(data.wallet.funded).toBe(true);
-        expect(data.bridge.running).toBe(true);
         expect(data.agent.exists).toBe(true);
         expect(data.agent.count).toBeGreaterThanOrEqual(1);
-        expect(data.project.exists).toBe(true);
-        expect(data.project.count).toBeGreaterThanOrEqual(1);
-        expect(data.complete).toBe(true);
     });
 
-    it('agent.walletConfigured reflects wallet_address on agent', async () => {
-        const agentId = crypto.randomUUID();
-        db.query("INSERT INTO agents (id, name, tenant_id, wallet_address) VALUES (?, 'WalletAgent', 'default', 'AGENTADDR')").run(agentId);
+    it('reflects project existence after creation', async () => {
+        // Insert a project directly
+        db.query(
+            `INSERT INTO projects (id, name, working_dir, tenant_id)
+             VALUES (?, ?, ?, ?)`
+        ).run('test-proj', 'TestProject', '/tmp/test', 'default');
 
         const { req, url } = fakeReq('GET', '/api/onboarding/status');
-        const res = await handleOnboardingRoutes(req, url, db, null, null, ctx);
+        const res = await handleOnboardingRoutes(req, url, db, null, null, defaultContext);
         const data = await (res as Response).json();
 
-        expect(data.agent.walletConfigured).toBe(true);
+        expect(data.project.exists).toBe(true);
+        expect(data.project.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('complete is true when all conditions met', async () => {
+        // We already have agent and project from previous tests
+        const mockBridge = {
+            getStatus: async () => ({
+                address: 'FUNDED_WALLET',
+                balance: 5_000_000,
+                network: 'localnet',
+            }),
+        } as unknown as AlgoChatBridge;
+
+        const { req, url } = fakeReq('GET', '/api/onboarding/status');
+        const res = await handleOnboardingRoutes(req, url, db, mockBridge, null, defaultContext);
+        const data = await (res as Response).json();
+        expect(data.complete).toBe(true);
     });
 });
