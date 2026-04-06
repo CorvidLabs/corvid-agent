@@ -43,6 +43,7 @@ Role-based access levels:
 - [Onboarding](#onboarding)
 - [Security Overview](#security-overview)
 - [Bridge Delivery](#bridge-delivery)
+- [Discord Image](#discord-image)
 - [A2A](#a2a)
 - [Backup](#backup)
 - [Self-Test](#self-test)
