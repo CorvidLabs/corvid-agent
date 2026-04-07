@@ -299,7 +299,7 @@ interface LibraryResponse {
         </div>
     `,
     styles: `
-        .page { padding: var(--space-6); max-width: 960px; }
+        .page { padding: 1.5rem; max-width: 960px; }
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .header__actions { display: flex; gap: 0.5rem; }
@@ -307,7 +307,7 @@ interface LibraryResponse {
         /* Status Banner */
         .status-banner {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg);
+            padding: 0.75rem 1rem; border-radius: var(--radius-lg);
             background: var(--bg-surface); border: 1px solid var(--border);
             font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;
         }
@@ -319,7 +319,7 @@ interface LibraryResponse {
         /* Tabs */
         .tabs { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
         .tab {
-            padding: 0.6rem var(--space-5); background: none; border: none; border-bottom: 2px solid transparent;
+            padding: 0.6rem 1.25rem; background: none; border: none; border-bottom: 2px solid transparent;
             color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; cursor: pointer;
             font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: color 0.15s, border-color 0.15s;
@@ -336,7 +336,7 @@ interface LibraryResponse {
 
         /* Model Card */
         .model-card {
-            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
+            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg); transition: border-color 0.2s;
         }
         .model-card:hover { border-color: var(--accent-cyan); }
@@ -351,7 +351,7 @@ interface LibraryResponse {
         /* Pull Card */
         .pull-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .pull-card {
-            padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--accent-cyan);
+            padding: 0.75rem 1rem; background: var(--bg-surface); border: 1px solid var(--accent-cyan);
             border-radius: var(--radius-lg); box-shadow: 0 0 8px var(--accent-cyan-subtle);
         }
         .pull-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
@@ -364,10 +364,10 @@ interface LibraryResponse {
 
         /* Progress Bar */
         .progress-bar {
-            height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); overflow: hidden;
+            height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden;
         }
         .progress-bar__fill {
-            height: 100%; background: var(--accent-cyan); border-radius: var(--radius-sm);
+            height: 100%; background: var(--accent-cyan); border-radius: 3px;
             transition: width 0.3s ease; box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
         .progress-bar__fill--done { background: #00e676; box-shadow: 0 0 6px rgba(0, 230, 118, 0.3); }
@@ -386,14 +386,14 @@ interface LibraryResponse {
         /* Library Controls */
         .library-controls { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         .search-input {
-            padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
+            padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             width: 100%;
         }
         .search-input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .category-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
         .filter-chip {
-            padding: 0.3rem var(--space-3); border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+            padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
             border: 1px solid var(--border-bright); background: transparent; color: var(--text-secondary);
             cursor: pointer; font-family: inherit; text-transform: capitalize;
             transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -412,7 +412,7 @@ interface LibraryResponse {
 
         /* Buttons */
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase;
             letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
         }
@@ -428,7 +428,7 @@ interface LibraryResponse {
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
         .hint { color: var(--text-tertiary); font-size: 0.82rem; }
-        .empty-state { text-align: center; padding: var(--space-8) var(--space-4); color: var(--text-secondary); }
+        .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }
         .empty-state strong { color: var(--accent-cyan); }
     `,
 })

@@ -112,12 +112,12 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 
         .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .search-input {
-            flex: 1; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
+            flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .category-select {
-            padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
             background: var(--bg-input); color: var(--text-secondary); font-size: 0.85rem; font-family: inherit;
         }
 
@@ -125,7 +125,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 
         .entry-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .entry-card {
-            border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4);
+            border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;
             cursor: pointer; transition: border-color 0.15s, background 0.15s;
         }
         .entry-card:hover { border-color: var(--border-bright); background: var(--bg-hover); }
@@ -149,7 +149,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__pages {
             font-size: 0.6rem; font-weight: 700; color: var(--accent-purple);
             background: var(--accent-purple-tint); border: 1px solid var(--accent-purple-mid);
-            padding: 1px 8px; border-radius: var(--radius-lg);
+            padding: 1px 8px; border-radius: 10px;
         }
 
         .entry-card__tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
@@ -159,7 +159,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         }
 
         .entry-card__content {
-            margin-top: 0.75rem; padding-top: var(--space-3); border-top: 1px solid var(--border);
+            margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
         }
         .entry-card__content pre {
             font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;

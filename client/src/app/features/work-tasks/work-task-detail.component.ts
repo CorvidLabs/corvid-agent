@@ -127,10 +127,10 @@ interface DiffFile {
         </div>
     `,
     styles: `
-        .detail { padding: var(--space-3) 0 0; }
+        .detail { padding: 0.75rem 0 0; }
 
         /* Tabs */
-        .detail__tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: var(--space-2); }
+        .detail__tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
         .detail__tab {
             padding: 0.3rem 0.6rem; background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
             color: var(--text-tertiary); font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer;
@@ -139,8 +139,8 @@ interface DiffFile {
         .detail__tab:hover { border-color: var(--border-bright); color: var(--text-secondary); }
         .detail__tab--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
 
-        .detail__empty { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: var(--space-6); }
-        .detail__error { color: var(--accent-red); font-size: 0.75rem; text-align: center; padding: var(--space-6); }
+        .detail__empty { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: 1.5rem; }
+        .detail__error { color: var(--accent-red); font-size: 0.75rem; text-align: center; padding: 1.5rem; }
 
         /* Log controls */
         .log-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
@@ -152,7 +152,7 @@ interface DiffFile {
         .log-filter:hover { border-color: var(--border-bright); color: var(--text-secondary); }
         .log-filter--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
         .log-search {
-            flex: 1; min-width: 120px; padding: var(--space-1) var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius-sm);
+            flex: 1; min-width: 120px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius-sm);
             font-size: 0.7rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .log-search:focus { border-color: var(--accent-cyan); outline: none; }
@@ -160,7 +160,7 @@ interface DiffFile {
         /* Log list */
         .log-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 400px; overflow-y: auto; }
         .log-entry {
-            background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2);
+            background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem;
             font-size: 0.7rem; transition: border-color 0.15s;
         }
         .log-entry[data-role="user"] { border-left: 2px solid var(--accent-cyan); }
@@ -184,11 +184,11 @@ interface DiffFile {
         /* Syntax highlighting in log content */
         :host ::ng-deep .log-code-block {
             display: block; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            padding: 0.4rem var(--space-2); margin: 0.25rem 0; font-family: var(--font-mono); font-size: 0.65rem;
+            padding: 0.4rem 0.5rem; margin: 0.25rem 0; font-family: var(--font-mono); font-size: 0.65rem;
             overflow-x: auto; color: var(--text-primary);
         }
         :host ::ng-deep .log-code-inline {
-            background: var(--bg-raised); padding: 1px 4px; border-radius: var(--radius-sm);
+            background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
             font-family: var(--font-mono); font-size: 0.9em; color: var(--accent-magenta);
         }
 
@@ -198,7 +198,7 @@ interface DiffFile {
         .diff-files { display: flex; flex-direction: column; gap: 0.5rem; }
         .diff-file { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
         .diff-file__header {
-            display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.4rem var(--space-2);
+            display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.4rem 0.5rem;
             background: var(--bg-raised); border: none; border-bottom: 1px solid var(--border);
             color: var(--text-primary); font-size: 0.7rem; font-family: var(--font-mono);
             cursor: pointer; text-align: left;
@@ -209,7 +209,7 @@ interface DiffFile {
         .diff-file__name { word-break: break-all; }
         .diff-file__content { overflow-x: auto; }
         .diff-hunk__header {
-            padding: 0.2rem var(--space-2); background: var(--accent-cyan-dim); color: var(--accent-cyan);
+            padding: 0.2rem 0.5rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
             font-size: 0.6rem; font-family: var(--font-mono);
         }
         .diff-line {
@@ -225,7 +225,7 @@ interface DiffFile {
             padding: 0 0.3rem; text-align: right; color: var(--text-tertiary); user-select: none;
             border-right: 1px solid var(--border);
         }
-        .diff-line__content { padding: 0 var(--space-2); white-space: pre-wrap; word-break: break-all; }
+        .diff-line__content { padding: 0 0.5rem; white-space: pre-wrap; word-break: break-all; }
 
         @media (max-width: 767px) {
             .log-controls { flex-direction: column; }

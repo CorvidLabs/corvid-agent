@@ -275,7 +275,7 @@ interface FlockStats {
     `,
     styles: `
         .flock-page {
-            padding: var(--space-6);
+            padding: 1.5rem;
             max-width: 1200px;
             margin: 0 auto;
             animation: slideUp 0.3s ease-out;
@@ -317,10 +317,10 @@ interface FlockStats {
             display: flex;
             align-items: center;
             gap: 0.35rem;
-            padding: var(--space-1) 0.6rem;
+            padding: 0.25rem 0.6rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 6px;
             font-size: 0.7rem;
         }
         .stat-pill__value { font-weight: 700; color: var(--text-primary); }
@@ -343,10 +343,10 @@ interface FlockStats {
             gap: 0.5rem;
             flex: 1;
             min-width: 200px;
-            padding: var(--space-2) var(--space-3);
+            padding: 0.5rem 0.75rem;
             background: var(--bg-input);
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             transition: border-color 0.15s;
         }
         .flock-search:focus-within { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
@@ -377,7 +377,7 @@ interface FlockStats {
             padding: 0.4rem 0.6rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 6px;
             color: var(--text-secondary);
             font-family: inherit;
             font-size: 0.7rem;
@@ -396,7 +396,7 @@ interface FlockStats {
             justify-content: center;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 6px;
             color: var(--text-secondary);
             cursor: pointer;
             font-size: 0.85rem;
@@ -412,7 +412,7 @@ interface FlockStats {
             flex-wrap: wrap;
         }
         .flock-cap-pill {
-            padding: 0.2rem var(--space-2);
+            padding: 0.2rem 0.5rem;
             background: transparent;
             border: 1px solid var(--border);
             border-radius: 12px;
@@ -431,7 +431,7 @@ interface FlockStats {
 
         /* Loading */
         .flock-loading {
-            padding: var(--space-12);
+            padding: 3rem;
             text-align: center;
             color: var(--text-tertiary);
             font-size: 0.8rem;
@@ -460,7 +460,7 @@ interface FlockStats {
         .flock-card {
             display: flex;
             flex-direction: column;
-            padding: var(--space-4);
+            padding: 1rem;
             background: rgba(15, 16, 24, 0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -508,7 +508,7 @@ interface FlockStats {
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             background: var(--bg-raised);
             border: 2px solid var(--border);
             font-weight: 700;
@@ -544,8 +544,8 @@ interface FlockStats {
         .flock-card__status[data-status="inactive"] { color: var(--text-tertiary); }
 
         .flock-card__score {
-            padding: 0.2rem var(--space-2);
-            border-radius: var(--radius);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
             font-weight: 700;
             font-size: 0.75rem;
             border: 1px solid;
@@ -572,7 +572,7 @@ interface FlockStats {
             padding: 0.1rem 0.4rem;
             background: rgba(255, 0, 128, 0.06);
             border: 1px solid rgba(255, 0, 128, 0.2);
-            border-radius: var(--radius-xs);
+            border-radius: 4px;
             font-size: 0.55rem;
             color: var(--accent-magenta);
         }
@@ -593,13 +593,13 @@ interface FlockStats {
             align-items: center;
             justify-content: center;
             gap: 1rem;
-            padding: var(--space-6) 0;
+            padding: 1.5rem 0;
         }
         .flock-pagination__btn {
-            padding: 0.35rem var(--space-3);
+            padding: 0.35rem 0.75rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 6px;
             color: var(--text-secondary);
             font-family: inherit;
             font-size: 0.7rem;
@@ -643,7 +643,7 @@ interface FlockStats {
             box-shadow: 0 24px 64px var(--overlay), 0 0 32px var(--accent-cyan-faint);
             overflow-y: auto;
             align-self: flex-start;
-            padding: var(--space-6);
+            padding: 1.5rem;
             animation: panelSlideUp 0.25s ease-out;
         }
 
@@ -659,7 +659,7 @@ interface FlockStats {
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: var(--radius-lg);
+            border-radius: 10px;
             background: var(--bg-raised);
             border: 2px solid var(--border);
             font-weight: 700;
@@ -689,7 +689,7 @@ interface FlockStats {
             color: var(--text-tertiary);
             font-size: 1.4rem;
             cursor: pointer;
-            padding: var(--space-1);
+            padding: 0.25rem;
             line-height: 1;
         }
         .flock-detail__close:hover { color: var(--text-primary); }
@@ -721,12 +721,12 @@ interface FlockStats {
             flex: 1;
             height: 8px;
             background: var(--bg-raised);
-            border-radius: var(--radius-xs);
+            border-radius: 4px;
             overflow: hidden;
         }
         .flock-detail__rep-fill {
             height: 100%;
-            border-radius: var(--radius-xs);
+            border-radius: 4px;
             transition: width 0.3s ease;
         }
         .flock-detail__rep-fill[data-level="high"] { background: var(--accent-green); }
@@ -751,7 +751,7 @@ interface FlockStats {
             text-align: center;
             padding: 0.6rem;
             background: var(--bg-raised);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
         }
         .flock-detail__metric-value {
             display: block;
@@ -775,10 +775,10 @@ interface FlockStats {
             flex-wrap: wrap;
         }
         .flock-detail__cap {
-            padding: 0.2rem var(--space-2);
+            padding: 0.2rem 0.5rem;
             background: rgba(255, 0, 128, 0.08);
             border: 1px solid rgba(255, 0, 128, 0.25);
-            border-radius: var(--radius-xs);
+            border-radius: 4px;
             font-size: 0.65rem;
             color: var(--accent-magenta);
         }
@@ -801,7 +801,7 @@ interface FlockStats {
 
         /* Actions */
         .flock-detail__actions {
-            padding-top: var(--space-3);
+            padding-top: 0.75rem;
             border-top: 1px solid var(--border);
         }
         .flock-detail__action-btn {
@@ -809,7 +809,7 @@ interface FlockStats {
             padding: 0.6rem;
             background: var(--accent-cyan-wash);
             border: 1px solid var(--accent-cyan-glow);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             color: var(--accent-cyan);
             font-family: inherit;
             font-size: 0.75rem;
@@ -821,7 +821,7 @@ interface FlockStats {
 
         /* Responsive */
         @media (max-width: 640px) {
-            .flock-page { padding: var(--space-4); }
+            .flock-page { padding: 1rem; }
             .flock-grid { grid-template-columns: 1fr; }
             .flock-detail { width: calc(100vw - 2rem); }
             .flock-header__title-row { flex-direction: column; align-items: flex-start; }

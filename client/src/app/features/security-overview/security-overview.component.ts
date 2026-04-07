@@ -168,17 +168,17 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         </div>
     `,
     styles: `
-        .page { padding: var(--space-6); max-width: 960px; }
+        .page { padding: 1.5rem; max-width: 960px; }
         .page__header { margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
-        .error { color: var(--accent-red); padding: var(--space-3); background: var(--accent-red-tint); border-radius: var(--radius); }
+        .error { color: var(--accent-red); padding: 0.75rem; background: var(--accent-red-tint); border-radius: var(--radius); }
 
         .card {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: var(--space-5);
+            padding: 1.25rem;
             margin-bottom: 1rem;
         }
         .card__title {
@@ -201,7 +201,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         }
         .card__checks {
             margin: 0;
-            padding-left: var(--space-5);
+            padding-left: 1.25rem;
             font-size: 0.85rem;
             color: var(--text-secondary);
             line-height: 1.8;
@@ -227,8 +227,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .tag-list--wrap { flex-wrap: wrap; }
         .tag {
             display: inline-block;
-            padding: 0.2rem var(--space-2);
-            border-radius: var(--radius-sm);
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
             font-size: 0.75rem;
             font-family: var(--font-mono);
         }
@@ -287,7 +287,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .tier-card {
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: var(--space-3);
+            padding: 0.75rem;
             background: var(--bg-raised);
         }
         .tier-card--layer0 { border-color: var(--accent-red); }
@@ -305,7 +305,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 0.15rem 0.4rem;
-            border-radius: var(--radius-sm);
+            border-radius: 3px;
         }
         .tier-card--layer0 .tier-card__badge { background: var(--accent-red-dim); color: var(--accent-red); }
         .tier-card--layer1 .tier-card__badge { background: rgba(255,183,77,0.15); color: var(--accent-amber); }
@@ -342,7 +342,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .link-card {
             display: flex;
             flex-direction: column;
-            padding: var(--space-3) var(--space-4);
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-raised);
