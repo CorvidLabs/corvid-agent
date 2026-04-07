@@ -72,7 +72,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             background: var(--bg-surface);
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius-lg);
-            padding: var(--space-6);
+            padding: 1.5rem;
             max-width: 520px;
             width: 90vw;
             max-height: 80vh;
@@ -86,7 +86,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1.25rem;
-            padding-bottom: var(--space-3);
+            padding-bottom: 0.75rem;
             border-bottom: 1px solid var(--border);
         }
         .shortcuts-panel__header h2 {
@@ -98,7 +98,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             letter-spacing: 0.08em;
         }
         .shortcuts-panel__close {
-            padding: var(--space-1) var(--space-2);
+            padding: 0.25rem 0.5rem;
             background: transparent;
             border: 1px solid var(--border-bright);
             border-radius: var(--radius-sm);
@@ -143,7 +143,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.375rem var(--space-2);
+            padding: 0.375rem 0.5rem;
             border-radius: var(--radius-sm);
             transition: background var(--transition-fast);
         }
@@ -182,7 +182,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         }
         .shortcuts-panel__footer {
             margin-top: 1rem;
-            padding-top: var(--space-3);
+            padding-top: 0.75rem;
             border-top: 1px solid var(--border);
             display: flex;
             align-items: center;

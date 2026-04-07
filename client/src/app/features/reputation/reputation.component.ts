@@ -7,23 +7,23 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Agent Reputation" icon="reputation">
-            <ng-container actions>
+        <div class="page">
+            <div class="page__header">
+                <h2>Agent Reputation</h2>
                 <button
                     class="btn btn--primary"
                     [disabled]="computing()"
                     (click)="onComputeAll()">
                     {{ computing() ? 'Computing...' : 'Compute All' }}
                 </button>
-            </ng-container>
+            </div>
 
             @if (reputationService.loading()) {
                 <app-skeleton variant="table" [count]="4" />
@@ -398,13 +398,16 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     </div>
                 }
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .page { padding: 1.5rem; }
+        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
-            padding: var(--space-3) var(--space-4); margin-bottom: 1rem;
+            padding: 0.75rem 1rem; margin-bottom: 1rem;
         }
         .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
 
@@ -412,7 +415,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
         .agent-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-4); cursor: pointer; transition: border-color 0.15s;
+            padding: 1rem; cursor: pointer; transition: border-color 0.15s;
         }
         .agent-card:hover { border-color: var(--accent-cyan); }
         .agent-card--selected { border-color: var(--accent-cyan); background: var(--bg-raised); }
@@ -456,8 +459,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .comp-bar { display: grid; grid-template-columns: 1fr 60px 28px; align-items: center; gap: 0.4rem; }
         .comp-bar__label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-secondary); }
         .comp-bar__weight { font-size: 0.6rem; color: var(--text-secondary); opacity: 0.7; }
-        .comp-bar__track { height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); overflow: hidden; }
-        .comp-bar__fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; }
+        .comp-bar__track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; }
+        .comp-bar__fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
         .comp-bar__fill[data-color="green"] { background: var(--accent-green); }
         .comp-bar__fill[data-color="yellow"] { background: var(--accent-yellow); }
         .comp-bar__fill[data-color="cyan"] { background: var(--accent-cyan); }
@@ -468,7 +471,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         /* Detail panel */
         .detail-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-6); margin-top: 1.5rem;
+            padding: 1.5rem; margin-top: 1.5rem;
         }
         .detail-panel__header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
         .detail-panel__header h3 { margin: 0; color: var(--text-primary); }
@@ -478,8 +481,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .detail-bar__label { display: flex; justify-content: space-between; }
         .detail-bar__label span:first-child { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
         .detail-bar__weight { font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
-        .detail-bar__track { height: 8px; background: var(--bg-raised); border-radius: var(--radius-xs); overflow: hidden; }
-        .detail-bar__fill { height: 100%; border-radius: var(--radius-xs); transition: width 0.3s ease; }
+        .detail-bar__track { height: 8px; background: var(--bg-raised); border-radius: 4px; overflow: hidden; }
+        .detail-bar__fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
         .detail-bar__fill[data-color="green"] { background: var(--accent-green); }
         .detail-bar__fill[data-color="yellow"] { background: var(--accent-yellow); }
         .detail-bar__fill[data-color="cyan"] { background: var(--accent-cyan); }
@@ -491,18 +494,18 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
 
         /* No activity */
         .no-activity {
-            color: var(--text-secondary); font-size: 0.8rem; padding: var(--space-4);
+            color: var(--text-secondary); font-size: 0.8rem; padding: 1rem;
             text-align: center; font-style: italic; width: 100%;
         }
         .no-activity-notice {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-3) var(--space-4); margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);
+            padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);
         }
 
         /* Decay notice */
         .decay-notice {
             background: var(--accent-yellow-dim); border: 1px solid var(--accent-yellow);
-            border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-bottom: 1rem;
+            border-radius: var(--radius); padding: 0.5rem 0.75rem; margin-bottom: 1rem;
             font-size: 0.8rem; color: var(--accent-yellow);
         }
 
@@ -510,7 +513,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .explain-components { display: flex; flex-direction: column; gap: 0.75rem; }
         .explain-card {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-3) var(--space-4);
+            padding: 0.75rem 1rem;
         }
         .explain-card--default { border-left: 3px solid var(--accent-yellow); }
         .explain-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
@@ -523,13 +526,13 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .explain-card__score[data-color="purple"] { color: var(--accent-purple); }
         .explain-card__score[data-color="orange"] { color: var(--accent-orange); }
         .default-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 700;
+            font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; font-weight: 700;
             background: var(--accent-yellow-dim);
             color: var(--accent-yellow); border: 1px solid var(--accent-yellow);
         }
         .explain-card__reason { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.3rem; }
         .explain-card__contribution { font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
-        .explain-card__events { margin-top: 0.5rem; padding-top: var(--space-2); border-top: 1px solid var(--border); }
+        .explain-card__events { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
         .explain-card__events-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem; }
         .explain-event { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; font-size: 0.75rem; }
         .explain-event__type { font-weight: 600; color: var(--text-primary); }
@@ -552,7 +555,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         }
         .stat-card {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-3); text-align: center;
+            padding: 0.75rem; text-align: center;
         }
         .stat-card__icon { font-size: 1.2rem; margin-bottom: 0.25rem; }
         .stat-card__icon[data-type="positive"] { color: var(--accent-green); }
@@ -594,10 +597,10 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
 
         /* Buttons */
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
+        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -605,7 +608,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         /* Trend chart */
         .trend-chart {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-3); margin-bottom: 1rem;
+            padding: 0.75rem; margin-bottom: 1rem;
         }
         .trend-chart__svg { width: 100%; height: 80px; display: block; }
         .trend-chart__zero { stroke: var(--border); stroke-width: 0.5; stroke-dasharray: 4 2; }
@@ -625,7 +628,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         /* History trend chart */
         .history-chart {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-3); margin-bottom: 1rem;
+            padding: 0.75rem; margin-bottom: 1rem;
         }
         .history-chart__legend {
             display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;
@@ -677,7 +680,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-section h4 { margin: 0 0 0.75rem; }
         .compare-grid {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-4);
+            padding: 1rem;
         }
         .compare-chart__svg { width: 100%; display: block; }
         .compare-chart__name { fill: var(--text-secondary); font-size: 10px; font-weight: 600; }
@@ -695,8 +698,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-component-bars { display: flex; flex-direction: column; gap: 0.2rem; }
         .compare-mini-bar { display: grid; grid-template-columns: 80px 1fr 30px; align-items: center; gap: 0.4rem; }
         .compare-mini-name { font-size: 0.65rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .compare-mini-track { height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); overflow: hidden; }
-        .compare-mini-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s; }
+        .compare-mini-track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; }
+        .compare-mini-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
         .compare-mini-fill[data-color="green"] { background: var(--accent-green); }
         .compare-mini-fill[data-color="yellow"] { background: var(--accent-yellow); }
         .compare-mini-fill[data-color="cyan"] { background: var(--accent-cyan); }
