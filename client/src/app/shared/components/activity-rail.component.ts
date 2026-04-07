@@ -108,10 +108,10 @@ import type { Session } from '../../core/models/session.model';
         .rail__content {
             flex: 1;
             overflow-y: auto;
-            padding: 0.5rem 0;
+            padding: var(--space-2) 0;
         }
         .rail__section {
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             border-bottom: 1px solid var(--border);
         }
         .rail__section:last-child {
@@ -129,13 +129,13 @@ import type { Session } from '../../core/models/session.model';
             font-size: 0.7rem;
             color: var(--text-tertiary);
             margin: 0;
-            padding: 0.25rem 0;
+            padding: var(--space-1) 0;
         }
         .rail__item {
             display: block;
-            padding: 0.4rem 0.5rem;
+            padding: 0.4rem var(--space-2);
             margin: 0.2rem 0;
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             text-decoration: none;
             color: var(--text-secondary);
             transition: background 0.1s;

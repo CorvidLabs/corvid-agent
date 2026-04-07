@@ -104,7 +104,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             position: relative;
         }
         .app-layout__banner {
-            padding: 0.375rem 1rem;
+            padding: 0.375rem var(--space-4);
             background: var(--accent-red-dim, rgba(255, 51, 85, 0.1));
             border-bottom: 1px solid var(--accent-red, #f33);
             color: var(--accent-red, #f33);

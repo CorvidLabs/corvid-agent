@@ -12,16 +12,14 @@ import type { MemoryEntry, MemoryTier } from '../../core/services/memory-browser
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-memory-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">Memory Browser</h2>
-            </div>
+        <app-page-shell title="Memory Browser" icon="memory">
 
             <!-- Stats summary -->
             @if (memoryService.stats(); as stats) {
@@ -47,35 +45,36 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                 </div>
             }
 
-            <!-- Toolbar: search + filters -->
-            <div class="page__toolbar">
-                <input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search by key or content..."
-                    [ngModel]="searchQuery()"
-                    (ngModelChange)="onSearchChange($event)"
-                    aria-label="Search memories" />
-                <select
-                    class="filter-select"
-                    [ngModel]="tierFilter()"
-                    (ngModelChange)="onTierChange($event)"
-                    aria-label="Filter by tier">
-                    <option value="">All Tiers</option>
-                    <option value="longterm">On-Chain (longterm)</option>
-                    <option value="shortterm">Pending (shortterm)</option>
-                </select>
-                <select
-                    class="filter-select"
-                    [ngModel]="statusFilter()"
-                    (ngModelChange)="onStatusChange($event)"
-                    aria-label="Filter by status">
-                    <option value="">All Statuses</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="pending">Pending</option>
-                    <option value="failed">Failed</option>
-                </select>
-            </div>
+            <ng-container toolbar>
+                <div class="page__toolbar">
+                    <input
+                        class="search-input"
+                        type="text"
+                        placeholder="Search by key or content..."
+                        [ngModel]="searchQuery()"
+                        (ngModelChange)="onSearchChange($event)"
+                        aria-label="Search memories" />
+                    <select
+                        class="filter-select"
+                        [ngModel]="tierFilter()"
+                        (ngModelChange)="onTierChange($event)"
+                        aria-label="Filter by tier">
+                        <option value="">All Tiers</option>
+                        <option value="longterm">On-Chain (longterm)</option>
+                        <option value="shortterm">Pending (shortterm)</option>
+                    </select>
+                    <select
+                        class="filter-select"
+                        [ngModel]="statusFilter()"
+                        (ngModelChange)="onStatusChange($event)"
+                        aria-label="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+            </ng-container>
 
             @if (memoryService.loading()) {
                 <app-skeleton variant="table" [count]="6" />
@@ -240,33 +239,30 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .page__toolbar { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
         /* ── Stats bar ── */
         .stats-bar {
             display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
         }
         .stat {
-            padding: 0.5rem 1rem; background: var(--bg-surface);
+            padding: var(--space-2) var(--space-4); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             display: flex; flex-direction: column; align-items: center; min-width: 80px;
         }
         .stat__value { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
-        .stat__label { font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
-        .stat--longterm { border-color: var(--accent-green, #00ff88); }
-        .stat--longterm .stat__value { color: var(--accent-green, #00ff88); }
-        .stat--shortterm { border-color: var(--accent-yellow, #ffcc00); }
-        .stat--shortterm .stat__value { color: var(--accent-yellow, #ffcc00); }
+        .stat__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat--longterm { border-color: var(--accent-green); }
+        .stat--longterm .stat__value { color: var(--accent-green); }
+        .stat--shortterm { border-color: var(--accent-yellow); }
+        .stat--shortterm .stat__value { color: var(--accent-yellow); }
 
         /* ── Search & filters ── */
         .search-input {
-            flex: 1; min-width: 200px; padding: 0.5rem 0.75rem;
+            flex: 1; min-width: 200px; padding: var(--space-2) var(--space-3);
             background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary);
             font-size: 0.85rem; font-family: inherit;
@@ -276,7 +272,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .search-input::placeholder { color: var(--text-tertiary); }
 
         .filter-select {
-            padding: 0.5rem 0.75rem; background: var(--bg-surface);
+            padding: var(--space-2) var(--space-3); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             appearance: auto; cursor: pointer;
@@ -285,7 +281,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Buttons ── */
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem;
             font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
@@ -296,7 +292,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .btn--ghost { color: var(--text-secondary); border-color: var(--border); }
         .btn--ghost:hover { border-color: var(--text-tertiary); }
         .btn--ghost:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn--danger { color: var(--accent-red, #ff5555); border-color: var(--accent-red, #ff5555); }
+        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
@@ -314,13 +310,13 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         .memory-card {
             display: flex; flex-direction: column; gap: 0.35rem;
-            padding: 0.75rem 1rem; background: var(--bg-surface);
+            padding: var(--space-3) var(--space-4); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius-lg);
             cursor: pointer; text-align: left; width: 100%;
             font-family: inherit; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .memory-card:hover { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(0, 255, 136, 0.08); }
+        .memory-card:hover { border-color: var(--accent-green); box-shadow: 0 0 12px var(--accent-green-wash); }
         .memory-card--active { border-color: var(--accent-cyan); box-shadow: 0 0 16px rgba(0, 200, 255, 0.12); }
 
         .memory-card__header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
@@ -333,7 +329,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         }
         .memory-card__asa {
             font-size: 0.7rem; color: var(--accent-cyan); font-weight: 600;
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
         .memory-card__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
         .memory-card__preview {
@@ -344,42 +340,42 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Tier badge ── */
         .tier-badge {
-            display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
+            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .tier-badge--longterm {
-            color: var(--accent-green, #00ff88); border-color: var(--accent-green, #00ff88);
-            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent-green); border-color: var(--accent-green);
+            background: var(--accent-green-tint);
         }
         .tier-badge--shortterm {
-            color: var(--accent-yellow, #ffcc00); border-color: var(--accent-yellow, #ffcc00);
+            color: var(--accent-yellow); border-color: var(--accent-yellow);
             background: rgba(255, 204, 0, 0.1);
         }
 
         /* ── Status chip ── */
         .status-chip {
-            display: inline-block; padding: 0.1rem 0.35rem; border-radius: 4px;
-            font-size: 0.6rem; font-weight: 600; text-transform: uppercase;
+            display: inline-block; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs);
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em;
         }
-        .status-chip--confirmed { color: var(--accent-green, #00ff88); background: rgba(0, 255, 136, 0.1); }
-        .status-chip--pending { color: var(--accent-yellow, #ffcc00); background: rgba(255, 204, 0, 0.1); }
-        .status-chip--failed { color: var(--accent-red, #ff5555); background: rgba(255, 85, 85, 0.1); }
+        .status-chip--confirmed { color: var(--accent-green); background: var(--accent-green-tint); }
+        .status-chip--pending { color: var(--accent-yellow); background: rgba(255, 204, 0, 0.1); }
+        .status-chip--failed { color: var(--accent-red); background: rgba(255, 85, 85, 0.1); }
 
-        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
+        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: var(--space-4); }
 
         /* ── Pagination ── */
         .pagination {
             display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-            padding: 0.75rem 0; margin-top: 0.5rem;
+            padding: var(--space-3) 0; margin-top: 0.5rem;
         }
         .pagination__info { font-size: 0.75rem; color: var(--text-tertiary); }
 
         /* ── Detail panel ── */
         .memory-detail {
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: 1.5rem;
+            border-radius: var(--radius-lg); padding: var(--space-6);
             overflow-y: auto; max-height: calc(100vh - 320px);
         }
         .memory-detail--empty {
@@ -402,17 +398,17 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             gap: 0.75rem; margin-bottom: 1.5rem;
         }
         .meta-item {
-            padding: 0.5rem 0.75rem;
-            background: var(--bg-base, rgba(0, 0, 0, 0.2));
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-base);
             border-radius: var(--radius);
         }
         .meta-item--wide { grid-column: 1 / -1; }
         .meta-label {
-            display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-tertiary);
+            display: block; font-size: var(--text-xxs); font-weight: 600; color: var(--text-tertiary);
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
         }
         .meta-value { font-size: 0.8rem; color: var(--text-primary); }
-        .meta-value--mono { font-family: var(--font-mono, monospace); font-size: 0.75rem; }
+        .meta-value--mono { font-family: var(--font-mono); font-size: 0.75rem; }
         .meta-value--break { word-break: break-all; }
         .confidence { font-size: 0.7rem; color: var(--text-tertiary); }
 
@@ -434,11 +430,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
         }
         .memory-content {
-            margin: 0; padding: 1rem; background: var(--bg-base, rgba(0, 0, 0, 0.3));
+            margin: 0; padding: var(--space-4); background: var(--bg-base);
             border-radius: var(--radius); color: var(--text-secondary);
             font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
             word-break: break-word; max-height: 400px; overflow-y: auto;
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
 
         .detail-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
@@ -449,7 +445,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
         }
         .field-input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base, rgba(0, 0, 0, 0.3));
+            width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-base);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             box-sizing: border-box;
@@ -458,17 +454,16 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .field-input--disabled { opacity: 0.5; cursor: not-allowed; }
         .field-textarea {
             resize: vertical; min-height: 120px;
-            font-family: var(--font-mono, monospace); font-size: 0.8rem;
+            font-family: var(--font-mono); font-size: 0.8rem;
         }
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
-            .page { padding: 1rem; }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }
             .memory-detail { max-height: none; }
             .stats-bar { gap: 0.5rem; }
-            .stat { min-width: 60px; padding: 0.35rem 0.5rem; }
+            .stat { min-width: 60px; padding: 0.35rem var(--space-2); }
             .stat__value { font-size: 1rem; }
             .meta-grid { grid-template-columns: 1fr 1fr; }
             .page__toolbar { flex-direction: column; }

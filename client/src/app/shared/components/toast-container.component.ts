@@ -59,7 +59,7 @@ import type { NotificationType } from '../../core/models/notification.model';
             display: flex;
             align-items: flex-start;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             border-radius: var(--radius-lg);
             border: 1px solid;
             font-size: 0.8rem;

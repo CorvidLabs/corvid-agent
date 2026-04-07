@@ -150,7 +150,7 @@ interface ParsedEvent {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--bg-deep);
             color: var(--text-primary);
             font-family: var(--font-mono);
@@ -160,8 +160,8 @@ interface ParsedEvent {
                 0deg,
                 transparent,
                 transparent 2px,
-                rgba(0, 229, 255, 0.008) 2px,
-                rgba(0, 229, 255, 0.008) 4px
+                var(--accent-cyan-faint) 2px,
+                var(--accent-cyan-faint) 4px
             );
         }
 
@@ -177,7 +177,7 @@ interface ParsedEvent {
         .line + .line--assistant,
         .line + .line--user {
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
 
@@ -191,18 +191,18 @@ interface ParsedEvent {
 
         .label {
             flex-shrink: 0;
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             padding: 1px 6px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             line-height: 1.6;
         }
 
         .time {
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             line-height: 1.8;
         }
@@ -229,7 +229,7 @@ interface ParsedEvent {
             color: var(--text-tertiary);
             cursor: pointer;
             font-size: 0.85rem;
-            padding: 0 0.25rem;
+            padding: 0 var(--space-1);
             line-height: 1.6;
             opacity: 0;
             transition: opacity 0.15s, color 0.15s;
@@ -245,17 +245,17 @@ interface ParsedEvent {
 
         /* Assistant */
         .line--assistant .prompt { color: var(--accent-green); }
-        .line--assistant .label { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .line--assistant .label { color: var(--accent-green); background: var(--accent-green-wash); }
         .line--assistant .text { color: var(--text-primary); }
 
         /* User */
         .line--user .prompt { color: var(--accent-cyan); }
-        .line--user .label { color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); }
+        .line--user .label { color: var(--accent-cyan); background: var(--accent-cyan-wash); }
         .line--user .text { color: var(--text-primary); }
 
         /* Tool use */
         .line--tool_use .prompt { color: var(--accent-magenta); }
-        .tool-label { color: var(--accent-magenta); background: rgba(255, 0, 170, 0.08); }
+        .tool-label { color: var(--accent-magenta); background: var(--accent-magenta-wash); }
         .text--tool { color: var(--text-secondary); font-size: 0.75rem; }
 
         /* Tool result */
@@ -274,7 +274,7 @@ interface ParsedEvent {
             color: var(--text-secondary);
             font-size: 0.7rem;
             margin-top: 0.25rem;
-            padding: 0.5rem;
+            padding: var(--space-2);
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -284,11 +284,11 @@ interface ParsedEvent {
 
         /* Result / done */
         .line--result .prompt { color: var(--accent-green); opacity: 1; }
-        .done-label { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .done-label { color: var(--accent-green); background: var(--accent-green-wash); }
 
         /* Error */
         .line--error .prompt { color: var(--accent-red); opacity: 1; }
-        .error-label { color: var(--accent-red); background: rgba(255, 51, 85, 0.08); }
+        .error-label { color: var(--accent-red); background: var(--accent-red-wash); }
         .text--error { color: var(--accent-red); }
 
         /* System */
@@ -303,7 +303,7 @@ interface ParsedEvent {
         .tool-group + .line--assistant,
         .tool-group + .line--user {
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
         .tool-group-summary {
@@ -328,10 +328,10 @@ interface ParsedEvent {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .tool-group-label {
             color: var(--accent-magenta);
-            background: rgba(255, 0, 170, 0.08);
+            background: var(--accent-magenta-wash);
         }
         .tool-group-children {
-            padding-left: 1.5rem;
+            padding-left: var(--space-6);
             border-left: 1px solid var(--border);
             margin-left: 0.55rem;
         }
@@ -343,7 +343,7 @@ interface ParsedEvent {
         .load-more {
             display: block;
             width: 100%;
-            padding: 0.4rem 0.75rem;
+            padding: 0.4rem var(--space-3);
             margin: 0.25rem 0;
             background: var(--bg-surface);
             border: 1px solid var(--border);
@@ -382,7 +382,7 @@ interface ParsedEvent {
         }
         .scroll-fab:hover {
             background: var(--bg-hover);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 0 12px var(--accent-cyan-glow);
         }
 
         /* Thinking indicator */
@@ -390,7 +390,7 @@ interface ParsedEvent {
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: 0.5rem 0;
+            padding: var(--space-2) 0;
             margin-top: 0.25rem;
         }
         .thinking-dot {
@@ -407,7 +407,7 @@ interface ParsedEvent {
             40% { opacity: 1; transform: scale(1); }
         }
         .thinking-text {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -416,20 +416,20 @@ interface ParsedEvent {
 
         /* ── Mobile optimizations ── */
         @media (max-width: 767px) {
-            .terminal { padding: 0.375rem 0.5rem; }
+            .terminal { padding: 0.375rem var(--space-2); }
             .line { gap: 0.375rem; }
             .line + .line--assistant,
             .line + .line--user {
                 margin-top: 0.25rem;
-                padding-top: 0.25rem;
+                padding-top: var(--space-1);
             }
             .tool-group + .line--assistant,
             .tool-group + .line--user {
                 margin-top: 0.25rem;
-                padding-top: 0.25rem;
+                padding-top: var(--space-1);
             }
             .tool-group-children {
-                padding-left: 0.75rem;
+                padding-left: var(--space-3);
                 margin-left: 0.25rem;
             }
             .text--result { max-height: 120px; }

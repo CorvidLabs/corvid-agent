@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 interface AgentSpendingInfo {
     agentId: string;
@@ -40,11 +41,9 @@ interface CreditTransaction {
 @Component({
     selector: 'app-spending',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="spending">
-            <h2>Spending Controls</h2>
-
+        <app-page-shell title="Spending Controls" icon="spending">
             @if (loading()) {
                 <app-skeleton variant="card" [count]="4" />
             } @else {
@@ -156,39 +155,38 @@ interface CreditTransaction {
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: [`
-        .spending { padding: 1rem; }
         .spending__section { margin-bottom: 2rem; }
-        .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+        .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: var(--space-1); }
         .spending__desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem; }
         .spending__empty { color: var(--text-secondary); font-style: italic; }
         .spending__table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .spending__table th, .spending__table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+        .spending__table th, .spending__table td { padding: var(--space-2); text-align: left; border-bottom: 1px solid var(--border); }
         .spending__table th { color: var(--text-secondary); font-weight: 600; }
         .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-top: 0.5rem; }
         .info-item { display: flex; flex-direction: column; gap: 0.25rem; }
         .info-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
         .info-value { font-size: 1.2rem; font-weight: 600; }
-        .progress-bar { width: 80px; height: 6px; background: var(--bg-raised); border-radius: 3px; display: inline-block; vertical-align: middle; }
-        .progress-bar__fill { height: 100%; background: var(--accent-cyan); border-radius: 3px; transition: width 0.3s; }
+        .progress-bar { width: 80px; height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); display: inline-block; vertical-align: middle; }
+        .progress-bar__fill { height: 100%; background: var(--accent-cyan); border-radius: var(--radius-sm); transition: width 0.3s; }
         .progress-bar__fill--warning { background: var(--accent-amber); }
         .progress-bar__fill--danger { background: var(--accent-red); }
         .progress-text { font-size: 0.75rem; margin-left: 0.5rem; }
-        .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: var(--bg-raised); }
+        .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); background: var(--bg-raised); }
         .badge--default { background: var(--bg-raised); color: var(--text-secondary); }
         .badge--purchase, .badge--usdc_deposit, .badge--grant { background: var(--accent-green-dim); color: var(--accent-green); }
         .badge--deduction, .badge--agent_message { background: var(--accent-red-dim); color: var(--accent-red); }
         .badge--reserve { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .badge--release, .badge--refund { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .txid { font-family: var(--font-mono); font-size: 0.8rem; }
-        .btn--sm { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+        .btn--sm { padding: 0.2rem var(--space-2); font-size: 0.75rem; }
         .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-        .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 229, 255, 0.1); }
+        .modal { background: var(--bg-surface); padding: var(--space-6); border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px var(--accent-cyan-tint); }
         .modal h3 { margin-bottom: 1rem; color: var(--text-primary); }
-        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; padding-top: var(--space-4); border-top: 1px solid var(--border); }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
         .form-group small { color: var(--text-secondary); font-size: 0.75rem; }
@@ -196,7 +194,6 @@ interface CreditTransaction {
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .spending__table { min-width: 500px; }
         @media (max-width: 767px) {
-            .spending { padding: 0.75rem; }
             .info-grid { grid-template-columns: repeat(2, 1fr); }
             .modal { min-width: auto; width: calc(100vw - 2rem); max-width: 400px; }
         }

@@ -452,7 +452,7 @@ interface SyncStatus {
         </div>
     `,
     styles: `
-        .brain-viewer { padding: 1.5rem; }
+        .brain-viewer { padding: var(--space-6); }
         .brain-viewer h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .brain-viewer h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
@@ -462,14 +462,14 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.6rem 1rem;
+            padding: 0.6rem var(--space-4);
             border-radius: var(--radius-lg);
             margin-bottom: 1.25rem;
             font-size: 0.75rem;
             border: 1px solid var(--border);
         }
-        .sync-banner--ok { background: rgba(0, 255, 136, 0.05); border-color: var(--accent-green); }
-        .sync-banner--warn { background: rgba(255, 170, 0, 0.05); border-color: var(--accent-amber); }
+        .sync-banner--ok { background: var(--accent-green-faint); border-color: var(--accent-green); }
+        .sync-banner--warn { background: var(--accent-amber-faint); border-color: var(--accent-amber); }
         .sync-banner__indicator {
             width: 8px;
             height: 8px;
@@ -491,7 +491,7 @@ interface SyncStatus {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             display: flex;
             flex-direction: column;
             gap: 0.35rem;
@@ -499,7 +499,7 @@ interface SyncStatus {
         .stat-card--longterm { border-color: var(--accent-cyan); border-style: dashed; }
         .stat-card--shortterm { border-color: var(--accent-amber); border-style: dashed; }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -508,21 +508,21 @@ interface SyncStatus {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+            text-shadow: 0 0 10px var(--accent-cyan-dim);
         }
         .stat-card__value--longterm { color: var(--accent-cyan); }
-        .stat-card__value--shortterm { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
-        .stat-card__value--decay { color: var(--accent-purple); text-shadow: 0 0 10px rgba(167, 139, 250, 0.15); }
-        .stat-card__value--confirmed { color: var(--accent-green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
-        .stat-card__value--pending { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
-        .stat-card__value--failed { color: var(--accent-red); text-shadow: 0 0 10px rgba(255, 51, 85, 0.15); }
+        .stat-card__value--shortterm { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
+        .stat-card__value--decay { color: var(--accent-purple); text-shadow: 0 0 10px var(--accent-purple-dim); }
+        .stat-card__value--confirmed { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
+        .stat-card__value--pending { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
+        .stat-card__value--failed { color: var(--accent-red); text-shadow: 0 0 10px var(--accent-red-dim); }
 
         /* ─── Section ────── */
         .section {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            padding: var(--space-5);
             margin-bottom: 1.25rem;
         }
         .section--errors { border-color: var(--accent-red); }
@@ -542,10 +542,10 @@ interface SyncStatus {
             min-width: 40px;
             transition: flex 0.3s;
         }
-        .tier-bar__segment--longterm { background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan); }
-        .tier-bar__segment--shortterm { background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1)); color: var(--accent-amber); }
+        .tier-bar__segment--longterm { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+        .tier-bar__segment--shortterm { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .tier-bar__label {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -598,13 +598,13 @@ interface SyncStatus {
             transition: border-color 0.15s, color 0.15s;
         }
         .chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.08)); }
+        .chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
         .chip--lt.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--st.chip--active { border-color: var(--accent-amber); color: var(--accent-amber); background: var(--accent-amber-dim, rgba(255, 170, 0, 0.08)); }
+        .chip--st.chip--active { border-color: var(--accent-amber); color: var(--accent-amber); background: var(--accent-amber-dim); }
         .chip--clear {
             border-color: var(--accent-magenta);
             color: var(--accent-magenta);
-            background: rgba(255, 0, 170, 0.06);
+            background: var(--accent-magenta-subtle);
         }
 
         /* ─── Filters ────── */
@@ -615,7 +615,7 @@ interface SyncStatus {
         }
         .search-input {
             width: 100%;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -656,12 +656,12 @@ interface SyncStatus {
             color: var(--text-secondary);
         }
         .btn--sm {
-            padding: 0.25rem 0.6rem;
+            padding: var(--space-1) 0.6rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -672,7 +672,7 @@ interface SyncStatus {
         /* ─── Empty State ────── */
         .empty-state {
             text-align: center;
-            padding: 2rem;
+            padding: var(--space-8);
             color: var(--text-tertiary);
         }
         .empty-state__icon {
@@ -696,24 +696,24 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             font-size: 0.7rem;
         }
         .memory-card__tier {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
-            font-size: 0.55rem;
+            border-radius: var(--radius-sm);
+            font-size: var(--text-micro);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             flex-shrink: 0;
         }
         .memory-card__tier[data-tier="longterm"] {
-            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1));
+            background: var(--accent-cyan-dim);
             color: var(--accent-cyan);
         }
         .memory-card__tier[data-tier="shortterm"] {
-            background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1));
+            background: var(--accent-amber-dim);
             color: var(--accent-amber);
         }
         .memory-card__key {
@@ -725,7 +725,7 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .memory-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -734,22 +734,22 @@ interface SyncStatus {
         .memory-card__status[data-status="pending"] { color: var(--accent-amber); }
         .memory-card__status[data-status="failed"] { color: var(--accent-red); }
         .memory-card__decay {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
         }
         .memory-card__category {
             padding: 0.1rem 0.3rem;
-            background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
+            background: var(--accent-purple-dim);
             color: var(--accent-purple);
-            border-radius: 3px;
-            font-size: 0.55rem;
+            border-radius: var(--radius-sm);
+            font-size: var(--text-micro);
             flex-shrink: 0;
         }
         .memory-card__storage {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.5rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -757,27 +757,27 @@ interface SyncStatus {
             flex-shrink: 0;
         }
         .memory-card__storage[data-storage="arc69"] {
-            background: var(--accent-green-dim, rgba(0, 255, 136, 0.1));
+            background: var(--accent-green-dim);
             color: var(--accent-green);
         }
         .memory-card__storage[data-storage="plain-txn"] {
-            background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
+            background: var(--accent-purple-dim);
             color: var(--accent-purple);
         }
         .memory-card__storage[data-storage="pending"] {
-            background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1));
+            background: var(--accent-amber-dim);
             color: var(--accent-amber);
         }
         .memory-card__time {
             color: var(--text-tertiary);
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             flex-shrink: 0;
             white-space: nowrap;
         }
 
         /* ─── Detail View ────── */
         .memory-card__detail {
-            padding: 0.75rem;
+            padding: var(--space-3);
             border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -794,14 +794,14 @@ interface SyncStatus {
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             padding-top: 0.1rem;
         }
         .detail-value {
             color: var(--text-secondary);
             word-break: break-all;
         }
-        .detail-value--mono { font-family: var(--font-mono); font-size: 0.65rem; }
+        .detail-value--mono { font-family: var(--font-mono); font-size: var(--text-xxs); }
         .detail-value--txid { color: var(--accent-green); }
         .detail-value--asa { color: var(--accent-cyan); }
         [data-storage="arc69"] { color: var(--accent-green); }
@@ -814,10 +814,10 @@ interface SyncStatus {
             margin-top: 0.3rem;
         }
         .detail-pre {
-            background: var(--bg-deep, #0a0a12);
+            background: var(--bg-deep);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 0.75rem;
+            padding: var(--space-3);
             font-size: 0.7rem;
             color: var(--text-secondary);
             white-space: pre-wrap;
@@ -843,7 +843,7 @@ interface SyncStatus {
 
         /* ─── Observations ────── */
         .stat-card--observations { border-color: var(--accent-magenta); border-style: dashed; }
-        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.15); }
+        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
 
         .obs-header {
             display: flex;
@@ -853,7 +853,7 @@ interface SyncStatus {
         }
         .obs-header h3 { margin: 0; }
         .obs-header__meta {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
         }
         .obs-empty {
@@ -861,9 +861,9 @@ interface SyncStatus {
             font-size: 0.75rem;
         }
         .chip--obs-active.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: var(--accent-green-wash); }
         .chip--obs-expired.chip--active { border-color: var(--text-tertiary); color: var(--text-tertiary); }
-        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: rgba(255, 51, 85, 0.08); }
+        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: var(--accent-red-wash); }
 
         .obs-list { display: flex; flex-direction: column; gap: 4px; }
         .obs-card {
@@ -879,18 +879,18 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             font-size: 0.7rem;
         }
         .obs-card__source {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
-            font-size: 0.55rem;
+            border-radius: var(--radius-sm);
+            font-size: var(--text-micro);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             flex-shrink: 0;
-            background: var(--accent-magenta-dim, rgba(255, 0, 170, 0.1));
+            background: var(--accent-magenta-dim);
             color: var(--accent-magenta);
         }
         .obs-card__content-preview {
@@ -901,13 +901,13 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .obs-card__score {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
         }
         .obs-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -917,7 +917,7 @@ interface SyncStatus {
         .obs-card__status[data-obs-status="expired"] { color: var(--text-tertiary); }
         .obs-card__status[data-obs-status="dismissed"] { color: var(--accent-red); }
         .obs-card__detail {
-            padding: 0.75rem;
+            padding: var(--space-3);
             border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -927,13 +927,13 @@ interface SyncStatus {
             display: flex;
             gap: 0.5rem;
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
         .btn--action {
-            padding: 0.35rem 0.75rem;
+            padding: 0.35rem var(--space-3);
             border-radius: var(--radius-sm);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -942,23 +942,23 @@ interface SyncStatus {
         }
         .btn--action:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--graduate {
-            background: rgba(0, 255, 136, 0.1);
+            background: var(--accent-green-tint);
             border-color: var(--accent-green);
             color: var(--accent-green);
         }
-        .btn--graduate:hover:not(:disabled) { background: rgba(0, 255, 136, 0.2); }
+        .btn--graduate:hover:not(:disabled) { background: var(--accent-green-mid); }
         .btn--boost {
-            background: rgba(0, 229, 255, 0.1);
+            background: var(--accent-cyan-tint);
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
         }
-        .btn--boost:hover { background: rgba(0, 229, 255, 0.2); }
+        .btn--boost:hover { background: var(--accent-cyan-mid); }
 
         /* ─── Responsive ────── */
         @media (max-width: 767px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
             .memory-card__header { flex-wrap: wrap; }
-            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: 0.6rem; }
+            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: var(--text-xxs); }
         }
     `,
 })

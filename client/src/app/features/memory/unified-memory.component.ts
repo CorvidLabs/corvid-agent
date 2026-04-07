@@ -5,6 +5,7 @@ import {
 } from '@angular/core';
 import { BrainViewerComponent } from '../brain-viewer/brain-viewer.component';
 import { MemoryBrowserComponent } from '../memory-browser/memory-browser.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 type MemoryView = 'overview' | 'browse';
 
@@ -14,70 +15,46 @@ const STORAGE_KEY = 'memory_view_mode';
     selector: 'app-unified-memory',
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="unified-memory">
-            <header class="unified-memory__header">
-                <h2 class="unified-memory__title">Memory</h2>
-                <div class="unified-memory__modes" role="tablist" aria-label="Memory view mode">
-                    <button
-                        class="unified-memory__mode-btn"
-                        [class.unified-memory__mode-btn--active]="view() === 'overview'"
-                        (click)="setView('overview')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'overview'">
-                        Overview
-                    </button>
-                    <button
-                        class="unified-memory__mode-btn"
-                        [class.unified-memory__mode-btn--active]="view() === 'browse'"
-                        (click)="setView('browse')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'browse'">
-                        Browse
-                    </button>
-                </div>
-            </header>
-            <div class="unified-memory__content">
-                @switch (view()) {
-                    @case ('overview') {
-                        <app-brain-viewer />
-                    }
-                    @case ('browse') {
-                        <app-memory-browser />
-                    }
-                }
+        <app-page-shell title="Memory" icon="memory">
+            <div actions class="mode-toggle" role="tablist" aria-label="Memory view mode">
+                <button
+                    class="mode-toggle__btn"
+                    [class.mode-toggle__btn--active]="view() === 'overview'"
+                    (click)="setView('overview')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'overview'">
+                    Overview
+                </button>
+                <button
+                    class="mode-toggle__btn"
+                    [class.mode-toggle__btn--active]="view() === 'browse'"
+                    (click)="setView('browse')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'browse'">
+                    Browse
+                </button>
             </div>
-        </div>
+
+            @switch (view()) {
+                @case ('overview') {
+                    <app-brain-viewer />
+                }
+                @case ('browse') {
+                    <app-memory-browser />
+                }
+            }
+        </app-page-shell>
     `,
     styles: `
-        .unified-memory {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .unified-memory__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1.25rem;
-            background: rgba(12, 13, 20, 0.3);
-            border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0;
-        }
-        .unified-memory__title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
-        .unified-memory__modes {
+        .mode-toggle {
             display: flex;
             gap: 0;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             overflow: hidden;
         }
-        .unified-memory__mode-btn {
+        .mode-toggle__btn {
             padding: 0.35rem 0.85rem;
             font-size: 0.72rem;
             font-weight: 600;
@@ -89,31 +66,24 @@ const STORAGE_KEY = 'memory_view_mode';
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
         }
-        .unified-memory__mode-btn:hover {
+        .mode-toggle__btn:hover {
             color: var(--text-primary);
             background: var(--bg-hover);
         }
-        .unified-memory__mode-btn--active {
+        .mode-toggle__btn--active {
             color: var(--accent-cyan);
             background: var(--accent-cyan-subtle);
             text-shadow: 0 0 8px var(--accent-cyan-border);
         }
-        .unified-memory__content {
-            flex: 1;
-            overflow-y: auto;
-        }
 
         @media (max-width: 767px) {
-            .unified-memory__header {
-                padding: 0.5rem 0.75rem;
-            }
-            .unified-memory__mode-btn {
+            .mode-toggle__btn {
                 padding: 0.3rem 0.65rem;
                 font-size: 0.68rem;
             }
         }
     `,
-    imports: [BrainViewerComponent, MemoryBrowserComponent],
+    imports: [BrainViewerComponent, MemoryBrowserComponent, PageShellComponent],
 })
 export class UnifiedMemoryComponent {
     readonly view = signal<MemoryView>(this.loadView());

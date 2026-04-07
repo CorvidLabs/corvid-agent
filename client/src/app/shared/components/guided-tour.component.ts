@@ -110,9 +110,9 @@ interface TooltipPos {
 
         .tour-spotlight-ring {
             position: absolute;
-            border: 2px solid var(--accent-cyan, #00e5ff);
-            border-radius: 8px;
-            box-shadow: 0 0 16px var(--accent-cyan-glow), inset 0 0 16px rgba(0, 229, 255, 0.05);
+            border: 2px solid var(--accent-cyan);
+            border-radius: var(--radius-md);
+            box-shadow: 0 0 16px var(--accent-cyan-glow), inset 0 0 16px var(--accent-cyan-subtle);
             pointer-events: none;
             transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
         }
@@ -121,10 +121,10 @@ interface TooltipPos {
             position: absolute;
             width: 340px;
             max-width: calc(100vw - 2rem);
-            background: var(--bg-surface, #1a1a2e);
-            border: 1px solid var(--border-bright, #3a3a5c);
-            border-radius: var(--radius-lg, 12px);
-            padding: 1rem 1.25rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-5);
             box-shadow: 0 8px 32px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-dim);
             z-index: 10001;
             transition: top 0.3s ease, left 0.3s ease;
@@ -146,37 +146,37 @@ interface TooltipPos {
         .tour-tooltip__step {
             font-size: 0.7rem;
             font-weight: 600;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             letter-spacing: 0.05em;
         }
 
         .tour-tooltip__skip {
             background: none;
             border: none;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-size: 0.7rem;
             font-family: inherit;
             cursor: pointer;
             padding: 0.2rem 0.4rem;
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
         }
         .tour-tooltip__skip:hover {
-            color: var(--text-secondary, #999);
-            background: var(--bg-hover, rgba(255,255,255,0.05));
+            color: var(--text-secondary);
+            background: var(--bg-hover);
         }
 
         .tour-tooltip__title {
             margin: 0 0 0.4rem;
             font-size: 0.95rem;
             font-weight: 700;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
 
         .tour-tooltip__content {
             margin: 0 0 0.75rem;
             font-size: 0.8rem;
             line-height: 1.5;
-            color: var(--text-secondary, #aaa);
+            color: var(--text-secondary);
             white-space: pre-line;
         }
 
@@ -191,17 +191,17 @@ interface TooltipPos {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: var(--border, #333);
+            background: var(--border);
             transition: background 0.2s, box-shadow 0.2s;
         }
 
         .tour-dot--active {
-            background: var(--accent-cyan, #00e5ff);
+            background: var(--accent-cyan);
             box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
 
         .tour-dot--done {
-            background: var(--accent-green, #00e676);
+            background: var(--accent-green);
         }
 
         .tour-tooltip__actions {
@@ -211,8 +211,8 @@ interface TooltipPos {
         }
 
         .tour-btn {
-            padding: 0.4rem 1rem;
-            border-radius: var(--radius, 6px);
+            padding: 0.4rem var(--space-4);
+            border-radius: var(--radius);
             font-size: 0.8rem;
             font-weight: 600;
             font-family: inherit;
@@ -223,8 +223,8 @@ interface TooltipPos {
 
         .tour-btn--primary {
             background: var(--accent-cyan-dim);
-            border-color: var(--accent-cyan, #00e5ff);
-            color: var(--accent-cyan, #00e5ff);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
         }
         .tour-btn--primary:hover {
             background: var(--accent-cyan-border);
@@ -233,11 +233,11 @@ interface TooltipPos {
 
         .tour-btn--ghost {
             background: transparent;
-            border-color: var(--border, #333);
-            color: var(--text-secondary, #999);
+            border-color: var(--border);
+            color: var(--text-secondary);
         }
         .tour-btn--ghost:hover {
-            background: var(--bg-hover, rgba(255,255,255,0.05));
+            background: var(--bg-hover);
         }
     `,
 })

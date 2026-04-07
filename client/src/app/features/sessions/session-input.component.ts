@@ -51,7 +51,7 @@ import { DecimalPipe } from '@angular/common';
         .input-bar {
             display: flex;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--bg-surface);
             border-top: 1px solid var(--border);
             transition: border-color 0.2s;
@@ -67,7 +67,7 @@ import { DecimalPipe } from '@angular/common';
         }
         .input-bar__field {
             width: 100%;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--bg-input);
             color: var(--text-primary);
             border: 1px solid var(--border-bright);
@@ -95,7 +95,7 @@ import { DecimalPipe } from '@angular/common';
             opacity: 1;
         }
         .input-bar__char-count {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             font-variant-numeric: tabular-nums;
             margin-right: auto;
@@ -104,23 +104,23 @@ import { DecimalPipe } from '@angular/common';
             color: var(--accent-amber);
         }
         .input-bar__kbd {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             padding: 1px 4px;
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             background: var(--bg-raised);
             color: var(--text-tertiary);
             font-family: inherit;
         }
         .input-bar__kbd-label {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             color: var(--text-tertiary);
         }
         .input-bar__send {
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: 0.5rem 1rem;
+            padding: var(--space-2) var(--space-4);
             background: transparent;
             color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan);
@@ -137,20 +137,20 @@ import { DecimalPipe } from '@angular/common';
         .input-bar__send:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .input-bar__send:active:not(:disabled) { transform: scale(0.97); }
         .input-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
-        .input-bar__send-icon { font-size: 0.65rem; }
+        .input-bar__send-icon { font-size: var(--text-xxs); }
 
         /* Mobile: tighter input bar */
         @media (max-width: 767px) {
             .input-bar {
-                padding: 0.5rem;
+                padding: var(--space-2);
                 gap: 0.375rem;
             }
             .input-bar__field {
-                padding: 0.375rem 0.5rem;
+                padding: 0.375rem var(--space-2);
                 font-size: 0.8rem;
             }
             .input-bar__send {
-                padding: 0.375rem 0.75rem;
+                padding: 0.375rem var(--space-3);
                 font-size: 0.7rem;
             }
             .input-bar__hints { display: none; }

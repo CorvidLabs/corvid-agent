@@ -63,6 +63,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
                 <button [class.active]="activeFilter() === 'draft'" (click)="activeFilter.set('draft')">Draft</button>
             </div>
 
+            <div class="stagger-children">
             @for (workflow of filteredWorkflows(); track workflow.id) {
                 <div class="card workflow-card" (click)="toggleExpand(workflow.id)">
                     <div class="workflow-header">
@@ -319,17 +320,18 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
                         actionAriaLabel="Create your first workflow" />
                 }
             }
+            </div>
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        .page { padding: var(--space-6); max-width: 1200px; margin: 0 auto; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         h1 { margin: 0; font-size: 1.5rem; }
         .card {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             margin-bottom: 1rem;
         }
         .create-form { margin-bottom: 1.5rem; animation: expandReveal 0.25s ease-out; }
@@ -360,12 +362,12 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         }
         .form-group textarea { resize: vertical; }
         .hint { font-size: 0.7rem; color: var(--text-tertiary); margin: 0.5rem 0; }
-        .loading { text-align: center; padding: 2rem; color: var(--text-secondary); }
+        .loading { text-align: center; padding: var(--space-8); color: var(--text-secondary); }
 
         /* Filter bar — themed pills */
         .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .filter-bar button {
-            padding: 0.35rem 0.75rem;
+            padding: 0.35rem var(--space-3);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: transparent;
@@ -383,7 +385,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
             background: var(--accent-cyan-dim);
-            box-shadow: 0 0 8px rgba(0, 229, 255, 0.12);
+            box-shadow: 0 0 8px var(--accent-cyan-dim);
         }
 
         /* Workflow card */
@@ -400,14 +402,14 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         .workflow-info { display: flex; align-items: center; gap: 0.5rem; }
         .workflow-actions { display: flex; gap: 0.35rem; }
         .description { font-size: 0.75rem; color: var(--text-secondary); margin: 0.5rem 0 0; }
-        .workflow-meta { display: flex; gap: 1rem; font-size: 0.65rem; color: var(--text-tertiary); margin-top: 0.5rem; }
+        .workflow-meta { display: flex; gap: 1rem; font-size: var(--text-xxs); color: var(--text-tertiary); margin-top: 0.5rem; }
         .meta { font-size: 0.7rem; color: var(--text-tertiary); }
 
         /* Status badges — themed */
         .status-badge {
             padding: 2px 8px;
             border-radius: var(--radius-sm);
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             font-weight: 700;
             letter-spacing: 0.04em;
@@ -424,7 +426,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         /* Expanded section — animated reveal */
         .expanded-section {
             margin-top: 1rem;
-            padding-top: 1rem;
+            padding-top: var(--space-4);
             border-top: 1px solid var(--border);
             animation: expandReveal 0.3s ease-out;
         }
@@ -436,7 +438,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             flex-direction: column;
             align-items: center;
             gap: 0.15rem;
-            padding: 0.75rem;
+            padding: var(--space-3);
             background: var(--bg-raised);
             border-radius: var(--radius);
             margin-bottom: 0.5rem;
@@ -446,7 +448,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
 
         /* Node chips — themed with hover */
         .node-chip {
-            padding: 0.15rem 0.5rem;
+            padding: 0.15rem var(--space-2);
             border-radius: var(--radius-sm);
             font-size: 0.7rem;
             white-space: nowrap;
@@ -476,7 +478,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.4rem 0.5rem;
+            padding: 0.4rem var(--space-2);
             background: var(--bg-raised);
             border-radius: var(--radius-sm);
             font-size: 0.75rem;
@@ -487,14 +489,14 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             transform: translateX(2px);
         }
         .node-label { font-weight: 600; color: var(--text-primary); }
-        .config-summary { color: var(--text-tertiary); font-size: 0.65rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .config-summary { color: var(--text-tertiary); font-size: var(--text-xxs); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* Edge rows */
         .edge-row {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.4rem 0.5rem;
+            padding: 0.4rem var(--space-2);
             background: var(--bg-raised);
             border-radius: var(--radius-sm);
             font-size: 0.75rem;
@@ -502,12 +504,12 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         }
         .edge-row:hover { background: var(--bg-hover); }
         .edge-arrow { color: var(--accent-cyan); font-size: 0.85rem; }
-        .edge-condition { color: var(--accent-cyan); font-size: 0.65rem; flex: 1; }
+        .edge-condition { color: var(--accent-cyan); font-size: var(--text-xxs); flex: 1; }
         .edge-add-row {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.4rem 0.5rem;
+            padding: 0.4rem var(--space-2);
             background: var(--bg-raised);
             border-radius: var(--radius-sm);
         }
@@ -533,7 +535,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
 
         /* Inline edit form — animated entrance */
         .inline-edit-form {
-            padding: 0.75rem;
+            padding: var(--space-3);
             background: var(--bg-raised);
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
@@ -542,7 +544,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         }
         .inline-edit-form .form-group { margin-bottom: 0.5rem; }
         .inline-edit-form .form-group label {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.04em;
@@ -567,7 +569,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--accent-cyan-dim);
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius);
@@ -581,16 +583,16 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.35rem 0.5rem;
+            padding: 0.35rem var(--space-2);
             font-size: 0.75rem;
             border-radius: var(--radius-sm);
             transition: background var(--transition-fast);
         }
         .run-row:hover { background: var(--bg-hover); }
         .error-text { color: var(--accent-red); font-size: 0.7rem; }
-        .paused-hint { font-size: 0.65rem; color: var(--accent-amber); font-style: italic; }
+        .paused-hint { font-size: var(--text-xxs); color: var(--accent-amber); font-style: italic; }
         .empty { color: var(--text-tertiary); font-size: 0.75rem; }
-        .empty-state { text-align: center; padding: 3rem; color: var(--text-tertiary); }
+        .empty-state { text-align: center; padding: var(--space-12); color: var(--text-tertiary); }
 
         /* Buttons — themed */
         .btn {
@@ -610,10 +612,10 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
         }
-        .btn-primary:hover { background: rgba(0, 229, 255, 0.2); }
+        .btn-primary:hover { background: var(--accent-cyan-mid); }
         .btn-danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn-danger:hover { background: var(--accent-red-dim); }
-        .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.65rem; }
+        .btn-sm { padding: 0.2rem var(--space-2); font-size: var(--text-xxs); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     `,
 })
