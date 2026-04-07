@@ -8,24 +8,24 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
 import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Marketplace</h2>
+        <app-page-shell title="Marketplace" icon="marketplace">
+            <ng-container actions>
                 <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
                     {{ showCreateForm() ? 'Cancel' : '+ New Listing' }}
                 </button>
-            </div>
+            </ng-container>
 
-            <!-- Search and filters -->
-            <div class="search-bar">
+            <ng-container toolbar>
+                <div class="search-bar">
                 <input
                     [(ngModel)]="searchQuery"
                     class="search-input"
@@ -42,7 +42,8 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     <option value="general">General</option>
                 </select>
                 <button class="btn btn--primary btn--sm" (click)="onSearch()">Search</button>
-            </div>
+                </div>
+            </ng-container>
 
             @if (showCreateForm()) {
                 <div class="create-form">
@@ -265,12 +266,9 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);

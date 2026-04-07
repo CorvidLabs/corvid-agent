@@ -12,16 +12,14 @@ import type { MemoryEntry, MemoryTier } from '../../core/services/memory-browser
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-memory-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">Memory Browser</h2>
-            </div>
+        <app-page-shell title="Memory Browser" icon="memory">
 
             <!-- Stats summary -->
             @if (memoryService.stats(); as stats) {
@@ -47,35 +45,36 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                 </div>
             }
 
-            <!-- Toolbar: search + filters -->
-            <div class="page__toolbar">
-                <input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search by key or content..."
-                    [ngModel]="searchQuery()"
-                    (ngModelChange)="onSearchChange($event)"
-                    aria-label="Search memories" />
-                <select
-                    class="filter-select"
-                    [ngModel]="tierFilter()"
-                    (ngModelChange)="onTierChange($event)"
-                    aria-label="Filter by tier">
-                    <option value="">All Tiers</option>
-                    <option value="longterm">On-Chain (longterm)</option>
-                    <option value="shortterm">Pending (shortterm)</option>
-                </select>
-                <select
-                    class="filter-select"
-                    [ngModel]="statusFilter()"
-                    (ngModelChange)="onStatusChange($event)"
-                    aria-label="Filter by status">
-                    <option value="">All Statuses</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="pending">Pending</option>
-                    <option value="failed">Failed</option>
-                </select>
-            </div>
+            <ng-container toolbar>
+                <div class="page__toolbar">
+                    <input
+                        class="search-input"
+                        type="text"
+                        placeholder="Search by key or content..."
+                        [ngModel]="searchQuery()"
+                        (ngModelChange)="onSearchChange($event)"
+                        aria-label="Search memories" />
+                    <select
+                        class="filter-select"
+                        [ngModel]="tierFilter()"
+                        (ngModelChange)="onTierChange($event)"
+                        aria-label="Filter by tier">
+                        <option value="">All Tiers</option>
+                        <option value="longterm">On-Chain (longterm)</option>
+                        <option value="shortterm">Pending (shortterm)</option>
+                    </select>
+                    <select
+                        class="filter-select"
+                        [ngModel]="statusFilter()"
+                        (ngModelChange)="onStatusChange($event)"
+                        aria-label="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+            </ng-container>
 
             @if (memoryService.loading()) {
                 <app-skeleton variant="table" [count]="6" />
@@ -240,13 +239,10 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .page__toolbar { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
         /* ── Stats bar ── */
         .stats-bar {
@@ -463,7 +459,6 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
-            .page { padding: var(--space-4); }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }
             .memory-detail { max-height: none; }
