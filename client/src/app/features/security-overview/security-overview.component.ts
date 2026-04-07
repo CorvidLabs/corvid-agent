@@ -2,17 +2,14 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, computed } from '@a
 import { RouterLink } from '@angular/router';
 import { SecurityOverviewService } from '../../core/services/security-overview.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-security-overview',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, SkeletonComponent],
+    imports: [RouterLink, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">Security Overview</h2>
-            </div>
-
+        <app-page-shell title="Security Overview" icon="security">
             @if (service.error()) {
                 <p class="error">{{ service.error() }}</p>
             }
@@ -165,12 +162,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     </div>
                 </section>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); max-width: 960px; }
-        .page__header { margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
         .error { color: var(--accent-red); padding: var(--space-3); background: var(--accent-red-tint); border-radius: var(--radius); }
 

@@ -14,6 +14,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { firstValueFrom } from 'rxjs';
 
 interface WalletSummary {
@@ -40,26 +41,17 @@ interface WalletMessage {
 @Component({
     selector: 'app-wallet-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>
-                    Wallets
-                    @if (wallets().length > 0) {
-                        <span class="count">({{ wallets().length }})</span>
-                    }
-                </h2>
-            </div>
-
-            <div class="search-bar">
+        <app-page-shell title="Wallets" icon="wallets" [subtitle]="wallets().length > 0 ? '(' + wallets().length + ')' : ''">
+            <ng-container toolbar>
                 <input
-                    class="input"
+                    class="input search-input"
                     type="text"
                     placeholder="Search by address or label..."
                     [value]="searchQuery()"
                     (input)="onSearch(toInputValue($event))" />
-            </div>
+            </ng-container>
 
             @if (loading()) {
                 <app-skeleton variant="card" [count]="3" />
@@ -198,15 +190,10 @@ interface WalletMessage {
                     </div>
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
-
-        .search-bar { margin-bottom: 1.5rem; }
+        .search-input { margin-bottom: var(--space-2); }
         .input {
             width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;

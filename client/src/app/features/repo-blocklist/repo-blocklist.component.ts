@@ -4,23 +4,16 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-repo-blocklist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">
-                    Repo Blocklist
-                    @if (service.entries().length > 0) {
-                        <span class="count">({{ service.entries().length }})</span>
-                    }
-                </h2>
-            </div>
-
-            <div class="add-form">
+        <app-page-shell title="Repo Blocklist" icon="repo-blocklist" [subtitle]="service.entries().length > 0 ? '(' + service.entries().length + ')' : ''">
+            <ng-container toolbar>
+                <div class="add-form">
                 <input
                     class="input"
                     type="text"
@@ -37,7 +30,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
                     class="btn btn--primary"
                     [disabled]="!newRepo().trim()"
                     (click)="add()">Block</button>
-            </div>
+                </div>
+            </ng-container>
 
             @if (error()) {
                 <p class="error">{{ error() }}</p>
@@ -71,14 +65,10 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
-        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .input {
             flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;

@@ -12,6 +12,7 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { IconComponent } from '../../shared/components/icon.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Contact, ContactPlatform, PlatformLink } from '../../core/models/contact.model';
 
 const PLATFORM_LABELS: Record<ContactPlatform, string> = {
@@ -23,15 +24,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 @Component({
     selector: 'app-contact-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">Contacts</h2>
+        <app-page-shell title="Contacts" icon="contacts">
+            <ng-container actions>
                 <button class="btn btn--primary" (click)="openCreate()">+ New Contact</button>
-            </div>
+            </ng-container>
 
-            <div class="page__toolbar">
+            <ng-container toolbar>
                 <input
                     class="search-input"
                     type="text"
@@ -39,7 +39,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                     [ngModel]="searchQuery()"
                     (ngModelChange)="searchQuery.set($event)"
                     aria-label="Search contacts" />
-            </div>
+            </ng-container>
 
             @if (contactService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -213,14 +213,9 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                     </div>
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__toolbar { margin-bottom: 1rem; }
-
         .search-input {
             width: 100%; max-width: 400px; padding: var(--space-2) var(--space-3);
             background: var(--bg-surface); border: 1px solid var(--border);
