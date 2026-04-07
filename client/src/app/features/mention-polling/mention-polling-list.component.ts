@@ -313,22 +313,22 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
         </div>
     `,
     styles: `
-        .polling{padding:var(--space-6);max-width:1100px}
+        .polling{padding:1.5rem;max-width:1100px}
         .polling__header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem}
         .polling__header h2{margin:0;color:var(--text-primary)}
         .polling__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
-        .create-btn,.save-btn{padding:var(--space-2) var(--space-4);background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
+        .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
         .create-btn:hover,.save-btn:hover:not(:disabled){background:var(--accent-cyan-mid)}
         .save-btn:disabled{opacity:.5;cursor:not-allowed}
 
-        .stats-banner{display:flex;gap:1.5rem;padding:var(--space-3) var(--space-4);background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
+        .stats-banner{display:flex;gap:1.5rem;padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
         .stat-item{display:flex;flex-direction:column;align-items:center;gap:.15rem}
         .stat-value{font-size:.85rem;font-weight:700;color:var(--text-primary)}
         .stat-running{color:var(--accent-green)}
         .stat-label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
 
-        .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:1.25rem}
+        .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
         .create-form h3{margin:0 0 .25rem;color:var(--text-primary);font-size:.85rem}
         .form-intro{margin:0 0 1rem;font-size:.75rem;color:var(--text-tertiary)}
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
@@ -346,17 +346,17 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
         .save-btn{text-transform:uppercase}
         .advanced-toggle{display:block;margin-top:.75rem;padding:.35rem 0;background:none;border:none;color:var(--text-tertiary);font-size:.7rem;cursor:pointer;font-family:inherit}
         .advanced-toggle:hover{color:var(--accent-cyan)}
-        .advanced-section{margin-top:.5rem;padding-top:var(--space-2);border-top:1px solid var(--border)}
+        .advanced-section{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)}
 
         .polling__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
         .filter-btn--active{border-color:var(--accent-cyan);color:var(--accent-cyan);background:var(--accent-cyan-dim)}
 
-        .empty{text-align:center;padding:var(--space-12);color:var(--text-tertiary)}
+        .empty{text-align:center;padding:3rem;color:var(--text-tertiary)}
         .empty-hint{font-size:.75rem;margin-top:.5rem}
 
         .config-list{display:flex;flex-direction:column;gap:.75rem}
-        .config-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);cursor:pointer;transition:border-color .15s}
+        .config-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;cursor:pointer;transition:border-color .15s}
         .config-card[data-status="active"]{border-left:3px solid var(--accent-green)}
         .config-card[data-status="paused"]{border-left:3px solid var(--accent-amber)}
         .config-card--expanded{border-color:var(--accent-cyan)}
@@ -381,7 +381,7 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
         .event-tag{font-size:.6rem;padding:2px 6px;border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-secondary);border:1px solid var(--border)}
         .event-tag--all{color:var(--accent-cyan);border-color:var(--accent-cyan)}
 
-        .config-detail{margin-top:.75rem;border-top:1px solid var(--border);padding-top:var(--space-3)}
+        .config-detail{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem}
 
         .action-btn--edit{border-color:var(--accent-cyan);color:var(--accent-cyan)}
         .edit-form{display:flex;flex-direction:column;gap:.75rem}
