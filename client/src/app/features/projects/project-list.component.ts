@@ -67,7 +67,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
             border-radius: var(--radius-lg); text-decoration: none; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .list__item:hover { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(0, 255, 136, 0.08); }
+        .list__item:hover { border-color: var(--accent-green); box-shadow: 0 0 12px var(--accent-green-wash); }
         .list__item-title { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--text-primary); }
         .list__item-desc { margin: 0; color: var(--text-secondary); font-size: 0.8rem; }
         .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; font-size: 0.75rem; color: var(--text-tertiary); }

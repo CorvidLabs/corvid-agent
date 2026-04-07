@@ -144,12 +144,12 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .session-view__live-dot {
             width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
             background: var(--accent-green);
-            box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+            box-shadow: 0 0 6px var(--accent-green-glow);
             animation: livePulse 1.5s ease-in-out infinite;
         }
         @keyframes livePulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(0, 255, 136, 0.5); }
-            50% { opacity: 0.5; box-shadow: 0 0 12px rgba(0, 255, 136, 0.3); }
+            0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-green-glow); }
+            50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent-green-glow); }
         }
         .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
@@ -193,7 +193,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px rgba(255, 51, 85, 0.25); }
+        .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px var(--accent-red-border); }
         .page { padding: 1.5rem; color: var(--text-primary); }
         .question-card {
             margin: 0.75rem 1rem; padding: 1rem; border-radius: var(--radius);
@@ -215,14 +215,14 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         /* Delete confirmation overlay */
         .confirm-overlay {
             position: fixed; inset: 0; z-index: 1000;
-            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+            background: var(--overlay-heavy); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
             animation: fadeIn 0.15s ease;
         }
         .confirm-dialog {
             background: var(--bg-surface); border: 1px solid var(--border-bright);
-            border-radius: var(--radius-lg, 10px); padding: 1.5rem;
-            max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border-radius: var(--radius-lg); padding: 1.5rem;
+            max-width: 400px; width: 90%; box-shadow: 0 8px 32px var(--overlay);
             animation: slideUp 0.2s ease;
         }
         .confirm-dialog__title { margin: 0 0 0.5rem; font-size: 1rem; color: var(--text-primary); }

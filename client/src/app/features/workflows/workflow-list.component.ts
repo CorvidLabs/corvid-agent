@@ -383,7 +383,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
             background: var(--accent-cyan-dim);
-            box-shadow: 0 0 8px rgba(0, 229, 255, 0.12);
+            box-shadow: 0 0 8px var(--accent-cyan-dim);
         }
 
         /* Workflow card */
@@ -610,7 +610,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
         }
-        .btn-primary:hover { background: rgba(0, 229, 255, 0.2); }
+        .btn-primary:hover { background: var(--accent-cyan-mid); }
         .btn-danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn-danger:hover { background: var(--accent-red-dim); }
         .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.65rem; }

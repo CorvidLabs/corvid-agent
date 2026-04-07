@@ -67,7 +67,7 @@ import {
 
         .resize-handle__indicator {
             border-radius: 2px;
-            background: var(--border-bright, #2a2d48);
+            background: var(--border-bright);
             transition: background 0.15s ease, box-shadow 0.15s ease;
         }
 
@@ -83,7 +83,7 @@ import {
 
         .resize-handle:hover .resize-handle__indicator,
         .resize-handle--dragging .resize-handle__indicator {
-            background: var(--accent-cyan, #00e5ff);
+            background: var(--accent-cyan);
             box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
 

@@ -307,8 +307,8 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
             background: var(--accent-red-dim);
         }
         .vote-panel__resolution[data-status="awaiting_human"] {
-            color: var(--accent-amber); border-color: rgba(255, 170, 0, 0.15);
-            background: rgba(255, 170, 0, 0.1);
+            color: var(--accent-amber); border-color: var(--accent-amber-dim);
+            background: var(--accent-amber-tint);
         }
     `,
 })

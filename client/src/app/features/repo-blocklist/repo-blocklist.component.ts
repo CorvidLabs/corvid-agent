@@ -93,10 +93,10 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
         .btn:disabled { opacity: 0.4; cursor: default; }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--danger { color: var(--accent-red, #f44); border-color: var(--accent-red, #f44); }
+        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
         .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
-        .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
+        .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
@@ -112,8 +112,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
             text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
         }
         .badge--manual { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        .badge--pr_rejection { color: var(--accent-red, #f44); border: 1px solid var(--accent-red, #f44); }
-        .badge--daily_review { color: var(--accent-yellow, #fa0); border: 1px solid var(--accent-yellow, #fa0); }
+        .badge--pr_rejection { color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .badge--daily_review { color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
         .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: 0.75rem; color: var(--text-tertiary); margin-left: 1rem; }
     `,
 })

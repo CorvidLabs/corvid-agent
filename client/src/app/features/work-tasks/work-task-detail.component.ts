@@ -174,7 +174,7 @@ interface DiffFile {
         .log-role[data-role="user"] { color: var(--accent-cyan); background: var(--accent-cyan-dim); }
         .log-role[data-role="assistant"] { color: var(--accent-green); background: var(--accent-green-dim); }
         .log-role[data-role="system"] { color: var(--accent-amber); background: var(--accent-amber-dim); }
-        .log-cost { font-size: 0.55rem; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+        .log-cost { font-size: 0.55rem; color: var(--text-tertiary); font-family: var(--font-mono); }
         .log-time { font-size: 0.55rem; color: var(--text-tertiary); margin-left: auto; }
         .log-content {
             color: var(--text-secondary); line-height: 1.5; white-space: pre-wrap; word-break: break-word;
@@ -184,12 +184,12 @@ interface DiffFile {
         /* Syntax highlighting in log content */
         :host ::ng-deep .log-code-block {
             display: block; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            padding: 0.4rem 0.5rem; margin: 0.25rem 0; font-family: var(--font-mono, monospace); font-size: 0.65rem;
+            padding: 0.4rem 0.5rem; margin: 0.25rem 0; font-family: var(--font-mono); font-size: 0.65rem;
             overflow-x: auto; color: var(--text-primary);
         }
         :host ::ng-deep .log-code-inline {
             background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
-            font-family: var(--font-mono, monospace); font-size: 0.9em; color: var(--accent-magenta);
+            font-family: var(--font-mono); font-size: 0.9em; color: var(--accent-magenta);
         }
 
         /* Diff viewer */
@@ -200,7 +200,7 @@ interface DiffFile {
         .diff-file__header {
             display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.4rem 0.5rem;
             background: var(--bg-raised); border: none; border-bottom: 1px solid var(--border);
-            color: var(--text-primary); font-size: 0.7rem; font-family: var(--font-mono, monospace);
+            color: var(--text-primary); font-size: 0.7rem; font-family: var(--font-mono);
             cursor: pointer; text-align: left;
         }
         .diff-file__header:hover { background: var(--bg-surface); }
@@ -210,10 +210,10 @@ interface DiffFile {
         .diff-file__content { overflow-x: auto; }
         .diff-hunk__header {
             padding: 0.2rem 0.5rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
-            font-size: 0.6rem; font-family: var(--font-mono, monospace);
+            font-size: 0.6rem; font-family: var(--font-mono);
         }
         .diff-line {
-            display: grid; grid-template-columns: 3rem 3rem 1fr; font-family: var(--font-mono, monospace);
+            display: grid; grid-template-columns: 3rem 3rem 1fr; font-family: var(--font-mono);
             font-size: 0.65rem; line-height: 1.5;
         }
         .diff-line[data-type="add"] { background: rgba(0, 200, 83, 0.08); }

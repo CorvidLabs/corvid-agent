@@ -115,7 +115,7 @@ const NAV_ITEMS: BottomNavItem[] = [
             background: var(--accent-cyan);
             border-radius: 0 0 2px 2px;
             animation: navIndicator 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 0 8px var(--accent-cyan-glow);
         }
         @keyframes navIndicator {
             from { transform: scaleX(0); }
@@ -148,7 +148,7 @@ const NAV_ITEMS: BottomNavItem[] = [
             align-items: center;
             justify-content: center;
             line-height: 1;
-            box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 0 6px var(--accent-cyan-glow);
             animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         @keyframes badgePop {

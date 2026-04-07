@@ -140,15 +140,15 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__category[data-category="guide"] { color: var(--accent-green); }
         .entry-card__category[data-category="reference"] { color: var(--accent-cyan); }
         .entry-card__category[data-category="decision"] { color: var(--accent-amber); }
-        .entry-card__category[data-category="standard"] { color: var(--accent-purple, #a78bfa); }
+        .entry-card__category[data-category="standard"] { color: var(--accent-purple); }
         .entry-card__category[data-category="runbook"] { color: var(--accent-red); }
 
         .entry-card__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.25rem; }
         .entry-card__asa { font-family: var(--font-mono); color: var(--accent-green); }
-        .entry-card--book { border-left: 3px solid var(--accent-purple, #a78bfa); }
+        .entry-card--book { border-left: 3px solid var(--accent-purple); }
         .entry-card__pages {
-            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple, #a78bfa);
-            background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2);
+            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple);
+            background: var(--accent-purple-tint); border: 1px solid var(--accent-purple-mid);
             padding: 1px 8px; border-radius: 10px;
         }
 

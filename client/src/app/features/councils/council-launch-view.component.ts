@@ -352,7 +352,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
-        .btn--danger { background: transparent; color: var(--accent-red, #f87171); border-color: var(--accent-red, #f87171); }
+        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
 
@@ -381,10 +381,10 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .stage-connector { flex: 1; height: 2px; background: var(--border); margin: 0 0.5rem; min-width: 20px; }
         .stage-connector--done { background: var(--accent-green); }
 
-        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; }
-        .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
-        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; }
-        .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
+        .stage-step--active[data-stage="responding"] .stage-dot { border-color: var(--accent-cyan); background: var(--accent-cyan); }
+        .stage-step--active[data-stage="responding"] .stage-label { color: var(--accent-cyan); }
+        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: var(--accent-yellow); background: var(--accent-yellow); }
+        .stage-step--active[data-stage="discussing"] .stage-label { color: var(--accent-yellow); }
         .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: var(--accent-purple); background: var(--accent-purple); }
         .stage-step--active[data-stage="reviewing"] .stage-label { color: var(--accent-purple); }
         .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; }
@@ -408,8 +408,8 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
         .log-entry--info .log-level { color: var(--accent-cyan); }
         .log-entry--stage .log-level { color: var(--accent-green); }
-        .log-entry--warn .log-level { color: var(--accent-yellow, #fbbf24); }
-        .log-entry--error .log-level { color: var(--accent-red, #f87171); }
+        .log-entry--warn .log-level { color: var(--accent-yellow); }
+        .log-entry--error .log-level { color: var(--accent-red); }
         .log-msg { color: var(--text-primary); }
         .log-detail { color: var(--text-tertiary); }
         .log-empty { color: var(--text-tertiary); padding: 0.5rem; text-align: center; }
@@ -456,7 +456,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
         .feed-badge {
             font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px;
-            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan);
+            background: var(--accent-cyan-dim); color: var(--accent-cyan);
             font-weight: 700; text-transform: uppercase; flex-shrink: 0;
         }
         .feed-time { font-size: 0.7rem; color: var(--text-tertiary); flex-shrink: 0; }
@@ -469,7 +469,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .feed-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
 
         .processing-dot {
-            width: 6px; height: 6px; border-radius: 50%; background: #00e5ff; flex-shrink: 0;
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan); flex-shrink: 0;
             animation: processing-pulse 1.5s ease-in-out infinite;
         }
         @keyframes processing-pulse {
@@ -478,7 +478,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
 
         .queued-dot {
-            width: 6px; height: 6px; border-radius: 50%; background: var(--accent-yellow, #fbbf24); flex-shrink: 0;
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent-yellow); flex-shrink: 0;
             opacity: 0.6;
         }
 
@@ -490,9 +490,9 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 
         .synthesis {
             margin-top: 1.5rem; border: 1px solid var(--accent-green); border-radius: var(--radius-lg);
-            background: var(--bg-surface); box-shadow: 0 0 16px rgba(0, 255, 136, 0.08);
+            background: var(--bg-surface); box-shadow: 0 0 16px var(--accent-green-wash);
         }
-        .synthesis--empty { border-color: var(--accent-yellow, #fbbf24); box-shadow: 0 0 12px rgba(251, 191, 36, 0.06); }
+        .synthesis--empty { border-color: var(--accent-yellow); box-shadow: 0 0 12px var(--accent-amber-subtle); }
         .synthesis__header {
             display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem;
             border-bottom: 1px solid var(--border); background: var(--bg-raised); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -500,12 +500,12 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .synthesis__icon {
             display: inline-flex; align-items: center; justify-content: center;
             width: 22px; height: 22px; border-radius: 50%;
-            background: var(--accent-green); color: var(--bg-base, #0a0f1a);
+            background: var(--accent-green); color: var(--bg-base);
             font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
         }
-        .synthesis--empty .synthesis__icon { background: var(--accent-yellow, #fbbf24); }
+        .synthesis--empty .synthesis__icon { background: var(--accent-yellow); }
         .synthesis__title { margin: 0; font-size: 0.95rem; color: var(--accent-green); font-weight: 700; }
-        .synthesis--empty .synthesis__title { color: var(--accent-yellow, #fbbf24); }
+        .synthesis--empty .synthesis__title { color: var(--accent-yellow); }
         .synthesis__content {
             padding: 1.25rem; font-size: 0.85rem; margin: 0;
             white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
@@ -513,7 +513,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
         .synthesis__warning {
             padding: 1rem 1.25rem; margin: 0; font-size: 0.85rem;
-            color: var(--accent-yellow, #fbbf24); font-style: italic;
+            color: var(--accent-yellow); font-style: italic;
         }
 
         .council-chat { margin-top: 1.5rem; }

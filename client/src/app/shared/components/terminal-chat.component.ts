@@ -346,7 +346,7 @@ interface AutocompleteItem {
             color: #484f58;
             user-select: none;
         }
-        .terminal__status[data-status="read"] { color: var(--accent-cyan, #00e5ff); }
+        .terminal__status[data-status="read"] { color: var(--accent-cyan); }
         .terminal__status[data-status="delivered"] { color: #7ee787; }
         .terminal__status[data-status="sent"] { color: #8b949e; }
         .terminal__copy {
@@ -528,7 +528,7 @@ interface AutocompleteItem {
             -webkit-backdrop-filter: blur(var(--glass-blur));
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(0,229,255,0.05);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px var(--accent-cyan-subtle);
             z-index: 10;
             margin-bottom: 4px;
             scrollbar-width: thin;

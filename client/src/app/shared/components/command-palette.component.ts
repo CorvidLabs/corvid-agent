@@ -100,10 +100,10 @@ interface CommandItem {
         .palette {
             width: 560px;
             max-height: 420px;
-            background: var(--bg-surface, #1a1a2e);
-            border: 1px solid var(--border-bright, #333);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-bright);
             border-radius: 12px;
-            box-shadow: 0 16px 48px var(--shadow-deep), 0 0 80px rgba(0, 229, 255, 0.06);
+            box-shadow: 0 16px 48px var(--shadow-deep), 0 0 80px var(--accent-cyan-subtle);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -119,10 +119,10 @@ interface CommandItem {
             align-items: center;
             gap: 0.5rem;
             padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--border, #2a2a3e);
+            border-bottom: 1px solid var(--border);
         }
         .palette__search-icon {
-            color: var(--accent-cyan, #0ef);
+            color: var(--accent-cyan);
             font-weight: 700;
             font-size: 0.9rem;
             flex-shrink: 0;
@@ -131,20 +131,20 @@ interface CommandItem {
             flex: 1;
             background: transparent;
             border: none;
-            color: var(--text-primary, #eee);
+            color: var(--text-primary);
             font-family: inherit;
             font-size: 0.9rem;
             outline: none;
         }
         .palette__input::placeholder {
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
         }
         .palette__esc {
             padding: 0.1rem 0.35rem;
-            background: var(--bg-raised, #222);
-            border: 1px solid var(--border, #333);
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
             border-radius: 4px;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-size: 0.55rem;
             font-family: inherit;
         }
@@ -156,7 +156,7 @@ interface CommandItem {
         .palette__empty {
             padding: 1.5rem;
             text-align: center;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-size: 0.8rem;
         }
         .palette__group {
@@ -168,7 +168,7 @@ interface CommandItem {
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
         }
         .palette__item {
             display: flex;
@@ -178,7 +178,7 @@ interface CommandItem {
             padding: 0.5rem 1rem;
             background: transparent;
             border: none;
-            color: var(--text-secondary, #bbb);
+            color: var(--text-secondary);
             font-family: inherit;
             font-size: 0.8rem;
             cursor: pointer;
@@ -187,8 +187,8 @@ interface CommandItem {
         }
         .palette__item:hover,
         .palette__item--active {
-            background: var(--accent-cyan-dim, var(--accent-cyan-subtle));
-            color: var(--text-primary, #eee);
+            background: var(--accent-cyan-dim);
+            color: var(--text-primary);
         }
         .palette__item--active {
             box-shadow: inset 3px 0 0 var(--accent-cyan);
@@ -199,7 +199,7 @@ interface CommandItem {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg-raised, #222);
+            background: var(--bg-raised);
             border-radius: 4px;
             font-size: 0.65rem;
             flex-shrink: 0;
@@ -212,21 +212,21 @@ interface CommandItem {
         }
         .palette__item-cat {
             font-size: 0.6rem;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             flex-shrink: 0;
         }
         .palette__footer {
             display: flex;
             gap: 1rem;
             padding: 0.5rem 1rem;
-            border-top: 1px solid var(--border, #2a2a3e);
+            border-top: 1px solid var(--border);
             font-size: 0.58rem;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
         }
         .palette__footer kbd {
             padding: 0.05rem 0.25rem;
-            background: var(--bg-raised, #222);
-            border: 1px solid var(--border, #333);
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
             border-radius: 3px;
             font-family: inherit;
             font-size: 0.55rem;

@@ -337,7 +337,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .exec-stats__bar{flex:1;min-width:100px;height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden;display:flex;margin-left:auto}
 .exec-stats__bar-fill--success{background:var(--accent-green);transition:width .3s}.exec-stats__bar-fill--fail{background:var(--accent-red);transition:width .3s}
 .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer}
-.create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}.save-btn:disabled{opacity:.5;cursor:not-allowed}
+.create-btn:hover,.save-btn:hover:not(:disabled){background:var(--accent-cyan-mid)}.save-btn:disabled{opacity:.5;cursor:not-allowed}
 .approvals-banner{background:var(--accent-amber-dim);border:1px solid var(--accent-amber);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1.25rem}.approvals-banner h3{margin:0 0 .75rem;color:var(--accent-amber);font-size:.8rem}
 .approval-card{display:flex;align-items:center;justify-content:space-between;padding:.5rem;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:.5rem}.approval-info{display:flex;gap:.5rem;align-items:center}
 .approval-type{font-size:.65rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:var(--radius-sm);background:var(--accent-magenta-dim);color:var(--accent-magenta)}.approval-desc{font-size:.75rem;color:var(--text-secondary)}.approval-actions{display:flex;gap:.35rem}

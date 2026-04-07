@@ -319,7 +319,7 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
         .polling__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
         .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
-        .create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}
+        .create-btn:hover,.save-btn:hover:not(:disabled){background:var(--accent-cyan-mid)}
         .save-btn:disabled{opacity:.5;cursor:not-allowed}
 
         .stats-banner{display:flex;gap:1.5rem;padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
@@ -406,7 +406,7 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
         .activity-title{font-size:.7rem;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .activity-sender{font-size:.6rem;color:var(--accent-cyan);font-family:monospace;flex-shrink:0}
         .activity-trigger{font-size:.5rem;text-transform:uppercase;padding:1px 4px;border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-tertiary);border:1px solid var(--border);flex-shrink:0}
-        .activity-trigger[data-trigger="review"]{color:var(--accent-purple, var(--text-secondary));border-color:var(--accent-purple, var(--border))}
+        .activity-trigger[data-trigger="review"]{color:var(--accent-purple);border-color:var(--accent-purple)}
         .activity-trigger[data-trigger="assignment"]{color:var(--accent-green);border-color:var(--accent-green)}
         .activity-repo{font-size:.6rem;color:var(--text-tertiary);font-family:monospace;flex-shrink:0}
         .activity-time{font-size:.6rem;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0}

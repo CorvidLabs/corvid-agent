@@ -198,7 +198,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }

@@ -468,8 +468,8 @@ interface SyncStatus {
             font-size: 0.75rem;
             border: 1px solid var(--border);
         }
-        .sync-banner--ok { background: rgba(0, 255, 136, 0.05); border-color: var(--accent-green); }
-        .sync-banner--warn { background: rgba(255, 170, 0, 0.05); border-color: var(--accent-amber); }
+        .sync-banner--ok { background: var(--accent-green-faint); border-color: var(--accent-green); }
+        .sync-banner--warn { background: var(--accent-amber-faint); border-color: var(--accent-amber); }
         .sync-banner__indicator {
             width: 8px;
             height: 8px;
@@ -508,14 +508,14 @@ interface SyncStatus {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+            text-shadow: 0 0 10px var(--accent-cyan-dim);
         }
         .stat-card__value--longterm { color: var(--accent-cyan); }
-        .stat-card__value--shortterm { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
-        .stat-card__value--decay { color: var(--accent-purple); text-shadow: 0 0 10px rgba(167, 139, 250, 0.15); }
-        .stat-card__value--confirmed { color: var(--accent-green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
-        .stat-card__value--pending { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
-        .stat-card__value--failed { color: var(--accent-red); text-shadow: 0 0 10px rgba(255, 51, 85, 0.15); }
+        .stat-card__value--shortterm { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
+        .stat-card__value--decay { color: var(--accent-purple); text-shadow: 0 0 10px var(--accent-purple-dim); }
+        .stat-card__value--confirmed { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
+        .stat-card__value--pending { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
+        .stat-card__value--failed { color: var(--accent-red); text-shadow: 0 0 10px var(--accent-red-dim); }
 
         /* ─── Section ────── */
         .section {
@@ -542,8 +542,8 @@ interface SyncStatus {
             min-width: 40px;
             transition: flex 0.3s;
         }
-        .tier-bar__segment--longterm { background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan); }
-        .tier-bar__segment--shortterm { background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1)); color: var(--accent-amber); }
+        .tier-bar__segment--longterm { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+        .tier-bar__segment--shortterm { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .tier-bar__label {
             font-size: 0.6rem;
             font-weight: 600;
@@ -598,13 +598,13 @@ interface SyncStatus {
             transition: border-color 0.15s, color 0.15s;
         }
         .chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.08)); }
+        .chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
         .chip--lt.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--st.chip--active { border-color: var(--accent-amber); color: var(--accent-amber); background: var(--accent-amber-dim, rgba(255, 170, 0, 0.08)); }
+        .chip--st.chip--active { border-color: var(--accent-amber); color: var(--accent-amber); background: var(--accent-amber-dim); }
         .chip--clear {
             border-color: var(--accent-magenta);
             color: var(--accent-magenta);
-            background: rgba(255, 0, 170, 0.06);
+            background: var(--accent-magenta-subtle);
         }
 
         /* ─── Filters ────── */
@@ -709,11 +709,11 @@ interface SyncStatus {
             flex-shrink: 0;
         }
         .memory-card__tier[data-tier="longterm"] {
-            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1));
+            background: var(--accent-cyan-dim);
             color: var(--accent-cyan);
         }
         .memory-card__tier[data-tier="shortterm"] {
-            background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1));
+            background: var(--accent-amber-dim);
             color: var(--accent-amber);
         }
         .memory-card__key {
@@ -741,7 +741,7 @@ interface SyncStatus {
         }
         .memory-card__category {
             padding: 0.1rem 0.3rem;
-            background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
+            background: var(--accent-purple-dim);
             color: var(--accent-purple);
             border-radius: 3px;
             font-size: 0.55rem;
@@ -757,15 +757,15 @@ interface SyncStatus {
             flex-shrink: 0;
         }
         .memory-card__storage[data-storage="arc69"] {
-            background: var(--accent-green-dim, rgba(0, 255, 136, 0.1));
+            background: var(--accent-green-dim);
             color: var(--accent-green);
         }
         .memory-card__storage[data-storage="plain-txn"] {
-            background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
+            background: var(--accent-purple-dim);
             color: var(--accent-purple);
         }
         .memory-card__storage[data-storage="pending"] {
-            background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1));
+            background: var(--accent-amber-dim);
             color: var(--accent-amber);
         }
         .memory-card__time {
@@ -814,7 +814,7 @@ interface SyncStatus {
             margin-top: 0.3rem;
         }
         .detail-pre {
-            background: var(--bg-deep, #0a0a12);
+            background: var(--bg-deep);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             padding: 0.75rem;
@@ -843,7 +843,7 @@ interface SyncStatus {
 
         /* ─── Observations ────── */
         .stat-card--observations { border-color: var(--accent-magenta); border-style: dashed; }
-        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.15); }
+        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
 
         .obs-header {
             display: flex;
@@ -861,9 +861,9 @@ interface SyncStatus {
             font-size: 0.75rem;
         }
         .chip--obs-active.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: var(--accent-green-wash); }
         .chip--obs-expired.chip--active { border-color: var(--text-tertiary); color: var(--text-tertiary); }
-        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: rgba(255, 51, 85, 0.08); }
+        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: var(--accent-red-wash); }
 
         .obs-list { display: flex; flex-direction: column; gap: 4px; }
         .obs-card {
@@ -890,7 +890,7 @@ interface SyncStatus {
             text-transform: uppercase;
             letter-spacing: 0.05em;
             flex-shrink: 0;
-            background: var(--accent-magenta-dim, rgba(255, 0, 170, 0.1));
+            background: var(--accent-magenta-dim);
             color: var(--accent-magenta);
         }
         .obs-card__content-preview {
@@ -942,17 +942,17 @@ interface SyncStatus {
         }
         .btn--action:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--graduate {
-            background: rgba(0, 255, 136, 0.1);
+            background: var(--accent-green-tint);
             border-color: var(--accent-green);
             color: var(--accent-green);
         }
-        .btn--graduate:hover:not(:disabled) { background: rgba(0, 255, 136, 0.2); }
+        .btn--graduate:hover:not(:disabled) { background: var(--accent-green-mid); }
         .btn--boost {
-            background: rgba(0, 229, 255, 0.1);
+            background: var(--accent-cyan-tint);
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
         }
-        .btn--boost:hover { background: rgba(0, 229, 255, 0.2); }
+        .btn--boost:hover { background: var(--accent-cyan-mid); }
 
         /* ─── Responsive ────── */
         @media (max-width: 767px) {

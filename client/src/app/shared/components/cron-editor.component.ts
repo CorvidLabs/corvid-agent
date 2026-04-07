@@ -162,7 +162,7 @@ const PRESETS: CronPreset[] = [
             border-color: var(--accent-red);
         }
         .cron-editor--error .cron-editor__input:focus {
-            box-shadow: 0 0 0 2px rgba(255, 51, 85, 0.15);
+            box-shadow: 0 0 0 2px var(--accent-red-dim);
         }
         .cron-editor__field-hints {
             display: flex;

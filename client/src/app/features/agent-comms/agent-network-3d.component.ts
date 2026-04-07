@@ -126,8 +126,8 @@ interface LogEntry {
             height: 100%;
             min-height: 400px;
             background: #05050a;
-            border-radius: var(--radius, 6px);
-            border: 1px solid var(--border, #1a1a2e);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
             overflow: hidden;
             cursor: crosshair;
         }
@@ -145,10 +145,10 @@ interface LogEntry {
             gap: 6px;
             padding: 4px 10px;
             background: rgba(5, 5, 10, 0.85);
-            border: 1px solid var(--border-bright, #2a2a3e);
+            border: 1px solid var(--border-bright);
             border-radius: 16px;
             font-size: 0.7rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -164,21 +164,21 @@ interface LogEntry {
         .network-3d__clear {
             background: none;
             border: none;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             cursor: pointer;
             font-size: 0.7rem;
             font-family: inherit;
             padding: 0 2px;
             line-height: 1;
         }
-        .network-3d__clear:hover { color: var(--text-primary, #e0e0e0); }
+        .network-3d__clear:hover { color: var(--text-primary); }
         .network-3d__hint {
             position: absolute;
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
             font-size: 0.6rem;
-            color: var(--text-tertiary, #555);
+            color: var(--text-tertiary);
             letter-spacing: 0.05em;
             opacity: 0.6;
             pointer-events: none;
@@ -192,7 +192,7 @@ interface LogEntry {
             width: 280px;
             max-height: 240px;
             background: rgba(5, 5, 10, 0.88);
-            border: 1px solid var(--border-bright, #2a2a3e);
+            border: 1px solid var(--border-bright);
             border-radius: 8px;
             backdrop-filter: blur(8px);
             z-index: 10;
@@ -206,19 +206,19 @@ interface LogEntry {
             align-items: center;
             justify-content: space-between;
             padding: 6px 10px;
-            border-bottom: 1px solid var(--border, #1a1a2e);
-            color: var(--text-secondary, #aaa);
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-size: 0.6rem;
         }
         .network-3d__log-count {
-            background: var(--surface-alt, #1a1a2e);
+            background: var(--surface-alt);
             padding: 1px 6px;
             border-radius: 8px;
             font-size: 0.55rem;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
         }
         .network-3d__log-list {
             overflow-y: auto;
@@ -234,22 +234,22 @@ interface LogEntry {
         }
         .network-3d__log-item:last-child { border-bottom: none; }
         .network-3d__log-time {
-            color: var(--text-tertiary, #555);
+            color: var(--text-tertiary);
             font-size: 0.55rem;
             font-family: var(--font-mono);
         }
         .network-3d__log-flow {
-            color: var(--text-secondary, #aaa);
+            color: var(--text-secondary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .network-3d__log-arrow {
-            color: var(--text-tertiary, #555);
+            color: var(--text-tertiary);
             margin: 0 3px;
         }
         .network-3d__log-preview {
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;

@@ -117,8 +117,16 @@
 
     /* ── Subtle backgrounds — very low opacity for tinted surfaces ── */
     --accent-cyan-subtle: rgba(0, 229, 255, 0.06);
+    --accent-green-faint: rgba(0, 255, 136, 0.04);
     --accent-green-subtle: rgba(0, 255, 136, 0.06);
+    --accent-green-wash: rgba(0, 255, 136, 0.08);
+    --accent-green-tint: rgba(0, 255, 136, 0.1);
+    --accent-green-mid: rgba(0, 255, 136, 0.2);
+    --accent-red-faint: rgba(255, 51, 85, 0.04);
     --accent-red-subtle: rgba(255, 51, 85, 0.06);
+    --accent-red-wash: rgba(255, 51, 85, 0.08);
+    --accent-red-tint: rgba(255, 51, 85, 0.1);
+    --accent-red-mid: rgba(255, 51, 85, 0.2);
     --accent-amber-subtle: rgba(255, 170, 0, 0.06);
     --accent-magenta-subtle: rgba(255, 0, 170, 0.05);
     --accent-purple-subtle: rgba(167, 139, 250, 0.06);

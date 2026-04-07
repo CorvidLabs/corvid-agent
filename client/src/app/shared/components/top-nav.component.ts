@@ -311,7 +311,7 @@ const TABS: NavTab[] = [
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid var(--border-faint);
-            border-radius: var(--radius-lg, 10px);
+            border-radius: var(--radius-lg);
             padding: 0.4rem 0;
             z-index: 200;
             box-shadow: 0 12px 40px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-subtle);
@@ -350,7 +350,7 @@ const TABS: NavTab[] = [
         .topnav__network {
             display: flex;
             border: 1px solid var(--border-bright);
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             overflow: hidden;
         }
         .network-btn {
@@ -391,7 +391,7 @@ const TABS: NavTab[] = [
             justify-content: center;
             background: none;
             border: 1px solid var(--border-bright);
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.75rem;
@@ -410,7 +410,7 @@ const TABS: NavTab[] = [
             padding: 0.3rem 0.7rem;
             background: rgba(12, 13, 20, 0.6);
             border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg, 10px);
+            border-radius: var(--radius-lg);
             color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.7rem;
@@ -429,8 +429,8 @@ const TABS: NavTab[] = [
         }
         .topnav__search-kbd {
             padding: 0.08rem 0.3rem;
-            background: var(--bg-raised, #222);
-            border: 1px solid var(--border, #333);
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
             border-radius: 3px;
             font-family: inherit;
             font-size: 0.55rem;
@@ -442,7 +442,7 @@ const TABS: NavTab[] = [
             display: none;
             background: none;
             border: 1px solid var(--border);
-            border-radius: var(--radius, 4px);
+            border-radius: var(--radius);
             padding: 0.35rem;
             cursor: pointer;
             width: 34px;

@@ -338,7 +338,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
 
         /* Stars */
         .star { color: var(--border); font-size: 0.85rem; line-height: 1; }
-        .star--filled { color: var(--accent-yellow, #ffc107); }
+        .star--filled { color: var(--accent-yellow); }
         .star--lg { font-size: 1.1rem; }
 
         /* Trust badge */
@@ -348,11 +348,11 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         }
         .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
         .trust-badge[data-level="medium"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .trust-badge[data-level="low"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
+        .trust-badge[data-level="low"] { color: var(--accent-yellow); border-color: var(--accent-yellow); }
         .trust-badge[data-level="untrusted"] { color: var(--accent-red); border-color: var(--accent-red); }
         .external-badge {
             font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
-            text-transform: uppercase; color: var(--accent-orange, #ff9100); border: 1px solid var(--accent-orange, #ff9100);
+            text-transform: uppercase; color: var(--accent-orange); border: 1px solid var(--accent-orange);
             background: var(--bg-raised);
         }
 
@@ -391,7 +391,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         }
         .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         @media (max-width: 767px) {

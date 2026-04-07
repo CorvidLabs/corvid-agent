@@ -172,7 +172,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .page__header { margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
-        .error { color: var(--accent-red, #f44); padding: 0.75rem; background: rgba(255,68,68,0.1); border-radius: var(--radius); }
+        .error { color: var(--accent-red); padding: 0.75rem; background: var(--accent-red-tint); border-radius: var(--radius); }
 
         .card {
             background: var(--bg-surface);
@@ -230,21 +230,21 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
             font-size: 0.75rem;
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
         .tag--file {
-            background: rgba(0, 229, 255, 0.1);
+            background: var(--accent-cyan-tint);
             color: var(--accent-cyan);
-            border: 1px solid rgba(0, 229, 255, 0.2);
+            border: 1px solid var(--accent-cyan-mid);
         }
         .tag--path {
             background: rgba(255, 183, 77, 0.1);
-            color: var(--accent-amber, #ffb74d);
+            color: var(--accent-amber);
             border: 1px solid rgba(255, 183, 77, 0.2);
         }
         .tag--domain {
             background: rgba(129, 199, 132, 0.1);
-            color: var(--accent-green, #81c784);
+            color: var(--accent-green);
             border: 1px solid rgba(129, 199, 132, 0.2);
         }
 
@@ -264,10 +264,10 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         }
         .pattern:last-child { border-bottom: none; }
         .pattern__name {
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
-        .pattern--critical .pattern__name { color: var(--accent-red, #f44); }
-        .pattern--warning .pattern__name { color: var(--accent-amber, #ffb74d); }
+        .pattern--critical .pattern__name { color: var(--accent-red); }
+        .pattern--warning .pattern__name { color: var(--accent-amber); }
         .pattern__cat {
             font-size: 0.7rem;
             color: var(--text-tertiary);
@@ -290,9 +290,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             padding: 0.75rem;
             background: var(--bg-raised);
         }
-        .tier-card--layer0 { border-color: var(--accent-red, #f44); }
-        .tier-card--layer1 { border-color: var(--accent-amber, #ffb74d); }
-        .tier-card--layer2 { border-color: var(--accent-green, #81c784); }
+        .tier-card--layer0 { border-color: var(--accent-red); }
+        .tier-card--layer1 { border-color: var(--accent-amber); }
+        .tier-card--layer2 { border-color: var(--accent-green); }
         .tier-card__header {
             display: flex;
             align-items: center;
@@ -307,9 +307,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             padding: 0.15rem 0.4rem;
             border-radius: 3px;
         }
-        .tier-card--layer0 .tier-card__badge { background: rgba(255,68,68,0.15); color: var(--accent-red, #f44); }
-        .tier-card--layer1 .tier-card__badge { background: rgba(255,183,77,0.15); color: var(--accent-amber, #ffb74d); }
-        .tier-card--layer2 .tier-card__badge { background: rgba(129,199,132,0.15); color: var(--accent-green, #81c784); }
+        .tier-card--layer0 .tier-card__badge { background: var(--accent-red-dim); color: var(--accent-red); }
+        .tier-card--layer1 .tier-card__badge { background: rgba(255,183,77,0.15); color: var(--accent-amber); }
+        .tier-card--layer2 .tier-card__badge { background: rgba(129,199,132,0.15); color: var(--accent-green); }
         .tier-card__label {
             font-size: 0.9rem;
             font-weight: 600;

@@ -52,7 +52,7 @@ export interface ApprovalDecision {
         .approval-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: var(--overlay-heavy);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -60,9 +60,9 @@ export interface ApprovalDecision {
             backdrop-filter: blur(2px);
         }
         .approval-dialog {
-            background: var(--bg-surface, #1a1a2e);
-            border: 1px solid var(--accent-cyan, #00d4ff);
-            border-radius: var(--radius, 8px);
+            background: var(--bg-surface);
+            border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius);
             padding: 1.25rem;
             max-width: 480px;
             width: 90vw;
@@ -78,18 +78,18 @@ export interface ApprovalDecision {
             margin: 0;
             font-size: 0.9rem;
             font-weight: 700;
-            color: var(--accent-cyan, #00d4ff);
+            color: var(--accent-cyan);
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
         .approval-dialog__timer {
             font-size: 0.8rem;
             font-weight: 600;
-            color: var(--text-secondary, #999);
+            color: var(--text-secondary);
             font-variant-numeric: tabular-nums;
         }
         .approval-dialog__timer--urgent {
-            color: var(--accent-red, #ff3355);
+            color: var(--accent-red);
         }
         .approval-dialog__body {
             margin-bottom: 1rem;
@@ -97,18 +97,18 @@ export interface ApprovalDecision {
         .approval-dialog__tool {
             font-size: 0.75rem;
             font-weight: 600;
-            color: var(--text-secondary, #999);
+            color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             margin-bottom: 0.375rem;
         }
         .approval-dialog__description {
             font-size: 0.85rem;
-            color: var(--text-primary, #eee);
+            color: var(--text-primary);
             word-break: break-word;
             white-space: pre-wrap;
             font-family: var(--font-mono);
-            background: var(--bg-inset, #0d0d1a);
+            background: var(--bg-inset);
             padding: 0.625rem;
             border-radius: 4px;
             max-height: 200px;
@@ -122,7 +122,7 @@ export interface ApprovalDecision {
             flex: 1;
             padding: 0.75rem 1rem;
             min-height: 44px;
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             font-size: 0.8rem;
             font-weight: 700;
             cursor: pointer;
@@ -146,28 +146,28 @@ export interface ApprovalDecision {
         }
         .btn--allow {
             background: transparent;
-            color: var(--accent-green, #22cc88);
-            border-color: var(--accent-green, #22cc88);
+            color: var(--accent-green);
+            border-color: var(--accent-green);
         }
         .btn--allow:hover {
             background: rgba(34, 204, 136, 0.12);
             box-shadow: 0 0 12px rgba(34, 204, 136, 0.25);
         }
         .btn--allow:focus-visible {
-            outline: 2px solid var(--accent-green, #22cc88);
+            outline: 2px solid var(--accent-green);
             outline-offset: 2px;
         }
         .btn--deny {
             background: transparent;
-            color: var(--accent-red, #ff3355);
-            border-color: var(--accent-red, #ff3355);
+            color: var(--accent-red);
+            border-color: var(--accent-red);
         }
         .btn--deny:hover {
-            background: rgba(255, 51, 85, 0.12);
-            box-shadow: 0 0 12px rgba(255, 51, 85, 0.25);
+            background: var(--accent-red-dim);
+            box-shadow: 0 0 12px var(--accent-red-border);
         }
         .btn--deny:focus-visible {
-            outline: 2px solid var(--accent-red, #ff3355);
+            outline: 2px solid var(--accent-red);
             outline-offset: 2px;
         }
     `,

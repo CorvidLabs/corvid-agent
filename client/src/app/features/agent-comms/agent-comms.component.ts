@@ -220,7 +220,7 @@ interface CommEntry {
             text-transform: uppercase; letter-spacing: 0.1em;
         }
         .comms__status[data-status="on"] {
-            color: var(--accent-green); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3);
+            color: var(--accent-green); background: var(--accent-green-tint); border: 1px solid var(--accent-green-glow);
             animation: live-pulse 2s ease-in-out infinite;
         }
         .comms__status[data-status="off"] {
@@ -277,7 +277,7 @@ interface CommEntry {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;
         }
         .comms__time {
-            font-family: var(--font-mono, monospace); font-size: 0.65rem;
+            font-family: var(--font-mono); font-size: 0.65rem;
             color: var(--text-secondary); opacity: 0.7; flex-shrink: 0;
         }
         .comms__channel-badge {
@@ -288,13 +288,13 @@ interface CommEntry {
             color: #60c0ff; background: rgba(96, 192, 255, 0.08); border: 1px solid rgba(96, 192, 255, 0.25);
         }
         .comms__channel-badge[data-channel="algochat"] {
-            color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2);
+            color: var(--accent-cyan); background: var(--accent-cyan-wash); border: 1px solid var(--accent-cyan-mid);
         }
         .comms__channel-badge[data-channel="council"] {
-            color: #a78bfa; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25);
+            color: var(--accent-purple); background: var(--accent-purple-wash); border: 1px solid var(--accent-purple-border);
         }
         .comms__channel-badge[data-channel="system"] {
-            color: var(--accent-amber); background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.2);
+            color: var(--accent-amber); background: var(--accent-amber-wash); border: 1px solid var(--accent-amber-mid);
         }
 
         .comms__status-dot {
@@ -312,7 +312,7 @@ interface CommEntry {
         .comms__agent-from { font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
         .comms__arrow {
             color: var(--text-secondary); opacity: 0.5; font-size: 0.7rem;
-            font-family: var(--font-mono, monospace); flex-shrink: 0;
+            font-family: var(--font-mono); flex-shrink: 0;
         }
         .comms__arrow[data-status="processing"] { color: #ffa040; opacity: 1; }
         .comms__arrow-anim {
@@ -327,7 +327,7 @@ interface CommEntry {
         .comms__agent-to { font-weight: 500; font-size: 0.8rem; color: var(--text-secondary); flex-shrink: 0; }
         .comms__fee { font-size: 0.7rem; color: var(--accent-green); font-weight: 600; flex-shrink: 0; }
         .comms__thread {
-            font-size: 0.6rem; font-family: var(--font-mono, monospace); color: var(--accent-yellow, #ffd700);
+            font-size: 0.6rem; font-family: var(--font-mono); color: var(--accent-yellow);
             background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2);
             padding: 1px 5px; border-radius: var(--radius-sm); flex-shrink: 0;
         }
@@ -350,7 +350,7 @@ interface CommEntry {
             padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
             border: 1px solid var(--border);
         }
-        .comms__msg-content--response { border-color: rgba(0, 255, 136, 0.15); }
+        .comms__msg-content--response { border-color: var(--accent-green-dim); }
 
         /* ── Mobile-first responsive ──────────────────────────────── */
         @media (max-width: 767px) {

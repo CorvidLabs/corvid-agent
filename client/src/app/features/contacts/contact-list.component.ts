@@ -242,7 +242,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn--ghost { color: var(--text-secondary); border-color: var(--border); }
         .btn--ghost:hover { border-color: var(--text-tertiary); }
-        .btn--danger { color: var(--accent-red, #ff5555); border-color: var(--accent-red, #ff5555); }
+        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
         .btn--xs { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
@@ -266,12 +266,12 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             font-family: inherit; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .contact-card:hover { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(0, 255, 136, 0.08); }
+        .contact-card:hover { border-color: var(--accent-green); box-shadow: 0 0 12px var(--accent-green-wash); }
         .contact-card--active { border-color: var(--accent-cyan); box-shadow: 0 0 16px rgba(0, 200, 255, 0.12); }
 
         .contact-card__avatar {
             width: 36px; height: 36px; border-radius: 50%;
-            background: var(--accent-cyan-dim, rgba(0, 200, 255, 0.15));
+            background: var(--accent-cyan-dim);
             color: var(--accent-cyan); display: flex; align-items: center;
             justify-content: center; font-weight: 700; font-size: 0.9rem;
             flex-shrink: 0;
@@ -289,9 +289,9 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             letter-spacing: 0.03em; border: 1px solid;
         }
         .platform-chip--discord { color: #7289da; border-color: #7289da; background: rgba(114, 137, 218, 0.1); }
-        .platform-chip--algochat { color: var(--accent-green, #00ff88); border-color: var(--accent-green, #00ff88); background: rgba(0, 255, 136, 0.1); }
-        .platform-chip--github { color: #f0f0f0; border-color: #666; background: rgba(255, 255, 255, 0.05); }
-        .platform-chip--verified { box-shadow: 0 0 6px rgba(0, 255, 136, 0.2); }
+        .platform-chip--algochat { color: var(--accent-green); border-color: var(--accent-green); background: var(--accent-green-tint); }
+        .platform-chip--github { color: #f0f0f0; border-color: var(--text-muted); background: rgba(255, 255, 255, 0.05); }
+        .platform-chip--verified { box-shadow: 0 0 6px var(--accent-green-mid); }
 
         .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
 
@@ -311,7 +311,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         }
         .detail-avatar {
             width: 48px; height: 48px; border-radius: 50%;
-            background: var(--accent-cyan-dim, rgba(0, 200, 255, 0.15));
+            background: var(--accent-cyan-dim);
             color: var(--accent-cyan); display: flex; align-items: center;
             justify-content: center; font-weight: 700; font-size: 1.2rem;
             flex-shrink: 0;
@@ -334,14 +334,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .links-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
         .link-row {
             display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
-            background: var(--bg-base, rgba(0, 0, 0, 0.2)); border-radius: var(--radius);
+            background: var(--bg-base); border-radius: var(--radius);
         }
         .link-id {
             font-size: 0.8rem; color: var(--text-secondary); flex: 1;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .verified-badge {
-            font-size: 0.65rem; color: var(--accent-green, #00ff88);
+            font-size: 0.65rem; color: var(--accent-green);
             font-weight: 600; text-transform: uppercase;
         }
         .empty-hint { color: var(--text-tertiary); font-size: 0.8rem; margin: 0.25rem 0; }
@@ -349,7 +349,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         /* ── Add link form ── */
         .add-link-form {
             display: flex; flex-direction: column; gap: 0.5rem;
-            padding: 0.75rem; background: var(--bg-base, rgba(0, 0, 0, 0.2));
+            padding: 0.75rem; background: var(--bg-base);
             border-radius: var(--radius); margin-top: 0.5rem;
         }
 
@@ -359,7 +359,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
         }
         .field-input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base, rgba(0, 0, 0, 0.3));
+            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             box-sizing: border-box;
@@ -370,7 +370,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 
         /* ── Modal ── */
         .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+            position: fixed; inset: 0; background: var(--overlay-heavy);
             display: flex; align-items: center; justify-content: center;
             z-index: 1000;
         }

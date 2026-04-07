@@ -271,7 +271,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .pipeline-connector[data-state="active"] {
             background: linear-gradient(90deg, var(--accent-cyan), var(--border));
         }
-        @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px rgba(0, 229, 255, 0.2); } }
+        @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-cyan-glow); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px var(--accent-cyan-mid); } }
         .task-actions { margin-top: 0.5rem; }
         .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
@@ -304,7 +304,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             transition: border-color 0.15s, color 0.15s;
         }
         .filter-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px rgba(0, 229, 255, 0.12); }
+        .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px var(--accent-cyan-dim); }
 
         .tasks__search-row {
             display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
@@ -409,7 +409,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             padding: 1px 6px;
             border-radius: var(--radius-sm);
             border: 1px solid var(--border);
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
         .task-duration--active {
             color: var(--accent-cyan);

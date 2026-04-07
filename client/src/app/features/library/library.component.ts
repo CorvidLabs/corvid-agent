@@ -286,7 +286,7 @@ type SortKey = 'date' | 'name' | 'author';
         .library__title {
             font-size: 1.2rem;
             font-weight: 700;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             margin: 0;
         }
 
@@ -316,8 +316,8 @@ type SortKey = 'date' | 'name' | 'author';
             display: flex;
             gap: 0;
             margin-bottom: 0.75rem;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--glass-bg-solid);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             overflow-x: auto;
         }
@@ -330,18 +330,18 @@ type SortKey = 'date' | 'name' | 'author';
             letter-spacing: 0.03em;
             background: transparent;
             border: none;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
             white-space: nowrap;
         }
         .library__tab:hover {
-            color: var(--text-primary, #e0e0e0);
-            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            color: var(--text-primary);
+            background: var(--bg-hover);
         }
         .library__tab--active {
-            color: var(--accent-cyan, #00e5ff);
-            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+            color: var(--accent-cyan);
+            background: var(--accent-cyan-subtle);
         }
         .library__toolbar {
             display: flex;
@@ -354,21 +354,21 @@ type SortKey = 'date' | 'name' | 'author';
             padding: 0.5rem 0.75rem;
             font-size: 0.8rem;
             font-family: inherit;
-            background: var(--input-bg, rgba(15, 15, 25, 0.8));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             outline: none;
             transition: border-color 0.15s;
         }
         .library__search:focus {
-            border-color: var(--accent-cyan, #00e5ff);
+            border-color: var(--accent-cyan);
         }
         .library__sort-buttons {
             display: flex;
             gap: 0;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--glass-bg-solid);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             flex-shrink: 0;
         }
@@ -381,17 +381,17 @@ type SortKey = 'date' | 'name' | 'author';
             letter-spacing: 0.03em;
             background: transparent;
             border: none;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
             white-space: nowrap;
         }
         .library__sort-btn:hover {
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
         .library__sort-btn--active {
-            color: var(--accent-cyan, #00e5ff);
-            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
+            color: var(--accent-cyan);
+            background: var(--accent-cyan-subtle);
         }
         .library__stats {
             display: flex;
@@ -403,16 +403,16 @@ type SortKey = 'date' | 'name' | 'author';
         }
         .library__stat {
             padding: 2px 8px;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.6));
+            background: var(--glass-bg-solid);
             border-radius: 10px;
         }
         .library__stat--total {
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
         .library__loading, .library__empty {
             text-align: center;
             padding: 2rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             font-size: 0.85rem;
         }
         .library__grid {
@@ -421,19 +421,19 @@ type SortKey = 'date' | 'name' | 'author';
             gap: 0.5rem;
         }
         .library__card {
-            background: var(--card-bg, rgba(15, 15, 25, 0.7));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
             border-radius: 8px;
             padding: 0.75rem;
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
         }
         .library__card:hover {
-            border-color: var(--border-bright, #2a2a3e);
-            background: var(--card-bg-hover, rgba(20, 20, 35, 0.8));
+            border-color: var(--border-bright);
+            background: var(--card-bg-hover);
         }
         .library__card--expanded {
-            border-color: var(--accent-cyan-border, rgba(0, 229, 255, 0.3));
+            border-color: var(--accent-cyan-border);
         }
         .library__card-header {
             display: flex;
@@ -454,24 +454,24 @@ type SortKey = 'date' | 'name' | 'author';
         .library__card-title {
             font-weight: 600;
             font-size: 0.85rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
         .library__card-pages {
             font-size: 0.6rem;
             font-weight: 700;
-            color: var(--accent-purple, #a78bfa);
-            background: var(--tag-bg, rgba(167, 139, 250, 0.1));
-            border: 1px solid var(--tag-border, rgba(167, 139, 250, 0.2));
+            color: var(--accent-purple);
+            background: var(--tag-bg);
+            border: 1px solid var(--tag-border);
             padding: 1px 8px;
             border-radius: 10px;
         }
         .library__card--book {
-            border-left: 3px solid var(--accent-purple, #a78bfa);
+            border-left: 3px solid var(--accent-purple);
         }
         .library__card-preview {
             margin-top: 0.35rem;
             font-size: 0.72rem;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -481,7 +481,7 @@ type SortKey = 'date' | 'name' | 'author';
             gap: 0.5rem;
             margin-top: 0.25rem;
             font-size: 0.7rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
         }
         .library__card-tags {
             display: flex;
@@ -492,16 +492,16 @@ type SortKey = 'date' | 'name' | 'author';
         .library__card-tag {
             display: inline-block;
             padding: 1px 6px;
-            background: var(--tag-bg, rgba(167, 139, 250, 0.1));
-            border: 1px solid var(--tag-border, rgba(167, 139, 250, 0.2));
+            background: var(--tag-bg);
+            border: 1px solid var(--tag-border);
             border-radius: 4px;
             font-size: 0.62rem;
-            color: var(--accent-purple, #a78bfa);
+            color: var(--accent-purple);
             text-transform: lowercase;
         }
         .library__card-content {
             margin-top: 0.5rem;
-            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            border-top: 1px solid var(--border-subtle);
             padding-top: 0.5rem;
         }
         .library__card-pre {
@@ -509,7 +509,7 @@ type SortKey = 'date' | 'name' | 'author';
             word-break: break-word;
             font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 0.75rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             line-height: 1.5;
             margin: 0;
             max-height: 400px;
@@ -519,7 +519,7 @@ type SortKey = 'date' | 'name' | 'author';
         /* Markdown rendered content */
         .library__markdown {
             font-size: 0.82rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             line-height: 1.65;
             word-break: break-word;
             max-height: 60vh;
@@ -530,7 +530,7 @@ type SortKey = 'date' | 'name' | 'author';
         :host ::ng-deep .library__markdown h1,
         :host ::ng-deep .library__markdown h2,
         :host ::ng-deep .library__markdown h3 {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             margin: 1.25rem 0 0.5rem;
             line-height: 1.3;
         }
@@ -553,7 +553,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown pre {
             background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             padding: 0.75rem;
             overflow-x: auto;
@@ -565,13 +565,13 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.75rem;
         }
         :host ::ng-deep .library__markdown blockquote {
-            border-left: 3px solid var(--accent-cyan, #00e5ff);
+            border-left: 3px solid var(--accent-cyan);
             margin: 0.75rem 0;
             padding: 0.25rem 0.75rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
         }
         :host ::ng-deep .library__markdown a {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             text-decoration: none;
         }
         :host ::ng-deep .library__markdown a:hover { text-decoration: underline; }
@@ -583,7 +583,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown th,
         :host ::ng-deep .library__markdown td {
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            border: 1px solid var(--border-subtle);
             padding: 0.35rem 0.6rem;
             text-align: left;
         }
@@ -593,7 +593,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown hr {
             border: none;
-            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            border-top: 1px solid var(--border-subtle);
             margin: 1rem 0;
         }
 
@@ -610,8 +610,8 @@ type SortKey = 'date' | 'name' | 'author';
             backdrop-filter: blur(4px);
         }
         .library__overlay-content {
-            background: var(--card-bg, rgba(15, 15, 25, 0.95));
-            border: 1px solid var(--border-bright, #2a2a3e);
+            background: var(--card-bg);
+            border: 1px solid var(--border-bright);
             border-radius: 12px;
             padding: 1.25rem;
             max-width: 700px;
@@ -627,13 +627,13 @@ type SortKey = 'date' | 'name' | 'author';
         .library__overlay-title {
             font-weight: 700;
             font-size: 1rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             flex: 1;
         }
         .library__overlay-close {
             background: transparent;
-            border: 1px solid var(--border-subtle, #1a1a2e);
-            color: var(--text-secondary, #888);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
             font-size: 0.8rem;
             padding: 2px 8px;
             border-radius: 4px;
@@ -641,12 +641,12 @@ type SortKey = 'date' | 'name' | 'author';
             font-family: inherit;
         }
         .library__overlay-close:hover {
-            color: var(--text-primary, #e0e0e0);
-            border-color: var(--border-bright, #2a2a3e);
+            color: var(--text-primary);
+            border-color: var(--border-bright);
         }
         .library__overlay-meta {
             font-size: 0.72rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             margin-top: 0.35rem;
         }
         .library__overlay-content--reader {
@@ -675,27 +675,27 @@ type SortKey = 'date' | 'name' | 'author';
             content: '';
             flex: 1;
             height: 1px;
-            background: var(--border-subtle, #1a1a2e);
+            background: var(--border-subtle);
         }
         .library__page-divider-label {
             font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: var(--text-tertiary, #555);
+            color: var(--text-tertiary);
             white-space: nowrap;
         }
         .library__overlay-type {
             font-size: 0.6rem;
             text-transform: uppercase;
-            color: var(--text-secondary, #888);
-            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            color: var(--text-secondary);
+            background: var(--bg-hover);
             padding: 1px 6px;
             border-radius: 4px;
         }
         .library__overlay-page-info {
             font-size: 0.65rem;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             font-weight: 600;
         }
 
@@ -705,12 +705,12 @@ type SortKey = 'date' | 'name' | 'author';
             transition: background 0.15s, border-color 0.15s;
         }
         .library__card-tag--clickable:hover {
-            background: rgba(167, 139, 250, 0.2);
+            background: var(--accent-purple-mid);
             border-color: rgba(167, 139, 250, 0.4);
         }
         .library__card-tag--active {
-            background: rgba(167, 139, 250, 0.3);
-            border-color: var(--accent-purple, #a78bfa);
+            background: var(--accent-purple-glow);
+            border-color: var(--accent-purple);
         }
         .library__active-filter {
             display: flex;
@@ -720,7 +720,7 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.72rem;
         }
         .library__filter-label {
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -730,16 +730,16 @@ type SortKey = 'date' | 'name' | 'author';
             align-items: center;
             gap: 4px;
             padding: 2px 8px;
-            background: rgba(167, 139, 250, 0.15);
-            border: 1px solid rgba(167, 139, 250, 0.3);
+            background: var(--accent-purple-dim);
+            border: 1px solid var(--accent-purple-glow);
             border-radius: 10px;
-            color: var(--accent-purple, #a78bfa);
+            color: var(--accent-purple);
             font-weight: 600;
         }
         .library__filter-clear {
             background: transparent;
             border: none;
-            color: var(--accent-purple, #a78bfa);
+            color: var(--accent-purple);
             cursor: pointer;
             font-size: 0.6rem;
             padding: 0 2px;
@@ -747,7 +747,7 @@ type SortKey = 'date' | 'name' | 'author';
             line-height: 1;
         }
         .library__filter-clear:hover {
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
 
         /* Page navigation */
@@ -758,7 +758,7 @@ type SortKey = 'date' | 'name' | 'author';
             gap: 0.75rem;
             margin-top: 0.75rem;
             padding: 0.5rem;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.6));
+            background: var(--glass-bg-solid);
             border-radius: 8px;
         }
         .library__page-btn {
@@ -766,26 +766,26 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.7rem;
             font-weight: 600;
             font-family: inherit;
-            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--bg-hover);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             cursor: pointer;
             transition: background 0.15s, border-color 0.15s;
         }
         .library__page-btn:hover:not(:disabled) {
-            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
-            border-color: var(--accent-cyan, #00e5ff);
+            background: var(--accent-cyan-subtle);
+            border-color: var(--accent-cyan);
         }
         .library__page-btn:disabled {
-            color: var(--text-tertiary, #555);
+            color: var(--text-tertiary);
             cursor: not-allowed;
             opacity: 0.5;
         }
         .library__page-indicator {
             font-size: 0.68rem;
             font-weight: 600;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             min-width: 6rem;
             text-align: center;
         }
@@ -795,13 +795,13 @@ type SortKey = 'date' | 'name' | 'author';
             margin-top: 0.75rem;
             font-size: 0.8rem;
             line-height: 1.6;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
         :host ::ng-deep .library__markdown-content h1,
         :host ::ng-deep .library__markdown-content h2,
         :host ::ng-deep .library__markdown-content h3,
         :host ::ng-deep .library__markdown-content h4 {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             margin: 1rem 0 0.5rem;
             font-weight: 700;
         }
@@ -815,14 +815,14 @@ type SortKey = 'date' | 'name' | 'author';
         :host ::ng-deep .library__markdown-content code {
             font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 0.75rem;
-            background: rgba(0, 229, 255, 0.06);
+            background: var(--accent-cyan-subtle);
             padding: 1px 4px;
             border-radius: 3px;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
         }
         :host ::ng-deep .library__markdown-content pre {
             background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             padding: 0.75rem;
             overflow-x: auto;
@@ -841,10 +841,10 @@ type SortKey = 'date' | 'name' | 'author';
             margin: 0.25rem 0;
         }
         :host ::ng-deep .library__markdown-content blockquote {
-            border-left: 3px solid var(--accent-purple, #a78bfa);
+            border-left: 3px solid var(--accent-purple);
             padding-left: 0.75rem;
             margin: 0.5rem 0;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
         }
         :host ::ng-deep .library__markdown-content table {
             border-collapse: collapse;
@@ -854,16 +854,16 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown-content th,
         :host ::ng-deep .library__markdown-content td {
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            border: 1px solid var(--border-subtle);
             padding: 0.35rem 0.5rem;
             text-align: left;
         }
         :host ::ng-deep .library__markdown-content th {
-            background: rgba(0, 229, 255, 0.06);
+            background: var(--accent-cyan-subtle);
             font-weight: 600;
         }
         :host ::ng-deep .library__markdown-content a {
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             text-decoration: none;
         }
         :host ::ng-deep .library__markdown-content a:hover {
@@ -871,14 +871,14 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown-content hr {
             border: none;
-            border-top: 1px solid var(--border-subtle, #1a1a2e);
+            border-top: 1px solid var(--border-subtle);
             margin: 1rem 0;
         }
 
         /* Search panel */
         .library__search-panel {
-            background: var(--card-bg, rgba(10, 10, 20, 0.97));
-            border: 1px solid var(--border-bright, #2a2a3e);
+            background: var(--card-bg);
+            border: 1px solid var(--border-bright);
             border-radius: 12px;
             padding: 1rem;
             max-width: 600px;
@@ -896,12 +896,12 @@ type SortKey = 'date' | 'name' | 'author';
         .library__search-panel-title {
             font-weight: 700;
             font-size: 1rem;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             flex: 1;
         }
         .library__search-panel-count {
             font-size: 0.65rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
         }
         .library__search--panel {
             margin-bottom: 0;
@@ -909,8 +909,8 @@ type SortKey = 'date' | 'name' | 'author';
         .library__search-panel-tabs {
             display: flex;
             gap: 0;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--glass-bg-solid);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             overflow-x: auto;
         }
@@ -927,15 +927,15 @@ type SortKey = 'date' | 'name' | 'author';
             align-items: flex-start;
             gap: 0.5rem;
             padding: 0.5rem 0.6rem;
-            background: var(--card-bg, rgba(15, 15, 25, 0.6));
-            border: 1px solid var(--border-subtle, #1a1a2e);
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
             border-radius: 6px;
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
         }
         .library__search-result:hover {
-            border-color: var(--accent-cyan-border, rgba(0, 229, 255, 0.3));
-            background: var(--card-bg-hover, rgba(20, 20, 35, 0.8));
+            border-color: var(--accent-cyan-border);
+            background: var(--card-bg-hover);
         }
         .library__search-result-info {
             flex: 1;
@@ -947,11 +947,11 @@ type SortKey = 'date' | 'name' | 'author';
         .library__search-result-title {
             font-weight: 600;
             font-size: 0.8rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
         .library__search-result-preview {
             font-size: 0.68rem;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -1001,7 +1001,7 @@ export class LibraryComponent implements OnInit, OnDestroy {
             counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
         }
         return [
-            { key: 'total' as string, label: 'total', count: entries.length, color: 'var(--text-primary, #e0e0e0)' },
+            { key: 'total' as string, label: 'total', count: entries.length, color: 'var(--text-primary)' },
             ...CATEGORIES.filter((c) => c.key !== 'all')
                 .map((c) => ({
                     key: c.key as string,

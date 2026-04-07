@@ -160,8 +160,8 @@ interface ParsedEvent {
                 0deg,
                 transparent,
                 transparent 2px,
-                rgba(0, 229, 255, 0.008) 2px,
-                rgba(0, 229, 255, 0.008) 4px
+                var(--accent-cyan-faint) 2px,
+                var(--accent-cyan-faint) 4px
             );
         }
 
@@ -245,17 +245,17 @@ interface ParsedEvent {
 
         /* Assistant */
         .line--assistant .prompt { color: var(--accent-green); }
-        .line--assistant .label { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .line--assistant .label { color: var(--accent-green); background: var(--accent-green-wash); }
         .line--assistant .text { color: var(--text-primary); }
 
         /* User */
         .line--user .prompt { color: var(--accent-cyan); }
-        .line--user .label { color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); }
+        .line--user .label { color: var(--accent-cyan); background: var(--accent-cyan-wash); }
         .line--user .text { color: var(--text-primary); }
 
         /* Tool use */
         .line--tool_use .prompt { color: var(--accent-magenta); }
-        .tool-label { color: var(--accent-magenta); background: rgba(255, 0, 170, 0.08); }
+        .tool-label { color: var(--accent-magenta); background: var(--accent-magenta-wash); }
         .text--tool { color: var(--text-secondary); font-size: 0.75rem; }
 
         /* Tool result */
@@ -284,11 +284,11 @@ interface ParsedEvent {
 
         /* Result / done */
         .line--result .prompt { color: var(--accent-green); opacity: 1; }
-        .done-label { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .done-label { color: var(--accent-green); background: var(--accent-green-wash); }
 
         /* Error */
         .line--error .prompt { color: var(--accent-red); opacity: 1; }
-        .error-label { color: var(--accent-red); background: rgba(255, 51, 85, 0.08); }
+        .error-label { color: var(--accent-red); background: var(--accent-red-wash); }
         .text--error { color: var(--accent-red); }
 
         /* System */
@@ -328,7 +328,7 @@ interface ParsedEvent {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .tool-group-label {
             color: var(--accent-magenta);
-            background: rgba(255, 0, 170, 0.08);
+            background: var(--accent-magenta-wash);
         }
         .tool-group-children {
             padding-left: 1.5rem;
@@ -382,7 +382,7 @@ interface ParsedEvent {
         }
         .scroll-fab:hover {
             background: var(--bg-hover);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 0 12px var(--accent-cyan-glow);
         }
 
         /* Thinking indicator */

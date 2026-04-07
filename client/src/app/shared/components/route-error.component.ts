@@ -48,9 +48,9 @@ import { Router, RouterLink } from '@angular/router';
             text-align: center;
             padding: 3rem 2rem;
             max-width: 480px;
-            border: 1px solid var(--accent-red, #ff3c5f);
-            border-radius: var(--radius-lg, 12px);
-            background: var(--bg-surface, #12131e);
+            border: 1px solid var(--accent-red);
+            border-radius: var(--radius-lg);
+            background: var(--bg-surface);
             position: relative;
             overflow: hidden;
         }
@@ -73,7 +73,7 @@ import { Router, RouterLink } from '@angular/router';
             font-family: var(--font-mono);
             font-size: 0.55rem;
             line-height: 1.3;
-            color: var(--accent-red, #ff3c5f);
+            color: var(--accent-red);
             user-select: none;
             animation: glitchShift 4s ease-in-out infinite;
         }
@@ -91,7 +91,7 @@ import { Router, RouterLink } from '@angular/router';
             margin: 0 0 0.75rem;
             font-size: 1.1rem;
             font-weight: 700;
-            color: var(--text-primary, #e4e6f0);
+            color: var(--text-primary);
             line-height: 1.4;
         }
         .route-error__glitch {
@@ -101,7 +101,7 @@ import { Router, RouterLink } from '@angular/router';
             font-family: var(--font-mono);
             letter-spacing: 0.15em;
             text-transform: uppercase;
-            color: var(--accent-red, #ff3c5f);
+            color: var(--accent-red);
             margin-bottom: 0.25rem;
             animation: glitchFlicker 3s steps(1) infinite;
         }
@@ -117,7 +117,7 @@ import { Router, RouterLink } from '@angular/router';
         .route-error__desc {
             margin: 0 0 1.75rem;
             font-size: 0.8rem;
-            color: var(--text-secondary, #9498b3);
+            color: var(--text-secondary);
             max-width: 360px;
             line-height: 1.7;
         }
@@ -130,7 +130,7 @@ import { Router, RouterLink } from '@angular/router';
         .route-error__btn {
             display: inline-block;
             padding: 0.6rem 1.25rem;
-            border-radius: var(--radius, 8px);
+            border-radius: var(--radius);
             font-size: 0.8rem;
             font-weight: 600;
             font-family: var(--font-mono);
@@ -141,41 +141,41 @@ import { Router, RouterLink } from '@angular/router';
             transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
         }
         .route-error__btn--primary {
-            border: 1px solid var(--accent-cyan, #00e5ff);
+            border: 1px solid var(--accent-cyan);
             background: transparent;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
         }
         .route-error__btn--primary:hover {
-            background: var(--accent-cyan, #00e5ff);
-            color: var(--bg-deep, #0a0b14);
-            box-shadow: var(--glow-cyan, 0 0 12px rgba(0, 229, 255, 0.35));
+            background: var(--accent-cyan);
+            color: var(--bg-deep);
+            box-shadow: var(--glow-cyan);
             transform: translateY(-1px);
         }
         .route-error__btn--primary:active {
             transform: translateY(0) scale(0.97);
         }
         .route-error__btn--secondary {
-            border: 1px solid var(--border, #2a2d45);
+            border: 1px solid var(--border);
             background: transparent;
-            color: var(--text-secondary, #9498b3);
+            color: var(--text-secondary);
         }
         .route-error__btn--secondary:hover {
-            border-color: var(--text-secondary, #9498b3);
-            color: var(--text-primary, #e4e6f0);
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
             transform: translateY(-1px);
         }
         .route-error__btn--secondary:active {
             transform: translateY(0) scale(0.97);
         }
         .route-error__btn:focus-visible {
-            outline: 2px solid var(--accent-cyan, #00e5ff);
+            outline: 2px solid var(--accent-cyan);
             outline-offset: 2px;
         }
         .route-error__hint {
             margin: 1.5rem 0 0;
             font-size: 0.6rem;
             font-family: var(--font-mono);
-            color: var(--text-tertiary, #555770);
+            color: var(--text-tertiary);
             letter-spacing: 0.1em;
         }
         @media (prefers-reduced-motion: reduce) {

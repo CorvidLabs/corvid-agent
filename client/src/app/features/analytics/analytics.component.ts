@@ -252,11 +252,11 @@ interface SessionStats {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+            text-shadow: 0 0 10px var(--accent-cyan-dim);
         }
-        .stat-card__value--usd { color: var(--accent-green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
-        .stat-card__value--algo { color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.15); }
-        .stat-card__value--active { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
+        .stat-card__value--usd { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
+        .stat-card__value--algo { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
+        .stat-card__value--active { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
 
         .analytics__section {
             background: var(--bg-surface);
@@ -359,7 +359,7 @@ interface SessionStats {
             text-align: right;
         }
         .chart-row__bar--sessions {
-            background: linear-gradient(90deg, var(--accent-magenta-dim, rgba(255, 0, 170, 0.15)), var(--accent-magenta));
+            background: linear-gradient(90deg, var(--accent-magenta-dim), var(--accent-magenta));
         }
         .chart-row__value--sessions { color: var(--accent-magenta); }
 

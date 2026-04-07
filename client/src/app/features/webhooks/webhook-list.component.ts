@@ -270,7 +270,7 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
         .webhooks__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
         .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
-        .create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}
+        .create-btn:hover,.save-btn:hover:not(:disabled){background:var(--accent-cyan-mid)}
 
         .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
         .create-form h3{margin:0 0 .25rem;color:var(--text-primary);font-size:.85rem}

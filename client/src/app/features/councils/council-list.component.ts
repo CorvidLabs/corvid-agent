@@ -211,14 +211,14 @@ interface CouncilCard {
             border-radius: var(--radius-lg); padding: 1rem; text-decoration: none; color: inherit;
             transition: border-color 0.15s, box-shadow 0.15s; cursor: pointer;
         }
-        .council-card:hover { border-color: var(--accent-magenta); box-shadow: 0 0 12px rgba(255, 0, 170, 0.08); }
+        .council-card:hover { border-color: var(--accent-magenta); box-shadow: 0 0 12px var(--accent-magenta-wash); }
         .council-card__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
         .council-card__name { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
         .council-card__desc { margin: 0 0 0.35rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .council-card__synthesis {
             margin: 0 0 0.5rem; font-size: 0.7rem; color: var(--accent-green); line-height: 1.4;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            padding: 0.25rem 0.5rem; border-left: 2px solid var(--accent-green); background: rgba(0, 255, 136, 0.04);
+            padding: 0.25rem 0.5rem; border-left: 2px solid var(--accent-green); background: var(--accent-green-faint);
         }
 
         .council-card__meta { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }

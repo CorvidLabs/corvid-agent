@@ -352,7 +352,7 @@ interface LibraryResponse {
         .pull-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .pull-card {
             padding: 0.75rem 1rem; background: var(--bg-surface); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-lg); box-shadow: 0 0 8px rgba(0, 229, 255, 0.05);
+            border-radius: var(--radius-lg); box-shadow: 0 0 8px var(--accent-cyan-subtle);
         }
         .pull-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
         .pull-card__model { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
@@ -368,7 +368,7 @@ interface LibraryResponse {
         }
         .progress-bar__fill {
             height: 100%; background: var(--accent-cyan); border-radius: 3px;
-            transition: width 0.3s ease; box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+            transition: width 0.3s ease; box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
         .progress-bar__fill--done { background: #00e676; box-shadow: 0 0 6px rgba(0, 230, 118, 0.3); }
 
@@ -378,8 +378,8 @@ interface LibraryResponse {
             font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase;
         }
         .badge--running { background: rgba(0, 230, 118, 0.1); color: #00e676; border-color: rgba(0, 230, 118, 0.3); }
-        .badge--tools { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: rgba(0, 229, 255, 0.3); }
-        .badge--vision { background: rgba(255, 170, 0, 0.1); color: #ffaa00; border-color: rgba(255, 170, 0, 0.3); }
+        .badge--tools { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan-glow); }
+        .badge--vision { background: var(--accent-amber-tint); color: var(--accent-amber); border-color: var(--accent-amber-glow); }
         .badge--size { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border); }
         .badge--cap { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border); font-size: 0.62rem; }
 

@@ -289,8 +289,8 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             max-height: 500px;
             opacity: 1;
             transition:
-                max-height var(--motion-collapse-duration, 0.28s) var(--motion-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
-                opacity calc(var(--motion-collapse-duration, 0.28s) * 0.85) var(--motion-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+                max-height var(--motion-collapse-duration) var(--motion-ease-out),
+                opacity calc(var(--motion-collapse-duration) * 0.85) var(--motion-ease-out);
         }
         .sidebar__section-items--collapsed {
             max-height: 0;

@@ -97,9 +97,9 @@ interface ImpactRing {
             width: 100%;
             height: 100%;
             min-height: 300px;
-            background: var(--bg-deep, #0a0a0f);
-            border-radius: var(--radius, 6px);
-            border: 1px solid var(--border, #1a1a2e);
+            background: var(--bg-deep);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
             overflow: hidden;
         }
         canvas {
@@ -116,10 +116,10 @@ interface ImpactRing {
             gap: 6px;
             padding: 4px 10px;
             background: rgba(10, 10, 15, 0.85);
-            border: 1px solid var(--border-bright, #2a2a3e);
+            border: 1px solid var(--border-bright);
             border-radius: 16px;
             font-size: 0.7rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -134,7 +134,7 @@ interface ImpactRing {
         .network-vis__clear {
             background: none;
             border: none;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             cursor: pointer;
             font-size: 0.7rem;
             font-family: inherit;
@@ -142,7 +142,7 @@ interface ImpactRing {
             line-height: 1;
         }
         .network-vis__clear:hover {
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -380,7 +380,7 @@ export class AgentNetworkVisComponent implements OnDestroy {
         if (!fromNode) return;
 
         const color =
-            msg.status === 'failed' ? '#ff4444' :
+            msg.status === 'failed' ? 'var(--accent-red)' :
             msg.status === 'processing' ? '#ffa040' :
             fromNode.color;
 

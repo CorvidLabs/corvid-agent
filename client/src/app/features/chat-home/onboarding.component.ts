@@ -179,7 +179,7 @@ const TEMPLATES: AgentTemplate[] = [
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius-lg, 10px);
+            border-radius: var(--radius-lg);
             color: var(--text-secondary);
             font-family: inherit;
             cursor: pointer;
@@ -188,9 +188,9 @@ const TEMPLATES: AgentTemplate[] = [
             position: relative;
         }
         .tpl-card:hover {
-            border-color: rgba(0, 229, 255, 0.3);
-            background: rgba(0, 229, 255, 0.06);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 229, 255, 0.08);
+            border-color: var(--accent-cyan-glow);
+            background: var(--accent-cyan-subtle);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px var(--accent-cyan-wash);
             transform: translateY(-2px);
         }
         .tpl-card__icon {
@@ -199,14 +199,14 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.06));
-            border: 1px solid rgba(0, 229, 255, 0.15);
+            background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-magenta-subtle));
+            border: 1px solid var(--accent-cyan-dim);
             border-radius: 12px;
             font-size: 0.7rem;
             font-weight: 800;
             color: var(--accent-cyan);
             letter-spacing: 0.05em;
-            box-shadow: 0 2px 12px rgba(0, 229, 255, 0.08);
+            box-shadow: 0 2px 12px var(--accent-cyan-wash);
         }
         .tpl-card__name {
             font-size: 0.82rem;
@@ -253,7 +253,7 @@ const TEMPLATES: AgentTemplate[] = [
             padding: 0.6rem 0.75rem;
             background: var(--bg-input);
             border: 1px solid var(--border);
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.82rem;
@@ -262,7 +262,7 @@ const TEMPLATES: AgentTemplate[] = [
         .field__input:focus {
             outline: none;
             border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 0 1px var(--accent-cyan-mid);
         }
         .onboard__form-actions {
             display: flex;
@@ -272,7 +272,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .btn {
             padding: 0.5rem 1.25rem;
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
@@ -281,13 +281,13 @@ const TEMPLATES: AgentTemplate[] = [
             transition: background 0.15s, box-shadow 0.15s;
         }
         .btn--primary {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(0, 229, 255, 0.06));
+            background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-cyan-subtle));
             color: var(--accent-cyan);
-            border-color: rgba(0, 229, 255, 0.3);
+            border-color: var(--accent-cyan-glow);
         }
         .btn--primary:hover:not(:disabled) {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 229, 255, 0.1));
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+            background: linear-gradient(135deg, var(--accent-cyan-mid), var(--accent-cyan-tint));
+            box-shadow: 0 0 20px var(--accent-cyan-dim);
         }
         .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn--ghost {
@@ -315,7 +315,7 @@ const TEMPLATES: AgentTemplate[] = [
             border-radius: 50%;
             font-size: 1.5rem;
             color: var(--accent-cyan);
-            box-shadow: 0 0 24px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 24px var(--accent-cyan-mid);
         }
         .onboard__done-actions {
             margin-top: 1.5rem;

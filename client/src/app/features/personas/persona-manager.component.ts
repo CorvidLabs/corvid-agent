@@ -192,7 +192,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
         }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover:not(:disabled) { background: var(--accent-red-dim); }

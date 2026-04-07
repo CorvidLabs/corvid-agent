@@ -814,7 +814,7 @@ interface PSKContact {
         .discord-textarea {
             resize: vertical;
             font-size: 0.75rem;
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
         .discord-select { cursor: pointer; }
         .discord-input:focus, .discord-select:focus, .discord-textarea:focus {
@@ -854,7 +854,7 @@ interface PSKContact {
             display: flex; justify-content: space-between; align-items: center;
         }
         .picker-item:hover { background: var(--bg-surface); color: var(--accent-cyan); }
-        .picker-id { font-size: 0.6rem; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+        .picker-id { font-size: 0.6rem; color: var(--text-tertiary); font-family: var(--font-mono); }
         .picker-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.3rem 0.5rem; }
 
         /* Role/Channel permission grid */
@@ -914,7 +914,7 @@ interface PSKContact {
         .network-badge[data-network="testnet"] { color: var(--network-testnet); }
         .network-badge[data-network="mainnet"] { color: var(--network-mainnet); }
         .network-badge[data-network="localnet"] { color: var(--accent-gold); }
-        .algo-balance--low { color: var(--accent-red, #ff4d4f) !important; }
+        .algo-balance--low { color: var(--accent-red) !important; }
 
         /* Connect Mobile — Contact List */
         .connect-desc {
@@ -968,7 +968,7 @@ interface PSKContact {
             margin-left: auto;
         }
         .contact-status--active { color: var(--accent-green); }
-        .contact-status--waiting { color: var(--accent-yellow, #f5a623); }
+        .contact-status--waiting { color: var(--accent-gold); }
         .contact-address {
             display: block;
             font-size: 0.6rem;
@@ -1002,7 +1002,7 @@ interface PSKContact {
         .qr-canvas {
             border-radius: var(--radius);
             border: 2px solid var(--accent-cyan);
-            box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 12px var(--accent-cyan-mid);
         }
         .add-contact {
             margin-top: 0.5rem;
@@ -1094,7 +1094,7 @@ interface PSKContact {
             color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan);
         }
-        .save-btn:hover:not(:disabled) { background: rgba(0, 229, 255, 0.2); }
+        .save-btn:hover:not(:disabled) { background: var(--accent-cyan-mid); }
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .save-btn--sm, .cancel-btn--sm {
             padding: 0.3rem 0.7rem;
@@ -1105,12 +1105,12 @@ interface PSKContact {
             color: var(--accent-magenta);
             border: 1px solid var(--accent-magenta);
         }
-        .backup-btn:hover:not(:disabled) { background: rgba(255, 0, 170, 0.2); }
+        .backup-btn:hover:not(:disabled) { background: var(--accent-magenta-border); }
         .backup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .cancel-btn {
             background: transparent;
-            color: var(--accent-red, #ff4d4f);
-            border: 1px solid var(--accent-red, #ff4d4f);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
         }
         .cancel-btn:hover { background: rgba(255, 77, 79, 0.1); }
         .backup-result {
@@ -1155,7 +1155,7 @@ interface PSKContact {
         }
         .env-key {
             font-size: 0.7rem; font-weight: 600; color: var(--text-primary);
-            font-family: var(--font-mono, monospace);
+            font-family: var(--font-mono);
         }
         .env-value { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
         .env-value--set { color: var(--accent-green); }

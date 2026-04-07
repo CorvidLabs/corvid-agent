@@ -71,8 +71,8 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         .tab-bar {
             display: flex;
             align-items: center;
-            background: var(--bg-surface, #1a1a2e);
-            border-bottom: 1px solid var(--border, #2a2a3e);
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
             height: 36px;
             padding: 0 0.25rem;
             gap: 0.25rem;
@@ -88,7 +88,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             gap: 0.25rem;
             background: none;
             border: none;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.6rem;
             cursor: pointer;
@@ -97,8 +97,8 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             transition: color 0.15s, background 0.15s;
         }
         .tab-bar__collapse:hover {
-            color: var(--accent-cyan, #0ef);
-            background: var(--bg-hover, #252538);
+            color: var(--accent-cyan);
+            background: var(--bg-hover);
         }
         .tab-bar__collapse-chevron {
             font-size: 0.55rem;
@@ -111,7 +111,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         .tab-bar__collapse-count {
             font-size: 0.55rem;
             font-weight: 700;
-            color: var(--accent-cyan, #0ef);
+            color: var(--accent-cyan);
         }
         .tab-bar__tabs {
             display: flex;
@@ -120,11 +120,11 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             gap: 2px;
             overflow-x: auto;
             scrollbar-width: thin;
-            scrollbar-color: var(--border, #2a2a3e) transparent;
+            scrollbar-color: var(--border) transparent;
         }
         .tab-bar__tabs::-webkit-scrollbar { height: 3px; }
         .tab-bar__tabs::-webkit-scrollbar-track { background: transparent; }
-        .tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--border, #2a2a3e); border-radius: 3px; }
+        .tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         .tab {
             display: flex;
             align-items: center;
@@ -133,7 +133,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             background: transparent;
             border: none;
             border-radius: 4px 4px 0 0;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.68rem;
             text-decoration: none;
@@ -145,24 +145,24 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             flex-shrink: 0;
         }
         .tab:hover {
-            background: var(--bg-hover, #252538);
-            color: var(--text-secondary, #bbb);
+            background: var(--bg-hover);
+            color: var(--text-secondary);
         }
         .tab--active {
-            background: var(--bg-deep, #111);
-            color: var(--text-primary, #eee);
-            border-bottom: 2px solid var(--accent-cyan, #0ef);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--accent-cyan);
         }
-        .tab--running .tab__status { color: var(--accent-cyan, #0ef); }
-        .tab--error .tab__status { color: var(--accent-red, #f33); }
+        .tab--running .tab__status { color: var(--accent-cyan); }
+        .tab--error .tab__status { color: var(--accent-red); }
         .tab__index {
             flex-shrink: 0;
             font-size: 0.55rem;
-            color: var(--text-quaternary, #555);
+            color: var(--text-quaternary);
             min-width: 8px;
             text-align: center;
         }
-        .tab--active .tab__index { color: var(--text-tertiary, #888); }
+        .tab--active .tab__index { color: var(--text-tertiary); }
         .tab__status {
             flex-shrink: 0;
             width: 10px;
@@ -175,7 +175,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         .tab__agent {
             flex-shrink: 0;
             font-size: 0.6rem;
-            color: var(--accent-cyan, #0ef);
+            color: var(--accent-cyan);
             opacity: 0.7;
             max-width: 60px;
             overflow: hidden;
@@ -186,7 +186,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: var(--accent-cyan, #0ef);
+            background: var(--accent-cyan);
             animation: pulse 1.5s ease-in-out infinite;
         }
         @keyframes pulse {
@@ -208,7 +208,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             background: transparent;
             border: none;
             border-radius: 2px;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-size: 0.8rem;
             cursor: pointer;
             opacity: 0;
@@ -216,8 +216,8 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         }
         .tab:hover .tab__close { opacity: 1; }
         .tab__close:hover {
-            background: var(--accent-red-dim, var(--accent-red-dim));
-            color: var(--accent-red, #f33);
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
         }
         .tab-bar__new {
             flex-shrink: 0;
@@ -227,16 +227,16 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             align-items: center;
             justify-content: center;
             background: transparent;
-            border: 1px solid var(--border, #333);
+            border: 1px solid var(--border);
             border-radius: 4px;
-            color: var(--text-tertiary, #666);
+            color: var(--text-tertiary);
             font-size: 1rem;
             cursor: pointer;
             transition: color 0.15s, border-color 0.15s;
         }
         .tab-bar__new:hover {
-            color: var(--accent-cyan, #0ef);
-            border-color: var(--accent-cyan, #0ef);
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
         }
     `,
 })

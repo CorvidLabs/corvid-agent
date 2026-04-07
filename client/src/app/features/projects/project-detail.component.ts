@@ -101,7 +101,7 @@ import type { Session } from '../../core/models/session.model';
         .empty { color: var(--text-tertiary); }
         .session-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
         .session-row a { color: var(--accent-cyan); text-decoration: none; }
-        .session-row a:hover { text-shadow: 0 0 8px rgba(0, 229, 255, 0.3); }
+        .session-row a:hover { text-shadow: 0 0 8px var(--accent-cyan-glow); }
         .session-row__time { margin-left: auto; font-size: 0.75rem; color: var(--text-tertiary); }
     `,
 })

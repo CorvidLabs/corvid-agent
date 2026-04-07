@@ -106,11 +106,11 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
         .btn:disabled { opacity: 0.4; cursor: default; }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--danger { color: var(--accent-red, #f44); border-color: var(--accent-red, #f44); }
+        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
         .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
-        .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
+        .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;

@@ -473,7 +473,7 @@ interface AgentTestRow {
                 text-align: right; flex-shrink: 0;
             }
             .ch-agent-score[data-level="high"] { color: var(--success); }
-            .ch-agent-score[data-level="mid"] { color: var(--warning, #f59e0b); }
+            .ch-agent-score[data-level="mid"] { color: var(--warning); }
             .ch-agent-score[data-level="low"] { color: var(--error); }
             .ch-agent-score--none { color: var(--text-muted); }
 
@@ -519,7 +519,7 @@ interface AgentTestRow {
             .ch-score-box__value { font-size: 1.25rem; font-weight: 700; }
             .ch-score-box__value--sm { font-size: 0.875rem; }
             .ch-score-box__value[data-level="high"] { color: var(--success); }
-            .ch-score-box__value[data-level="mid"] { color: var(--warning, #f59e0b); }
+            .ch-score-box__value[data-level="mid"] { color: var(--warning); }
             .ch-score-box__value[data-level="low"] { color: var(--error); }
             .ch-decay-note { width: 100%; font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
 
@@ -534,7 +534,7 @@ interface AgentTestRow {
                 font-size: 1.125rem; font-weight: 700; min-width: 36px;
             }
             .ch-run__score[data-level="high"] { color: var(--success); }
-            .ch-run__score[data-level="mid"] { color: var(--warning, #f59e0b); }
+            .ch-run__score[data-level="mid"] { color: var(--warning); }
             .ch-run__score[data-level="low"] { color: var(--error); }
             .ch-run__date { flex: 1; font-size: 0.8125rem; color: var(--text-muted); }
             .ch-run__dur { font-size: 0.75rem; color: var(--text-muted); }
@@ -548,7 +548,7 @@ interface AgentTestRow {
             .ch-cat-row__bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
             .ch-cat-row__fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s ease; }
             .ch-cat-row__fill[data-level="high"] { background: var(--success); }
-            .ch-cat-row__fill[data-level="mid"] { background: var(--warning, #f59e0b); }
+            .ch-cat-row__fill[data-level="mid"] { background: var(--warning); }
             .ch-cat-row__fill[data-level="low"] { background: var(--error); }
             .ch-cat-row__score { font-size: 0.75rem; font-weight: 600; min-width: 28px; text-align: right; }
             .ch-cat-row__resp { font-size: 0.6875rem; color: var(--text-muted); min-width: 32px; text-align: right; }
@@ -564,7 +564,7 @@ interface AgentTestRow {
             .ch-cr__id { font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; }
             .ch-cr__score { font-weight: 700; min-width: 28px; text-align: right; }
             .ch-cr__score[data-level="high"] { color: var(--success); }
-            .ch-cr__score[data-level="mid"] { color: var(--warning, #f59e0b); }
+            .ch-cr__score[data-level="mid"] { color: var(--warning); }
             .ch-cr__score[data-level="low"] { color: var(--error); }
             .ch-cr__time { color: var(--text-muted); min-width: 40px; }
             .ch-cr__reason { color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

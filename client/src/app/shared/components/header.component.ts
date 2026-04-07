@@ -144,7 +144,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             display: none;
             background: none;
             border: 1px solid var(--border);
-            border-radius: var(--radius, 4px);
+            border-radius: var(--radius);
             padding: 0.4rem;
             cursor: pointer;
             width: 36px;
