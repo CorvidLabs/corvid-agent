@@ -452,7 +452,7 @@ interface SyncStatus {
         </div>
     `,
     styles: `
-        .brain-viewer { padding: 1.5rem; }
+        .brain-viewer { padding: var(--space-6); }
         .brain-viewer h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .brain-viewer h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
@@ -462,7 +462,7 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.6rem 1rem;
+            padding: 0.6rem var(--space-4);
             border-radius: var(--radius-lg);
             margin-bottom: 1.25rem;
             font-size: 0.75rem;
@@ -491,7 +491,7 @@ interface SyncStatus {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             display: flex;
             flex-direction: column;
             gap: 0.35rem;
@@ -522,7 +522,7 @@ interface SyncStatus {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            padding: var(--space-5);
             margin-bottom: 1.25rem;
         }
         .section--errors { border-color: var(--accent-red); }
@@ -615,7 +615,7 @@ interface SyncStatus {
         }
         .search-input {
             width: 100%;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -656,7 +656,7 @@ interface SyncStatus {
             color: var(--text-secondary);
         }
         .btn--sm {
-            padding: 0.25rem 0.6rem;
+            padding: var(--space-1) 0.6rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -672,7 +672,7 @@ interface SyncStatus {
         /* ─── Empty State ────── */
         .empty-state {
             text-align: center;
-            padding: 2rem;
+            padding: var(--space-8);
             color: var(--text-tertiary);
         }
         .empty-state__icon {
@@ -696,12 +696,12 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             font-size: 0.7rem;
         }
         .memory-card__tier {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.55rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -743,13 +743,13 @@ interface SyncStatus {
             padding: 0.1rem 0.3rem;
             background: var(--accent-purple-dim);
             color: var(--accent-purple);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.55rem;
             flex-shrink: 0;
         }
         .memory-card__storage {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.5rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -777,7 +777,7 @@ interface SyncStatus {
 
         /* ─── Detail View ────── */
         .memory-card__detail {
-            padding: 0.75rem;
+            padding: var(--space-3);
             border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -817,7 +817,7 @@ interface SyncStatus {
             background: var(--bg-deep);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 0.75rem;
+            padding: var(--space-3);
             font-size: 0.7rem;
             color: var(--text-secondary);
             white-space: pre-wrap;
@@ -879,12 +879,12 @@ interface SyncStatus {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             font-size: 0.7rem;
         }
         .obs-card__source {
             padding: 0.15rem 0.35rem;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.55rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -917,7 +917,7 @@ interface SyncStatus {
         .obs-card__status[data-obs-status="expired"] { color: var(--text-tertiary); }
         .obs-card__status[data-obs-status="dismissed"] { color: var(--accent-red); }
         .obs-card__detail {
-            padding: 0.75rem;
+            padding: var(--space-3);
             border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -927,11 +927,11 @@ interface SyncStatus {
             display: flex;
             gap: 0.5rem;
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
         .btn--action {
-            padding: 0.35rem 0.75rem;
+            padding: 0.35rem var(--space-3);
             border-radius: var(--radius-sm);
             font-size: 0.65rem;
             font-weight: 600;

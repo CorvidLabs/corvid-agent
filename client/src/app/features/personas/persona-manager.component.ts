@@ -125,7 +125,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
@@ -133,7 +133,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         /* Agent picker — horizontal wrapping chips */
         .agent-picker {
             display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.25rem;
-            padding: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
+            padding: var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius);
         }
         .agent-chip {
@@ -155,7 +155,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         /* Detail panel */
         .detail-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; min-height: 200px;
+            padding: var(--space-6); min-height: 200px;
         }
         .detail-empty {
             display: flex; align-items: center; justify-content: center; min-height: 150px;
@@ -172,13 +172,13 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         .no-persona-banner {
             background: var(--bg-raised); border: 1px dashed var(--border-bright); border-radius: var(--radius);
-            padding: 0.75rem 1rem; margin-bottom: 1rem;
+            padding: var(--space-3) var(--space-4); margin-bottom: 1rem;
         }
         .no-persona-banner p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -187,7 +187,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
         }

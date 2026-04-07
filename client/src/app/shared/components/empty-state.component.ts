@@ -37,7 +37,7 @@ import { RouterLink } from '@angular/router';
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 4rem 2rem;
+            padding: 4rem var(--space-8);
             min-height: 280px;
             position: relative;
             border: 1px dashed var(--border);
@@ -88,7 +88,7 @@ import { RouterLink } from '@angular/router';
         }
         .empty-state__action {
             display: inline-block;
-            padding: 0.6rem 1.25rem;
+            padding: 0.6rem var(--space-5);
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius);
             background: transparent;
@@ -129,7 +129,7 @@ import { RouterLink } from '@angular/router';
         }
         @media (max-width: 767px) {
             .empty-state {
-                padding: 2.5rem 1.5rem;
+                padding: var(--space-10) var(--space-6);
                 min-height: 200px;
             }
         }

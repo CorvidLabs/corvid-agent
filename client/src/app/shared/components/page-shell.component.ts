@@ -81,8 +81,8 @@ export interface Breadcrumb {
         .page-shell__breadcrumbs {
             display: flex;
             align-items: center;
-            gap: 0.35rem;
-            padding: 0.6rem 1.5rem 0;
+            gap: var(--space-1);
+            padding: var(--space-2) var(--space-6) 0;
             font-size: 0.7rem;
             letter-spacing: 0.02em;
         }
@@ -109,13 +109,13 @@ export interface Breadcrumb {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.5rem 1.5rem 0.25rem;
-            gap: 1rem;
+            padding: var(--space-2) var(--space-6) var(--space-1);
+            gap: var(--space-4);
         }
         .page-shell__title-row {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: var(--space-2);
             min-width: 0;
             color: var(--text-primary);
         }
@@ -136,7 +136,7 @@ export interface Breadcrumb {
         .page-shell__actions {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: var(--space-2);
             flex-shrink: 0;
         }
 
@@ -145,7 +145,7 @@ export interface Breadcrumb {
             display: none;
         }
         .page-shell__toolbar {
-            padding: 0 1.5rem;
+            padding: 0 var(--space-6);
         }
 
         /* Content */
@@ -153,21 +153,21 @@ export interface Breadcrumb {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 1rem 2rem 2rem;
+            padding: var(--space-4) var(--space-8) var(--space-8);
         }
 
         @media (max-width: 767px) {
             .page-shell__breadcrumbs {
-                padding: 0.5rem 1rem 0;
+                padding: var(--space-2) var(--space-4) 0;
             }
             .page-shell__header {
-                padding: 0.6rem 1rem 0.4rem;
+                padding: var(--space-2) var(--space-4) var(--space-1);
             }
             .page-shell__toolbar {
-                padding: 0 1rem;
+                padding: 0 var(--space-4);
             }
             .page-shell__content {
-                padding: 0.75rem 1.25rem 1.25rem;
+                padding: var(--space-3) var(--space-5) var(--space-5);
             }
             .page-shell__title {
                 font-size: 1rem;

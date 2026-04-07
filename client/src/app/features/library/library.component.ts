@@ -273,7 +273,7 @@ type SortKey = 'date' | 'name' | 'author';
     `,
     styles: `
         .library {
-            padding: 1.5rem;
+            padding: var(--space-6);
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -318,7 +318,7 @@ type SortKey = 'date' | 'name' | 'author';
             margin-bottom: 0.75rem;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             overflow-x: auto;
         }
         .library__tab {
@@ -351,12 +351,12 @@ type SortKey = 'date' | 'name' | 'author';
         }
         .library__search {
             flex: 1;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             font-size: 0.8rem;
             font-family: inherit;
             background: var(--input-bg);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             color: var(--text-primary);
             outline: none;
             transition: border-color 0.15s;
@@ -369,7 +369,7 @@ type SortKey = 'date' | 'name' | 'author';
             gap: 0;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             flex-shrink: 0;
         }
         .library__sort-btn {
@@ -404,14 +404,14 @@ type SortKey = 'date' | 'name' | 'author';
         .library__stat {
             padding: 2px 8px;
             background: var(--glass-bg-solid);
-            border-radius: 10px;
+            border-radius: var(--radius-lg);
         }
         .library__stat--total {
             color: var(--text-primary);
         }
         .library__loading, .library__empty {
             text-align: center;
-            padding: 2rem;
+            padding: var(--space-8);
             color: var(--text-secondary);
             font-size: 0.85rem;
         }
@@ -423,8 +423,8 @@ type SortKey = 'date' | 'name' | 'author';
         .library__card {
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            padding: var(--space-3);
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
         }
@@ -444,7 +444,7 @@ type SortKey = 'date' | 'name' | 'author';
         .library__card-badge {
             display: inline-block;
             padding: 2px 8px;
-            border-radius: 10px;
+            border-radius: var(--radius-lg);
             font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -463,7 +463,7 @@ type SortKey = 'date' | 'name' | 'author';
             background: var(--tag-bg);
             border: 1px solid var(--tag-border);
             padding: 1px 8px;
-            border-radius: 10px;
+            border-radius: var(--radius-lg);
         }
         .library__card--book {
             border-left: 3px solid var(--accent-purple);
@@ -494,7 +494,7 @@ type SortKey = 'date' | 'name' | 'author';
             padding: 1px 6px;
             background: var(--tag-bg);
             border: 1px solid var(--tag-border);
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             font-size: 0.62rem;
             color: var(--accent-purple);
             text-transform: lowercase;
@@ -502,7 +502,7 @@ type SortKey = 'date' | 'name' | 'author';
         .library__card-content {
             margin-top: 0.5rem;
             border-top: 1px solid var(--border-subtle);
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
         }
         .library__card-pre {
             white-space: pre-wrap;
@@ -540,22 +540,22 @@ type SortKey = 'date' | 'name' | 'author';
         :host ::ng-deep .library__markdown p { margin: 0.5rem 0; }
         :host ::ng-deep .library__markdown ul,
         :host ::ng-deep .library__markdown ol {
-            padding-left: 1.5rem;
+            padding-left: var(--space-6);
             margin: 0.5rem 0;
         }
         :host ::ng-deep .library__markdown li { margin: 0.25rem 0; }
         :host ::ng-deep .library__markdown code {
             background: rgba(255, 255, 255, 0.06);
             padding: 1px 5px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 0.78rem;
         }
         :host ::ng-deep .library__markdown pre {
             background: rgba(0, 0, 0, 0.4);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
-            padding: 0.75rem;
+            border-radius: var(--radius);
+            padding: var(--space-3);
             overflow-x: auto;
             margin: 0.75rem 0;
         }
@@ -567,7 +567,7 @@ type SortKey = 'date' | 'name' | 'author';
         :host ::ng-deep .library__markdown blockquote {
             border-left: 3px solid var(--accent-cyan);
             margin: 0.75rem 0;
-            padding: 0.25rem 0.75rem;
+            padding: var(--space-1) var(--space-3);
             color: var(--text-secondary);
         }
         :host ::ng-deep .library__markdown a {
@@ -606,14 +606,14 @@ type SortKey = 'date' | 'name' | 'author';
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1rem;
+            padding: var(--space-4);
             backdrop-filter: blur(4px);
         }
         .library__overlay-content {
             background: var(--card-bg);
             border: 1px solid var(--border-bright);
             border-radius: 12px;
-            padding: 1.25rem;
+            padding: var(--space-5);
             max-width: 700px;
             width: 100%;
             max-height: 80vh;
@@ -636,7 +636,7 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-secondary);
             font-size: 0.8rem;
             padding: 2px 8px;
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             cursor: pointer;
             font-family: inherit;
         }
@@ -659,7 +659,7 @@ type SortKey = 'date' | 'name' | 'author';
             margin-top: 0.75rem;
             max-height: 65vh;
             overflow-y: auto;
-            padding-right: 0.5rem;
+            padding-right: var(--space-2);
         }
         .library__page-content {
             margin: 0;
@@ -691,7 +691,7 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-secondary);
             background: var(--bg-hover);
             padding: 1px 6px;
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
         }
         .library__overlay-page-info {
             font-size: 0.65rem;
@@ -732,7 +732,7 @@ type SortKey = 'date' | 'name' | 'author';
             padding: 2px 8px;
             background: var(--accent-purple-dim);
             border: 1px solid var(--accent-purple-glow);
-            border-radius: 10px;
+            border-radius: var(--radius-lg);
             color: var(--accent-purple);
             font-weight: 600;
         }
@@ -757,9 +757,9 @@ type SortKey = 'date' | 'name' | 'author';
             justify-content: center;
             gap: 0.75rem;
             margin-top: 0.75rem;
-            padding: 0.5rem;
+            padding: var(--space-2);
             background: var(--glass-bg-solid);
-            border-radius: 8px;
+            border-radius: var(--radius-md);
         }
         .library__page-btn {
             padding: 0.3rem 0.6rem;
@@ -768,7 +768,7 @@ type SortKey = 'date' | 'name' | 'author';
             font-family: inherit;
             background: var(--bg-hover);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             color: var(--accent-cyan);
             cursor: pointer;
             transition: background 0.15s, border-color 0.15s;
@@ -817,14 +817,14 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.75rem;
             background: var(--accent-cyan-subtle);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             color: var(--accent-cyan);
         }
         :host ::ng-deep .library__markdown-content pre {
             background: rgba(0, 0, 0, 0.4);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
-            padding: 0.75rem;
+            border-radius: var(--radius);
+            padding: var(--space-3);
             overflow-x: auto;
             margin: 0.5rem 0;
         }
@@ -834,7 +834,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown-content ul,
         :host ::ng-deep .library__markdown-content ol {
-            padding-left: 1.5rem;
+            padding-left: var(--space-6);
             margin: 0.5rem 0;
         }
         :host ::ng-deep .library__markdown-content li {
@@ -842,7 +842,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
         :host ::ng-deep .library__markdown-content blockquote {
             border-left: 3px solid var(--accent-purple);
-            padding-left: 0.75rem;
+            padding-left: var(--space-3);
             margin: 0.5rem 0;
             color: var(--text-secondary);
         }
@@ -855,7 +855,7 @@ type SortKey = 'date' | 'name' | 'author';
         :host ::ng-deep .library__markdown-content th,
         :host ::ng-deep .library__markdown-content td {
             border: 1px solid var(--border-subtle);
-            padding: 0.35rem 0.5rem;
+            padding: 0.35rem var(--space-2);
             text-align: left;
         }
         :host ::ng-deep .library__markdown-content th {
@@ -880,7 +880,7 @@ type SortKey = 'date' | 'name' | 'author';
             background: var(--card-bg);
             border: 1px solid var(--border-bright);
             border-radius: 12px;
-            padding: 1rem;
+            padding: var(--space-4);
             max-width: 600px;
             width: 100%;
             max-height: 80vh;
@@ -911,7 +911,7 @@ type SortKey = 'date' | 'name' | 'author';
             gap: 0;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             overflow-x: auto;
         }
         .library__search-results {
@@ -926,10 +926,10 @@ type SortKey = 'date' | 'name' | 'author';
             display: flex;
             align-items: flex-start;
             gap: 0.5rem;
-            padding: 0.5rem 0.6rem;
+            padding: var(--space-2) 0.6rem;
             background: var(--card-bg);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
         }
@@ -962,9 +962,9 @@ type SortKey = 'date' | 'name' | 'author';
         }
 
         @media (max-width: 600px) {
-            .library { padding: 0.5rem; }
-            .library__card { padding: 0.5rem; }
-            .library__search-panel { max-width: 100%; padding: 0.75rem; }
+            .library { padding: var(--space-2); }
+            .library__card { padding: var(--space-2); }
+            .library__search-panel { max-width: 100%; padding: var(--space-3); }
             .library__toolbar { flex-direction: column; }
             .library__sort-buttons { align-self: flex-end; }
         }

@@ -177,7 +177,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 4rem 2rem 3rem;
+            padding: 4rem var(--space-8) var(--space-12);
         }
         .chat-home__center {
             width: 100%;
@@ -233,7 +233,7 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home__shortcut-hint kbd {
             padding: 1px 5px;
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             background: var(--bg-raised);
             font-family: inherit;
             font-size: 0.7rem;
@@ -255,7 +255,7 @@ import { OnboardingComponent } from './onboarding.component';
         }
         .chat-home__textarea {
             width: 100%;
-            padding: 1.25rem 1.25rem 0.5rem;
+            padding: var(--space-5) var(--space-5) var(--space-2);
             border: none;
             background: transparent;
             color: var(--text-primary);
@@ -277,7 +277,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.5rem 1.25rem 0.85rem;
+            padding: var(--space-2) var(--space-5) 0.85rem;
             gap: 0.75rem;
         }
         .chat-home__pickers {
@@ -316,7 +316,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: center;
             gap: 0.35rem;
-            padding: 0.5rem 1.4rem;
+            padding: var(--space-2) 1.4rem;
             border: none;
             border-radius: var(--radius-lg);
             background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-cyan-wash));
@@ -377,7 +377,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: flex-start;
             gap: 0.6rem;
-            padding: 0.85rem 1rem;
+            padding: 0.85rem var(--space-4);
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: var(--radius-lg);
             background: rgba(15, 16, 24, 0.5);
@@ -459,7 +459,7 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: center;
             gap: 0.6rem;
-            padding: 0.6rem 0.75rem;
+            padding: 0.6rem var(--space-3);
             border: none;
             border-radius: var(--radius);
             background: transparent;
@@ -509,7 +509,7 @@ import { OnboardingComponent } from './onboarding.component';
         }
 
         @media (max-width: 480px) {
-            .chat-home__scroll { padding: 2rem 1rem; }
+            .chat-home__scroll { padding: var(--space-8) var(--space-4); }
             .chat-home__title { font-size: 1.5rem; }
             .chat-home__logo-mark { width: 44px; height: 44px; font-size: 1.2rem; }
             .chat-home__actions { flex-direction: column; align-items: stretch; }

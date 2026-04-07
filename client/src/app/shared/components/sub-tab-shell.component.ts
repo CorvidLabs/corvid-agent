@@ -48,7 +48,7 @@ export interface SubTab {
             display: flex;
             align-items: center;
             gap: 0;
-            padding: 0 1.25rem;
+            padding: 0 var(--space-5);
             background: rgba(12, 13, 20, 0.5);
             border-bottom: 1px solid var(--border-subtle);
             overflow-x: auto;
@@ -61,7 +61,7 @@ export interface SubTab {
         .tab-shell__tab {
             display: flex;
             align-items: center;
-            padding: 0.65rem 1rem;
+            padding: 0.65rem var(--space-4);
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 0.78rem;
@@ -94,10 +94,10 @@ transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 
         @media (max-width: 767px) {
             .tab-shell__tabs {
-                padding: 0 0.75rem;
+                padding: 0 var(--space-3);
             }
             .tab-shell__tab {
-                padding: 0.55rem 0.75rem;
+                padding: 0.55rem var(--space-3);
                 font-size: 0.72rem;
             }
         }

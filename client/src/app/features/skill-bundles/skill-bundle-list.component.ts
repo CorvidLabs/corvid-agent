@@ -161,17 +161,17 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .filter-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
         .filter-tab {
-            padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.4rem var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
             background: transparent; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer;
             font-family: inherit; transition: all 0.15s;
         }
@@ -179,13 +179,13 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            padding: var(--space-6); margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -194,7 +194,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
@@ -206,7 +206,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .bundle-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .bundle-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.75rem 1rem; transition: border-color 0.15s;
+            padding: var(--space-3) var(--space-4); transition: border-color 0.15s;
         }
         .bundle-card--expanded { border-color: var(--accent-cyan); }
         .bundle-card__header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -218,7 +218,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         }
         .bundle-card__meta { font-size: 0.75rem; color: var(--text-secondary); }
         .bundle-card__desc { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-secondary); }
-        .bundle-card__details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .bundle-card__details { margin-top: 1rem; padding-top: var(--space-4); border-top: 1px solid var(--border); }
         .bundle-card__tools-list { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; }
         .bundle-card__prompt pre { font-size: 0.8rem; color: var(--accent-green); white-space: pre-wrap; margin: 0.25rem 0; }
         @media (max-width: 767px) {

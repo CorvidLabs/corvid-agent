@@ -155,10 +155,10 @@ interface CreditTransaction {
         </div>
     `,
     styles: `
-        .logs { padding: 1.5rem; }
+        .logs { padding: var(--space-6); }
         .logs h2 { margin: 0 0 1rem; color: var(--text-primary); }
         .loading { color: var(--text-secondary); }
-        .empty { text-align: center; padding: 3rem; color: var(--text-tertiary); }
+        .empty { text-align: center; padding: var(--space-12); color: var(--text-tertiary); }
 
         /* Tabs */
         .tabs {
@@ -167,7 +167,7 @@ interface CreditTransaction {
             margin-bottom: 1rem;
         }
         .tab-btn {
-            padding: 0.45rem 1rem;
+            padding: 0.45rem var(--space-4);
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -186,7 +186,7 @@ interface CreditTransaction {
             display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
         }
         .log-search {
-            flex: 1; padding: 0.4rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            flex: 1; padding: 0.4rem var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.8rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .log-search:focus { border-color: var(--accent-cyan); outline: none; }
@@ -201,7 +201,7 @@ interface CreditTransaction {
         }
         .filter-group { display: flex; gap: 0.35rem; }
         .filter-chip {
-            padding: 0.25rem 0.55rem;
+            padding: var(--space-1) 0.55rem;
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: 20px;
@@ -225,7 +225,7 @@ interface CreditTransaction {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 0.75rem;
+            padding: var(--space-3);
             transition: border-color 0.15s;
         }
         .log-entry:hover { border-color: var(--border-bright); }
@@ -290,7 +290,7 @@ interface CreditTransaction {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr 1.5fr 1fr;
             gap: 0.5rem;
-            padding: 0.45rem 0.5rem;
+            padding: 0.45rem var(--space-2);
             font-size: 0.7rem;
         }
         .credit-header {
@@ -330,7 +330,7 @@ interface CreditTransaction {
         .load-more {
             display: block;
             margin: 1rem auto;
-            padding: 0.5rem 1.5rem;
+            padding: var(--space-2) var(--space-6);
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);

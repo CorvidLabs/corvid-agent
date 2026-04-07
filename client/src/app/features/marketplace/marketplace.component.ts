@@ -268,39 +268,39 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .search-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; align-items: center; }
         .search-input {
-            flex: 1; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            flex: 1; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .filter-select {
-            padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
-            padding: 0.75rem 1rem; margin-bottom: 1rem;
+            padding: var(--space-3) var(--space-4); margin-bottom: 1rem;
         }
         .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            padding: var(--space-6); margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -313,7 +313,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
         .listing-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1rem; cursor: pointer; transition: border-color 0.15s;
+            padding: var(--space-4); cursor: pointer; transition: border-color 0.15s;
         }
         .listing-card:hover { border-color: var(--accent-cyan); }
         .listing-card--selected { border-color: var(--accent-cyan); background: var(--bg-raised); }
@@ -362,7 +362,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         /* Detail panel */
         .detail-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-top: 1.5rem;
+            padding: var(--space-6); margin-top: 1.5rem;
         }
         .detail-columns { display: grid; grid-template-columns: 1fr auto; gap: 2rem; }
         .detail-panel__header { display: flex; justify-content: space-between; align-items: center; }
@@ -376,7 +376,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .stat-value { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
         .stat-value--rating { display: flex; align-items: center; gap: 0.1rem; }
         .stat-value--price { color: var(--accent-green); }
-        .review-row { border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
+        .review-row { border-bottom: 1px solid var(--border); padding: var(--space-2) 0; }
         .review-row__header { display: flex; justify-content: space-between; align-items: center; }
         .review-row__stars { display: inline-flex; gap: 0.1rem; }
         .review-row__time { font-size: 0.75rem; color: var(--text-secondary); }
@@ -386,10 +386,10 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .review-form__fields { display: flex; gap: 0.5rem; align-items: center; }
         .review-form__rating { width: auto; flex-shrink: 0; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--sm { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }

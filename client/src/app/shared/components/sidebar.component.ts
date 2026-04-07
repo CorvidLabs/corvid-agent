@@ -148,7 +148,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             width: 100%;
             background: var(--glass-bg-solid);
             min-height: 100%;
-            padding: 1rem 0;
+            padding: var(--space-4) 0;
             border-right: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
@@ -167,7 +167,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         .sidebar__link {
             display: flex;
             align-items: center;
-            padding: 0.75rem 1.5rem;
+            padding: var(--space-3) var(--space-6);
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 0.85rem;
@@ -210,10 +210,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             from {
                 background: transparent;
                 border-left-color: transparent;
-                padding-left: 1rem;
+                padding-left: var(--space-4);
             }
             to {
-                padding-left: 1.5rem;
+                padding-left: var(--space-6);
             }
         }
         .sidebar__link--active::before {
@@ -229,7 +229,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         /* Section headers */
         .sidebar__section {
             list-style: none;
-            padding: 0.5rem 1.5rem 0.2rem;
+            padding: var(--space-2) var(--space-6) 0.2rem;
             margin-top: 0.4rem;
             border-top: 1px solid var(--border);
         }
@@ -258,7 +258,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             cursor: pointer;
             font-family: inherit;
             color: inherit;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
         }
         .sidebar__section-toggle:hover .sidebar__section-label {
             color: var(--text-secondary);
@@ -313,7 +313,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             align-items: center;
             justify-content: center;
             margin-top: auto;
-            padding: 0.6rem 1.5rem;
+            padding: 0.6rem var(--space-6);
             background: transparent;
             border: none;
             border-top: 1px solid var(--border);
@@ -362,7 +362,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             display: inline;
         }
         .sidebar--collapsed .sidebar__link {
-            padding: 0.75rem 0;
+            padding: var(--space-3) 0;
             text-align: center;
             border-left-width: 2px;
         }
@@ -425,12 +425,12 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 display: none;
             }
             .sidebar--collapsed .sidebar__link {
-                padding: 0.75rem 1.5rem;
+                padding: var(--space-3) var(--space-6);
                 text-align: left;
                 border-left-width: 3px;
             }
             .sidebar--collapsed .sidebar__section {
-                padding: 0.5rem 1.5rem 0.2rem;
+                padding: var(--space-2) var(--space-6) 0.2rem;
             }
             .sidebar--collapsed .sidebar__section-label {
                 display: inline;

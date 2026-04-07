@@ -59,7 +59,7 @@ const STORAGE_KEY = 'comms_view_mode';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.75rem 1.25rem;
+            padding: var(--space-3) var(--space-5);
             background: rgba(12, 13, 20, 0.3);
             border-bottom: 1px solid var(--border-subtle);
             flex-shrink: 0;
@@ -75,7 +75,7 @@ const STORAGE_KEY = 'comms_view_mode';
             gap: 0;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: 6px;
+            border-radius: var(--radius);
             overflow: hidden;
         }
         .unified-comms__mode-btn {
@@ -106,7 +106,7 @@ const STORAGE_KEY = 'comms_view_mode';
 
         @media (max-width: 767px) {
             .unified-comms__header {
-                padding: 0.5rem 0.75rem;
+                padding: var(--space-2) var(--space-3);
             }
             .unified-comms__mode-btn {
                 padding: 0.3rem 0.65rem;

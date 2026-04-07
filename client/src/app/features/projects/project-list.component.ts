@@ -49,11 +49,11 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -63,7 +63,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border);
+            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg); text-decoration: none; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }

@@ -62,7 +62,7 @@ const ROUTE_LABELS: Record<string, string> = {
     `,
     styles: `
         .breadcrumb {
-            padding: 0.5rem 1.5rem;
+            padding: var(--space-2) var(--space-6);
             border-bottom: 1px solid var(--border);
             background: var(--bg-surface);
         }
@@ -116,7 +116,7 @@ const ROUTE_LABELS: Record<string, string> = {
         }
 
         @media (max-width: 767px) {
-            .breadcrumb { padding: 0.4rem 1rem; }
+            .breadcrumb { padding: 0.4rem var(--space-4); }
         }
     `,
 })

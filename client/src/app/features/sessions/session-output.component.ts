@@ -150,7 +150,7 @@ interface ParsedEvent {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--bg-deep);
             color: var(--text-primary);
             font-family: var(--font-mono);
@@ -177,7 +177,7 @@ interface ParsedEvent {
         .line + .line--assistant,
         .line + .line--user {
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
 
@@ -196,7 +196,7 @@ interface ParsedEvent {
             text-transform: uppercase;
             letter-spacing: 0.08em;
             padding: 1px 6px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             line-height: 1.6;
         }
 
@@ -229,7 +229,7 @@ interface ParsedEvent {
             color: var(--text-tertiary);
             cursor: pointer;
             font-size: 0.85rem;
-            padding: 0 0.25rem;
+            padding: 0 var(--space-1);
             line-height: 1.6;
             opacity: 0;
             transition: opacity 0.15s, color 0.15s;
@@ -274,7 +274,7 @@ interface ParsedEvent {
             color: var(--text-secondary);
             font-size: 0.7rem;
             margin-top: 0.25rem;
-            padding: 0.5rem;
+            padding: var(--space-2);
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -303,7 +303,7 @@ interface ParsedEvent {
         .tool-group + .line--assistant,
         .tool-group + .line--user {
             margin-top: 0.5rem;
-            padding-top: 0.5rem;
+            padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
         .tool-group-summary {
@@ -331,7 +331,7 @@ interface ParsedEvent {
             background: var(--accent-magenta-wash);
         }
         .tool-group-children {
-            padding-left: 1.5rem;
+            padding-left: var(--space-6);
             border-left: 1px solid var(--border);
             margin-left: 0.55rem;
         }
@@ -343,7 +343,7 @@ interface ParsedEvent {
         .load-more {
             display: block;
             width: 100%;
-            padding: 0.4rem 0.75rem;
+            padding: 0.4rem var(--space-3);
             margin: 0.25rem 0;
             background: var(--bg-surface);
             border: 1px solid var(--border);
@@ -390,7 +390,7 @@ interface ParsedEvent {
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: 0.5rem 0;
+            padding: var(--space-2) 0;
             margin-top: 0.25rem;
         }
         .thinking-dot {
@@ -416,20 +416,20 @@ interface ParsedEvent {
 
         /* ── Mobile optimizations ── */
         @media (max-width: 767px) {
-            .terminal { padding: 0.375rem 0.5rem; }
+            .terminal { padding: 0.375rem var(--space-2); }
             .line { gap: 0.375rem; }
             .line + .line--assistant,
             .line + .line--user {
                 margin-top: 0.25rem;
-                padding-top: 0.25rem;
+                padding-top: var(--space-1);
             }
             .tool-group + .line--assistant,
             .tool-group + .line--user {
                 margin-top: 0.25rem;
-                padding-top: 0.25rem;
+                padding-top: var(--space-1);
             }
             .tool-group-children {
-                padding-left: 0.75rem;
+                padding-left: var(--space-3);
                 margin-left: 0.25rem;
             }
             .text--result { max-height: 120px; }

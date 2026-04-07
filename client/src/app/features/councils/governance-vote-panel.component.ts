@@ -150,7 +150,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem 1.25rem;
+            padding: var(--space-4) var(--space-5);
             margin: 1rem 0;
         }
         .vote-panel--resolved { border-color: var(--border-bright); }
@@ -216,7 +216,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
         .vote-list {
             background: var(--bg-deep);
             border-radius: var(--radius);
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             margin-bottom: 0.75rem;
         }
         .vote-list__header {
@@ -226,7 +226,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
         }
         .vote-row {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.25rem 0;
+            padding: var(--space-1) 0;
             font-size: var(--text-sm);
         }
         .vote-row--pending { opacity: 0.5; }
@@ -240,10 +240,10 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
         }
         .vote-row__bar {
             flex: 1; height: 6px; background: var(--bg-surface);
-            border-radius: 3px; overflow: hidden;
+            border-radius: var(--radius-sm); overflow: hidden;
         }
         .vote-row__bar-fill {
-            height: 100%; border-radius: 3px;
+            height: 100%; border-radius: var(--radius-sm);
             transition: width var(--transition-slow);
         }
         .vote-row__bar-fill[data-vote="approve"] { background: var(--accent-green); }
@@ -275,7 +275,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
             display: flex; justify-content: center;
         }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius);
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius);
             font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid;
             font-family: inherit;
@@ -293,7 +293,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
 
         /* Resolution banner */
         .vote-panel__resolution {
-            margin-top: 0.5rem; padding: 0.5rem 0.75rem;
+            margin-top: 0.5rem; padding: var(--space-2) var(--space-3);
             border-radius: var(--radius);
             font-size: var(--text-sm); font-weight: 600;
             border: 1px solid;

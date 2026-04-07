@@ -51,7 +51,7 @@ import { DecimalPipe } from '@angular/common';
         .input-bar {
             display: flex;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--bg-surface);
             border-top: 1px solid var(--border);
             transition: border-color 0.2s;
@@ -67,7 +67,7 @@ import { DecimalPipe } from '@angular/common';
         }
         .input-bar__field {
             width: 100%;
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--bg-input);
             color: var(--text-primary);
             border: 1px solid var(--border-bright);
@@ -107,7 +107,7 @@ import { DecimalPipe } from '@angular/common';
             font-size: 0.55rem;
             padding: 1px 4px;
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             background: var(--bg-raised);
             color: var(--text-tertiary);
             font-family: inherit;
@@ -120,7 +120,7 @@ import { DecimalPipe } from '@angular/common';
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: 0.5rem 1rem;
+            padding: var(--space-2) var(--space-4);
             background: transparent;
             color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan);
@@ -142,15 +142,15 @@ import { DecimalPipe } from '@angular/common';
         /* Mobile: tighter input bar */
         @media (max-width: 767px) {
             .input-bar {
-                padding: 0.5rem;
+                padding: var(--space-2);
                 gap: 0.375rem;
             }
             .input-bar__field {
-                padding: 0.375rem 0.5rem;
+                padding: 0.375rem var(--space-2);
                 font-size: 0.8rem;
             }
             .input-bar__send {
-                padding: 0.375rem 0.75rem;
+                padding: 0.375rem var(--space-3);
                 font-size: 0.7rem;
             }
             .input-bar__hints { display: none; }

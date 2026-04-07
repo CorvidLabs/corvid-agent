@@ -372,7 +372,7 @@ interface AgentTestRow {
 
         <style>
             .ch-page {
-                padding: 1.5rem;
+                padding: var(--space-6);
                 max-width: 960px;
                 margin: 0 auto;
             }
@@ -388,7 +388,7 @@ interface AgentTestRow {
             .stat-pill {
                 display: flex; flex-direction: column; align-items: center;
                 background: var(--surface-2); border-radius: 0.5rem;
-                padding: 0.35rem 0.75rem; min-width: 64px;
+                padding: 0.35rem var(--space-3); min-width: 64px;
             }
             .stat-pill__value { font-weight: 700; font-size: 1rem; line-height: 1.2; }
             .stat-pill__label { font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -399,7 +399,7 @@ interface AgentTestRow {
             .ch-tabs { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
             .ch-tab {
                 background: none; border: none; cursor: pointer;
-                padding: 0.625rem 1rem; font-size: 0.875rem; color: var(--text-muted);
+                padding: 0.625rem var(--space-4); font-size: 0.875rem; color: var(--text-muted);
                 border-bottom: 2px solid transparent; margin-bottom: -1px;
                 display: flex; align-items: center; gap: 0.375rem;
                 transition: color 0.15s, border-color 0.15s;
@@ -416,17 +416,17 @@ interface AgentTestRow {
             .ch-category { background: var(--surface-2); border-radius: 0.75rem; overflow: hidden; }
             .ch-category__header {
                 display: flex; align-items: center; gap: 0.625rem;
-                padding: 0.875rem 1rem; background: var(--surface-3);
+                padding: 0.875rem var(--space-4); background: var(--surface-3);
             }
             .ch-category__icon { font-size: 1.125rem; }
             .ch-category__name { font-size: 1rem; font-weight: 600; margin: 0; flex: 1; }
             .ch-category__weight { font-size: 0.75rem; color: var(--accent); font-weight: 600; }
             .ch-category__count { font-size: 0.75rem; color: var(--text-muted); }
 
-            .ch-challenge-list { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem; }
+            .ch-challenge-list { padding: var(--space-2); display: flex; flex-direction: column; gap: 0.375rem; }
             .ch-challenge {
                 display: flex; align-items: center; gap: 0.75rem;
-                padding: 0.5rem 0.625rem; border-radius: 0.375rem;
+                padding: var(--space-2) 0.625rem; border-radius: 0.375rem;
                 background: var(--surface-1);
             }
             .ch-challenge__id { font-size: 0.6875rem; font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; }
@@ -488,7 +488,7 @@ interface AgentTestRow {
             .ch-detail {
                 background: var(--surface-1); border-radius: 1rem 1rem 0 0;
                 width: 100%; max-width: 680px; max-height: 85vh;
-                overflow-y: auto; padding: 1.25rem;
+                overflow-y: auto; padding: var(--space-5);
             }
             @media (min-width: 640px) {
                 .ch-detail { border-radius: 1rem; }
@@ -502,9 +502,9 @@ interface AgentTestRow {
             .ch-detail__close {
                 background: none; border: none; cursor: pointer;
                 font-size: 1.5rem; color: var(--text-muted); line-height: 1;
-                padding: 0.25rem;
+                padding: var(--space-1);
             }
-            .ch-detail__empty { color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 2rem 0; }
+            .ch-detail__empty { color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: var(--space-8) 0; }
             .ch-detail__section-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
             .ch-detail__actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
 
@@ -545,8 +545,8 @@ interface AgentTestRow {
             .ch-cat-row { display: flex; align-items: center; gap: 0.5rem; }
             .ch-cat-row__icon { font-size: 0.875rem; flex-shrink: 0; }
             .ch-cat-row__label { font-size: 0.75rem; min-width: 100px; flex-shrink: 0; }
-            .ch-cat-row__bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
-            .ch-cat-row__fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s ease; }
+            .ch-cat-row__bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: var(--radius-sm); overflow: hidden; }
+            .ch-cat-row__fill { height: 100%; border-radius: var(--radius-sm); background: var(--accent); transition: width 0.4s ease; }
             .ch-cat-row__fill[data-level="high"] { background: var(--success); }
             .ch-cat-row__fill[data-level="mid"] { background: var(--warning); }
             .ch-cat-row__fill[data-level="low"] { background: var(--error); }
@@ -554,7 +554,7 @@ interface AgentTestRow {
             .ch-cat-row__resp { font-size: 0.6875rem; color: var(--text-muted); min-width: 32px; text-align: right; }
 
             /* Per-challenge results */
-            .ch-challenge-results { padding: 0.5rem 0.875rem; display: flex; flex-direction: column; gap: 0.25rem; }
+            .ch-challenge-results { padding: var(--space-2) 0.875rem; display: flex; flex-direction: column; gap: 0.25rem; }
             .ch-cr {
                 display: flex; align-items: center; gap: 0.5rem;
                 padding: 0.3rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem;
@@ -571,7 +571,7 @@ interface AgentTestRow {
 
             /* Mobile adjustments */
             @media (max-width: 600px) {
-                .ch-page { padding: 1rem; }
+                .ch-page { padding: var(--space-4); }
                 .ch-challenge { flex-wrap: wrap; }
                 .ch-challenge__id { min-width: 0; }
                 .ch-agent-grid { grid-template-columns: 1fr 1fr; }

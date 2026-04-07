@@ -146,7 +146,7 @@ interface LogEntry {
             padding: 4px 10px;
             background: rgba(5, 5, 10, 0.85);
             border: 1px solid var(--border-bright);
-            border-radius: 16px;
+            border-radius: var(--radius-xl);
             font-size: 0.7rem;
             color: var(--text-primary);
             font-weight: 600;
@@ -193,7 +193,7 @@ interface LogEntry {
             max-height: 240px;
             background: rgba(5, 5, 10, 0.88);
             border: 1px solid var(--border-bright);
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             backdrop-filter: blur(8px);
             z-index: 10;
             overflow: hidden;
@@ -216,7 +216,7 @@ interface LogEntry {
         .network-3d__log-count {
             background: var(--surface-alt);
             padding: 1px 6px;
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             font-size: 0.55rem;
             color: var(--text-tertiary);
         }

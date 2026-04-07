@@ -56,7 +56,7 @@ type IntegrationsSection = 'mcp' | 'contacts' | 'marketplace';
         .settings-section__nav {
             display: flex;
             gap: 0;
-            padding: 0 1rem;
+            padding: 0 var(--space-4);
             border-bottom: 1px solid var(--border-subtle);
             background: rgba(12, 13, 20, 0.2);
             overflow-x: auto;
@@ -65,7 +65,7 @@ type IntegrationsSection = 'mcp' | 'contacts' | 'marketplace';
         }
         .settings-section__nav::-webkit-scrollbar { display: none; }
         .settings-section__btn {
-            padding: 0.5rem 0.85rem;
+            padding: var(--space-2) 0.85rem;
             font-size: 0.72rem;
             font-weight: 600;
             font-family: inherit;

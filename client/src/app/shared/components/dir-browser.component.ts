@@ -78,7 +78,7 @@ import {
         }
         .browser__header {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             border-bottom: 1px solid var(--border);
         }
         .browser__path {
@@ -87,7 +87,7 @@ import {
             direction: rtl; text-align: left;
         }
         .btn--icon {
-            padding: 0.25rem 0.5rem; font-size: 0.75rem;
+            padding: var(--space-1) var(--space-2); font-size: 0.75rem;
             background: transparent; color: var(--text-secondary);
             border: 1px solid var(--border-bright); border-radius: var(--radius);
             cursor: pointer; font-family: inherit;
@@ -99,24 +99,24 @@ import {
             overflow-y: auto; flex: 1; min-height: 200px; max-height: 400px;
         }
         .browser__item {
-            padding: 0.4rem 1rem; font-size: 0.8rem; color: var(--text-primary);
+            padding: 0.4rem var(--space-4); font-size: 0.8rem; color: var(--text-primary);
             cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
         }
         .browser__item:hover { background: var(--bg-hover); }
         .browser__item:focus-visible { background: var(--accent-cyan-dim); outline: none; }
         .browser__icon { font-size: 0.9rem; }
         .browser__empty {
-            padding: 1.5rem 1rem; text-align: center;
+            padding: var(--space-6) var(--space-4); text-align: center;
             color: var(--text-tertiary); font-size: 0.8rem;
         }
         .browser__loading, .browser__error {
-            padding: 1.5rem 1rem; text-align: center; font-size: 0.8rem;
+            padding: var(--space-6) var(--space-4); text-align: center; font-size: 0.8rem;
         }
         .browser__loading { color: var(--text-secondary); }
         .browser__error { color: var(--accent-red); }
         .browser__actions {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             border-top: 1px solid var(--border);
         }
         .browser__toggle {
@@ -126,7 +126,7 @@ import {
         .browser__toggle input { accent-color: var(--accent-cyan); }
         .browser__buttons { display: flex; gap: 0.5rem; }
         .btn {
-            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }

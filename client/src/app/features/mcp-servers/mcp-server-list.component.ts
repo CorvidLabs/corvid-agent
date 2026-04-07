@@ -454,11 +454,11 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
@@ -472,7 +472,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .official-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
         .official-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            padding: 0.75rem; transition: border-color 0.15s;
+            padding: var(--space-3); transition: border-color 0.15s;
         }
         .official-card:hover { border-color: var(--border-bright); }
         .official-card--installed { opacity: 0.6; }
@@ -482,20 +482,20 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .official-card__desc { margin: 0 0 0.35rem; font-size: 0.7rem; color: var(--text-secondary); }
         .official-card__cmd { display: block; font-size: 0.65rem; color: var(--text-tertiary); margin-bottom: 0.5rem; word-break: break-all; }
         .official-card__env { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
-        .env-input { padding: 0.35rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: var(--font-mono); background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
+        .env-input { padding: 0.35rem var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: var(--font-mono); background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
         .env-input:focus { border-color: var(--accent-cyan); outline: none; }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
         .server-card__agent-tag { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: 600; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            padding: var(--space-6); margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -509,7 +509,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .server-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .server-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.75rem 1rem; transition: border-color 0.15s;
+            padding: var(--space-3) var(--space-4); transition: border-color 0.15s;
         }
         .server-card--expanded { border-color: var(--accent-cyan); }
         .server-card__header { cursor: pointer; }
@@ -522,19 +522,19 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .server-card__status[data-enabled="true"] { color: var(--accent-green); border-color: var(--accent-green); }
         .server-card__status[data-enabled="false"] { color: var(--text-secondary); }
         .server-card__command { font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); }
-        .server-card__details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .server-card__details { margin-top: 1rem; padding-top: var(--space-4); border-top: 1px solid var(--border); }
         .server-detail-list { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin-bottom: 1rem; }
         .server-detail-list dt { font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; }
         .server-detail-list dd { margin: 0; color: var(--text-primary); font-size: 0.85rem; }
         .server-detail-list code { color: var(--accent-cyan); font-size: 0.8rem; }
         .test-result {
-            padding: 0.5rem 0.75rem; border-radius: var(--radius); font-size: 0.8rem; margin-bottom: 1rem;
+            padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: 0.8rem; margin-bottom: 1rem;
             border: 1px solid var(--border);
         }
         .test-result[data-success="true"] { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0, 255, 0, 0.05); }
         .test-result[data-success="false"] { color: var(--accent-red); border-color: var(--accent-red); background: var(--accent-red-dim); }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }

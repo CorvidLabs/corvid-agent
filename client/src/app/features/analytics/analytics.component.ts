@@ -217,7 +217,7 @@ interface SessionStats {
         </div>
     `,
     styles: `
-        .analytics { padding: 1.5rem; }
+        .analytics { padding: var(--space-6); }
         .analytics h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .analytics h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
@@ -233,7 +233,7 @@ interface SessionStats {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             display: flex;
             flex-direction: column;
             gap: 0.35rem;
@@ -262,7 +262,7 @@ interface SessionStats {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            padding: var(--space-5);
             margin-bottom: 1.25rem;
         }
 
@@ -402,7 +402,7 @@ interface SessionStats {
         .kv-key[data-status="error"] { color: var(--accent-red); }
         .kv-val { color: var(--text-primary); font-weight: 600; }
 
-        .empty-state { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: 1rem; }
+        .empty-state { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: var(--space-4); }
     `,
 })
 export class AnalyticsComponent implements OnInit {

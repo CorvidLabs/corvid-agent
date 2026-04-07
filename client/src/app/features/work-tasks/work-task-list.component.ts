@@ -206,7 +206,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         </div>
     `,
     styles: `
-        .tasks { padding: 1.5rem; }
+        .tasks { padding: var(--space-6); }
         .tasks__header {
             display: flex;
             align-items: center;
@@ -217,18 +217,18 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .tasks__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; animation: expandReveal 0.25s ease-out; }
+        .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); margin-bottom: 1rem; animation: expandReveal 0.25s ease-out; }
         .create-form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
-        .form-select, .form-textarea { padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
+        .form-select, .form-textarea { padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
         .form-select { min-width: 150px; }
         .form-textarea { flex: 1; resize: vertical; min-height: 2.5em; line-height: 1.5; }
         .form-select, .form-textarea { transition: border-color var(--transition-fast), box-shadow var(--transition-base); }
         .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .btn { padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn { padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .tasks__filter-row { margin-bottom: 1rem; }
@@ -273,7 +273,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-cyan-glow); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px var(--accent-cyan-mid); } }
         .task-actions { margin-top: 0.5rem; }
-        .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
+        .action-btn { padding: var(--space-1) 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
         .action-btn--cancel:hover { background: var(--accent-red-dim); }
         .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
@@ -281,7 +281,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .action-btn--retry:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .detail-toggle {
-            display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.6rem;
+            display: inline-block; margin-top: 0.5rem; padding: var(--space-1) 0.6rem;
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);
             color: var(--text-tertiary); font-size: 0.6rem; font-weight: 600; font-family: inherit;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
@@ -318,7 +318,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .search-input::placeholder { color: var(--text-tertiary); }
         .agent-filter-select {
-            padding: 0.4rem 0.5rem; font-size: 0.7rem; font-family: inherit;
+            padding: 0.4rem var(--space-2); font-size: 0.7rem; font-family: inherit;
             background: var(--bg-input); color: var(--text-primary);
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             cursor: pointer; min-width: 120px;
@@ -335,7 +335,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
 
         .empty {
             text-align: center;
-            padding: 3rem;
+            padding: var(--space-12);
             color: var(--text-tertiary);
         }
 
@@ -349,7 +349,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             transition: border-color 0.2s, transform 0.2s ease, box-shadow 0.25s ease;
         }
         .task-card:hover { border-color: var(--border-bright); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); }
@@ -484,7 +484,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .task-error-wrapper { margin-top: 0.5rem; }
 
         .task-error {
-            padding: 0.5rem;
+            padding: var(--space-2);
             background: var(--accent-red-dim);
             border: 1px solid var(--accent-red);
             border-radius: var(--radius);
@@ -510,7 +510,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .task-error--expanded .task-error__content {
             background: var(--bg-deep);
             border-radius: var(--radius-sm);
-            padding: 0.5rem;
+            padding: var(--space-2);
         }
         .error-toggle {
             display: inline-block;
@@ -528,7 +528,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
 
         .task-summary {
             margin-top: 0.5rem;
-            padding: 0.5rem;
+            padding: var(--space-2);
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -540,7 +540,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
 
         @media (max-width: 767px) {
-            .tasks { padding: 1rem; }
+            .tasks { padding: var(--space-4); }
             .tasks__header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
             .create-form__row { flex-direction: column; }
             .form-select { min-width: 100%; }
@@ -553,7 +553,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             .pipeline-stage__dot { width: 8px; height: 8px; }
         }
         @media (max-width: 480px) {
-            .tasks { padding: 0.75rem; }
+            .tasks { padding: var(--space-3); }
             .pipeline-stage__label { display: none; }
         }
     `,

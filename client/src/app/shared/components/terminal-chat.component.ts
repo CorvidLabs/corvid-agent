@@ -158,7 +158,7 @@ interface AutocompleteItem {
         }
         .terminal__output {
             flex: 1;
-            padding: 1rem;
+            padding: var(--space-4);
             min-height: 0;
             overflow-y: auto;
             scrollbar-width: thin;
@@ -225,7 +225,7 @@ interface AutocompleteItem {
         }
         .terminal__text :global(pre) {
             background: var(--terminal-surface);
-            padding: 0.75rem;
+            padding: var(--space-3);
             border-radius: var(--radius);
             border: 1px solid var(--border);
             overflow-x: auto;
@@ -251,13 +251,13 @@ interface AutocompleteItem {
         }
         .terminal__text :global(ul),
         .terminal__text :global(ol) {
-            padding-left: 1.25rem;
+            padding-left: var(--space-5);
             margin: 0.25rem 0;
         }
         .terminal__text :global(li) { margin: 0.1rem 0; }
         .terminal__text :global(blockquote) {
             border-left: 3px solid var(--border-bright);
-            padding-left: 0.75rem;
+            padding-left: var(--space-3);
             color: var(--text-secondary);
             margin: 0.25rem 0;
         }
@@ -284,7 +284,7 @@ interface AutocompleteItem {
             align-items: center;
             justify-content: space-between;
             background: var(--bg-deep);
-            padding: 0.3rem 0.75rem;
+            padding: 0.3rem var(--space-3);
             border-bottom: 1px solid var(--border);
         }
         .terminal__text :global(.code-block__lang) {
@@ -302,7 +302,7 @@ interface AutocompleteItem {
             font-family: inherit;
             font-size: 0.65rem;
             padding: 2px 8px;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
             transition: color 0.1s, border-color 0.1s;
             min-height: 24px;
@@ -313,7 +313,7 @@ interface AutocompleteItem {
         }
         .terminal__text :global(.code-block pre) {
             background: #0d1117;
-            padding: 0.75rem;
+            padding: var(--space-3);
             margin: 0;
             border-radius: 0;
             border: none;
@@ -378,8 +378,8 @@ interface AutocompleteItem {
         }
         /* Mobile */
         @media (max-width: 480px) {
-            .terminal__output { padding: 0.5rem; }
-            .terminal__input-area { padding: 0.5rem 0.75rem; }
+            .terminal__output { padding: var(--space-2); }
+            .terminal__input-area { padding: var(--space-2) var(--space-3); }
         }
 
         /* ── Blinking cursor ────────────────────────────── */
@@ -412,7 +412,7 @@ interface AutocompleteItem {
             background: var(--terminal-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 0.5rem;
+            padding: var(--space-2);
             font-size: 0.75rem;
             color: var(--terminal-text-dim);
             overflow-x: auto;
@@ -426,7 +426,7 @@ interface AutocompleteItem {
             gap: 0.5rem;
             color: var(--terminal-text-dim);
             font-size: 0.75rem;
-            padding: 0.25rem 0;
+            padding: var(--space-1) 0;
             margin-bottom: 0.5rem;
         }
         .terminal__typing-dot {
@@ -463,7 +463,7 @@ interface AutocompleteItem {
             display: flex;
             align-items: flex-start;
             border-top: 1px solid var(--border);
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--terminal-bg);
         }
         .terminal__input-prompt {
@@ -486,7 +486,7 @@ interface AutocompleteItem {
             line-height: inherit;
             resize: none;
             outline: none;
-            padding: 0 0 0 0.25rem;
+            padding: 0 0 0 var(--space-1);
             min-height: 1.6em;
         }
         .terminal__input::placeholder { color: var(--terminal-text-faint); }
@@ -543,7 +543,7 @@ interface AutocompleteItem {
             display: flex;
             align-items: baseline;
             gap: 0.75rem;
-            padding: 0.4rem 0.75rem;
+            padding: 0.4rem var(--space-3);
             cursor: pointer;
             transition: background 0.1s;
         }
