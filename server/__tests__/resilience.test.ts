@@ -97,11 +97,15 @@ describe('withRetry', () => {
 
     test('uses defaults (3 attempts) when no options provided', async () => {
         let calls = 0;
+        // Only override delays to keep test fast — maxAttempts defaults to 3
         await expect(
-            withRetry(async () => {
-                calls++;
-                throw new Error('fail');
-            }),
+            withRetry(
+                async () => {
+                    calls++;
+                    throw new Error('fail');
+                },
+                { baseDelayMs: 1, jitter: false },
+            ),
         ).rejects.toThrow('fail');
         expect(calls).toBe(3);
     });
