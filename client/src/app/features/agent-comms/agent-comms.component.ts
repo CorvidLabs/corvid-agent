@@ -45,9 +45,6 @@ interface CommEntry {
     selector: 'app-agent-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent, AgentNetwork3DComponent, ViewModeToggleComponent],
-    // AgentNetwork3DComponent stays in imports so Angular's compiler sees it,
-    // but is only used inside @defer so the build system code-splits it
-    // (and Three.js) into a separate lazy chunk.
     template: `
         <div class="page">
             <div class="page__header">
