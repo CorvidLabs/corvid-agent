@@ -4,18 +4,18 @@ import { runMigrations } from '../db/schema';
 import type { McpToolContext } from '../mcp/tool-handlers/types';
 import { mockDiscordRest } from './helpers/mock-discord-rest';
 
-// Create controllable mocks for embeds functions. This is necessary because
+// Create controllable mock for sendMessageWithFiles. This is necessary because
 // routes-discord-image.test.ts uses mock.module to replace sendMessageWithFiles,
 // which persists in Bun's module cache and would bypass _setRestClientForTesting.
-// By owning the mock here, we can control return values per-test.
+// NOTE: We intentionally do NOT mock sendDiscordMessage here — doing so would
+// contaminate the module cache for discord-bridge.test.ts and other files that
+// rely on the real sendDiscordMessage calling through to the REST client.
 const mockSendMessageWithFiles = mock((..._args: unknown[]) => Promise.resolve('mock-msg-1' as string | null));
-const mockSendDiscordMessage = mock((..._args: unknown[]) => Promise.resolve());
 
 const realEmbeds = await import('../discord/embeds');
 mock.module('../discord/embeds', () => ({
     ...realEmbeds,
     sendMessageWithFiles: mockSendMessageWithFiles,
-    sendDiscordMessage: mockSendDiscordMessage,
 }));
 
 const { handleDiscordSendMessage, handleDiscordSendImage } = await import('../mcp/tool-handlers/discord');
@@ -42,9 +42,8 @@ beforeEach(() => {
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     const { cleanup } = mockDiscordRest();
     restCleanup = cleanup;
-    // Reset mocks to default success behavior
+    // Reset mock to default success behavior
     mockSendMessageWithFiles.mockImplementation((..._args: unknown[]) => Promise.resolve('mock-msg-1'));
-    mockSendDiscordMessage.mockImplementation((..._args: unknown[]) => Promise.resolve());
 });
 
 afterEach(() => {
