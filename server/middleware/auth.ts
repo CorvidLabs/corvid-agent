@@ -11,19 +11,19 @@
  * - Health endpoint (/api/health) is always public (monitoring probes need it).
  */
 
-import { createLogger } from '../lib/logger';
-import { readFileSync, openSync, writeSync, closeSync, constants as fsConstants } from 'node:fs';
-import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { closeSync, constants as fsConstants, openSync, readFileSync, writeSync } from 'node:fs';
+import { join } from 'node:path';
+import { createLogger } from '../lib/logger';
 
 const log = createLogger('Auth');
 
 /** Thrown by validateStartupSecurity when the configuration is unsafe to run. */
 export class SecurityConfigError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'SecurityConfigError';
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = 'SecurityConfigError';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -31,20 +31,20 @@ export class SecurityConfigError extends Error {
 // ---------------------------------------------------------------------------
 
 export interface AuthConfig {
-    /** The API key required for access. null = auth disabled (localhost-only). */
-    apiKey: string | null;
-    /** Origins allowed by CORS. Empty = allow all (for localhost). */
-    allowedOrigins: string[];
-    /** The bind host — used to enforce the "must have key if not localhost" rule. */
-    bindHost: string;
-    /** Previous API key retained during rotation grace period. */
-    previousApiKey?: string | null;
-    /** Timestamp (ms since epoch) when the previous API key expires. */
-    previousKeyExpiry?: number;
-    /** Epoch ms when the current API key was created. */
-    apiKeyCreatedAt?: number;
-    /** Epoch ms when the current API key expires (0 or undefined = no expiry). */
-    apiKeyExpiresAt?: number;
+  /** The API key required for access. null = auth disabled (localhost-only). */
+  apiKey: string | null;
+  /** Origins allowed by CORS. Empty = allow all (for localhost). */
+  allowedOrigins: string[];
+  /** The bind host — used to enforce the "must have key if not localhost" rule. */
+  bindHost: string;
+  /** Previous API key retained during rotation grace period. */
+  previousApiKey?: string | null;
+  /** Timestamp (ms since epoch) when the previous API key expires. */
+  previousKeyExpiry?: number;
+  /** Epoch ms when the current API key was created. */
+  apiKeyCreatedAt?: number;
+  /** Epoch ms when the current API key expires (0 or undefined = no expiry). */
+  apiKeyExpiresAt?: number;
 }
 
 /**
@@ -52,38 +52,38 @@ export interface AuthConfig {
  * Throws if the deployment is insecure (non-localhost without API_KEY).
  */
 export function loadAuthConfig(): AuthConfig {
-    const apiKey = process.env.API_KEY?.trim() || null;
-    const bindHost = process.env.BIND_HOST || '127.0.0.1';
+  const apiKey = process.env.API_KEY?.trim() || null;
+  const bindHost = process.env.BIND_HOST || '127.0.0.1';
 
-    const allowedOrigins: string[] = [];
-    const rawOrigins = process.env.ALLOWED_ORIGINS?.trim();
-    if (rawOrigins) {
-        for (const origin of rawOrigins.split(',')) {
-            const trimmed = origin.trim();
-            if (trimmed.length > 0) allowedOrigins.push(trimmed);
-        }
+  const allowedOrigins: string[] = [];
+  const rawOrigins = process.env.ALLOWED_ORIGINS?.trim();
+  if (rawOrigins) {
+    for (const origin of rawOrigins.split(',')) {
+      const trimmed = origin.trim();
+      if (trimmed.length > 0) allowedOrigins.push(trimmed);
     }
+  }
 
-    const config: AuthConfig = { apiKey, allowedOrigins, bindHost };
+  const config: AuthConfig = { apiKey, allowedOrigins, bindHost };
 
-    // API key expiration: if API_KEY_TTL_DAYS is set and > 0, compute expiry
-    const ttlDaysStr = process.env.API_KEY_TTL_DAYS?.trim();
-    if (ttlDaysStr && apiKey) {
-        const ttlDays = parseInt(ttlDaysStr, 10);
-        if (ttlDays > 0) {
-            config.apiKeyCreatedAt = Date.now();
-            config.apiKeyExpiresAt = Date.now() + ttlDays * 24 * 60 * 60 * 1000;
-        }
+  // API key expiration: if API_KEY_TTL_DAYS is set and > 0, compute expiry
+  const ttlDaysStr = process.env.API_KEY_TTL_DAYS?.trim();
+  if (ttlDaysStr && apiKey) {
+    const ttlDays = parseInt(ttlDaysStr, 10);
+    if (ttlDays > 0) {
+      config.apiKeyCreatedAt = Date.now();
+      config.apiKeyExpiresAt = Date.now() + ttlDays * 24 * 60 * 60 * 1000;
     }
+  }
 
-    return config;
+  return config;
 }
 
 /**
  * Generate a cryptographically random API key.
  */
 function generateApiKey(): string {
-    return randomBytes(32).toString('base64url');
+  return randomBytes(32).toString('base64url');
 }
 
 /**
@@ -96,43 +96,39 @@ function generateApiKey(): string {
  *   create-or-append in a single syscall.
  */
 function persistApiKeyToEnv(key: string): boolean {
+  try {
+    const envPath = join(process.cwd(), '.env');
+    const line = `API_KEY=${key}\n`;
+
+    // Try to read existing content; treat ENOENT as empty file
+    let content = '';
     try {
-        const envPath = join(process.cwd(), '.env');
-        const line = `API_KEY=${key}\n`;
-
-        // Try to read existing content; treat ENOENT as empty file
-        let content = '';
-        try {
-            content = readFileSync(envPath, 'utf8');
-        } catch (readErr: unknown) {
-            if ((readErr as NodeJS.ErrnoException).code !== 'ENOENT') throw readErr;
-            // File doesn't exist yet — content stays empty
-        }
-
-        // Don't overwrite an existing API_KEY
-        if (content.includes('API_KEY=')) {
-            return false;
-        }
-
-        // O_WRONLY | O_CREAT | O_APPEND atomically creates-or-appends
-        const fd = openSync(
-            envPath,
-            fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_APPEND,
-            0o600,
-        );
-        try {
-            writeSync(fd, line);
-        } finally {
-            closeSync(fd);
-        }
-
-        return true;
-    } catch (err) {
-        log.warn('Failed to persist API key to .env', {
-            error: err instanceof Error ? err.message : String(err),
-        });
-        return false;
+      content = readFileSync(envPath, 'utf8');
+    } catch (readErr: unknown) {
+      if ((readErr as NodeJS.ErrnoException).code !== 'ENOENT') throw readErr;
+      // File doesn't exist yet — content stays empty
     }
+
+    // Don't overwrite an existing API_KEY
+    if (content.includes('API_KEY=')) {
+      return false;
+    }
+
+    // O_WRONLY | O_CREAT | O_APPEND atomically creates-or-appends
+    const fd = openSync(envPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_APPEND, 0o600);
+    try {
+      writeSync(fd, line);
+    } finally {
+      closeSync(fd);
+    }
+
+    return true;
+  } catch (err) {
+    log.warn('Failed to persist API key to .env', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
 }
 
 /**
@@ -143,48 +139,65 @@ function persistApiKeyToEnv(key: string): boolean {
  * and persists it to .env (admin bootstrap).
  */
 export function validateStartupSecurity(config: AuthConfig): void {
-    const isLocalhost = config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
+  const isLocalhost = config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
 
-    if (!isLocalhost && !config.apiKey) {
-        // First-run admin bootstrap: generate and persist a key
-        const generatedKey = generateApiKey();
-        const persisted = persistApiKeyToEnv(generatedKey);
+  if (!isLocalhost && !config.apiKey) {
+    // First-run admin bootstrap: generate and persist a key
+    const generatedKey = generateApiKey();
+    const persisted = persistApiKeyToEnv(generatedKey);
 
-        if (persisted) {
-            // Update config in-place so the rest of the server uses the new key
-            config.apiKey = generatedKey;
-            process.env.API_KEY = generatedKey;
+    if (persisted) {
+      // Update config in-place so the rest of the server uses the new key
+      config.apiKey = generatedKey;
+      process.env.API_KEY = generatedKey;
 
-            log.info('==========================================================');
-            log.info('FIRST-RUN BOOTSTRAP: Generated API key for remote access');
-            log.info(`API_KEY=${generatedKey.slice(0, 8)}...  (check .env for full key)`);
-            log.info('This key has been persisted to .env');
-            log.info('Use this key in the Authorization header: Bearer <key>');
-            log.info('==========================================================');
-        } else {
-            // .env already has an API_KEY line or write failed — fall back to refusing
-            log.error('SECURITY: BIND_HOST is not localhost but no API_KEY is set');
-            log.error('Set API_KEY in your .env to secure the server, or bind to 127.0.0.1');
-            process.exit(1);
-        }
-    }
-
-    if (config.apiKey) {
-        if (config.apiKey.length < 16) {
-            log.warn('API_KEY is shorter than 16 characters — consider using a stronger key');
-        }
-        log.info('API key authentication enabled');
+      log.info('==========================================================');
+      log.info('FIRST-RUN BOOTSTRAP: Generated API key for remote access');
+      log.info(`API_KEY=${generatedKey.slice(0, 8)}...  (check .env for full key)`);
+      log.info('This key has been persisted to .env');
+      log.info('Use this key in the Authorization header: Bearer <key>');
+      log.info('==========================================================');
     } else {
-        log.info('No API_KEY set — server is localhost-only, auth disabled');
+      // .env already has an API_KEY line or write failed — fall back to refusing
+      log.error('SECURITY: BIND_HOST is not localhost but no API_KEY is set');
+      log.error('Set API_KEY in your .env to secure the server, or bind to 127.0.0.1');
+      process.exit(1);
     }
+  }
 
-    if (config.allowedOrigins.length > 0) {
-        log.info(`CORS restricted to origins: ${config.allowedOrigins.join(', ')}`);
-    } else if (!isLocalhost) {
-        throw new SecurityConfigError(
-            'CORS allows all origins (Access-Control-Allow-Origin: *) in remote mode. Set ALLOWED_ORIGINS in your .env to restrict access.',
-        );
+  if (config.apiKey) {
+    if (config.apiKey.length < 16) {
+      log.warn('API_KEY is shorter than 16 characters — consider using a stronger key');
     }
+    log.info('API key authentication enabled');
+  } else {
+    log.info('No API_KEY set — server is localhost-only, auth disabled');
+  }
+
+  if (config.allowedOrigins.length > 0) {
+    log.info(`CORS restricted to origins: ${config.allowedOrigins.join(', ')}`);
+  } else if (!isLocalhost) {
+    throw new SecurityConfigError(
+      'CORS allows all origins (Access-Control-Allow-Origin: *) in remote mode. Set ALLOWED_ORIGINS in your .env to restrict access.',
+    );
+  }
+
+  // Proxy trust safety check: TRUST_PROXY should only be set when the server is
+  // behind a trusted reverse proxy and bound to a non-public interface. When the
+  // server is publicly exposed (BIND_HOST != localhost), X-Forwarded-* headers
+  // could be injected by an attacker — log a prominent warning.
+  const trustProxy = process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
+  if (trustProxy) {
+    if (!isLocalhost) {
+      log.warn(
+        'SECURITY WARNING: TRUST_PROXY=true but BIND_HOST is not localhost. ' +
+          'X-Forwarded-* headers can be spoofed by external clients. ' +
+          'Bind the server to 127.0.0.1 or an internal interface when using TRUST_PROXY.',
+      );
+    } else {
+      log.info('Proxy trust mode enabled (TRUST_PROXY=true) — accepting X-Forwarded-Email from upstream proxy');
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -199,62 +212,62 @@ const PUBLIC_PATHS = new Set(['/api/health', '/.well-known/agent-card.json', '/a
  * Returns null if authenticated, or a 401/403 Response if not.
  */
 export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Response | null {
-    // No API key configured = auth disabled (localhost mode)
-    if (!config.apiKey) return null;
+  // No API key configured = auth disabled (localhost mode)
+  if (!config.apiKey) return null;
 
-    // OPTIONS preflight is always allowed (CORS handles it)
-    if (req.method === 'OPTIONS') return null;
+  // OPTIONS preflight is always allowed (CORS handles it)
+  if (req.method === 'OPTIONS') return null;
 
-    // Public paths bypass auth
-    if (PUBLIC_PATHS.has(url.pathname)) return null;
+  // Public paths bypass auth
+  if (PUBLIC_PATHS.has(url.pathname)) return null;
 
-    // A2A endpoints require auth when API key is configured
-    // (agent-card discovery at /.well-known/agent-card.json is already in PUBLIC_PATHS)
+  // A2A endpoints require auth when API key is configured
+  // (agent-card discovery at /.well-known/agent-card.json is already in PUBLIC_PATHS)
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-        return new Response(JSON.stringify({ error: 'Authentication required' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
-        });
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+    });
+  }
+
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return new Response(JSON.stringify({ error: 'Invalid Authorization header format. Expected: Bearer <key>' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+    });
+  }
+
+  // Check if the key is valid but expired
+  if (isValidApiKey(match[1], config) && isApiKeyExpired(config)) {
+    return new Response(JSON.stringify({ error: 'API key expired, rotation required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+    });
+  }
+
+  if (!isValidApiKey(match[1], config)) {
+    const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
+    log.warn('Rejected request with invalid API key', { path: url.pathname, ip });
+
+    // Record failed auth attempt — lazy import to avoid circular deps
+    try {
+      const { recordAudit: audit } = require('../db/audit');
+      const { getDb: getDbConn } = require('../db/connection');
+      audit(getDbConn(), 'auth_failed', ip, 'http', null, `path=${url.pathname}`, null, ip);
+    } catch (err) {
+      log.warn('Audit log failed for rejected auth attempt', { path: url.pathname, error: String(err) });
     }
 
-    const match = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!match) {
-        return new Response(JSON.stringify({ error: 'Invalid Authorization header format. Expected: Bearer <key>' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
-        });
-    }
+    return new Response(JSON.stringify({ error: 'Invalid API key' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
-    // Check if the key is valid but expired
-    if (isValidApiKey(match[1], config) && isApiKeyExpired(config)) {
-        return new Response(JSON.stringify({ error: 'API key expired, rotation required' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
-        });
-    }
-
-    if (!isValidApiKey(match[1], config)) {
-        const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
-        log.warn('Rejected request with invalid API key', { path: url.pathname, ip });
-
-        // Record failed auth attempt — lazy import to avoid circular deps
-        try {
-            const { recordAudit: audit } = require('../db/audit');
-            const { getDb: getDbConn } = require('../db/connection');
-            audit(getDbConn(), 'auth_failed', ip, 'http', null, `path=${url.pathname}`, null, ip);
-        } catch (err) {
-            log.warn('Audit log failed for rejected auth attempt', { path: url.pathname, error: String(err) });
-        }
-
-        return new Response(JSON.stringify({ error: 'Invalid API key' }), {
-            status: 403,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
-
-    return null;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -268,36 +281,38 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
  * Returns true if authenticated, false if not.
  */
 export function checkWsAuth(req: Request, url: URL, config: AuthConfig): boolean {
-    // No API key configured = auth disabled
-    if (!config.apiKey) return true;
+  // No API key configured = auth disabled
+  if (!config.apiKey) return true;
 
-    // Check Authorization header first (preferred path)
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-        const match = authHeader.match(/^Bearer\s+(.+)$/i);
-        if (match && isValidApiKey(match[1], config)) return true;
+  // Check Authorization header first (preferred path)
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match && isValidApiKey(match[1], config)) return true;
+  }
+
+  // Check query parameter (deprecated — tokens in URLs leak via proxy logs, CDN logs, and browser history).
+  // When DISABLE_WS_KEY_PARAM=true the query param is rejected entirely; use Authorization: Bearer instead.
+  const key = url.searchParams.get('key');
+  if (key) {
+    if (process.env.DISABLE_WS_KEY_PARAM === 'true' || process.env.DISABLE_WS_KEY_PARAM === '1') {
+      log.warn('WebSocket auth via ?key= query param is disabled (DISABLE_WS_KEY_PARAM=true)', {
+        ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+      });
+      return false;
     }
-
-    // Check query parameter (deprecated — tokens in URLs leak via proxy logs, CDN logs, and browser history).
-    // When DISABLE_WS_KEY_PARAM=true the query param is rejected entirely; use Authorization: Bearer instead.
-    const key = url.searchParams.get('key');
-    if (key) {
-        if (process.env.DISABLE_WS_KEY_PARAM === 'true' || process.env.DISABLE_WS_KEY_PARAM === '1') {
-            log.warn('WebSocket auth via ?key= query param is disabled (DISABLE_WS_KEY_PARAM=true)', {
-                ip: req.headers.get('x-forwarded-for') ?? 'unknown',
-            });
-            return false;
-        }
-        if (isValidApiKey(key, config)) {
-            log.warn('WebSocket auth via query string is deprecated — use Authorization: Bearer header instead', {
-                ip: req.headers.get('x-forwarded-for') ?? 'unknown',
-            });
-            return true;
-        }
+    if (isValidApiKey(key, config)) {
+      log.warn('WebSocket auth via query string is deprecated — use Authorization: Bearer header instead', {
+        ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+      });
+      return true;
     }
+  }
 
-    log.warn('Rejected WebSocket connection: invalid or missing auth', { ip: req.headers.get('x-forwarded-for') ?? 'unknown' });
-    return false;
+  log.warn('Rejected WebSocket connection: invalid or missing auth', {
+    ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+  });
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -312,71 +327,67 @@ const DEFAULT_API_KEY_GRACE_MS = 24 * 60 * 60 * 1000;
  * or (during grace period) the previous API key.
  */
 function isValidApiKey(key: string, config: AuthConfig): boolean {
-    if (!config.apiKey) return false;
+  if (!config.apiKey) return false;
 
-    // Check current key
-    if (timingSafeEqual(key, config.apiKey)) return true;
+  // Check current key
+  if (timingSafeEqual(key, config.apiKey)) return true;
 
-    // Check previous key during grace period
-    if (
-        config.previousApiKey &&
-        config.previousKeyExpiry &&
-        Date.now() < config.previousKeyExpiry &&
-        timingSafeEqual(key, config.previousApiKey)
-    ) {
-        return true;
-    }
+  // Check previous key during grace period
+  if (
+    config.previousApiKey &&
+    config.previousKeyExpiry &&
+    Date.now() < config.previousKeyExpiry &&
+    timingSafeEqual(key, config.previousApiKey)
+  ) {
+    return true;
+  }
 
-    return false;
+  return false;
 }
 
 /**
  * Rotate the API key. The old key remains valid for `gracePeriodMs`.
  * Returns the new API key.
  */
-export function rotateApiKey(
-    config: AuthConfig,
-    gracePeriodMs: number = DEFAULT_API_KEY_GRACE_MS,
-): string {
-    const newKey = randomBytes(32).toString('base64url');
+export function rotateApiKey(config: AuthConfig, gracePeriodMs: number = DEFAULT_API_KEY_GRACE_MS): string {
+  const newKey = randomBytes(32).toString('base64url');
 
-    // Stash current key as previous (with grace period)
-    config.previousApiKey = config.apiKey;
-    config.previousKeyExpiry = Date.now() + gracePeriodMs;
+  // Stash current key as previous (with grace period)
+  config.previousApiKey = config.apiKey;
+  config.previousKeyExpiry = Date.now() + gracePeriodMs;
 
-    // Install new key
-    config.apiKey = newKey;
-    process.env.API_KEY = newKey;
+  // Install new key
+  config.apiKey = newKey;
+  process.env.API_KEY = newKey;
 
-    log.info('API key rotated', {
-        gracePeriodMs,
-        previousKeyExpiry: new Date(config.previousKeyExpiry).toISOString(),
-    });
+  log.info('API key rotated', {
+    gracePeriodMs,
+    previousKeyExpiry: new Date(config.previousKeyExpiry).toISOString(),
+  });
 
-    return newKey;
+  return newKey;
 }
 
 /**
  * Get the rotation status for the API key.
  */
 export function getApiKeyRotationStatus(config: AuthConfig): {
-    hasActiveKey: boolean;
-    isInGracePeriod: boolean;
-    gracePeriodExpiry: string | null;
+  hasActiveKey: boolean;
+  isInGracePeriod: boolean;
+  gracePeriodExpiry: string | null;
 } {
-    const isInGracePeriod = !!(
-        config.previousApiKey &&
-        config.previousKeyExpiry &&
-        Date.now() < config.previousKeyExpiry
-    );
+  const isInGracePeriod = !!(
+    config.previousApiKey &&
+    config.previousKeyExpiry &&
+    Date.now() < config.previousKeyExpiry
+  );
 
-    return {
-        hasActiveKey: !!config.apiKey,
-        isInGracePeriod,
-        gracePeriodExpiry: isInGracePeriod && config.previousKeyExpiry
-            ? new Date(config.previousKeyExpiry).toISOString()
-            : null,
-    };
+  return {
+    hasActiveKey: !!config.apiKey,
+    isInGracePeriod,
+    gracePeriodExpiry:
+      isInGracePeriod && config.previousKeyExpiry ? new Date(config.previousKeyExpiry).toISOString() : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -385,14 +396,14 @@ export function getApiKeyRotationStatus(config: AuthConfig): {
 
 /** Set API key expiry relative to now. */
 export function setApiKeyExpiry(config: AuthConfig, ttlMs: number): void {
-    config.apiKeyCreatedAt = Date.now();
-    config.apiKeyExpiresAt = Date.now() + ttlMs;
+  config.apiKeyCreatedAt = Date.now();
+  config.apiKeyExpiresAt = Date.now() + ttlMs;
 }
 
 /** Returns true if the API key has an expiry and it has passed. */
 export function isApiKeyExpired(config: AuthConfig): boolean {
-    if (!config.apiKeyExpiresAt) return false;
-    return Date.now() > config.apiKeyExpiresAt;
+  if (!config.apiKeyExpiresAt) return false;
+  return Date.now() > config.apiKeyExpiresAt;
 }
 
 /** Warn threshold: 7 days in ms. */
@@ -403,13 +414,13 @@ const EXPIRY_WARN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
  * Returns null if no expiry is configured or the key is already expired.
  */
 export function getApiKeyExpiryWarning(config: AuthConfig): string | null {
-    if (!config.apiKeyExpiresAt) return null;
-    const remaining = config.apiKeyExpiresAt - Date.now();
-    if (remaining <= 0) return null; // Already expired — handled separately
-    if (remaining > EXPIRY_WARN_THRESHOLD_MS) return null;
+  if (!config.apiKeyExpiresAt) return null;
+  const remaining = config.apiKeyExpiresAt - Date.now();
+  if (remaining <= 0) return null; // Already expired — handled separately
+  if (remaining > EXPIRY_WARN_THRESHOLD_MS) return null;
 
-    const daysRemaining = Math.ceil(remaining / (24 * 60 * 60 * 1000));
-    return `API key expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}. Rotate with POST /api/settings/api-key/rotate`;
+  const daysRemaining = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+  return `API key expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}. Rotate with POST /api/settings/api-key/rotate`;
 }
 
 // ---------------------------------------------------------------------------
@@ -420,47 +431,46 @@ export function getApiKeyExpiryWarning(config: AuthConfig): string | null {
  * Build CORS headers based on the request origin and allowed origins config.
  */
 export function buildCorsHeaders(req: Request, config: AuthConfig): Record<string, string> {
-    const requestOrigin = req.headers.get('Origin');
-    const isLocalhost =
-        config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
+  const requestOrigin = req.headers.get('Origin');
+  const isLocalhost = config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
 
-    let allowOrigin = '*';
-    if (config.allowedOrigins.length > 0) {
-        // Specific allowlist — reflect only matching origins
-        if (requestOrigin && config.allowedOrigins.includes(requestOrigin)) {
-            allowOrigin = requestOrigin;
-        } else if (requestOrigin) {
-            allowOrigin = ''; // not in allowlist
-        }
-        // No Origin header: allow (same-origin or non-browser)
-    } else if (!isLocalhost) {
-        // Publicly exposed, no allowlist — deny cross-origin requests.
-        // Set ALLOWED_ORIGINS to permit specific origins.
-        allowOrigin = requestOrigin ? '' : '*';
+  let allowOrigin = '*';
+  if (config.allowedOrigins.length > 0) {
+    // Specific allowlist — reflect only matching origins
+    if (requestOrigin && config.allowedOrigins.includes(requestOrigin)) {
+      allowOrigin = requestOrigin;
+    } else if (requestOrigin) {
+      allowOrigin = ''; // not in allowlist
     }
-    // isLocalhost + no allowlist: keep '*' (development mode)
+    // No Origin header: allow (same-origin or non-browser)
+  } else if (!isLocalhost) {
+    // Publicly exposed, no allowlist — deny cross-origin requests.
+    // Set ALLOWED_ORIGINS to permit specific origins.
+    allowOrigin = requestOrigin ? '' : '*';
+  }
+  // isLocalhost + no allowlist: keep '*' (development mode)
 
-    const headers: Record<string, string> = {
-        'Access-Control-Allow-Origin': allowOrigin,
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    };
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
 
-    if (allowOrigin !== '*') {
-        headers['Vary'] = 'Origin';
-    }
+  if (allowOrigin !== '*') {
+    headers['Vary'] = 'Origin';
+  }
 
-    return headers;
+  return headers;
 }
 
 /**
  * Apply CORS headers to an existing Response.
  */
 export function applyCors(response: Response, req: Request, config: AuthConfig): void {
-    const corsHeaders = buildCorsHeaders(req, config);
-    for (const [key, value] of Object.entries(corsHeaders)) {
-        response.headers.set(key, value);
-    }
+  const corsHeaders = buildCorsHeaders(req, config);
+  for (const [key, value] of Object.entries(corsHeaders)) {
+    response.headers.set(key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -472,20 +482,20 @@ export function applyCors(response: Response, req: Request, config: AuthConfig):
  * Uses the same approach as crypto.timingSafeEqual but works with strings.
  */
 export function timingSafeEqual(a: string, b: string): boolean {
-    const encoder = new TextEncoder();
-    const bufA = encoder.encode(a);
-    const bufB = encoder.encode(b);
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
 
-    // If lengths differ, still compare to avoid timing leak, but result is false
-    const len = Math.max(bufA.length, bufB.length);
-    const paddedA = new Uint8Array(len);
-    const paddedB = new Uint8Array(len);
-    paddedA.set(bufA);
-    paddedB.set(bufB);
+  // If lengths differ, still compare to avoid timing leak, but result is false
+  const len = Math.max(bufA.length, bufB.length);
+  const paddedA = new Uint8Array(len);
+  const paddedB = new Uint8Array(len);
+  paddedA.set(bufA);
+  paddedB.set(bufB);
 
-    let result = bufA.length ^ bufB.length; // non-zero if lengths differ
-    for (let i = 0; i < len; i++) {
-        result |= paddedA[i] ^ paddedB[i];
-    }
-    return result === 0;
+  let result = bufA.length ^ bufB.length; // non-zero if lengths differ
+  for (let i = 0; i < len; i++) {
+    result |= paddedA[i] ^ paddedB[i];
+  }
+  return result === 0;
 }
