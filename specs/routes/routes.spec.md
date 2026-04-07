@@ -141,6 +141,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
 | `handleContactRoutes` | contacts.ts | Contact identity CRUD and cross-platform lookup |
 | `handleDiscordImageRoutes` | discord-image.ts | Send images to Discord channels via `POST /api/discord/send-image` (base64, file path, or multipart) |
+| `DiscordImageDeps` | discord-image.ts | Optional dependency overrides for testing (DI for `sendMessageWithFiles`, `sendEmbedWithFiles`, `getDeliveryTracker`) |
 | `handleCursorRoutes` | cursor.ts | Cursor CLI status and model discovery endpoints |
 | `handleVariantRoutes` | variants.ts | Agent variant profile CRUD and agent-variant assignment/removal |
 | `handleBrainViewerRoutes` | brain-viewer.ts | Brain Viewer dashboard endpoints for inspecting agent memory (longterm + shortterm tiers) |
@@ -256,6 +257,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSecurityOverviewRoutes` | Security configuration overview |
 | `handleContactRoutes` | Contact identity CRUD and cross-platform lookup |
 | `handleDiscordImageRoutes` | Send images to Discord channels |
+| `DiscordImageDeps` | Optional dependency overrides for discord-image route testing |
 | `handleCursorRoutes` | Cursor CLI status and model discovery endpoints |
 | `handleVariantRoutes` | Agent variant profile CRUD and assignment |
 | `handleBrainViewerRoutes` | Brain Viewer dashboard for agent memory inspection |
