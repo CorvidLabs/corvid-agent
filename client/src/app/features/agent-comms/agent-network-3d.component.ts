@@ -10,7 +10,7 @@ import {
     afterNextRender,
     effect,
 } from '@angular/core';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 
 /* ── Data types (same interface as 2D vis) ──────────────── */
 
@@ -314,6 +314,11 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private static readonly MAX_LOG_ENTRIES = 50;
     private static readonly TRAIL_MAX_AGE = 45; // seconds
 
+    /* ── Lazy-loaded Three.js module ────────────────────── */
+    // THREE is loaded dynamically so it only enters the bundle when the 3D view
+    // is actually activated — zero cost for users who never open this mode.
+    private three!: typeof import('three');
+
     /* ── Orbit control state ────────────────────────────── */
     private isDragging = false;
     private lastMouseX = 0;
@@ -326,27 +331,16 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private targetRadius = 30;
 
     /* ── Raycasting ─────────────────────────────────────── */
-    private raycaster = new THREE.Raycaster();
-    private mouse = new THREE.Vector2();
+    private raycaster!: THREE.Raycaster;
+    private mouse!: THREE.Vector2;
     private hoveredNodeId: string | null = null;
     private selectedNodeId: string | null = null;
     private lastProcessedMsgCount = 0;
 
-    /* ── Reusable materials ─────────────────────────────── */
-    private static readonly GLOW_MATERIAL = new THREE.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0.15,
-        depthWrite: false,
-        side: THREE.FrontSide,
-    });
-
-    private static readonly EDGE_MATERIAL = new THREE.LineBasicMaterial({
-        color: 0x1a2a3e,
-        transparent: true,
-        opacity: 0.4,
-    });
-
-    private static readonly PARTICLE_GEOMETRY = new THREE.SphereGeometry(0.12, 6, 6);
+    /* ── Reusable materials (initialized lazily in initScene) ─ */
+    private glowMaterialTemplate!: THREE.MeshBasicMaterial;
+    private sharedEdgeMaterial!: THREE.LineBasicMaterial;
+    private sharedParticleGeometry!: THREE.SphereGeometry;
 
     /* ── Drag state ───────────────────────────────────────── */
     private dragStartX = 0;
@@ -361,7 +355,12 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private onWheel = (e: WheelEvent) => this.handleWheel(e);
 
     constructor() {
-        afterNextRender(() => {
+        // Load Three.js lazily — the dynamic import creates a separate chunk so the
+        // ~600 KB library is only fetched when this component is first rendered.
+        afterNextRender(async () => {
+            this.three = await import('three');
+            this.raycaster = new this.three.Raycaster();
+            this.mouse = new this.three.Vector2();
             this.initScene();
             this.rebuildGraph(this.agents(), this.messages());
             this.startAnimation();
@@ -385,36 +384,42 @@ export class AgentNetwork3DComponent implements OnDestroy {
             canvas.removeEventListener('pointerup', this.onPointerUp);
             canvas.removeEventListener('wheel', this.onWheel);
         }
-        // Dispose Three.js resources
-        this.agentNodes.forEach((n) => {
-            n.mesh.geometry.dispose();
-            (n.mesh.material as THREE.Material).dispose();
-            n.glowMesh.geometry.dispose();
-            n.label.material.dispose();
-        });
-        this.edges.forEach((e) => {
-            e.line.geometry.dispose();
-        });
-        this.particles.forEach((p) => {
-            (p.mesh.material as THREE.Material).dispose();
-        });
-        this.trails.forEach((t) => {
-            (t.mesh.material as THREE.Material).dispose();
-        });
-        this.starField?.geometry.dispose();
-        (this.starField?.material as THREE.Material)?.dispose();
-        this.groundGrid?.traverse((child) => {
-            if (child instanceof THREE.Line) {
-                child.geometry.dispose();
-                (child.material as THREE.Material).dispose();
-            }
-        });
-        this.nebulaClouds?.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                child.geometry.dispose();
-                (child.material as THREE.Material).dispose();
-            }
-        });
+        // Dispose Three.js resources (only if module was loaded)
+        if (this.three) {
+            const THREE = this.three;
+            this.agentNodes.forEach((n) => {
+                n.mesh.geometry.dispose();
+                (n.mesh.material as THREE.Material).dispose();
+                n.glowMesh.geometry.dispose();
+                n.label.material.dispose();
+            });
+            this.edges.forEach((e) => {
+                e.line.geometry.dispose();
+            });
+            this.particles.forEach((p) => {
+                (p.mesh.material as THREE.Material).dispose();
+            });
+            this.trails.forEach((t) => {
+                (t.mesh.material as THREE.Material).dispose();
+            });
+            this.glowMaterialTemplate?.dispose();
+            this.sharedEdgeMaterial?.dispose();
+            this.sharedParticleGeometry?.dispose();
+            this.starField?.geometry.dispose();
+            (this.starField?.material as THREE.Material)?.dispose();
+            this.groundGrid?.traverse((child) => {
+                if (child instanceof THREE.Line) {
+                    child.geometry.dispose();
+                    (child.material as THREE.Material).dispose();
+                }
+            });
+            this.nebulaClouds?.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.geometry.dispose();
+                    (child.material as THREE.Material).dispose();
+                }
+            });
+        }
         this.renderer?.dispose();
     }
 
@@ -432,9 +437,24 @@ export class AgentNetwork3DComponent implements OnDestroy {
     /* ── Scene initialization ───────────────────────────── */
 
     private initScene(): void {
+        const THREE = this.three;
         const canvas = this.canvasRef().nativeElement;
         const container = this.containerRef().nativeElement;
         const rect = container.getBoundingClientRect();
+
+        // Initialize shared/reusable Three.js objects
+        this.glowMaterialTemplate = new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 0.15,
+            depthWrite: false,
+            side: THREE.FrontSide,
+        });
+        this.sharedEdgeMaterial = new THREE.LineBasicMaterial({
+            color: 0x1a2a3e,
+            transparent: true,
+            opacity: 0.4,
+        });
+        this.sharedParticleGeometry = new THREE.SphereGeometry(0.12, 6, 6);
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -512,6 +532,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private createStarfield(): void {
+        const THREE = this.three;
         const starCount = 900;
         const positions = new Float32Array(starCount * 3);
         const colors = new Float32Array(starCount * 3);
@@ -574,6 +595,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private createGroundGrid(): void {
+        const THREE = this.three;
         this.groundGrid = new THREE.Group();
 
         // Hexagonal grid on XZ plane
@@ -617,6 +639,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private createNebulaClouds(): void {
+        const THREE = this.three;
         this.nebulaClouds = new THREE.Group();
 
         // Procedural nebula using transparent spheres at varying distances
@@ -659,7 +682,8 @@ export class AgentNetwork3DComponent implements OnDestroy {
     /* ── Graph building ─────────────────────────────────── */
 
     private rebuildGraph(agents: VisAgent[], messages: VisMessage[]): void {
-        if (!this.scene) return;
+        if (!this.scene || !this.three) return;
+        const THREE = this.three;
 
         // Place agents in a circle in 3D space (XZ plane, slight Y variation)
         const n = agents.length;
@@ -700,7 +724,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
             // Glow sphere (larger, transparent)
             const glowGeometry = new THREE.SphereGeometry(baseRadius * 2, 16, 16);
-            const glowMaterial = AgentNetwork3DComponent.GLOW_MATERIAL.clone();
+            const glowMaterial = this.glowMaterialTemplate.clone();
             glowMaterial.color = color.clone();
             const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
             glowMesh.position.copy(mesh.position);
@@ -750,7 +774,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
             if (!edge) {
                 const lineGeometry = new THREE.BufferGeometry();
                 this.updateEdgeGeometry(lineGeometry, from.position, to.position);
-                const lineMaterial = AgentNetwork3DComponent.EDGE_MATERIAL.clone();
+                const lineMaterial = this.sharedEdgeMaterial.clone();
                 const line = new THREE.Line(lineGeometry, lineMaterial);
                 this.scene!.add(line);
 
@@ -799,6 +823,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private updateEdgeGeometry(geometry: THREE.BufferGeometry, from: THREE.Vector3, to: THREE.Vector3): void {
+        const THREE = this.three;
         // Create a curved line between two points (via midpoint lifted up)
         const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
         mid.y += from.distanceTo(to) * 0.15; // Arc upward
@@ -809,13 +834,14 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private spawnParticle(from: AgentNode3D, to: AgentNode3D): void {
+        const THREE = this.three;
         const material = new THREE.MeshBasicMaterial({
             color: from.color,
             transparent: true,
             opacity: 0.9,
             depthWrite: false,
         });
-        const mesh = new THREE.Mesh(AgentNetwork3DComponent.PARTICLE_GEOMETRY, material);
+        const mesh = new THREE.Mesh(this.sharedParticleGeometry, material);
         mesh.position.copy(from.position);
         this.scene!.add(mesh);
 
@@ -831,6 +857,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private createLabelSprite(text: string, color: string): THREE.Sprite {
+        const THREE = this.three;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
         canvas.width = 256;
@@ -864,6 +891,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     /* ── Animation loop ─────────────────────────────────── */
 
     private startAnimation(): void {
+        const THREE = this.three;
         const clock = new THREE.Clock();
 
         const animate = () => {
