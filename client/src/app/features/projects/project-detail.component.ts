@@ -59,7 +59,6 @@ import type { Session } from '../../core/models/session.model';
                         }
                     }
                 </div>
-            </div>
             } @else {
                 <app-skeleton variant="card" [count]="1" />
                 <app-skeleton variant="table" [count]="3" />
