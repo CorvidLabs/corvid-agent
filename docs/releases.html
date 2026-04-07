@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.60.0</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.61.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -473,28 +473,28 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">53 days · 60 releases · 1100+ commits</div>
+    <div class="hero-badge">60 days · 61 releases · 1200+ commits</div>
     <h1>CorvidAgent<br>Release Retrospective</h1>
     <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
     <div class="hero-version-range">
       <span class="version">v0.1.0</span>
       <span class="arrow">→</span>
-      <span class="version">v0.60.0</span>
+      <span class="version">v0.61.0</span>
     </div>
   </section>
 
   <!-- Stats bar -->
   <section class="stats-bar">
     <div class="stat-card">
-      <div class="stat-number">60</div>
+      <div class="stat-number">61</div>
       <div class="stat-label">Releases</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">1100+</div>
+      <div class="stat-number">1200+</div>
       <div class="stat-label">Commits</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">10,500+</div>
+      <div class="stat-number">11,000+</div>
       <div class="stat-label">Unit Tests</div>
     </div>
     <div class="stat-card">
@@ -577,8 +577,16 @@
         <div class="growth-label">0.29</div>
       </div>
       <div class="growth-bar-wrapper">
-        <div class="growth-bar" style="height: 100%; background: linear-gradient(180deg, var(--green), var(--accent));" title="v0.41.0: 7,000+ tests"></div>
+        <div class="growth-bar" style="height: 100%" title="v0.41.0: 7,000+ tests"></div>
         <div class="growth-label">0.41</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 150%" title="v0.60.0: 10,500+ tests"></div>
+        <div class="growth-label">0.60</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 157%; background: linear-gradient(180deg, var(--green), var(--accent));" title="v0.61.0: 11,000+ tests"></div>
+        <div class="growth-label">0.61</div>
       </div>
     </div>
   </section>
@@ -950,7 +958,7 @@
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
           <div class="era-date">Mar 21 – Mar 30, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.60.0</div>
+        <div class="era-versions">v0.42.0 – v0.61.0</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -994,6 +1002,22 @@
             <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
             <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.61.0</span>
+            <span class="release-date">Apr 5</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Discord REST migration (5 phases)</strong> — replace all raw fetch() with discord.js REST client: foundation, gateway, slash commands, threads, embeds</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Auth: proxy trust + hardening</strong> — oauth2-proxy email-based tenant auth, input validation, WS auth guard</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Reputation-gated work</strong> — require minimum reputation for work task creation</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Weekly activity recap</strong> — analytics endpoint for weekly activity summaries</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Mainnet preflight</strong> — launch readiness validation script</li>
+            <li><span class="tag tag-sec">sec</span> SSRF guard, SDK pin (GHSA-5474-4w2j-mq4c), max-length validation, scope enforcement</li>
+            <li><span class="tag tag-test">test</span> <strong>Test coverage surge</strong> — 10+ test PRs covering routes, billing, OpenRouter, discord, A2A SSRF</li>
+            <li><span class="tag tag-chore">deps</span> actions/checkout → 6.0.2, docker/login-action → 4.1.0, @anthropic-ai/sdk ≥ 0.82.0</li>
           </ul>
         </div>
         <div class="release-card" style="border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.05);">
@@ -1093,8 +1117,8 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="footer-logo">CorvidAgent</div>
-    <p>Built by <a href="https://github.com/CorvidLabs">CorvidLabs</a> · Feb 6 – Mar 29, 2026</p>
-    <p style="margin-top: 8px;">52 days from zero to a full autonomous AI agent platform.</p>
+    <p>Built by <a href="https://github.com/CorvidLabs">CorvidLabs</a> · Feb 6 – Apr 5, 2026</p>
+    <p style="margin-top: 8px;">59 days from zero to a full autonomous AI agent platform.</p>
   </footer>
 
 </div>

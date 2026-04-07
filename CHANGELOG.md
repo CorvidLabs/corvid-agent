@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [0.61.0] - 2026-04-05
 
 ### Added
-- **Discord: Phase 3 SlashCommandBuilder migration** — migrate command registration to SlashCommandBuilder (#1822)
-- **Discord: Phase 2 discord.js integration** — replace custom WebSocket gateway with discord.js Client (#1818)
-- **Auth: proxy trust mode** — oauth2-proxy email-based tenant authentication via TRUST_PROXY (#1813)
+- **Discord: complete REST client migration (Phases 1–5)** — replace all raw `fetch()` calls with discord.js REST client: foundation (#1825), gateway (#1818), SlashCommandBuilder (#1822), interaction passthrough (#1823), thread lifecycle (#1826), embeds (#1855)
+- **Auth: proxy trust mode** — oauth2-proxy email-based tenant authentication via TRUST_PROXY (#1813, #1836)
+- **Work: reputation-gated creation** — require minimum reputation for work task creation (#1842)
+- **Analytics: weekly activity recap** — add weekly activity recap endpoint (#1835)
 - **Mainnet: preflight checks** — mainnet launch readiness validation script (#1816)
 - **Discord: permission middleware** — declarative permission enforcement for command dispatcher (#1808)
 - **Ollama: Claude Code proxy** — add Claude Code proxy for Ollama cloud models (#1787)
@@ -32,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - **Work: governance validator** — resolve false positives blocking legitimate work tasks (#1775)
 - **Work: TSC validation** — skip TypeScript check for projects without tsconfig.json (#1768)
 - **Work: worktree cleanup** — clean stale state and block creation on lingering worktrees (#1803, #1769)
+- **Security: input validation** — add max-length constraints to agent and session validation schemas (#1827)
+- **Work: queued inserts** — use non-atomic insert for queued work tasks (#1844)
+- **Work: origin remote** — ensure origin remote before fallback PR creation (#1830)
 - **Tests: env isolation** — use empty string instead of delete for Bun env var isolation (#1820)
 - **Tests: coverage** — add coverage for discord guild-api, contact-linker, memory-sync, session-heartbeat (#1821)
 - **Docs: testnet-onboarding** — correct project field name in onboarding guide (#1771)
@@ -55,10 +59,18 @@ All notable changes to this project will be documented in this file.
 - **Memory: deepSearch** — add coverage for deepSearch, search dispatch, LibrarySyncService (#1807)
 - **Scheduler: flock_reputation_refresh** — add coverage for flock reputation refresh action (#1778)
 - **Session: audit logging** — audit logging, tier transitions, and state machine tests (#1797, #1783)
+- **A2A: SSRF blocking** — add SSRF blocking coverage for invokeRemoteAgent and fetchAgentCard (#1837)
+- **Routes: untested handlers** — add route tests for 10 untested handlers (#1854, #1853)
+- **Discord: edge cases** — discord-permissions and priority-rules edge case tests (#1833)
+- **OpenRouter** — unit tests for OpenRouter routes (#1851)
+- **Billing** — tests for UsageMeter and db/usdc-revenue (#1850)
+- **Library/Contacts** — unit tests for library, contacts, and buddy routes (#1840)
 
 ### Dependencies
 - @anthropic-ai/claude-agent-sdk → 0.2.92
+- @anthropic-ai/sdk ≥ 0.82.0 (pinned for GHSA-5474-4w2j-mq4c) (#1841)
 - spec-sync → v3.2.0 (with stricter validation)
+- docker/login-action → 4.1.0, actions/checkout → 6.0.2, actions/upload-pages-artifact → 4.0.0
 
 ## [0.60.0] - 2026-03-30
 
