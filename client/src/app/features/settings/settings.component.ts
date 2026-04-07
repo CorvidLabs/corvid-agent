@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { NotificationService } from '../../core/services/notification.service';
 import { SessionService } from '../../core/services/session.service';
 import { GuidedTourService } from '../../core/services/guided-tour.service';
@@ -72,10 +73,9 @@ interface PSKContact {
 @Component({
     selector: 'app-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, TitleCasePipe, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, TitleCasePipe, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="settings">
-            <h2>Settings</h2>
+        <app-page-shell title="Settings" icon="settings">
 
             @if (loading()) {
                 <app-skeleton variant="line" [count]="6" />
@@ -740,11 +740,10 @@ interface PSKContact {
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .settings { padding: var(--space-6); max-width: 900px; }
-        .settings h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
+        .settings { max-width: 900px; }
         .settings h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading, .muted { color: var(--text-secondary); font-size: 0.8rem; }
 

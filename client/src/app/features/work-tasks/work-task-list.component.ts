@@ -8,21 +8,19 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { WorkTask } from '../../core/models/work-task.model';
 import { WorkTaskDetailComponent } from './work-task-detail.component';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent, WorkTaskDetailComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent, PageShellComponent, WorkTaskDetailComponent],
     template: `
-        <div class="tasks">
-            <div class="tasks__header">
-                <h2>Work Tasks</h2>
-                <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
-                    {{ showCreateForm() ? 'Cancel' : '+ New Task' }}
-                </button>
-            </div>
+        <app-page-shell title="Work Tasks" icon="work-tasks">
+            <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+                {{ showCreateForm() ? 'Cancel' : '+ New Task' }}
+            </button>
 
             @if (showCreateForm()) {
                 <div class="create-form">
@@ -41,7 +39,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
                 </div>
             }
 
-            <div class="tasks__filter-row sticky-toolbar">
+            <div toolbar class="tasks__filter-row sticky-toolbar">
                 <div class="tasks__filters">
                     <button
                         class="filter-btn"
@@ -197,25 +195,15 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
                                 </button>
                             }
                             @if (isDetailExpanded(task.id)) {
-                                <app-work-task-detail [task]="task" />
+                                <div class="expand-section"><app-work-task-detail [task]="task" /></div>
                             }
                         </div>
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .tasks { padding: var(--space-6); }
-        .tasks__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        .tasks__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);

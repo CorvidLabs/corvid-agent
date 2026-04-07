@@ -54,7 +54,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             } @else {
                 <div class="contact-layout">
                     <!-- List panel -->
-                    <div class="contact-list" role="list">
+                    <div class="contact-list stagger-children" role="list">
                         @for (contact of filteredContacts(); track contact.id) {
                             <button
                                 class="contact-card"

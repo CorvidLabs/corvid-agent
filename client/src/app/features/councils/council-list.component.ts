@@ -84,9 +84,9 @@ interface CouncilCard {
                         }
                     </p>
                 } @else {
-                    <div class="council-grid">
+                    <div class="council-grid stagger-scale">
                         @for (card of paginatedCards(); track card.council.id) {
-                            <a class="council-card" [routerLink]="['/sessions/councils', card.council.id]">
+                            <a class="council-card card-interactive" [routerLink]="['/sessions/councils', card.council.id]">
                                 <div class="council-card__top">
                                     <h3 class="council-card__name">{{ card.council.name }}</h3>
                                     @if (card.lastLaunch) {

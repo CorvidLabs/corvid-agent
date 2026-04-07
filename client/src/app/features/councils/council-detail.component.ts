@@ -6,26 +6,25 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 @Component({
     selector: 'app-council-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, PageShellComponent, TooltipDirective],
     template: `
-        @if (council(); as c) {
-            <div class="page">
-                <div class="page__header">
-                    <div>
-                        <h2 class="page-title">{{ c.name }}</h2>
-                        <p class="page__desc">{{ c.description }}</p>
-                    </div>
-                    <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                    </div>
-                </div>
+        <app-page-shell
+            [title]="council()?.name ?? 'Loading...'"
+            icon="councils"
+            [subtitle]="council()?.description"
+            [breadcrumbs]="[{ label: 'Councils', route: '/sessions/councils' }, { label: council()?.name ?? '' }]">
+            @if (council(); as c) {
+                <ng-container actions>
+                    <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
+                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                </ng-container>
 
                 <div class="detail__info">
                     <dl>
@@ -104,17 +103,12 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         </div>
                     }
                 </div>
-            </div>
-        } @else {
-            <div class="page"><app-skeleton variant="card" [count]="2" /></div>
-        }
+            } @else {
+                <app-skeleton variant="card" [count]="2" />
+            }
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
-        .page__actions { display: flex; gap: 0.5rem; }
         .btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;

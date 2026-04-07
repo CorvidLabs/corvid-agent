@@ -151,11 +151,11 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                 <section class="card">
                     <h3 class="card__title">Related Pages</h3>
                     <div class="link-grid">
-                        <a class="link-card" routerLink="/settings/github-allowlist">
+                        <a class="link-card card-interactive" routerLink="/settings/github-allowlist">
                             <span class="link-card__label">GitHub Allowlist</span>
                             <span class="link-card__count">{{ d.allowlistCount }} entries</span>
                         </a>
-                        <a class="link-card" routerLink="/settings/repo-blocklist">
+                        <a class="link-card card-interactive" routerLink="/settings/repo-blocklist">
                             <span class="link-card__label">Repo Blocklist</span>
                             <span class="link-card__count">{{ d.blocklistCount }} entries</span>
                         </a>

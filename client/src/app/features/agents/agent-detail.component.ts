@@ -13,6 +13,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
@@ -29,20 +30,18 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 @Component({
     selector: 'app-agent-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent],
+    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent, PageShellComponent],
     template: `
-        @if (agent(); as a) {
-            <div class="page">
-                <div class="page__header">
-                    <div>
-                        <h2>{{ a.name }}</h2>
-                        <p class="page__desc">{{ a.description }}</p>
-                    </div>
-                    <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/agents', a.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                    </div>
-                </div>
+        <app-page-shell
+            [title]="agent()?.name ?? 'Loading...'"
+            icon="agents"
+            [subtitle]="agent()?.description"
+            [breadcrumbs]="[{ label: 'Agents', route: '/agents' }, { label: agent()?.name ?? '' }]">
+            @if (agent(); as a) {
+                <ng-container actions>
+                    <a class="btn btn--secondary" [routerLink]="['/agents', a.id, 'edit']">Edit</a>
+                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                </ng-container>
 
                 <!-- Tabs -->
                 <div class="tabs">
@@ -379,20 +378,13 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                         </div>
                     }
                 }
-            </div>
-        } @else {
-            <div class="page">
+            } @else {
                 <app-skeleton variant="card" [count]="1" />
                 <app-skeleton variant="table" [count]="4" />
-            </div>
-        }
+            }
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
-        .page__actions { display: flex; gap: 0.5rem; }
 
         /* Tabs */
         .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }

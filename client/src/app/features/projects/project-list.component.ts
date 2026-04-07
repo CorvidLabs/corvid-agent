@@ -28,7 +28,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                     actionRoute="/agents/projects/new"
                     actionAriaLabel="Create your first project" />
             } @else {
-                <div class="list" role="list">
+                <div class="list stagger-children" role="list">
                     @for (project of projectService.projects(); track project.id) {
                         <a
                             class="list__item"

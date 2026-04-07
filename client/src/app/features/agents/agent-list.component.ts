@@ -114,7 +114,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             } @else {
                 <div class="agent-grid stagger-children">
                     @for (card of filteredAgents(); track card.agent.id) {
-                        <a class="agent-card" [routerLink]="['/agents', card.agent.id]"
+                        <a class="agent-card card-interactive" [routerLink]="['/agents', card.agent.id]"
                            [style.--agent-accent]="card.agent.displayColor || ''">
                             <div class="agent-card__top">
                                 <div class="agent-card__title-row">

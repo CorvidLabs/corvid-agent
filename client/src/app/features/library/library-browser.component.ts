@@ -4,6 +4,7 @@ import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../c
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
     { value: '', label: 'All Categories' },
@@ -17,17 +18,14 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 @Component({
     selector: 'app-library-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Shared Library (CRVLIB)</h2>
-                <button class="btn btn--primary btn--sm" (click)="refresh()" [disabled]="libraryService.loading()">
-                    {{ libraryService.loading() ? 'Loading...' : 'Refresh' }}
-                </button>
-            </div>
+        <app-page-shell title="Shared Library" subtitle="CRVLIB" icon="library">
+            <button actions class="btn btn--primary btn--sm" (click)="refresh()" [disabled]="libraryService.loading()">
+                {{ libraryService.loading() ? 'Loading...' : 'Refresh' }}
+            </button>
 
-            <div class="toolbar">
+            <div toolbar class="toolbar">
                 <input
                     class="search-input"
                     placeholder="Filter by key or content..."
@@ -104,12 +102,9 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
-
         .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .search-input {
             flex: 1; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);

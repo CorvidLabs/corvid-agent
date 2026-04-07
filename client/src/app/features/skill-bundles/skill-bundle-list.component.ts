@@ -4,23 +4,21 @@ import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { SkillBundle } from '../../core/models/skill-bundle.model';
 
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Skill Bundles</h2>
-                <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
-                    {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
-                </button>
-            </div>
+        <app-page-shell title="Skill Bundles" icon="skill-bundles">
+            <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+                {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
+            </button>
 
             <!-- Filter tabs -->
-            <div class="filter-tabs">
+            <div toolbar class="filter-tabs">
                 <button
                     class="filter-tab"
                     [class.filter-tab--active]="activeFilter() === 'all'"
@@ -91,7 +89,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                     actionLabel="+ Create a Bundle"
                     actionAriaLabel="Create your first skill bundle" />
             } @else {
-                <div class="bundle-list">
+                <div class="bundle-list stagger-children">
                     @for (bundle of filteredBundles(); track bundle.id) {
                         <div
                             class="bundle-card"
@@ -110,7 +108,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                             <p class="bundle-card__desc">{{ bundle.description || 'No description' }}</p>
 
                             @if (expandedId() === bundle.id) {
-                                <div class="bundle-card__details">
+                                <div class="bundle-card__details expand-section">
                                     @if (editingId() === bundle.id) {
                                         <div class="form-grid">
                                             <div class="form-field">
@@ -158,12 +156,9 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);

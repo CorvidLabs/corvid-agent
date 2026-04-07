@@ -63,6 +63,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
                 <button [class.active]="activeFilter() === 'draft'" (click)="activeFilter.set('draft')">Draft</button>
             </div>
 
+            <div class="stagger-children">
             @for (workflow of filteredWorkflows(); track workflow.id) {
                 <div class="card workflow-card" (click)="toggleExpand(workflow.id)">
                     <div class="workflow-header">
@@ -319,6 +320,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
                         actionAriaLabel="Create your first workflow" />
                 }
             }
+            </div>
         </div>
     `,
     styles: `

@@ -125,7 +125,7 @@ interface FlockStats {
                 } @else {
                     <div class="flock-grid stagger-children">
                         @for (agent of agents(); track agent.id) {
-                            <button class="flock-card" (click)="selectAgent(agent)" [class.flock-card--selected]="selectedAgent()?.id === agent.id" type="button">
+                            <button class="flock-card card-interactive" (click)="selectAgent(agent)" [class.flock-card--selected]="selectedAgent()?.id === agent.id" type="button">
                                 <div class="flock-card__header">
                                     <div class="flock-card__avatar" [attr.data-status]="agent.status">
                                         {{ agent.name.charAt(0).toUpperCase() }}
