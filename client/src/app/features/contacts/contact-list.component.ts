@@ -240,7 +240,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-        .btn--xs { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
+        .btn--xs { padding: 0.2rem 0.4rem; font-size: var(--text-xxs); }
 
         .contact-layout {
             display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;
@@ -280,7 +280,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 
         .platform-chip {
             display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em; border: 1px solid;
         }
         .platform-chip--discord { color: #7289da; border-color: #7289da; background: rgba(114, 137, 218, 0.1); }
@@ -336,7 +336,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .verified-badge {
-            font-size: 0.65rem; color: var(--accent-green);
+            font-size: var(--text-xxs); color: var(--accent-green);
             font-weight: 600; text-transform: uppercase;
         }
         .empty-hint { color: var(--text-tertiary); font-size: 0.8rem; margin: 0.25rem 0; }

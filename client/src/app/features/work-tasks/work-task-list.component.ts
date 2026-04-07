@@ -221,7 +221,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .tasks__filter-row { margin-bottom: 1rem; }
         .loading { color: var(--text-secondary); }
-        .task-agent { font-size: 0.65rem; color: var(--accent-cyan); font-weight: 600; }
+        .task-agent { font-size: var(--text-xxs); color: var(--accent-cyan); font-weight: 600; }
         /* Pipeline stage indicator */
         .pipeline-stages {
             display: flex; align-items: center; margin: 0.5rem 0; gap: 0;
@@ -261,7 +261,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-cyan-glow); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px var(--accent-cyan-mid); } }
         .task-actions { margin-top: 0.5rem; }
-        .action-btn { padding: var(--space-1) 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
+        .action-btn { padding: var(--space-1) 0.6rem; font-size: var(--text-xxs); font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
         .action-btn--cancel:hover { background: var(--accent-red-dim); }
         .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
@@ -271,7 +271,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .detail-toggle {
             display: inline-block; margin-top: 0.5rem; padding: var(--space-1) 0.6rem;
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            color: var(--text-tertiary); font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            color: var(--text-tertiary); font-size: var(--text-xxs); font-weight: 600; font-family: inherit;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
         }
         .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
@@ -313,7 +313,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .agent-filter-select:focus { border-color: var(--accent-cyan); outline: none; }
         .clear-filters-btn {
-            padding: 0.35rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            padding: 0.35rem 0.6rem; font-size: var(--text-xxs); font-weight: 600; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             background: transparent; border: 1px solid var(--border);
             border-radius: var(--radius-sm); color: var(--text-tertiary);
@@ -367,7 +367,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
 
         .task-status {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -391,7 +391,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .status-icon--fail::before { content: '\\2717'; }
 
         .task-duration {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             background: var(--bg-raised);
             padding: 1px 6px;
@@ -405,7 +405,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             animation: progress-pulse 1.5s ease-in-out infinite;
         }
         .task-time {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
@@ -426,7 +426,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             align-items: center;
         }
         .task-branch {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--accent-magenta);
             background: var(--accent-magenta-dim);
             padding: 2px 6px;
@@ -441,7 +441,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-branch:hover { text-decoration: underline; }
         .task-pr {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--accent-green);
             text-decoration: none;
             border: 1px solid var(--accent-green);
@@ -453,7 +453,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-pr:hover { background: var(--accent-green-dim); }
         .task-session {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--accent-cyan);
             text-decoration: none;
             border: 1px solid var(--accent-cyan);
@@ -462,7 +462,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-session:hover { background: var(--accent-cyan-dim); }
         .task-iterations {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
@@ -507,7 +507,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             background: none;
             border: none;
             color: var(--text-tertiary);
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             text-decoration: underline;
@@ -537,7 +537,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             .tasks__filters { flex-wrap: wrap; }
             .tasks__search-row { flex-wrap: wrap; }
             .agent-filter-select { min-width: 100%; }
-            .pipeline-stage__label { font-size: 0.45rem; }
+            .pipeline-stage__label { font-size: var(--text-micro); }
             .pipeline-stage__dot { width: 8px; height: 8px; }
         }
         @media (max-width: 480px) {

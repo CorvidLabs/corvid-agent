@@ -191,7 +191,7 @@ interface ParsedEvent {
 
         .label {
             flex-shrink: 0;
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -202,7 +202,7 @@ interface ParsedEvent {
 
         .time {
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             line-height: 1.8;
         }
@@ -407,7 +407,7 @@ interface ParsedEvent {
             40% { opacity: 1; transform: scale(1); }
         }
         .thinking-text {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;

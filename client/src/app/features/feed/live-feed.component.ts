@@ -166,7 +166,7 @@ interface FeedEntry {
         .feed__direction-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; flex-shrink: 0; }
         .dir-chip {
             padding: var(--space-1) 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
+            border-radius: 20px; color: var(--text-tertiary); font-size: var(--text-xxs); font-family: inherit;
             cursor: pointer; text-transform: uppercase; transition: all 0.15s;
         }
         .dir-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
@@ -194,7 +194,7 @@ interface FeedEntry {
         }
         .feed__time { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; flex-shrink: 0; }
         .feed__direction {
-            font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
         }
         .feed__direction[data-dir="inbound"] { color: var(--accent-cyan); background: var(--accent-cyan-wash); border: 1px solid var(--accent-cyan-mid); }
@@ -211,7 +211,7 @@ interface FeedEntry {
             max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed__thread {
-            font-size: 0.65rem; font-family: var(--font-mono); color: var(--accent-yellow);
+            font-size: var(--text-xxs); font-family: var(--font-mono); color: var(--accent-yellow);
             background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2);
             padding: 1px 5px; border-radius: var(--radius-sm); cursor: pointer; flex-shrink: 0;
         }

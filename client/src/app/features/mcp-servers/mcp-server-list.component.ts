@@ -478,15 +478,15 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .official-card--installed { opacity: 0.6; }
         .official-card__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
         .official-card__name { font-weight: 700; color: var(--text-primary); font-size: 0.85rem; }
-        .installed-badge { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: 600; text-transform: uppercase; }
+        .installed-badge { font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: 600; text-transform: uppercase; }
         .official-card__desc { margin: 0 0 0.35rem; font-size: 0.7rem; color: var(--text-secondary); }
-        .official-card__cmd { display: block; font-size: 0.65rem; color: var(--text-tertiary); margin-bottom: 0.5rem; word-break: break-all; }
+        .official-card__cmd { display: block; font-size: var(--text-xxs); color: var(--text-tertiary); margin-bottom: 0.5rem; word-break: break-all; }
         .official-card__env { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
         .env-input { padding: 0.35rem var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: var(--font-mono); background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
         .env-input:focus { border-color: var(--accent-cyan); outline: none; }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
-        .server-card__agent-tag { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: 600; }
+        .server-card__agent-tag { font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: 600; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: var(--space-6); margin-bottom: 1.5rem;
@@ -516,7 +516,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .server-card__title { display: flex; align-items: center; gap: 0.5rem; }
         .server-card__name { font-weight: 600; color: var(--text-primary); }
         .server-card__status {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
         .server-card__status[data-enabled="true"] { color: var(--accent-green); border-color: var(--accent-green); }

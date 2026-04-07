@@ -98,7 +98,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .list__item-detail { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
         .list__item-reason { font-size: 0.8rem; color: var(--text-secondary); }
         .badge {
-            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
         }
         .badge--manual { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }

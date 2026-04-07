@@ -427,7 +427,7 @@ type SortKey = 'date' | 'name' | 'author';
             display: inline-block;
             padding: 2px 8px;
             border-radius: var(--radius-lg);
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -439,7 +439,7 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-primary);
         }
         .library__card-pages {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             color: var(--accent-purple);
             background: var(--tag-bg);
@@ -660,7 +660,7 @@ type SortKey = 'date' | 'name' | 'author';
             background: var(--border-subtle);
         }
         .library__page-divider-label {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -668,7 +668,7 @@ type SortKey = 'date' | 'name' | 'author';
             white-space: nowrap;
         }
         .library__overlay-type {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             color: var(--text-secondary);
             background: var(--bg-hover);
@@ -676,7 +676,7 @@ type SortKey = 'date' | 'name' | 'author';
             border-radius: var(--radius-xs);
         }
         .library__overlay-page-info {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--accent-cyan);
             font-weight: 600;
         }
@@ -723,7 +723,7 @@ type SortKey = 'date' | 'name' | 'author';
             border: none;
             color: var(--accent-purple);
             cursor: pointer;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             padding: 0 2px;
             font-family: inherit;
             line-height: 1;
@@ -882,7 +882,7 @@ type SortKey = 'date' | 'name' | 'author';
             flex: 1;
         }
         .library__search-panel-count {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
         }
         .library__search--panel {

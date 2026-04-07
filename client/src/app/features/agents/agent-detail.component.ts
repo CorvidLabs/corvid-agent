@@ -397,7 +397,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .tab:hover { color: var(--text-primary); }
         .tab--active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
         .tab__count {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-tertiary); border: 1px solid var(--border);
         }
         .tab--active .tab__count { color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -411,7 +411,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             padding: var(--space-3); display: flex; flex-direction: column; gap: 0.2rem;
         }
-        .stat-card__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
+        .stat-card__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
         .stat-card__value { font-size: 1.3rem; font-weight: 700; color: var(--accent-cyan); }
         .stat-card__value--active { color: var(--accent-amber); }
         .stat-card__value--cost { color: var(--accent-green); }
@@ -438,10 +438,10 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         /* Cost Bars */
         .cost-bars { display: flex; flex-direction: column; gap: 3px; }
         .cost-bar-row { display: flex; align-items: center; gap: 0.5rem; }
-        .cost-bar-row__label { width: 48px; flex-shrink: 0; font-size: 0.6rem; color: var(--text-tertiary); text-align: right; }
+        .cost-bar-row__label { width: 48px; flex-shrink: 0; font-size: var(--text-xxs); color: var(--text-tertiary); text-align: right; }
         .cost-bar-row__bar-wrap { flex: 1; height: 14px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; }
         .cost-bar-row__bar { height: 100%; background: linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan)); border-radius: 2px; min-width: 1px; transition: width 0.3s; }
-        .cost-bar-row__value { width: 64px; flex-shrink: 0; font-size: 0.6rem; color: var(--accent-green); text-align: right; }
+        .cost-bar-row__value { width: 64px; flex-shrink: 0; font-size: var(--text-xxs); color: var(--accent-green); text-align: right; }
 
         /* Shared styles from original */
         .btn {
@@ -539,7 +539,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .flock-metric__value[data-level="high"] { color: var(--accent-cyan); }
         .flock-metric__value[data-level="mid"] { color: var(--accent-amber); }
         .flock-metric__value[data-level="low"] { color: var(--accent-red); }
-        .flock-metric__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
+        .flock-metric__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
         .flock-metric__bar { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; margin-top: 0.25rem; }
         .flock-metric__fill { height: 100%; background: linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan)); border-radius: 2px; min-width: 1px; transition: width 0.3s; }
         .flock-profile__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }

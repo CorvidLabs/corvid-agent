@@ -241,7 +241,7 @@ interface SessionStats {
             border-style: dashed;
         }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -290,7 +290,7 @@ interface SessionStats {
             transition: flex 0.3s;
         }
         .work-task-segment__label {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -331,7 +331,7 @@ interface SessionStats {
         .chart-row__label {
             width: 48px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-align: right;
         }
@@ -352,7 +352,7 @@ interface SessionStats {
         .chart-row__value {
             width: 64px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--accent-green);
             text-align: right;
         }

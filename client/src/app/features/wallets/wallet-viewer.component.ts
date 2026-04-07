@@ -247,7 +247,7 @@ interface WalletMessage {
         }
 
         .badge {
-            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
             font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .badge--allowed {
@@ -299,7 +299,7 @@ interface WalletMessage {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;
             font-size: 0.7rem;
         }
-        .message__dir { font-weight: 700; font-size: 0.65rem; }
+        .message__dir { font-weight: 700; font-size: var(--text-xxs); }
         .message__time { color: var(--text-tertiary); }
         .message__fee { color: var(--accent-green); }
         .accent-cyan { color: var(--accent-cyan); }

@@ -208,7 +208,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .bundle-card__title { display: flex; align-items: center; gap: 0.5rem; }
         .bundle-card__name { font-weight: 600; color: var(--text-primary); }
         .bundle-card__preset {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; color: var(--accent-green); border: 1px solid var(--accent-green);
         }
         .bundle-card__meta { font-size: 0.75rem; color: var(--text-secondary); }

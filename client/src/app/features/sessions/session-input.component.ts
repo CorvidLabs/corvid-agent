@@ -95,7 +95,7 @@ import { DecimalPipe } from '@angular/common';
             opacity: 1;
         }
         .input-bar__char-count {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             font-variant-numeric: tabular-nums;
             margin-right: auto;
@@ -104,7 +104,7 @@ import { DecimalPipe } from '@angular/common';
             color: var(--accent-amber);
         }
         .input-bar__kbd {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             padding: 1px 4px;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -113,7 +113,7 @@ import { DecimalPipe } from '@angular/common';
             font-family: inherit;
         }
         .input-bar__kbd-label {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             color: var(--text-tertiary);
         }
         .input-bar__send {
@@ -137,7 +137,7 @@ import { DecimalPipe } from '@angular/common';
         .input-bar__send:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .input-bar__send:active:not(:disabled) { transform: scale(0.97); }
         .input-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
-        .input-bar__send-icon { font-size: 0.65rem; }
+        .input-bar__send-icon { font-size: var(--text-xxs); }
 
         /* Mobile: tighter input bar */
         @media (max-width: 767px) {

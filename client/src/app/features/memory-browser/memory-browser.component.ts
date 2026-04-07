@@ -254,7 +254,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             display: flex; flex-direction: column; align-items: center; min-width: 80px;
         }
         .stat__value { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
-        .stat__label { font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
         .stat--longterm { border-color: var(--accent-green); }
         .stat--longterm .stat__value { color: var(--accent-green); }
         .stat--shortterm { border-color: var(--accent-yellow); }
@@ -341,7 +341,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         /* ── Tier badge ── */
         .tier-badge {
             display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .tier-badge--longterm {
@@ -356,7 +356,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         /* ── Status chip ── */
         .status-chip {
             display: inline-block; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs);
-            font-size: 0.6rem; font-weight: 600; text-transform: uppercase;
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em;
         }
         .status-chip--confirmed { color: var(--accent-green); background: var(--accent-green-tint); }
@@ -404,7 +404,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         }
         .meta-item--wide { grid-column: 1 / -1; }
         .meta-label {
-            display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-tertiary);
+            display: block; font-size: var(--text-xxs); font-weight: 600; color: var(--text-tertiary);
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
         }
         .meta-value { font-size: 0.8rem; color: var(--text-primary); }

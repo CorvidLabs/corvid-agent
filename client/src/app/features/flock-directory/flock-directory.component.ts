@@ -383,7 +383,7 @@ interface FlockStats {
             border-radius: 12px;
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             cursor: pointer;
             transition: all 0.1s;
         }
@@ -500,7 +500,7 @@ interface FlockStats {
             white-space: nowrap;
         }
         .flock-card__status {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -538,7 +538,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.06);
             border: 1px solid rgba(255, 0, 128, 0.2);
             border-radius: var(--radius-xs);
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             color: var(--accent-magenta);
         }
         .flock-card__cap--more { background: transparent; border-style: dashed; }
@@ -546,7 +546,7 @@ interface FlockStats {
         .flock-card__metrics {
             display: flex;
             gap: 0.75rem;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             margin-top: auto;
         }
@@ -640,7 +640,7 @@ interface FlockStats {
             margin: 0;
         }
         .flock-detail__status {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -668,7 +668,7 @@ interface FlockStats {
 
         .flock-detail__section { margin-bottom: 1.25rem; }
         .flock-detail__section-title {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
@@ -726,7 +726,7 @@ interface FlockStats {
         }
         .flock-detail__metric-label {
             display: block;
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -744,7 +744,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.08);
             border: 1px solid rgba(255, 0, 128, 0.25);
             border-radius: var(--radius-xs);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--accent-magenta);
         }
 

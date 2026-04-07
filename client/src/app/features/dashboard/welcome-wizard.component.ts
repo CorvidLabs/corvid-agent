@@ -229,7 +229,7 @@ const TEMPLATES: AgentTemplate[] = [
 
         .wizard__header { margin-bottom: 1.5rem; }
         .wizard__logo {
-            font-size: 0.35rem;
+            font-size: var(--text-micro);
             line-height: 1.1;
             color: var(--accent-cyan);
             margin: 0 0 1rem;
@@ -508,7 +508,7 @@ const TEMPLATES: AgentTemplate[] = [
 
         @media (max-width: 767px) {
             .wizard { padding: var(--space-4); }
-            .wizard__logo { font-size: 0.25rem; }
+            .wizard__logo { font-size: var(--text-micro); }
             .wizard__step { padding: var(--space-4); }
             .template-grid { grid-template-columns: 1fr; }
             .field-row { grid-template-columns: 1fr; }

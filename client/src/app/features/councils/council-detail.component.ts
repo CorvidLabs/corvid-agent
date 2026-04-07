@@ -152,7 +152,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .launch-card:hover { border-color: var(--accent-cyan); }
         .launch-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
         .launch-card__stage {
-            font-size: 0.65rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid;
         }
         .launch-card__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -167,7 +167,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
             padding: var(--space-2); background: var(--bg-raised); border: 1px solid var(--border);
             border-radius: var(--radius); margin-top: 0.35rem;
         }
-        .synthesis-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
+        .synthesis-label { font-size: var(--text-xxs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
         .synthesis-text { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
     `,
 })

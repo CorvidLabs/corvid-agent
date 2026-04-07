@@ -109,7 +109,7 @@ import { createTextSprite } from './library-3d.utils';
             background: rgba(5, 5, 10, 0.85);
             border: 1px solid var(--border-bright);
             border-radius: 12px;
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             font-family: inherit;
             text-transform: uppercase;
@@ -147,7 +147,7 @@ import { createTextSprite } from './library-3d.utils';
             white-space: nowrap;
         }
         .lib3d__tooltip-cat {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             color: var(--text-secondary);
         }
@@ -159,7 +159,7 @@ import { createTextSprite } from './library-3d.utils';
             background: rgba(5, 5, 10, 0.85);
             border: 1px solid var(--accent-cyan);
             border-radius: 12px;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             font-family: inherit;
             text-transform: uppercase;
@@ -173,7 +173,7 @@ import { createTextSprite } from './library-3d.utils';
             position: absolute;
             bottom: 12px;
             left: 12px;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
             pointer-events: none;
         }
@@ -182,7 +182,7 @@ import { createTextSprite } from './library-3d.utils';
             .lib3d { height: 450px; }
             .lib3d__minimap { width: 100px; height: 100px; }
             .lib3d__legend { gap: 2px; }
-            .lib3d__legend-btn { font-size: 0.58rem; padding: 2px 6px; }
+            .lib3d__legend-btn { font-size: var(--text-micro); padding: 2px 6px; }
         }
     `,
 })

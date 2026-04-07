@@ -499,7 +499,7 @@ interface SyncStatus {
         .stat-card--longterm { border-color: var(--accent-cyan); border-style: dashed; }
         .stat-card--shortterm { border-color: var(--accent-amber); border-style: dashed; }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -545,7 +545,7 @@ interface SyncStatus {
         .tier-bar__segment--longterm { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .tier-bar__segment--shortterm { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .tier-bar__label {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -661,7 +661,7 @@ interface SyncStatus {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -702,7 +702,7 @@ interface SyncStatus {
         .memory-card__tier {
             padding: 0.15rem 0.35rem;
             border-radius: var(--radius-sm);
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -725,7 +725,7 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .memory-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -734,7 +734,7 @@ interface SyncStatus {
         .memory-card__status[data-status="pending"] { color: var(--accent-amber); }
         .memory-card__status[data-status="failed"] { color: var(--accent-red); }
         .memory-card__decay {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
@@ -744,7 +744,7 @@ interface SyncStatus {
             background: var(--accent-purple-dim);
             color: var(--accent-purple);
             border-radius: var(--radius-sm);
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             flex-shrink: 0;
         }
         .memory-card__storage {
@@ -770,7 +770,7 @@ interface SyncStatus {
         }
         .memory-card__time {
             color: var(--text-tertiary);
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             flex-shrink: 0;
             white-space: nowrap;
         }
@@ -794,14 +794,14 @@ interface SyncStatus {
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             padding-top: 0.1rem;
         }
         .detail-value {
             color: var(--text-secondary);
             word-break: break-all;
         }
-        .detail-value--mono { font-family: var(--font-mono); font-size: 0.65rem; }
+        .detail-value--mono { font-family: var(--font-mono); font-size: var(--text-xxs); }
         .detail-value--txid { color: var(--accent-green); }
         .detail-value--asa { color: var(--accent-cyan); }
         [data-storage="arc69"] { color: var(--accent-green); }
@@ -853,7 +853,7 @@ interface SyncStatus {
         }
         .obs-header h3 { margin: 0; }
         .obs-header__meta {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
         }
         .obs-empty {
@@ -885,7 +885,7 @@ interface SyncStatus {
         .obs-card__source {
             padding: 0.15rem 0.35rem;
             border-radius: var(--radius-sm);
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -901,13 +901,13 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .obs-card__score {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
         }
         .obs-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -933,7 +933,7 @@ interface SyncStatus {
         .btn--action {
             padding: 0.35rem var(--space-3);
             border-radius: var(--radius-sm);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -958,7 +958,7 @@ interface SyncStatus {
         @media (max-width: 767px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
             .memory-card__header { flex-wrap: wrap; }
-            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: 0.6rem; }
+            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: var(--text-xxs); }
         }
     `,
 })

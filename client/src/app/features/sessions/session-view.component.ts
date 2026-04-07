@@ -153,7 +153,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         }
         .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
-        .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.05em; margin-right: 0.2rem; }
+        .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: var(--text-xxs); letter-spacing: 0.05em; margin-right: 0.2rem; }
         .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .export-group { display: flex; gap: 0.25rem; }
         .btn {
@@ -180,7 +180,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             }
             .btn {
                 padding: var(--space-1) var(--space-2);
-                font-size: 0.65rem;
+                font-size: var(--text-xxs);
             }
             .question-card {
                 margin: 0.5rem 0.5rem;

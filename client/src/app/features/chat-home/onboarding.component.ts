@@ -214,7 +214,7 @@ const TEMPLATES: AgentTemplate[] = [
             color: var(--text-primary);
         }
         .tpl-card__desc {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             line-height: 1.4;
         }

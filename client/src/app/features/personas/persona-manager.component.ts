@@ -143,7 +143,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             border-color: var(--accent-cyan); box-shadow: var(--glow-cyan);
         }
         .agent-chip[data-status="configured"]::after {
-            content: ' \\2713'; color: var(--accent-green); font-size: 0.65rem;
+            content: ' \\2713'; color: var(--accent-green); font-size: var(--text-xxs);
         }
 
         /* Detail panel */

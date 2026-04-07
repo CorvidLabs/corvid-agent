@@ -294,7 +294,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             margin-bottom: 0.4rem;
         }
         .tier-card__badge {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;

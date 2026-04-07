@@ -203,7 +203,7 @@ interface CreditTransaction {
             border: 1px solid var(--border);
             border-radius: 20px;
             color: var(--text-tertiary);
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             text-transform: capitalize;
@@ -238,7 +238,7 @@ interface CreditTransaction {
         }
 
         .log-type {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -250,7 +250,7 @@ interface CreditTransaction {
         .log-type[data-type="work-task"] { color: var(--accent-magenta); background: var(--accent-magenta-dim); }
 
         .log-level {
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             text-transform: uppercase;
             font-weight: 600;
         }
@@ -259,7 +259,7 @@ interface CreditTransaction {
         .log-level[data-level="info"] { color: var(--text-tertiary); }
 
         .log-time {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             margin-left: auto;
         }
@@ -273,7 +273,7 @@ interface CreditTransaction {
 
         .log-detail {
             margin: 0.25rem 0 0;
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             font-family: var(--font-mono);
         }
@@ -315,7 +315,7 @@ interface CreditTransaction {
         .credit-amount--negative { color: var(--accent-red); }
         .credit-balance { color: var(--text-primary); font-weight: 600; }
         .credit-wallet code {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             background: var(--bg-raised);
             padding: 1px 4px;
             border-radius: var(--radius-sm);

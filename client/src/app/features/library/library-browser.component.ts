@@ -129,7 +129,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
         .entry-card__key { font-weight: 600; color: var(--accent-cyan); font-size: 0.85rem; }
         .entry-card__category {
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
             padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text-secondary);
         }
         .entry-card__category[data-category="guide"] { color: var(--accent-green); }
@@ -142,14 +142,14 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__asa { font-family: var(--font-mono); color: var(--accent-green); }
         .entry-card--book { border-left: 3px solid var(--accent-purple); }
         .entry-card__pages {
-            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple);
+            font-size: var(--text-xxs); font-weight: 700; color: var(--accent-purple);
             background: var(--accent-purple-tint); border: 1px solid var(--accent-purple-mid);
             padding: 1px 8px; border-radius: var(--radius-lg);
         }
 
         .entry-card__tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
         .tag {
-            font-size: 0.6rem; padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
             background: var(--accent-cyan-dim); color: var(--accent-cyan); font-weight: 600;
         }
 
@@ -169,7 +169,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
             content: ''; flex: 1; height: 1px; background: var(--border);
         }
         .page-divider__label {
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: var(--text-tertiary); white-space: nowrap;
         }
 

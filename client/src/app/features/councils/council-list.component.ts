@@ -221,7 +221,7 @@ interface CouncilCard {
         .meta-item--chairman { color: var(--accent-gold); }
 
         .stage-badge {
-            font-size: 0.6rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .stage-badge[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -233,14 +233,14 @@ interface CouncilCard {
 
         .council-card__members { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
         .member-chip {
-            font-size: 0.65rem; padding: 2px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 2px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-secondary);
         }
         .member-chip--chairman { color: var(--accent-gold); border-color: var(--accent-gold-dim); background: var(--accent-gold-dim); }
 
         .council-card__footer {
             display: flex; gap: 0.75rem; padding-top: 0.4rem; border-top: 1px solid var(--border);
-            font-size: 0.65rem; color: var(--text-tertiary);
+            font-size: var(--text-xxs); color: var(--text-tertiary);
         }
         .council-card__time { margin-left: auto; }
 
