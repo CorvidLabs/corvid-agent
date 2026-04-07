@@ -20,6 +20,10 @@ function createMockClient(): {
 
     // Replace the private `rest` instance with a mock
     const mockRest = {
+        get: async (route: string, options?: unknown) => {
+            calls.push({ method: 'get', route, options });
+            return { id: 'mock-result' };
+        },
         post: async (route: string, options?: unknown) => {
             calls.push({ method: 'post', route, options });
             return { id: 'mock-result' };
@@ -35,10 +39,6 @@ function createMockClient(): {
         delete: async (route: string, options?: unknown) => {
             calls.push({ method: 'delete', route, options });
             return undefined;
-        },
-        get: async (route: string, options?: unknown) => {
-            calls.push({ method: 'get', route, options });
-            return { id: 'mock-result' };
         },
     };
 
@@ -56,11 +56,11 @@ function createErrorClient(errorMessage = 'Discord API error'): {
 } {
     const client = new DiscordRestClient({ token: 'test-token' });
     const mockRest = {
+        get: async () => { throw new Error(errorMessage); },
         post: async () => { throw new Error(errorMessage); },
         patch: async () => { throw new Error(errorMessage); },
         put: async () => { throw new Error(errorMessage); },
         delete: async () => { throw new Error(errorMessage); },
-        get: async () => { throw new Error(errorMessage); },
     };
     (client as any).rest = mockRest;
     return { client };
@@ -376,10 +376,32 @@ describe('DiscordRestClient methods', () => {
         });
     });
 
+    describe('createThread', () => {
+        test('posts to threads route with body', async () => {
+            const { client, calls } = createMockClient();
+            const data = { name: 'Test Thread', type: 11, auto_archive_duration: 1440 };
+
+            const result = await client.createThread('chan-1', data);
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].method).toBe('post');
+            expect(calls[0].route).toContain('/channels/chan-1/threads');
+            expect(calls[0].options).toEqual({ body: data });
+            expect((result as { id: string }).id).toBe('mock-result');
+        });
+
+        test('throws on API error', async () => {
+            const { client } = createErrorClient();
+            await expect(
+                client.createThread('chan-1', { name: 'Test', type: 11 }),
+            ).rejects.toThrow('Discord API error');
+        });
+    });
+
     describe('modifyChannel', () => {
         test('patches channel data', async () => {
             const { client, calls } = createMockClient();
-            const data = { archived: false };
+            const data = { archived: true };
 
             await client.modifyChannel('chan-1', data);
 
@@ -398,3 +420,4 @@ describe('DiscordRestClient methods', () => {
     });
 });
 
+// Note: createRestClient is covered via guild-api tests which mock and exercise it.

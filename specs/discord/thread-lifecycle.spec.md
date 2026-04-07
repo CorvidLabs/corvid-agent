@@ -20,9 +20,9 @@ Manages Discord thread lifecycle operations including creation, archival, and st
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `archiveThread` | `(botToken: string, threadId: string)` | `Promise<void>` | Archives a single Discord thread via the REST API. |
-| `createStandaloneThread` | `(botToken: string, channelId: string, name: string)` | `Promise<string \| null>` | Creates a new standalone thread in a channel. Returns the thread ID or null on failure. |
-| `archiveStaleThreads` | `(botToken: string, threadSessions: Map, threadCallbacks: Map, processManager: ProcessManager, delivery: DeliveryTracker, staleThresholdMs: number, threadLastActivity: Map)` | `Promise<void>` | Archives threads that have been inactive beyond the stale threshold. Sends a notification embed before archiving. |
+| `archiveThread` | `(threadId: string)` | `Promise<void>` | Archives a single Discord thread via the REST client. |
+| `createStandaloneThread` | `(channelId: string, name: string)` | `Promise<string \| null>` | Creates a new standalone thread in a channel. Returns the thread ID or null on failure. |
+| `archiveStaleThreads` | `(processManager: ProcessManager, threadLastActivity: Map, threadSessions: Map, threadCallbacks: Map, staleThresholdMs: number, db?: Database)` | `Promise<void>` | Archives threads that have been inactive beyond the stale threshold. Sends a notification embed before archiving. |
 
 ## Invariants
 
@@ -32,8 +32,9 @@ Manages Discord thread lifecycle operations including creation, archival, and st
 
 ## Behavioral Examples
 
-- archiveThread: sends PATCH to Discord API to set archived: true.
-- archiveStaleThreads: iterates tracked threads, identifies stale ones, sends warning embed, then archives.
+- archiveThread: calls `getRestClient().modifyChannel(threadId, { archived: true })`.
+- createStandaloneThread: calls `getRestClient().createThread(channelId, { name, type: 11, auto_archive_duration: 1440 })`.
+- archiveStaleThreads: iterates tracked threads, identifies stale ones, sends warning embed via REST client, then archives.
 
 ## Error Cases
 
@@ -42,7 +43,8 @@ Manages Discord thread lifecycle operations including creation, archival, and st
 
 ## Dependencies
 
-- `server/discord/embeds.ts` — embed building and Discord API helpers
+- `server/discord/rest-client.ts` — centralized rate-limited REST client (`getRestClient()`)
+- `server/discord/embeds.ts` — embed building helpers (`buildActionRow`, `assertSnowflake`)
 - `server/discord/thread-session-map.ts` — thread session types
 - `server/lib/logger.ts` — structured logging
 
