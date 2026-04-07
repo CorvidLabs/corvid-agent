@@ -286,11 +286,26 @@ export function createConversation(
 
     db.query(
         `INSERT INTO algochat_conversations (id, participant_addr, agent_id, session_id)
-         VALUES (?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(participant_addr) DO UPDATE SET
+             agent_id = COALESCE(excluded.agent_id, agent_id),
+             session_id = COALESCE(excluded.session_id, session_id)`
     ).run(id, participantAddr, agentId, sessionId);
 
-    const row = db.query('SELECT * FROM algochat_conversations WHERE id = ?').get(id) as ConversationRow;
+    const row = db.query(
+        'SELECT * FROM algochat_conversations WHERE participant_addr = ?'
+    ).get(participantAddr) as ConversationRow;
     return rowToConversation(row);
+}
+
+export function getConversationBySessionId(
+    db: Database,
+    sessionId: string,
+): AlgoChatConversation | null {
+    const row = db.query(
+        'SELECT * FROM algochat_conversations WHERE session_id = ?'
+    ).get(sessionId) as ConversationRow | null;
+    return row ? rowToConversation(row) : null;
 }
 
 export function updateConversationRound(db: Database, id: string, lastRound: number): void {
