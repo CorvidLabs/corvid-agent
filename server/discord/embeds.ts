@@ -6,7 +6,7 @@
  * REST client (rest-client.ts), which handles rate limiting automatically.
  */
 
-import type { RepliableInteraction } from 'discord.js';
+import { MessageFlags, type RepliableInteraction } from 'discord.js';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { splitMessage } from './message-formatter';
@@ -231,7 +231,7 @@ export async function respondToInteractionEmbed(
 ): Promise<void> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await interaction.reply({ embeds: [embed as any], ephemeral });
+    await interaction.reply({ embeds: [embed as any], ...(ephemeral && { flags: MessageFlags.Ephemeral }) });
   } catch (error) {
     log.error('Failed to respond to Discord interaction with embed', {
       error: error instanceof Error ? error.message : String(error),
@@ -246,7 +246,7 @@ export async function respondToInteractionEmbeds(
 ): Promise<void> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await interaction.reply({ embeds: embeds as any[], ephemeral });
+    await interaction.reply({ embeds: embeds as any[], ...(ephemeral && { flags: MessageFlags.Ephemeral }) });
   } catch (error) {
     log.error('Failed to respond to Discord interaction with embeds', {
       error: error instanceof Error ? error.message : String(error),
@@ -260,7 +260,7 @@ export async function respondToInteractionEmbeds(
  */
 export async function deferInteraction(interaction: RepliableInteraction, ephemeral = false): Promise<void> {
   try {
-    await interaction.deferReply({ ephemeral });
+    await interaction.deferReply(ephemeral ? { flags: MessageFlags.Ephemeral } : {});
   } catch (error) {
     log.error('Failed to defer interaction', {
       error: error instanceof Error ? error.message : String(error),
@@ -294,7 +294,7 @@ export async function editDeferredResponse(
  */
 export async function respondEphemeral(interaction: RepliableInteraction, content: string): Promise<void> {
   try {
-    await interaction.reply({ content: content.slice(0, MAX_MESSAGE_LENGTH), ephemeral: true });
+    await interaction.reply({ content: content.slice(0, MAX_MESSAGE_LENGTH), flags: MessageFlags.Ephemeral });
   } catch (error) {
     log.error('Failed to send ephemeral response', {
       error: error instanceof Error ? error.message : String(error),
@@ -304,7 +304,7 @@ export async function respondEphemeral(interaction: RepliableInteraction, conten
 
 export async function acknowledgeButton(interaction: RepliableInteraction, message: string): Promise<void> {
   try {
-    await interaction.reply({ content: message, ephemeral: true });
+    await interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
   } catch (error) {
     log.error('Failed to acknowledge button', {
       error: error instanceof Error ? error.message : String(error),
