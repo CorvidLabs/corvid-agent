@@ -1,17 +1,12 @@
 /**
  * Discord slash command registration and interaction dispatch.
  *
- * Builds command definitions using @discordjs/builders SlashCommandBuilder,
- * registers them with Discord API via the discord.js REST client,
- * and dispatches interaction events to the appropriate handler.
+ * Builds command definitions using SlashCommandBuilder (type-safe, auto-validated),
+ * registers them via DiscordRestClient.putCommands(), and dispatches interaction
+ * events to the appropriate handler.
  *
  * Command handler implementations are in ./command-handlers/.
- *
- * Phase 3 of the discord.js migration (#1793):
- * - Command definitions use SlashCommandBuilder (type-safe, auto-validated)
- * - Registration uses DiscordRestClient.putCommands() instead of raw discordFetch
- * Phase 1 (REST client) lives in rest-client.ts.
- * Phase 2 (WebSocket gateway) lives in gateway.ts.
+ * Part of the discord.js migration (#1800).
  */
 
 import type { Database } from 'bun:sqlite';
@@ -59,8 +54,6 @@ const log = createLogger('DiscordCommands');
  * - Compile-time type checking on option types and constraints
  * - Automatic validation (option count limits, name length, etc.)
  * - Self-documenting intent — option types are explicit method names
- *
- * Phase 3 of the discord.js migration (#1793).
  */
 function buildCommands(): ReturnType<SlashCommandBuilder['toJSON']>[] {
   return [

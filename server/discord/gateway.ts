@@ -1,16 +1,11 @@
 /**
  * Discord Gateway — Discord.js Client wrapper.
  *
- * Replaces the custom WebSocket gateway implementation with discord.js Client,
- * which handles the WebSocket lifecycle, heartbeat, identify/resume, and
- * reconnection internally.
+ * Uses discord.js Client for the WebSocket lifecycle, heartbeat, identify/resume,
+ * and reconnection. Exposes a thin dispatch interface (GatewayDispatchHandlers)
+ * that the bridge layer consumes.
  *
- * Public interface is unchanged: GatewayDispatchHandlers + DiscordGateway class
- * with start(), stop(), running, botToken, and updatePresence().
- * Downstream modules (bridge.ts, commands.ts, etc.) are unaffected.
- *
- * Phase 2 of the discord.js migration (#1792).
- * Phase 1 (REST API layer) lives in rest-client.ts.
+ * Part of the discord.js migration (#1800). REST layer lives in rest-client.ts.
  */
 
 import {
@@ -48,10 +43,9 @@ export interface GatewayDispatchHandlers {
 }
 
 /**
- * Discord.js Client wrapper that provides the same dispatch interface
- * as the former raw WebSocket gateway.
+ * Discord.js Client wrapper providing the dispatch interface consumed by bridge.ts.
  *
- * Discord.js handles: WebSocket lifecycle, heartbeat, identify/resume,
+ * Discord.js handles WebSocket lifecycle, heartbeat, identify/resume,
  * session management, and exponential-backoff reconnection automatically.
  */
 export class DiscordGateway {
