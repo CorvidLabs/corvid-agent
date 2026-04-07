@@ -743,7 +743,7 @@ interface PSKContact {
         </div>
     `,
     styles: `
-        .settings { padding: 1.5rem; max-width: 900px; }
+        .settings { padding: var(--space-6); max-width: 900px; }
         .settings h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .settings h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading, .muted { color: var(--text-secondary); font-size: 0.8rem; }
@@ -771,7 +771,7 @@ interface PSKContact {
 
         /* Health grid */
         .health-grid { display: flex; flex-direction: column; gap: 0.5rem; }
-        .health-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.5rem; background: var(--bg-raised); border-radius: var(--radius); }
+        .health-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem var(--space-2); background: var(--bg-raised); border-radius: var(--radius); }
         .health-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .health-dot[data-status="ok"] { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
         .health-dot[data-status="warn"] { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
@@ -831,7 +831,7 @@ interface PSKContact {
         .chip-list { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
         .chip {
             display: inline-flex; align-items: center; gap: 0.3rem;
-            padding: 0.2rem 0.5rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
+            padding: 0.2rem var(--space-2); background: var(--accent-cyan-dim); color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
             font-size: 0.7rem; font-weight: 600;
         }
@@ -849,19 +849,19 @@ interface PSKContact {
         }
         .picker-item {
             background: none; border: none; color: var(--text-primary);
-            text-align: left; padding: 0.3rem 0.5rem; cursor: pointer;
+            text-align: left; padding: 0.3rem var(--space-2); cursor: pointer;
             border-radius: var(--radius-sm); font-size: 0.75rem; font-family: inherit;
             display: flex; justify-content: space-between; align-items: center;
         }
         .picker-item:hover { background: var(--bg-surface); color: var(--accent-cyan); }
         .picker-id { font-size: 0.6rem; color: var(--text-tertiary); font-family: var(--font-mono); }
-        .picker-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.3rem 0.5rem; }
+        .picker-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.3rem var(--space-2); }
 
         /* Role/Channel permission grid */
         .role-perm-grid { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
         .role-perm-row {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.3rem 0.5rem; background: var(--bg-raised);
+            padding: 0.3rem var(--space-2); background: var(--bg-raised);
             border-radius: var(--radius-sm);
         }
         .role-name { font-size: 0.75rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -871,7 +871,7 @@ interface PSKContact {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            padding: var(--space-5);
             margin-bottom: 1.25rem;
         }
 
@@ -934,7 +934,7 @@ interface PSKContact {
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 0.75rem;
+            padding: var(--space-3);
         }
         .contact-header {
             display: flex;
@@ -949,7 +949,7 @@ interface PSKContact {
             cursor: pointer;
         }
         .contact-nickname-input {
-            padding: 0.25rem 0.4rem;
+            padding: var(--space-1) 0.4rem;
             background: var(--bg-input);
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius-sm);
@@ -1079,7 +1079,7 @@ interface PSKContact {
 
         /* Buttons */
         .save-btn, .backup-btn, .cancel-btn {
-            padding: 0.5rem 1.25rem;
+            padding: var(--space-2) var(--space-5);
             border-radius: var(--radius);
             font-size: 0.75rem;
             font-weight: 600;
@@ -1132,7 +1132,7 @@ interface PSKContact {
         .notif-toggle { position: relative; display: inline-flex; cursor: pointer; }
         .notif-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
         .notif-toggle__track {
-            width: 36px; height: 20px; border-radius: 10px;
+            width: 36px; height: 20px; border-radius: var(--radius-lg);
             background: var(--border-bright); transition: background 0.2s;
             position: relative; flex-shrink: 0;
         }
@@ -1162,12 +1162,12 @@ interface PSKContact {
         .env-value--unset { color: var(--text-tertiary); }
         .env-hint { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 0.5rem; }
         .env-hint code {
-            background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
+            background: var(--bg-raised); padding: 1px 4px; border-radius: var(--radius-sm);
             font-size: 0.6rem; border: 1px solid var(--border);
         }
 
         @media (max-width: 600px) {
-            .settings { padding: 1rem; }
+            .settings { padding: var(--space-4); }
             .discord-grid { grid-template-columns: 1fr; }
             .credit-grid { grid-template-columns: 1fr; }
             .info-grid { grid-template-columns: 1fr; }

@@ -118,7 +118,7 @@ interface CommandItem {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             border-bottom: 1px solid var(--border);
         }
         .palette__search-icon {
@@ -143,7 +143,7 @@ interface CommandItem {
             padding: 0.1rem 0.35rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             color: var(--text-tertiary);
             font-size: 0.55rem;
             font-family: inherit;
@@ -151,19 +151,19 @@ interface CommandItem {
         .palette__results {
             flex: 1;
             overflow-y: auto;
-            padding: 0.25rem 0;
+            padding: var(--space-1) 0;
         }
         .palette__empty {
-            padding: 1.5rem;
+            padding: var(--space-6);
             text-align: center;
             color: var(--text-tertiary);
             font-size: 0.8rem;
         }
         .palette__group {
-            padding: 0.25rem 0;
+            padding: var(--space-1) 0;
         }
         .palette__group-label {
-            padding: 0.25rem 1rem;
+            padding: var(--space-1) var(--space-4);
             font-size: 0.58rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -175,7 +175,7 @@ interface CommandItem {
             align-items: center;
             gap: 0.5rem;
             width: 100%;
-            padding: 0.5rem 1rem;
+            padding: var(--space-2) var(--space-4);
             background: transparent;
             border: none;
             color: var(--text-secondary);
@@ -200,7 +200,7 @@ interface CommandItem {
             align-items: center;
             justify-content: center;
             background: var(--bg-raised);
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             font-size: 0.65rem;
             flex-shrink: 0;
         }
@@ -218,16 +218,16 @@ interface CommandItem {
         .palette__footer {
             display: flex;
             gap: 1rem;
-            padding: 0.5rem 1rem;
+            padding: var(--space-2) var(--space-4);
             border-top: 1px solid var(--border);
             font-size: 0.58rem;
             color: var(--text-tertiary);
         }
         .palette__footer kbd {
-            padding: 0.05rem 0.25rem;
+            padding: 0.05rem var(--space-1);
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-family: inherit;
             font-size: 0.55rem;
             margin-right: 0.15rem;

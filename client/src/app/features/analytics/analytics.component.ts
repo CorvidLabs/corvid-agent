@@ -3,7 +3,6 @@ import { DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 interface OverviewData {
     totalSessions: number;
@@ -56,9 +55,10 @@ interface SessionStats {
 @Component({
     selector: 'app-analytics',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SkeletonComponent, PageShellComponent],
+    imports: [DecimalPipe, SkeletonComponent],
     template: `
-        <app-page-shell title="Analytics" icon="analytics">
+        <div class="analytics">
+            <h2>Analytics</h2>
 
             @if (loading()) {
                 <app-skeleton variant="card" [count]="6" />
@@ -214,10 +214,12 @@ interface SessionStats {
                     </div>
                 }
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
+        .analytics { padding: var(--space-6); }
+        .analytics h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
+        .analytics h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
 
         .analytics__cards {

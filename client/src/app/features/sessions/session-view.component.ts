@@ -135,7 +135,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .session-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
         .session-view__header {
             display: flex; align-items: center; gap: 1rem;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
         }
@@ -157,7 +157,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .export-group { display: flex; gap: 0.25rem; }
         .btn {
-            padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.375rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -166,7 +166,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         @media (max-width: 767px) {
             .session-view__header {
                 flex-wrap: wrap;
-                padding: 0.5rem 0.75rem;
+                padding: var(--space-2) var(--space-3);
                 gap: 0.5rem;
             }
             .session-view__meta {
@@ -179,12 +179,12 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                 display: none;
             }
             .btn {
-                padding: 0.25rem 0.5rem;
+                padding: var(--space-1) var(--space-2);
                 font-size: 0.65rem;
             }
             .question-card {
                 margin: 0.5rem 0.5rem;
-                padding: 0.75rem;
+                padding: var(--space-3);
             }
             .question-card__options { gap: 0.375rem; }
         }
@@ -194,9 +194,9 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px var(--accent-red-border); }
-        .page { padding: 1.5rem; color: var(--text-primary); }
+        .page { padding: var(--space-6); color: var(--text-primary); }
         .question-card {
-            margin: 0.75rem 1rem; padding: 1rem; border-radius: var(--radius);
+            margin: 0.75rem 1rem; padding: var(--space-4); border-radius: var(--radius);
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
             box-shadow: var(--glow-cyan);
         }
@@ -206,7 +206,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .question-card__options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .question-card__input { display: flex; gap: 0.5rem; }
         .question-card__input input {
-            flex: 1; padding: 0.375rem 0.75rem; border-radius: var(--radius);
+            flex: 1; padding: 0.375rem var(--space-3); border-radius: var(--radius);
             background: var(--bg-primary); border: 1px solid var(--border-bright);
             color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
         }
@@ -221,7 +221,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         }
         .confirm-dialog {
             background: var(--bg-surface); border: 1px solid var(--border-bright);
-            border-radius: var(--radius-lg); padding: 1.5rem;
+            border-radius: var(--radius-lg); padding: var(--space-6);
             max-width: 400px; width: 90%; box-shadow: 0 8px 32px var(--overlay);
             animation: slideUp 0.2s ease;
         }
@@ -242,7 +242,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             min-width: 160px; overflow: hidden; animation: slideUp 0.15s ease;
         }
         .mobile-menu__item {
-            display: block; width: 100%; padding: 0.6rem 0.75rem;
+            display: block; width: 100%; padding: 0.6rem var(--space-3);
             background: none; border: none; border-bottom: 1px solid var(--border);
             color: var(--text-primary); font-family: inherit; font-size: 0.75rem;
             text-align: left; cursor: pointer; transition: background 0.1s;
@@ -251,9 +251,9 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .mobile-menu__item:hover { background: var(--bg-hover); }
 
         /* Loading skeleton */
-        .session-view__loading { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .session-view__loading { padding: var(--space-6); display: flex; flex-direction: column; gap: 0.75rem; }
         .skeleton {
-            height: 14px; border-radius: 4px;
+            height: 14px; border-radius: var(--radius-xs);
             background: linear-gradient(90deg, var(--bg-surface) 25%, rgba(255,255,255,0.04) 50%, var(--bg-surface) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s ease-in-out infinite;
