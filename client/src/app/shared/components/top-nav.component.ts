@@ -349,14 +349,16 @@ const TABS: NavTab[] = [
         }
         .topnav__network {
             display: flex;
+            gap: 2px;
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             overflow: hidden;
         }
         .network-btn {
-            padding: 0.25rem 0.5rem;
+            padding: 0.35rem 0.6rem;
+            min-height: 28px;
             font-family: inherit;
-            font-size: 0.55rem;
+            font-size: 0.6rem;
             font-weight: 700;
             letter-spacing: 0.06em;
             border: none;

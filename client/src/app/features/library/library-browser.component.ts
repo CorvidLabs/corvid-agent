@@ -107,6 +107,8 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         </div>
     `,
     styles: `
+        .page { padding: var(--space-6); }
+        @media (max-width: 600px) { .page { padding: 1rem; } }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 

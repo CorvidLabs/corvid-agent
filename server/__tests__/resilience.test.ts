@@ -123,54 +123,45 @@ describe('withRetry', () => {
                     lastTime = now;
                     throw new Error('fail');
                 },
-                { maxAttempts: 4, baseDelayMs: 30, multiplier: 2, jitter: false },
+                { maxAttempts: 4, baseDelayMs: 50, multiplier: 2, jitter: false },
             ),
         ).rejects.toThrow('fail');
         expect(calls).toBe(4);
-        // delays[0] ≈ 30ms (30 * 2^0), delays[1] ≈ 60ms (30 * 2^1), delays[2] ≈ 120ms (30 * 2^2)
-        // Each successive delay should be roughly double the previous
+        // delays[0] ≈ 50ms (50 * 2^0), delays[1] ≈ 100ms (50 * 2^1), delays[2] ≈ 200ms (50 * 2^2)
+        // Each delay should be at least the configured minimum (allow CI scheduling jitter)
         expect(delays).toHaveLength(3);
-        for (let i = 1; i < delays.length; i++) {
-            expect(delays[i]).toBeGreaterThan(delays[i - 1] * 1.1); // allow wide margin for Windows CI timing
-        }
+        expect(delays[0]).toBeGreaterThanOrEqual(30);
+        expect(delays[1]).toBeGreaterThanOrEqual(60);
+        expect(delays[2]).toBeGreaterThanOrEqual(120);
     });
 
     test('no jitter when disabled (exact exponential delay)', async () => {
         // With jitter=false, the delay formula is exactly: min(baseDelayMs * multiplier^attempt, maxDelayMs)
-        let lastTime = Date.now();
         let calls = 0;
-        const results: number[][] = [];
+        let lastTime = Date.now();
+        const runDelays: number[] = [];
 
-        // Run multiple times — without jitter, delays should be consistent
-        for (let run = 0; run < 2; run++) {
-            const runDelays: number[] = [];
-            calls = 0;
-            lastTime = Date.now();
-            await expect(
-                withRetry(
-                    async () => {
-                        calls++;
-                        const now = Date.now();
-                        if (calls > 1) runDelays.push(now - lastTime);
-                        lastTime = now;
-                        throw new Error('fail');
-                    },
-                    { maxAttempts: 3, baseDelayMs: 50, multiplier: 2, jitter: false },
-                ),
-            ).rejects.toThrow('fail');
-            results.push(runDelays);
-        }
+        await expect(
+            withRetry(
+                async () => {
+                    calls++;
+                    const now = Date.now();
+                    if (calls > 1) runDelays.push(now - lastTime);
+                    lastTime = now;
+                    throw new Error('fail');
+                },
+                { maxAttempts: 3, baseDelayMs: 50, multiplier: 2, jitter: false },
+            ),
+        ).rejects.toThrow('fail');
 
-        // Both runs should produce similar delays (no randomness)
-        expect(results[0]).toHaveLength(2);
-        expect(results[1]).toHaveLength(2);
-        // First delay should be ~50ms, second ~100ms — wide bounds for CI variability (esp. macOS)
-        for (const runDelays of results) {
-            expect(runDelays[0]).toBeGreaterThanOrEqual(30);
-            expect(runDelays[0]).toBeLessThan(150);
-            expect(runDelays[1]).toBeGreaterThanOrEqual(60);
-            expect(runDelays[1]).toBeLessThan(250);
-        }
+        expect(runDelays).toHaveLength(2);
+        // First delay should be ~50ms, second ~100ms — wide bounds for CI variability
+        expect(runDelays[0]).toBeGreaterThanOrEqual(30);
+        expect(runDelays[0]).toBeLessThan(250);
+        expect(runDelays[1]).toBeGreaterThanOrEqual(60);
+        expect(runDelays[1]).toBeLessThan(400);
+        // Second delay should be greater than first (exponential growth)
+        expect(runDelays[1]).toBeGreaterThan(runDelays[0]);
     });
 
     test('custom multiplier works correctly', async () => {

@@ -100,7 +100,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
+        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }

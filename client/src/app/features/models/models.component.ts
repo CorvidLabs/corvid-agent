@@ -393,10 +393,10 @@ interface LibraryResponse {
         .search-input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .category-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
         .filter-chip {
-            padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+            padding: 0.4rem 0.75rem; min-height: 32px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
             border: 1px solid var(--border-bright); background: transparent; color: var(--text-secondary);
             cursor: pointer; font-family: inherit; text-transform: capitalize;
-            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            transition: background 0.15s, border-color 0.15s, color 0.15s; display: inline-flex; align-items: center;
         }
         .filter-chip:hover { border-color: var(--accent-cyan); color: var(--text-primary); }
         .filter-chip--active { background: var(--accent-cyan-dim); border-color: var(--accent-cyan); color: var(--accent-cyan); }
@@ -425,7 +425,7 @@ interface LibraryResponse {
         .btn--danger { background: transparent; color: #ff5050; border-color: rgba(255, 80, 80, 0.4); }
         .btn--danger:hover { background: rgba(255, 80, 80, 0.08); box-shadow: 0 0 8px rgba(255, 80, 80, 0.15); }
         .btn--danger:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
 
         .hint { color: var(--text-tertiary); font-size: 0.82rem; }
         .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }

@@ -85,7 +85,7 @@ import type { Session } from '../../core/models/session.model';
         .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
-        .btn--sm { padding: 0.375rem var(--space-3); font-size: 0.75rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .detail__info dd { margin: 0; color: var(--text-primary); }

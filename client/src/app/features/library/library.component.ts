@@ -962,8 +962,8 @@ type SortKey = 'date' | 'name' | 'author';
         }
 
         @media (max-width: 600px) {
-            .library { padding: 0.5rem; }
-            .library__card { padding: 0.5rem; }
+            .library { padding: 1rem; }
+            .library__card { padding: 0.75rem; }
             .library__search-panel { max-width: 100%; padding: 0.75rem; }
             .library__toolbar { flex-direction: column; }
             .library__sort-buttons { align-self: flex-end; }
