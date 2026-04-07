@@ -17,7 +17,7 @@
  * @see https://github.com/CorvidLabs/corvid-agent/issues/747
  */
 
-import { existsSync, statSync, readdirSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { join } from "path";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
