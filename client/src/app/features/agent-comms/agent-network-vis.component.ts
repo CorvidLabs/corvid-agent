@@ -380,7 +380,7 @@ export class AgentNetworkVisComponent implements OnDestroy {
         if (!fromNode) return;
 
         const color =
-            msg.status === 'failed' ? 'var(--accent-red)' :
+            msg.status === 'failed' ? '#ff3355' :
             msg.status === 'processing' ? '#ffa040' :
             fromNode.color;
 
