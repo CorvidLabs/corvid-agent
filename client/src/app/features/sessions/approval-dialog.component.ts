@@ -63,7 +63,7 @@ export interface ApprovalDecision {
             background: var(--bg-surface);
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius);
-            padding: 1.25rem;
+            padding: var(--space-5);
             max-width: 480px;
             width: 90vw;
             box-shadow: 0 0 24px rgba(0, 212, 255, 0.15);
@@ -110,7 +110,7 @@ export interface ApprovalDecision {
             font-family: var(--font-mono);
             background: var(--bg-inset);
             padding: 0.625rem;
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             max-height: 200px;
             overflow-y: auto;
         }
@@ -120,7 +120,7 @@ export interface ApprovalDecision {
         }
         .btn {
             flex: 1;
-            padding: 0.75rem 1rem;
+            padding: var(--space-3) var(--space-4);
             min-height: 44px;
             border-radius: var(--radius);
             font-size: 0.8rem;
@@ -135,7 +135,7 @@ export interface ApprovalDecision {
         @media (max-width: 360px) {
             .approval-dialog {
                 width: 95vw;
-                padding: 1rem;
+                padding: var(--space-4);
             }
             .approval-dialog__header h3 {
                 font-size: 0.75rem;

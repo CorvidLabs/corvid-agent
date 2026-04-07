@@ -5,7 +5,6 @@ import {
 } from '@angular/core';
 import { LiveFeedComponent } from '../feed/live-feed.component';
 import { AgentCommsComponent } from '../agent-comms/agent-comms.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 type CommsView = 'feed' | 'network';
 
@@ -14,40 +13,64 @@ const STORAGE_KEY = 'comms_view_mode';
 @Component({
     selector: 'app-unified-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LiveFeedComponent, AgentCommsComponent, PageShellComponent],
+    imports: [LiveFeedComponent, AgentCommsComponent],
     template: `
-        <app-page-shell title="Comms" icon="comms">
-            <div actions class="mode-toggle" role="tablist" aria-label="Comms view mode">
-                <button
-                    class="mode-toggle__btn"
-                    [class.mode-toggle__btn--active]="view() === 'feed'"
-                    (click)="setView('feed')"
-                    role="tab"
-                    [attr.aria-selected]="view() === 'feed'">
-                    Feed
-                </button>
-                <button
-                    class="mode-toggle__btn"
-                    [class.mode-toggle__btn--active]="view() === 'network'"
-                    (click)="setView('network')"
-                    role="tab"
-                    [attr.aria-selected]="view() === 'network'">
-                    Network
-                </button>
+        <div class="unified-comms">
+            <header class="unified-comms__header">
+                <h2 class="unified-comms__title">Comms</h2>
+                <div class="unified-comms__modes" role="tablist" aria-label="Comms view mode">
+                    <button
+                        class="unified-comms__mode-btn"
+                        [class.unified-comms__mode-btn--active]="view() === 'feed'"
+                        (click)="setView('feed')"
+                        role="tab"
+                        [attr.aria-selected]="view() === 'feed'">
+                        Feed
+                    </button>
+                    <button
+                        class="unified-comms__mode-btn"
+                        [class.unified-comms__mode-btn--active]="view() === 'network'"
+                        (click)="setView('network')"
+                        role="tab"
+                        [attr.aria-selected]="view() === 'network'">
+                        Network
+                    </button>
+                </div>
+            </header>
+            <div class="unified-comms__content">
+                @switch (view()) {
+                    @case ('feed') {
+                        <app-live-feed />
+                    }
+                    @case ('network') {
+                        <app-agent-comms />
+                    }
+                }
             </div>
-
-            @switch (view()) {
-                @case ('feed') {
-                    <app-live-feed />
-                }
-                @case ('network') {
-                    <app-agent-comms />
-                }
-            }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        .mode-toggle {
+        .unified-comms {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .unified-comms__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-3) var(--space-5);
+            background: rgba(12, 13, 20, 0.3);
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+        .unified-comms__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .unified-comms__modes {
             display: flex;
             gap: 0;
             background: var(--glass-bg-solid);
@@ -55,7 +78,7 @@ const STORAGE_KEY = 'comms_view_mode';
             border-radius: var(--radius);
             overflow: hidden;
         }
-        .mode-toggle__btn {
+        .unified-comms__mode-btn {
             padding: 0.35rem 0.85rem;
             font-size: 0.72rem;
             font-weight: 600;
@@ -67,18 +90,25 @@ const STORAGE_KEY = 'comms_view_mode';
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
         }
-        .mode-toggle__btn:hover {
+        .unified-comms__mode-btn:hover {
             color: var(--text-primary);
             background: var(--bg-hover);
         }
-        .mode-toggle__btn--active {
+        .unified-comms__mode-btn--active {
             color: var(--accent-cyan);
             background: var(--accent-cyan-subtle);
             text-shadow: 0 0 8px var(--accent-cyan-border);
         }
+        .unified-comms__content {
+            flex: 1;
+            overflow-y: auto;
+        }
 
         @media (max-width: 767px) {
-            .mode-toggle__btn {
+            .unified-comms__header {
+                padding: var(--space-2) var(--space-3);
+            }
+            .unified-comms__mode-btn {
                 padding: 0.3rem 0.65rem;
                 font-size: 0.68rem;
             }

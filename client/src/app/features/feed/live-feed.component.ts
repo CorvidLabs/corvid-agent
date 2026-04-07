@@ -128,13 +128,13 @@ interface FeedEntry {
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
+        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__actions { display: flex; align-items: center; gap: 0.75rem; }
         .feed__count { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
         .btn {
-            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s;
         }
@@ -146,7 +146,7 @@ interface FeedEntry {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-shrink: 0;
         }
         .feed__search {
-            flex: 1; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-family: inherit;
+            flex: 1; padding: 0.4rem var(--space-3); font-size: 0.8rem; font-family: inherit;
             background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-bright);
             border-radius: var(--radius); outline: none;
         }
@@ -165,7 +165,7 @@ interface FeedEntry {
         .feed__page-controls { display: flex; gap: 0.5rem; }
         .feed__direction-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; flex-shrink: 0; }
         .dir-chip {
-            padding: 0.25rem 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
+            padding: var(--space-1) 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
             cursor: pointer; text-transform: uppercase; transition: all 0.15s;
         }
@@ -177,7 +177,7 @@ interface FeedEntry {
         }
         .feed__entry {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.35rem 0.75rem; font-size: 0.8rem;
+            padding: 0.35rem var(--space-3); font-size: 0.8rem;
             border-left: 3px solid var(--border);
             cursor: pointer; transition: background 0.1s;
         }
@@ -228,7 +228,7 @@ interface FeedEntry {
         .feed__content {
             margin: 0.4rem 0 0 0; white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
             font-size: 0.78rem; line-height: 1.5; max-height: 600px; overflow-y: auto;
-            padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
+            padding: var(--space-2); background: var(--bg-deep); border-radius: var(--radius-sm);
             border: 1px solid var(--border);
         }
         .feed__processing-indicator {

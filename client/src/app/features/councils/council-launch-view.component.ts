@@ -339,12 +339,12 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__prompt { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.9rem; max-width: 600px; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
         }
@@ -354,7 +354,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
+        .btn--sm { font-size: 0.7rem; padding: 0.35rem var(--space-3); }
 
         .auto-label {
             font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;
@@ -368,7 +368,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         /* Stage bar with per-stage colors */
         .stage-bar {
             display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem;
-            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
         }
         .stage-step { display: flex; align-items: center; gap: 0.5rem; }
         .stage-dot {
@@ -397,10 +397,10 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 
         .log-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            padding: 0.5rem; margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto;
+            padding: var(--space-2); margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto;
             font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
         }
-        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; }
+        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem var(--space-2); }
         .log-entry:hover { background: var(--bg-hover); }
         .log-ts { color: var(--text-tertiary); flex-shrink: 0; }
         .log-level {
@@ -412,7 +412,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .log-entry--error .log-level { color: var(--accent-red); }
         .log-msg { color: var(--text-primary); }
         .log-detail { color: var(--text-tertiary); }
-        .log-empty { color: var(--text-tertiary); padding: 0.5rem; text-align: center; }
+        .log-empty { color: var(--text-tertiary); padding: var(--space-2); text-align: center; }
 
         /* Feed-style compact layout */
         .feed-list {
@@ -420,7 +420,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
         .feed-entry {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.35rem 0.75rem; font-size: 0.8rem;
+            padding: 0.35rem var(--space-3); font-size: 0.8rem;
             border-left: 3px solid var(--border);
             cursor: pointer; transition: background 0.1s;
         }
@@ -451,11 +451,11 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .feed-content--text {
             white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
             font-size: 0.78rem; line-height: 1.5;
-            padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
+            padding: var(--space-2); background: var(--bg-deep); border-radius: var(--radius-sm);
             border: 1px solid var(--border);
         }
         .feed-badge {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px;
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-full);
             background: var(--accent-cyan-dim); color: var(--accent-cyan);
             font-weight: 700; text-transform: uppercase; flex-shrink: 0;
         }
@@ -466,7 +466,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
             color: var(--accent-magenta); text-decoration: none; font-weight: 600; flex-shrink: 0;
         }
         .feed-tx:hover { background: var(--bg-hover); }
-        .feed-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
+        .feed-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: var(--space-2); }
 
         .processing-dot {
             width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan); flex-shrink: 0;
@@ -484,7 +484,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 
         .discussion-loading {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.75rem; font-size: 0.8rem; color: var(--accent-cyan);
+            padding: var(--space-3); font-size: 0.8rem; color: var(--accent-cyan);
             animation: pulse 1.5s ease-in-out infinite;
         }
 
@@ -494,7 +494,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
         .synthesis--empty { border-color: var(--accent-yellow); box-shadow: 0 0 12px var(--accent-amber-subtle); }
         .synthesis__header {
-            display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem;
+            display: flex; align-items: center; gap: 0.5rem; padding: var(--space-3) var(--space-5);
             border-bottom: 1px solid var(--border); background: var(--bg-raised); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         }
         .synthesis__icon {
@@ -507,19 +507,19 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .synthesis__title { margin: 0; font-size: 0.95rem; color: var(--accent-green); font-weight: 700; }
         .synthesis--empty .synthesis__title { color: var(--accent-yellow); }
         .synthesis__content {
-            padding: 1.25rem; font-size: 0.85rem; margin: 0;
+            padding: var(--space-5); font-size: 0.85rem; margin: 0;
             white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
             line-height: 1.6;
         }
         .synthesis__warning {
-            padding: 1rem 1.25rem; margin: 0; font-size: 0.85rem;
+            padding: var(--space-4) var(--space-5); margin: 0; font-size: 0.85rem;
             color: var(--accent-yellow); font-style: italic;
         }
 
         .council-chat { margin-top: 1.5rem; }
-        .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 0.75rem; max-height: 500px; overflow-y: auto; }
+        .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3); margin-bottom: 0.75rem; max-height: 500px; overflow-y: auto; }
         .council-chat__input { display: flex; gap: 0.5rem; align-items: center; }
-        .council-chat__field { flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-bright); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; }
+        .council-chat__field { flex: 1; padding: var(--space-2) var(--space-3); border-radius: var(--radius); border: 1px solid var(--border-bright); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; }
         .council-chat__field:focus { border-color: var(--accent-cyan); }
         .council-chat__field:disabled { opacity: 0.5; }
     `,

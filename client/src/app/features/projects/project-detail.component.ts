@@ -4,7 +4,6 @@ import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Project } from '../../core/models/project.model';
 import type { Session } from '../../core/models/session.model';
@@ -12,18 +11,20 @@ import type { Session } from '../../core/models/session.model';
 @Component({
     selector: 'app-project-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, PageShellComponent, RelativeTimePipe],
+    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe],
     template: `
-        <app-page-shell
-            [title]="project()?.name ?? 'Loading...'"
-            icon="projects"
-            [subtitle]="project()?.description"
-            [breadcrumbs]="[{ label: 'Projects', route: '/agents/projects' }, { label: project()?.name ?? '' }]">
-            @if (project(); as p) {
-                <ng-container actions>
-                    <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
-                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                </ng-container>
+        @if (project(); as p) {
+            <div class="page">
+                <div class="page__header">
+                    <div>
+                        <h2>{{ p.name }}</h2>
+                        <p class="page__desc">{{ p.description }}</p>
+                    </div>
+                    <div class="page__actions">
+                        <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
+                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                    </div>
+                </div>
 
                 <div class="detail__info">
                     <dl>
@@ -59,13 +60,20 @@ import type { Session } from '../../core/models/session.model';
                         }
                     }
                 </div>
-            } @else {
+            </div>
+        } @else {
+            <div class="page">
                 <app-skeleton variant="card" [count]="1" />
                 <app-skeleton variant="table" [count]="3" />
-            }
-        </app-page-shell>
+            </div>
+        }
     `,
     styles: `
+        .page { padding: var(--space-6); }
+        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
+        .page__actions { display: flex; gap: 0.5rem; }
         .btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;

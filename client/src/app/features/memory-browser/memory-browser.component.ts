@@ -243,7 +243,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
+        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -253,7 +253,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
         }
         .stat {
-            padding: 0.5rem 1rem; background: var(--bg-surface);
+            padding: var(--space-2) var(--space-4); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             display: flex; flex-direction: column; align-items: center; min-width: 80px;
         }
@@ -266,7 +266,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Search & filters ── */
         .search-input {
-            flex: 1; min-width: 200px; padding: 0.5rem 0.75rem;
+            flex: 1; min-width: 200px; padding: var(--space-2) var(--space-3);
             background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary);
             font-size: 0.85rem; font-family: inherit;
@@ -276,7 +276,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .search-input::placeholder { color: var(--text-tertiary); }
 
         .filter-select {
-            padding: 0.5rem 0.75rem; background: var(--bg-surface);
+            padding: var(--space-2) var(--space-3); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             appearance: auto; cursor: pointer;
@@ -285,7 +285,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Buttons ── */
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem;
             font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
@@ -314,7 +314,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         .memory-card {
             display: flex; flex-direction: column; gap: 0.35rem;
-            padding: 0.75rem 1rem; background: var(--bg-surface);
+            padding: var(--space-3) var(--space-4); background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius-lg);
             cursor: pointer; text-align: left; width: 100%;
             font-family: inherit; color: inherit;
@@ -344,7 +344,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Tier badge ── */
         .tier-badge {
-            display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+            display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
             font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
@@ -359,7 +359,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Status chip ── */
         .status-chip {
-            display: inline-block; padding: 0.1rem 0.35rem; border-radius: 4px;
+            display: inline-block; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs);
             font-size: 0.6rem; font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em;
         }
@@ -367,19 +367,19 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .status-chip--pending { color: var(--accent-yellow); background: rgba(255, 204, 0, 0.1); }
         .status-chip--failed { color: var(--accent-red); background: rgba(255, 85, 85, 0.1); }
 
-        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
+        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: var(--space-4); }
 
         /* ── Pagination ── */
         .pagination {
             display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-            padding: 0.75rem 0; margin-top: 0.5rem;
+            padding: var(--space-3) 0; margin-top: 0.5rem;
         }
         .pagination__info { font-size: 0.75rem; color: var(--text-tertiary); }
 
         /* ── Detail panel ── */
         .memory-detail {
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: 1.5rem;
+            border-radius: var(--radius-lg); padding: var(--space-6);
             overflow-y: auto; max-height: calc(100vh - 320px);
         }
         .memory-detail--empty {
@@ -402,7 +402,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             gap: 0.75rem; margin-bottom: 1.5rem;
         }
         .meta-item {
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             background: var(--bg-base);
             border-radius: var(--radius);
         }
@@ -434,7 +434,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
         }
         .memory-content {
-            margin: 0; padding: 1rem; background: var(--bg-base);
+            margin: 0; padding: var(--space-4); background: var(--bg-base);
             border-radius: var(--radius); color: var(--text-secondary);
             font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
             word-break: break-word; max-height: 400px; overflow-y: auto;
@@ -449,7 +449,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
         }
         .field-input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base);
+            width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-base);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             box-sizing: border-box;
@@ -463,12 +463,12 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
-            .page { padding: 1rem; }
+            .page { padding: var(--space-4); }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }
             .memory-detail { max-height: none; }
             .stats-bar { gap: 0.5rem; }
-            .stat { min-width: 60px; padding: 0.35rem 0.5rem; }
+            .stat { min-width: 60px; padding: 0.35rem var(--space-2); }
             .stat__value { font-size: 1rem; }
             .meta-grid { grid-template-columns: 1fr 1fr; }
             .page__toolbar { flex-direction: column; }

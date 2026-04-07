@@ -5,7 +5,6 @@ import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { firstValueFrom } from 'rxjs';
 
 interface LogEntry {
@@ -32,11 +31,13 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="System Logs" icon="logs">
+        <div class="logs">
+            <h2>System Logs</h2>
+
             <!-- Tab bar -->
-            <div toolbar class="tabs">
+            <div class="tabs">
                 <button
                     class="tab-btn"
                     [class.tab-btn--active]="activeTab() === 'logs'"
@@ -94,7 +95,7 @@ interface CreditTransaction {
                         title="No system logs."
                         description="System logs appear here when agents run sessions, handle webhooks, or process scheduled tasks." />
                 } @else {
-                    <div class="log-list stagger-children">
+                    <div class="log-list">
                         @for (log of logs(); track log.id + '-' + log.type) {
                             <div class="log-entry" [attr.data-level]="log.level">
                                 <div class="log-entry__header">
@@ -151,9 +152,11 @@ interface CreditTransaction {
                     }
                 }
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .logs { padding: var(--space-6); }
+        .logs h2 { margin: 0 0 1rem; color: var(--text-primary); }
         .loading { color: var(--text-secondary); }
         .empty { text-align: center; padding: var(--space-12); color: var(--text-tertiary); }
 
@@ -203,7 +206,7 @@ interface CreditTransaction {
             border: 1px solid var(--border);
             border-radius: 20px;
             color: var(--text-tertiary);
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             font-family: inherit;
             cursor: pointer;
             text-transform: capitalize;
@@ -238,7 +241,7 @@ interface CreditTransaction {
         }
 
         .log-type {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -250,7 +253,7 @@ interface CreditTransaction {
         .log-type[data-type="work-task"] { color: var(--accent-magenta); background: var(--accent-magenta-dim); }
 
         .log-level {
-            font-size: var(--text-micro);
+            font-size: 0.55rem;
             text-transform: uppercase;
             font-weight: 600;
         }
@@ -259,7 +262,7 @@ interface CreditTransaction {
         .log-level[data-level="info"] { color: var(--text-tertiary); }
 
         .log-time {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             color: var(--text-tertiary);
             margin-left: auto;
         }
@@ -273,7 +276,7 @@ interface CreditTransaction {
 
         .log-detail {
             margin: 0.25rem 0 0;
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             color: var(--text-tertiary);
             font-family: var(--font-mono);
         }
@@ -315,7 +318,7 @@ interface CreditTransaction {
         .credit-amount--negative { color: var(--accent-red); }
         .credit-balance { color: var(--text-primary); font-weight: 600; }
         .credit-wallet code {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             background: var(--bg-raised);
             padding: 1px 4px;
             border-radius: var(--radius-sm);

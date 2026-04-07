@@ -201,14 +201,14 @@ interface WalletMessage {
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
+        .page { padding: var(--space-6); }
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
 
         .search-bar { margin-bottom: 1.5rem; }
         .input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
+            width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
             transition: border-color var(--transition-fast), box-shadow var(--transition-base);
         }
@@ -230,7 +230,7 @@ interface WalletMessage {
 
         .wallet-card__header {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 1rem; cursor: pointer; gap: 1rem;
+            padding: var(--space-4); cursor: pointer; gap: 1rem;
         }
         .wallet-card__header:hover { background: var(--bg-hover); }
 
@@ -241,7 +241,7 @@ interface WalletMessage {
         }
         .wallet-card__label {
             font-size: 0.75rem; color: var(--accent-cyan); font-family: inherit;
-            background: var(--accent-cyan-wash); padding: 0.1rem 0.4rem; border-radius: 3px;
+            background: var(--accent-cyan-wash); padding: 0.1rem 0.4rem; border-radius: var(--radius-sm);
         }
 
         .wallet-card__stats {
@@ -260,7 +260,7 @@ interface WalletMessage {
         }
 
         .badge {
-            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px;
+            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
             font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .badge--allowed {
@@ -271,7 +271,7 @@ interface WalletMessage {
         .expand-icon { color: var(--text-tertiary); font-size: 0.7rem; }
 
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
         }
@@ -280,12 +280,12 @@ interface WalletMessage {
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-tint); box-shadow: 0 0 8px var(--accent-cyan-mid); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--small { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .btn--ghost:hover { background: var(--bg-hover); }
 
         .wallet-card__messages {
-            border-top: 1px solid var(--border); padding: 1rem;
+            border-top: 1px solid var(--border); padding: var(--space-4);
             background: var(--bg-deep);
             animation: expandReveal 0.3s ease-out;
         }
@@ -299,7 +299,7 @@ interface WalletMessage {
         .message-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 400px; overflow-y: auto; }
 
         .message {
-            padding: 0.6rem 0.75rem; border-radius: var(--radius);
+            padding: 0.6rem var(--space-3); border-radius: var(--radius);
             border: 1px solid var(--border);
             transition: background var(--transition-fast), transform var(--transition-fast);
         }
@@ -335,7 +335,7 @@ interface WalletMessage {
         }
         .modal {
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-lg); padding: 1.5rem; width: 360px; max-width: 90vw;
+            border-radius: var(--radius-lg); padding: var(--space-6); width: 360px; max-width: 90vw;
             box-shadow: 0 8px 32px var(--overlay), 0 0 0 1px var(--accent-cyan-tint);
             animation: modalSlideIn 0.2s ease-out;
         }
