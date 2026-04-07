@@ -138,7 +138,7 @@ interface HoverTooltip {
                     </div>
                 </div>
             }
-            <div class="network-3d__hint">Click &amp; drag to orbit &middot; Scroll to zoom &middot; Click agent to select</div>
+            <div class="network-3d__hint">Click &amp; drag to orbit &middot; Scroll to zoom &middot; Click to select &middot; Double-click to focus</div>
         </div>
     `,
     styles: `
@@ -405,6 +405,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private onPointerMove = (e: PointerEvent) => this.handlePointerMove(e);
     private onPointerUp = (e: PointerEvent) => this.handlePointerUp(e);
     private onWheel = (e: WheelEvent) => this.handleWheel(e);
+    private onDblClick = (e: MouseEvent) => this.handleDblClick(e);
 
     constructor() {
         afterNextRender(() => {
@@ -431,6 +432,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
             canvas.removeEventListener('pointermove', this.onPointerMove);
             canvas.removeEventListener('pointerup', this.onPointerUp);
             canvas.removeEventListener('wheel', this.onWheel);
+            canvas.removeEventListener('dblclick', this.onDblClick);
         }
         // Dispose Three.js resources
         this.agentNodes.forEach((n) => {
@@ -550,6 +552,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
         canvas.addEventListener('pointermove', this.onPointerMove);
         canvas.addEventListener('pointerup', this.onPointerUp);
         canvas.addEventListener('wheel', this.onWheel, { passive: false });
+        canvas.addEventListener('dblclick', this.onDblClick);
 
         // Touch events for mobile
         canvas.addEventListener('touchstart', (e) => {
@@ -957,6 +960,8 @@ export class AgentNetwork3DComponent implements OnDestroy {
 
         const animate = () => {
             this.animId = requestAnimationFrame(animate);
+            // Pause rendering when tab is hidden — saves CPU/GPU
+            if (document.hidden) return;
             const dt = clock.getDelta();
             const time = clock.getElapsedTime();
 
@@ -1201,6 +1206,34 @@ export class AgentNetwork3DComponent implements OnDestroy {
             } else {
                 this.clearSelection();
             }
+        }
+    }
+
+    private handleDblClick(e: MouseEvent): void {
+        if (!this.camera || !this.raycaster || !this.mouse) return;
+        const canvas = this.canvasRef().nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const meshes = this.agentNodes.map((n) => n.mesh);
+        const intersects = this.raycaster.intersectObjects(meshes);
+
+        if (intersects.length > 0) {
+            const agentId = intersects[0].object.userData['agentId'] as string;
+            const node = this.nodeMap.get(agentId);
+            if (!node) return;
+
+            // Compute spherical angles of the node position so the camera
+            // zooms in from that same direction, keeping the node centered.
+            const pos = node.position;
+            const len = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
+            if (len < 0.001) return;
+
+            this.targetTheta = Math.atan2(pos.z, pos.x);
+            this.targetPhi = Math.acos(Math.max(-1, Math.min(1, pos.y / len)));
+            this.targetRadius = 15; // zoom in close
         }
     }
 

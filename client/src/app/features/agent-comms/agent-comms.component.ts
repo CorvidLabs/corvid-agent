@@ -45,6 +45,9 @@ interface CommEntry {
     selector: 'app-agent-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent, AgentNetwork3DComponent, ViewModeToggleComponent],
+    // AgentNetwork3DComponent stays in imports so Angular's compiler sees it,
+    // but is only used inside @defer so the build system code-splits it
+    // (and Three.js) into a separate lazy chunk.
     template: `
         <div class="page">
             <div class="page__header">
@@ -129,11 +132,15 @@ interface CommEntry {
                     (agentSelected)="onNetworkAgentSelected($event)"
                 />
             } @else if (viewMode() === 'network' && networkViewMode() === '3d') {
-                <app-agent-network-3d
-                    [agents]="visAgents()"
-                    [messages]="visMessages()"
-                    (agentSelected)="onNetworkAgentSelected($event)"
-                />
+                @defer (when networkViewMode() === '3d') {
+                    <app-agent-network-3d
+                        [agents]="visAgents()"
+                        [messages]="visMessages()"
+                        (agentSelected)="onNetworkAgentSelected($event)"
+                    />
+                } @placeholder (minimum 200ms) {
+                    <div class="network-3d-loading">Loading 3D scene…</div>
+                }
             } @else if (loading()) {
                 <app-skeleton variant="table" [count]="6" />
             } @else if (entries().length === 0) {
@@ -369,6 +376,11 @@ interface CommEntry {
             .page { padding: var(--space-2); }
             .comms__msg-header { flex-wrap: wrap; }
             .comms__msg-flow { flex-wrap: wrap; gap: 0.25rem; }
+        }
+
+        .network-3d-loading {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            color: var(--text-tertiary); font-size: 0.8rem; min-height: 400px;
         }
 
         @media (prefers-reduced-motion: reduce) {
