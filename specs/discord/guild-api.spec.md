@@ -45,7 +45,7 @@ Discord Guild REST API client for fetching server roles, channels, and metadata.
 
 ## Invariants
 
-1. All Discord REST calls go through `discordFetch` (from embeds module) for consistent rate-limit handling.
+1. All Discord REST calls go through the `DiscordRestClient` (from rest-client module) for consistent rate-limit handling.
 2. API failures return `null` rather than throwing — callers must handle missing data gracefully.
 3. `syncGuildData` fetches roles, channels, and info in parallel via `Promise.all`.
 4. Cache is stored as JSON strings in the `discord_config` table under keys `guild_roles_cache`, `guild_channels_cache`, and `guild_info_cache`.
@@ -69,7 +69,7 @@ Discord Guild REST API client for fetching server roles, channels, and metadata.
 
 ## Dependencies
 
-- `server/discord/embeds.ts` — `discordFetch` for rate-limited HTTP requests to Discord API.
+- `server/discord/rest-client.ts` — `DiscordRestClient` for rate-limited HTTP requests to Discord API.
 - `server/db/discord-config.ts` — `updateDiscordConfig` for persisting cache entries.
 - `server/lib/logger.ts` — `createLogger` for structured logging.
 

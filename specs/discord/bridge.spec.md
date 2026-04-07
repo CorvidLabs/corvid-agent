@@ -82,7 +82,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `registerSlashCommands` | `(db, config)` | `Promise<void>` | Register all slash commands with the Discord API. Phase 3: definitions use `SlashCommandBuilder` from `@discordjs/builders`; registration uses `DiscordRestClient.putCommands()` instead of raw `discordFetch` |
+| `registerSlashCommands` | `(db, config)` | `Promise<void>` | Register all slash commands with the Discord API. Definitions use `SlashCommandBuilder` from `@discordjs/builders`; registration uses `DiscordRestClient.putCommands()` |
 | `handleInteraction` | `(ctx, interaction)` | `Promise<void>` | Dispatch an interaction event to the appropriate command handler |
 
 ### Exported Functions (from admin-commands.ts)
@@ -179,8 +179,6 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `getRateLimitWaitMs` | `()` | `number` | Returns milliseconds to wait before next Discord API call (0 if not rate-limited) |
-| `discordFetch` | `(url, init)` | `Promise<Response>` | Rate-limit-aware fetch wrapper for Discord API that queues requests during 429 cooldowns |
 | `respondToInteraction` | `(interaction, content)` | `Promise<void>` | Send a text response to an interaction callback |
 | `respondToInteractionEmbed` | `(interaction, embed, ephemeral?)` | `Promise<void>` | Send an embed response to an interaction callback |
 | `respondToInteractionEmbeds` | `(interaction, embeds, ephemeral?)` | `Promise<void>` | Send multiple embeds in a single interaction response |
@@ -211,8 +209,6 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Deprecated alias for `extractContentFromEmbed` |
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
 | `sendMessageWithFiles` | `(delivery, botToken, channelId, content, files)` | `Promise<string \| null>` | Send a text message with file attachments via multipart/form-data |
-| `getRateLimitWaitMs` | `()` | `number` | Check if globally rate-limited; returns remaining wait ms or 0 |
-| `discordFetch` | `(url: string, init: RequestInit)` | `Promise<Response>` | Wrapper for Discord API fetch that handles 429 rate limits globally, preventing Cloudflare IP bans |
 
 ### Exported Functions (from message-handler.ts)
 

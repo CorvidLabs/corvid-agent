@@ -1,22 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleDiscordSendMessage, handleDiscordSendImage } from '../mcp/tool-handlers/discord';
 import type { McpToolContext } from '../mcp/tool-handlers/types';
-
-// Mock globalThis.fetch instead of mock.module to avoid leaking mocks
-// into other test files that share discord/embeds and delivery-tracker.
-const originalFetch = globalThis.fetch;
-
-function okResponse(): Promise<Response> {
-    return Promise.resolve(new Response(JSON.stringify({ id: 'mock-msg-id' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-    }));
-}
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 let db: Database;
 const ORIGINAL_ENV = process.env.DISCORD_BOT_TOKEN;
+let restCleanup: (() => void) | null = null;
 
 function createMockContext(overrides?: Partial<McpToolContext>): McpToolContext {
     return {
@@ -34,13 +25,14 @@ beforeEach(() => {
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
     process.env.DISCORD_BOT_TOKEN = 'test-token';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    globalThis.fetch = mock(okResponse) as any;
+    const { cleanup } = mockDiscordRest();
+    restCleanup = cleanup;
 });
 
 afterEach(() => {
     db.close();
-    globalThis.fetch = originalFetch;
+    restCleanup?.();
+    restCleanup = null;
     if (ORIGINAL_ENV) process.env.DISCORD_BOT_TOKEN = ORIGINAL_ENV;
     else delete process.env.DISCORD_BOT_TOKEN;
 });
@@ -92,10 +84,21 @@ describe('handleDiscordSendMessage', () => {
     });
 
     it('returns error when Discord API fails', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        globalThis.fetch = mock(() =>
-            Promise.resolve(new Response('Internal Server Error', { status: 500 })),
-        ) as any;
+        // Install a REST client that throws to simulate API failure
+        const { _setRestClientForTesting } = await import('../discord/rest-client');
+        _setRestClientForTesting({
+            sendMessage: async () => { throw new Error('500 Internal Server Error'); },
+            editMessage: async () => { throw new Error('500'); },
+            sendMessageWithFiles: async () => { throw new Error('500'); },
+            respondToInteraction: async () => { throw new Error('500'); },
+            deferInteraction: async () => { throw new Error('500'); },
+            editDeferredResponse: async () => { throw new Error('500'); },
+            deleteMessage: async () => { throw new Error('500'); },
+            addReaction: async () => { throw new Error('500'); },
+            removeReaction: async () => { throw new Error('500'); },
+            sendTypingIndicator: async () => { throw new Error('500'); },
+        } as never);
+        restCleanup = () => _setRestClientForTesting(null);
         const ctx = createMockContext();
         const result = await handleDiscordSendMessage(ctx, {
             channel_id: '123456',
@@ -170,10 +173,20 @@ describe('handleDiscordSendImage', () => {
     });
 
     it('returns error when Discord API returns failure', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        globalThis.fetch = mock(() =>
-            Promise.resolve(new Response('Bad Request', { status: 400 })),
-        ) as any;
+        const { _setRestClientForTesting } = await import('../discord/rest-client');
+        _setRestClientForTesting({
+            sendMessage: async () => { throw new Error('400 Bad Request'); },
+            editMessage: async () => { throw new Error('400'); },
+            sendMessageWithFiles: async () => { throw new Error('400 Bad Request'); },
+            respondToInteraction: async () => { throw new Error('400'); },
+            deferInteraction: async () => { throw new Error('400'); },
+            editDeferredResponse: async () => { throw new Error('400'); },
+            deleteMessage: async () => { throw new Error('400'); },
+            addReaction: async () => { throw new Error('400'); },
+            removeReaction: async () => { throw new Error('400'); },
+            sendTypingIndicator: async () => { throw new Error('400'); },
+        } as never);
+        restCleanup = () => _setRestClientForTesting(null);
         const ctx = createMockContext();
         const result = await handleDiscordSendImage(ctx, {
             channel_id: '123456',
@@ -186,8 +199,20 @@ describe('handleDiscordSendImage', () => {
     });
 
     it('returns error when fetch throws', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        globalThis.fetch = mock(() => Promise.reject(new Error('Network error'))) as any;
+        const { _setRestClientForTesting } = await import('../discord/rest-client');
+        _setRestClientForTesting({
+            sendMessage: async () => { throw new Error('Network error'); },
+            editMessage: async () => { throw new Error('Network error'); },
+            sendMessageWithFiles: async () => { throw new Error('Network error'); },
+            respondToInteraction: async () => { throw new Error('Network error'); },
+            deferInteraction: async () => { throw new Error('Network error'); },
+            editDeferredResponse: async () => { throw new Error('Network error'); },
+            deleteMessage: async () => { throw new Error('Network error'); },
+            addReaction: async () => { throw new Error('Network error'); },
+            removeReaction: async () => { throw new Error('Network error'); },
+            sendTypingIndicator: async () => { throw new Error('Network error'); },
+        } as never);
+        restCleanup = () => _setRestClientForTesting(null);
         const ctx = createMockContext();
         const result = await handleDiscordSendImage(ctx, {
             channel_id: '123456',
