@@ -10,6 +10,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type {
     FlockAgent,
     FlockAgentStatus,
@@ -28,41 +29,36 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SkeletonComponent, EmptyStateComponent],
+    imports: [SkeletonComponent, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="flock-page">
-            <!-- Stats Header -->
-            <div class="flock-header">
-                <div class="flock-header__title-row">
-                    <h1 class="flock-header__title">Flock Directory</h1>
-                    @if (stats()) {
-                        <div class="flock-header__stats">
-                            <div class="stat-pill">
-                                <span class="stat-pill__value">{{ stats()!.total }}</span>
-                                <span class="stat-pill__label">Total</span>
-                            </div>
-                            <div class="stat-pill stat-pill--active">
-                                <span class="stat-pill__value">{{ stats()!.active }}</span>
-                                <span class="stat-pill__label">Active</span>
-                            </div>
-                            <div class="stat-pill stat-pill--inactive">
-                                <span class="stat-pill__value">{{ stats()!.inactive }}</span>
-                                <span class="stat-pill__label">Offline</span>
-                            </div>
-                            @if (stats()!.onChainAppId) {
-                                <div class="stat-pill stat-pill--chain">
-                                    <span class="stat-pill__value">On-Chain</span>
-                                    <span class="stat-pill__label">App {{ stats()!.onChainAppId }}</span>
-                                </div>
-                            }
+        <app-page-shell title="Flock Directory" icon="flock" subtitle="Discover agents in the network. Search by name, capability, or reputation.">
+            <ng-container actions>
+                @if (stats()) {
+                    <div class="flock-header__stats">
+                        <div class="stat-pill">
+                            <span class="stat-pill__value">{{ stats()!.total }}</span>
+                            <span class="stat-pill__label">Total</span>
                         </div>
-                    }
-                </div>
-                <p class="flock-header__subtitle">Discover agents in the network. Search by name, capability, or reputation.</p>
-            </div>
+                        <div class="stat-pill stat-pill--active">
+                            <span class="stat-pill__value">{{ stats()!.active }}</span>
+                            <span class="stat-pill__label">Active</span>
+                        </div>
+                        <div class="stat-pill stat-pill--inactive">
+                            <span class="stat-pill__value">{{ stats()!.inactive }}</span>
+                            <span class="stat-pill__label">Offline</span>
+                        </div>
+                        @if (stats()!.onChainAppId) {
+                            <div class="stat-pill stat-pill--chain">
+                                <span class="stat-pill__value">On-Chain</span>
+                                <span class="stat-pill__label">App {{ stats()!.onChainAppId }}</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </ng-container>
 
-            <!-- Search & Filters -->
-            <div class="flock-controls">
+            <ng-container toolbar>
+                <div class="flock-controls">
                 <div class="flock-search">
                     <span class="flock-search__icon">/</span>
                     <input
@@ -97,7 +93,8 @@ interface FlockStats {
                         {{ sortOrder() === 'desc' ? '↓' : '↑' }}
                     </button>
                 </div>
-            </div>
+                </div>
+            </ng-container>
 
             <!-- Capability Quick-Filters -->
             @if (allCapabilities().length > 0) {
@@ -271,47 +268,15 @@ interface FlockStats {
                     </div>
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .flock-page {
-            padding: var(--space-6);
-            max-width: 1200px;
-            margin: 0 auto;
-            animation: slideUp 0.3s ease-out;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Header */
-        .flock-header { margin-bottom: 1.5rem; }
-        .flock-header__title-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        .flock-header__title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin: 0;
-        }
+        /* Stats pills */
         .flock-header__stats {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
-        .flock-header__subtitle {
-            font-size: 0.8rem;
-            color: var(--text-tertiary);
-            margin: 0;
-        }
-
         /* Stat Pills */
         .stat-pill {
             display: flex;
@@ -821,10 +786,8 @@ interface FlockStats {
 
         /* Responsive */
         @media (max-width: 640px) {
-            .flock-page { padding: var(--space-4); }
             .flock-grid { grid-template-columns: 1fr; }
             .flock-detail { width: calc(100vw - 2rem); }
-            .flock-header__title-row { flex-direction: column; align-items: flex-start; }
         }
     `,
 })
