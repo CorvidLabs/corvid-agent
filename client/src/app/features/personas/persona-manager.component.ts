@@ -6,17 +6,14 @@ import { NotificationService } from '../../core/services/notification.service';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-persona-manager',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, SkeletonComponent],
+    imports: [FormsModule, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Persona Manager</h2>
-            </div>
-
+        <app-page-shell title="Persona Manager" icon="personas">
             @if (agentService.loading()) {
                 <app-skeleton variant="line" [count]="4" />
             } @else if (agentService.agents().length === 0) {
@@ -122,12 +119,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
 
         /* Agent picker — horizontal wrapping chips */

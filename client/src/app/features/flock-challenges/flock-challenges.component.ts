@@ -17,6 +17,7 @@ import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { FlockAgent, FlockDirectorySearchResult } from '@shared/types/flock-directory';
 
 // ─── Challenge definitions (mirrors server/flock-directory/testing/challenges.ts) ──
@@ -143,35 +144,33 @@ interface AgentTestRow {
 @Component({
     selector: 'app-flock-challenges',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, EmptyStateComponent],
+    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="ch-page">
-
-            <!-- Page Header -->
-            <div class="ch-header">
-                <div class="ch-header__title-row">
-                    <h1 class="ch-header__title">Challenges</h1>
-                    @if (stats()) {
-                        <div class="ch-header__stats">
-                            <div class="stat-pill">
-                                <span class="stat-pill__value">{{ stats()!.totalTests }}</span>
-                                <span class="stat-pill__label">Total Tests</span>
-                            </div>
-                            <div class="stat-pill stat-pill--active">
-                                <span class="stat-pill__value">{{ stats()!.testedAgents }}</span>
-                                <span class="stat-pill__label">Agents Tested</span>
-                            </div>
-                            <div class="stat-pill stat-pill--score">
-                                <span class="stat-pill__value">{{ stats()!.avgScore | number:'1.0-0' }}</span>
-                                <span class="stat-pill__label">Avg Score</span>
-                            </div>
+        <app-page-shell title="Challenges" icon="challenges">
+            <ng-container actions>
+                @if (stats()) {
+                    <div class="ch-header__stats">
+                        <div class="stat-pill">
+                            <span class="stat-pill__value">{{ stats()!.totalTests }}</span>
+                            <span class="stat-pill__label">Total Tests</span>
                         </div>
-                    }
-                </div>
+                        <div class="stat-pill stat-pill--active">
+                            <span class="stat-pill__value">{{ stats()!.testedAgents }}</span>
+                            <span class="stat-pill__label">Agents Tested</span>
+                        </div>
+                        <div class="stat-pill stat-pill--score">
+                            <span class="stat-pill__value">{{ stats()!.avgScore | number:'1.0-0' }}</span>
+                            <span class="stat-pill__label">Avg Score</span>
+                        </div>
+                    </div>
+                }
+            </ng-container>
+
+            <ng-container toolbar>
                 <p class="ch-header__subtitle">
                     19 built-in challenges across 6 categories evaluate agent responsiveness, accuracy, context handling, efficiency, safety, and bot authenticity.
                 </p>
-            </div>
+            </ng-container>
 
             <!-- Tab Bar -->
             <div class="ch-tabs">
@@ -368,19 +367,13 @@ interface AgentTestRow {
                     }
                 }
             }
-        </div>
+        </app-page-shell>
 
         <style>
-            .ch-page {
-                padding: var(--space-6);
+            .ch-content {
                 max-width: 960px;
-                margin: 0 auto;
             }
 
-            /* Header */
-            .ch-header { margin-bottom: 1.5rem; }
-            .ch-header__title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.5rem; }
-            .ch-header__title { font-size: 1.5rem; font-weight: 700; margin: 0; }
             .ch-header__stats { display: flex; gap: 0.5rem; flex-wrap: wrap; }
             .ch-header__subtitle { color: var(--text-muted); font-size: 0.875rem; margin: 0; }
 
@@ -571,7 +564,6 @@ interface AgentTestRow {
 
             /* Mobile adjustments */
             @media (max-width: 600px) {
-                .ch-page { padding: var(--space-4); }
                 .ch-challenge { flex-wrap: wrap; }
                 .ch-challenge__id { min-width: 0; }
                 .ch-agent-grid { grid-template-columns: 1fr 1fr; }

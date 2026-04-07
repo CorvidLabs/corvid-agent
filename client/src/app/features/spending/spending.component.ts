@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 interface AgentSpendingInfo {
     agentId: string;
@@ -40,11 +41,9 @@ interface CreditTransaction {
 @Component({
     selector: 'app-spending',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="spending">
-            <h2>Spending Controls</h2>
-
+        <app-page-shell title="Spending Controls" icon="spending">
             @if (loading()) {
                 <app-skeleton variant="card" [count]="4" />
             } @else {
@@ -156,10 +155,9 @@ interface CreditTransaction {
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: [`
-        .spending { padding: var(--space-4); }
         .spending__section { margin-bottom: 2rem; }
         .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: var(--space-1); }
         .spending__desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem; }
@@ -196,7 +194,6 @@ interface CreditTransaction {
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .spending__table { min-width: 500px; }
         @media (max-width: 767px) {
-            .spending { padding: var(--space-3); }
             .info-grid { grid-template-columns: repeat(2, 1fr); }
             .modal { min-width: auto; width: calc(100vw - 2rem); max-width: 400px; }
         }

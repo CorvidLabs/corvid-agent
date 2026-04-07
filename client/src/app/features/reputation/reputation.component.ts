@@ -7,23 +7,23 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Agent Reputation</h2>
+        <app-page-shell title="Agent Reputation" icon="reputation">
+            <ng-container actions>
                 <button
                     class="btn btn--primary"
                     [disabled]="computing()"
                     (click)="onComputeAll()">
                     {{ computing() ? 'Computing...' : 'Compute All' }}
                 </button>
-            </div>
+            </ng-container>
 
             @if (reputationService.loading()) {
                 <app-skeleton variant="table" [count]="4" />
@@ -398,12 +398,9 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     </div>
                 }
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);

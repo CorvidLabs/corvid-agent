@@ -4,21 +4,17 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">
-                    Allowlist
-                    @if (allowlistService.entries().length > 0) {
-                        <span class="count">({{ allowlistService.entries().length }})</span>
-                    }
-                </h2>
-            </div>
+        <app-page-shell
+            title="Allowlist"
+            icon="allowlist"
+            [subtitle]="allowlistService.entries().length > 0 ? '(' + allowlistService.entries().length + ')' : ''">
 
             <div class="add-form">
                 <input
@@ -83,13 +79,9 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
         .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .input {
             flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
