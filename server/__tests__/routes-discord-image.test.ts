@@ -22,18 +22,22 @@ function fakeReq(body: unknown, contentType = 'application/json'): { req: Reques
     return { req, url };
 }
 
-// Mock discord embeds before importing the route
+// Pre-import real modules so mock.module can spread their exports and avoid
+// breaking other test files that share the Bun module cache.
+const realEmbeds = await import('../discord/embeds');
+const realDeliveryTracker = await import('../lib/delivery-tracker');
+
 const mockSendMessageWithFiles = mock(() => Promise.resolve('msg-123'));
 const mockSendEmbedWithFiles = mock(() => Promise.resolve('embed-msg-456'));
-const mockGetDeliveryTracker = mock(() => ({}));
 
 mock.module('../discord/embeds', () => ({
+    ...realEmbeds,
     sendMessageWithFiles: mockSendMessageWithFiles,
     sendEmbedWithFiles: mockSendEmbedWithFiles,
 }));
 
 mock.module('../lib/delivery-tracker', () => ({
-    getDeliveryTracker: mockGetDeliveryTracker,
+    ...realDeliveryTracker,
 }));
 
 const { handleDiscordImageRoutes } = await import('../routes/discord-image');
