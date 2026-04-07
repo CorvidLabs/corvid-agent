@@ -1,7 +1,7 @@
 ---
 module: arc69-memory
 version: 1
-status: draft
+status: active
 files:
   - server/memory/arc69-store.ts
   - server/db/migrations/094_arc69_memory_asa.ts
