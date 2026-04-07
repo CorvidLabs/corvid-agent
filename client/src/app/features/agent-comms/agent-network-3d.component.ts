@@ -146,7 +146,7 @@ interface LogEntry {
             padding: 4px 10px;
             background: rgba(5, 5, 10, 0.85);
             border: 1px solid var(--border-bright);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             font-size: 0.7rem;
             color: var(--text-primary);
             font-weight: 600;
@@ -177,7 +177,7 @@ interface LogEntry {
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             color: var(--text-tertiary);
             letter-spacing: 0.05em;
             opacity: 0.6;
@@ -193,13 +193,13 @@ interface LogEntry {
             max-height: 240px;
             background: rgba(5, 5, 10, 0.88);
             border: 1px solid var(--border-bright);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             backdrop-filter: blur(8px);
             z-index: 10;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
         }
         .network-3d__log-header {
             display: flex;
@@ -211,13 +211,13 @@ interface LogEntry {
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
         }
         .network-3d__log-count {
             background: var(--surface-alt);
             padding: 1px 6px;
-            border-radius: var(--radius-md);
-            font-size: var(--text-micro);
+            border-radius: 8px;
+            font-size: 0.55rem;
             color: var(--text-tertiary);
         }
         .network-3d__log-list {
@@ -235,7 +235,7 @@ interface LogEntry {
         .network-3d__log-item:last-child { border-bottom: none; }
         .network-3d__log-time {
             color: var(--text-tertiary);
-            font-size: var(--text-micro);
+            font-size: 0.55rem;
             font-family: var(--font-mono);
         }
         .network-3d__log-flow {
@@ -253,7 +253,7 @@ interface LogEntry {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-size: var(--text-micro);
+            font-size: 0.58rem;
         }
         @media (max-width: 600px) {
             .network-3d__log {

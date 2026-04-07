@@ -208,7 +208,7 @@ interface CommEntry {
         </div>
     `,
     styles: `
-        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
+        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0; flex-wrap: wrap; gap: 0.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__actions { display: flex; align-items: center; gap: 0.75rem; }
@@ -216,7 +216,7 @@ interface CommEntry {
         .comms__view-toggle { display: flex; gap: 2px; }
 
         .comms__status {
-            font-size: var(--text-xxs); font-weight: 700; padding: 2px 8px; border-radius: var(--radius-lg);
+            font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
             text-transform: uppercase; letter-spacing: 0.1em;
         }
         .comms__status[data-status="on"] {
@@ -229,7 +229,7 @@ interface CommEntry {
         @keyframes live-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
         .btn {
-            padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s;
         }
@@ -242,7 +242,7 @@ interface CommEntry {
             align-items: flex-end;
         }
         .comms__filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
-        .comms__filter-label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
+        .comms__filter-label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
         .comms__select {
             padding: 0.35rem 0.6rem; font-size: 0.75rem; font-family: inherit;
             background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-bright);
@@ -252,8 +252,8 @@ interface CommEntry {
         .comms__select:focus { border-color: var(--accent-cyan); }
         .comms__channel-chips { display: flex; gap: 0.25rem; flex-wrap: wrap; }
         .ch-chip {
-            padding: var(--space-1) 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: 20px; color: var(--text-tertiary); font-size: var(--text-xxs); font-family: inherit;
+            padding: 0.25rem 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
             cursor: pointer; text-transform: uppercase; transition: all 0.15s;
         }
         .ch-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
@@ -266,7 +266,7 @@ interface CommEntry {
         }
         .comms__msg {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: var(--space-2) var(--space-3); border-left: 3px solid var(--border);
+            padding: 0.5rem 0.75rem; border-left: 3px solid var(--border);
             cursor: pointer; transition: background 0.1s;
         }
         .comms__msg:hover { background: var(--bg-hover); }
@@ -277,11 +277,11 @@ interface CommEntry {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;
         }
         .comms__time {
-            font-family: var(--font-mono); font-size: var(--text-xxs);
+            font-family: var(--font-mono); font-size: 0.65rem;
             color: var(--text-secondary); opacity: 0.7; flex-shrink: 0;
         }
         .comms__channel-badge {
-            font-size: var(--text-micro); font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: 0.55rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
         }
         .comms__channel-badge[data-channel="agent-invoke"] {
@@ -327,7 +327,7 @@ interface CommEntry {
         .comms__agent-to { font-weight: 500; font-size: 0.8rem; color: var(--text-secondary); flex-shrink: 0; }
         .comms__fee { font-size: 0.7rem; color: var(--accent-green); font-weight: 600; flex-shrink: 0; }
         .comms__thread {
-            font-size: var(--text-xxs); font-family: var(--font-mono); color: var(--accent-yellow);
+            font-size: 0.6rem; font-family: var(--font-mono); color: var(--accent-yellow);
             background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2);
             padding: 1px 5px; border-radius: var(--radius-sm); flex-shrink: 0;
         }
@@ -341,32 +341,32 @@ interface CommEntry {
         .comms__msg-detail { margin-top: 0.5rem; }
         .comms__msg-section { margin-bottom: 0.5rem; }
         .comms__msg-section-label {
-            font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase;
+            font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase;
             letter-spacing: 0.08em; display: block; margin-bottom: 0.2rem;
         }
         .comms__msg-content {
             margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
             font-size: 0.78rem; line-height: 1.5; max-height: 400px; overflow-y: auto;
-            padding: var(--space-2); background: var(--bg-deep); border-radius: var(--radius-sm);
+            padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
             border: 1px solid var(--border);
         }
         .comms__msg-content--response { border-color: var(--accent-green-dim); }
 
         /* ── Mobile-first responsive ──────────────────────────────── */
         @media (max-width: 767px) {
-            .page { padding: var(--space-3); }
+            .page { padding: 0.75rem; }
             .page__header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
             .page__actions { width: 100%; justify-content: space-between; }
             .comms__filters { flex-direction: column; gap: 0.5rem; }
             .comms__select { min-width: unset; width: 100%; }
             .comms__msg-flow { font-size: 0.75rem; }
-            .comms__msg { padding: 0.4rem var(--space-2); }
-            .comms__time { font-size: var(--text-xxs); }
+            .comms__msg { padding: 0.4rem 0.5rem; }
+            .comms__time { font-size: 0.6rem; }
             .comms__agent-from, .comms__agent-to { font-size: 0.75rem; }
         }
 
         @media (max-width: 480px) {
-            .page { padding: var(--space-2); }
+            .page { padding: 0.5rem; }
             .comms__msg-header { flex-wrap: wrap; }
             .comms__msg-flow { flex-wrap: wrap; gap: 0.25rem; }
         }

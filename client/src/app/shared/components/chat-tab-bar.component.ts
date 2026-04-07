@@ -74,7 +74,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
             height: 36px;
-            padding: 0 var(--space-1);
+            padding: 0 0.25rem;
             gap: 0.25rem;
             min-width: 0;
         }
@@ -93,7 +93,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             font-size: 0.6rem;
             cursor: pointer;
             padding: 0.15rem 0.35rem;
-            border-radius: var(--radius-sm);
+            border-radius: 3px;
             transition: color 0.15s, background 0.15s;
         }
         .tab-bar__collapse:hover {
@@ -124,15 +124,15 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         }
         .tab-bar__tabs::-webkit-scrollbar { height: 3px; }
         .tab-bar__tabs::-webkit-scrollbar-track { background: transparent; }
-        .tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
+        .tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         .tab {
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: var(--space-1) var(--space-2);
+            padding: 0.25rem 0.5rem;
             background: transparent;
             border: none;
-            border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+            border-radius: 4px 4px 0 0;
             color: var(--text-tertiary);
             font-family: inherit;
             font-size: 0.68rem;
@@ -228,7 +228,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             justify-content: center;
             background: transparent;
             border: 1px solid var(--border);
-            border-radius: var(--radius-xs);
+            border-radius: 4px;
             color: var(--text-tertiary);
             font-size: 1rem;
             cursor: pointer;

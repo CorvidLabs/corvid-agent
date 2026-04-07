@@ -146,7 +146,7 @@ const TEMPLATES: AgentTemplate[] = [
         .onboard {
             max-width: 640px;
             margin: 0 auto;
-            padding: var(--space-12) var(--space-6);
+            padding: 3rem 1.5rem;
             text-align: center;
         }
         .onboard__hero { margin-bottom: 2rem; }
@@ -174,7 +174,7 @@ const TEMPLATES: AgentTemplate[] = [
             flex-direction: column;
             align-items: center;
             gap: 0.5rem;
-            padding: var(--space-5) var(--space-4);
+            padding: 1.25rem 1rem;
             background: rgba(15, 16, 24, 0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -214,7 +214,7 @@ const TEMPLATES: AgentTemplate[] = [
             color: var(--text-primary);
         }
         .tpl-card__desc {
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             color: var(--text-tertiary);
             line-height: 1.4;
         }
@@ -250,7 +250,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .field__input {
             width: 100%;
-            padding: 0.6rem var(--space-3);
+            padding: 0.6rem 0.75rem;
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -271,7 +271,7 @@ const TEMPLATES: AgentTemplate[] = [
             margin-top: 1.5rem;
         }
         .btn {
-            padding: var(--space-2) var(--space-5);
+            padding: 0.5rem 1.25rem;
             border-radius: var(--radius);
             font-size: 0.78rem;
             font-weight: 600;
@@ -297,12 +297,12 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .btn--ghost:hover { background: var(--bg-hover); }
         .btn--large {
-            padding: var(--space-3) var(--space-8);
+            padding: 0.75rem 2rem;
             font-size: 0.9rem;
         }
 
         /* Done */
-        .onboard__done { padding: var(--space-8) 0; }
+        .onboard__done { padding: 2rem 0; }
         .onboard__done-icon {
             width: 64px;
             height: 64px;
@@ -322,7 +322,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
 
         @media (max-width: 480px) {
-            .onboard { padding: var(--space-6) var(--space-4); }
+            .onboard { padding: 1.5rem 1rem; }
             .onboard__templates { grid-template-columns: 1fr 1fr; }
         }
     `,

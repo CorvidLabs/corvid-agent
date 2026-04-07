@@ -4,16 +4,23 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-repo-blocklist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
     template: `
-        <app-page-shell title="Repo Blocklist" icon="repo-blocklist" [subtitle]="service.entries().length > 0 ? '(' + service.entries().length + ')' : ''">
-            <ng-container toolbar>
-                <div class="add-form">
+        <div class="page">
+            <div class="page__header">
+                <h2 class="page-title">
+                    Repo Blocklist
+                    @if (service.entries().length > 0) {
+                        <span class="count">({{ service.entries().length }})</span>
+                    }
+                </h2>
+            </div>
+
+            <div class="add-form">
                 <input
                     class="input"
                     type="text"
@@ -30,8 +37,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                     class="btn btn--primary"
                     [disabled]="!newRepo().trim()"
                     (click)="add()">Block</button>
-                </div>
-            </ng-container>
+            </div>
 
             @if (error()) {
                 <p class="error">{{ error() }}</p>
@@ -65,18 +71,22 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                     }
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .page { padding: 1.5rem; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
+        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .input {
-            flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
+            flex: 1; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
         }
         .input::placeholder { color: var(--text-tertiary); }
         .input--reason { max-width: 250px; }
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
         }
@@ -85,12 +95,12 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
+        .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
+            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg);
         }
         .list__item-main { flex: 1; min-width: 0; }
@@ -98,7 +108,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .list__item-detail { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
         .list__item-reason { font-size: 0.8rem; color: var(--text-secondary); }
         .badge {
-            font-size: var(--text-xxs); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
+            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px;
             text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
         }
         .badge--manual { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }

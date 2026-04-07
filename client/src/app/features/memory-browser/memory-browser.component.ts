@@ -12,14 +12,16 @@ import type { MemoryEntry, MemoryTier } from '../../core/services/memory-browser
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-memory-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Memory Browser" icon="memory">
+        <div class="page">
+            <div class="page__header">
+                <h2 class="page-title">Memory Browser</h2>
+            </div>
 
             <!-- Stats summary -->
             @if (memoryService.stats(); as stats) {
@@ -45,36 +47,35 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                 </div>
             }
 
-            <ng-container toolbar>
-                <div class="page__toolbar">
-                    <input
-                        class="search-input"
-                        type="text"
-                        placeholder="Search by key or content..."
-                        [ngModel]="searchQuery()"
-                        (ngModelChange)="onSearchChange($event)"
-                        aria-label="Search memories" />
-                    <select
-                        class="filter-select"
-                        [ngModel]="tierFilter()"
-                        (ngModelChange)="onTierChange($event)"
-                        aria-label="Filter by tier">
-                        <option value="">All Tiers</option>
-                        <option value="longterm">On-Chain (longterm)</option>
-                        <option value="shortterm">Pending (shortterm)</option>
-                    </select>
-                    <select
-                        class="filter-select"
-                        [ngModel]="statusFilter()"
-                        (ngModelChange)="onStatusChange($event)"
-                        aria-label="Filter by status">
-                        <option value="">All Statuses</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="pending">Pending</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
-            </ng-container>
+            <!-- Toolbar: search + filters -->
+            <div class="page__toolbar">
+                <input
+                    class="search-input"
+                    type="text"
+                    placeholder="Search by key or content..."
+                    [ngModel]="searchQuery()"
+                    (ngModelChange)="onSearchChange($event)"
+                    aria-label="Search memories" />
+                <select
+                    class="filter-select"
+                    [ngModel]="tierFilter()"
+                    (ngModelChange)="onTierChange($event)"
+                    aria-label="Filter by tier">
+                    <option value="">All Tiers</option>
+                    <option value="longterm">On-Chain (longterm)</option>
+                    <option value="shortterm">Pending (shortterm)</option>
+                </select>
+                <select
+                    class="filter-select"
+                    [ngModel]="statusFilter()"
+                    (ngModelChange)="onStatusChange($event)"
+                    aria-label="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
 
             @if (memoryService.loading()) {
                 <app-skeleton variant="table" [count]="6" />
@@ -239,22 +240,25 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                     }
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        .page__toolbar { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
 
         /* ── Stats bar ── */
         .stats-bar {
             display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
         }
         .stat {
-            padding: var(--space-2) var(--space-4); background: var(--bg-surface);
+            padding: 0.5rem 1rem; background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             display: flex; flex-direction: column; align-items: center; min-width: 80px;
         }
         .stat__value { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
-        .stat__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat__label { font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
         .stat--longterm { border-color: var(--accent-green); }
         .stat--longterm .stat__value { color: var(--accent-green); }
         .stat--shortterm { border-color: var(--accent-yellow); }
@@ -262,7 +266,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Search & filters ── */
         .search-input {
-            flex: 1; min-width: 200px; padding: var(--space-2) var(--space-3);
+            flex: 1; min-width: 200px; padding: 0.5rem 0.75rem;
             background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary);
             font-size: 0.85rem; font-family: inherit;
@@ -272,7 +276,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .search-input::placeholder { color: var(--text-tertiary); }
 
         .filter-select {
-            padding: var(--space-2) var(--space-3); background: var(--bg-surface);
+            padding: 0.5rem 0.75rem; background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             appearance: auto; cursor: pointer;
@@ -281,7 +285,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Buttons ── */
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
             font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
@@ -310,7 +314,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         .memory-card {
             display: flex; flex-direction: column; gap: 0.35rem;
-            padding: var(--space-3) var(--space-4); background: var(--bg-surface);
+            padding: 0.75rem 1rem; background: var(--bg-surface);
             border: 1px solid var(--border); border-radius: var(--radius-lg);
             cursor: pointer; text-align: left; width: 100%;
             font-family: inherit; color: inherit;
@@ -340,8 +344,8 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Tier badge ── */
         .tier-badge {
-            display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
-            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
+            display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .tier-badge--longterm {
@@ -355,27 +359,27 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Status chip ── */
         .status-chip {
-            display: inline-block; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs);
-            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
+            display: inline-block; padding: 0.1rem 0.35rem; border-radius: 4px;
+            font-size: 0.6rem; font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em;
         }
         .status-chip--confirmed { color: var(--accent-green); background: var(--accent-green-tint); }
         .status-chip--pending { color: var(--accent-yellow); background: rgba(255, 204, 0, 0.1); }
         .status-chip--failed { color: var(--accent-red); background: rgba(255, 85, 85, 0.1); }
 
-        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: var(--space-4); }
+        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
 
         /* ── Pagination ── */
         .pagination {
             display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-            padding: var(--space-3) 0; margin-top: 0.5rem;
+            padding: 0.75rem 0; margin-top: 0.5rem;
         }
         .pagination__info { font-size: 0.75rem; color: var(--text-tertiary); }
 
         /* ── Detail panel ── */
         .memory-detail {
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: var(--space-6);
+            border-radius: var(--radius-lg); padding: 1.5rem;
             overflow-y: auto; max-height: calc(100vh - 320px);
         }
         .memory-detail--empty {
@@ -398,13 +402,13 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             gap: 0.75rem; margin-bottom: 1.5rem;
         }
         .meta-item {
-            padding: var(--space-2) var(--space-3);
+            padding: 0.5rem 0.75rem;
             background: var(--bg-base);
             border-radius: var(--radius);
         }
         .meta-item--wide { grid-column: 1 / -1; }
         .meta-label {
-            display: block; font-size: var(--text-xxs); font-weight: 600; color: var(--text-tertiary);
+            display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-tertiary);
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
         }
         .meta-value { font-size: 0.8rem; color: var(--text-primary); }
@@ -430,7 +434,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
         }
         .memory-content {
-            margin: 0; padding: var(--space-4); background: var(--bg-base);
+            margin: 0; padding: 1rem; background: var(--bg-base);
             border-radius: var(--radius); color: var(--text-secondary);
             font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
             word-break: break-word; max-height: 400px; overflow-y: auto;
@@ -445,7 +449,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
         }
         .field-input {
-            width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-base);
+            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base);
             border: 1px solid var(--border); border-radius: var(--radius);
             color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
             box-sizing: border-box;
@@ -459,11 +463,12 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
+            .page { padding: 1rem; }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }
             .memory-detail { max-height: none; }
             .stats-bar { gap: 0.5rem; }
-            .stat { min-width: 60px; padding: 0.35rem var(--space-2); }
+            .stat { min-width: 60px; padding: 0.35rem 0.5rem; }
             .stat__value { font-size: 1rem; }
             .meta-grid { grid-template-columns: 1fr 1fr; }
             .page__toolbar { flex-direction: column; }

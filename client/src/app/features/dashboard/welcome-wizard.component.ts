@@ -223,13 +223,13 @@ const TEMPLATES: AgentTemplate[] = [
             align-items: center;
             justify-content: center;
             min-height: 100%;
-            padding: var(--space-8) var(--space-6);
+            padding: 2rem 1.5rem;
             text-align: center;
         }
 
         .wizard__header { margin-bottom: 1.5rem; }
         .wizard__logo {
-            font-size: var(--text-micro);
+            font-size: 0.35rem;
             line-height: 1.1;
             color: var(--accent-cyan);
             margin: 0 0 1rem;
@@ -274,7 +274,7 @@ const TEMPLATES: AgentTemplate[] = [
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: var(--space-6);
+            padding: 1.5rem;
         }
         .wizard__step--wide { max-width: 580px; }
         .wizard__step--done { text-align: center; }
@@ -302,7 +302,7 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
-            padding: var(--space-3);
+            padding: 0.75rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -360,7 +360,7 @@ const TEMPLATES: AgentTemplate[] = [
             letter-spacing: 0.06em;
         }
         .field__input {
-            padding: var(--space-2) var(--space-3);
+            padding: 0.5rem 0.75rem;
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             font-size: 0.85rem;
@@ -381,7 +381,7 @@ const TEMPLATES: AgentTemplate[] = [
             gap: 0.35rem;
         }
         .skill-tag {
-            padding: 0.2rem var(--space-2);
+            padding: 0.2rem 0.5rem;
             background: var(--accent-cyan-wash);
             border: 1px solid var(--accent-cyan-mid);
             border-radius: var(--radius);
@@ -428,7 +428,7 @@ const TEMPLATES: AgentTemplate[] = [
             background: var(--accent-amber-wash);
             border: 1px solid var(--accent-amber-glow);
             border-radius: var(--radius);
-            padding: var(--space-3);
+            padding: 0.75rem;
             margin-bottom: 1rem;
         }
         .wizard__warning p {
@@ -440,7 +440,7 @@ const TEMPLATES: AgentTemplate[] = [
         .wizard__warning code {
             background: var(--bg-raised);
             padding: 0.1rem 0.35rem;
-            border-radius: var(--radius-sm);
+            border-radius: 3px;
             font-size: 0.75rem;
         }
 
@@ -470,7 +470,7 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.4rem var(--space-3);
+            padding: 0.4rem 0.75rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -507,9 +507,9 @@ const TEMPLATES: AgentTemplate[] = [
         .wizard__footer a:hover { text-decoration: underline; }
 
         @media (max-width: 767px) {
-            .wizard { padding: var(--space-4); }
-            .wizard__logo { font-size: var(--text-micro); }
-            .wizard__step { padding: var(--space-4); }
+            .wizard { padding: 1rem; }
+            .wizard__logo { font-size: 0.25rem; }
+            .wizard__step { padding: 1rem; }
             .template-grid { grid-template-columns: 1fr; }
             .field-row { grid-template-columns: 1fr; }
         }

@@ -111,7 +111,7 @@ interface TooltipPos {
         .tour-spotlight-ring {
             position: absolute;
             border: 2px solid var(--accent-cyan);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             box-shadow: 0 0 16px var(--accent-cyan-glow), inset 0 0 16px var(--accent-cyan-subtle);
             pointer-events: none;
             transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
@@ -124,7 +124,7 @@ interface TooltipPos {
             background: var(--bg-surface);
             border: 1px solid var(--border-bright);
             border-radius: var(--radius-lg);
-            padding: var(--space-4) var(--space-5);
+            padding: 1rem 1.25rem;
             box-shadow: 0 8px 32px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-dim);
             z-index: 10001;
             transition: top 0.3s ease, left 0.3s ease;
@@ -211,7 +211,7 @@ interface TooltipPos {
         }
 
         .tour-btn {
-            padding: 0.4rem var(--space-4);
+            padding: 0.4rem 1rem;
             border-radius: var(--radius);
             font-size: 0.8rem;
             font-weight: 600;
