@@ -138,7 +138,7 @@ interface HoverTooltip {
                     </div>
                 </div>
             }
-            <div class="network-3d__hint">Click &amp; drag to orbit &middot; Scroll to zoom &middot; Click to select &middot; Double-click to focus</div>
+            <div class="network-3d__hint">Drag to orbit &middot; Right-drag to pan &middot; Scroll to zoom &middot; Click agent to select &middot; Double-click to focus</div>
         </div>
     `,
     styles: `
@@ -370,14 +370,16 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private trails: Trail3D[] = [];
     private static readonly MAX_LOG_ENTRIES = 50;
     private static readonly TRAIL_MAX_AGE = 45; // seconds
+    private static readonly MAX_PARTICLES = 500; // performance cap (60fps target)
 
     /* ── Reusable materials (initialized after lazy load) ── */
     private glowMaterial: THREE.MeshBasicMaterial | null = null;
     private edgeMaterial: THREE.LineBasicMaterial | null = null;
     private particleGeometry: THREE.SphereGeometry | null = null;
 
-    /* ── Orbit control state ────────────────────────────── */
+    /* ── Orbit + pan control state ──────────────────────── */
     private isDragging = false;
+    private isPanning = false;
     private lastMouseX = 0;
     private lastMouseY = 0;
     private orbitTheta = 0;
@@ -386,6 +388,11 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private targetTheta = 0;
     private targetPhi = Math.PI / 4;
     private targetRadius = 30;
+    // Pan offsets in camera-local space (right/up axes)
+    private panX = 0;
+    private panY = 0;
+    private targetPanX = 0;
+    private targetPanY = 0;
 
     /* ── Raycasting (initialized after lazy load) ───────── */
     private raycaster: THREE.Raycaster | null = null;
@@ -553,6 +560,8 @@ export class AgentNetwork3DComponent implements OnDestroy {
         canvas.addEventListener('pointerup', this.onPointerUp);
         canvas.addEventListener('wheel', this.onWheel, { passive: false });
         canvas.addEventListener('dblclick', this.onDblClick);
+        // Prevent right-click context menu so right-drag pan works without interruption
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
         // Touch events for mobile
         canvas.addEventListener('touchstart', (e) => {
@@ -898,6 +907,8 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private spawnParticle(from: AgentNode3D, to: AgentNode3D): void {
+        // Hard cap to maintain 60fps target with up to 500 concurrent particles
+        if (this.particles.length >= AgentNetwork3DComponent.MAX_PARTICLES) return;
         const T = this.T!;
         const material = new T.MeshBasicMaterial({
             color: from.color,
@@ -969,9 +980,12 @@ export class AgentNetwork3DComponent implements OnDestroy {
             this.orbitTheta += (this.targetTheta - this.orbitTheta) * 0.08;
             this.orbitPhi += (this.targetPhi - this.orbitPhi) * 0.08;
             this.orbitRadius += (this.targetRadius - this.orbitRadius) * 0.08;
+            // Smooth pan interpolation
+            this.panX += (this.targetPanX - this.panX) * 0.08;
+            this.panY += (this.targetPanY - this.panY) * 0.08;
 
-            // Slow auto-rotation when not dragging
-            if (!this.isDragging) {
+            // Slow auto-rotation when not actively controlling camera
+            if (!this.isDragging && !this.isPanning) {
                 this.targetTheta += 0.0008;
             }
 
@@ -1104,12 +1118,37 @@ export class AgentNetwork3DComponent implements OnDestroy {
         const y = this.orbitRadius * Math.cos(this.orbitPhi);
         const z = this.orbitRadius * Math.sin(this.orbitPhi) * Math.sin(this.orbitTheta);
         this.camera.position.set(x, y, z);
-        this.camera.lookAt(0, 0, 0);
+
+        // Apply camera-local pan offsets so pan is always relative to the current view
+        // Right axis: cross(forward, worldUp), Up axis: cross(right, forward)
+        const cx = -Math.sin(this.orbitTheta); // camera right X
+        const cz = -Math.cos(this.orbitTheta); // camera right Z
+        // lookAt target with pan applied
+        const targetX = this.panX * cx;
+        const targetY = this.panY;
+        const targetZ = this.panX * cz;
+        this.camera.position.x += targetX;
+        this.camera.position.y += targetY;
+        this.camera.position.z += targetZ;
+        this.camera.lookAt(targetX, targetY, targetZ);
     }
 
     /* ── Event handlers ─────────────────────────────────── */
 
     private handlePointerDown(e: PointerEvent): void {
+        if (e.button === 2) {
+            // Right-click drag → pan
+            e.preventDefault();
+            const canvas = this.canvasRef().nativeElement;
+            canvas.setPointerCapture(e.pointerId);
+            this.capturedPointerId = e.pointerId;
+            this.isPanning = true;
+            this.isDragging = false;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            canvas.style.cursor = 'move';
+            return;
+        }
         if (e.button !== 0) return;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
@@ -1126,6 +1165,17 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private handlePointerMove(e: PointerEvent): void {
+        if (this.isPanning) {
+            const dx = e.clientX - this.lastMouseX;
+            const dy = e.clientY - this.lastMouseY;
+            // Pan sensitivity scaled by camera distance
+            const panSpeed = this.orbitRadius * 0.001;
+            this.targetPanX -= dx * panSpeed;
+            this.targetPanY += dy * panSpeed;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            return;
+        }
         if (this.isDragging) {
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
@@ -1175,13 +1225,16 @@ export class AgentNetwork3DComponent implements OnDestroy {
     }
 
     private handlePointerUp(e: PointerEvent): void {
+        const wasPanning = this.isPanning;
         this.isDragging = false;
+        this.isPanning = false;
         const canvas = this.canvasRef().nativeElement;
         if (this.capturedPointerId >= 0) {
             canvas.releasePointerCapture(this.capturedPointerId);
             this.capturedPointerId = -1;
         }
         canvas.style.cursor = 'crosshair';
+        if (wasPanning) return; // panning ends here, no click to process
 
         // If didn't drag much, treat as click
         if (!this.dragMoved && this.camera && this.raycaster && this.mouse) {
