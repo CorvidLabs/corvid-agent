@@ -623,7 +623,7 @@ async function handleRoutes(
     }
   }
 
-  if (url.pathname === '/api/algochat/conversations' && req.method === 'POST') {
+  if (url.pathname === '/api/algochat/conversations' && (req.method === 'GET' || req.method === 'POST')) {
     return json(listConversations(db));
   }
 

@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 114;
+const SCHEMA_VERSION = 115;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -202,6 +202,12 @@ const MIGRATIONS: Record<number, string[]> = {
         // without requiring an API key (the proxy already authenticated the user).
         `ALTER TABLE tenant_members ADD COLUMN email TEXT DEFAULT NULL`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`,
+    ],
+    115: [
+        // Fix duplicate AlgoChat conversations: enforce unique participant_addr
+        `DELETE FROM algochat_conversations WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY participant_addr ORDER BY created_at DESC) AS rn FROM algochat_conversations) WHERE rn = 1)`,
+        `DROP INDEX IF EXISTS idx_algochat_participant`,
+        `CREATE UNIQUE INDEX idx_algochat_participant ON algochat_conversations(participant_addr)`,
     ],
 };
 

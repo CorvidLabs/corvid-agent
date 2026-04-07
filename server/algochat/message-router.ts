@@ -32,9 +32,9 @@ import type { ClaudeStreamEvent } from '../process/types';
 import type { SessionMessage } from '../channels/types';
 import {
     getConversationByParticipant,
+    getConversationBySessionId,
     createConversation,
     updateConversationRound,
-    listConversations,
     createSession,
 } from '../db/sessions';
 import { getAgent } from '../db/agents';
@@ -227,8 +227,7 @@ export class MessageRouter {
         const callback = (sessionId: string, event: ClaudeStreamEvent) => {
             // Forward approval requests for AlgoChat sessions on-chain
             if (event.type === 'approval_request') {
-                const conversations = listConversations(this.db);
-                const conversation = conversations.find((c) => c.sessionId === sessionId);
+                const conversation = getConversationBySessionId(this.db, sessionId);
                 if (conversation) {
                     // Register the expected responder so resolveByShortId can verify sender
                     this.approvalManager?.setSenderAddress(event.id!, conversation.participantAddr);
@@ -252,8 +251,7 @@ export class MessageRouter {
             // Find the conversation for this session
             if (event.type !== 'session_exited' && event.type !== 'error') return;
 
-            const conversations = listConversations(this.db);
-            const conversation = conversations.find((c) => c.sessionId === sessionId);
+            const conversation = getConversationBySessionId(this.db, sessionId);
             if (!conversation) return;
 
             if (event.type === 'session_exited') {
