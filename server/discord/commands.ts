@@ -15,7 +15,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { GuildMember, PermissionFlagsBits, SlashCommandBuilder, type BaseInteraction, type ChatInputCommandInteraction } from 'discord.js';
 import type { BuddyService } from '../buddy/service';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
@@ -47,8 +47,8 @@ import type { MentionSessionInfo } from './message-handler';
 import { checkRateLimit, resolvePermissionLevel } from './permissions';
 import { getRestClient } from './rest-client';
 import type { ThreadCallbackInfo, ThreadSessionInfo } from './thread-manager';
-import type { DiscordBridgeConfig, DiscordInteractionData } from './types';
-import { InteractionType, PermissionLevel } from './types';
+import type { DiscordBridgeConfig } from './types';
+import { PermissionLevel } from './types';
 
 const log = createLogger('DiscordCommands');
 
@@ -565,9 +565,8 @@ export interface InteractionContext {
  */
 type CommandHandler = (
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   permLevel: number,
-  getOption: (name: string) => string | undefined,
   userId: string,
 ) => Promise<void>;
 
@@ -596,24 +595,24 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
   [
     'session',
     {
-      handler: (ctx, interaction, permLevel, getOption, userId) =>
-        handleSessionCommand(ctx, interaction, permLevel, getOption, userId),
+      handler: (ctx, interaction, permLevel, userId) =>
+        handleSessionCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.STANDARD,
     },
   ],
   [
     'message',
     {
-      handler: (ctx, interaction, permLevel, getOption, userId) =>
-        handleMessageCommand(ctx, interaction, permLevel, getOption, userId),
+      handler: (ctx, interaction, permLevel, userId) =>
+        handleMessageCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.BASIC,
     },
   ],
   [
     'work',
     {
-      handler: (ctx, interaction, permLevel, getOption, userId) =>
-        handleWorkCommand(ctx, interaction, permLevel, getOption, userId),
+      handler: (ctx, interaction, permLevel, userId) =>
+        handleWorkCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.STANDARD,
     },
   ],
@@ -632,39 +631,37 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
   [
     'council',
     {
-      handler: (ctx, interaction, permLevel, getOption) => handleCouncilCommand(ctx, interaction, permLevel, getOption),
+      handler: (ctx, interaction, permLevel, userId) => handleCouncilCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.ADMIN,
     },
   ],
   ['quickstart', { handler: (ctx, interaction) => handleQuickstartCommand(ctx, interaction) }],
   ['help', { handler: (_ctx, interaction) => handleHelpCommand(interaction) }],
-  ['tools', { handler: (_ctx, interaction, _permLevel, getOption) => handleToolsCommand(interaction, getOption) }],
+  ['tools', { handler: (_ctx, interaction) => handleToolsCommand(interaction) }],
   [
     'mute',
     {
-      handler: (ctx, interaction, permLevel, getOption) => handleMuteCommand(ctx, interaction, permLevel, getOption),
+      handler: (ctx, interaction, permLevel, userId) => handleMuteCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.ADMIN,
     },
   ],
   [
     'unmute',
     {
-      handler: (ctx, interaction, permLevel, getOption) => handleUnmuteCommand(ctx, interaction, permLevel, getOption),
+      handler: (ctx, interaction, permLevel, userId) => handleUnmuteCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.ADMIN,
     },
   ],
   [
     'admin',
     {
-      handler: async (ctx, interaction, _permLevel) => {
-        const options = interaction.data?.options ?? [];
+      handler: async (ctx, interaction) => {
         await handleAdminCommand(
           ctx.db,
           ctx.config,
           ctx.mutedUsers,
           ctx.threadSessions.size,
           interaction,
-          options,
           ctx.guildCache,
           ctx.syncGuildData,
         );
@@ -688,35 +685,44 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
   ],
 ]);
 
-export async function handleInteraction(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
+export async function handleInteraction(ctx: InteractionContext, interaction: BaseInteraction): Promise<void> {
   // Handle button/component interactions
-  if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+  if (interaction.isMessageComponent()) {
     await handleComponentInteraction(ctx, interaction);
     return;
   }
 
   // Handle autocomplete interactions — query DB live so new agents/projects appear immediately
-  if (interaction.type === InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE) {
+  if (interaction.isAutocomplete()) {
     await handleAutocomplete(ctx, interaction);
     return;
   }
 
-  // Only handle application commands
-  if (interaction.type !== InteractionType.APPLICATION_COMMAND) return;
+  // Only handle chat input (slash) commands
+  if (!interaction.isChatInputCommand()) return;
 
-  const commandName = interaction.data?.name;
-  if (!commandName) return;
+  const commandName = interaction.commandName;
 
-  const userId = interaction.member?.user?.id ?? interaction.user?.id;
-  if (!userId) return;
+  const userId = interaction.user.id;
+
+  // Extract member roles for permission resolution
+  const memberRoles: string[] = [];
+  if (interaction.member) {
+    const m = interaction.member;
+    if (m.roles instanceof GuildMember || (typeof m.roles === 'object' && 'cache' in m.roles)) {
+      memberRoles.push(...(m.roles as GuildMember['roles']).cache.keys());
+    } else if (Array.isArray(m.roles)) {
+      memberRoles.push(...(m.roles as string[]));
+    }
+  }
 
   // Role-based permission check
   const permLevel = resolvePermissionLevel(
     ctx.config,
     ctx.mutedUsers,
     userId,
-    interaction.member?.roles,
-    interaction.channel_id,
+    memberRoles,
+    interaction.channelId ?? undefined,
   );
   if (permLevel <= PermissionLevel.BLOCKED) {
     await respondEphemeral(interaction, 'You do not have permission to use this bot.');
@@ -738,9 +744,6 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
     return;
   }
 
-  const options = interaction.data?.options ?? [];
-  const getOption = (name: string) => options.find((o) => o.name === name)?.value as string | undefined;
-
   const entry = COMMAND_HANDLERS.get(commandName);
   if (!entry) {
     await respondToInteraction(interaction, `Unknown command: ${commandName}`);
@@ -753,5 +756,5 @@ export async function handleInteraction(ctx: InteractionContext, interaction: Di
     return;
   }
 
-  await entry.handler(ctx, interaction, permLevel, getOption, userId);
+  await entry.handler(ctx, interaction, permLevel, userId);
 }

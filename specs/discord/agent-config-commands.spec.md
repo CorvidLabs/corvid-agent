@@ -24,8 +24,8 @@ are unaffected.
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleAgentSkillCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number)` | `Promise<void>` | Handles `/agent-skill add\|remove\|list` — assigns, unassigns, or lists skill bundles for an agent |
-| `handleAgentPersonaCommand` | `(ctx: InteractionContext, interaction: DiscordInteractionData, permLevel: number)` | `Promise<void>` | Handles `/agent-persona add\|remove\|list` — assigns, unassigns, or lists personas for an agent |
+| `handleAgentSkillCommand` | `(ctx: InteractionContext, interaction: ChatInputCommandInteraction, permLevel: number)` | `Promise<void>` | Handles `/agent-skill add\|remove\|list` — assigns, unassigns, or lists skill bundles for an agent |
+| `handleAgentPersonaCommand` | `(ctx: InteractionContext, interaction: ChatInputCommandInteraction, permLevel: number)` | `Promise<void>` | Handles `/agent-persona add\|remove\|list` — assigns, unassigns, or lists personas for an agent |
 
 ## Invariants
 
@@ -87,7 +87,7 @@ are unaffected.
 | Module | What is used |
 |--------|-------------|
 | `server/discord/commands` | `InteractionContext` type |
-| `server/discord/types` | `DiscordInteractionData`, `PermissionLevel` |
+| `server/discord/types` | `PermissionLevel` |
 | `server/db/agents` | `listAgents` |
 | `server/db/skill-bundles` | `listBundles`, `getAgentBundles`, `assignBundle`, `unassignBundle` |
 | `server/db/personas` | `listPersonas`, `getAgentPersonas`, `assignPersona`, `unassignPersona` |

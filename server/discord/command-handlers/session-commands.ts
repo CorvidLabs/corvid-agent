@@ -4,6 +4,7 @@
  * Handles `/session` (threaded conversations) and `/work` (async tasks).
  */
 
+import type { ChatInputCommandInteraction } from 'discord.js';
 import type { SessionSource } from '../../../shared/types';
 import { listAgents } from '../../db/agents';
 import { saveThreadSession } from '../../db/discord-thread-sessions';
@@ -24,23 +25,21 @@ import {
   sendEmbed,
   sendEmbedWithButtons,
 } from '../embeds';
-import type { DiscordInteractionData } from '../types';
 import { ButtonStyle } from '../types';
 
 const log = createLogger('DiscordCommands');
 
 export async function handleSessionCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   permLevel: number,
-  getOption: (name: string) => string | undefined,
   userId: string,
 ): Promise<void> {
-  const agentName = getOption('agent');
-  const topic = getOption('topic');
-  const projectName = getOption('project');
-  const buddyName = getOption('buddy');
-  const buddyRounds = getOption('rounds');
+  const agentName = interaction.options.getString('agent');
+  const topic = interaction.options.getString('topic');
+  const projectName = interaction.options.getString('project');
+  const buddyName = interaction.options.getString('buddy');
+  const buddyRoundsNum = interaction.options.getInteger('rounds');
   if (!agentName || !topic) {
     await respondToInteraction(interaction, 'Please provide both an agent and a topic.');
     return;
@@ -109,7 +108,7 @@ export async function handleSessionCommand(
 
   // Create a standalone thread in the channel where the command was invoked
   const threadName = `${agent.name} — ${topic}`;
-  const targetChannelId = interaction.channel_id || ctx.config.channelId;
+  const targetChannelId = interaction.channelId || ctx.config.channelId;
   const threadId = await ctx.createStandaloneThread(targetChannelId, threadName);
   if (!threadId) {
     await editDeferredResponse(interaction, 'Failed to create conversation thread.');
@@ -158,7 +157,7 @@ export async function handleSessionCommand(
       ? {
           buddyAgentId: buddyAgent.id,
           buddyAgentName: buddyAgent.name,
-          maxRounds: buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined,
+          maxRounds: buddyRoundsNum !== null ? Math.max(1, Math.min(10, buddyRoundsNum)) : undefined,
         }
       : undefined,
   };
@@ -211,9 +210,8 @@ export async function handleSessionCommand(
 
 export async function handleWorkCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
-  getOption: (name: string) => string | undefined,
   userId: string,
 ): Promise<void> {
   if (!ctx.workTaskService) {
@@ -221,16 +219,16 @@ export async function handleWorkCommand(
     return;
   }
 
-  const workDescription = getOption('description');
+  const workDescription = interaction.options.getString('description');
   if (!workDescription) {
     await respondToInteraction(interaction, 'Please provide a task description.');
     return;
   }
 
-  const workAgentName = getOption('agent');
-  const workProjectName = getOption('project');
-  const buddyName = getOption('buddy');
-  const buddyRounds = getOption('rounds');
+  const workAgentName = interaction.options.getString('agent');
+  const workProjectName = interaction.options.getString('project');
+  const buddyName = interaction.options.getString('buddy');
+  const buddyRoundsNum = interaction.options.getInteger('rounds');
 
   // Resolve agent
   const allAgents = listAgents(ctx.db);
@@ -296,7 +294,7 @@ export async function handleWorkCommand(
   const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
   await respondToInteraction(interaction, `Creating work task for **${workAgent.name}**${buddyLabel}...`);
 
-  const channelId = interaction.channel_id;
+  const channelId = interaction.channelId;
   try {
     const task = await ctx.workTaskService.create({
       agentId: workAgent.id,
@@ -307,7 +305,7 @@ export async function handleWorkCommand(
       buddyConfig: buddyAgent
         ? {
             buddyAgentId: buddyAgent.id,
-            maxRounds: buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined,
+            maxRounds: buddyRoundsNum !== null ? Math.max(1, Math.min(10, buddyRoundsNum)) : undefined,
           }
         : undefined,
     });

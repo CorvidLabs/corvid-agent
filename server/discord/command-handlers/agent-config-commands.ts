@@ -7,13 +7,13 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { ChatInputCommandInteraction } from 'discord.js';
 import { listAgents } from '../../db/agents';
 import { assignPersona, getAgentPersonas, listPersonas, unassignPersona } from '../../db/personas';
 import { assignBundle, getAgentBundles, listBundles, unassignBundle } from '../../db/skill-bundles';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
 import { respondToInteraction, respondToInteractionEmbed } from '../embeds';
-import type { DiscordInteractionData } from '../types';
 
 const log = createLogger('DiscordCommands');
 
@@ -38,21 +38,16 @@ function resolveAgentByName(db: Database, agentName: string) {
  */
 export async function handleAgentSkillCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
 ): Promise<void> {
-  const options = interaction.data?.options ?? [];
-  const subcommand = options[0];
-  if (!subcommand) {
+  const subName = interaction.options.getSubcommand(false);
+  if (!subName) {
     await respondToInteraction(interaction, 'Missing subcommand.');
     return;
   }
 
-  const subName = subcommand.name;
-  const subOpts = subcommand.options ?? [];
-  const getSubOption = (name: string) => subOpts.find((o) => o.name === name)?.value as string | undefined;
-
-  const agentName = getSubOption('agent');
+  const agentName = interaction.options.getString('agent');
   if (!agentName) {
     await respondToInteraction(interaction, 'Please specify an agent.');
     return;
@@ -93,7 +88,7 @@ export async function handleAgentSkillCommand(
   }
 
   // add / remove require the skill option
-  const skillName = getSubOption('skill');
+  const skillName = interaction.options.getString('skill');
   if (!skillName) {
     await respondToInteraction(interaction, 'Please specify a skill bundle.');
     return;
@@ -159,21 +154,16 @@ export async function handleAgentSkillCommand(
  */
 export async function handleAgentPersonaCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   _permLevel: number,
 ): Promise<void> {
-  const options = interaction.data?.options ?? [];
-  const subcommand = options[0];
-  if (!subcommand) {
+  const subName = interaction.options.getSubcommand(false);
+  if (!subName) {
     await respondToInteraction(interaction, 'Missing subcommand.');
     return;
   }
 
-  const subName = subcommand.name;
-  const subOpts = subcommand.options ?? [];
-  const getSubOption = (name: string) => subOpts.find((o) => o.name === name)?.value as string | undefined;
-
-  const agentName = getSubOption('agent');
+  const agentName = interaction.options.getString('agent');
   if (!agentName) {
     await respondToInteraction(interaction, 'Please specify an agent.');
     return;
@@ -216,7 +206,7 @@ export async function handleAgentPersonaCommand(
   }
 
   // add / remove require the persona option
-  const personaName = getSubOption('persona');
+  const personaName = interaction.options.getString('persona');
   if (!personaName) {
     await respondToInteraction(interaction, 'Please specify a persona.');
     return;

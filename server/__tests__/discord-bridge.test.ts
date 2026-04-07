@@ -17,7 +17,7 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { withAuthorContext } from '../discord/message-handler';
-import { mockDiscordRest } from './helpers/mock-discord-rest';
+import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
 
 function createMockProcessManager() {
     return {
@@ -1007,30 +1007,17 @@ describe('DiscordBridge onboarding', () => {
             appId: '800000000000000001',
         };
         const bridge = new DiscordBridge(db, pm, config);
+        const interaction = makeMockChatInteraction('help', {}, 'user-1');
 
-        const { fetchBodies, cleanup } = mockDiscordRest();
+        await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction(interaction);
 
-        try {
-            await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
-                id: '300000000000000001',
-                token: 'test-interaction-token-abcdef123456',
-                type: 2, // APPLICATION_COMMAND
-                channel_id: '100000000000000001',
-                data: { name: 'help' },
-                member: { user: { id: 'user-1' }, roles: [] },
-            });
-
-            expect(fetchBodies.length).toBe(1);
-            const body = fetchBodies[0] as { data: { embeds: Array<{ title: string; fields: Array<{ name: string }> }> } };
-            expect(body.data.embeds).toBeDefined();
-            expect(body.data.embeds[0].title).toBe('CorvidAgent Commands');
-            const fieldNames = body.data.embeds[0].fields.map((f: { name: string }) => f.name);
-            expect(fieldNames).toContain('Conversations');
-            expect(fieldNames).toContain('Information');
-            expect(fieldNames).toContain('Advanced');
-        } finally {
-            cleanup();
-        }
+        const embeds = interaction.getEmbeds() as Array<{ title: string; fields: Array<{ name: string }> }>;
+        expect(embeds).toBeDefined();
+        expect(embeds[0].title).toBe('CorvidAgent Commands');
+        const fieldNames = embeds[0].fields.map((f: { name: string }) => f.name);
+        expect(fieldNames).toContain('Conversations');
+        expect(fieldNames).toContain('Information');
+        expect(fieldNames).toContain('Advanced');
     });
 
     test('/quickstart responds with welcome embed listing agents', async () => {
@@ -1044,29 +1031,16 @@ describe('DiscordBridge onboarding', () => {
             appId: '800000000000000001',
         };
         const bridge = new DiscordBridge(db, pm, config);
+        const interaction = makeMockChatInteraction('quickstart', {}, 'user-1');
 
-        const { fetchBodies, cleanup } = mockDiscordRest();
+        await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction(interaction);
 
-        try {
-            await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
-                id: '300000000000000002',
-                token: 'test-interaction-token-quickstart789',
-                type: 2,
-                channel_id: '100000000000000001',
-                data: { name: 'quickstart' },
-                member: { user: { id: 'user-1' }, roles: [] },
-            });
-
-            expect(fetchBodies.length).toBe(1);
-            const body = fetchBodies[0] as { data: { embeds: Array<{ title: string; description: string; fields: Array<{ value: string }> }> } };
-            expect(body.data.embeds[0].title).toBe('Welcome to CorvidAgent!');
-            expect(body.data.embeds[0].description).toContain('/session');
-            // Should list agents in the field
-            expect(body.data.embeds[0].fields[0].value).toContain('AlphaAgent');
-            expect(body.data.embeds[0].fields[0].value).toContain('BetaAgent');
-        } finally {
-            cleanup();
-        }
+        const embeds = interaction.getEmbeds() as Array<{ title: string; description: string; fields: Array<{ value: string }> }>;
+        expect(embeds[0].title).toBe('Welcome to CorvidAgent!');
+        expect(embeds[0].description).toContain('/session');
+        // Should list agents in the field
+        expect(embeds[0].fields[0].value).toContain('AlphaAgent');
+        expect(embeds[0].fields[0].value).toContain('BetaAgent');
     });
 
     test('first-interaction tip is sent once on @mention', async () => {

@@ -6,15 +6,13 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { AutocompleteInteraction } from 'discord.js';
 import { listAgents } from '../../db/agents';
 import { listPersonas } from '../../db/personas';
 import { listProjects } from '../../db/projects';
 import { listBundles } from '../../db/skill-bundles';
 import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
-import { getRestClient } from '../rest-client';
-import type { DiscordInteractionData, DiscordInteractionOption } from '../types';
-import { InteractionCallbackType } from '../types';
 
 const log = createLogger('DiscordCommands');
 
@@ -58,28 +56,15 @@ function listCouncilNames(db: Database): { name: string; description: string }[]
   }[];
 }
 
-/** Depth-first search for the STRING option the user is typing (Discord marks it `focused`). */
-function findFocusedOption(options: DiscordInteractionOption[] | undefined): DiscordInteractionOption | undefined {
-  if (!options?.length) return undefined;
-  for (const o of options) {
-    if (o.focused) return o;
-    const nested = findFocusedOption(o.options);
-    if (nested) return nested;
-  }
-  return undefined;
-}
-
-export async function handleAutocomplete(ctx: InteractionContext, interaction: DiscordInteractionData): Promise<void> {
+export async function handleAutocomplete(ctx: InteractionContext, interaction: AutocompleteInteraction): Promise<void> {
   let choices: { name: string; value: string }[] = [];
 
   try {
-    const options = interaction.data?.options ?? [];
-    const focused = findFocusedOption(options);
+    const focused = interaction.options.getFocused(true);
 
     if (!focused) {
       log.warn('Autocomplete: no focused option in payload', {
-        command: interaction.data?.name,
-        options: JSON.stringify(options).slice(0, 300),
+        command: interaction.commandName,
       });
     }
 
@@ -134,11 +119,11 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
           value: p.name,
         }));
     } else if (focused) {
-      log.warn('Autocomplete: unhandled focused field', { field: focused.name, command: interaction.data?.name });
+      log.warn('Autocomplete: unhandled focused field', { field: focused.name, command: interaction.commandName });
     }
   } catch (err) {
     log.error('Autocomplete: error building choices — sending empty list', {
-      command: interaction.data?.name,
+      command: interaction.commandName,
       error: err instanceof Error ? err.message : String(err),
     });
     choices = [];
@@ -146,20 +131,16 @@ export async function handleAutocomplete(ctx: InteractionContext, interaction: D
 
   // Guard: skip the response if we're past Discord's 3-second interaction deadline.
   // Sending a stale response results in a 404 "Unknown interaction" error — silence is better.
-  if (interaction.receivedAt !== undefined && Date.now() - interaction.receivedAt >= AUTOCOMPLETE_DEADLINE_MS) {
+  if (Date.now() - interaction.createdTimestamp >= AUTOCOMPLETE_DEADLINE_MS) {
     log.warn('Autocomplete: skipping stale interaction (deadline exceeded)', {
-      command: interaction.data?.name,
-      elapsedMs: Date.now() - interaction.receivedAt,
+      command: interaction.commandName,
+      elapsedMs: Date.now() - interaction.createdTimestamp,
     });
     return;
   }
 
   try {
-    const rest = getRestClient();
-    await rest.respondToInteraction(interaction.id, interaction.token, {
-      type: InteractionCallbackType.AUTOCOMPLETE_RESULT,
-      data: { choices },
-    });
+    await interaction.respond(choices);
   } catch (err) {
     log.error('Failed to respond to autocomplete', {
       error: err instanceof Error ? err.message : String(err),

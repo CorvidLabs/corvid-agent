@@ -392,16 +392,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], mention_roles?: string[], member?: { roles: string[] }, message_reference?, referenced_message?, attachments?: DiscordAttachment[] }` |
 | `DiscordAttachment` | `{ id, filename, content_type?, size, url, proxy_url, width?, height? }` — file attached to a Discord message |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
-| `DiscordInteractionOption` | `{ name, type, value?, options?: DiscordInteractionOption[] }` — recursive option type for subcommands and subcommand groups |
-| `DiscordInteractionData` | Slash command interaction payload from gateway |
 | `DiscordReactionData` | `{ user_id, channel_id, message_id, guild_id?, emoji: { id, name } }` — payload from messageReactionAdd event |
 | `PermissionLevel` | Constants: `BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3` |
 | `ComponentType` | Constants for Discord component types: `ACTION_ROW=1, BUTTON=2` |
 | `ButtonStyle` | Constants for Discord button styles: `PRIMARY=1, SECONDARY=2, SUCCESS=3, DANGER=4` |
 | `DiscordButton` | `{ type, style, label, custom_id, emoji?, disabled? }` — a Discord button component |
 | `DiscordActionRow` | `{ type, components: DiscordButton[] }` — a row of button components |
-| `InteractionType` | `PING=1, APPLICATION_COMMAND=2, MESSAGE_COMPONENT=3` |
-| `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5, UPDATE_MESSAGE=7` |
 | `recoverActiveMentionSessions` | Restores recent mention sessions from DB into the in-memory map on startup |
 | `recoverActiveThreadSessions` | Restores recent thread sessions from DB into in-memory maps on startup |
 

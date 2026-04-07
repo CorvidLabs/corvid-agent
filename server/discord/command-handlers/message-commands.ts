@@ -9,6 +9,7 @@
  * round-by-round embeds in the channel.
  */
 
+import type { ChatInputCommandInteraction } from 'discord.js';
 import type { Project, SessionSource } from '../../../shared/types';
 import type { BuddyRoundEvent } from '../../../shared/types/buddy';
 import { listAgents } from '../../db/agents';
@@ -19,7 +20,7 @@ import { createLogger } from '../../lib/logger';
 import type { InteractionContext } from '../commands';
 import { buildFooterText, respondToInteraction, sendEmbed, sendTypingIndicator } from '../embeds';
 import { withAuthorContext } from '../message-handler';
-import type { DiscordBridgeConfig, DiscordInteractionData } from '../types';
+import type { DiscordBridgeConfig } from '../types';
 import { PermissionLevel } from '../types';
 
 const log = createLogger('DiscordMessageCommand');
@@ -100,22 +101,21 @@ export function getBuddyRoleIcon(role: string, approved: boolean): string {
 
 export async function handleMessageCommand(
   ctx: InteractionContext,
-  interaction: DiscordInteractionData,
+  interaction: ChatInputCommandInteraction,
   permLevel: number,
-  getOption: (name: string) => string | undefined,
   userId: string,
 ): Promise<void> {
-  const agentName = getOption('agent');
+  const agentName = interaction.options.getString('agent');
   // Option was renamed from `message` → `text` to avoid clashing with command name `/message` in some clients.
-  const message = getOption('text') ?? getOption('message');
+  const message = interaction.options.getString('text') ?? interaction.options.getString('message');
   if (!agentName || !message) {
     await respondToInteraction(interaction, 'Please provide both an agent and a message.');
     return;
   }
 
-  const projectNameOpt = getOption('project');
-  const buddyName = getOption('buddy');
-  const buddyRounds = getOption('rounds');
+  const projectNameOpt = interaction.options.getString('project');
+  const buddyName = interaction.options.getString('buddy');
+  const buddyRoundsNum = interaction.options.getInteger('rounds');
 
   const agents = listAgents(ctx.db);
   if (agents.length === 0) {
@@ -175,14 +175,14 @@ export async function handleMessageCommand(
     return;
   }
 
-  const channelId = interaction.channel_id;
+  const channelId = interaction.channelId;
   if (!channelId) {
     await respondToInteraction(interaction, 'Could not determine channel.');
     return;
   }
 
   // Acknowledge the command immediately
-  const username = interaction.member?.user?.username ?? interaction.user?.username ?? userId;
+  const username = interaction.member?.user?.username ?? interaction.user.username ?? userId;
   const buddyLabel = buddyAgent ? ` with buddy **${buddyAgent.name}**` : '';
   await respondToInteraction(interaction, `**${agent.name}** is thinking...${buddyLabel}`);
 
@@ -194,7 +194,7 @@ export async function handleMessageCommand(
   // This prevents the double-response problem (lead responding inline AND
   // again inside the buddy round loop).
   if (buddyAgent && ctx.buddyService) {
-    const maxRounds = buddyRounds ? Math.max(1, Math.min(10, parseInt(buddyRounds, 10))) : undefined;
+    const maxRounds = buddyRoundsNum !== null ? Math.max(1, Math.min(10, buddyRoundsNum)) : undefined;
     const buddyCallback = createBuddyDiscordCallback(ctx, channelId, {
       leadAgentName: agent.name,
       leadAgentModel: agent.model || 'unknown',

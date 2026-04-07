@@ -5,12 +5,13 @@
  * and responding to interactions.
  */
 
-import type { DiscordInteractionData, DiscordActionRow } from './types';
-import { InteractionCallbackType, ComponentType, ButtonStyle } from './types';
+import type { RepliableInteraction } from 'discord.js';
+import type { DiscordActionRow } from './types';
+import { ComponentType, ButtonStyle } from './types';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { splitMessage } from './message-formatter';
 import { createLogger } from '../lib/logger';
-import { getRestClient } from './rest-client';
+
 
 const log = createLogger('DiscordEmbeds');
 
@@ -271,15 +272,9 @@ export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): st
     return `${base} | ${statParts.join(' · ')}`;
 }
 
-export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
+export async function respondToInteraction(interaction: RepliableInteraction, content: string): Promise<void> {
     try {
-        const restClient = getRestClient();
-        await restClient.respondToInteraction(interaction.id, interaction.token, {
-            type: InteractionCallbackType.CHANNEL_MESSAGE,
-            data: { content: content.slice(0, MAX_MESSAGE_LENGTH) },
-        });
+        await interaction.reply({ content: content.slice(0, MAX_MESSAGE_LENGTH) });
     } catch (error) {
         log.error('Failed to respond to Discord interaction', {
             error: error instanceof Error ? error.message : String(error),
@@ -288,21 +283,13 @@ export async function respondToInteraction(interaction: DiscordInteractionData, 
 }
 
 export async function respondToInteractionEmbed(
-    interaction: DiscordInteractionData,
+    interaction: RepliableInteraction,
     embed: DiscordEmbed,
     ephemeral = false,
 ): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
     try {
-        const restClient = getRestClient();
-        await restClient.respondToInteraction(interaction.id, interaction.token, {
-            type: InteractionCallbackType.CHANNEL_MESSAGE,
-            data: {
-                embeds: [embed],
-                ...(ephemeral ? { flags: 64 } : {}),
-            },
-        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await interaction.reply({ embeds: [embed as any], ephemeral });
     } catch (error) {
         log.error('Failed to respond to Discord interaction with embed', {
             error: error instanceof Error ? error.message : String(error),
@@ -311,21 +298,13 @@ export async function respondToInteractionEmbed(
 }
 
 export async function respondToInteractionEmbeds(
-    interaction: DiscordInteractionData,
+    interaction: RepliableInteraction,
     embeds: DiscordEmbed[],
     ephemeral = false,
 ): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
     try {
-        const restClient = getRestClient();
-        await restClient.respondToInteraction(interaction.id, interaction.token, {
-            type: InteractionCallbackType.CHANNEL_MESSAGE,
-            data: {
-                embeds,
-                ...(ephemeral ? { flags: 64 } : {}),
-            },
-        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await interaction.reply({ embeds: embeds as any[], ephemeral });
     } catch (error) {
         log.error('Failed to respond to Discord interaction with embeds', {
             error: error instanceof Error ? error.message : String(error),
@@ -337,12 +316,9 @@ export async function respondToInteractionEmbeds(
  * Defer a slash command response — shows "thinking..." in Discord.
  * Follow up later with editDeferredResponse().
  */
-export async function deferInteraction(interaction: DiscordInteractionData, ephemeral = false): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
+export async function deferInteraction(interaction: RepliableInteraction, ephemeral = false): Promise<void> {
     try {
-        const restClient = getRestClient();
-        await restClient.deferInteraction(interaction.id, interaction.token, ephemeral);
+        await interaction.deferReply({ ephemeral });
     } catch (error) {
         log.error('Failed to defer interaction', {
             error: error instanceof Error ? error.message : String(error),
@@ -354,23 +330,16 @@ export async function deferInteraction(interaction: DiscordInteractionData, ephe
  * Edit the deferred "thinking..." response with the final content.
  */
 export async function editDeferredResponse(
-    interaction: DiscordInteractionData,
+    interaction: RepliableInteraction,
     content: string,
     embeds?: DiscordEmbed[],
 ): Promise<void> {
-    assertInteractionToken(interaction.token);
-    const appId = process.env.DISCORD_APP_ID;
-    if (!appId) {
-        log.error('DISCORD_APP_ID not set — cannot edit deferred response');
-        return;
-    }
     try {
         const body: Record<string, unknown> = {};
         if (content) body.content = content.slice(0, MAX_MESSAGE_LENGTH);
-        if (embeds) body.embeds = embeds;
-
-        const restClient = getRestClient();
-        await restClient.editDeferredResponse(appId, interaction.token, body);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (embeds) body.embeds = embeds as any[];
+        await interaction.editReply(body);
     } catch (error) {
         log.error('Failed to edit deferred response', {
             error: error instanceof Error ? error.message : String(error),
@@ -381,15 +350,9 @@ export async function editDeferredResponse(
 /**
  * Respond to an interaction with an ephemeral (only-visible-to-user) message.
  */
-export async function respondEphemeral(interaction: DiscordInteractionData, content: string): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
+export async function respondEphemeral(interaction: RepliableInteraction, content: string): Promise<void> {
     try {
-        const restClient = getRestClient();
-        await restClient.respondToInteraction(interaction.id, interaction.token, {
-            type: InteractionCallbackType.CHANNEL_MESSAGE,
-            data: { content: content.slice(0, MAX_MESSAGE_LENGTH), flags: 64 },
-        });
+        await interaction.reply({ content: content.slice(0, MAX_MESSAGE_LENGTH), ephemeral: true });
     } catch (error) {
         log.error('Failed to send ephemeral response', {
             error: error instanceof Error ? error.message : String(error),
@@ -397,15 +360,9 @@ export async function respondEphemeral(interaction: DiscordInteractionData, cont
     }
 }
 
-export async function acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
-    assertSnowflake(interaction.id, 'interaction ID');
-    assertInteractionToken(interaction.token);
+export async function acknowledgeButton(interaction: RepliableInteraction, message: string): Promise<void> {
     try {
-        const restClient = getRestClient();
-        await restClient.respondToInteraction(interaction.id, interaction.token, {
-            type: InteractionCallbackType.CHANNEL_MESSAGE,
-            data: { content: message, flags: 64 }, // 64 = ephemeral
-        });
+        await interaction.reply({ content: message, ephemeral: true });
     } catch (error) {
         log.error('Failed to acknowledge button', {
             error: error instanceof Error ? error.message : String(error),
