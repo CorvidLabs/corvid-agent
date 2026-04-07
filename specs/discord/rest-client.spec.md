@@ -42,6 +42,7 @@ Thin wrapper around the discord.js `REST` client that encapsulates rate limit ha
 |----------|-----------|---------|-------------|
 | `initializeRestClient` | `(token: string)` | `void` | Initialize the global REST client singleton with a bot token |
 | `getRestClient` | `()` | `DiscordRestClient` | Get the global REST client instance; throws if not initialized |
+| `createRestClient` | `(token: string)` | `DiscordRestClient` | Create a standalone REST client with a custom token (e.g., for guild-specific bots) |
 | `_setRestClientForTesting` | `(client: DiscordRestClient \| null)` | `void` | Test-only: inject a mock client or reset to null |
 
 ## Invariants

@@ -204,19 +204,11 @@ function tryRecoverThreadFromCtx(
 /** Un-archive a thread so it can receive messages again. */
 async function unarchiveThread(botToken: string, threadId: string): Promise<void> {
     assertSnowflake(threadId, 'thread ID');
-    const { discordFetch } = await import('../embeds');
-    const response = await discordFetch(
-        `https://discord.com/api/v10/channels/${threadId}`,
-        {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bot ${botToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ archived: false }),
-        },
-    );
-    if (!response.ok) {
-        log.debug('Failed to unarchive thread', { threadId, status: response.status });
+    try {
+        const { createRestClient } = await import('../rest-client');
+        const rest = createRestClient(botToken);
+        await rest.modifyChannel(threadId, { archived: false });
+    } catch (err) {
+        log.debug('Failed to unarchive thread', { threadId, error: err instanceof Error ? err.message : String(err) });
     }
 }
