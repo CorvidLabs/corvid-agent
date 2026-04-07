@@ -310,7 +310,7 @@ interface SimpleAgent {
             border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
             font-size: 0.7rem; font-weight: 600;
         }
-        .chip-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.85rem; padding: 0; line-height: 1; opacity: 0.7; }
+        .chip-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; padding: 0.2rem 0.3rem; min-width: 24px; min-height: 24px; line-height: 1; opacity: 0.7; display: inline-flex; align-items: center; justify-content: center; }
         .chip-remove:hover { opacity: 1; }
         .picker-search { margin-bottom: 0.3rem; }
         .picker-results {

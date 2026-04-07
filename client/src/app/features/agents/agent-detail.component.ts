@@ -464,7 +464,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn--sm { padding: var(--space-1) var(--space-2); font-size: 0.7rem; margin-top: 0.5rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; margin-top: 0.5rem; }
 
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -524,7 +524,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .skills-assign__btn:disabled { opacity: 0.4; cursor: default; }
         .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .skill-tag { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; opacity: 0.6; }
+        .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0.2rem 0.3rem; min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.6; }
         .skill-tag__remove:hover { opacity: 1; }
 
         /* Flock Profile */

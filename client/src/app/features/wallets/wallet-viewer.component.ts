@@ -280,7 +280,7 @@ interface WalletMessage {
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-tint); box-shadow: 0 0 8px var(--accent-cyan-mid); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .btn--ghost:hover { background: var(--bg-hover); }
 

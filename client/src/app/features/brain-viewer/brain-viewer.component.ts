@@ -656,12 +656,13 @@ interface SyncStatus {
             color: var(--text-secondary);
         }
         .btn--sm {
-            padding: var(--space-1) 0.6rem;
+            padding: 0.4rem 0.75rem;
+            min-height: 32px;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;

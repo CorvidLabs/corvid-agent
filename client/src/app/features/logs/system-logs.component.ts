@@ -168,6 +168,7 @@ interface CreditTransaction {
         }
         .tab-btn {
             padding: 0.45rem var(--space-4);
+            min-height: 32px;
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -190,7 +191,7 @@ interface CreditTransaction {
             font-size: 0.8rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .log-search:focus { border-color: var(--accent-cyan); outline: none; }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
         .btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
         /* Log filters */
@@ -201,16 +202,19 @@ interface CreditTransaction {
         }
         .filter-group { display: flex; gap: 0.35rem; }
         .filter-chip {
-            padding: var(--space-1) 0.55rem;
+            padding: 0.35rem 0.65rem;
+            min-height: 28px;
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: 20px;
             color: var(--text-tertiary);
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             font-family: inherit;
             cursor: pointer;
             text-transform: capitalize;
             transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
         }
         .filter-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
         .filter-chip--active { border-color: var(--accent-magenta); color: var(--accent-magenta); background: var(--accent-magenta-dim); }

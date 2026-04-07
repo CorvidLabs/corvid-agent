@@ -387,7 +387,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }

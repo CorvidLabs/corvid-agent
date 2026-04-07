@@ -183,7 +183,7 @@ interface CreditTransaction {
         .badge--reserve { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .badge--release, .badge--refund { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .txid { font-family: var(--font-mono); font-size: 0.8rem; }
-        .btn--sm { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
         .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px var(--accent-cyan-tint); }

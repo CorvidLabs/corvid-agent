@@ -256,9 +256,9 @@ interface CommEntry {
         .comms__select:focus { border-color: var(--accent-cyan); }
         .comms__channel-chips { display: flex; gap: 0.25rem; flex-wrap: wrap; }
         .ch-chip {
-            padding: var(--space-1) 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
-            cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+            padding: 0.35rem 0.65rem; min-height: 28px; background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 20px; color: var(--text-tertiary); font-size: 0.7rem; font-family: inherit;
+            cursor: pointer; text-transform: uppercase; transition: all 0.15s; display: inline-flex; align-items: center;
         }
         .ch-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
         .ch-chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }

@@ -176,9 +176,9 @@ interface CouncilCard {
         .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
         .filter-group { display: flex; gap: 0.25rem; }
         .filter-chip {
-            padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.4rem 0.75rem; min-height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm);
             background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-            cursor: pointer; transition: all 0.15s; text-transform: capitalize;
+            cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: inline-flex; align-items: center;
         }
         .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
         .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }

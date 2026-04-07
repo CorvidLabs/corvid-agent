@@ -600,7 +600,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -348,7 +348,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .form-hint{font-size:.6rem;color:var(--text-tertiary)}.form-hint--active{color:var(--accent-cyan)}.mono{font-family:monospace}.schedule-type-toggle{display:flex;gap:.35rem}
 .type-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer}.type-btn--active{border-color:var(--accent-cyan);color:var(--accent-cyan);background:var(--accent-cyan-dim)}
 .action-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem}.action-type-select{min-width:140px}
-.remove-action-btn{padding:.25rem .5rem;background:var(--accent-red-dim);color:var(--accent-red);border:1px solid var(--accent-red);border-radius:var(--radius-sm);cursor:pointer;font-size:.9rem;line-height:1}
+.remove-action-btn{padding:.3rem .5rem;min-width:28px;min-height:28px;background:var(--accent-red-dim);color:var(--accent-red);border:1px solid var(--accent-red);border-radius:var(--radius-sm);cursor:pointer;font-size:.9rem;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .add-action-btn{padding:.35rem .75rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-secondary);font-size:.7rem;cursor:pointer;margin-top:.25rem}
 .form-checkbox{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--text-secondary);cursor:pointer;white-space:nowrap}.form-buttons{margin-top:1rem}.save-btn{text-transform:uppercase}
 .empty{text-align:center;padding:3rem;color:var(--text-tertiary)}.empty-hint{font-size:.75rem;margin-top:.5rem}

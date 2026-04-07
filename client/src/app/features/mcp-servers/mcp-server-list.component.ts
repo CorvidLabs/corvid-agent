@@ -484,7 +484,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
         .official-card__env { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
         .env-input { padding: 0.35rem var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: var(--font-mono); background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
         .env-input:focus { border-color: var(--accent-cyan); outline: none; }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
 
         .server-card__agent-tag { font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: 600; }
         .create-form {

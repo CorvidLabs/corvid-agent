@@ -244,8 +244,8 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--ghost:hover { border-color: var(--text-tertiary); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-        .btn--xs { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
+        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        .btn--xs { padding: 0.3rem 0.5rem; font-size: 0.7rem; min-height: 28px; }
 
         .contact-layout {
             display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;

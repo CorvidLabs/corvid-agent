@@ -354,7 +354,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
+        .btn--sm { font-size: 0.7rem; padding: 0.4rem 0.75rem; min-height: 32px; }
 
         .auto-label {
             font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;
