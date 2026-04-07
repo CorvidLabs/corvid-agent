@@ -153,21 +153,21 @@ export interface Breadcrumb {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: var(--space-4) var(--space-8) var(--space-8);
+            padding: var(--space-5) var(--space-8) var(--space-8);
         }
 
         @media (max-width: 767px) {
             .page-shell__breadcrumbs {
-                padding: var(--space-2) var(--space-4) 0;
+                padding: var(--space-2) var(--space-5) 0;
             }
             .page-shell__header {
-                padding: var(--space-2) var(--space-4) var(--space-1);
+                padding: var(--space-2) var(--space-5) var(--space-1);
             }
             .page-shell__toolbar {
-                padding: 0 var(--space-4);
+                padding: 0 var(--space-5);
             }
             .page-shell__content {
-                padding: var(--space-3) var(--space-5) var(--space-5);
+                padding: var(--space-4) var(--space-5) var(--space-6);
             }
             .page-shell__title {
                 font-size: 1rem;

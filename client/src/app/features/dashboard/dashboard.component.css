@@ -512,11 +512,11 @@
     .action-btn { flex: 1 1 calc(50% - .25rem); min-width: 0; text-align: center; }
 }
 @media (max-width:480px) {
-    .dashboard { padding: var(--space-3); }
+    .dashboard { padding: var(--space-4); }
     .metrics-row { grid-template-columns: repeat(2,1fr); gap: .5rem; }
-    .metric-card { padding: var(--space-2) var(--space-3); }
+    .metric-card { padding: var(--space-3) var(--space-4); }
     .metric-card__value { font-size: 1.2rem; }
-    .section { padding: var(--space-3); }
+    .section { padding: var(--space-4); }
 }
 
 /* ===== PHASE 3: Dashboard Overhaul ===== */

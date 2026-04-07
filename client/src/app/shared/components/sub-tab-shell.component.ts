@@ -90,6 +90,7 @@ transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
         .tab-shell__content {
             flex: 1;
             overflow-y: auto;
+            padding: var(--space-4) var(--space-6);
         }
 
         @media (max-width: 767px) {
@@ -99,6 +100,9 @@ transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
             .tab-shell__tab {
                 padding: 0.55rem var(--space-3);
                 font-size: 0.72rem;
+            }
+            .tab-shell__content {
+                padding: var(--space-3) var(--space-4);
             }
         }
     `,
