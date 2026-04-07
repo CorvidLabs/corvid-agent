@@ -4,6 +4,7 @@ version: 1
 status: active
 files:
   - server/db/sessions.ts
+  - server/db/migrations/115_algochat_unique_participant.ts
 db_tables:
   - sessions
   - session_messages
@@ -42,7 +43,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `addSessionMessage` | `(db: Database, sessionId: string, role: string, content: string, costUsd?: number)` | `SessionMessage` | Append a message to a session |
 | `listConversations` | `(db: Database)` | `AlgoChatConversation[]` | List all AlgoChat conversations, ordered by `created_at DESC` |
 | `getConversationByParticipant` | `(db: Database, participantAddr: string)` | `AlgoChatConversation \| null` | Look up conversation by wallet address |
-| `createConversation` | `(db: Database, participantAddr: string, agentId: string \| null, sessionId: string \| null)` | `AlgoChatConversation` | Create a new AlgoChat conversation |
+| `getConversationBySessionId` | `(db: Database, sessionId: string)` | `AlgoChatConversation \| null` | Look up conversation by linked session ID |
+| `createConversation` | `(db: Database, participantAddr: string, agentId: string \| null, sessionId: string \| null)` | `AlgoChatConversation` | Create or update (upsert) an AlgoChat conversation. On conflict with existing `participant_addr`, updates `agent_id` and `session_id` |
 | `updateConversationRound` | `(db: Database, id: string, lastRound: number)` | `void` | Update the last-seen Algorand round |
 | `updateConversationSession` | `(db: Database, id: string, sessionId: string)` | `void` | Link a conversation to a session |
 | `updateConversationAgent` | `(db: Database, id: string, agentId: string, sessionId: string)` | `void` | Update both agent and session for a conversation |
@@ -50,6 +52,13 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for a session |
 | `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session (for context carry-over) |
 | `getParticipantForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup: get wallet address for a session via conversations |
+
+### Exported Migration Functions — `server/db/migrations/115_algochat_unique_participant.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Removes duplicate conversations (keeps latest per `participant_addr`), replaces index with UNIQUE constraint |
+| `down` | `(db: Database)` | `void` | Reverts UNIQUE index back to a non-unique index |
 
 ## Invariants
 
