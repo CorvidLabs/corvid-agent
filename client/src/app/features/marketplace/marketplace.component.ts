@@ -8,24 +8,24 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
 import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Marketplace</h2>
+        <app-page-shell title="Marketplace" icon="marketplace">
+            <ng-container actions>
                 <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
                     {{ showCreateForm() ? 'Cancel' : '+ New Listing' }}
                 </button>
-            </div>
+            </ng-container>
 
-            <!-- Search and filters -->
-            <div class="search-bar">
+            <ng-container toolbar>
+                <div class="search-bar">
                 <input
                     [(ngModel)]="searchQuery"
                     class="search-input"
@@ -42,7 +42,8 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     <option value="general">General</option>
                 </select>
                 <button class="btn btn--primary btn--sm" (click)="onSearch()">Search</button>
-            </div>
+                </div>
+            </ng-container>
 
             @if (showCreateForm()) {
                 <div class="create-form">
@@ -265,42 +266,39 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .search-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; align-items: center; }
         .search-input {
-            flex: 1; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            flex: 1; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .filter-select {
-            padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
-            padding: 0.75rem 1rem; margin-bottom: 1rem;
+            padding: var(--space-3) var(--space-4); margin-bottom: 1rem;
         }
         .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            padding: var(--space-6); margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -313,7 +311,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
         .listing-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1rem; cursor: pointer; transition: border-color 0.15s;
+            padding: var(--space-4); cursor: pointer; transition: border-color 0.15s;
         }
         .listing-card:hover { border-color: var(--accent-cyan); }
         .listing-card--selected { border-color: var(--accent-cyan); background: var(--bg-raised); }
@@ -322,7 +320,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-card__name { font-weight: 600; color: var(--text-primary); }
         .listing-card__badges { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
         .listing-card__category {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm);
             text-transform: uppercase; color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
         }
         .listing-card__desc { margin: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary); }
@@ -332,27 +330,27 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-card__price { color: var(--accent-green); }
         .listing-card__tags { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
         .tag {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
         }
 
         /* Stars */
         .star { color: var(--border); font-size: 0.85rem; line-height: 1; }
-        .star--filled { color: var(--accent-yellow, #ffc107); }
+        .star--filled { color: var(--accent-yellow); }
         .star--lg { font-size: 1.1rem; }
 
         /* Trust badge */
         .trust-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
         .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
         .trust-badge[data-level="medium"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .trust-badge[data-level="low"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
+        .trust-badge[data-level="low"] { color: var(--accent-yellow); border-color: var(--accent-yellow); }
         .trust-badge[data-level="untrusted"] { color: var(--accent-red); border-color: var(--accent-red); }
         .external-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
-            text-transform: uppercase; color: var(--accent-orange, #ff9100); border: 1px solid var(--accent-orange, #ff9100);
+            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            text-transform: uppercase; color: var(--accent-orange); border: 1px solid var(--accent-orange);
             background: var(--bg-raised);
         }
 
@@ -362,7 +360,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         /* Detail panel */
         .detail-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-top: 1.5rem;
+            padding: var(--space-6); margin-top: 1.5rem;
         }
         .detail-columns { display: grid; grid-template-columns: 1fr auto; gap: 2rem; }
         .detail-panel__header { display: flex; justify-content: space-between; align-items: center; }
@@ -372,11 +370,11 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .detail-time { font-size: 0.75rem; color: var(--text-secondary); }
         .detail-stats { display: flex; flex-direction: column; gap: 0.75rem; min-width: 140px; }
         .stat-item { display: flex; flex-direction: column; gap: 0.15rem; }
-        .stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+        .stat-label { font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
         .stat-value { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
         .stat-value--rating { display: flex; align-items: center; gap: 0.1rem; }
         .stat-value--price { color: var(--accent-green); }
-        .review-row { border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
+        .review-row { border-bottom: 1px solid var(--border); padding: var(--space-2) 0; }
         .review-row__header { display: flex; justify-content: space-between; align-items: center; }
         .review-row__stars { display: inline-flex; gap: 0.1rem; }
         .review-row__time { font-size: 0.75rem; color: var(--text-secondary); }
@@ -386,12 +384,12 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .review-form__fields { display: flex; gap: 0.5rem; align-items: center; }
         .review-form__rating { width: auto; flex-shrink: 0; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--sm { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         @media (max-width: 767px) {

@@ -41,9 +41,9 @@ export type ViewMode = 'basic' | '3d';
         .view-toggle {
             display: inline-flex;
             gap: 0;
-            background: var(--glass-bg-solid, rgba(20, 21, 30, 0.9));
-            border: 1px solid var(--border-subtle, #1a1a2e);
-            border-radius: 6px;
+            background: var(--glass-bg-solid);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
             overflow: hidden;
         }
         .view-toggle__btn {
@@ -58,18 +58,18 @@ export type ViewMode = 'basic' | '3d';
             text-transform: uppercase;
             background: transparent;
             border: none;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
         }
         .view-toggle__btn:hover {
-            color: var(--text-primary, #e0e0e0);
-            background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+            color: var(--text-primary);
+            background: var(--bg-hover);
         }
         .view-toggle__btn--active {
-            color: var(--accent-cyan, #00e5ff);
-            background: var(--accent-cyan-subtle, rgba(0, 229, 255, 0.08));
-            text-shadow: 0 0 8px var(--accent-cyan-border, rgba(0, 229, 255, 0.3));
+            color: var(--accent-cyan);
+            background: var(--accent-cyan-subtle);
+            text-shadow: 0 0 8px var(--accent-cyan-border);
         }
         .view-toggle__icon {
             width: 14px;
@@ -82,7 +82,7 @@ export type ViewMode = 'basic' | '3d';
 
         @media (max-width: 480px) {
             .view-toggle__label { display: none; }
-            .view-toggle__btn { padding: 0.3rem 0.5rem; }
+            .view-toggle__btn { padding: 0.3rem var(--space-2); }
         }
     `,
 })

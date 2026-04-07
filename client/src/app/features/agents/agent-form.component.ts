@@ -172,7 +172,7 @@ import { firstValueFrom } from 'rxjs';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; max-width: 640px; }
+        .page { padding: var(--space-6); max-width: 640px; }
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .form__textarea { min-height: 5em; line-height: 1.5; }
         .form__hint { font-style: italic; }
@@ -185,7 +185,7 @@ import { firstValueFrom } from 'rxjs';
             border-radius: var(--radius); background: var(--bg-input); cursor: pointer;
         }
         .color-picker__input::-webkit-color-swatch-wrapper { padding: 2px; }
-        .color-picker__input::-webkit-color-swatch { border-radius: 3px; border: none; }
+        .color-picker__input::-webkit-color-swatch { border-radius: var(--radius-sm); border: none; }
         .color-picker__hex { width: 100px; font-family: var(--font-mono); }
         .icon-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
         .icon-picker__option {

@@ -4,21 +4,17 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">
-                    Allowlist
-                    @if (allowlistService.entries().length > 0) {
-                        <span class="count">({{ allowlistService.entries().length }})</span>
-                    }
-                </h2>
-            </div>
+        <app-page-shell
+            title="Allowlist"
+            icon="allowlist"
+            [subtitle]="allowlistService.entries().length > 0 ? '(' + allowlistService.entries().length + ')' : ''">
 
             <div class="add-form">
                 <input
@@ -83,38 +79,34 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
         .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .input {
-            flex: 1; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
+            flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
         }
         .input::placeholder { color: var(--text-tertiary); }
         .input--label { max-width: 200px; }
-        .input--inline { flex: 1; padding: 0.3rem 0.5rem; font-size: 0.8rem; }
+        .input--inline { flex: 1; padding: 0.3rem var(--space-2); font-size: 0.8rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
         }
         .btn:disabled { opacity: 0.4; cursor: default; }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--danger { color: var(--accent-red, #f44); border-color: var(--accent-red, #f44); }
+        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--small { padding: var(--space-1) var(--space-2); font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
-        .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
+        .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border);
+            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg);
         }
         .list__item-main { flex: 1; min-width: 0; }

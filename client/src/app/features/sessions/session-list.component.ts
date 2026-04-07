@@ -127,7 +127,7 @@ interface SessionGroup {
 
         .search-bar { margin-bottom: 0.75rem; }
         .search-input {
-            width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
@@ -142,7 +142,7 @@ interface SessionGroup {
         .filter-tab--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .filter-tabs__spacer { flex: 1; }
         .source-select {
-            padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.35rem var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
             background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
         }
 
@@ -153,20 +153,20 @@ interface SessionGroup {
         .session-group { margin-bottom: 1.5rem; }
         .session-group__label {
             font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-            color: var(--text-tertiary); margin-bottom: 0.5rem; padding-left: 0.25rem;
+            color: var(--text-tertiary); margin-bottom: 0.5rem; padding-left: var(--space-1);
         }
 
         .session-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
         .session-table__header {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
-            padding: 0.5rem 1rem; background: var(--bg-raised); font-size: 0.7rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); background: var(--bg-raised); font-size: 0.7rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);
             position: sticky; top: 0; z-index: 5;
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
         .session-table__row {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
-            padding: 0.5rem 1rem; border-top: 1px solid var(--border);
+            padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border);
             font-size: 0.8rem; color: var(--text-primary); text-decoration: none;
             transition: background 0.15s, border-color 0.15s; align-items: center;
         }
@@ -179,7 +179,7 @@ interface SessionGroup {
         .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
 
         .show-more {
-            display: block; width: 100%; margin-top: 0.5rem; padding: 0.5rem;
+            display: block; width: 100%; margin-top: 0.5rem; padding: var(--space-2);
             background: transparent; border: 1px dashed var(--border-bright); border-radius: var(--radius);
             color: var(--accent-cyan); font-size: 0.75rem; font-family: inherit; font-weight: 600;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
@@ -191,9 +191,9 @@ interface SessionGroup {
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
             .filter-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0.15rem; }
             .filter-tabs::-webkit-scrollbar { display: none; }
-            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: 0.65rem; padding: 0.3rem 0.5rem; }
+            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: var(--text-xxs); padding: 0.3rem var(--space-2); }
             .filter-tabs__spacer { display: none; }
-            .source-select { flex-shrink: 0; font-size: 0.65rem; }
+            .source-select { flex-shrink: 0; font-size: var(--text-xxs); }
             .search-input { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
         }
     `,

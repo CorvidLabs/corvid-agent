@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 interface OverviewData {
     totalSessions: number;
@@ -55,10 +56,9 @@ interface SessionStats {
 @Component({
     selector: 'app-analytics',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SkeletonComponent],
+    imports: [DecimalPipe, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="analytics">
-            <h2>Analytics</h2>
+        <app-page-shell title="Analytics" icon="analytics">
 
             @if (loading()) {
                 <app-skeleton variant="card" [count]="6" />
@@ -214,12 +214,10 @@ interface SessionStats {
                     </div>
                 }
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .analytics { padding: 1.5rem; }
-        .analytics h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .analytics h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
+        h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
 
         .analytics__cards {
@@ -233,7 +231,7 @@ interface SessionStats {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1rem;
+            padding: var(--space-4);
             display: flex;
             flex-direction: column;
             gap: 0.35rem;
@@ -243,7 +241,7 @@ interface SessionStats {
             border-style: dashed;
         }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -252,17 +250,17 @@ interface SessionStats {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+            text-shadow: 0 0 10px var(--accent-cyan-dim);
         }
-        .stat-card__value--usd { color: var(--accent-green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.15); }
-        .stat-card__value--algo { color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.15); }
-        .stat-card__value--active { color: var(--accent-amber); text-shadow: 0 0 10px rgba(255, 170, 0, 0.15); }
+        .stat-card__value--usd { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
+        .stat-card__value--algo { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
+        .stat-card__value--active { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
 
         .analytics__section {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.25rem;
+            padding: var(--space-5);
             margin-bottom: 1.25rem;
         }
 
@@ -292,7 +290,7 @@ interface SessionStats {
             transition: flex 0.3s;
         }
         .work-task-segment__label {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -333,7 +331,7 @@ interface SessionStats {
         .chart-row__label {
             width: 48px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-align: right;
         }
@@ -354,12 +352,12 @@ interface SessionStats {
         .chart-row__value {
             width: 64px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             color: var(--accent-green);
             text-align: right;
         }
         .chart-row__bar--sessions {
-            background: linear-gradient(90deg, var(--accent-magenta-dim, rgba(255, 0, 170, 0.15)), var(--accent-magenta));
+            background: linear-gradient(90deg, var(--accent-magenta-dim), var(--accent-magenta));
         }
         .chart-row__value--sessions { color: var(--accent-magenta); }
 
@@ -402,7 +400,7 @@ interface SessionStats {
         .kv-key[data-status="error"] { color: var(--accent-red); }
         .kv-val { color: var(--text-primary); font-weight: 600; }
 
-        .empty-state { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: 1rem; }
+        .empty-state { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: var(--space-4); }
     `,
 })
 export class AnalyticsComponent implements OnInit {

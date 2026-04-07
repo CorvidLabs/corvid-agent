@@ -5,17 +5,17 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-project-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2 class="page-title">Projects</h2>
+        <app-page-shell title="Projects" icon="projects">
+            <ng-container actions>
                 <a class="btn btn--primary" routerLink="/agents/projects/new">New Project</a>
-            </div>
+            </ng-container>
 
             @if (projectService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -28,7 +28,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
                     actionRoute="/agents/projects/new"
                     actionAriaLabel="Create your first project" />
             } @else {
-                <div class="list" role="list">
+                <div class="list stagger-children" role="list">
                     @for (project of projectService.projects(); track project.id) {
                         <a
                             class="list__item"
@@ -46,14 +46,11 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -63,11 +60,11 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border);
+            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg); text-decoration: none; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .list__item:hover { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(0, 255, 136, 0.08); }
+        .list__item:hover { border-color: var(--accent-green); box-shadow: 0 0 12px var(--accent-green-wash); }
         .list__item-title { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--text-primary); }
         .list__item-desc { margin: 0; color: var(--text-secondary); font-size: 0.8rem; }
         .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; font-size: 0.75rem; color: var(--text-tertiary); }

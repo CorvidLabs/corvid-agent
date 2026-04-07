@@ -713,6 +713,34 @@ export class WorkTaskService {
             tenantId,
         });
         if (!task) {
+            // Race condition: another task became active between getActiveTaskForProject
+            // and the atomic insert. Queue behind it instead of rejecting.
+            const raceActiveTask = getActiveTaskForProject(this.db, projectId);
+            if (raceActiveTask) {
+                const queued = createWorkTask(this.db, {
+                    agentId: input.agentId,
+                    projectId,
+                    description: input.description,
+                    source: input.source,
+                    sourceId: input.sourceId,
+                    requesterInfo: input.requesterInfo,
+                    priority,
+                    tenantId,
+                });
+                updateWorkTaskStatus(this.db, queued.id, 'queued');
+                this.setTaskPriority(queued, priority);
+                this.storeTierOverride(queued.id, input.modelTier);
+                this.storeBuddyConfig(queued.id, input);
+                log.info('Work task queued (race condition recovery)', {
+                    taskId: queued.id,
+                    activeTaskId: raceActiveTask.id,
+                    priority,
+                });
+                this.emitCreationNotifications(queued, input);
+                const enriched = getWorkTask(this.db, queued.id) ?? queued;
+                return this.enrichTask(enriched);
+            }
+            // Truly unexpected — no active task found but atomic insert still failed
             throw new ConflictError('Another task is already active on project', { projectId });
         }
 

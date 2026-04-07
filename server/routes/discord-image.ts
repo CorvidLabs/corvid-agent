@@ -33,18 +33,26 @@ const ALLOWED_IMAGE_ROOTS = [
 
 const log = createLogger('DiscordImageRoute');
 
+/** Optional dependency overrides for testing. */
+export interface DiscordImageDeps {
+    sendMessageWithFiles?: typeof sendMessageWithFiles;
+    sendEmbedWithFiles?: typeof sendEmbedWithFiles;
+    getDeliveryTracker?: typeof getDeliveryTracker;
+}
+
 export function handleDiscordImageRoutes(
     req: Request,
     url: URL,
     _context: RequestContext,
+    deps?: DiscordImageDeps,
 ): Response | Promise<Response> | null {
     if (url.pathname !== '/api/discord/send-image') return null;
     if (req.method !== 'POST') return null;
 
-    return handleSendImage(req);
+    return handleSendImage(req, deps);
 }
 
-async function handleSendImage(req: Request): Promise<Response> {
+async function handleSendImage(req: Request, deps?: DiscordImageDeps): Promise<Response> {
     const botToken = process.env.DISCORD_BOT_TOKEN;
     if (!botToken) {
         return json({ error: 'Discord bot token not configured' }, 503);
@@ -130,7 +138,11 @@ async function handleSendImage(req: Request): Promise<Response> {
             return json({ error: 'Missing required field: channelId' }, 400);
         }
 
-        const delivery = getDeliveryTracker();
+        const _getDeliveryTracker = deps?.getDeliveryTracker ?? getDeliveryTracker;
+        const _sendMessageWithFiles = deps?.sendMessageWithFiles ?? sendMessageWithFiles;
+        const _sendEmbedWithFiles = deps?.sendEmbedWithFiles ?? sendEmbedWithFiles;
+
+        const delivery = _getDeliveryTracker();
         const attachment: DiscordFileAttachment = {
             name: filename,
             data: imageData,
@@ -141,15 +153,15 @@ async function handleSendImage(req: Request): Promise<Response> {
 
         if (replyToMessageId) {
             // Send as embed with image + reply reference
-            messageId = await sendEmbedWithFiles(delivery, botToken, channelId, {
+            messageId = await _sendEmbedWithFiles(delivery, botToken, channelId, {
                 description: message || undefined,
                 image: { url: `attachment://${filename}` },
             }, [attachment]);
         } else if (message) {
-            messageId = await sendMessageWithFiles(delivery, botToken, channelId, message, [attachment]);
+            messageId = await _sendMessageWithFiles(delivery, botToken, channelId, message, [attachment]);
         } else {
             // Just the image, no text
-            messageId = await sendMessageWithFiles(delivery, botToken, channelId, '', [attachment]);
+            messageId = await _sendMessageWithFiles(delivery, botToken, channelId, '', [attachment]);
         }
 
         if (!messageId) {

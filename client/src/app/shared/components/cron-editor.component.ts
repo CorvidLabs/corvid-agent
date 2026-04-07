@@ -162,7 +162,7 @@ const PRESETS: CronPreset[] = [
             border-color: var(--accent-red);
         }
         .cron-editor--error .cron-editor__input:focus {
-            box-shadow: 0 0 0 2px rgba(255, 51, 85, 0.15);
+            box-shadow: 0 0 0 2px var(--accent-red-dim);
         }
         .cron-editor__field-hints {
             display: flex;
@@ -181,7 +181,7 @@ const PRESETS: CronPreset[] = [
             font-size: 0.7rem;
             color: var(--accent-cyan);
             font-weight: 600;
-            padding: 0.3rem 0.5rem;
+            padding: 0.3rem var(--space-2);
             background: var(--accent-cyan-dim);
             border-radius: var(--radius-sm);
             border-left: 2px solid var(--accent-cyan);
@@ -190,7 +190,7 @@ const PRESETS: CronPreset[] = [
             font-size: 0.7rem;
             color: var(--accent-red);
             font-weight: 600;
-            padding: 0.3rem 0.5rem;
+            padding: 0.3rem var(--space-2);
             background: var(--accent-red-dim);
             border-radius: var(--radius-sm);
             border-left: 2px solid var(--accent-red);
@@ -200,7 +200,7 @@ const PRESETS: CronPreset[] = [
                 gap: 0.25rem;
             }
             .cron-preset {
-                padding: 0.25rem 0.4rem;
+                padding: var(--space-1) 0.4rem;
                 font-size: 0.6rem;
             }
         }

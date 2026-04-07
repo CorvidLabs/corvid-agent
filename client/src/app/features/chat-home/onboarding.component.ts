@@ -146,7 +146,7 @@ const TEMPLATES: AgentTemplate[] = [
         .onboard {
             max-width: 640px;
             margin: 0 auto;
-            padding: 3rem 1.5rem;
+            padding: var(--space-12) var(--space-6);
             text-align: center;
         }
         .onboard__hero { margin-bottom: 2rem; }
@@ -174,12 +174,12 @@ const TEMPLATES: AgentTemplate[] = [
             flex-direction: column;
             align-items: center;
             gap: 0.5rem;
-            padding: 1.25rem 1rem;
+            padding: var(--space-5) var(--space-4);
             background: rgba(15, 16, 24, 0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius-lg, 10px);
+            border-radius: var(--radius-lg);
             color: var(--text-secondary);
             font-family: inherit;
             cursor: pointer;
@@ -188,9 +188,9 @@ const TEMPLATES: AgentTemplate[] = [
             position: relative;
         }
         .tpl-card:hover {
-            border-color: rgba(0, 229, 255, 0.3);
-            background: rgba(0, 229, 255, 0.06);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 229, 255, 0.08);
+            border-color: var(--accent-cyan-glow);
+            background: var(--accent-cyan-subtle);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px var(--accent-cyan-wash);
             transform: translateY(-2px);
         }
         .tpl-card__icon {
@@ -199,14 +199,14 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.06));
-            border: 1px solid rgba(0, 229, 255, 0.15);
+            background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-magenta-subtle));
+            border: 1px solid var(--accent-cyan-dim);
             border-radius: 12px;
             font-size: 0.7rem;
             font-weight: 800;
             color: var(--accent-cyan);
             letter-spacing: 0.05em;
-            box-shadow: 0 2px 12px rgba(0, 229, 255, 0.08);
+            box-shadow: 0 2px 12px var(--accent-cyan-wash);
         }
         .tpl-card__name {
             font-size: 0.82rem;
@@ -214,7 +214,7 @@ const TEMPLATES: AgentTemplate[] = [
             color: var(--text-primary);
         }
         .tpl-card__desc {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             line-height: 1.4;
         }
@@ -250,10 +250,10 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .field__input {
             width: 100%;
-            padding: 0.6rem 0.75rem;
+            padding: 0.6rem var(--space-3);
             background: var(--bg-input);
             border: 1px solid var(--border);
-            border-radius: var(--radius, 6px);
+            border-radius: var(--radius);
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.82rem;
@@ -262,7 +262,7 @@ const TEMPLATES: AgentTemplate[] = [
         .field__input:focus {
             outline: none;
             border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 0 1px var(--accent-cyan-mid);
         }
         .onboard__form-actions {
             display: flex;
@@ -271,8 +271,8 @@ const TEMPLATES: AgentTemplate[] = [
             margin-top: 1.5rem;
         }
         .btn {
-            padding: 0.5rem 1.25rem;
-            border-radius: var(--radius, 6px);
+            padding: var(--space-2) var(--space-5);
+            border-radius: var(--radius);
             font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
@@ -281,13 +281,13 @@ const TEMPLATES: AgentTemplate[] = [
             transition: background 0.15s, box-shadow 0.15s;
         }
         .btn--primary {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(0, 229, 255, 0.06));
+            background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-cyan-subtle));
             color: var(--accent-cyan);
-            border-color: rgba(0, 229, 255, 0.3);
+            border-color: var(--accent-cyan-glow);
         }
         .btn--primary:hover:not(:disabled) {
-            background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 229, 255, 0.1));
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+            background: linear-gradient(135deg, var(--accent-cyan-mid), var(--accent-cyan-tint));
+            box-shadow: 0 0 20px var(--accent-cyan-dim);
         }
         .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn--ghost {
@@ -297,12 +297,12 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .btn--ghost:hover { background: var(--bg-hover); }
         .btn--large {
-            padding: 0.75rem 2rem;
+            padding: var(--space-3) var(--space-8);
             font-size: 0.9rem;
         }
 
         /* Done */
-        .onboard__done { padding: 2rem 0; }
+        .onboard__done { padding: var(--space-8) 0; }
         .onboard__done-icon {
             width: 64px;
             height: 64px;
@@ -315,14 +315,14 @@ const TEMPLATES: AgentTemplate[] = [
             border-radius: 50%;
             font-size: 1.5rem;
             color: var(--accent-cyan);
-            box-shadow: 0 0 24px rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 24px var(--accent-cyan-mid);
         }
         .onboard__done-actions {
             margin-top: 1.5rem;
         }
 
         @media (max-width: 480px) {
-            .onboard { padding: 1.5rem 1rem; }
+            .onboard { padding: var(--space-6) var(--space-4); }
             .onboard__templates { grid-template-columns: 1fr 1fr; }
         }
     `,

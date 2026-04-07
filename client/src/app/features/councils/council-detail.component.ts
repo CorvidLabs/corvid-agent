@@ -6,26 +6,25 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 @Component({
     selector: 'app-council-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, PageShellComponent, TooltipDirective],
     template: `
-        @if (council(); as c) {
-            <div class="page">
-                <div class="page__header">
-                    <div>
-                        <h2 class="page-title">{{ c.name }}</h2>
-                        <p class="page__desc">{{ c.description }}</p>
-                    </div>
-                    <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                    </div>
-                </div>
+        <app-page-shell
+            [title]="council()?.name ?? 'Loading...'"
+            icon="councils"
+            [subtitle]="council()?.description"
+            [breadcrumbs]="[{ label: 'Councils', route: '/sessions/councils' }, { label: council()?.name ?? '' }]">
+            @if (council(); as c) {
+                <ng-container actions>
+                    <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
+                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                </ng-container>
 
                 <div class="detail__info">
                     <dl>
@@ -104,19 +103,14 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         </div>
                     }
                 </div>
-            </div>
-        } @else {
-            <div class="page"><app-skeleton variant="card" [count]="2" /></div>
-        }
+            } @else {
+                <app-skeleton variant="card" [count]="2" />
+            }
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
-        .page__actions { display: flex; gap: 0.5rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
         }
@@ -134,14 +128,14 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .detail__members h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .member-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .member-badge {
-            padding: 0.25rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-bright);
+            padding: var(--space-1) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border-bright);
             border-radius: var(--radius); font-size: 0.8rem; color: var(--text-primary);
         }
         .detail__launch { margin-top: 2rem; }
         .detail__launch h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .launch-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 600px; }
         .launch-select, .launch-textarea {
-            padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .launch-select:focus, .launch-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
@@ -151,14 +145,14 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .detail__empty { color: var(--text-secondary); font-size: 0.85rem; }
         .launches-list { display: flex; flex-direction: column; gap: 0.75rem; }
         .launch-card {
-            display: block; padding: 0.75rem;
+            display: block; padding: var(--space-3);
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             text-decoration: none; color: inherit; transition: border-color 0.2s;
         }
         .launch-card:hover { border-color: var(--accent-cyan); }
         .launch-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
         .launch-card__stage {
-            font-size: 0.65rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid;
         }
         .launch-card__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -170,10 +164,10 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .launch-card__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
         .launch-card__prompt { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .launch-card__synthesis {
-            padding: 0.5rem; background: var(--bg-raised); border: 1px solid var(--border);
+            padding: var(--space-2); background: var(--bg-raised); border: 1px solid var(--border);
             border-radius: var(--radius); margin-top: 0.35rem;
         }
-        .synthesis-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
+        .synthesis-label { font-size: var(--text-xxs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
         .synthesis-text { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
     `,
 })

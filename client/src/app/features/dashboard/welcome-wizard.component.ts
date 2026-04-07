@@ -223,17 +223,17 @@ const TEMPLATES: AgentTemplate[] = [
             align-items: center;
             justify-content: center;
             min-height: 100%;
-            padding: 2rem 1.5rem;
+            padding: var(--space-8) var(--space-6);
             text-align: center;
         }
 
         .wizard__header { margin-bottom: 1.5rem; }
         .wizard__logo {
-            font-size: 0.35rem;
+            font-size: var(--text-micro);
             line-height: 1.1;
             color: var(--accent-cyan);
             margin: 0 0 1rem;
-            text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+            text-shadow: 0 0 8px var(--accent-cyan-glow);
             overflow-x: auto;
         }
         .wizard__title {
@@ -262,7 +262,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .progress-dot[data-active="true"] {
             background: var(--accent-cyan);
-            box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+            box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
         .progress-dot[data-done="true"] {
             background: var(--accent-green);
@@ -274,7 +274,7 @@ const TEMPLATES: AgentTemplate[] = [
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 1.5rem;
+            padding: var(--space-6);
         }
         .wizard__step--wide { max-width: 580px; }
         .wizard__step--done { text-align: center; }
@@ -302,7 +302,7 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
-            padding: 0.75rem;
+            padding: var(--space-3);
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -317,7 +317,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .template-card[data-selected="true"] {
             border-color: var(--accent-cyan);
-            background: rgba(0, 229, 255, 0.06);
+            background: var(--accent-cyan-subtle);
             box-shadow: var(--glow-cyan);
         }
         .template-card:last-child:nth-child(odd) {
@@ -360,7 +360,7 @@ const TEMPLATES: AgentTemplate[] = [
             letter-spacing: 0.06em;
         }
         .field__input {
-            padding: 0.5rem 0.75rem;
+            padding: var(--space-2) var(--space-3);
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             font-size: 0.85rem;
@@ -381,9 +381,9 @@ const TEMPLATES: AgentTemplate[] = [
             gap: 0.35rem;
         }
         .skill-tag {
-            padding: 0.2rem 0.5rem;
-            background: rgba(0, 229, 255, 0.08);
-            border: 1px solid rgba(0, 229, 255, 0.2);
+            padding: 0.2rem var(--space-2);
+            background: var(--accent-cyan-wash);
+            border: 1px solid var(--accent-cyan-mid);
             border-radius: var(--radius);
             font-size: 0.7rem;
             color: var(--accent-cyan);
@@ -415,32 +415,32 @@ const TEMPLATES: AgentTemplate[] = [
         .wizard__btn--primary {
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
-            background: rgba(0, 229, 255, 0.06);
+            background: var(--accent-cyan-subtle);
         }
         .wizard__btn--primary:hover:not(:disabled) {
-            background: rgba(0, 229, 255, 0.14);
+            background: var(--accent-cyan-dim);
             box-shadow: var(--glow-cyan);
         }
         .wizard__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         /* Warning */
         .wizard__warning {
-            background: rgba(255, 193, 7, 0.08);
-            border: 1px solid rgba(255, 193, 7, 0.3);
+            background: var(--accent-amber-wash);
+            border: 1px solid var(--accent-amber-glow);
             border-radius: var(--radius);
-            padding: 0.75rem;
+            padding: var(--space-3);
             margin-bottom: 1rem;
         }
         .wizard__warning p {
             margin: 0;
             font-size: 0.8rem;
-            color: var(--accent-amber, #ffc107);
+            color: var(--accent-amber);
             text-align: left;
         }
         .wizard__warning code {
             background: var(--bg-raised);
             padding: 0.1rem 0.35rem;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-size: 0.75rem;
         }
 
@@ -457,7 +457,7 @@ const TEMPLATES: AgentTemplate[] = [
             border-radius: 50%;
             color: var(--accent-green);
             border: 2px solid var(--accent-green);
-            background: rgba(0, 255, 136, 0.08);
+            background: var(--accent-green-wash);
         }
         .done__summary {
             display: flex;
@@ -470,7 +470,7 @@ const TEMPLATES: AgentTemplate[] = [
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.4rem 0.75rem;
+            padding: 0.4rem var(--space-3);
             background: var(--bg-raised);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -486,7 +486,7 @@ const TEMPLATES: AgentTemplate[] = [
             color: var(--text-primary);
         }
         .done__value--ok { color: var(--accent-green); }
-        .done__value--warn { color: var(--accent-amber, #ffc107); }
+        .done__value--warn { color: var(--accent-amber); }
         .done__actions {
             display: flex;
             flex-direction: column;
@@ -507,9 +507,9 @@ const TEMPLATES: AgentTemplate[] = [
         .wizard__footer a:hover { text-decoration: underline; }
 
         @media (max-width: 767px) {
-            .wizard { padding: 1rem; }
-            .wizard__logo { font-size: 0.25rem; }
-            .wizard__step { padding: 1rem; }
+            .wizard { padding: var(--space-4); }
+            .wizard__logo { font-size: var(--text-micro); }
+            .wizard__step { padding: var(--space-4); }
             .template-grid { grid-template-columns: 1fr; }
             .field-row { grid-template-columns: 1fr; }
         }

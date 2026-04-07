@@ -4,6 +4,7 @@ import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../c
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
     { value: '', label: 'All Categories' },
@@ -17,17 +18,14 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 @Component({
     selector: 'app-library-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Shared Library (CRVLIB)</h2>
-                <button class="btn btn--primary btn--sm" (click)="refresh()" [disabled]="libraryService.loading()">
-                    {{ libraryService.loading() ? 'Loading...' : 'Refresh' }}
-                </button>
-            </div>
+        <app-page-shell title="Shared Library" subtitle="CRVLIB" icon="library">
+            <button actions class="btn btn--primary btn--sm" (click)="refresh()" [disabled]="libraryService.loading()">
+                {{ libraryService.loading() ? 'Loading...' : 'Refresh' }}
+            </button>
 
-            <div class="toolbar">
+            <div toolbar class="toolbar">
                 <input
                     class="search-input"
                     placeholder="Filter by key or content..."
@@ -104,20 +102,17 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
-
         .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .search-input {
-            flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            flex: 1; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .category-select {
-            padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
+            padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
             background: var(--bg-input); color: var(--text-secondary); font-size: 0.85rem; font-family: inherit;
         }
 
@@ -125,7 +120,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 
         .entry-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .entry-card {
-            border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;
+            border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4);
             cursor: pointer; transition: border-color 0.15s, background 0.15s;
         }
         .entry-card:hover { border-color: var(--border-bright); background: var(--bg-hover); }
@@ -134,32 +129,32 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
         .entry-card__key { font-weight: 600; color: var(--accent-cyan); font-size: 0.85rem; }
         .entry-card__category {
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
             padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text-secondary);
         }
         .entry-card__category[data-category="guide"] { color: var(--accent-green); }
         .entry-card__category[data-category="reference"] { color: var(--accent-cyan); }
         .entry-card__category[data-category="decision"] { color: var(--accent-amber); }
-        .entry-card__category[data-category="standard"] { color: var(--accent-purple, #a78bfa); }
+        .entry-card__category[data-category="standard"] { color: var(--accent-purple); }
         .entry-card__category[data-category="runbook"] { color: var(--accent-red); }
 
         .entry-card__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.25rem; }
         .entry-card__asa { font-family: var(--font-mono); color: var(--accent-green); }
-        .entry-card--book { border-left: 3px solid var(--accent-purple, #a78bfa); }
+        .entry-card--book { border-left: 3px solid var(--accent-purple); }
         .entry-card__pages {
-            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple, #a78bfa);
-            background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2);
-            padding: 1px 8px; border-radius: 10px;
+            font-size: var(--text-xxs); font-weight: 700; color: var(--accent-purple);
+            background: var(--accent-purple-tint); border: 1px solid var(--accent-purple-mid);
+            padding: 1px 8px; border-radius: var(--radius-lg);
         }
 
         .entry-card__tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
         .tag {
-            font-size: 0.6rem; padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
+            font-size: var(--text-xxs); padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
             background: var(--accent-cyan-dim); color: var(--accent-cyan); font-weight: 600;
         }
 
         .entry-card__content {
-            margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+            margin-top: 0.75rem; padding-top: var(--space-3); border-top: 1px solid var(--border);
         }
         .entry-card__content pre {
             font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;
@@ -174,7 +169,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
             content: ''; flex: 1; height: 1px; background: var(--border);
         }
         .page-divider__label {
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: var(--text-tertiary); white-space: nowrap;
         }
 

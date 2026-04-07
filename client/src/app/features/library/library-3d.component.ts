@@ -71,8 +71,8 @@ import { createTextSprite } from './library-3d.utils';
             height: 600px;
             min-height: 400px;
             background: #05050a;
-            border-radius: var(--radius, 6px);
-            border: 1px solid var(--border, #1a1a2e);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
             overflow: hidden;
         }
         canvas {
@@ -86,8 +86,8 @@ import { createTextSprite } from './library-3d.utils';
             right: 12px;
             width: 140px;
             height: 140px;
-            border-radius: 8px;
-            border: 1px solid var(--border-bright, #2a2a3e);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-bright);
             background: rgba(5, 5, 10, 0.85);
             backdrop-filter: blur(4px);
             pointer-events: none;
@@ -107,14 +107,14 @@ import { createTextSprite } from './library-3d.utils';
             gap: 6px;
             padding: 3px 10px;
             background: rgba(5, 5, 10, 0.85);
-            border: 1px solid var(--border-bright, #2a2a3e);
+            border: 1px solid var(--border-bright);
             border-radius: 12px;
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             font-family: inherit;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             cursor: pointer;
             backdrop-filter: blur(4px);
             transition: background 0.15s, border-color 0.15s;
@@ -136,10 +136,10 @@ import { createTextSprite } from './library-3d.utils';
             pointer-events: none;
             padding: 4px 10px;
             background: rgba(5, 5, 10, 0.9);
-            border: 1px solid var(--border-bright, #2a2a3e);
-            border-radius: 6px;
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius);
             font-size: 0.7rem;
-            color: var(--text-primary, #e0e0e0);
+            color: var(--text-primary);
             backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
@@ -147,9 +147,9 @@ import { createTextSprite } from './library-3d.utils';
             white-space: nowrap;
         }
         .lib3d__tooltip-cat {
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
-            color: var(--text-secondary, #888);
+            color: var(--text-secondary);
         }
         .lib3d__mode-badge {
             position: absolute;
@@ -157,14 +157,14 @@ import { createTextSprite } from './library-3d.utils';
             right: 12px;
             padding: 4px 12px;
             background: rgba(5, 5, 10, 0.85);
-            border: 1px solid var(--accent-cyan, #00e5ff);
+            border: 1px solid var(--accent-cyan);
             border-radius: 12px;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             font-family: inherit;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             pointer-events: none;
             backdrop-filter: blur(4px);
             z-index: 15;
@@ -173,8 +173,8 @@ import { createTextSprite } from './library-3d.utils';
             position: absolute;
             bottom: 12px;
             left: 12px;
-            font-size: 0.6rem;
-            color: var(--text-secondary, #666);
+            font-size: var(--text-xxs);
+            color: var(--text-secondary);
             pointer-events: none;
         }
 
@@ -182,7 +182,7 @@ import { createTextSprite } from './library-3d.utils';
             .lib3d { height: 450px; }
             .lib3d__minimap { width: 100px; height: 100px; }
             .lib3d__legend { gap: 2px; }
-            .lib3d__legend-btn { font-size: 0.58rem; padding: 2px 6px; }
+            .lib3d__legend-btn { font-size: var(--text-micro); padding: 2px 6px; }
         }
     `,
 })

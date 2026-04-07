@@ -69,54 +69,54 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             z-index: 2000;
         }
         .shortcuts-panel {
-            background: var(--bg-surface, #0f1018);
-            border: 1px solid var(--accent-cyan, #00e5ff);
-            border-radius: var(--radius-lg, 8px);
-            padding: 1.5rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-lg);
+            padding: var(--space-6);
             max-width: 520px;
             width: 90vw;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow:
                 0 0 24px var(--accent-cyan-dim),
-                0 0 60px rgba(0, 229, 255, 0.05);
+                0 0 60px var(--accent-cyan-subtle);
         }
         .shortcuts-panel__header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1.25rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border, #1e2035);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--border);
         }
         .shortcuts-panel__header h2 {
             margin: 0;
             font-size: 0.9rem;
             font-weight: 700;
-            color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
             text-transform: uppercase;
             letter-spacing: 0.08em;
         }
         .shortcuts-panel__close {
-            padding: 0.25rem 0.5rem;
+            padding: var(--space-1) var(--space-2);
             background: transparent;
-            border: 1px solid var(--border-bright, #2a2d48);
-            border-radius: var(--radius-sm, 3px);
-            color: var(--text-tertiary, #4a4d68);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-sm);
+            color: var(--text-tertiary);
             font-size: 0.65rem;
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            transition: color var(--transition-fast, 0.1s ease), border-color var(--transition-fast, 0.1s ease);
+            transition: color var(--transition-fast), border-color var(--transition-fast);
         }
         .shortcuts-panel__close:hover {
-            color: var(--accent-cyan, #00e5ff);
-            border-color: var(--accent-cyan, #00e5ff);
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
         }
         .shortcuts-panel__close:focus-visible {
-            outline: 2px solid var(--accent-cyan, #00e5ff);
+            outline: 2px solid var(--accent-cyan);
             outline-offset: 2px;
         }
         .shortcuts-panel__body {
@@ -129,7 +129,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--text-tertiary, #4a4d68);
+            color: var(--text-tertiary);
             font-weight: 600;
         }
         .shortcuts-panel__list {
@@ -143,12 +143,12 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.375rem 0.5rem;
-            border-radius: var(--radius-sm, 3px);
-            transition: background var(--transition-fast, 0.1s ease);
+            padding: 0.375rem var(--space-2);
+            border-radius: var(--radius-sm);
+            transition: background var(--transition-fast);
         }
         .shortcuts-panel__entry:hover {
-            background: var(--bg-hover, #1a1c2e);
+            background: var(--bg-hover);
         }
         .shortcuts-panel__keys {
             display: flex;
@@ -158,39 +158,39 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         kbd {
             display: inline-block;
             padding: 0.15rem 0.4rem;
-            background: var(--bg-raised, #161822);
-            border: 1px solid var(--border-bright, #2a2d48);
-            border-radius: var(--radius-sm, 3px);
+            background: var(--bg-raised);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-sm);
             font-size: 0.7rem;
             font-family: inherit;
-            color: var(--text-primary, #e0e0ec);
+            color: var(--text-primary);
             font-weight: 600;
             min-width: 1.5em;
             text-align: center;
-            box-shadow: 0 1px 0 var(--border, #1e2035);
+            box-shadow: 0 1px 0 var(--border);
         }
         .shortcuts-panel__then {
             font-size: 0.55rem;
-            color: var(--text-tertiary, #4a4d68);
+            color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .shortcuts-panel__desc {
             font-size: 0.75rem;
-            color: var(--text-secondary, #7a7d98);
+            color: var(--text-secondary);
             margin: 0;
         }
         .shortcuts-panel__footer {
             margin-top: 1rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--border, #1e2035);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .shortcuts-panel__version {
             font-size: 0.6rem;
-            color: var(--text-tertiary, #4a4d68);
+            color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
         }

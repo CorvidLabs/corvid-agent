@@ -4,23 +4,21 @@ import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { SkillBundle } from '../../core/models/skill-bundle.model';
 
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Skill Bundles</h2>
-                <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
-                    {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
-                </button>
-            </div>
+        <app-page-shell title="Skill Bundles" icon="skill-bundles">
+            <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+                {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
+            </button>
 
             <!-- Filter tabs -->
-            <div class="filter-tabs">
+            <div toolbar class="filter-tabs">
                 <button
                     class="filter-tab"
                     [class.filter-tab--active]="activeFilter() === 'all'"
@@ -91,7 +89,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                     actionLabel="+ Create a Bundle"
                     actionAriaLabel="Create your first skill bundle" />
             } @else {
-                <div class="bundle-list">
+                <div class="bundle-list stagger-children">
                     @for (bundle of filteredBundles(); track bundle.id) {
                         <div
                             class="bundle-card"
@@ -110,7 +108,7 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                             <p class="bundle-card__desc">{{ bundle.description || 'No description' }}</p>
 
                             @if (expandedId() === bundle.id) {
-                                <div class="bundle-card__details">
+                                <div class="bundle-card__details expand-section">
                                     @if (editingId() === bundle.id) {
                                         <div class="form-grid">
                                             <div class="form-field">
@@ -158,20 +156,17 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .filter-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
         .filter-tab {
-            padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.4rem var(--space-3); border: 1px solid var(--border); border-radius: var(--radius);
             background: transparent; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer;
             font-family: inherit; transition: all 0.15s;
         }
@@ -179,13 +174,13 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 1.5rem; margin-bottom: 1.5rem;
+            padding: var(--space-6); margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -194,11 +189,11 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
@@ -206,19 +201,19 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
         .bundle-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .bundle-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.75rem 1rem; transition: border-color 0.15s;
+            padding: var(--space-3) var(--space-4); transition: border-color 0.15s;
         }
         .bundle-card--expanded { border-color: var(--accent-cyan); }
         .bundle-card__header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .bundle-card__title { display: flex; align-items: center; gap: 0.5rem; }
         .bundle-card__name { font-weight: 600; color: var(--text-primary); }
         .bundle-card__preset {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; color: var(--accent-green); border: 1px solid var(--accent-green);
         }
         .bundle-card__meta { font-size: 0.75rem; color: var(--text-secondary); }
         .bundle-card__desc { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-secondary); }
-        .bundle-card__details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .bundle-card__details { margin-top: 1rem; padding-top: var(--space-4); border-top: 1px solid var(--border); }
         .bundle-card__tools-list { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; }
         .bundle-card__prompt pre { font-size: 0.8rem; color: var(--accent-green); white-space: pre-wrap; margin: 0.25rem 0; }
         @media (max-width: 767px) {

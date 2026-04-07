@@ -92,7 +92,7 @@ import type { Agent } from '../../core/models/agent.model';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; max-width: 640px; }
+        .page { padding: var(--space-6); max-width: 640px; }
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .form__fieldset { background: var(--bg-surface); }
         .form__legend { color: var(--accent-magenta); }

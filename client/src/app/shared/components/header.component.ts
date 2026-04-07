@@ -58,7 +58,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 1.5rem;
+            padding: 0 var(--space-6);
             height: 56px;
             background: rgba(15, 16, 24, 0.85);
             backdrop-filter: blur(12px);
@@ -144,7 +144,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             display: none;
             background: none;
             border: 1px solid var(--border);
-            border-radius: var(--radius, 4px);
+            border-radius: var(--radius);
             padding: 0.4rem;
             cursor: pointer;
             width: 36px;
@@ -187,7 +187,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                 display: flex;
             }
             .header {
-                padding: 0 1rem;
+                padding: 0 var(--space-4);
             }
             .header__title {
                 font-size: 1rem;

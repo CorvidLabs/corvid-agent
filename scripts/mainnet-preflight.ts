@@ -18,7 +18,7 @@
  * Related: #311 (v1.0.0 — Mainnet Launch)
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
@@ -317,7 +317,7 @@ if (existsSync(envPath)) {
     } else if (!network) {
         warn('env', 'ALGORAND_NETWORK not set in .env', 'Defaults to localnet — set to mainnet for production');
     } else {
-        fail('env', `ALGORAND_NETWORK=${network}`, 'Must be "mainnet" for production launch');
+        fail('env', 'ALGORAND_NETWORK is not set to mainnet', 'Must be "mainnet" for production launch');
     }
 
     // Check API_KEY
@@ -357,7 +357,7 @@ if (existsSync(envPath)) {
     } else if (!bindHost) {
         warn('env', 'BIND_HOST not set', 'Defaults to localhost — set to 0.0.0.0 for production with reverse proxy');
     } else {
-        warn('env', `BIND_HOST=${bindHost}`, 'Ensure this is correct for your production deployment');
+        warn('env', 'BIND_HOST is set (verify it matches your production deployment)');
     }
 
     // Check ALLOWED_ORIGINS
@@ -365,9 +365,9 @@ if (existsSync(envPath)) {
     if (!origins) {
         warn('env', 'ALLOWED_ORIGINS not set', 'Recommend restricting to production domain');
     } else if (origins.includes('localhost') || origins.includes('127.0.0.1')) {
-        warn('env', `ALLOWED_ORIGINS includes localhost: ${origins}`, 'Should be production domain only on mainnet');
+        warn('env', 'ALLOWED_ORIGINS includes localhost references', 'Should be production domain only on mainnet');
     } else {
-        pass('env', `ALLOWED_ORIGINS set: ${origins}`);
+        pass('env', 'ALLOWED_ORIGINS configured');
     }
 
     // Check ALGOCHAT_MNEMONIC
@@ -386,7 +386,7 @@ if (existsSync(envPath)) {
     // Check BACKUP_DIR
     const backupDir = envVars['BACKUP_DIR'];
     if (backupDir) {
-        pass('env', `BACKUP_DIR configured: ${backupDir}`);
+        pass('env', 'BACKUP_DIR configured');
     } else {
         warn('env', 'BACKUP_DIR not set', 'Required for daily database backups');
     }
