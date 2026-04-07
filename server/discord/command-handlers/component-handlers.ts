@@ -72,7 +72,7 @@ export async function handleComponentInteraction(
       }
 
       // Un-archive the thread if it was archived
-      await unarchiveThread(ctx.config.botToken, threadId);
+      await unarchiveThread(threadId);
 
       // Don't resubscribe here — the process isn't running yet.
       // subscribeForResponseWithEmbed will be called by routeToThread when
@@ -115,7 +115,7 @@ export async function handleComponentInteraction(
       }
 
       await acknowledgeButton(ri, 'Thread archived.');
-      await archiveThread(ctx.config.botToken, threadId);
+      await archiveThread(threadId);
       break;
     }
 
@@ -227,12 +227,11 @@ function tryRecoverThreadFromCtx(ctx: InteractionContext, threadId: string): Thr
 }
 
 /** Un-archive a thread so it can receive messages again. */
-async function unarchiveThread(botToken: string, threadId: string): Promise<void> {
+async function unarchiveThread(threadId: string): Promise<void> {
   assertSnowflake(threadId, 'thread ID');
   try {
-    const { createRestClient } = await import('../rest-client');
-    const rest = createRestClient(botToken);
-    await rest.modifyChannel(threadId, { archived: false });
+    const { getRestClient } = await import('../rest-client');
+    await getRestClient().modifyChannel(threadId, { archived: false });
   } catch (err) {
     log.debug('Failed to unarchive thread', { threadId, error: err instanceof Error ? err.message : String(err) });
   }

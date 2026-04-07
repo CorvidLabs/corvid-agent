@@ -288,6 +288,25 @@ export class DiscordRestClient {
   }
 
   /**
+   * Create a standalone thread in a channel (not attached to a message).
+   */
+  async createThread(
+    channelId: string,
+    data: { name: string; type: number; auto_archive_duration?: number },
+  ): Promise<{ id: string }> {
+    try {
+      const result = await this.rest.post(Routes.threads(channelId), { body: data });
+      return result as { id: string };
+    } catch (error) {
+      log.error('Failed to create Discord thread', {
+        channelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Modify a channel (e.g., unarchive a thread).
    */
   async modifyChannel(channelId: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {

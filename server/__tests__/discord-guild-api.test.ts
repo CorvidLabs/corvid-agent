@@ -1,6 +1,20 @@
 import { test, expect, describe, beforeEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
+
+// Mock rest-client module so createRestClient returns our mock
+const mockGetGuildRoles = mock(async (): Promise<unknown[]> => []);
+const mockGetGuildChannels = mock(async (): Promise<unknown[]> => []);
+const mockGetGuild = mock(async (): Promise<Record<string, unknown>> => ({}));
+
+mock.module('../discord/rest-client', () => ({
+    createRestClient: () => ({
+        getGuildRoles: mockGetGuildRoles,
+        getGuildChannels: mockGetGuildChannels,
+        getGuild: mockGetGuild,
+    }),
+}));
+
 import {
     getRoleName,
     getChannelName,
@@ -8,6 +22,9 @@ import {
     suggestRoleMappings,
     saveGuildCache,
     loadGuildCache,
+    fetchGuildRoles,
+    fetchGuildChannels,
+    fetchGuildInfo,
     type GuildRole,
     type GuildChannel,
 } from '../discord/guild-api';
@@ -250,106 +267,89 @@ describe('saveGuildCache / loadGuildCache', () => {
     });
 });
 
-// ─── REST fetch functions ────────────────────────────────────────────────
+// ─── fetchGuildRoles ────────────────────────────────────────────────────────
 
-// These tests exercise the fetch* functions that delegate to createRestClient.
-// We use Bun's mock.module to intercept the rest-client import.
-
-const mockGetGuildRoles = mock(async () => [
-    { id: 'r1', name: 'Admin', color: 0xFF0000, position: 5, managed: false, hoist: true, permissions: '8' },
-]);
-const mockGetGuildChannels = mock(async () => [
-    { id: 'c1', name: 'general', type: 0, position: 0, parent_id: null },
-]);
-const mockGetGuild = mock(async () => ({
-    id: 'g1', name: 'Test Guild', description: 'A guild',
-    rules_channel_id: 'c-rules', system_channel_id: 'c-sys',
-    approximate_member_count: 42, icon: 'abc123',
-}));
-
-mock.module('../discord/rest-client', () => ({
-    createRestClient: () => ({
-        getGuildRoles: mockGetGuildRoles,
-        getGuildChannels: mockGetGuildChannels,
-        getGuild: mockGetGuild,
-    }),
-}));
-
-// Re-import after mocking so the module picks up the mocked createRestClient
-const guildApiMocked = await import('../discord/guild-api');
-
-describe('fetchGuildRoles (REST)', () => {
+describe('fetchGuildRoles', () => {
     beforeEach(() => {
         mockGetGuildRoles.mockReset();
-        mockGetGuildRoles.mockImplementation(async () => [
-            { id: 'r1', name: 'Admin', color: 0xFF0000, position: 5, managed: false, hoist: true, permissions: '8' },
-        ]);
+        mockGetGuildRoles.mockImplementation(async () => []);
     });
 
     test('returns mapped roles on success', async () => {
-        const result = await guildApiMocked.fetchGuildRoles('token', 'guild-1');
-        expect(result).not.toBeNull();
-        expect(result!).toHaveLength(1);
-        expect(result![0].id).toBe('r1');
-        expect(result![0].name).toBe('Admin');
-        expect(result![0].permissions).toBe('8');
+        mockGetGuildRoles.mockImplementation(async () => [
+            { id: 'r1', name: 'Admin', color: 0xFF0000, position: 5, managed: false, hoist: true, permissions: '8' },
+        ]);
+        const roles = await fetchGuildRoles('token', 'guild-1');
+        expect(roles).toHaveLength(1);
+        expect(roles![0].id).toBe('r1');
+        expect(roles![0].name).toBe('Admin');
+        expect(roles![0].color).toBe(0xFF0000);
     });
 
     test('returns null on API error', async () => {
         mockGetGuildRoles.mockImplementation(async () => { throw new Error('API fail'); });
-        const result = await guildApiMocked.fetchGuildRoles('token', 'guild-1');
-        expect(result).toBeNull();
+        const roles = await fetchGuildRoles('token', 'guild-1');
+        expect(roles).toBeNull();
     });
 });
 
-describe('fetchGuildChannels (REST)', () => {
+// ─── fetchGuildChannels ─────────────────────────────────────────────────────
+
+describe('fetchGuildChannels', () => {
     beforeEach(() => {
         mockGetGuildChannels.mockReset();
-        mockGetGuildChannels.mockImplementation(async () => [
-            { id: 'c1', name: 'general', type: 0, position: 0, parent_id: null },
-        ]);
+        mockGetGuildChannels.mockImplementation(async () => []);
     });
 
     test('returns mapped channels on success', async () => {
-        const result = await guildApiMocked.fetchGuildChannels('token', 'guild-1');
-        expect(result).not.toBeNull();
-        expect(result!).toHaveLength(1);
-        expect(result![0].id).toBe('c1');
-        expect(result![0].name).toBe('general');
-        expect(result![0].parentId).toBeNull();
+        mockGetGuildChannels.mockImplementation(async () => [
+            { id: 'c1', name: 'general', type: 0, position: 0, parent_id: null },
+            { id: 'c2', name: 'dev', type: 0, position: 1, parent_id: 'cat-1' },
+        ]);
+        const channels = await fetchGuildChannels('token', 'guild-1');
+        expect(channels).toHaveLength(2);
+        expect(channels![0].name).toBe('general');
+        expect(channels![0].parentId).toBeNull();
+        expect(channels![1].parentId).toBe('cat-1');
     });
 
     test('returns null on API error', async () => {
         mockGetGuildChannels.mockImplementation(async () => { throw new Error('API fail'); });
-        const result = await guildApiMocked.fetchGuildChannels('token', 'guild-1');
-        expect(result).toBeNull();
+        const channels = await fetchGuildChannels('token', 'guild-1');
+        expect(channels).toBeNull();
     });
 });
 
-describe('fetchGuildInfo (REST)', () => {
+// ─── fetchGuildInfo ─────────────────────────────────────────────────────────
+
+describe('fetchGuildInfo', () => {
     beforeEach(() => {
         mockGetGuild.mockReset();
-        mockGetGuild.mockImplementation(async () => ({
-            id: 'g1', name: 'Test Guild', description: 'A guild',
-            rules_channel_id: 'c-rules', system_channel_id: 'c-sys',
-            approximate_member_count: 42, icon: 'abc123',
-        }));
+        mockGetGuild.mockImplementation(async () => ({}));
     });
 
     test('returns mapped guild info on success', async () => {
-        const result = await guildApiMocked.fetchGuildInfo('token', 'guild-1');
-        expect(result).not.toBeNull();
-        expect(result!.id).toBe('g1');
-        expect(result!.name).toBe('Test Guild');
-        expect(result!.description).toBe('A guild');
-        expect(result!.rulesChannelId).toBe('c-rules');
-        expect(result!.memberCount).toBe(42);
-        expect(result!.fetchedAt).toBeTruthy();
+        mockGetGuild.mockImplementation(async () => ({
+            id: 'guild-1',
+            name: 'Test Server',
+            description: 'A test guild',
+            rules_channel_id: 'rules-1',
+            system_channel_id: 'sys-1',
+            approximate_member_count: 42,
+            icon: 'icon-hash',
+        }));
+        const info = await fetchGuildInfo('token', 'guild-1');
+        expect(info).not.toBeNull();
+        expect(info!.name).toBe('Test Server');
+        expect(info!.rulesChannelId).toBe('rules-1');
+        expect(info!.systemChannelId).toBe('sys-1');
+        expect(info!.memberCount).toBe(42);
+        expect(info!.fetchedAt).toBeTruthy();
     });
 
     test('returns null on API error', async () => {
         mockGetGuild.mockImplementation(async () => { throw new Error('API fail'); });
-        const result = await guildApiMocked.fetchGuildInfo('token', 'guild-1');
-        expect(result).toBeNull();
+        const info = await fetchGuildInfo('token', 'guild-1');
+        expect(info).toBeNull();
     });
 });
