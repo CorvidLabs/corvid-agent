@@ -12,7 +12,7 @@
  * Related: #310 (v1.0.0-rc — Release Candidate)
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 

@@ -148,16 +148,26 @@ function checkProviders(envOverrides: Record<string, string>): CheckResult[] {
 async function checkPort(serverUrl: string): Promise<CheckResult> {
     // Extract port from configured server URL
     let port = 3000;
+    let parsedUrl: URL;
     try {
-        const url = new URL(serverUrl);
-        port = url.port ? parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : 80);
-    } catch { /* use default */ }
+        parsedUrl = new URL(serverUrl);
+        port = parsedUrl.port ? parseInt(parsedUrl.port, 10) : (parsedUrl.protocol === 'https:' ? 443 : 80);
+    } catch {
+        return fail(`Port ${port}`, 'invalid server URL', 'Check SERVER_URL in your config');
+    }
+
+    // Validate: only connect to localhost or known local addresses
+    const host = parsedUrl.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1' && !host.endsWith('.local')) {
+        return fail(`Port ${port}`, 'server URL is not a local address', 'Doctor only checks local server instances');
+    }
 
     // Try to connect to the server — if it responds, the server is already running (good)
+    const healthUrl = `${parsedUrl.origin}/api/health`;
     try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch(`${serverUrl}/api/health`, { signal: controller.signal });
+        const res = await fetch(healthUrl, { signal: controller.signal });
         clearTimeout(timer);
         if (res.ok) {
             return pass(`Port ${port}`, 'server already running');
@@ -181,12 +191,29 @@ async function checkAlgoChat(envOverrides: Record<string, string>): Promise<Chec
 
     if (network === 'localnet') {
         const algodUrl = getEnv('LOCALNET_ALGOD_URL', envOverrides) ?? 'http://localhost:4001';
+
+        // Validate algod URL is a local address before connecting
+        let parsedAlgod: URL;
+        try {
+            parsedAlgod = new URL(algodUrl);
+        } catch {
+            results.push(fail('Algorand localnet', 'invalid LOCALNET_ALGOD_URL', 'Check LOCALNET_ALGOD_URL in .env'));
+            return results;
+        }
+        const algodHost = parsedAlgod.hostname;
+        if (algodHost !== 'localhost' && algodHost !== '127.0.0.1' && algodHost !== '::1') {
+            results.push(fail('Algorand localnet', 'LOCALNET_ALGOD_URL is not a local address', 'Localnet algod should be on localhost'));
+            return results;
+        }
+
+        const algodToken = getEnv('ALGOD_TOKEN', envOverrides) ?? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`${algodUrl}/v2/status`, {
+            const statusUrl = `${parsedAlgod.origin}/v2/status`;
+            const res = await fetch(statusUrl, {
                 signal: controller.signal,
-                headers: { 'X-Algo-API-Token': getEnv('ALGOD_TOKEN', envOverrides) ?? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+                headers: { 'X-Algo-API-Token': algodToken },
             });
             clearTimeout(timer);
             if (res.ok) {
