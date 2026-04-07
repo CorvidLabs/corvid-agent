@@ -124,7 +124,7 @@ skills/
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, ~380 API endpoints, 1,300+ test files, 323 module specs.
+Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, 382 API endpoints, 1,286 test files, 212 module specs.
 
 **[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
 
