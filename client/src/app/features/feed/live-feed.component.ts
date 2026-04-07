@@ -132,9 +132,9 @@ interface FeedEntry {
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__actions { display: flex; align-items: center; gap: 0.75rem; }
-        .feed__count { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .feed__count { font-size: var(--text-xs); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
         .btn {
-            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: var(--text-xs); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s;
         }
@@ -146,7 +146,7 @@ interface FeedEntry {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-shrink: 0;
         }
         .feed__search {
-            flex: 1; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-family: inherit;
+            flex: 1; padding: 0.4rem 0.75rem; font-size: var(--text-caption); font-family: inherit;
             background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-bright);
             border-radius: var(--radius); outline: none;
         }
@@ -155,18 +155,18 @@ interface FeedEntry {
         .btn--filter {
             background: rgba(255, 215, 0, 0.1); color: var(--accent-yellow, #ffd700);
             border: 1px solid rgba(255, 215, 0, 0.3); padding: 0.3rem 0.6rem; border-radius: var(--radius);
-            font-size: 0.7rem; font-family: var(--font-mono, monospace); cursor: pointer;
+            font-size: var(--text-xxs); font-family: var(--font-mono, monospace); cursor: pointer;
         }
         .btn--filter:hover { background: rgba(255, 215, 0, 0.2); }
         .feed__pagination {
             display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-shrink: 0;
         }
-        .feed__page-info { font-size: 0.75rem; color: var(--text-secondary); }
+        .feed__page-info { font-size: var(--text-xs); color: var(--text-secondary); }
         .feed__page-controls { display: flex; gap: 0.5rem; }
         .feed__direction-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; flex-shrink: 0; }
         .dir-chip {
             padding: 0.25rem 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
+            border-radius: 20px; color: var(--text-tertiary); font-size: var(--text-2xs); font-family: inherit;
             cursor: pointer; text-transform: uppercase; transition: all 0.15s;
         }
         .dir-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
@@ -177,7 +177,7 @@ interface FeedEntry {
         }
         .feed__entry {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.35rem 0.75rem; font-size: 0.8rem;
+            padding: 0.35rem 0.75rem; font-size: var(--text-caption);
             border-left: 3px solid var(--border);
             cursor: pointer; transition: background 0.1s;
         }
@@ -192,9 +192,9 @@ interface FeedEntry {
         .feed__meta {
             display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; overflow: hidden;
         }
-        .feed__time { font-family: var(--font-mono, monospace); font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; flex-shrink: 0; }
+        .feed__time { font-family: var(--font-mono, monospace); font-size: var(--text-xxs); color: var(--text-secondary); opacity: 0.7; flex-shrink: 0; }
         .feed__direction {
-            font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
+            font-size: var(--text-3xs); font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
         }
         .feed__direction[data-dir="inbound"] { color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2); }
@@ -204,36 +204,36 @@ interface FeedEntry {
         .feed__direction[data-dir="agent-processing"] { color: #ffa040; background: rgba(255, 160, 64, 0.08); border: 1px solid rgba(255, 160, 64, 0.25); animation: pulse-bg 2s ease-in-out infinite; }
         @keyframes pulse-bg { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
         .feed__direction[data-dir="status"] { color: var(--accent-amber); background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.2); }
-        .feed__sender { font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
-        .feed__arrow { color: var(--text-secondary); opacity: 0.4; font-size: 0.7rem; flex-shrink: 0; }
+        .feed__sender { font-weight: 700; font-size: var(--text-caption); flex-shrink: 0; }
+        .feed__arrow { color: var(--text-secondary); opacity: 0.4; font-size: var(--text-xxs); flex-shrink: 0; }
         .feed__participant {
-            font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; flex-shrink: 0;
+            font-size: var(--text-xs); color: var(--text-secondary); font-weight: 500; flex-shrink: 0;
             max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed__thread {
-            font-size: 0.65rem; font-family: var(--font-mono, monospace); color: var(--accent-yellow, #ffd700);
+            font-size: var(--text-2xs); font-family: var(--font-mono, monospace); color: var(--accent-yellow, #ffd700);
             background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2);
             padding: 1px 5px; border-radius: var(--radius-sm); cursor: pointer; flex-shrink: 0;
         }
-        .feed__fee { font-size: 0.7rem; color: var(--accent-green); font-weight: 600; flex-shrink: 0; }
+        .feed__fee { font-size: var(--text-xxs); color: var(--accent-green); font-weight: 600; flex-shrink: 0; }
         .feed__preview {
             flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
+            color: var(--text-tertiary); font-size: var(--text-xs); margin-left: 0.25rem;
         }
         .feed__preview--hidden { display: none; }
         .feed__toggle {
-            flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
+            flex-shrink: 0; color: var(--text-tertiary); font-size: var(--text-xxs); margin-left: auto;
             user-select: none;
         }
         .feed__content {
             margin: 0.4rem 0 0 0; white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
-            font-size: 0.78rem; line-height: 1.5; max-height: 600px; overflow-y: auto;
+            font-size: var(--text-caption); line-height: 1.5; max-height: 600px; overflow-y: auto;
             padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
             border: 1px solid var(--border);
         }
         .feed__processing-indicator {
             display: flex; align-items: center; gap: 0.4rem;
-            font-size: 0.75rem; color: #ffa040; font-style: italic; margin-left: 0.25rem;
+            font-size: var(--text-xs); color: #ffa040; font-style: italic; margin-left: 0.25rem;
         }
         .feed__processing-dot {
             width: 6px; height: 6px; border-radius: 50%; background: #ffa040;

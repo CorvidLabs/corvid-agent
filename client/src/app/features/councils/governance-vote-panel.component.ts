@@ -163,7 +163,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
             display: flex; align-items: center; gap: 0.75rem;
             margin-bottom: 0.75rem;
         }
-        .vote-panel__icon { color: var(--accent-amber); font-size: 0.7rem; }
+        .vote-panel__icon { color: var(--accent-amber); font-size: var(--text-xxs); }
         .vote-panel__title {
             font-size: var(--text-sm); font-weight: 700;
             text-transform: uppercase; letter-spacing: 0.08em;
@@ -276,7 +276,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
         }
         .btn {
             padding: 0.5rem 1rem; border-radius: var(--radius);
-            font-size: 0.8rem; font-weight: 600;
+            font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid;
             font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;

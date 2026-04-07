@@ -71,7 +71,7 @@ import { Router, RouterLink } from '@angular/router';
         .route-error__icon {
             margin: 0 0 1.5rem;
             font-family: var(--font-mono);
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             line-height: 1.3;
             color: var(--accent-red, #ff3c5f);
             user-select: none;
@@ -96,7 +96,7 @@ import { Router, RouterLink } from '@angular/router';
         }
         .route-error__glitch {
             display: block;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 600;
             font-family: var(--font-mono);
             letter-spacing: 0.15em;
@@ -116,7 +116,7 @@ import { Router, RouterLink } from '@angular/router';
         }
         .route-error__desc {
             margin: 0 0 1.75rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-secondary, #9498b3);
             max-width: 360px;
             line-height: 1.7;
@@ -131,7 +131,7 @@ import { Router, RouterLink } from '@angular/router';
             display: inline-block;
             padding: 0.6rem 1.25rem;
             border-radius: var(--radius, 8px);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             font-family: var(--font-mono);
             text-decoration: none;
@@ -173,7 +173,7 @@ import { Router, RouterLink } from '@angular/router';
         }
         .route-error__hint {
             margin: 1.5rem 0 0;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-family: var(--font-mono);
             color: var(--text-tertiary, #555770);
             letter-spacing: 0.1em;

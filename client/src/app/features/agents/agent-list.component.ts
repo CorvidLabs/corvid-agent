@@ -183,18 +183,18 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
     `,
     styles: `
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .loading, .empty { color: var(--text-tertiary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         /* Search */
         .search-bar { margin-bottom: 0.85rem; }
         .search-input {
             width: 100%; padding: 0.6rem 0.85rem; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg, 10px);
-            font-size: 0.85rem; font-family: inherit; background: rgba(12, 13, 20, 0.6); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: rgba(12, 13, 20, 0.6); color: var(--text-primary);
             box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s;
         }
         .search-input:focus { border-color: rgba(0, 229, 255, 0.4); box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.1), 0 0 20px rgba(0, 229, 255, 0.05); outline: none; }
@@ -204,7 +204,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .filter-group { display: flex; gap: 0.25rem; }
         .filter-chip {
             padding: 0.5rem 0.75rem; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: transparent; color: var(--text-secondary); font-size: var(--text-xxs); font-family: inherit;
             cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: flex; align-items: center;
         }
         .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
@@ -212,14 +212,14 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .sort-group { margin-left: auto; }
         .sort-select {
             padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-xxs); font-family: inherit;
         }
         .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
 
         /* Hide-inactive toggle */
         .toggle-label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; user-select: none; }
         .toggle-input { accent-color: var(--accent-cyan); cursor: pointer; }
-        .toggle-text { font-size: 0.7rem; color: var(--text-secondary); }
+        .toggle-text { font-size: var(--text-xxs); color: var(--text-secondary); }
 
         /* Agent Grid — fluid + container-query aware */
         :host { container-type: inline-size; }
@@ -273,7 +273,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card:hover::before { opacity: 1; }
         .agent-card__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-bright); flex-shrink: 0; }
         .agent-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
-        .agent-card__icon--fallback { font-size: 0.65rem; font-family: var(--font-mono, monospace); color: var(--text-tertiary); background: var(--bg-input); border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+        .agent-card__icon--fallback { font-size: var(--text-2xs); font-family: var(--font-mono, monospace); color: var(--text-tertiary); background: var(--bg-input); border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
         .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; }
         .agent-card__health-dot {
@@ -282,28 +282,28 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card__health-dot[data-health="green"] { background: var(--accent-green); box-shadow: 0 0 6px rgba(0,255,136,.4); }
         .agent-card__health-dot[data-health="yellow"] { background: var(--accent-amber); box-shadow: 0 0 6px rgba(255,170,0,.4); }
         .agent-card__health-dot[data-health="red"] { background: var(--accent-red); box-shadow: 0 0 6px rgba(255,51,85,.3); opacity: .6; }
-        .agent-card__name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+        .agent-card__name { font-weight: 700; font-size: var(--text-sm); color: var(--text-primary); }
         .status-indicator { display: flex; align-items: center; gap: 0.25rem; }
-        .status-indicator__label { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+        .status-indicator__label { font-size: var(--text-4xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
         .status-indicator--active .status-indicator__label { color: var(--accent-green); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .status-dot--active { background: var(--accent-green); box-shadow: 0 0 6px rgba(0, 255, 136, 0.4); }
         .agent-card__badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
-        .badge { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase; }
+        .badge { font-size: var(--text-3xs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase; }
         .badge--provider { font-family: var(--font-mono, monospace); }
         .badge--algochat { color: var(--accent-magenta); border-color: rgba(255, 0, 170, 0.3); }
         .badge--persona { color: var(--accent-amber, #ffc107); border-color: rgba(255, 193, 7, 0.3); }
-        .agent-card__desc { margin: 0 0 0.5rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .agent-card__desc { margin: 0 0 0.5rem; font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .agent-card__stats { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
         .agent-card__stat { display: flex; flex-direction: column; gap: 0.1rem; }
-        .agent-card__stat-value { font-size: 0.95rem; font-weight: 700; color: var(--accent-cyan); }
-        .agent-card__stat-value--cost { color: var(--accent-green); font-size: 0.85rem; }
-        .agent-card__stat-value--time { font-size: 0.75rem; color: var(--text-secondary); }
-        .agent-card__stat-label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .agent-card__stat-value { font-size: var(--text-sm); font-weight: 700; color: var(--accent-cyan); }
+        .agent-card__stat-value--cost { color: var(--accent-green); font-size: var(--text-sm); }
+        .agent-card__stat-value--time { font-size: var(--text-xs); color: var(--text-secondary); }
+        .agent-card__stat-label { font-size: var(--text-4xs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
         .agent-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid var(--border); }
-        .agent-card__perm { font-size: 0.65rem; color: var(--text-tertiary); text-transform: capitalize; }
+        .agent-card__perm { font-size: var(--text-2xs); color: var(--text-tertiary); text-transform: capitalize; }
         .agent-card__start-btn {
-            padding: 0.5rem 0.85rem; min-height: 44px; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            padding: 0.5rem 0.85rem; min-height: 44px; font-size: var(--text-3xs); font-weight: 600; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
             background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(0, 229, 255, 0.05));
             border: none; border-radius: var(--radius, 6px);

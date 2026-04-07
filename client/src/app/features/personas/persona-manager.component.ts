@@ -128,7 +128,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .page { padding: 1.5rem; }
         .page__header { margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
-        .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-secondary); font-size: var(--text-sm); }
 
         /* Agent picker — horizontal wrapping chips */
         .agent-picker {
@@ -137,7 +137,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             border-radius: var(--radius);
         }
         .agent-chip {
-            padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); font-size: 0.75rem;
+            padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); font-size: var(--text-xs);
             font-family: inherit; font-weight: 600; cursor: pointer;
             background: var(--bg-raised); color: var(--text-secondary);
             border: 1px solid var(--border); transition: all 0.15s;
@@ -149,7 +149,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             border-color: var(--accent-cyan); box-shadow: var(--glow-cyan);
         }
         .agent-chip[data-status="configured"]::after {
-            content: ' \\2713'; color: var(--accent-green); font-size: 0.65rem;
+            content: ' \\2713'; color: var(--accent-green); font-size: var(--text-2xs);
         }
 
         /* Detail panel */
@@ -160,11 +160,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .detail-empty {
             display: flex; align-items: center; justify-content: center; min-height: 150px;
         }
-        .detail-empty p { color: var(--text-tertiary); font-size: 0.85rem; }
+        .detail-empty p { color: var(--text-tertiary); font-size: var(--text-sm); }
         .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
         .detail-header h3 { margin: 0; color: var(--accent-cyan); }
         .detail-status {
-            font-size: 0.7rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-xxs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em;
             background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
         }
@@ -174,12 +174,12 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             background: var(--bg-raised); border: 1px dashed var(--border-bright); border-radius: var(--radius);
             padding: 0.75rem 1rem; margin-bottom: 1rem;
         }
-        .no-persona-banner p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
+        .no-persona-banner p { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+        .form-field label { display: block; font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
             width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
@@ -187,7 +187,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
         }

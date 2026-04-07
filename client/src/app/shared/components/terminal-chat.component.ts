@@ -150,7 +150,7 @@ interface AutocompleteItem {
             border-radius: var(--radius-lg);
             background: var(--terminal-bg);
             font-family: var(--font-mono);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             line-height: 1.6;
             overflow: hidden;
             flex: 1;
@@ -172,7 +172,7 @@ interface AutocompleteItem {
             gap: 0.5rem;
             margin: 0.75rem 0 0.5rem;
             color: #484f58;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
         }
         .terminal__date-sep::before,
         .terminal__date-sep::after {
@@ -220,7 +220,7 @@ interface AutocompleteItem {
             background: var(--terminal-surface);
             padding: 1px 4px;
             border-radius: var(--radius-sm);
-            font-size: 0.78rem;
+            font-size: var(--text-caption);
             color: var(--terminal-code);
         }
         .terminal__text :global(pre) {
@@ -243,7 +243,7 @@ interface AutocompleteItem {
         .terminal__text :global(h2),
         .terminal__text :global(h3) {
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-weight: 700;
             margin: 0.5rem 0 0.25rem;
             border-bottom: 1px solid var(--border);
@@ -289,7 +289,7 @@ interface AutocompleteItem {
         }
         .terminal__text :global(.code-block__lang) {
             color: var(--text-secondary);
-            font-size: 0.68rem;
+            font-size: var(--text-xxs);
             text-transform: lowercase;
         }
         .terminal__copy {
@@ -300,7 +300,7 @@ interface AutocompleteItem {
             border: 1px solid var(--border);
             color: var(--terminal-text-faint);
             font-family: inherit;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             padding: 2px 8px;
             border-radius: 3px;
             cursor: pointer;
@@ -322,7 +322,7 @@ interface AutocompleteItem {
         .terminal__text :global(.code-block pre code) {
             background: none;
             padding: 0;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
 
         /* ── Syntax highlight tokens (GitHub dark palette) ─ */
@@ -342,7 +342,7 @@ interface AutocompleteItem {
             margin-left: 0.25rem;
         }
         .terminal__status {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: #484f58;
             user-select: none;
         }
@@ -354,7 +354,7 @@ interface AutocompleteItem {
             border: 1px solid #30363d;
             color: #484f58;
             font-family: inherit;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             padding: 2px 6px;
             min-width: 32px;
             min-height: 26px;
@@ -403,7 +403,7 @@ interface AutocompleteItem {
         }
         .terminal__tool-name {
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--terminal-code);
             user-select: none;
         }
@@ -413,7 +413,7 @@ interface AutocompleteItem {
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 0.5rem;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--terminal-text-dim);
             overflow-x: auto;
             margin: 0.25rem 0 0;
@@ -425,7 +425,7 @@ interface AutocompleteItem {
             align-items: center;
             gap: 0.5rem;
             color: var(--terminal-text-dim);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             padding: 0.25rem 0;
             margin-bottom: 0.5rem;
         }
@@ -454,7 +454,7 @@ interface AutocompleteItem {
             background: var(--terminal-surface);
             padding: 1px 4px;
             border-radius: var(--radius-sm);
-            font-size: 0.78rem;
+            font-size: var(--text-caption);
             color: var(--terminal-code);
         }
 
@@ -496,7 +496,7 @@ interface AutocompleteItem {
             border: 1px solid var(--border);
             color: var(--terminal-text-faint);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 700;
             width: 44px;
             height: 44px;
@@ -558,7 +558,7 @@ interface AutocompleteItem {
         .autocomplete__label {
             color: var(--text-primary);
             font-weight: 600;
-            font-size: 0.78rem;
+            font-size: var(--text-caption);
             white-space: nowrap;
         }
         .autocomplete__item[data-kind="command"] .autocomplete__label {
@@ -569,7 +569,7 @@ interface AutocompleteItem {
         }
         .autocomplete__desc {
             color: var(--terminal-text-dim);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;

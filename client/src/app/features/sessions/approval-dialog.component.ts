@@ -76,14 +76,14 @@ export interface ApprovalDecision {
         }
         .approval-dialog__header h3 {
             margin: 0;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             font-weight: 700;
             color: var(--accent-cyan, #00d4ff);
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
         .approval-dialog__timer {
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             color: var(--text-secondary, #999);
             font-variant-numeric: tabular-nums;
@@ -95,7 +95,7 @@ export interface ApprovalDecision {
             margin-bottom: 1rem;
         }
         .approval-dialog__tool {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             color: var(--text-secondary, #999);
             text-transform: uppercase;
@@ -103,7 +103,7 @@ export interface ApprovalDecision {
             margin-bottom: 0.375rem;
         }
         .approval-dialog__description {
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-primary, #eee);
             word-break: break-word;
             white-space: pre-wrap;
@@ -123,7 +123,7 @@ export interface ApprovalDecision {
             padding: 0.75rem 1rem;
             min-height: 44px;
             border-radius: var(--radius, 6px);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 700;
             cursor: pointer;
             border: 1px solid;
@@ -138,7 +138,7 @@ export interface ApprovalDecision {
                 padding: 1rem;
             }
             .approval-dialog__header h3 {
-                font-size: 0.75rem;
+                font-size: var(--text-xs);
             }
             .approval-dialog__actions {
                 flex-direction: column;

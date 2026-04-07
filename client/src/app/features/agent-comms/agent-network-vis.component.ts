@@ -118,7 +118,7 @@ interface ImpactRing {
             background: rgba(10, 10, 15, 0.85);
             border: 1px solid var(--border-bright, #2a2a3e);
             border-radius: 16px;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-primary, #e0e0e0);
             font-weight: 600;
             text-transform: uppercase;
@@ -136,7 +136,7 @@ interface ImpactRing {
             border: none;
             color: var(--text-tertiary, #666);
             cursor: pointer;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             padding: 0 2px;
             line-height: 1;
@@ -152,7 +152,7 @@ interface ImpactRing {
                 position: absolute; inset: 0;
                 display: flex; align-items: center; justify-content: center;
                 color: var(--text-tertiary);
-                font-size: 0.8rem;
+                font-size: var(--text-caption);
             }
         }
     `,

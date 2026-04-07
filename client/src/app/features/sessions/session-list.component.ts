@@ -123,19 +123,19 @@ interface SessionGroup {
     styles: `
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
-        .loading, .empty { color: var(--text-tertiary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         .search-bar { margin-bottom: 0.75rem; }
         .search-input {
             width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
 
         .filter-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
         .filter-tab {
             padding: 0.35rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: transparent; color: var(--text-secondary); font-size: var(--text-xxs); font-family: inherit;
             cursor: pointer; transition: all 0.15s;
         }
         .filter-tab:hover { border-color: var(--border-bright); }
@@ -143,7 +143,7 @@ interface SessionGroup {
         .filter-tabs__spacer { flex: 1; }
         .source-select {
             padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-xxs); font-family: inherit;
         }
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
@@ -152,14 +152,14 @@ interface SessionGroup {
         /* Session groups */
         .session-group { margin-bottom: 1.5rem; }
         .session-group__label {
-            font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
             color: var(--text-tertiary); margin-bottom: 0.5rem; padding-left: 0.25rem;
         }
 
         .session-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
         .session-table__header {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
-            padding: 0.5rem 1rem; background: var(--bg-raised); font-size: 0.7rem; font-weight: 600;
+            padding: 0.5rem 1rem; background: var(--bg-raised); font-size: var(--text-xxs); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);
             position: sticky; top: 0; z-index: 5;
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -167,21 +167,21 @@ interface SessionGroup {
         .session-table__row {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
             padding: 0.5rem 1rem; border-top: 1px solid var(--border);
-            font-size: 0.8rem; color: var(--text-primary); text-decoration: none;
+            font-size: var(--text-caption); color: var(--text-primary); text-decoration: none;
             transition: background 0.15s, border-color 0.15s; align-items: center;
         }
         .session-table__row:hover { background: var(--bg-hover); }
         .session-table__row--running { border-left: 2px solid var(--accent-green); }
         .session-table__name { font-weight: 600; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .session-table__agent { color: var(--text-secondary); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .session-table__agent { color: var(--text-secondary); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .session-table__cost { color: var(--accent-green); font-family: var(--font-mono); }
-        .session-table__source { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; }
-        .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
+        .session-table__source { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; }
+        .session-table__time { font-size: var(--text-xxs); color: var(--text-tertiary); }
 
         .show-more {
             display: block; width: 100%; margin-top: 0.5rem; padding: 0.5rem;
             background: transparent; border: 1px dashed var(--border-bright); border-radius: var(--radius);
-            color: var(--accent-cyan); font-size: 0.75rem; font-family: inherit; font-weight: 600;
+            color: var(--accent-cyan); font-size: var(--text-xs); font-family: inherit; font-weight: 600;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
         }
         .show-more:hover { background: var(--accent-cyan-dim); }
@@ -191,10 +191,10 @@ interface SessionGroup {
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
             .filter-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0.15rem; }
             .filter-tabs::-webkit-scrollbar { display: none; }
-            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: 0.65rem; padding: 0.3rem 0.5rem; }
+            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: var(--text-2xs); padding: 0.3rem 0.5rem; }
             .filter-tabs__spacer { display: none; }
-            .source-select { flex-shrink: 0; font-size: 0.65rem; }
-            .search-input { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
+            .source-select { flex-shrink: 0; font-size: var(--text-2xs); }
+            .search-input { font-size: var(--text-caption); padding: 0.4rem 0.6rem; }
         }
     `,
 })

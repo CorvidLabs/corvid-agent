@@ -88,7 +88,7 @@ export class TooltipDirective implements AfterViewInit, OnDestroy {
             color: var(--text-primary, #e0e0ec);
             border: 1px solid var(--border-bright, #2a2d48);
             border-radius: var(--radius-sm, 3px);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-family: inherit;
             line-height: 1.6;
             pointer-events: none;

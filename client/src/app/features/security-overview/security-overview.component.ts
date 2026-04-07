@@ -171,7 +171,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .page { padding: 1.5rem; max-width: 960px; }
         .page__header { margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-sm); }
         .error { color: var(--accent-red, #f44); padding: 0.75rem; background: rgba(255,68,68,0.1); border-radius: var(--radius); }
 
         .card {
@@ -183,26 +183,26 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         }
         .card__title {
             margin: 0 0 0.5rem;
-            font-size: 1rem;
+            font-size: var(--text-base);
             color: var(--text-primary);
         }
         .card__subtitle {
             margin: 0.75rem 0 0.4rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .card__desc {
             margin: 0 0 0.75rem;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-secondary);
             line-height: 1.5;
         }
         .card__checks {
             margin: 0;
             padding-left: 1.25rem;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-secondary);
             line-height: 1.8;
         }
@@ -229,7 +229,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             display: inline-block;
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-family: var(--font-mono, monospace);
         }
         .tag--file {
@@ -259,7 +259,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             justify-content: space-between;
             align-items: center;
             padding: 0.35rem 0;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             border-bottom: 1px solid var(--border);
         }
         .pattern:last-child { border-bottom: none; }
@@ -269,7 +269,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .pattern--critical .pattern__name { color: var(--accent-red, #f44); }
         .pattern--warning .pattern__name { color: var(--accent-amber, #ffb74d); }
         .pattern__cat {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -300,7 +300,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             margin-bottom: 0.4rem;
         }
         .tier-card__badge {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -311,12 +311,12 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .tier-card--layer1 .tier-card__badge { background: rgba(255,183,77,0.15); color: var(--accent-amber, #ffb74d); }
         .tier-card--layer2 .tier-card__badge { background: rgba(129,199,132,0.15); color: var(--accent-green, #81c784); }
         .tier-card__label {
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             font-weight: 600;
             color: var(--text-primary);
         }
         .tier-card__desc {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-secondary);
             margin: 0 0 0.4rem;
             line-height: 1.4;
@@ -325,7 +325,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             list-style: none;
             margin: 0;
             padding: 0;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-tertiary);
         }
         .tier-card__props li { padding: 0.1rem 0; }
@@ -355,11 +355,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             background: var(--bg-hover);
         }
         .link-card__label {
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-weight: 600;
         }
         .link-card__count {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-tertiary);
             margin-top: 0.2rem;
         }

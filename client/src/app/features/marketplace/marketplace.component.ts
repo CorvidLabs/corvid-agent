@@ -272,36 +272,36 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .search-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; align-items: center; }
         .search-input {
             flex: 1; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .filter-select {
             padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
-        .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-secondary); font-size: var(--text-sm); }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
             padding: 0.75rem 1rem; margin-bottom: 1rem;
         }
-        .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
+        .error-banner p { margin: 0; color: var(--accent-red); font-size: var(--text-sm); }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 1.5rem; margin-bottom: 1.5rem;
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+        .form-field label { display: block; font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
         .form-input, .form-select, .form-textarea {
             width: 100%; padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
@@ -322,28 +322,28 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-card__name { font-weight: 600; color: var(--text-primary); }
         .listing-card__badges { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
         .listing-card__category {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-2xs); padding: 1px 6px; border-radius: var(--radius-sm);
             text-transform: uppercase; color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
         }
-        .listing-card__desc { margin: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary); }
-        .listing-card__meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary); align-items: center; }
+        .listing-card__desc { margin: 0.5rem 0; font-size: var(--text-caption); color: var(--text-secondary); }
+        .listing-card__meta { display: flex; gap: 1rem; font-size: var(--text-xs); color: var(--text-secondary); align-items: center; }
         .listing-card__stars { display: inline-flex; align-items: center; gap: 0.1rem; }
-        .listing-card__review-count { font-size: 0.7rem; color: var(--text-secondary); margin-left: 0.2rem; }
+        .listing-card__review-count { font-size: var(--text-xxs); color: var(--text-secondary); margin-left: 0.2rem; }
         .listing-card__price { color: var(--accent-green); }
         .listing-card__tags { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
         .tag {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-2xs); padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
         }
 
         /* Stars */
-        .star { color: var(--border); font-size: 0.85rem; line-height: 1; }
+        .star { color: var(--border); font-size: var(--text-sm); line-height: 1; }
         .star--filled { color: var(--accent-yellow, #ffc107); }
         .star--lg { font-size: 1.1rem; }
 
         /* Trust badge */
         .trust-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-3xs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
         .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
@@ -351,13 +351,13 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .trust-badge[data-level="low"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
         .trust-badge[data-level="untrusted"] { color: var(--accent-red); border-color: var(--accent-red); }
         .external-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-3xs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; color: var(--accent-orange, #ff9100); border: 1px solid var(--accent-orange, #ff9100);
             background: var(--bg-raised);
         }
 
         /* Section title */
-        .section-title { margin: 2rem 0 1rem; color: var(--text-primary); font-size: 1rem; }
+        .section-title { margin: 2rem 0 1rem; color: var(--text-primary); font-size: var(--text-base); }
 
         /* Detail panel */
         .detail-panel {
@@ -368,28 +368,28 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .detail-panel__header { display: flex; justify-content: space-between; align-items: center; }
         .detail-panel__header h3 { margin: 0; color: var(--text-primary); }
         .detail-panel h4 { margin: 1.5rem 0 0.75rem; color: var(--text-primary); }
-        .detail-agent { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0; }
-        .detail-time { font-size: 0.75rem; color: var(--text-secondary); }
+        .detail-agent { display: flex; align-items: center; gap: 0.5rem; font-size: var(--text-caption); color: var(--text-secondary); margin: 0.5rem 0; }
+        .detail-time { font-size: var(--text-xs); color: var(--text-secondary); }
         .detail-stats { display: flex; flex-direction: column; gap: 0.75rem; min-width: 140px; }
         .stat-item { display: flex; flex-direction: column; gap: 0.15rem; }
-        .stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
-        .stat-value { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+        .stat-label { font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+        .stat-value { font-size: var(--text-base); font-weight: 600; color: var(--text-primary); }
         .stat-value--rating { display: flex; align-items: center; gap: 0.1rem; }
         .stat-value--price { color: var(--accent-green); }
         .review-row { border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
         .review-row__header { display: flex; justify-content: space-between; align-items: center; }
         .review-row__stars { display: inline-flex; gap: 0.1rem; }
-        .review-row__time { font-size: 0.75rem; color: var(--text-secondary); }
-        .review-row__comment { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text-primary); }
+        .review-row__time { font-size: var(--text-xs); color: var(--text-secondary); }
+        .review-row__comment { margin: 0.25rem 0 0; font-size: var(--text-sm); color: var(--text-primary); }
         .review-form { margin-top: 1rem; }
         .review-form h4 { margin: 0 0 0.5rem; }
         .review-form__fields { display: flex; gap: 0.5rem; align-items: center; }
         .review-form__rating { width: auto; flex-shrink: 0; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.25rem 0.5rem; font-size: var(--text-xxs); }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }

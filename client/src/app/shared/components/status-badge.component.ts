@@ -16,7 +16,7 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
             display: inline-block;
             padding: 2px 8px;
             border-radius: var(--radius-sm);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.08em;

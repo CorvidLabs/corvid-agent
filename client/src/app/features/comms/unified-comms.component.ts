@@ -65,7 +65,7 @@ const STORAGE_KEY = 'comms_view_mode';
             flex-shrink: 0;
         }
         .unified-comms__title {
-            font-size: 0.95rem;
+            font-size: var(--text-sm);
             font-weight: 600;
             color: var(--text-primary);
             margin: 0;
@@ -80,7 +80,7 @@ const STORAGE_KEY = 'comms_view_mode';
         }
         .unified-comms__mode-btn {
             padding: 0.35rem 0.85rem;
-            font-size: 0.72rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             font-family: inherit;
             letter-spacing: 0.03em;
@@ -110,7 +110,7 @@ const STORAGE_KEY = 'comms_view_mode';
             }
             .unified-comms__mode-btn {
                 padding: 0.3rem 0.65rem;
-                font-size: 0.68rem;
+                font-size: var(--text-xxs);
             }
         }
     `,

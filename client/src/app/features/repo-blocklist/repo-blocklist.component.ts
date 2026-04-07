@@ -77,16 +77,16 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
         .page { padding: 1.5rem; }
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-sm); }
         .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .input {
             flex: 1; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
+            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: var(--text-sm);
         }
         .input::placeholder { color: var(--text-tertiary); }
         .input--reason { max-width: 250px; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
         }
@@ -95,8 +95,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--danger { color: var(--accent-red, #f44); border-color: var(--accent-red, #f44); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
-        .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
+        .btn--small { padding: 0.25rem 0.5rem; font-size: var(--text-xxs); }
+        .error { color: var(--accent-red, #f44); font-size: var(--text-sm); margin-bottom: 1rem; }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
@@ -104,17 +104,17 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
             border-radius: var(--radius-lg);
         }
         .list__item-main { flex: 1; min-width: 0; }
-        .list__item-repo { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); }
+        .list__item-repo { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-primary); }
         .list__item-detail { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
-        .list__item-reason { font-size: 0.8rem; color: var(--text-secondary); }
+        .list__item-reason { font-size: var(--text-caption); color: var(--text-secondary); }
         .badge {
-            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px;
+            font-size: var(--text-2xs); padding: 0.15rem 0.4rem; border-radius: 3px;
             text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
         }
         .badge--manual { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
         .badge--pr_rejection { color: var(--accent-red, #f44); border: 1px solid var(--accent-red, #f44); }
         .badge--daily_review { color: var(--accent-yellow, #fa0); border: 1px solid var(--accent-yellow, #fa0); }
-        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: 0.75rem; color: var(--text-tertiary); margin-left: 1rem; }
+        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 1rem; }
     `,
 })
 export class RepoBlocklistComponent implements OnInit {

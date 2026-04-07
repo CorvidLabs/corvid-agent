@@ -225,14 +225,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             width: 100%; max-width: 400px; padding: 0.5rem 0.75rem;
             background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary);
-            font-size: 0.85rem; font-family: inherit;
+            font-size: var(--text-sm); font-family: inherit;
             transition: border-color 0.2s;
         }
         .search-input:focus { outline: none; border-color: var(--accent-cyan); }
         .search-input::placeholder { color: var(--text-tertiary); }
 
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption);
             font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
@@ -244,8 +244,8 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--ghost:hover { border-color: var(--text-tertiary); }
         .btn--danger { color: var(--accent-red, #ff5555); border-color: var(--accent-red, #ff5555); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-        .btn--xs { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
+        .btn--sm { padding: 0.3rem 0.6rem; font-size: var(--text-xxs); }
+        .btn--xs { padding: 0.2rem 0.4rem; font-size: var(--text-2xs); }
 
         .contact-layout {
             display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;
@@ -273,19 +273,19 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             width: 36px; height: 36px; border-radius: 50%;
             background: var(--accent-cyan-dim, rgba(0, 200, 255, 0.15));
             color: var(--accent-cyan); display: flex; align-items: center;
-            justify-content: center; font-weight: 700; font-size: 0.9rem;
+            justify-content: center; font-weight: 700; font-size: var(--text-sm);
             flex-shrink: 0;
         }
 
         .contact-card__info { flex: 1; min-width: 0; }
-        .contact-card__name { margin: 0 0 0.2rem; font-size: 0.9rem; color: var(--text-primary); }
+        .contact-card__name { margin: 0 0 0.2rem; font-size: var(--text-sm); color: var(--text-primary); }
         .contact-card__platforms { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-        .contact-card__no-links { font-size: 0.7rem; color: var(--text-tertiary); }
-        .contact-card__time { font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; }
+        .contact-card__no-links { font-size: var(--text-xxs); color: var(--text-tertiary); }
+        .contact-card__time { font-size: var(--text-xxs); color: var(--text-tertiary); white-space: nowrap; }
 
         .platform-chip {
             display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+            font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em; border: 1px solid;
         }
         .platform-chip--discord { color: #7289da; border-color: #7289da; background: rgba(114, 137, 218, 0.1); }
@@ -293,7 +293,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .platform-chip--github { color: #f0f0f0; border-color: #666; background: rgba(255, 255, 255, 0.05); }
         .platform-chip--verified { box-shadow: 0 0 6px rgba(0, 255, 136, 0.2); }
 
-        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
+        .no-results { color: var(--text-tertiary); font-size: var(--text-sm); padding: 1rem; }
 
         /* ── Detail panel ── */
         .contact-detail {
@@ -317,16 +317,16 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             flex-shrink: 0;
         }
         .detail-name { margin: 0; font-size: 1.1rem; color: var(--text-primary); }
-        .detail-meta { font-size: 0.75rem; color: var(--text-tertiary); }
+        .detail-meta { font-size: var(--text-xs); color: var(--text-tertiary); }
         .detail-header-actions { margin-left: auto; display: flex; gap: 0.5rem; }
 
         .detail-section { margin-bottom: 1.5rem; }
         .detail-title { margin: 0 0 1rem; color: var(--text-primary); }
         .section-label {
-            margin: 0 0 0.5rem; font-size: 0.75rem; font-weight: 600;
+            margin: 0 0 0.5rem; font-size: var(--text-xs); font-weight: 600;
             color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .detail-notes { margin: 0; color: var(--text-secondary); font-size: 0.85rem; white-space: pre-wrap; }
+        .detail-notes { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); white-space: pre-wrap; }
 
         .detail-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 
@@ -337,14 +337,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             background: var(--bg-base, rgba(0, 0, 0, 0.2)); border-radius: var(--radius);
         }
         .link-id {
-            font-size: 0.8rem; color: var(--text-secondary); flex: 1;
+            font-size: var(--text-caption); color: var(--text-secondary); flex: 1;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .verified-badge {
-            font-size: 0.65rem; color: var(--accent-green, #00ff88);
+            font-size: var(--text-2xs); color: var(--accent-green, #00ff88);
             font-weight: 600; text-transform: uppercase;
         }
-        .empty-hint { color: var(--text-tertiary); font-size: 0.8rem; margin: 0.25rem 0; }
+        .empty-hint { color: var(--text-tertiary); font-size: var(--text-caption); margin: 0.25rem 0; }
 
         /* ── Add link form ── */
         .add-link-form {
@@ -355,13 +355,13 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 
         /* ── Form fields ── */
         .field-label {
-            display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary);
+            display: block; font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary);
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
         }
         .field-input {
             width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base, rgba(0, 0, 0, 0.3));
             border: 1px solid var(--border); border-radius: var(--radius);
-            color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
+            color: var(--text-primary); font-size: var(--text-sm); font-family: inherit;
             box-sizing: border-box;
         }
         .field-input:focus { outline: none; border-color: var(--accent-cyan); }

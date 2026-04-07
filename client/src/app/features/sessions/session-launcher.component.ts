@@ -61,16 +61,16 @@ import { NotificationService } from '../../core/services/notification.service';
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .form { display: flex; flex-direction: column; gap: 1rem; }
         .form__field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .form__label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .form__label { font-size: var(--text-caption); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
         .form__input {
             padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .form__textarea { resize: vertical; }
         .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }

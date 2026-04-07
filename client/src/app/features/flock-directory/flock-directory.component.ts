@@ -307,7 +307,7 @@ interface FlockStats {
             flex-wrap: wrap;
         }
         .flock-header__subtitle {
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-tertiary, #666);
             margin: 0;
         }
@@ -321,7 +321,7 @@ interface FlockStats {
             background: var(--bg-raised, #222);
             border: 1px solid var(--border, #333);
             border-radius: 6px;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .stat-pill__value { font-weight: 700; color: var(--text-primary, #eee); }
         .stat-pill__label { color: var(--text-tertiary, #666); }
@@ -353,7 +353,7 @@ interface FlockStats {
         .flock-search__icon {
             color: var(--accent-cyan, #0ef);
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             flex-shrink: 0;
         }
         .flock-search__input {
@@ -362,7 +362,7 @@ interface FlockStats {
             border: none;
             color: var(--text-primary, #eee);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             outline: none;
         }
         .flock-search__input::placeholder { color: var(--text-tertiary, #666); }
@@ -380,7 +380,7 @@ interface FlockStats {
             border-radius: 6px;
             color: var(--text-secondary, #bbb);
             font-family: inherit;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             cursor: pointer;
             outline: none;
             transition: border-color var(--transition-fast), box-shadow var(--transition-base);
@@ -399,7 +399,7 @@ interface FlockStats {
             border-radius: 6px;
             color: var(--text-secondary, #bbb);
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             transition: background 0.1s;
         }
         .flock-sort-toggle:hover { background: var(--bg-hover, #2a2a3e); }
@@ -418,7 +418,7 @@ interface FlockStats {
             border-radius: 12px;
             color: var(--text-tertiary, #666);
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             cursor: pointer;
             transition: all 0.1s;
         }
@@ -434,7 +434,7 @@ interface FlockStats {
             padding: 3rem;
             text-align: center;
             color: var(--text-tertiary, #666);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
         }
 
 
@@ -512,7 +512,7 @@ interface FlockStats {
             background: var(--bg-raised, #222);
             border: 2px solid var(--border, #333);
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-primary, #eee);
             flex-shrink: 0;
         }
@@ -528,14 +528,14 @@ interface FlockStats {
         }
         .flock-card__name {
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-primary, #eee);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .flock-card__status {
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -547,7 +547,7 @@ interface FlockStats {
             padding: 0.2rem 0.5rem;
             border-radius: 6px;
             font-weight: 700;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             border: 1px solid;
             flex-shrink: 0;
         }
@@ -556,7 +556,7 @@ interface FlockStats {
         .flock-card__score[data-level="low"] { color: var(--accent-red, #f44); border-color: var(--accent-red, #f44); background: rgba(255, 68, 68, 0.06); }
 
         .flock-card__desc {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary, #888);
             margin: 0 0 0.5rem;
             line-height: 1.45;
@@ -573,7 +573,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.06);
             border: 1px solid rgba(255, 0, 128, 0.2);
             border-radius: 4px;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--accent-magenta, #f08);
         }
         .flock-card__cap--more { background: transparent; border-style: dashed; }
@@ -581,7 +581,7 @@ interface FlockStats {
         .flock-card__metrics {
             display: flex;
             gap: 0.75rem;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary, #666);
             margin-top: auto;
         }
@@ -602,13 +602,13 @@ interface FlockStats {
             border-radius: 6px;
             color: var(--text-secondary, #bbb);
             font-family: inherit;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             cursor: pointer;
             transition: background 0.1s;
         }
         .flock-pagination__btn:hover:not(:disabled) { background: var(--bg-hover, #2a2a3e); }
         .flock-pagination__btn:disabled { opacity: 0.4; cursor: default; }
-        .flock-pagination__info { font-size: 0.7rem; color: var(--text-tertiary, #666); }
+        .flock-pagination__info { font-size: var(--text-xxs); color: var(--text-tertiary, #666); }
 
         /* Detail Panel (Overlay) */
         .flock-detail-backdrop {
@@ -675,7 +675,7 @@ interface FlockStats {
             margin: 0;
         }
         .flock-detail__status {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -695,7 +695,7 @@ interface FlockStats {
         .flock-detail__close:hover { color: var(--text-primary, #eee); }
 
         .flock-detail__desc {
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-secondary, #bbb);
             line-height: 1.5;
             margin: 0 0 1.25rem;
@@ -703,7 +703,7 @@ interface FlockStats {
 
         .flock-detail__section { margin-bottom: 1.25rem; }
         .flock-detail__section-title {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
@@ -734,7 +734,7 @@ interface FlockStats {
         .flock-detail__rep-fill[data-level="low"] { background: var(--accent-red, #f44); }
         .flock-detail__rep-value {
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             flex-shrink: 0;
         }
         .flock-detail__rep-value[data-level="high"] { color: var(--accent-green, #0f0); }
@@ -756,12 +756,12 @@ interface FlockStats {
         .flock-detail__metric-value {
             display: block;
             font-weight: 700;
-            font-size: 1rem;
+            font-size: var(--text-base);
             color: var(--text-primary, #eee);
         }
         .flock-detail__metric-label {
             display: block;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--text-tertiary, #666);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -779,7 +779,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.08);
             border: 1px solid rgba(255, 0, 128, 0.25);
             border-radius: 4px;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--accent-magenta, #f08);
         }
 
@@ -793,11 +793,11 @@ interface FlockStats {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
         .flock-detail__field-label { color: var(--text-tertiary, #666); }
         .flock-detail__field-value { color: var(--text-secondary, #bbb); }
-        .flock-detail__field-value--mono { font-family: var(--font-mono); font-size: 0.7rem; }
+        .flock-detail__field-value--mono { font-family: var(--font-mono); font-size: var(--text-xxs); }
 
         /* Actions */
         .flock-detail__actions {
@@ -812,7 +812,7 @@ interface FlockStats {
             border-radius: 8px;
             color: var(--accent-cyan, #0ef);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             cursor: pointer;
             transition: background 0.1s;

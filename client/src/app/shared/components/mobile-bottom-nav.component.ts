@@ -123,7 +123,7 @@ const NAV_ITEMS: BottomNavItem[] = [
         }
 
         .bottom-nav__label {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 600;
             letter-spacing: 0.03em;
             text-transform: uppercase;
@@ -142,7 +142,7 @@ const NAV_ITEMS: BottomNavItem[] = [
             border-radius: 8px;
             background: var(--accent-cyan);
             color: var(--bg-deep);
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 700;
             display: flex;
             align-items: center;

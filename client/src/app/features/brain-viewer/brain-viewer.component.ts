@@ -454,7 +454,7 @@ interface SyncStatus {
     styles: `
         .brain-viewer { padding: 1.5rem; }
         .brain-viewer h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .brain-viewer h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
+        .brain-viewer h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: var(--text-sm); }
         .loading { color: var(--text-secondary); }
 
         /* ─── Sync Banner ────── */
@@ -465,7 +465,7 @@ interface SyncStatus {
             padding: 0.6rem 1rem;
             border-radius: var(--radius-lg);
             margin-bottom: 1.25rem;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             border: 1px solid var(--border);
         }
         .sync-banner--ok { background: rgba(0, 255, 136, 0.05); border-color: var(--accent-green); }
@@ -499,7 +499,7 @@ interface SyncStatus {
         .stat-card--longterm { border-color: var(--accent-cyan); border-style: dashed; }
         .stat-card--shortterm { border-color: var(--accent-amber); border-style: dashed; }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -545,7 +545,7 @@ interface SyncStatus {
         .tier-bar__segment--longterm { background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan); }
         .tier-bar__segment--shortterm { background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1)); color: var(--accent-amber); }
         .tier-bar__label {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -559,7 +559,7 @@ interface SyncStatus {
             grid-template-columns: 2fr 1fr 1fr 1fr;
             gap: 0.5rem;
             padding: 0.4rem 0;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .agent-table__header {
             color: var(--text-tertiary);
@@ -592,7 +592,7 @@ interface SyncStatus {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -621,7 +621,7 @@ interface SyncStatus {
             border-radius: var(--radius-sm);
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             outline: none;
             transition: border-color 0.15s;
         }
@@ -641,7 +641,7 @@ interface SyncStatus {
             margin-bottom: 0.75rem;
         }
         .list-header__count {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -652,7 +652,7 @@ interface SyncStatus {
             gap: 0.5rem;
         }
         .page-info {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
         }
         .btn--sm {
@@ -661,7 +661,7 @@ interface SyncStatus {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -676,7 +676,7 @@ interface SyncStatus {
             color: var(--text-tertiary);
         }
         .empty-state__icon {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             line-height: 1.3;
             margin-bottom: 0.75rem;
         }
@@ -697,12 +697,12 @@ interface SyncStatus {
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 0.75rem;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .memory-card__tier {
             padding: 0.15rem 0.35rem;
             border-radius: 3px;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -725,7 +725,7 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .memory-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -734,7 +734,7 @@ interface SyncStatus {
         .memory-card__status[data-status="pending"] { color: var(--accent-amber); }
         .memory-card__status[data-status="failed"] { color: var(--accent-red); }
         .memory-card__decay {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
@@ -744,7 +744,7 @@ interface SyncStatus {
             background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
             color: var(--accent-purple);
             border-radius: 3px;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             flex-shrink: 0;
         }
         .memory-card__storage {
@@ -770,7 +770,7 @@ interface SyncStatus {
         }
         .memory-card__time {
             color: var(--text-tertiary);
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             flex-shrink: 0;
             white-space: nowrap;
         }
@@ -786,7 +786,7 @@ interface SyncStatus {
         .detail-row {
             display: flex;
             gap: 0.75rem;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .detail-label {
             width: 72px;
@@ -794,14 +794,14 @@ interface SyncStatus {
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             padding-top: 0.1rem;
         }
         .detail-value {
             color: var(--text-secondary);
             word-break: break-all;
         }
-        .detail-value--mono { font-family: var(--font-mono); font-size: 0.65rem; }
+        .detail-value--mono { font-family: var(--font-mono); font-size: var(--text-2xs); }
         .detail-value--txid { color: var(--accent-green); }
         .detail-value--asa { color: var(--accent-cyan); }
         [data-storage="arc69"] { color: var(--accent-green); }
@@ -818,7 +818,7 @@ interface SyncStatus {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             padding: 0.75rem;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
             white-space: pre-wrap;
             word-break: break-word;
@@ -832,7 +832,7 @@ interface SyncStatus {
             display: flex;
             gap: 0.75rem;
             padding: 0.4rem 0;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             border-bottom: 1px solid var(--border);
             align-items: center;
         }
@@ -853,12 +853,12 @@ interface SyncStatus {
         }
         .obs-header h3 { margin: 0; }
         .obs-header__meta {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
         }
         .obs-empty {
             color: var(--text-tertiary);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
         .chip--obs-active.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
         .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
@@ -880,12 +880,12 @@ interface SyncStatus {
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 0.75rem;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .obs-card__source {
             padding: 0.15rem 0.35rem;
             border-radius: 3px;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -901,13 +901,13 @@ interface SyncStatus {
             white-space: nowrap;
         }
         .obs-card__score {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             flex-shrink: 0;
             font-family: var(--font-mono);
         }
         .obs-card__status {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             text-transform: uppercase;
             letter-spacing: 0.04em;
             flex-shrink: 0;
@@ -933,7 +933,7 @@ interface SyncStatus {
         .btn--action {
             padding: 0.35rem 0.75rem;
             border-radius: var(--radius-sm);
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -958,7 +958,7 @@ interface SyncStatus {
         @media (max-width: 767px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
             .memory-card__header { flex-wrap: wrap; }
-            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: 0.6rem; }
+            .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: var(--text-3xs); }
         }
     `,
 })

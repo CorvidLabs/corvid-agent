@@ -170,7 +170,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             padding: 0.75rem 1.5rem;
             color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             letter-spacing: 0.03em;
             transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease, padding-left 0.15s ease;
             border-left: 3px solid transparent;
@@ -238,7 +238,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             border-top: none;
         }
         .sidebar__section-label {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-tertiary);
@@ -270,7 +270,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
 
         /* Chevron indicator */
         .sidebar__chevron {
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--text-tertiary);
             transition: transform 150ms ease;
             display: inline-block;
@@ -319,7 +319,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             border-top: 1px solid var(--border);
             color: var(--text-tertiary);
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-family: inherit;
             font-weight: 600;
             letter-spacing: 0.04em;
@@ -342,7 +342,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             border-top: 1px solid var(--border);
             color: var(--text-tertiary);
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             font-family: inherit;
             transition: color 0.15s, background 0.15s;
         }

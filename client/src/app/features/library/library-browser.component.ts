@@ -113,15 +113,15 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
         .search-input {
             flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
         }
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .category-select {
             padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.85rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-sm); font-family: inherit;
         }
 
-        .empty { color: var(--text-tertiary); font-size: 0.85rem; }
+        .empty { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         .entry-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .entry-card {
@@ -132,9 +132,9 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card--expanded { border-color: var(--accent-cyan); }
 
         .entry-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
-        .entry-card__key { font-weight: 600; color: var(--accent-cyan); font-size: 0.85rem; }
+        .entry-card__key { font-weight: 600; color: var(--accent-cyan); font-size: var(--text-sm); }
         .entry-card__category {
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
             padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text-secondary);
         }
         .entry-card__category[data-category="guide"] { color: var(--accent-green); }
@@ -143,18 +143,18 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .entry-card__category[data-category="standard"] { color: var(--accent-purple, #a78bfa); }
         .entry-card__category[data-category="runbook"] { color: var(--accent-red); }
 
-        .entry-card__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.25rem; }
+        .entry-card__meta { display: flex; gap: 0.75rem; font-size: var(--text-xxs); color: var(--text-tertiary); margin-bottom: 0.25rem; }
         .entry-card__asa { font-family: var(--font-mono); color: var(--accent-green); }
         .entry-card--book { border-left: 3px solid var(--accent-purple, #a78bfa); }
         .entry-card__pages {
-            font-size: 0.6rem; font-weight: 700; color: var(--accent-purple, #a78bfa);
+            font-size: var(--text-3xs); font-weight: 700; color: var(--accent-purple, #a78bfa);
             background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2);
             padding: 1px 8px; border-radius: 10px;
         }
 
         .entry-card__tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
         .tag {
-            font-size: 0.6rem; padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
+            font-size: var(--text-3xs); padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
             background: var(--accent-cyan-dim); color: var(--accent-cyan); font-weight: 600;
         }
 
@@ -162,11 +162,11 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
             margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
         }
         .entry-card__content pre {
-            font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;
+            font-size: var(--text-caption); color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;
             margin: 0; font-family: inherit; line-height: 1.5;
         }
         .entry-card__book-reader { max-height: 500px; overflow-y: auto; }
-        .loading-text { color: var(--text-tertiary); font-size: 0.8rem; margin: 0; }
+        .loading-text { color: var(--text-tertiary); font-size: var(--text-caption); margin: 0; }
         .page-divider {
             display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0;
         }
@@ -174,7 +174,7 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
             content: ''; flex: 1; height: 1px; background: var(--border);
         }
         .page-divider__label {
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            font-size: var(--text-3xs); font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; color: var(--text-tertiary); white-space: nowrap;
         }
 

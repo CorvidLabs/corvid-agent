@@ -140,7 +140,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             border-bottom: 1px solid var(--border);
         }
         .session-view__info { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-        .session-view__info h2 { margin: 0; font-size: 1rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .session-view__info h2 { margin: 0; font-size: var(--text-base); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .session-view__live-dot {
             width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
             background: var(--accent-green);
@@ -151,13 +151,13 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(0, 255, 136, 0.5); }
             50% { opacity: 0.5; box-shadow: 0 0 12px rgba(0, 255, 136, 0.3); }
         }
-        .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
+        .session-view__meta { display: flex; gap: 0.75rem; font-size: var(--text-xxs); color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
-        .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.05em; margin-right: 0.2rem; }
+        .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: var(--text-3xs); letter-spacing: 0.05em; margin-right: 0.2rem; }
         .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .export-group { display: flex; gap: 0.25rem; }
         .btn {
-            padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: var(--text-xs); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -180,7 +180,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             }
             .btn {
                 padding: 0.25rem 0.5rem;
-                font-size: 0.65rem;
+                font-size: var(--text-2xs);
             }
             .question-card {
                 margin: 0.5rem 0.5rem;
@@ -200,15 +200,15 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
             box-shadow: var(--glow-cyan);
         }
-        .question-card__header { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-cyan); margin-bottom: 0.5rem; font-weight: 700; }
-        .question-card__text { margin: 0 0 0.5rem; color: var(--text-primary); font-size: 0.875rem; }
-        .question-card__context { margin: 0 0 0.75rem; color: var(--text-secondary); font-size: 0.75rem; font-style: italic; }
+        .question-card__header { font-size: var(--text-xxs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-cyan); margin-bottom: 0.5rem; font-weight: 700; }
+        .question-card__text { margin: 0 0 0.5rem; color: var(--text-primary); font-size: var(--text-sm); }
+        .question-card__context { margin: 0 0 0.75rem; color: var(--text-secondary); font-size: var(--text-xs); font-style: italic; }
         .question-card__options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .question-card__input { display: flex; gap: 0.5rem; }
         .question-card__input input {
             flex: 1; padding: 0.375rem 0.75rem; border-radius: var(--radius);
             background: var(--bg-primary); border: 1px solid var(--border-bright);
-            color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
+            color: var(--text-primary); font-size: var(--text-caption); font-family: inherit;
         }
         .question-card__input input:focus { outline: none; border-color: var(--accent-cyan); }
 
@@ -225,15 +225,15 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             animation: slideUp 0.2s ease;
         }
-        .confirm-dialog__title { margin: 0 0 0.5rem; font-size: 1rem; color: var(--text-primary); }
-        .confirm-dialog__text { margin: 0 0 1.25rem; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+        .confirm-dialog__title { margin: 0 0 0.5rem; font-size: var(--text-base); color: var(--text-primary); }
+        .confirm-dialog__text { margin: 0 0 1.25rem; font-size: var(--text-caption); color: var(--text-secondary); line-height: 1.5; }
         .confirm-dialog__actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Mobile overflow menu */
         .mobile-menu-wrapper { display: none; position: relative; z-index: 100; }
-        .mobile-menu-btn { font-size: 0.9rem; letter-spacing: 0.15em; }
+        .mobile-menu-btn { font-size: var(--text-sm); letter-spacing: 0.15em; }
         .mobile-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
         .mobile-menu {
             position: absolute; right: 0; top: 100%; z-index: 101;
@@ -244,7 +244,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
         .mobile-menu__item {
             display: block; width: 100%; padding: 0.6rem 0.75rem;
             background: none; border: none; border-bottom: 1px solid var(--border);
-            color: var(--text-primary); font-family: inherit; font-size: 0.75rem;
+            color: var(--text-primary); font-family: inherit; font-size: var(--text-xs);
             text-align: left; cursor: pointer; transition: background 0.1s;
         }
         .mobile-menu__item:last-child { border-bottom: none; }

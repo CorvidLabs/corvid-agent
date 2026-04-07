@@ -90,7 +90,7 @@ const PRESETS: CronPreset[] = [
             gap: 0.5rem;
         }
         .cron-editor__label {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -109,7 +109,7 @@ const PRESETS: CronPreset[] = [
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             cursor: pointer;
             transition: border-color 0.1s, color 0.1s, background 0.1s;
             white-space: nowrap;
@@ -125,7 +125,7 @@ const PRESETS: CronPreset[] = [
         }
         .cron-preset__icon {
             font-family: var(--font-mono);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             opacity: 0.7;
         }
@@ -148,7 +148,7 @@ const PRESETS: CronPreset[] = [
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-family: var(--font-mono);
             letter-spacing: 0.08em;
             transition: border-color 0.15s, box-shadow 0.15s;
@@ -172,13 +172,13 @@ const PRESETS: CronPreset[] = [
         .cron-editor__field-hints span {
             flex: 1;
             text-align: center;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
         .cron-editor__preview {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--accent-cyan);
             font-weight: 600;
             padding: 0.3rem 0.5rem;
@@ -187,7 +187,7 @@ const PRESETS: CronPreset[] = [
             border-left: 2px solid var(--accent-cyan);
         }
         .cron-editor__error {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--accent-red);
             font-weight: 600;
             padding: 0.3rem 0.5rem;
@@ -201,7 +201,7 @@ const PRESETS: CronPreset[] = [
             }
             .cron-preset {
                 padding: 0.25rem 0.4rem;
-                font-size: 0.6rem;
+                font-size: var(--text-3xs);
             }
         }
     `,

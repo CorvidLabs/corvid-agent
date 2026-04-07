@@ -404,12 +404,12 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .page { padding: 1.5rem; }
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
-        .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-secondary); font-size: var(--text-sm); }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
             padding: 0.75rem 1rem; margin-bottom: 1rem;
         }
-        .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
+        .error-banner p { margin: 0; color: var(--accent-red); font-size: var(--text-sm); }
 
         /* Card grid */
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
@@ -420,17 +420,17 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .agent-card:hover { border-color: var(--accent-cyan); }
         .agent-card--selected { border-color: var(--accent-cyan); background: var(--bg-raised); }
         .agent-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-        .agent-card__name { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
+        .agent-card__name { font-weight: 600; color: var(--text-primary); font-size: var(--text-sm); }
         .agent-card__body { display: flex; gap: 1rem; align-items: flex-start; }
         .agent-card__footer { margin-top: 0.75rem; }
-        .computed-at { font-size: 0.7rem; color: var(--text-secondary); }
+        .computed-at { font-size: var(--text-xxs); color: var(--text-secondary); }
 
         /* Trust badge */
         .trust-badge {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-2xs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
-        .trust-badge--lg { font-size: 0.75rem; padding: 2px 10px; }
+        .trust-badge--lg { font-size: var(--text-xs); padding: 2px 10px; }
         .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
         .trust-badge[data-level="medium"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .trust-badge[data-level="low"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
@@ -457,8 +457,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         /* Component bars (card) */
         .component-bars { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
         .comp-bar { display: grid; grid-template-columns: 1fr 60px 28px; align-items: center; gap: 0.4rem; }
-        .comp-bar__label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-secondary); }
-        .comp-bar__weight { font-size: 0.6rem; color: var(--text-secondary); opacity: 0.7; }
+        .comp-bar__label { display: flex; justify-content: space-between; font-size: var(--text-2xs); color: var(--text-secondary); }
+        .comp-bar__weight { font-size: var(--text-3xs); color: var(--text-secondary); opacity: 0.7; }
         .comp-bar__track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; }
         .comp-bar__fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
         .comp-bar__fill[data-color="green"] { background: var(--accent-green); }
@@ -466,7 +466,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .comp-bar__fill[data-color="cyan"] { background: var(--accent-cyan); }
         .comp-bar__fill[data-color="purple"] { background: var(--accent-purple, #b388ff); }
         .comp-bar__fill[data-color="orange"] { background: var(--accent-orange, #ff9100); }
-        .comp-bar__value { font-size: 0.7rem; color: var(--text-primary); text-align: right; }
+        .comp-bar__value { font-size: var(--text-xxs); color: var(--text-primary); text-align: right; }
 
         /* Detail panel */
         .detail-panel {
@@ -479,8 +479,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .detail-components { display: flex; flex-direction: column; gap: 0.5rem; }
         .detail-bar { display: grid; grid-template-columns: 140px 1fr 40px; align-items: center; gap: 0.5rem; }
         .detail-bar__label { display: flex; justify-content: space-between; }
-        .detail-bar__label span:first-child { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
-        .detail-bar__weight { font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
+        .detail-bar__label span:first-child { font-size: var(--text-caption); color: var(--text-secondary); font-weight: 600; }
+        .detail-bar__weight { font-size: var(--text-xxs); color: var(--text-secondary); opacity: 0.7; }
         .detail-bar__track { height: 8px; background: var(--bg-raised); border-radius: 4px; overflow: hidden; }
         .detail-bar__fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
         .detail-bar__fill[data-color="green"] { background: var(--accent-green); }
@@ -488,25 +488,25 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .detail-bar__fill[data-color="cyan"] { background: var(--accent-cyan); }
         .detail-bar__fill[data-color="purple"] { background: var(--accent-purple, #b388ff); }
         .detail-bar__fill[data-color="orange"] { background: var(--accent-orange, #ff9100); }
-        .detail-bar__value { font-size: 0.85rem; color: var(--text-primary); text-align: right; font-weight: 600; }
-        .attestation { font-size: 0.8rem; color: var(--text-secondary); margin: 1rem 0; }
-        .attestation code { color: var(--accent-green); font-size: 0.75rem; }
+        .detail-bar__value { font-size: var(--text-sm); color: var(--text-primary); text-align: right; font-weight: 600; }
+        .attestation { font-size: var(--text-caption); color: var(--text-secondary); margin: 1rem 0; }
+        .attestation code { color: var(--accent-green); font-size: var(--text-xs); }
 
         /* No activity */
         .no-activity {
-            color: var(--text-secondary); font-size: 0.8rem; padding: 1rem;
+            color: var(--text-secondary); font-size: var(--text-caption); padding: 1rem;
             text-align: center; font-style: italic; width: 100%;
         }
         .no-activity-notice {
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);
+            padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: var(--text-caption); color: var(--text-secondary);
         }
 
         /* Decay notice */
         .decay-notice {
             background: var(--accent-yellow-dim, rgba(255, 193, 7, 0.1)); border: 1px solid var(--accent-yellow, #ffc107);
             border-radius: var(--radius); padding: 0.5rem 0.75rem; margin-bottom: 1rem;
-            font-size: 0.8rem; color: var(--accent-yellow, #ffc107);
+            font-size: var(--text-caption); color: var(--accent-yellow, #ffc107);
         }
 
         /* Explanation cards */
@@ -517,24 +517,24 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         }
         .explain-card--default { border-left: 3px solid var(--accent-yellow, #ffc107); }
         .explain-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
-        .explain-card__name { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
-        .explain-card__weight { font-size: 0.7rem; color: var(--text-secondary); }
-        .explain-card__score { font-size: 0.85rem; font-weight: 700; margin-left: auto; }
+        .explain-card__name { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); }
+        .explain-card__weight { font-size: var(--text-xxs); color: var(--text-secondary); }
+        .explain-card__score { font-size: var(--text-sm); font-weight: 700; margin-left: auto; }
         .explain-card__score[data-color="green"] { color: var(--accent-green); }
         .explain-card__score[data-color="yellow"] { color: var(--accent-yellow, #ffc107); }
         .explain-card__score[data-color="cyan"] { color: var(--accent-cyan); }
         .explain-card__score[data-color="purple"] { color: var(--accent-purple, #b388ff); }
         .explain-card__score[data-color="orange"] { color: var(--accent-orange, #ff9100); }
         .default-badge {
-            font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; font-weight: 700;
+            font-size: var(--text-3xs); padding: 1px 5px; border-radius: 3px; font-weight: 700;
             background: var(--accent-yellow-dim, rgba(255, 193, 7, 0.1));
             color: var(--accent-yellow, #ffc107); border: 1px solid var(--accent-yellow, #ffc107);
         }
-        .explain-card__reason { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.3rem; }
-        .explain-card__contribution { font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
+        .explain-card__reason { font-size: var(--text-caption); color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.3rem; }
+        .explain-card__contribution { font-size: var(--text-xxs); color: var(--text-secondary); opacity: 0.7; }
         .explain-card__events { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
-        .explain-card__events-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem; }
-        .explain-event { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; font-size: 0.75rem; }
+        .explain-card__events-label { font-size: var(--text-xxs); color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem; }
+        .explain-event { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; font-size: var(--text-xs); }
         .explain-event__type { font-weight: 600; color: var(--text-primary); }
         .explain-event__type[data-type="task_completed"],
         .explain-event__type[data-type="credit_earned"],
@@ -561,13 +561,13 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .stat-card__icon[data-type="positive"] { color: var(--accent-green); }
         .stat-card__icon[data-type="negative"] { color: var(--accent-red); }
         .stat-card__value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-        .stat-card__label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+        .stat-card__label { font-size: var(--text-2xs); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
 
         /* Feedback sources */
         .feedback-sources { display: flex; flex-direction: column; gap: 0.25rem; }
         .source-row {
             display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0;
-            font-size: 0.8rem; border-bottom: 1px solid var(--border);
+            font-size: var(--text-caption); border-bottom: 1px solid var(--border);
         }
         .source-row__name { font-weight: 600; color: var(--text-primary); flex: 1; text-transform: capitalize; }
         .source-row__positive { color: var(--accent-green); font-weight: 600; }
@@ -577,7 +577,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .events-list { display: flex; flex-direction: column; gap: 0.25rem; }
         .event-row {
             display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0;
-            font-size: 0.8rem; border-bottom: 1px solid var(--border);
+            font-size: var(--text-caption); border-bottom: 1px solid var(--border);
         }
         .event-label { font-weight: 600; color: var(--text-primary); }
         .event-label[data-type="task_completed"],
@@ -593,14 +593,14 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .event-impact { font-weight: 600; min-width: 3em; }
         .event-impact[data-impact="positive"] { color: var(--accent-green); }
         .event-impact[data-impact="negative"] { color: var(--accent-red); }
-        .event-time { color: var(--text-secondary); margin-left: auto; font-size: 0.75rem; }
+        .event-time { color: var(--text-secondary); margin-left: auto; font-size: var(--text-xs); }
 
         /* Buttons */
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.25rem 0.5rem; font-size: var(--text-xxs); }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -621,7 +621,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .trend-chart__dot[data-impact="positive"] { fill: var(--accent-green); }
         .trend-chart__dot[data-impact="negative"] { fill: var(--accent-red); }
         .trend-chart__labels { display: flex; justify-content: space-between; margin-top: 0.35rem; }
-        .trend-chart__label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .trend-chart__label { font-size: var(--text-4xs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
         .trend-chart__label--positive { color: var(--accent-green); }
         .trend-chart__label--negative { color: var(--accent-red); }
 
@@ -634,11 +634,11 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
             display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;
         }
         .history-chart__toggle {
-            font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;
+            font-size: var(--text-xxs); color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;
         }
         .history-chart__toggle input { cursor: pointer; }
         .history-chart__legend-item {
-            font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            font-size: var(--text-3xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .history-chart__legend-item[data-color="green"] { color: var(--accent-green); }
         .history-chart__legend-item[data-color="yellow"] { color: var(--accent-yellow, #ffc107); }
@@ -670,7 +670,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
             position: relative; height: 1rem; margin-top: 0.25rem;
         }
         .history-chart__x-labels span {
-            position: absolute; font-size: 0.55rem; color: var(--text-tertiary); transform: translateX(-50%);
+            position: absolute; font-size: var(--text-4xs); color: var(--text-tertiary); transform: translateX(-50%);
         }
 
         /* Compare section */
@@ -693,11 +693,11 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-components { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         .compare-component-row {}
         .compare-component-label {
-            font-size: 0.75rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.3rem;
+            font-size: var(--text-xs); font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.3rem;
         }
         .compare-component-bars { display: flex; flex-direction: column; gap: 0.2rem; }
         .compare-mini-bar { display: grid; grid-template-columns: 80px 1fr 30px; align-items: center; gap: 0.4rem; }
-        .compare-mini-name { font-size: 0.65rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .compare-mini-name { font-size: var(--text-2xs); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .compare-mini-track { height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; }
         .compare-mini-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
         .compare-mini-fill[data-color="green"] { background: var(--accent-green); }
@@ -705,7 +705,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-mini-fill[data-color="cyan"] { background: var(--accent-cyan); }
         .compare-mini-fill[data-color="purple"] { background: var(--accent-purple, #b388ff); }
         .compare-mini-fill[data-color="orange"] { background: var(--accent-orange, #ff9100); }
-        .compare-mini-val { font-size: 0.7rem; color: var(--text-primary); text-align: right; }
+        .compare-mini-val { font-size: var(--text-xxs); color: var(--text-primary); text-align: right; }
 
         @media (max-width: 767px) {
             .card-grid { grid-template-columns: 1fr; }

@@ -62,7 +62,7 @@ import type { NotificationType } from '../../core/models/notification.model';
             padding: 0.75rem 1rem;
             border-radius: var(--radius-lg);
             border: 1px solid;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             pointer-events: auto;
             animation: toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
             backdrop-filter: blur(12px);
@@ -115,7 +115,7 @@ import type { NotificationType } from '../../core/models/notification.model';
 
         .toast__icon {
             flex-shrink: 0;
-            font-size: 1rem;
+            font-size: var(--text-base);
             line-height: 1;
             margin-top: 1px;
         }
@@ -134,7 +134,7 @@ import type { NotificationType } from '../../core/models/notification.model';
 
         .toast__detail {
             margin: 0.25rem 0 0;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-secondary);
             line-height: 1.4;
             word-break: break-word;

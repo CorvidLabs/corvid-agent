@@ -51,7 +51,7 @@ export type ViewMode = 'basic' | '3d';
             align-items: center;
             gap: 4px;
             padding: 0.3rem 0.7rem;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             font-family: inherit;
             letter-spacing: 0.03em;

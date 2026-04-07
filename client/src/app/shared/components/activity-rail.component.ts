@@ -96,7 +96,7 @@ import type { Session } from '../../core/models/session.model';
             border: none;
             border-bottom: 1px solid var(--border);
             color: var(--text-tertiary);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-family: inherit;
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
@@ -118,7 +118,7 @@ import type { Session } from '../../core/models/session.model';
             border-bottom: none;
         }
         .rail__heading {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-tertiary);
@@ -126,7 +126,7 @@ import type { Session } from '../../core/models/session.model';
             margin: 0 0 0.5rem;
         }
         .rail__empty {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             margin: 0;
             padding: 0.25rem 0;
@@ -151,7 +151,7 @@ import type { Session } from '../../core/models/session.model';
             gap: 0.4rem;
         }
         .rail__item-name {
-            font-size: 0.72rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -164,11 +164,11 @@ import type { Session } from '../../core/models/session.model';
             padding: 0.3rem 0;
         }
         .rail__stat-label {
-            font-size: 0.68rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
         }
         .rail__stat-value {
-            font-size: 0.68rem;
+            font-size: var(--text-xxs);
             color: var(--text-primary);
             font-weight: 600;
         }

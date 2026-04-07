@@ -116,7 +116,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
         .page__actions { display: flex; gap: 0.5rem; }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
         }
@@ -128,27 +128,27 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
-        .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: var(--text-caption); text-transform: uppercase; letter-spacing: 0.03em; }
         .detail__info dd { margin: 0; color: var(--text-primary); }
         .detail__members { margin-top: 1.5rem; }
         .detail__members h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .member-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .member-badge {
             padding: 0.25rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-bright);
-            border-radius: var(--radius); font-size: 0.8rem; color: var(--text-primary);
+            border-radius: var(--radius); font-size: var(--text-caption); color: var(--text-primary);
         }
         .detail__launch { margin-top: 2rem; }
         .detail__launch h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .launch-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 600px; }
         .launch-select, .launch-textarea {
             padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .launch-select:focus, .launch-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .launch-textarea { resize: vertical; min-height: 80px; }
         .detail__launches { margin-top: 2rem; }
         .detail__launches h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
-        .detail__empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .detail__empty { color: var(--text-secondary); font-size: var(--text-sm); }
         .launches-list { display: flex; flex-direction: column; gap: 0.75rem; }
         .launch-card {
             display: block; padding: 0.75rem;
@@ -158,7 +158,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .launch-card:hover { border-color: var(--accent-cyan); }
         .launch-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
         .launch-card__stage {
-            font-size: 0.65rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: var(--text-2xs); padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid;
         }
         .launch-card__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -166,15 +166,15 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .launch-card__stage[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
         .launch-card__stage[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .launch-card__stage[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
-        .launch-card__meta { font-size: 0.7rem; color: var(--text-tertiary); }
-        .launch-card__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
-        .launch-card__prompt { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .launch-card__meta { font-size: var(--text-xxs); color: var(--text-tertiary); }
+        .launch-card__time { font-size: var(--text-xxs); color: var(--text-tertiary); margin-left: auto; }
+        .launch-card__prompt { margin: 0 0 0.35rem; font-size: var(--text-caption); color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .launch-card__synthesis {
             padding: 0.5rem; background: var(--bg-raised); border: 1px solid var(--border);
             border-radius: var(--radius); margin-top: 0.35rem;
         }
-        .synthesis-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
-        .synthesis-text { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
+        .synthesis-label { font-size: var(--text-3xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
+        .synthesis-text { margin: 0.25rem 0 0; font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.5; }
     `,
 })
 export class CouncilDetailComponent implements OnInit {

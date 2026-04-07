@@ -53,7 +53,7 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -68,9 +68,9 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
             transition: border-color 0.2s, box-shadow 0.2s;
         }
         .list__item:hover { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(0, 255, 136, 0.08); }
-        .list__item-title { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--text-primary); }
-        .list__item-desc { margin: 0; color: var(--text-secondary); font-size: 0.8rem; }
-        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; font-size: 0.75rem; color: var(--text-tertiary); }
+        .list__item-title { margin: 0 0 0.25rem; font-size: var(--text-sm); color: var(--text-primary); }
+        .list__item-desc { margin: 0; color: var(--text-secondary); font-size: var(--text-caption); }
+        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; font-size: var(--text-xs); color: var(--text-tertiary); }
         .list__item-path { color: var(--accent-green); opacity: 0.7; }
     `,
 })

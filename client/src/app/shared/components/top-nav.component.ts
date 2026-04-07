@@ -247,7 +247,7 @@ const TABS: NavTab[] = [
         }
         .topnav__logo-text {
             font-family: var(--font-display);
-            font-size: 1rem;
+            font-size: var(--text-base);
             font-weight: 700;
             background: var(--gradient-cyan-amber);
             background-size: 200% 200%;
@@ -274,7 +274,7 @@ const TABS: NavTab[] = [
             border: none;
             color: var(--text-secondary);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             letter-spacing: 0.04em;
             cursor: pointer;
@@ -294,7 +294,7 @@ const TABS: NavTab[] = [
             background: linear-gradient(180deg, transparent 0%, var(--accent-cyan-subtle) 100%);
         }
         .topnav__tab-chevron {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             transition: transform 150ms ease;
         }
         .topnav__tab-chevron--open {
@@ -328,7 +328,7 @@ const TABS: NavTab[] = [
             padding: 0.5rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             letter-spacing: 0.03em;
             transition: background 0.1s, color 0.1s;
         }
@@ -356,7 +356,7 @@ const TABS: NavTab[] = [
         .network-btn {
             padding: 0.25rem 0.5rem;
             font-family: inherit;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-weight: 700;
             letter-spacing: 0.06em;
             border: none;
@@ -394,7 +394,7 @@ const TABS: NavTab[] = [
             border-radius: var(--radius, 6px);
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 700;
             cursor: pointer;
             transition: color 0.15s, border-color 0.15s;
@@ -413,7 +413,7 @@ const TABS: NavTab[] = [
             border-radius: var(--radius-lg, 10px);
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             cursor: pointer;
             transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
             min-width: 160px;
@@ -433,7 +433,7 @@ const TABS: NavTab[] = [
             border: 1px solid var(--border, #333);
             border-radius: 3px;
             font-family: inherit;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--text-tertiary);
         }
 
@@ -507,7 +507,7 @@ const TABS: NavTab[] = [
             .topnav-mobile__section-label {
                 display: block;
                 padding: 0.4rem 1.5rem;
-                font-size: 0.6rem;
+                font-size: var(--text-3xs);
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
                 color: var(--text-tertiary);
@@ -520,7 +520,7 @@ const TABS: NavTab[] = [
                 padding: 0.75rem 1.5rem;
                 color: var(--text-secondary);
                 text-decoration: none;
-                font-size: 0.85rem;
+                font-size: var(--text-sm);
                 transition: background 0.1s, color 0.1s;
             }
             .topnav-mobile__link:hover {

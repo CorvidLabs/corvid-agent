@@ -243,7 +243,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .wizard__subtitle {
             margin: 0.35rem 0 0;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-tertiary);
         }
 
@@ -281,12 +281,12 @@ const TEMPLATES: AgentTemplate[] = [
 
         .step__title {
             margin: 0 0 0.25rem;
-            font-size: 1rem;
+            font-size: var(--text-base);
             color: var(--text-primary);
         }
         .step__desc {
             margin: 0 0 1.25rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-tertiary);
         }
 
@@ -324,17 +324,17 @@ const TEMPLATES: AgentTemplate[] = [
             grid-column: 1 / -1;
         }
         .template-card__icon {
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-weight: 700;
             color: var(--accent-cyan);
             font-family: var(--font-mono);
         }
         .template-card__name {
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
         }
         .template-card__desc {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             line-height: 1.35;
         }
@@ -353,7 +353,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .field { display: flex; flex-direction: column; gap: 0.25rem; }
         .field__label {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             color: var(--text-secondary);
             text-transform: uppercase;
@@ -363,7 +363,7 @@ const TEMPLATES: AgentTemplate[] = [
             padding: 0.5rem 0.75rem;
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-family: inherit;
             background: var(--bg-input);
             color: var(--text-primary);
@@ -385,7 +385,7 @@ const TEMPLATES: AgentTemplate[] = [
             background: rgba(0, 229, 255, 0.08);
             border: 1px solid rgba(0, 229, 255, 0.2);
             border-radius: var(--radius);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--accent-cyan);
             font-weight: 600;
         }
@@ -400,7 +400,7 @@ const TEMPLATES: AgentTemplate[] = [
         .wizard__btn {
             padding: 0.55rem 1.2rem;
             border-radius: var(--radius);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -433,7 +433,7 @@ const TEMPLATES: AgentTemplate[] = [
         }
         .wizard__warning p {
             margin: 0;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--accent-amber, #ffc107);
             text-align: left;
         }
@@ -441,7 +441,7 @@ const TEMPLATES: AgentTemplate[] = [
             background: var(--bg-raised);
             padding: 0.1rem 0.35rem;
             border-radius: 3px;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
 
         /* Done */
@@ -476,12 +476,12 @@ const TEMPLATES: AgentTemplate[] = [
             border-radius: var(--radius);
         }
         .done__label {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             color: var(--text-secondary);
         }
         .done__value {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             color: var(--text-primary);
         }
@@ -497,7 +497,7 @@ const TEMPLATES: AgentTemplate[] = [
         /* Footer */
         .wizard__footer {
             margin-top: 2rem;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
         }
         .wizard__footer a {

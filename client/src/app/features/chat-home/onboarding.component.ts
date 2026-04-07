@@ -157,7 +157,7 @@ const TEMPLATES: AgentTemplate[] = [
             margin: 0 0 0.5rem;
         }
         .onboard__sub {
-            font-size: 0.82rem;
+            font-size: var(--text-caption);
             color: var(--text-tertiary);
             margin: 0;
         }
@@ -202,19 +202,19 @@ const TEMPLATES: AgentTemplate[] = [
             background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(255, 0, 170, 0.06));
             border: 1px solid rgba(0, 229, 255, 0.15);
             border-radius: 12px;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-weight: 800;
             color: var(--accent-cyan);
             letter-spacing: 0.05em;
             box-shadow: 0 2px 12px rgba(0, 229, 255, 0.08);
         }
         .tpl-card__name {
-            font-size: 0.82rem;
+            font-size: var(--text-caption);
             font-weight: 700;
             color: var(--text-primary);
         }
         .tpl-card__desc {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             line-height: 1.4;
         }
@@ -225,7 +225,7 @@ const TEMPLATES: AgentTemplate[] = [
             border: none;
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             cursor: pointer;
             text-decoration: underline;
             transition: color 0.15s;
@@ -242,7 +242,7 @@ const TEMPLATES: AgentTemplate[] = [
         .field__label {
             display: block;
             margin-bottom: 0.35rem;
-            font-size: 0.68rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -256,7 +256,7 @@ const TEMPLATES: AgentTemplate[] = [
             border-radius: var(--radius, 6px);
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.82rem;
+            font-size: var(--text-caption);
             box-sizing: border-box;
         }
         .field__input:focus {
@@ -273,7 +273,7 @@ const TEMPLATES: AgentTemplate[] = [
         .btn {
             padding: 0.5rem 1.25rem;
             border-radius: var(--radius, 6px);
-            font-size: 0.78rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             cursor: pointer;
             border: 1px solid;
@@ -298,7 +298,7 @@ const TEMPLATES: AgentTemplate[] = [
         .btn--ghost:hover { background: var(--bg-hover); }
         .btn--large {
             padding: 0.75rem 2rem;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
         }
 
         /* Done */

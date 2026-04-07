@@ -124,7 +124,7 @@ interface CommandItem {
         .palette__search-icon {
             color: var(--accent-cyan, #0ef);
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             flex-shrink: 0;
         }
         .palette__input {
@@ -133,7 +133,7 @@ interface CommandItem {
             border: none;
             color: var(--text-primary, #eee);
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             outline: none;
         }
         .palette__input::placeholder {
@@ -145,7 +145,7 @@ interface CommandItem {
             border: 1px solid var(--border, #333);
             border-radius: 4px;
             color: var(--text-tertiary, #666);
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-family: inherit;
         }
         .palette__results {
@@ -157,7 +157,7 @@ interface CommandItem {
             padding: 1.5rem;
             text-align: center;
             color: var(--text-tertiary, #666);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
         }
         .palette__group {
             padding: 0.25rem 0;
@@ -180,7 +180,7 @@ interface CommandItem {
             border: none;
             color: var(--text-secondary, #bbb);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             cursor: pointer;
             text-align: left;
             transition: background 0.05s;
@@ -201,7 +201,7 @@ interface CommandItem {
             justify-content: center;
             background: var(--bg-raised, #222);
             border-radius: 4px;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             flex-shrink: 0;
         }
         .palette__item-label {
@@ -211,7 +211,7 @@ interface CommandItem {
             white-space: nowrap;
         }
         .palette__item-cat {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary, #666);
             flex-shrink: 0;
         }
@@ -229,7 +229,7 @@ interface CommandItem {
             border: 1px solid var(--border, #333);
             border-radius: 3px;
             font-family: inherit;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             margin-right: 0.15rem;
         }
         @media (max-width: 640px) {

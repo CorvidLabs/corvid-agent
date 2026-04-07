@@ -217,23 +217,23 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .tasks__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; animation: expandReveal 0.25s ease-out; }
         .create-form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
-        .form-select, .form-textarea { padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
+        .form-select, .form-textarea { padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
         .form-select { min-width: 150px; }
         .form-textarea { flex: 1; resize: vertical; min-height: 2.5em; line-height: 1.5; }
         .form-select, .form-textarea { transition: border-color var(--transition-fast), box-shadow var(--transition-base); }
         .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .btn { padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn { padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
         .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .tasks__filter-row { margin-bottom: 1rem; }
         .loading { color: var(--text-secondary); }
-        .task-agent { font-size: 0.65rem; color: var(--accent-cyan); font-weight: 600; }
+        .task-agent { font-size: var(--text-2xs); color: var(--accent-cyan); font-weight: 600; }
         /* Pipeline stage indicator */
         .pipeline-stages {
             display: flex; align-items: center; margin: 0.5rem 0; gap: 0;
@@ -273,7 +273,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px rgba(0, 229, 255, 0.2); } }
         .task-actions { margin-top: 0.5rem; }
-        .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
+        .action-btn { padding: 0.25rem 0.6rem; font-size: var(--text-2xs); font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
         .action-btn--cancel:hover { background: var(--accent-red-dim); }
         .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
@@ -283,7 +283,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .detail-toggle {
             display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.6rem;
             background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            color: var(--text-tertiary); font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            color: var(--text-tertiary); font-size: var(--text-3xs); font-weight: 600; font-family: inherit;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
         }
         .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
@@ -298,7 +298,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -310,7 +310,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
         }
         .search-input {
-            flex: 1; padding: 0.4rem 0.65rem; font-size: 0.75rem; font-family: inherit;
+            flex: 1; padding: 0.4rem 0.65rem; font-size: var(--text-xs); font-family: inherit;
             background: var(--bg-input); color: var(--text-primary);
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             transition: border-color 0.15s, box-shadow 0.15s; min-width: 0;
@@ -318,14 +318,14 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .search-input::placeholder { color: var(--text-tertiary); }
         .agent-filter-select {
-            padding: 0.4rem 0.5rem; font-size: 0.7rem; font-family: inherit;
+            padding: 0.4rem 0.5rem; font-size: var(--text-xxs); font-family: inherit;
             background: var(--bg-input); color: var(--text-primary);
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             cursor: pointer; min-width: 120px;
         }
         .agent-filter-select:focus { border-color: var(--accent-cyan); outline: none; }
         .clear-filters-btn {
-            padding: 0.35rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            padding: 0.35rem 0.6rem; font-size: var(--text-3xs); font-weight: 600; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
             background: transparent; border: 1px solid var(--border);
             border-radius: var(--radius-sm); color: var(--text-tertiary);
@@ -379,7 +379,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
 
         .task-status {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -403,7 +403,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         .status-icon--fail::before { content: '\\2717'; }
 
         .task-duration {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             background: var(--bg-raised);
             padding: 1px 6px;
@@ -417,7 +417,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             animation: progress-pulse 1.5s ease-in-out infinite;
         }
         .task-time {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
@@ -426,7 +426,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
 
         .task-desc {
             margin: 0 0 0.5rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-secondary);
             line-height: 1.5;
         }
@@ -438,7 +438,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             align-items: center;
         }
         .task-branch {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--accent-magenta);
             background: var(--accent-magenta-dim);
             padding: 2px 6px;
@@ -453,7 +453,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-branch:hover { text-decoration: underline; }
         .task-pr {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--accent-green);
             text-decoration: none;
             border: 1px solid var(--accent-green);
@@ -465,7 +465,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-pr:hover { background: var(--accent-green-dim); }
         .task-session {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--accent-cyan);
             text-decoration: none;
             border: 1px solid var(--accent-cyan);
@@ -474,7 +474,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .task-session:hover { background: var(--accent-cyan-dim); }
         .task-iterations {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
@@ -489,7 +489,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             border: 1px solid var(--accent-red);
             border-radius: var(--radius);
             color: var(--accent-red);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: var(--font-mono);
         }
         .task-error--interrupted {
@@ -519,7 +519,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             background: none;
             border: none;
             color: var(--text-tertiary);
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-family: inherit;
             cursor: pointer;
             text-decoration: underline;
@@ -533,7 +533,7 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             border: 1px solid var(--border);
             border-radius: var(--radius);
             color: var(--text-secondary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             line-height: 1.5;
             max-height: 120px;
             overflow-y: auto;

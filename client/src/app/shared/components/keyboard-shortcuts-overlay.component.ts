@@ -91,7 +91,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         }
         .shortcuts-panel__header h2 {
             margin: 0;
-            font-size: 0.9rem;
+            font-size: var(--text-sm);
             font-weight: 700;
             color: var(--accent-cyan, #00e5ff);
             text-transform: uppercase;
@@ -103,7 +103,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             border: 1px solid var(--border-bright, #2a2d48);
             border-radius: var(--radius-sm, 3px);
             color: var(--text-tertiary, #4a4d68);
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -126,7 +126,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         }
         .shortcuts-panel__category-label {
             margin: 0 0 0.5rem;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-tertiary, #4a4d68);
@@ -161,7 +161,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             background: var(--bg-raised, #161822);
             border: 1px solid var(--border-bright, #2a2d48);
             border-radius: var(--radius-sm, 3px);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             color: var(--text-primary, #e0e0ec);
             font-weight: 600;
@@ -170,13 +170,13 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             box-shadow: 0 1px 0 var(--border, #1e2035);
         }
         .shortcuts-panel__then {
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--text-tertiary, #4a4d68);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .shortcuts-panel__desc {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-secondary, #7a7d98);
             margin: 0;
         }
@@ -189,7 +189,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
             justify-content: center;
         }
         .shortcuts-panel__version {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary, #4a4d68);
             text-transform: uppercase;
             letter-spacing: 0.08em;

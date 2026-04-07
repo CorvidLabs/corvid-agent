@@ -63,7 +63,7 @@ import { RouterLink } from '@angular/router';
         .empty-state__icon {
             margin: 0 0 1.25rem;
             font-family: var(--font-mono);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             line-height: 1.4;
             color: var(--text-secondary);
             user-select: none;
@@ -75,13 +75,13 @@ import { RouterLink } from '@angular/router';
         }
         .empty-state__title {
             margin: 0 0 0.5rem;
-            font-size: 1rem;
+            font-size: var(--text-base);
             font-weight: 700;
             color: var(--text-primary);
         }
         .empty-state__desc {
             margin: 0 0 1.5rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             color: var(--text-secondary);
             max-width: 360px;
             line-height: 1.6;
@@ -93,7 +93,7 @@ import { RouterLink } from '@angular/router';
             border-radius: var(--radius);
             background: transparent;
             color: var(--accent-cyan);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             font-family: inherit;
             text-decoration: none;
@@ -118,7 +118,7 @@ import { RouterLink } from '@angular/router';
         }
         .empty-state__docs {
             margin: 1rem 0 0;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
         }
         @media (prefers-reduced-motion: reduce) {

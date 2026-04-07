@@ -90,7 +90,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             border: none;
             color: var(--text-tertiary, #666);
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             cursor: pointer;
             padding: 0.15rem 0.35rem;
             border-radius: 3px;
@@ -101,7 +101,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             background: var(--bg-hover, #252538);
         }
         .tab-bar__collapse-chevron {
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             transition: transform 150ms ease;
             transform: rotate(-90deg);
         }
@@ -109,7 +109,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             transform: rotate(0deg);
         }
         .tab-bar__collapse-count {
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             font-weight: 700;
             color: var(--accent-cyan, #0ef);
         }
@@ -135,7 +135,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             border-radius: 4px 4px 0 0;
             color: var(--text-tertiary, #666);
             font-family: inherit;
-            font-size: 0.68rem;
+            font-size: var(--text-xxs);
             text-decoration: none;
             cursor: pointer;
             transition: background 0.1s, color 0.1s;
@@ -157,7 +157,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
         .tab--error .tab__status { color: var(--accent-red, #f33); }
         .tab__index {
             flex-shrink: 0;
-            font-size: 0.55rem;
+            font-size: var(--text-4xs);
             color: var(--text-quaternary, #555);
             min-width: 8px;
             text-align: center;
@@ -169,12 +169,12 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 700;
         }
         .tab__agent {
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--accent-cyan, #0ef);
             opacity: 0.7;
             max-width: 60px;
@@ -209,7 +209,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             border: none;
             border-radius: 2px;
             color: var(--text-tertiary, #666);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             cursor: pointer;
             opacity: 0;
             transition: opacity 0.1s, background 0.1s;
@@ -230,7 +230,7 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             border: 1px solid var(--border, #333);
             border-radius: 4px;
             color: var(--text-tertiary, #666);
-            font-size: 1rem;
+            font-size: var(--text-base);
             cursor: pointer;
             transition: color 0.15s, border-color 0.15s;
         }

@@ -73,7 +73,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
         }
         .header__title {
             font-family: var(--font-display);
-            font-size: 1rem;
+            font-size: var(--text-base);
             font-weight: 700;
             margin: 0;
             color: var(--accent-cyan);
@@ -95,7 +95,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
         .network-btn {
             padding: 0.3rem 0.6rem;
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 700;
             letter-spacing: 0.06em;
             border: none;
@@ -133,7 +133,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             gap: 0.5rem;
         }
         .header__label {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -190,7 +190,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                 padding: 0 1rem;
             }
             .header__title {
-                font-size: 1rem;
+                font-size: var(--text-base);
             }
             .header__label {
                 display: none;

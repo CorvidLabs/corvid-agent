@@ -66,7 +66,7 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
         .settings-section__nav::-webkit-scrollbar { display: none; }
         .settings-section__btn {
             padding: 0.5rem 0.85rem;
-            font-size: 0.72rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             font-family: inherit;
             letter-spacing: 0.03em;

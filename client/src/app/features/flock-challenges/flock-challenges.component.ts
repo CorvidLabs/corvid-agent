@@ -382,7 +382,7 @@ interface AgentTestRow {
             .ch-header__title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.5rem; }
             .ch-header__title { font-size: 1.5rem; font-weight: 700; margin: 0; }
             .ch-header__stats { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-            .ch-header__subtitle { color: var(--text-muted); font-size: 0.875rem; margin: 0; }
+            .ch-header__subtitle { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }
 
             /* Stat pills */
             .stat-pill {
@@ -390,7 +390,7 @@ interface AgentTestRow {
                 background: var(--surface-2); border-radius: 0.5rem;
                 padding: 0.35rem 0.75rem; min-width: 64px;
             }
-            .stat-pill__value { font-weight: 700; font-size: 1rem; line-height: 1.2; }
+            .stat-pill__value { font-weight: 700; font-size: var(--text-base); line-height: 1.2; }
             .stat-pill__label { font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
             .stat-pill--active .stat-pill__value { color: var(--success); }
             .stat-pill--score .stat-pill__value { color: var(--accent); }
@@ -399,7 +399,7 @@ interface AgentTestRow {
             .ch-tabs { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
             .ch-tab {
                 background: none; border: none; cursor: pointer;
-                padding: 0.625rem 1rem; font-size: 0.875rem; color: var(--text-muted);
+                padding: 0.625rem 1rem; font-size: var(--text-sm); color: var(--text-muted);
                 border-bottom: 2px solid transparent; margin-bottom: -1px;
                 display: flex; align-items: center; gap: 0.375rem;
                 transition: color 0.15s, border-color 0.15s;
@@ -419,9 +419,9 @@ interface AgentTestRow {
                 padding: 0.875rem 1rem; background: var(--surface-3);
             }
             .ch-category__icon { font-size: 1.125rem; }
-            .ch-category__name { font-size: 1rem; font-weight: 600; margin: 0; flex: 1; }
-            .ch-category__weight { font-size: 0.75rem; color: var(--accent); font-weight: 600; }
-            .ch-category__count { font-size: 0.75rem; color: var(--text-muted); }
+            .ch-category__name { font-size: var(--text-base); font-weight: 600; margin: 0; flex: 1; }
+            .ch-category__weight { font-size: var(--text-xs); color: var(--accent); font-weight: 600; }
+            .ch-category__count { font-size: var(--text-xs); color: var(--text-muted); }
 
             .ch-challenge-list { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem; }
             .ch-challenge {
@@ -429,10 +429,10 @@ interface AgentTestRow {
                 padding: 0.5rem 0.625rem; border-radius: 0.375rem;
                 background: var(--surface-1);
             }
-            .ch-challenge__id { font-size: 0.6875rem; font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; }
+            .ch-challenge__id { font-size: var(--text-xxs); font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; }
             .ch-challenge__desc { flex: 1; font-size: 0.8125rem; }
             .ch-challenge__meta { display: flex; gap: 0.5rem; }
-            .ch-challenge__timeout, .ch-challenge__weight { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; }
+            .ch-challenge__timeout, .ch-challenge__weight { font-size: var(--text-xxs); color: var(--text-muted); white-space: nowrap; }
 
             /* Agent grid */
             .ch-agent-grid {
@@ -450,18 +450,18 @@ interface AgentTestRow {
             .ch-agent-card--selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
             .ch-agent-card__header { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.375rem; }
             .ch-agent-card__info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-            .ch-agent-card__name { font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .ch-agent-card__status { font-size: 0.6875rem; }
+            .ch-agent-card__name { font-weight: 600; font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .ch-agent-card__status { font-size: var(--text-xxs); }
             .ch-agent-card__status[data-status="active"] { color: var(--success); }
             .ch-agent-card__status[data-status="inactive"] { color: var(--text-muted); }
-            .ch-agent-card__tested { font-size: 0.6875rem; color: var(--text-muted); }
+            .ch-agent-card__tested { font-size: var(--text-xxs); color: var(--text-muted); }
             .ch-agent-card__tested--never { font-style: italic; }
 
             /* Agent avatar */
             .ch-agent-avatar {
                 width: 36px; height: 36px; border-radius: 50%;
                 display: flex; align-items: center; justify-content: center;
-                font-weight: 700; font-size: 1rem; flex-shrink: 0;
+                font-weight: 700; font-size: var(--text-base); flex-shrink: 0;
                 background: var(--surface-3); color: var(--text-muted);
             }
             .ch-agent-avatar[data-status="active"] { background: color-mix(in srgb, var(--success) 15%, var(--surface-3)); color: var(--success); }
@@ -469,7 +469,7 @@ interface AgentTestRow {
 
             /* Agent score badge */
             .ch-agent-score {
-                font-size: 1rem; font-weight: 700; min-width: 36px;
+                font-size: var(--text-base); font-weight: 700; min-width: 36px;
                 text-align: right; flex-shrink: 0;
             }
             .ch-agent-score[data-level="high"] { color: var(--success); }
@@ -504,8 +504,8 @@ interface AgentTestRow {
                 font-size: 1.5rem; color: var(--text-muted); line-height: 1;
                 padding: 0.25rem;
             }
-            .ch-detail__empty { color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 2rem 0; }
-            .ch-detail__section-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
+            .ch-detail__empty { color: var(--text-muted); font-size: var(--text-sm); text-align: center; padding: 2rem 0; }
+            .ch-detail__section-title { font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
             .ch-detail__actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
 
             /* Score summary */
@@ -515,13 +515,13 @@ interface AgentTestRow {
                 padding: 0.875rem; margin-bottom: 1rem;
             }
             .ch-score-box { display: flex; flex-direction: column; gap: 0.125rem; }
-            .ch-score-box__label { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+            .ch-score-box__label { font-size: var(--text-xxs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
             .ch-score-box__value { font-size: 1.25rem; font-weight: 700; }
-            .ch-score-box__value--sm { font-size: 0.875rem; }
+            .ch-score-box__value--sm { font-size: var(--text-sm); }
             .ch-score-box__value[data-level="high"] { color: var(--success); }
             .ch-score-box__value[data-level="mid"] { color: var(--warning, #f59e0b); }
             .ch-score-box__value[data-level="low"] { color: var(--error); }
-            .ch-decay-note { width: 100%; font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
+            .ch-decay-note { width: 100%; font-size: var(--text-xs); color: var(--text-muted); font-style: italic; }
 
             /* Test runs */
             .ch-test-runs { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -537,27 +537,27 @@ interface AgentTestRow {
             .ch-run__score[data-level="mid"] { color: var(--warning, #f59e0b); }
             .ch-run__score[data-level="low"] { color: var(--error); }
             .ch-run__date { flex: 1; font-size: 0.8125rem; color: var(--text-muted); }
-            .ch-run__dur { font-size: 0.75rem; color: var(--text-muted); }
+            .ch-run__dur { font-size: var(--text-xs); color: var(--text-muted); }
             .ch-run__toggle { font-size: 0.625rem; color: var(--text-muted); }
 
             /* Category score bars */
             .ch-cat-scores { padding: 0.625rem 0.875rem; background: var(--surface-3); display: flex; flex-direction: column; gap: 0.375rem; }
             .ch-cat-row { display: flex; align-items: center; gap: 0.5rem; }
-            .ch-cat-row__icon { font-size: 0.875rem; flex-shrink: 0; }
-            .ch-cat-row__label { font-size: 0.75rem; min-width: 100px; flex-shrink: 0; }
+            .ch-cat-row__icon { font-size: var(--text-sm); flex-shrink: 0; }
+            .ch-cat-row__label { font-size: var(--text-xs); min-width: 100px; flex-shrink: 0; }
             .ch-cat-row__bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
             .ch-cat-row__fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s ease; }
             .ch-cat-row__fill[data-level="high"] { background: var(--success); }
             .ch-cat-row__fill[data-level="mid"] { background: var(--warning, #f59e0b); }
             .ch-cat-row__fill[data-level="low"] { background: var(--error); }
-            .ch-cat-row__score { font-size: 0.75rem; font-weight: 600; min-width: 28px; text-align: right; }
-            .ch-cat-row__resp { font-size: 0.6875rem; color: var(--text-muted); min-width: 32px; text-align: right; }
+            .ch-cat-row__score { font-size: var(--text-xs); font-weight: 600; min-width: 28px; text-align: right; }
+            .ch-cat-row__resp { font-size: var(--text-xxs); color: var(--text-muted); min-width: 32px; text-align: right; }
 
             /* Per-challenge results */
             .ch-challenge-results { padding: 0.5rem 0.875rem; display: flex; flex-direction: column; gap: 0.25rem; }
             .ch-cr {
                 display: flex; align-items: center; gap: 0.5rem;
-                padding: 0.3rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem;
+                padding: 0.3rem 0.4rem; border-radius: 0.25rem; font-size: var(--text-xs);
             }
             .ch-cr--pass { background: color-mix(in srgb, var(--success) 8%, transparent); }
             .ch-cr--fail { background: color-mix(in srgb, var(--error) 8%, transparent); }

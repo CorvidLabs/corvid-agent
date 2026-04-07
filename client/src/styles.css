@@ -203,14 +203,18 @@
     --radius-xl: 16px;
 
     /* ── Typography scale (rem based, root 16px) ── */
-    --text-3xl: 2rem;
-    --text-2xl: 1.5rem;
-    --text-xl: 1.25rem;
-    --text-lg: 1rem;
-    --text-base: 1rem;
-    --text-sm: 0.875rem;
-    --text-xs: 0.75rem;
-    --text-xxs: 0.7rem;
+    --text-3xl: 2rem;        /* 32px — hero headings */
+    --text-2xl: 1.5rem;      /* 24px — page titles */
+    --text-xl: 1.25rem;      /* 20px — section headers */
+    --text-lg: 1rem;         /* 16px — large body */
+    --text-base: 1rem;       /* 16px — body */
+    --text-sm: 0.875rem;     /* 14px — secondary text */
+    --text-caption: 0.8rem;  /* 12.8px — captions, compact labels */
+    --text-xs: 0.75rem;      /* 12px — small labels */
+    --text-xxs: 0.7rem;      /* 11.2px — badges, metadata */
+    --text-2xs: 0.65rem;     /* 10.4px — timestamps, tiny labels */
+    --text-3xs: 0.6rem;      /* 9.6px — micro metadata */
+    --text-4xs: 0.55rem;     /* 8.8px — micro badges, dot labels */
 
     /* ── Transitions ── */
     --transition-fast: 0.1s ease;

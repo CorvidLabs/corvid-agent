@@ -309,10 +309,10 @@ interface LibraryResponse {
             display: flex; align-items: center; gap: 0.5rem;
             padding: 0.75rem 1rem; border-radius: var(--radius-lg);
             background: var(--bg-surface); border: 1px solid var(--border);
-            font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;
+            font-size: var(--text-caption); color: var(--text-secondary); margin-bottom: 1.25rem;
         }
         .status-banner--offline { border-color: rgba(255, 80, 80, 0.3); }
-        .status-banner code { background: var(--bg-raised); padding: 1px 6px; border-radius: var(--radius-sm); font-size: 0.75rem; }
+        .status-banner code { background: var(--bg-raised); padding: 1px 6px; border-radius: var(--radius-sm); font-size: var(--text-xs); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5050; flex-shrink: 0; }
         .status-dot--online { background: #00e676; box-shadow: 0 0 6px rgba(0, 230, 118, 0.4); }
 
@@ -320,7 +320,7 @@ interface LibraryResponse {
         .tabs { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
         .tab {
             padding: 0.6rem 1.25rem; background: none; border: none; border-bottom: 2px solid transparent;
-            color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            color: var(--text-secondary); font-size: var(--text-caption); font-weight: 600; cursor: pointer;
             font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: color 0.15s, border-color 0.15s;
         }
@@ -329,7 +329,7 @@ interface LibraryResponse {
 
         /* Section */
         .section { margin-bottom: 1.5rem; }
-        .section__title { font-size: 0.8rem; font-weight: 600; color: var(--accent-magenta); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem; }
+        .section__title { font-size: var(--text-caption); font-weight: 600; color: var(--accent-magenta); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem; }
 
         /* Model Grid */
         .model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; }
@@ -342,10 +342,10 @@ interface LibraryResponse {
         .model-card:hover { border-color: var(--accent-cyan); }
         .model-card--installed { opacity: 0.7; }
         .model-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
-        .model-card__name { margin: 0; font-size: 0.9rem; color: var(--text-primary); font-weight: 600; }
-        .model-card__desc { margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
+        .model-card__name { margin: 0; font-size: var(--text-sm); color: var(--text-primary); font-weight: 600; }
+        .model-card__desc { margin: 0 0 0.5rem; font-size: var(--text-caption); color: var(--text-secondary); line-height: 1.4; }
         .model-card__info { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
-        .model-card__meta { font-size: 0.72rem; color: var(--text-tertiary); background: var(--bg-raised); padding: 2px 8px; border-radius: var(--radius-sm); }
+        .model-card__meta { font-size: var(--text-xs); color: var(--text-tertiary); background: var(--bg-raised); padding: 2px 8px; border-radius: var(--radius-sm); }
         .model-card__actions { display: flex; gap: 0.5rem; align-items: center; }
 
         /* Pull Card */
@@ -355,12 +355,12 @@ interface LibraryResponse {
             border-radius: var(--radius-lg); box-shadow: 0 0 8px rgba(0, 229, 255, 0.05);
         }
         .pull-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-        .pull-card__model { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
-        .pull-card__status { font-size: 0.72rem; text-transform: uppercase; color: var(--accent-cyan); font-weight: 600; letter-spacing: 0.05em; }
+        .pull-card__model { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); }
+        .pull-card__status { font-size: var(--text-xs); text-transform: uppercase; color: var(--accent-cyan); font-weight: 600; letter-spacing: 0.05em; }
         .pull-card__status--error { color: #ff5050; }
-        .pull-card__detail { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-tertiary); margin-top: 0.35rem; }
-        .pull-card__layer { font-size: 0.68rem; color: var(--text-tertiary); margin-top: 0.25rem; font-family: var(--font-mono); }
-        .pull-card__error { font-size: 0.78rem; color: #ff5050; margin-top: 0.35rem; }
+        .pull-card__detail { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 0.35rem; }
+        .pull-card__layer { font-size: var(--text-xxs); color: var(--text-tertiary); margin-top: 0.25rem; font-family: var(--font-mono); }
+        .pull-card__error { font-size: var(--text-caption); color: #ff5050; margin-top: 0.35rem; }
 
         /* Progress Bar */
         .progress-bar {
@@ -387,13 +387,13 @@ interface LibraryResponse {
         .library-controls { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         .search-input {
             padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             width: 100%;
         }
         .search-input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .category-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
         .filter-chip {
-            padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+            padding: 0.3rem 0.75rem; border-radius: 999px; font-size: var(--text-xs); font-weight: 600;
             border: 1px solid var(--border-bright); background: transparent; color: var(--text-secondary);
             cursor: pointer; font-family: inherit; text-transform: capitalize;
             transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -402,8 +402,8 @@ interface LibraryResponse {
         .filter-chip--active { background: var(--accent-cyan-dim); border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
         /* Labels */
-        .installed-label { font-size: 0.72rem; color: #00e676; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        .pulling-label { font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .installed-label { font-size: var(--text-xs); color: #00e676; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .pulling-label { font-size: var(--text-xs); color: var(--accent-cyan); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 
         /* Manual Pull */
         .manual-pull { margin-top: 1.5rem; }
@@ -412,7 +412,7 @@ interface LibraryResponse {
 
         /* Buttons */
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: var(--text-caption); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase;
             letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
         }
@@ -425,9 +425,9 @@ interface LibraryResponse {
         .btn--danger { background: transparent; color: #ff5050; border-color: rgba(255, 80, 80, 0.4); }
         .btn--danger:hover { background: rgba(255, 80, 80, 0.08); box-shadow: 0 0 8px rgba(255, 80, 80, 0.15); }
         .btn--danger:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+        .btn--sm { padding: 0.3rem 0.6rem; font-size: var(--text-xxs); }
 
-        .hint { color: var(--text-tertiary); font-size: 0.82rem; }
+        .hint { color: var(--text-tertiary); font-size: var(--text-caption); }
         .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }
         .empty-state strong { color: var(--accent-cyan); }
     `,

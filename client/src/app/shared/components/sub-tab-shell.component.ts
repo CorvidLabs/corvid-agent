@@ -64,7 +64,7 @@ export interface SubTab {
             padding: 0.65rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.78rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             letter-spacing: 0.03em;
             white-space: nowrap;
@@ -98,7 +98,7 @@ transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
             }
             .tab-shell__tab {
                 padding: 0.55rem 0.75rem;
-                font-size: 0.72rem;
+                font-size: var(--text-xs);
             }
         }
     `,

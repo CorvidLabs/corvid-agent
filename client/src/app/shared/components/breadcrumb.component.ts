@@ -83,7 +83,7 @@ const ROUTE_LABELS: Record<string, string> = {
         .breadcrumb__link {
             color: var(--accent-cyan);
             text-decoration: none;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             letter-spacing: 0.03em;
             transition: color 0.15s ease;
             position: relative;
@@ -108,11 +108,11 @@ const ROUTE_LABELS: Record<string, string> = {
         }
         .breadcrumb__sep {
             color: var(--text-tertiary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .breadcrumb__current {
             color: var(--text-secondary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
 
         @media (max-width: 767px) {

@@ -144,7 +144,7 @@ interface TooltipPos {
         }
 
         .tour-tooltip__step {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-weight: 600;
             color: var(--accent-cyan, #00e5ff);
             letter-spacing: 0.05em;
@@ -154,7 +154,7 @@ interface TooltipPos {
             background: none;
             border: none;
             color: var(--text-tertiary, #666);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             padding: 0.2rem 0.4rem;
@@ -167,14 +167,14 @@ interface TooltipPos {
 
         .tour-tooltip__title {
             margin: 0 0 0.4rem;
-            font-size: 0.95rem;
+            font-size: var(--text-sm);
             font-weight: 700;
             color: var(--text-primary, #e0e0e0);
         }
 
         .tour-tooltip__content {
             margin: 0 0 0.75rem;
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             line-height: 1.5;
             color: var(--text-secondary, #aaa);
             white-space: pre-line;
@@ -213,7 +213,7 @@ interface TooltipPos {
         .tour-btn {
             padding: 0.4rem 1rem;
             border-radius: var(--radius, 6px);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;

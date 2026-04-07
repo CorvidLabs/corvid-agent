@@ -745,8 +745,8 @@ interface PSKContact {
     styles: `
         .settings { padding: 1.5rem; max-width: 900px; }
         .settings h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .settings h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
-        .loading, .muted { color: var(--text-secondary); font-size: 0.8rem; }
+        .settings h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: var(--text-sm); }
+        .loading, .muted { color: var(--text-secondary); font-size: var(--text-caption); }
 
         /* Collapsible sections */
         .section-toggle {
@@ -754,9 +754,9 @@ interface PSKContact {
             user-select: none; transition: color 0.15s;
         }
         .section-toggle:hover { color: var(--accent-cyan); }
-        .section-chevron { font-size: 0.55rem; color: var(--text-tertiary); width: 0.75rem; }
+        .section-chevron { font-size: var(--text-4xs); color: var(--text-tertiary); width: 0.75rem; }
         .section-badge {
-            font-size: 0.55rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-4xs); font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
             text-transform: uppercase; letter-spacing: 0.04em;
         }
@@ -764,7 +764,7 @@ interface PSKContact {
         .section-badge--mode[data-mode="queued"] { color: var(--accent-amber); border-color: var(--accent-amber); background: var(--accent-amber-dim); }
         .section-badge--mode[data-mode="paused"] { color: var(--accent-red); border-color: var(--accent-red); background: var(--accent-red-dim); }
         .dirty-badge {
-            font-size: 0.55rem; font-weight: 600; padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: var(--text-4xs); font-weight: 600; padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid var(--accent-amber);
             margin-left: auto;
         }
@@ -776,8 +776,8 @@ interface PSKContact {
         .health-dot[data-status="ok"] { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
         .health-dot[data-status="warn"] { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
         .health-dot[data-status="off"] { background: var(--text-tertiary); }
-        .health-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); min-width: 120px; }
-        .health-status { font-size: 0.7rem; color: var(--text-secondary); }
+        .health-name { font-size: var(--text-xs); font-weight: 600; color: var(--text-primary); min-width: 120px; }
+        .health-status { font-size: var(--text-xxs); color: var(--text-secondary); }
 
         /* Credit dirty input */
         .credit-input--dirty { border-color: var(--accent-amber) !important; }
@@ -797,7 +797,7 @@ interface PSKContact {
         }
         .discord-field--wide { grid-column: 1 / -1; }
         .discord-label {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
             font-weight: 600;
         }
@@ -807,13 +807,13 @@ interface PSKContact {
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-family: inherit;
             width: 100%;
         }
         .discord-textarea {
             resize: vertical;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-family: var(--font-mono, monospace);
         }
         .discord-select { cursor: pointer; }
@@ -821,10 +821,10 @@ interface PSKContact {
             border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
         }
         .discord-desc {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
         }
-        .discord-select--sm { padding: 0.3rem; font-size: 0.75rem; width: auto; min-width: 120px; }
+        .discord-select--sm { padding: 0.3rem; font-size: var(--text-xs); width: auto; min-width: 120px; }
         .discord-actions { display: flex; gap: 0.5rem; align-items: center; }
 
         /* Chip picker */
@@ -833,11 +833,11 @@ interface PSKContact {
             display: inline-flex; align-items: center; gap: 0.3rem;
             padding: 0.2rem 0.5rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
-            font-size: 0.7rem; font-weight: 600;
+            font-size: var(--text-xxs); font-weight: 600;
         }
         .chip-remove {
             background: none; border: none; color: inherit; cursor: pointer;
-            font-size: 0.85rem; padding: 0; line-height: 1; opacity: 0.7;
+            font-size: var(--text-sm); padding: 0; line-height: 1; opacity: 0.7;
         }
         .chip-remove:hover { opacity: 1; }
         .picker-search { margin-bottom: 0.3rem; }
@@ -850,12 +850,12 @@ interface PSKContact {
         .picker-item {
             background: none; border: none; color: var(--text-primary);
             text-align: left; padding: 0.3rem 0.5rem; cursor: pointer;
-            border-radius: var(--radius-sm); font-size: 0.75rem; font-family: inherit;
+            border-radius: var(--radius-sm); font-size: var(--text-xs); font-family: inherit;
             display: flex; justify-content: space-between; align-items: center;
         }
         .picker-item:hover { background: var(--bg-surface); color: var(--accent-cyan); }
-        .picker-id { font-size: 0.6rem; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
-        .picker-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.3rem 0.5rem; }
+        .picker-id { font-size: var(--text-3xs); color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+        .picker-empty { font-size: var(--text-xxs); color: var(--text-tertiary); padding: 0.3rem 0.5rem; }
 
         /* Role/Channel permission grid */
         .role-perm-grid { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
@@ -864,8 +864,8 @@ interface PSKContact {
             padding: 0.3rem 0.5rem; background: var(--bg-raised);
             border-radius: var(--radius-sm);
         }
-        .role-name { font-size: 0.75rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .channel-name { font-size: 0.75rem; font-weight: 600; flex: 1; color: var(--text-primary); }
+        .role-name { font-size: var(--text-xs); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .channel-name { font-size: var(--text-xs); font-weight: 600; flex: 1; color: var(--text-primary); }
 
         .settings__section {
             background: var(--bg-surface);
@@ -886,13 +886,13 @@ interface PSKContact {
             gap: 0.2rem;
         }
         .info-label {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
         .info-value {
-            font-size: 1rem;
+            font-size: var(--text-base);
             font-weight: 700;
             color: var(--text-primary);
         }
@@ -903,13 +903,13 @@ interface PSKContact {
             color: var(--accent-magenta);
             padding: 2px 6px;
             border-radius: var(--radius-sm);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             border: 1px solid var(--border);
             word-break: break-all;
         }
         .network-badge {
             text-transform: uppercase;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
         .network-badge[data-network="testnet"] { color: var(--network-testnet); }
         .network-badge[data-network="mainnet"] { color: var(--network-mainnet); }
@@ -918,7 +918,7 @@ interface PSKContact {
 
         /* Connect Mobile — Contact List */
         .connect-desc {
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             color: var(--text-secondary);
             margin-bottom: 1rem;
         }
@@ -944,7 +944,7 @@ interface PSKContact {
         }
         .contact-nickname {
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             color: var(--text-primary);
             cursor: pointer;
         }
@@ -954,14 +954,14 @@ interface PSKContact {
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius-sm);
             color: var(--text-primary);
-            font-size: 0.8rem;
+            font-size: var(--text-caption);
             font-family: inherit;
             font-weight: 600;
             outline: none;
             width: 140px;
         }
         .contact-status {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -971,7 +971,7 @@ interface PSKContact {
         .contact-status--waiting { color: var(--accent-yellow, #f5a623); }
         .contact-address {
             display: block;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--accent-magenta);
             background: var(--bg-surface);
             padding: 2px 4px;
@@ -989,7 +989,7 @@ interface PSKContact {
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             padding: 0.1rem 0.3rem;
             border-radius: var(--radius-sm);
         }
@@ -1025,7 +1025,7 @@ interface PSKContact {
             border: 1px solid var(--border);
             border-radius: var(--radius);
             color: var(--text-secondary);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-family: inherit;
             font-weight: 600;
             cursor: pointer;
@@ -1039,7 +1039,7 @@ interface PSKContact {
             background: var(--accent-cyan-dim);
         }
         .mode-desc {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             margin: 0;
         }
@@ -1057,7 +1057,7 @@ interface PSKContact {
             gap: 0.2rem;
         }
         .credit-label {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-secondary);
             font-weight: 600;
         }
@@ -1067,13 +1067,13 @@ interface PSKContact {
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: var(--text-sm);
             font-family: inherit;
             width: 100%;
         }
         .credit-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .credit-desc {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
         }
 
@@ -1081,7 +1081,7 @@ interface PSKContact {
         .save-btn, .backup-btn, .cancel-btn {
             padding: 0.5rem 1.25rem;
             border-radius: var(--radius);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 600;
             cursor: pointer;
             font-family: inherit;
@@ -1098,7 +1098,7 @@ interface PSKContact {
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .save-btn--sm, .cancel-btn--sm {
             padding: 0.3rem 0.7rem;
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
         }
         .backup-btn {
             background: var(--accent-magenta-dim);
@@ -1114,7 +1114,7 @@ interface PSKContact {
         }
         .cancel-btn:hover { background: rgba(255, 77, 79, 0.1); }
         .backup-result {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--accent-green);
             margin-top: 0.5rem;
         }
@@ -1127,8 +1127,8 @@ interface PSKContact {
             border-radius: var(--radius); gap: 1rem;
         }
         .notif-info { display: flex; flex-direction: column; gap: 0.1rem; }
-        .notif-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
-        .notif-desc { font-size: 0.6rem; color: var(--text-tertiary); }
+        .notif-name { font-size: var(--text-xs); font-weight: 600; color: var(--text-primary); }
+        .notif-desc { font-size: var(--text-3xs); color: var(--text-tertiary); }
         .notif-toggle { position: relative; display: inline-flex; cursor: pointer; }
         .notif-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
         .notif-toggle__track {
@@ -1154,16 +1154,16 @@ interface PSKContact {
             padding: 0.45rem 0.65rem; background: var(--bg-raised); border-radius: var(--radius);
         }
         .env-key {
-            font-size: 0.7rem; font-weight: 600; color: var(--text-primary);
+            font-size: var(--text-xxs); font-weight: 600; color: var(--text-primary);
             font-family: var(--font-mono, monospace);
         }
-        .env-value { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .env-value { font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
         .env-value--set { color: var(--accent-green); }
         .env-value--unset { color: var(--text-tertiary); }
-        .env-hint { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 0.5rem; }
+        .env-hint { font-size: var(--text-2xs); color: var(--text-tertiary); margin-top: 0.5rem; }
         .env-hint code {
             background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
-            font-size: 0.6rem; border: 1px solid var(--border);
+            font-size: var(--text-3xs); border: 1px solid var(--border);
         }
 
         @media (max-width: 600px) {

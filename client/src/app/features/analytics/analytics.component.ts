@@ -219,7 +219,7 @@ interface SessionStats {
     styles: `
         .analytics { padding: 1.5rem; }
         .analytics h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .analytics h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
+        .analytics h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: var(--text-sm); }
         .loading { color: var(--text-secondary); }
 
         .analytics__cards {
@@ -243,7 +243,7 @@ interface SessionStats {
             border-style: dashed;
         }
         .stat-card__label {
-            font-size: 0.65rem;
+            font-size: var(--text-2xs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -292,7 +292,7 @@ interface SessionStats {
             transition: flex 0.3s;
         }
         .work-task-segment__label {
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -315,7 +315,7 @@ interface SessionStats {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             color: var(--text-secondary);
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             font-family: inherit;
             cursor: pointer;
             transition: border-color 0.15s, color 0.15s;
@@ -333,7 +333,7 @@ interface SessionStats {
         .chart-row__label {
             width: 48px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--text-tertiary);
             text-align: right;
         }
@@ -354,7 +354,7 @@ interface SessionStats {
         .chart-row__value {
             width: 64px;
             flex-shrink: 0;
-            font-size: 0.6rem;
+            font-size: var(--text-3xs);
             color: var(--accent-green);
             text-align: right;
         }
@@ -370,7 +370,7 @@ interface SessionStats {
             grid-template-columns: 2fr 1fr 1fr 1fr;
             gap: 0.5rem;
             padding: 0.4rem 0;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
         }
         .agent-table__header {
             color: var(--text-tertiary);
@@ -393,7 +393,7 @@ interface SessionStats {
             justify-content: space-between;
             padding: 0.35rem 0;
             border-bottom: 1px solid var(--border);
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
         }
         .kv-row:last-child { border-bottom: none; }
         .kv-key { color: var(--text-secondary); text-transform: capitalize; }
@@ -402,7 +402,7 @@ interface SessionStats {
         .kv-key[data-status="error"] { color: var(--accent-red); }
         .kv-val { color: var(--text-primary); font-weight: 600; }
 
-        .empty-state { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: 1rem; }
+        .empty-state { color: var(--text-tertiary); font-size: var(--text-xs); text-align: center; padding: 1rem; }
     `,
 })
 export class AnalyticsComponent implements OnInit {
