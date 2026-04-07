@@ -1,0 +1,119 @@
+.lib3d {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    min-height: 400px;
+    background: #05050a;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.lib3d__minimap {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 140px;
+    height: 140px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-bright);
+    background: rgba(5, 5, 10, 0.85);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+}
+.lib3d__legend {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+.lib3d__legend-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(5, 5, 10, 0.85);
+    border: 1px solid var(--border-bright);
+    border-radius: 12px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, border-color 0.15s;
+}
+.lib3d__legend-btn:hover {
+    background: rgba(20, 20, 35, 0.9);
+    border-color: var(--zone-color);
+}
+.lib3d__legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--zone-color);
+    box-shadow: 0 0 6px var(--zone-color);
+}
+.lib3d__tooltip {
+    position: absolute;
+    z-index: 20;
+    pointer-events: none;
+    padding: 4px 10px;
+    background: rgba(5, 5, 10, 0.9);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius);
+    font-size: 0.7rem;
+    color: var(--text-primary);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+.lib3d__tooltip-cat {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+.lib3d__mode-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 4px 12px;
+    background: rgba(5, 5, 10, 0.85);
+    border: 1px solid var(--accent-cyan);
+    border-radius: 12px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-cyan);
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    z-index: 15;
+}
+.lib3d__hint {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+@media (max-width: 600px) {
+    .lib3d { height: 450px; }
+    .lib3d__minimap { width: 100px; height: 100px; }
+    .lib3d__legend { gap: 2px; }
+    .lib3d__legend-btn { font-size: 0.58rem; padding: 2px 6px; }
+}
