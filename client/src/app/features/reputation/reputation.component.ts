@@ -7,23 +7,23 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Agent Reputation" icon="reputation">
-            <ng-container actions>
+        <div class="page">
+            <div class="page__header">
+                <h2>Agent Reputation</h2>
                 <button
                     class="btn btn--primary"
                     [disabled]="computing()"
                     (click)="onComputeAll()">
                     {{ computing() ? 'Computing...' : 'Compute All' }}
                 </button>
-            </ng-container>
+            </div>
 
             @if (reputationService.loading()) {
                 <app-skeleton variant="table" [count]="4" />
@@ -398,9 +398,12 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     </div>
                 }
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .page { padding: var(--space-6); }
+        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
@@ -424,7 +427,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
 
         /* Trust badge */
         .trust-badge {
-            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
         .trust-badge--lg { font-size: 0.75rem; padding: 2px 10px; }
@@ -454,8 +457,8 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         /* Component bars (card) */
         .component-bars { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
         .comp-bar { display: grid; grid-template-columns: 1fr 60px 28px; align-items: center; gap: 0.4rem; }
-        .comp-bar__label { display: flex; justify-content: space-between; font-size: var(--text-xxs); color: var(--text-secondary); }
-        .comp-bar__weight { font-size: var(--text-xxs); color: var(--text-secondary); opacity: 0.7; }
+        .comp-bar__label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-secondary); }
+        .comp-bar__weight { font-size: 0.6rem; color: var(--text-secondary); opacity: 0.7; }
         .comp-bar__track { height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); overflow: hidden; }
         .comp-bar__fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; }
         .comp-bar__fill[data-color="green"] { background: var(--accent-green); }
@@ -523,7 +526,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .explain-card__score[data-color="purple"] { color: var(--accent-purple); }
         .explain-card__score[data-color="orange"] { color: var(--accent-orange); }
         .default-badge {
-            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 700;
+            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 700;
             background: var(--accent-yellow-dim);
             color: var(--accent-yellow); border: 1px solid var(--accent-yellow);
         }
@@ -558,7 +561,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .stat-card__icon[data-type="positive"] { color: var(--accent-green); }
         .stat-card__icon[data-type="negative"] { color: var(--accent-red); }
         .stat-card__value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-        .stat-card__label { font-size: var(--text-xxs); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+        .stat-card__label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
 
         /* Feedback sources */
         .feedback-sources { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -618,7 +621,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .trend-chart__dot[data-impact="positive"] { fill: var(--accent-green); }
         .trend-chart__dot[data-impact="negative"] { fill: var(--accent-red); }
         .trend-chart__labels { display: flex; justify-content: space-between; margin-top: 0.35rem; }
-        .trend-chart__label { font-size: var(--text-micro); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .trend-chart__label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
         .trend-chart__label--positive { color: var(--accent-green); }
         .trend-chart__label--negative { color: var(--accent-red); }
 
@@ -635,7 +638,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         }
         .history-chart__toggle input { cursor: pointer; }
         .history-chart__legend-item {
-            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .history-chart__legend-item[data-color="green"] { color: var(--accent-green); }
         .history-chart__legend-item[data-color="yellow"] { color: var(--accent-yellow); }
@@ -667,7 +670,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
             position: relative; height: 1rem; margin-top: 0.25rem;
         }
         .history-chart__x-labels span {
-            position: absolute; font-size: var(--text-micro); color: var(--text-tertiary); transform: translateX(-50%);
+            position: absolute; font-size: 0.55rem; color: var(--text-tertiary); transform: translateX(-50%);
         }
 
         /* Compare section */
@@ -694,7 +697,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         }
         .compare-component-bars { display: flex; flex-direction: column; gap: 0.2rem; }
         .compare-mini-bar { display: grid; grid-template-columns: 80px 1fr 30px; align-items: center; gap: 0.4rem; }
-        .compare-mini-name { font-size: var(--text-xxs); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .compare-mini-name { font-size: 0.65rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .compare-mini-track { height: 6px; background: var(--bg-raised); border-radius: var(--radius-sm); overflow: hidden; }
         .compare-mini-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s; }
         .compare-mini-fill[data-color="green"] { background: var(--accent-green); }

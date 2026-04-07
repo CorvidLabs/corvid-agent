@@ -8,24 +8,24 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
 import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Marketplace" icon="marketplace">
-            <ng-container actions>
+        <div class="page">
+            <div class="page__header">
+                <h2>Marketplace</h2>
                 <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
                     {{ showCreateForm() ? 'Cancel' : '+ New Listing' }}
                 </button>
-            </ng-container>
+            </div>
 
-            <ng-container toolbar>
-                <div class="search-bar">
+            <!-- Search and filters -->
+            <div class="search-bar">
                 <input
                     [(ngModel)]="searchQuery"
                     class="search-input"
@@ -42,8 +42,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     <option value="general">General</option>
                 </select>
                 <button class="btn btn--primary btn--sm" (click)="onSearch()">Search</button>
-                </div>
-            </ng-container>
+            </div>
 
             @if (showCreateForm()) {
                 <div class="create-form">
@@ -266,9 +265,12 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     }
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .page { padding: var(--space-6); }
+        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
@@ -320,7 +322,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-card__name { font-weight: 600; color: var(--text-primary); }
         .listing-card__badges { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
         .listing-card__category {
-            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
             text-transform: uppercase; color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
         }
         .listing-card__desc { margin: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary); }
@@ -330,7 +332,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .listing-card__price { color: var(--accent-green); }
         .listing-card__tags { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
         .tag {
-            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-sm);
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
         }
 
@@ -341,7 +343,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
 
         /* Trust badge */
         .trust-badge {
-            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
         }
         .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
@@ -349,7 +351,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .trust-badge[data-level="low"] { color: var(--accent-yellow); border-color: var(--accent-yellow); }
         .trust-badge[data-level="untrusted"] { color: var(--accent-red); border-color: var(--accent-red); }
         .external-badge {
-            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; color: var(--accent-orange); border: 1px solid var(--accent-orange);
             background: var(--bg-raised);
         }
@@ -370,7 +372,7 @@ import type { TrustLevel } from '../../core/models/reputation.model';
         .detail-time { font-size: 0.75rem; color: var(--text-secondary); }
         .detail-stats { display: flex; flex-direction: column; gap: 0.75rem; min-width: 140px; }
         .stat-item { display: flex; flex-direction: column; gap: 0.15rem; }
-        .stat-label { font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+        .stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
         .stat-value { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
         .stat-value--rating { display: flex; align-items: center; gap: 0.1rem; }
         .stat-value--price { color: var(--accent-green); }

@@ -455,13 +455,13 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
             border: 1px solid var(--border);
         }
         .feed-badge {
-            font-size: var(--text-xxs); padding: 1px 6px; border-radius: var(--radius-full);
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-full);
             background: var(--accent-cyan-dim); color: var(--accent-cyan);
             font-weight: 700; text-transform: uppercase; flex-shrink: 0;
         }
         .feed-time { font-size: 0.7rem; color: var(--text-tertiary); flex-shrink: 0; }
         .feed-tx {
-            font-size: var(--text-xxs); padding: 1px 5px; border-radius: var(--radius-sm);
+            font-size: 0.65rem; padding: 1px 5px; border-radius: var(--radius-sm);
             background: var(--bg-raised); border: 1px solid var(--border-bright);
             color: var(--accent-magenta); text-decoration: none; font-weight: 600; flex-shrink: 0;
         }

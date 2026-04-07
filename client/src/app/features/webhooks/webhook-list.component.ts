@@ -9,20 +9,23 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookRegistrationStatus } from '../../core/models/webhook.model';
 
 @Component({
     selector: 'app-webhook-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="GitHub Webhooks" icon="webhooks" subtitle="Real-time GitHub event triggers via webhook">
-            <ng-container actions>
+        <div class="webhooks">
+            <div class="webhooks__header">
+                <div>
+                    <h2>GitHub Webhooks</h2>
+                    <p class="webhooks__subtitle">Real-time GitHub event triggers via webhook</p>
+                </div>
                 <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
                     {{ showCreateForm() ? 'Cancel' : '+ New Webhook' }}
                 </button>
-            </ng-container>
+            </div>
 
             <!-- Create Form -->
             @if (showCreateForm()) {
@@ -258,9 +261,13 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .webhooks{padding:var(--space-6);max-width:1100px}
+        .webhooks__header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem}
+        .webhooks__header h2{margin:0;color:var(--text-primary)}
+        .webhooks__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
         .create-btn,.save-btn{padding:var(--space-2) var(--space-4);background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
         .create-btn:hover,.save-btn:hover:not(:disabled){background:var(--accent-cyan-mid)}

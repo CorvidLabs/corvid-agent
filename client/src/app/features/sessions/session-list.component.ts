@@ -191,9 +191,9 @@ interface SessionGroup {
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
             .filter-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0.15rem; }
             .filter-tabs::-webkit-scrollbar { display: none; }
-            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: var(--text-xxs); padding: 0.3rem var(--space-2); }
+            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: 0.65rem; padding: 0.3rem var(--space-2); }
             .filter-tabs__spacer { display: none; }
-            .source-select { flex-shrink: 0; font-size: var(--text-xxs); }
+            .source-select { flex-shrink: 0; font-size: 0.65rem; }
             .search-input { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
         }
     `,

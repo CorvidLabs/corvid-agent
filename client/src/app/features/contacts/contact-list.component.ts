@@ -12,7 +12,6 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { IconComponent } from '../../shared/components/icon.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Contact, ContactPlatform, PlatformLink } from '../../core/models/contact.model';
 
 const PLATFORM_LABELS: Record<ContactPlatform, string> = {
@@ -24,14 +23,15 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 @Component({
     selector: 'app-contact-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent, PageShellComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent],
     template: `
-        <app-page-shell title="Contacts" icon="contacts">
-            <ng-container actions>
+        <div class="page">
+            <div class="page__header">
+                <h2 class="page-title">Contacts</h2>
                 <button class="btn btn--primary" (click)="openCreate()">+ New Contact</button>
-            </ng-container>
+            </div>
 
-            <ng-container toolbar>
+            <div class="page__toolbar">
                 <input
                     class="search-input"
                     type="text"
@@ -39,7 +39,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                     [ngModel]="searchQuery()"
                     (ngModelChange)="searchQuery.set($event)"
                     aria-label="Search contacts" />
-            </ng-container>
+            </div>
 
             @if (contactService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -54,7 +54,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             } @else {
                 <div class="contact-layout">
                     <!-- List panel -->
-                    <div class="contact-list stagger-children" role="list">
+                    <div class="contact-list" role="list">
                         @for (contact of filteredContacts(); track contact.id) {
                             <button
                                 class="contact-card"
@@ -213,9 +213,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__toolbar { margin-bottom: 1rem; }
+
         .search-input {
             width: 100%; max-width: 400px; padding: var(--space-2) var(--space-3);
             background: var(--bg-surface); border: 1px solid var(--border);
@@ -240,7 +245,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-        .btn--xs { padding: 0.2rem 0.4rem; font-size: var(--text-xxs); }
+        .btn--xs { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
 
         .contact-layout {
             display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;
@@ -280,7 +285,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 
         .platform-chip {
             display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
-            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
+            font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em; border: 1px solid;
         }
         .platform-chip--discord { color: #7289da; border-color: #7289da; background: rgba(114, 137, 218, 0.1); }
@@ -336,7 +341,7 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .verified-badge {
-            font-size: var(--text-xxs); color: var(--accent-green);
+            font-size: 0.65rem; color: var(--accent-green);
             font-weight: 600; text-transform: uppercase;
         }
         .empty-hint { color: var(--text-tertiary); font-size: 0.8rem; margin: 0.25rem 0; }

@@ -10,7 +10,6 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type {
     FlockAgent,
     FlockAgentStatus,
@@ -29,36 +28,41 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SkeletonComponent, EmptyStateComponent, PageShellComponent],
+    imports: [SkeletonComponent, EmptyStateComponent],
     template: `
-        <app-page-shell title="Flock Directory" icon="flock" subtitle="Discover agents in the network. Search by name, capability, or reputation.">
-            <ng-container actions>
-                @if (stats()) {
-                    <div class="flock-header__stats">
-                        <div class="stat-pill">
-                            <span class="stat-pill__value">{{ stats()!.total }}</span>
-                            <span class="stat-pill__label">Total</span>
-                        </div>
-                        <div class="stat-pill stat-pill--active">
-                            <span class="stat-pill__value">{{ stats()!.active }}</span>
-                            <span class="stat-pill__label">Active</span>
-                        </div>
-                        <div class="stat-pill stat-pill--inactive">
-                            <span class="stat-pill__value">{{ stats()!.inactive }}</span>
-                            <span class="stat-pill__label">Offline</span>
-                        </div>
-                        @if (stats()!.onChainAppId) {
-                            <div class="stat-pill stat-pill--chain">
-                                <span class="stat-pill__value">On-Chain</span>
-                                <span class="stat-pill__label">App {{ stats()!.onChainAppId }}</span>
+        <div class="flock-page">
+            <!-- Stats Header -->
+            <div class="flock-header">
+                <div class="flock-header__title-row">
+                    <h1 class="flock-header__title">Flock Directory</h1>
+                    @if (stats()) {
+                        <div class="flock-header__stats">
+                            <div class="stat-pill">
+                                <span class="stat-pill__value">{{ stats()!.total }}</span>
+                                <span class="stat-pill__label">Total</span>
                             </div>
-                        }
-                    </div>
-                }
-            </ng-container>
+                            <div class="stat-pill stat-pill--active">
+                                <span class="stat-pill__value">{{ stats()!.active }}</span>
+                                <span class="stat-pill__label">Active</span>
+                            </div>
+                            <div class="stat-pill stat-pill--inactive">
+                                <span class="stat-pill__value">{{ stats()!.inactive }}</span>
+                                <span class="stat-pill__label">Offline</span>
+                            </div>
+                            @if (stats()!.onChainAppId) {
+                                <div class="stat-pill stat-pill--chain">
+                                    <span class="stat-pill__value">On-Chain</span>
+                                    <span class="stat-pill__label">App {{ stats()!.onChainAppId }}</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <p class="flock-header__subtitle">Discover agents in the network. Search by name, capability, or reputation.</p>
+            </div>
 
-            <ng-container toolbar>
-                <div class="flock-controls">
+            <!-- Search & Filters -->
+            <div class="flock-controls">
                 <div class="flock-search">
                     <span class="flock-search__icon">/</span>
                     <input
@@ -93,8 +97,7 @@ interface FlockStats {
                         {{ sortOrder() === 'desc' ? '↓' : '↑' }}
                     </button>
                 </div>
-                </div>
-            </ng-container>
+            </div>
 
             <!-- Capability Quick-Filters -->
             @if (allCapabilities().length > 0) {
@@ -125,7 +128,7 @@ interface FlockStats {
                 } @else {
                     <div class="flock-grid stagger-children">
                         @for (agent of agents(); track agent.id) {
-                            <button class="flock-card card-interactive" (click)="selectAgent(agent)" [class.flock-card--selected]="selectedAgent()?.id === agent.id" type="button">
+                            <button class="flock-card" (click)="selectAgent(agent)" [class.flock-card--selected]="selectedAgent()?.id === agent.id" type="button">
                                 <div class="flock-card__header">
                                     <div class="flock-card__avatar" [attr.data-status]="agent.status">
                                         {{ agent.name.charAt(0).toUpperCase() }}
@@ -268,15 +271,47 @@ interface FlockStats {
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        /* Stats pills */
+        .flock-page {
+            padding: var(--space-6);
+            max-width: 1200px;
+            margin: 0 auto;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        .flock-header { margin-bottom: 1.5rem; }
+        .flock-header__title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .flock-header__title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
         .flock-header__stats {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
+        .flock-header__subtitle {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            margin: 0;
+        }
+
         /* Stat Pills */
         .stat-pill {
             display: flex;
@@ -383,7 +418,7 @@ interface FlockStats {
             border-radius: 12px;
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             cursor: pointer;
             transition: all 0.1s;
         }
@@ -500,7 +535,7 @@ interface FlockStats {
             white-space: nowrap;
         }
         .flock-card__status {
-            font-size: var(--text-micro);
+            font-size: 0.55rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -538,7 +573,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.06);
             border: 1px solid rgba(255, 0, 128, 0.2);
             border-radius: var(--radius-xs);
-            font-size: var(--text-micro);
+            font-size: 0.55rem;
             color: var(--accent-magenta);
         }
         .flock-card__cap--more { background: transparent; border-style: dashed; }
@@ -546,7 +581,7 @@ interface FlockStats {
         .flock-card__metrics {
             display: flex;
             gap: 0.75rem;
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             color: var(--text-tertiary);
             margin-top: auto;
         }
@@ -640,7 +675,7 @@ interface FlockStats {
             margin: 0;
         }
         .flock-detail__status {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -668,7 +703,7 @@ interface FlockStats {
 
         .flock-detail__section { margin-bottom: 1.25rem; }
         .flock-detail__section-title {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
@@ -726,7 +761,7 @@ interface FlockStats {
         }
         .flock-detail__metric-label {
             display: block;
-            font-size: var(--text-micro);
+            font-size: 0.55rem;
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -744,7 +779,7 @@ interface FlockStats {
             background: rgba(255, 0, 128, 0.08);
             border: 1px solid rgba(255, 0, 128, 0.25);
             border-radius: var(--radius-xs);
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             color: var(--accent-magenta);
         }
 
@@ -786,8 +821,10 @@ interface FlockStats {
 
         /* Responsive */
         @media (max-width: 640px) {
+            .flock-page { padding: var(--space-4); }
             .flock-grid { grid-template-columns: 1fr; }
             .flock-detail { width: calc(100vw - 2rem); }
+            .flock-header__title-row { flex-direction: column; align-items: flex-start; }
         }
     `,
 })

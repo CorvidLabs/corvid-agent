@@ -12,7 +12,6 @@ import { ApiService } from '../../core/services/api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
@@ -74,14 +73,17 @@ interface LibraryResponse {
 @Component({
     selector: 'app-models',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SlicePipe, SkeletonComponent, PageShellComponent],
+    imports: [DecimalPipe, SlicePipe, SkeletonComponent],
     template: `
-        <app-page-shell title="Models" icon="models">
-            <ng-container actions>
-                <button class="btn btn--secondary" (click)="refresh()" [disabled]="loading()">
-                    Refresh
-                </button>
-            </ng-container>
+        <div class="page">
+            <div class="page__header">
+                <h2>Models</h2>
+                <div class="header__actions">
+                    <button class="btn btn--secondary" (click)="refresh()" [disabled]="loading()">
+                        Refresh
+                    </button>
+                </div>
+            </div>
 
             <!-- Status Banner -->
             <div class="status-banner" [class.status-banner--offline]="!ollamaAvailable()">
@@ -294,10 +296,13 @@ interface LibraryResponse {
                     </button>
                 </div>
             </section>
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        :host { display: block; max-width: 960px; }
+        .page { padding: var(--space-6); max-width: 960px; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .header__actions { display: flex; gap: 0.5rem; }
 
         /* Status Banner */
         .status-banner {

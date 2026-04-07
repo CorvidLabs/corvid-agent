@@ -14,7 +14,6 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { firstValueFrom } from 'rxjs';
 
 interface WalletSummary {
@@ -41,17 +40,26 @@ interface WalletMessage {
 @Component({
     selector: 'app-wallet-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Wallets" icon="wallets" [subtitle]="wallets().length > 0 ? '(' + wallets().length + ')' : ''">
-            <ng-container toolbar>
+        <div class="page">
+            <div class="page__header">
+                <h2>
+                    Wallets
+                    @if (wallets().length > 0) {
+                        <span class="count">({{ wallets().length }})</span>
+                    }
+                </h2>
+            </div>
+
+            <div class="search-bar">
                 <input
-                    class="input search-input"
+                    class="input"
                     type="text"
                     placeholder="Search by address or label..."
                     [value]="searchQuery()"
                     (input)="onSearch(toInputValue($event))" />
-            </ng-container>
+            </div>
 
             @if (loading()) {
                 <app-skeleton variant="card" [count]="3" />
@@ -190,10 +198,15 @@ interface WalletMessage {
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        .search-input { margin-bottom: var(--space-2); }
+        .page { padding: var(--space-6); }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
+
+        .search-bar { margin-bottom: 1.5rem; }
         .input {
             width: 100%; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
@@ -247,7 +260,7 @@ interface WalletMessage {
         }
 
         .badge {
-            font-size: var(--text-xxs); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
+            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
             font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .badge--allowed {
@@ -299,7 +312,7 @@ interface WalletMessage {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;
             font-size: 0.7rem;
         }
-        .message__dir { font-weight: 700; font-size: var(--text-xxs); }
+        .message__dir { font-weight: 700; font-size: 0.65rem; }
         .message__time { color: var(--text-tertiary); }
         .message__fee { color: var(--accent-green); }
         .accent-cyan { color: var(--accent-cyan); }

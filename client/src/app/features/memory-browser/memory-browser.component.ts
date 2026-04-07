@@ -12,14 +12,16 @@ import type { MemoryEntry, MemoryTier } from '../../core/services/memory-browser
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-memory-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Memory Browser" icon="memory">
+        <div class="page">
+            <div class="page__header">
+                <h2 class="page-title">Memory Browser</h2>
+            </div>
 
             <!-- Stats summary -->
             @if (memoryService.stats(); as stats) {
@@ -45,36 +47,35 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                 </div>
             }
 
-            <ng-container toolbar>
-                <div class="page__toolbar">
-                    <input
-                        class="search-input"
-                        type="text"
-                        placeholder="Search by key or content..."
-                        [ngModel]="searchQuery()"
-                        (ngModelChange)="onSearchChange($event)"
-                        aria-label="Search memories" />
-                    <select
-                        class="filter-select"
-                        [ngModel]="tierFilter()"
-                        (ngModelChange)="onTierChange($event)"
-                        aria-label="Filter by tier">
-                        <option value="">All Tiers</option>
-                        <option value="longterm">On-Chain (longterm)</option>
-                        <option value="shortterm">Pending (shortterm)</option>
-                    </select>
-                    <select
-                        class="filter-select"
-                        [ngModel]="statusFilter()"
-                        (ngModelChange)="onStatusChange($event)"
-                        aria-label="Filter by status">
-                        <option value="">All Statuses</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="pending">Pending</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
-            </ng-container>
+            <!-- Toolbar: search + filters -->
+            <div class="page__toolbar">
+                <input
+                    class="search-input"
+                    type="text"
+                    placeholder="Search by key or content..."
+                    [ngModel]="searchQuery()"
+                    (ngModelChange)="onSearchChange($event)"
+                    aria-label="Search memories" />
+                <select
+                    class="filter-select"
+                    [ngModel]="tierFilter()"
+                    (ngModelChange)="onTierChange($event)"
+                    aria-label="Filter by tier">
+                    <option value="">All Tiers</option>
+                    <option value="longterm">On-Chain (longterm)</option>
+                    <option value="shortterm">Pending (shortterm)</option>
+                </select>
+                <select
+                    class="filter-select"
+                    [ngModel]="statusFilter()"
+                    (ngModelChange)="onStatusChange($event)"
+                    aria-label="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
 
             @if (memoryService.loading()) {
                 <app-skeleton variant="table" [count]="6" />
@@ -239,10 +240,13 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                     }
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
-        .page__toolbar { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .page { padding: var(--space-6); height: 100%; display: flex; flex-direction: column; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
 
         /* ── Stats bar ── */
         .stats-bar {
@@ -254,7 +258,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             display: flex; flex-direction: column; align-items: center; min-width: 80px;
         }
         .stat__value { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
-        .stat__label { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat__label { font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
         .stat--longterm { border-color: var(--accent-green); }
         .stat--longterm .stat__value { color: var(--accent-green); }
         .stat--shortterm { border-color: var(--accent-yellow); }
@@ -341,7 +345,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         /* ── Tier badge ── */
         .tier-badge {
             display: inline-block; padding: 0.1rem 0.4rem; border-radius: var(--radius-xs);
-            font-size: var(--text-xxs); font-weight: 700; text-transform: uppercase;
+            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .tier-badge--longterm {
@@ -356,7 +360,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         /* ── Status chip ── */
         .status-chip {
             display: inline-block; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs);
-            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
+            font-size: 0.6rem; font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em;
         }
         .status-chip--confirmed { color: var(--accent-green); background: var(--accent-green-tint); }
@@ -404,7 +408,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         }
         .meta-item--wide { grid-column: 1 / -1; }
         .meta-label {
-            display: block; font-size: var(--text-xxs); font-weight: 600; color: var(--text-tertiary);
+            display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-tertiary);
             text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
         }
         .meta-value { font-size: 0.8rem; color: var(--text-primary); }
@@ -459,6 +463,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
+            .page { padding: var(--space-4); }
             .memory-layout { grid-template-columns: 1fr; }
             .memory-list { max-height: none; }
             .memory-detail { max-height: none; }

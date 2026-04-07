@@ -12,7 +12,6 @@ import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
 import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { Library3DComponent } from './library-3d.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 const CATEGORIES: { key: LibraryCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -36,15 +35,16 @@ type SortKey = 'date' | 'name' | 'author';
 @Component({
     selector: 'app-library',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe, PageShellComponent],
+    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe],
     template: `
-        <app-page-shell title="Library" icon="library">
-            <ng-container actions>
+        <div class="library">
+            <div class="library__header">
+                <h2 class="library__title">Library</h2>
                 <app-view-mode-toggle
                     [mode]="viewMode()"
                     ariaLabel="Library view mode"
                     (modeChange)="setViewMode($event)" />
-            </ng-container>
+            </div>
 
             <!-- Stats bar -->
             <div class="library__stats">
@@ -269,9 +269,27 @@ type SortKey = 'date' | 'name' | 'author';
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .library {
+            padding: var(--space-6);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .library__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .library__title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
         /* Stats bar */
         .library__stats {
             display: flex;
@@ -427,7 +445,7 @@ type SortKey = 'date' | 'name' | 'author';
             display: inline-block;
             padding: 2px 8px;
             border-radius: var(--radius-lg);
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -439,7 +457,7 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-primary);
         }
         .library__card-pages {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 700;
             color: var(--accent-purple);
             background: var(--tag-bg);
@@ -660,7 +678,7 @@ type SortKey = 'date' | 'name' | 'author';
             background: var(--border-subtle);
         }
         .library__page-divider-label {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -668,7 +686,7 @@ type SortKey = 'date' | 'name' | 'author';
             white-space: nowrap;
         }
         .library__overlay-type {
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             text-transform: uppercase;
             color: var(--text-secondary);
             background: var(--bg-hover);
@@ -676,7 +694,7 @@ type SortKey = 'date' | 'name' | 'author';
             border-radius: var(--radius-xs);
         }
         .library__overlay-page-info {
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             color: var(--accent-cyan);
             font-weight: 600;
         }
@@ -723,7 +741,7 @@ type SortKey = 'date' | 'name' | 'author';
             border: none;
             color: var(--accent-purple);
             cursor: pointer;
-            font-size: var(--text-xxs);
+            font-size: 0.6rem;
             padding: 0 2px;
             font-family: inherit;
             line-height: 1;
@@ -882,7 +900,7 @@ type SortKey = 'date' | 'name' | 'author';
             flex: 1;
         }
         .library__search-panel-count {
-            font-size: var(--text-xxs);
+            font-size: 0.65rem;
             color: var(--text-secondary);
         }
         .library__search--panel {
@@ -944,6 +962,7 @@ type SortKey = 'date' | 'name' | 'author';
         }
 
         @media (max-width: 600px) {
+            .library { padding: var(--space-2); }
             .library__card { padding: var(--space-2); }
             .library__search-panel { max-width: 100%; padding: var(--space-3); }
             .library__toolbar { flex-direction: column; }

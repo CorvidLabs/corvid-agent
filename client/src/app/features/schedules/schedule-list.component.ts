@@ -11,21 +11,21 @@ import { CronHumanPipe, cronToHuman, validateCron } from '../../shared/pipes/cro
 import { CronEditorComponent } from '../../shared/components/cron-editor.component';
 import type { CronEditorResult } from '../../shared/components/cron-editor.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 @Component({
     selector: 'app-schedule-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, DurationPipe, CronHumanPipe, CronEditorComponent, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, DurationPipe, CronHumanPipe, CronEditorComponent, EmptyStateComponent, SkeletonComponent],
     template: `
-        <app-page-shell title="Automation Schedules" icon="schedules">
-            <ng-container actions>
+        <div class="schedules">
+            <div class="schedules__header">
+                <h2>Automation Schedules</h2>
                 <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
                     {{ showCreateForm() ? 'Cancel' : '+ New Schedule' }}
                 </button>
-            </ng-container>
+            </div>
 
             <!-- Execution Stats Summary -->
             @if (execStats().total > 0) {
@@ -328,9 +328,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     </div>
                 </div>
             }
-        </app-page-shell>
+        </div>
     `,
-    styles: `.loading{color:var(--text-secondary)}
+    styles: `.schedules{padding:var(--space-6);max-width:1100px}.schedules__header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}.schedules__header h2{margin:0;color:var(--text-primary)}.loading{color:var(--text-secondary)}
 .exec-stats{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;padding:var(--space-3) var(--space-4);background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
 .exec-stats__item{display:flex;flex-direction:column;gap:.1rem}.exec-stats__value{font-size:1rem;font-weight:700;color:var(--text-primary)}.exec-stats__label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
 .exec-stats__item--success .exec-stats__value{color:var(--accent-green)}.exec-stats__item--fail .exec-stats__value{color:var(--accent-red)}
