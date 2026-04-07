@@ -3,7 +3,7 @@
  * Encapsulates rate limit handling and provides a thin adapter to the discord.js REST client.
  */
 
-import { REST, Routes, type APIMessage, type APIInteractionResponse } from 'discord.js';
+import { type APIInteractionResponse, type APIMessage, REST, Routes } from 'discord.js';
 import { createLogger } from '../lib/logger.js';
 
 const log = createLogger('DiscordRestClient');
@@ -151,6 +151,47 @@ export class DiscordRestClient {
       await this.rest.post(Routes.channelTyping(channelId));
     } catch (error) {
       log.error('Failed to send typing indicator', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove the bot's own reaction from a message.
+   */
+  async removeReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
+    try {
+      await this.rest.delete(Routes.channelMessageOwnReaction(channelId, messageId, emoji));
+    } catch (error) {
+      log.error('Failed to remove Discord reaction', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send a message with file attachments to a channel.
+   * Discord.js REST handles multipart form encoding automatically.
+   */
+  async sendMessageWithFiles(
+    channelId: string,
+    data: Record<string, unknown>,
+    files: Array<{ name: string; data: Uint8Array | Buffer; contentType?: string }>,
+  ): Promise<APIMessage> {
+    try {
+      const result = await this.rest.post(Routes.channelMessages(channelId), {
+        body: data,
+        files: files.map((f) => ({
+          name: f.name,
+          data: Buffer.from(f.data),
+          contentType: f.contentType,
+        })),
+      });
+      return result as APIMessage;
+    } catch (error) {
+      log.error('Failed to send Discord message with files', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
