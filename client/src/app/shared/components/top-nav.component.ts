@@ -227,7 +227,7 @@ const TABS: NavTab[] = [
             align-items: center;
             justify-content: space-between;
             height: 48px;
-            padding: 0 var(--space-5);
+            padding: 0 1.25rem;
             background: var(--glass-bg-solid);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -269,7 +269,7 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            padding: var(--space-2) var(--space-4);
+            padding: 0.5rem 1rem;
             background: none;
             border: none;
             color: var(--text-secondary);
@@ -325,7 +325,7 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: var(--space-2) var(--space-4);
+            padding: 0.5rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 0.75rem;
@@ -354,7 +354,7 @@ const TABS: NavTab[] = [
             overflow: hidden;
         }
         .network-btn {
-            padding: var(--space-1) var(--space-2);
+            padding: 0.25rem 0.5rem;
             font-family: inherit;
             font-size: 0.55rem;
             font-weight: 700;
@@ -431,7 +431,7 @@ const TABS: NavTab[] = [
             padding: 0.08rem 0.3rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
+            border-radius: 3px;
             font-family: inherit;
             font-size: 0.55rem;
             color: var(--text-tertiary);
@@ -498,15 +498,15 @@ const TABS: NavTab[] = [
                 background: var(--bg-surface);
                 z-index: 999;
                 overflow-y: auto;
-                padding: var(--space-4) 0;
+                padding: 1rem 0;
             }
             .topnav-mobile__section {
-                padding: var(--space-2) 0;
+                padding: 0.5rem 0;
                 border-bottom: 1px solid var(--border);
             }
             .topnav-mobile__section-label {
                 display: block;
-                padding: 0.4rem var(--space-6);
+                padding: 0.4rem 1.5rem;
                 font-size: 0.6rem;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
@@ -517,7 +517,7 @@ const TABS: NavTab[] = [
                 display: flex;
                 align-items: center;
                 gap: 0.6rem;
-                padding: var(--space-3) var(--space-6);
+                padding: 0.75rem 1.5rem;
                 color: var(--text-secondary);
                 text-decoration: none;
                 font-size: 0.85rem;

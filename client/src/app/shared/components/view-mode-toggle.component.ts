@@ -43,7 +43,7 @@ export type ViewMode = 'basic' | '3d';
             gap: 0;
             background: var(--glass-bg-solid);
             border: 1px solid var(--border-subtle);
-            border-radius: var(--radius);
+            border-radius: 6px;
             overflow: hidden;
         }
         .view-toggle__btn {
@@ -82,7 +82,7 @@ export type ViewMode = 'basic' | '3d';
 
         @media (max-width: 480px) {
             .view-toggle__label { display: none; }
-            .view-toggle__btn { padding: 0.3rem var(--space-2); }
+            .view-toggle__btn { padding: 0.3rem 0.5rem; }
         }
     `,
 })

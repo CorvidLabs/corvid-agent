@@ -117,7 +117,7 @@ interface ImpactRing {
             padding: 4px 10px;
             background: rgba(10, 10, 15, 0.85);
             border: 1px solid var(--border-bright);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             font-size: 0.7rem;
             color: var(--text-primary);
             font-weight: 600;
@@ -380,7 +380,7 @@ export class AgentNetworkVisComponent implements OnDestroy {
         if (!fromNode) return;
 
         const color =
-            msg.status === 'failed' ? '#ff3355' :
+            msg.status === 'failed' ? 'var(--accent-red)' :
             msg.status === 'processing' ? '#ffa040' :
             fromNode.color;
 

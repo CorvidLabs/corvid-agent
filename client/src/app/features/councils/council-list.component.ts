@@ -7,7 +7,6 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
-import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 /** Pattern matching test/E2E council names */
@@ -25,21 +24,24 @@ interface CouncilCard {
 @Component({
     selector: 'app-council-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
     template: `
-        <app-page-shell title="Councils" icon="councils">
-            <ng-container actions>
-                @if (hasTestCouncils()) {
-                    <button
-                        class="btn btn--ghost"
-                        (click)="toggleTestFilter()"
-                        [attr.aria-pressed]="hideTestData()"
-                    >
-                        {{ hideTestData() ? 'Show all' : 'Hide test data' }}
-                    </button>
-                }
-                <a class="btn btn--primary" routerLink="/sessions/councils/new">New Council</a>
-            </ng-container>
+        <div class="page">
+            <div class="page__header">
+                <h2>Councils</h2>
+                <div class="page__actions">
+                    @if (hasTestCouncils()) {
+                        <button
+                            class="btn btn--ghost"
+                            (click)="toggleTestFilter()"
+                            [attr.aria-pressed]="hideTestData()"
+                        >
+                            {{ hideTestData() ? 'Show all' : 'Hide test data' }}
+                        </button>
+                    }
+                    <a class="btn btn--primary" routerLink="/sessions/councils/new">New Council</a>
+                </div>
+            </div>
 
             @if (councilService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
@@ -143,11 +145,15 @@ interface CouncilCard {
                     }
                 }
             }
-        </app-page-shell>
+        </div>
     `,
     styles: `
+        .page { padding: 1.5rem; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__actions { display: flex; gap: 0.5rem; align-items: center; }
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
             transition: background 0.15s, box-shadow 0.15s;
         }
@@ -160,7 +166,7 @@ interface CouncilCard {
         /* Search */
         .search-bar { margin-bottom: 0.75rem; }
         .search-input {
-            width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
+            width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
             box-sizing: border-box;
         }
@@ -178,7 +184,7 @@ interface CouncilCard {
         .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .sort-group { margin-left: auto; }
         .sort-select {
-            padding: 0.3rem var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
             background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
         }
         .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
@@ -186,7 +192,7 @@ interface CouncilCard {
         /* Pagination */
         .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
         .pagination__btn {
-            padding: 0.35rem var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
             background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit; cursor: pointer;
         }
         .pagination__btn:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
@@ -202,7 +208,7 @@ interface CouncilCard {
         .council-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
         .council-card {
             display: block; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: var(--space-4); text-decoration: none; color: inherit;
+            border-radius: var(--radius-lg); padding: 1rem; text-decoration: none; color: inherit;
             transition: border-color 0.15s, box-shadow 0.15s; cursor: pointer;
         }
         .council-card:hover { border-color: var(--accent-magenta); box-shadow: 0 0 12px var(--accent-magenta-wash); }
@@ -212,7 +218,7 @@ interface CouncilCard {
         .council-card__synthesis {
             margin: 0 0 0.5rem; font-size: 0.7rem; color: var(--accent-green); line-height: 1.4;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            padding: var(--space-1) var(--space-2); border-left: 2px solid var(--accent-green); background: var(--accent-green-faint);
+            padding: 0.25rem 0.5rem; border-left: 2px solid var(--accent-green); background: var(--accent-green-faint);
         }
 
         .council-card__meta { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }
@@ -248,8 +254,12 @@ interface CouncilCard {
             .council-grid { grid-template-columns: 1fr; }
             .filters { flex-direction: column; align-items: stretch; }
             .sort-group { margin-left: 0; }
+            .page__header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+            .page__actions { width: 100%; }
+            .page__actions .btn { flex: 1; text-align: center; }
         }
         @media (max-width: 480px) {
+            .page { padding: 1rem; }
             .filter-group { flex-wrap: wrap; }
         }
     `,

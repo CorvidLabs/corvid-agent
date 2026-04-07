@@ -39,14 +39,14 @@ import { Router, RouterLink } from '@angular/router';
             align-items: center;
             justify-content: center;
             min-height: 100%;
-            padding: var(--space-8);
+            padding: 2rem;
         }
         .route-error {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            padding: var(--space-12) var(--space-8);
+            padding: 3rem 2rem;
             max-width: 480px;
             border: 1px solid var(--accent-red);
             border-radius: var(--radius-lg);
@@ -129,7 +129,7 @@ import { Router, RouterLink } from '@angular/router';
         }
         .route-error__btn {
             display: inline-block;
-            padding: 0.6rem var(--space-5);
+            padding: 0.6rem 1.25rem;
             border-radius: var(--radius);
             font-size: 0.8rem;
             font-weight: 600;
@@ -185,8 +185,8 @@ import { Router, RouterLink } from '@angular/router';
             .route-error__btn:active { transform: none; }
         }
         @media (max-width: 767px) {
-            :host { padding: var(--space-6); }
-            .route-error { padding: var(--space-8) var(--space-6); }
+            :host { padding: 1.5rem; }
+            .route-error { padding: 2rem 1.5rem; }
         }
     `,
 })
