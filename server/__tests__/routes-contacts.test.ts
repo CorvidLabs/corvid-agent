@@ -87,6 +87,48 @@ describe('Contact Routes', () => {
         expect(data.contacts[0].displayName).toContain('Alice');
     });
 
+    it('GET /api/contacts respects limit param', async () => {
+        // Seed extra contacts
+        const ids: string[] = [];
+        for (let i = 0; i < 5; i++) {
+            const { req, url } = fakeReq('POST', '/api/contacts', { displayName: `PaginationTest${i}` });
+            const res = await handleContactRoutes(req, url, db, ctx);
+            const data = await res!.json();
+            ids.push(data.id);
+        }
+        const { req, url } = fakeReq('GET', '/api/contacts?limit=2');
+        const res = await handleContactRoutes(req, url, db, ctx);
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.contacts.length).toBeLessThanOrEqual(2);
+        expect(typeof data.total).toBe('number');
+        // Cleanup
+        for (const id of ids) {
+            await handleContactRoutes(fakeReq('DELETE', `/api/contacts/${id}`).req, fakeReq('DELETE', `/api/contacts/${id}`).url, db, ctx);
+        }
+    });
+
+    it('GET /api/contacts respects offset param', async () => {
+        // Seed 3 contacts to ensure there are enough
+        const ids: string[] = [];
+        for (let i = 0; i < 3; i++) {
+            const { req, url } = fakeReq('POST', '/api/contacts', { displayName: `OffsetTest${i}` });
+            const res = await handleContactRoutes(req, url, db, ctx);
+            const data = await res!.json();
+            ids.push(data.id);
+        }
+        const first = await (await handleContactRoutes(fakeReq('GET', '/api/contacts?limit=1').req, fakeReq('GET', '/api/contacts?limit=1').url, db, ctx))!.json();
+        const offset1 = await (await handleContactRoutes(fakeReq('GET', '/api/contacts?limit=1&offset=1').req, fakeReq('GET', '/api/contacts?limit=1&offset=1').url, db, ctx))!.json();
+        // Different pages should return different contacts (when there's more than 1)
+        if (first.total > 1) {
+            expect(first.contacts[0].id).not.toBe(offset1.contacts[0].id);
+        }
+        // Cleanup
+        for (const id of ids) {
+            await handleContactRoutes(fakeReq('DELETE', `/api/contacts/${id}`).req, fakeReq('DELETE', `/api/contacts/${id}`).url, db, ctx);
+        }
+    });
+
     it('GET /api/contacts/lookup?name=Alice Updated finds by exact name', async () => {
         const { req, url } = fakeReq('GET', '/api/contacts/lookup?name=Alice%20Updated');
         const res = await handleContactRoutes(req, url, db, ctx);
