@@ -800,6 +800,131 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: spec-sync in Practice — Bidirectional Spec-to-Code Validation at Scale -->
+      <article class="post post--full" id="spec-sync-in-practice"
+               data-tags="engineering,research,release" data-date="2026-04-07"
+               data-search="spec-sync specification validation bidirectional specs modules coverage scaffold deps changelog PR comments enforcement graduated strict warn rust cli v3.4.0 212 specs 54 modules 11 languages typescript go python swift kotlin java csharp dart php ruby code quality testing invariants source of truth">
+        <div class="post-meta">
+          <time datetime="2026-04-07">2026-04-07</time>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-research">RESEARCH</span>
+          <span class="post-tag tag-release">RELEASE</span>
+        </div>
+        <h2><a href="#spec-sync-in-practice">spec-sync in Practice &mdash; 212 Specs, 54 Modules, and Why We Validate Code Against Prose</a></h2>
+
+        <p><strong>TL;DR:</strong> We built <a href="https://github.com/CorvidLabs/spec-sync">spec-sync</a>, a Rust CLI that enforces bidirectional consistency between human-written specifications and source code. corvid-agent now has 212 specs covering 54 modules, validated on every PR. Version 3.4.0 shipped today with scaffold, dependency graphs, PR comments, changelog generation, and graduated enforcement. This post explains why we built it, how it works, and what 212 validated specs actually buys you.</p>
+
+        <h3>The Problem: Specs Rot, Code Drifts</h3>
+
+        <p>Every software project has a spec problem. Documentation gets written once, then slowly drifts from reality. Someone renames a function but doesn&rsquo;t update the design doc. A new field appears in the database but the spec still describes the old schema. Within weeks, the spec is a historical artifact &mdash; not a source of truth.</p>
+
+        <p>For corvid-agent, this is especially acute. We have 10+ AI agents making changes to the codebase simultaneously. A human can barely keep up reviewing one agent&rsquo;s PRs, let alone auditing whether each change still conforms to the module&rsquo;s intended architecture. We needed a machine that reads specs and code together and tells us when they disagree.</p>
+
+        <p>That machine is spec-sync.</p>
+
+        <h3>How It Works</h3>
+
+        <p>spec-sync is a Rust CLI (~220 commits, 167+ tests) that parses <code>.spec.md</code> files and cross-references them against source code. Each spec declares:</p>
+
+        <ul>
+          <li><strong>Files</strong> &mdash; which source files implement this module</li>
+          <li><strong>Invariants</strong> &mdash; rules that must hold (e.g., &ldquo;all database queries use parameterized statements&rdquo;)</li>
+          <li><strong>Exports</strong> &mdash; public API surface the module must expose</li>
+          <li><strong>Dependencies</strong> &mdash; which other modules this one depends on</li>
+        </ul>
+
+        <p>When you run <code>specsync check</code>, it:</p>
+
+        <ol>
+          <li>Discovers all <code>.spec.md</code> files in the project</li>
+          <li>Parses their frontmatter and structured sections</li>
+          <li>Scans the referenced source files for exports, imports, and structural patterns</li>
+          <li>Reports any mismatches: missing exports, undeclared dependencies, broken file references, stale invariants</li>
+        </ol>
+
+        <p>The key insight: specs are <em>bidirectional</em>. The spec constrains the code, but the code also validates the spec. If a spec claims a module exports <code>createSession()</code> and no such function exists, spec-sync flags the spec as stale &mdash; not just the code as non-conforming. Both sides must agree.</p>
+
+        <h3>What 212 Specs Looks Like</h3>
+
+        <p>corvid-agent currently has 212 specs across 54 module categories. The breakdown tells you where the complexity lives:</p>
+
+        <table>
+          <tr><th>Category</th><th>Specs</th><th>Category</th><th>Specs</th></tr>
+          <tr><td>Database (db)</td><td>51</td><td>Library utilities (lib)</td><td>19</td></tr>
+          <tr><td>MCP tools</td><td>11</td><td>Process management</td><td>10</td></tr>
+          <tr><td>AlgoChat</td><td>9</td><td>Discord bridge</td><td>9</td></tr>
+          <tr><td>Flock directory</td><td>9</td><td>Providers</td><td>8</td></tr>
+          <tr><td>Polling services</td><td>7</td><td>Work tasks</td><td>6</td></tr>
+        </table>
+
+        <p>The database layer alone has 51 specs &mdash; one for each table, migration pattern, and query service. This is deliberate. The database is the most dangerous place for drift: an agent adding a column that the spec doesn&rsquo;t know about is a schema divergence waiting to cause a runtime error. spec-sync catches these before they reach <code>main</code>.</p>
+
+        <p>Every spec has companion files: <code>tasks.md</code> (outstanding work), <code>context.md</code> (design decisions and rationale). When an agent picks up a task involving the AlgoChat module, it reads <code>specs/algochat/algochat.spec.md</code> first. That spec is the contract. The agent builds to spec, or it updates the spec and explains why.</p>
+
+        <h3>v3.4.0 &mdash; The Tooling Matures</h3>
+
+        <p>spec-sync has been evolving rapidly. The v3.4.0 release (shipped today) adds seven major capabilities:</p>
+
+        <p><strong>Scaffold</strong> (<code>specsync scaffold &lt;name&gt;</code>) &mdash; Generates a new spec with auto-detected source files, registers it in the project, and creates companion files. No more copy-pasting templates and forgetting to update the registry.</p>
+
+        <p><strong>Dependency Graphs</strong> (<code>specsync deps</code>) &mdash; Validates cross-module dependencies. Detects cycles, missing dependencies, and undeclared imports. When Module A imports from Module B but the spec doesn&rsquo;t declare that dependency, you hear about it.</p>
+
+        <p><strong>Coverage Reports</strong> (<code>specsync report</code>) &mdash; Per-module coverage analysis showing which modules have specs, which are stale, and which are incomplete. corvid-agent currently runs at 100% spec coverage &mdash; every module has a validated spec.</p>
+
+        <p><strong>PR Comments</strong> (<code>specsync comment</code>) &mdash; Posts spec-sync check summaries directly as PR comments with links to the relevant specs. Reviewers (human or agent) see spec status without leaving the PR.</p>
+
+        <p><strong>Changelog Generation</strong> (<code>specsync changelog</code>) &mdash; Generates changelogs of spec changes between two git refs. When you tag a release, you can automatically summarize what changed in the specification layer, not just the code.</p>
+
+        <p><strong>Graduated Enforcement</strong> (<code>--enforcement-mode</code>) &mdash; Three levels: <code>warn</code> (default, reports issues), <code>enforce-new</code> (errors only for newly added specs, grandfather existing ones), <code>strict</code> (all warnings are errors, blocks merge). This lets teams adopt spec-sync incrementally without drowning in warnings on day one.</p>
+
+        <p><strong>Interactive Wizard</strong> (<code>specsync wizard</code>) &mdash; Guided spec creation for teams new to the tool. Step-by-step prompts for module name, files, invariants, and exports.</p>
+
+        <h3>Integration: GitHub Action, VS Code, MCP</h3>
+
+        <p>spec-sync isn&rsquo;t just a local CLI. It ships with three integration points:</p>
+
+        <ul>
+          <li><strong>GitHub Action</strong> (<code>CorvidLabs/spec-sync@v3</code>) &mdash; Runs <code>specsync check</code> on every PR. Blocks merge if specs are violated. This is what makes 212 specs actually enforceable at scale &mdash; no agent or human can merge code that contradicts a spec.</li>
+          <li><strong>VS Code Extension</strong> &mdash; Inline validation, go-to-spec from source files, spec preview. Developers see spec violations as they type, not after pushing.</li>
+          <li><strong>MCP Server Mode</strong> &mdash; spec-sync exposes itself as an MCP tool server, so AI agents can query specs programmatically. An agent can ask &ldquo;what are the invariants for the memory module?&rdquo; and get structured data back, not just a file to parse.</li>
+        </ul>
+
+        <p>In corvid-agent, all three are active. CI runs the GitHub Action. Team Alpha agents use MCP mode. Leif uses the VS Code extension. The same validation logic, three different surfaces.</p>
+
+        <h3>Why This Matters for Multi-Agent Development</h3>
+
+        <p>Here&rsquo;s the thing most teams don&rsquo;t realize until they&rsquo;re deep in multi-agent workflows: <em>agents don&rsquo;t share implicit knowledge</em>. A human developer who&rsquo;s been on a project for six months carries a mental model of how modules relate, what the unwritten rules are, which patterns are blessed and which are deprecated. An AI agent has none of that. It reads the code, reads the prompt, and does its best.</p>
+
+        <p>Specs are the <em>externalized mental model</em>. When Jackdaw picks up a task to add a new MCP tool, it reads the MCP spec and learns: tools must be registered in <code>sdk-tools.ts</code>, handlers go in <code>tool-handlers.ts</code>, and the context type must be extended if new services are needed. Without the spec, the agent would figure this out eventually by reading code &mdash; but &ldquo;eventually&rdquo; might mean a wrong first attempt, a review cycle, and wasted compute.</p>
+
+        <p>With 10 agents making concurrent changes across a 50,000+ line codebase, specs are not documentation. They are <em>coordination infrastructure</em>. They reduce the probability that Agent A&rsquo;s changes break Module B&rsquo;s invariants, because both agents read and conform to the same spec. It&rsquo;s the difference between 10 developers working on the same project and 10 developers working on the same <em>architecture</em>.</p>
+
+        <h3>Language Support</h3>
+
+        <p>spec-sync supports 11 languages: TypeScript, JavaScript, Rust, Go, Python, Swift, Kotlin, Java, C#, Dart, PHP, and Ruby. Each language has a dedicated parser that understands its export conventions, module systems, and structural patterns. corvid-agent uses the TypeScript parser exclusively, but the tool is designed for polyglot codebases.</p>
+
+        <h3>By the Numbers</h3>
+
+        <ul>
+          <li><strong>212 specs</strong> across 54 module categories</li>
+          <li><strong>100% spec coverage</strong> in corvid-agent &mdash; every module has a validated spec</li>
+          <li><strong>220+ commits</strong> to spec-sync since inception</li>
+          <li><strong>167+ unit tests</strong> covering config, parser, validator, generator, and exports</li>
+          <li><strong>11 languages</strong> supported</li>
+          <li><strong>7 major commands</strong> added in v3.4.0</li>
+          <li><strong>3 integration surfaces</strong> &mdash; GitHub Action, VS Code, MCP</li>
+          <li><strong>Pre-built binaries</strong> for macOS (Intel + Apple Silicon), Linux (x86_64 + aarch64), Windows</li>
+        </ul>
+
+        <h3>What&rsquo;s Next</h3>
+
+        <p>The immediate priority is <em>spec quality</em>. Having 212 specs is meaningless if half of them are boilerplate. We&rsquo;re running a quality pass to graduate every spec from &ldquo;lists the exports&rdquo; to &ldquo;captures the design decisions and invariants that actually matter.&rdquo; The <code>specsync score</code> command (which rates specs 0&ndash;100 on completeness) will guide this work.</p>
+
+        <p>Beyond that: <em>semantic validation</em>. Today, spec-sync checks structural conformance &mdash; do the exports exist, are the files referenced correctly. Tomorrow, it should check <em>behavioral</em> conformance: does the implementation actually <em>do</em> what the spec says it does? This is where LLM integration gets interesting &mdash; an agent reads the spec, reads the code, and judges whether the behavior matches the intent. Not type-checking. Meaning-checking.</p>
+
+        <p>spec-sync started as a linter for prose. It&rsquo;s becoming a <em>contract system</em> for multi-agent software development &mdash; the layer that ensures 10 agents building the same project are actually building the same thing.</p>
+      </article>
+
       <!-- Post: v0.60 — 3D Visualization, Dashboard Modernization, Accessibility Maturity -->
       <article class="post post--full" id="v0-60-spatial-ui-era"
                data-tags="release,milestone,engineering,research" data-date="2026-04-03"
