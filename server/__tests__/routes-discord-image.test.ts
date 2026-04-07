@@ -1,9 +1,12 @@
 /**
  * Tests for POST /api/discord/send-image — Discord image route.
  *
- * Mocks Discord send functions so no real network calls are made.
+ * Uses dependency injection (DiscordImageDeps) instead of mock.module to
+ * avoid polluting the global module registry and breaking other test files
+ * that import from discord/embeds or delivery-tracker.
  */
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { handleDiscordImageRoutes, type DiscordImageDeps } from '../routes/discord-image';
 import type { RequestContext } from '../middleware/guards';
 
 const ctx: RequestContext = {
@@ -22,21 +25,15 @@ function fakeReq(body: unknown, contentType = 'application/json'): { req: Reques
     return { req, url };
 }
 
-// Mock discord embeds before importing the route
 const mockSendMessageWithFiles = mock(() => Promise.resolve('msg-123'));
 const mockSendEmbedWithFiles = mock(() => Promise.resolve('embed-msg-456'));
-const mockGetDeliveryTracker = mock(() => ({}));
+const mockGetDeliveryTracker = mock(() => ({}) as any);
 
-mock.module('../discord/embeds', () => ({
-    sendMessageWithFiles: mockSendMessageWithFiles,
-    sendEmbedWithFiles: mockSendEmbedWithFiles,
-}));
-
-mock.module('../lib/delivery-tracker', () => ({
+const deps: DiscordImageDeps = {
+    sendMessageWithFiles: mockSendMessageWithFiles as any,
+    sendEmbedWithFiles: mockSendEmbedWithFiles as any,
     getDeliveryTracker: mockGetDeliveryTracker,
-}));
-
-const { handleDiscordImageRoutes } = await import('../routes/discord-image');
+};
 
 describe('Discord Image Route', () => {
     const originalBotToken = process.env.DISCORD_BOT_TOKEN;
@@ -58,19 +55,19 @@ describe('Discord Image Route', () => {
     it('returns null for non-matching paths', () => {
         const url = new URL('http://localhost:3000/api/discord/other');
         const req = new Request(url.toString(), { method: 'POST' });
-        expect(handleDiscordImageRoutes(req, url, ctx)).toBeNull();
+        expect(handleDiscordImageRoutes(req, url, ctx, deps)).toBeNull();
     });
 
     it('returns null for non-POST methods', () => {
         const url = new URL('http://localhost:3000/api/discord/send-image');
         const req = new Request(url.toString(), { method: 'GET' });
-        expect(handleDiscordImageRoutes(req, url, ctx)).toBeNull();
+        expect(handleDiscordImageRoutes(req, url, ctx, deps)).toBeNull();
     });
 
     it('returns 503 when DISCORD_BOT_TOKEN is not set', async () => {
         delete process.env.DISCORD_BOT_TOKEN;
         const { req, url } = fakeReq({ channelId: 'ch-1', imageBase64: 'aGVsbG8=' });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(503);
         const data = await res!.json() as { error: string };
@@ -79,7 +76,7 @@ describe('Discord Image Route', () => {
 
     it('returns 400 when channelId is missing', async () => {
         const { req, url } = fakeReq({ imageBase64: 'aGVsbG8=' });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json() as { error: string };
@@ -88,7 +85,7 @@ describe('Discord Image Route', () => {
 
     it('returns 400 when neither imageBase64 nor imagePath is provided', async () => {
         const { req, url } = fakeReq({ channelId: 'ch-1' });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json() as { error: string };
@@ -97,7 +94,7 @@ describe('Discord Image Route', () => {
 
     it('returns 403 for path traversal attempts', async () => {
         const { req, url } = fakeReq({ channelId: 'ch-1', imagePath: '../../etc/passwd' });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(403);
         const data = await res!.json() as { error: string };
@@ -105,10 +102,9 @@ describe('Discord Image Route', () => {
     });
 
     it('sends image with base64 data and returns success', async () => {
-        // "hello" in base64
         const imageBase64 = Buffer.from('hello').toString('base64');
         const { req, url } = fakeReq({ channelId: 'ch-1', imageBase64, message: 'hi!' });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json() as { success: boolean; messageId: string };
@@ -124,7 +120,7 @@ describe('Discord Image Route', () => {
             imageBase64,
             replyToMessageId: 'msg-ref',
         });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json() as { success: boolean; messageId: string };
@@ -137,7 +133,7 @@ describe('Discord Image Route', () => {
         mockSendMessageWithFiles.mockImplementationOnce(() => Promise.resolve(null as unknown as string));
         const imageBase64 = Buffer.from('img').toString('base64');
         const { req, url } = fakeReq({ channelId: 'ch-1', imageBase64 });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(502);
         const data = await res!.json() as { error: string };
@@ -152,10 +148,9 @@ describe('Discord Image Route', () => {
             filename: 'photo.jpg',
             contentType: 'image/jpeg',
         });
-        const res = await handleDiscordImageRoutes(req, url, ctx);
+        const res = await handleDiscordImageRoutes(req, url, ctx, deps);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
-        // Verify the attachment passed to sendMessageWithFiles has the correct name
         const callArgs = mockSendMessageWithFiles.mock.calls[0] as unknown as unknown[][];
         const attachments = callArgs?.[4] as Array<{ name: string; contentType: string }> | undefined;
         expect(attachments?.[0]?.name).toBe('photo.jpg');
