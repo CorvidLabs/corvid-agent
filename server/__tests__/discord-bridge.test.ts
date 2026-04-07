@@ -18,6 +18,7 @@ import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { withAuthorContext } from '../discord/message-handler';
 import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 function createMockProcessManager() {
     return {
@@ -155,12 +156,7 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchCalls: string[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (url: string | URL | Request) => {
-            fetchCalls.push(String(url));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             // Regular message without @mention — should be silently ignored
@@ -174,9 +170,9 @@ describe('DiscordBridge', () => {
             });
 
             expect(pm.startProcess).not.toHaveBeenCalled();
-            expect(fetchCalls.length).toBe(0);
+            expect(fetchBodies.length).toBe(0);
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -193,10 +189,7 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -218,7 +211,7 @@ describe('DiscordBridge', () => {
             // Should subscribe for response
             expect(pm.subscribe).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -235,13 +228,7 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchCalls: { url: string; body: string }[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
-            const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
-            fetchCalls.push({ url: urlStr, body: init?.body as string ?? '' });
-            return new Response(JSON.stringify({ id: '300000000000000001' }), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -256,10 +243,10 @@ describe('DiscordBridge', () => {
             // Should start a process
             expect(pm.startProcess).toHaveBeenCalled();
             // Should have sent a complexity warning message to Discord
-            const warningCall = fetchCalls.find(c => c.body.includes('Advisory'));
+            const warningCall = fetchBodies.find(b => JSON.stringify(b).includes('Advisory'));
             expect(warningCall).toBeDefined();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -272,25 +259,20 @@ describe('DiscordBridge', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const fetchCalls: number[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            fetchCalls.push(1);
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             // Short message — single API call
             await bridge.sendMessage('100000000000000001', 'Hello');
-            expect(fetchCalls.length).toBe(1);
+            expect(fetchBodies.length).toBe(1);
 
             // Long message (>2000 chars) — split into multiple calls
-            fetchCalls.length = 0;
+            fetchBodies.length = 0;
             const longText = 'x'.repeat(3000);
             await bridge.sendMessage('100000000000000001', longText);
-            expect(fetchCalls.length).toBe(2);
+            expect(fetchBodies.length).toBe(2);
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -344,10 +326,7 @@ describe('DiscordBridge', () => {
             ownerUserId: 'user-1',
         });
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -361,7 +340,7 @@ describe('DiscordBridge', () => {
             // Should send message to existing session
             expect(pm.sendMessage).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });
@@ -397,10 +376,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             ownerUserId: 'user-1',
         });
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             // First message — subscribes
@@ -429,7 +405,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             // subscribe called twice total (once per message)
             expect(pm.subscribe).toHaveBeenCalledTimes(2);
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -463,10 +439,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             ownerUserId: 'user-1',
         });
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             // Before any message, no threadCallbacks entry
@@ -497,7 +470,7 @@ describe('DiscordBridge thread subscription dedup', () => {
             const secondCallback = tsm.threadCallbacks.get('500000000000000001')!.callback;
             expect(secondCallback).not.toBe(firstCallback);
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });
@@ -518,12 +491,7 @@ describe('DiscordBridge work_intake mode', () => {
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -552,7 +520,7 @@ describe('DiscordBridge work_intake mode', () => {
             expect(embedBody).toBeDefined();
             expect(embedBody!.embeds[0].title).toBe('Task Queued');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -571,10 +539,7 @@ describe('DiscordBridge work_intake mode', () => {
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
         setBotUserId(bridge, '999000000000000001');
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -589,7 +554,7 @@ describe('DiscordBridge work_intake mode', () => {
             // Should NOT have created a task — no @mention
             expect(wts.create).not.toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -608,12 +573,7 @@ describe('DiscordBridge work_intake mode', () => {
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             // Create task via @mention
@@ -673,7 +633,7 @@ describe('DiscordBridge work_intake mode', () => {
             expect(prField).toBeDefined();
             expect(prField!.value).toBe('https://github.com/test/repo/pull/1');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -692,12 +652,7 @@ describe('DiscordBridge work_intake mode', () => {
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -750,7 +705,7 @@ describe('DiscordBridge work_intake mode', () => {
             expect(errorField).toBeDefined();
             expect(errorField!.value).toContain('TypeScript compilation failed');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -769,12 +724,7 @@ describe('DiscordBridge work_intake mode', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -790,7 +740,7 @@ describe('DiscordBridge work_intake mode', () => {
             expect(textBody).toBeDefined();
             expect(textBody!.content).toContain('WorkTaskService');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });
@@ -830,10 +780,7 @@ describe('DiscordBridge mention-reply resume', () => {
             agentModel: 'test-model',
         });
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -853,7 +800,7 @@ describe('DiscordBridge mention-reply resume', () => {
             // Should send message to existing session (resume) rather than start new
             expect(pm.sendMessage).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -870,10 +817,7 @@ describe('DiscordBridge mention-reply resume', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             // Reply to a bot message that isn't tracked (e.g. after restart)
@@ -894,7 +838,7 @@ describe('DiscordBridge mention-reply resume', () => {
             // Should create a new session (startProcess) since mentionSessions doesn't have this message
             expect(pm.startProcess).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -912,10 +856,7 @@ describe('DiscordBridge mention-reply resume', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -931,7 +872,7 @@ describe('DiscordBridge mention-reply resume', () => {
             // Should start process — bot role was mentioned
             expect(pm.startProcess).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -946,10 +887,7 @@ describe('DiscordBridge mention-reply resume', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -965,7 +903,7 @@ describe('DiscordBridge mention-reply resume', () => {
             // Should NOT start process — wrong role
             expect(pm.startProcess).not.toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });
@@ -1054,12 +992,7 @@ describe('DiscordBridge onboarding', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             const msg = {
@@ -1091,7 +1024,7 @@ describe('DiscordBridge onboarding', () => {
             });
             expect(secondWelcome).toBeUndefined();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });
@@ -1155,13 +1088,7 @@ describe('DiscordBridge expired thread session resume', () => {
             projectName: 'ResumeProject',
         });
 
-        const originalFetch = globalThis.fetch;
-        const fetchCalls: string[] = [];
-        globalThis.fetch = mock(async (url: string | URL | Request) => {
-            const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
-            fetchCalls.push(urlStr);
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -1184,7 +1111,7 @@ describe('DiscordBridge expired thread session resume', () => {
             // Should have subscribed for responses
             expect(pm.subscribe).toHaveBeenCalled();
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -1206,16 +1133,7 @@ describe('DiscordBridge expired thread session resume', () => {
             ownerUserId: 'user-1',
         });
 
-        const originalFetch = globalThis.fetch;
-        const fetchUrls: string[] = [];
-        const fetchBodies: unknown[] = [];
-        globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
-            fetchUrls.push(String(url));
-            if (init?.body) {
-                try { fetchBodies.push(JSON.parse(init.body as string)); } catch { /* skip */ }
-            }
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { fetchBodies, cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -1236,12 +1154,9 @@ describe('DiscordBridge expired thread session resume', () => {
             expect(tsm.threadSessions.has('700000000000000001')).toBe(false);
 
             // Should have sent a message to the thread channel (dead-end embed)
-            const threadMessages = fetchUrls.filter(u =>
-                u.includes('/channels/700000000000000001/messages'),
-            );
-            expect(threadMessages.length).toBeGreaterThan(0);
+            expect(fetchBodies.length).toBeGreaterThan(0);
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 
@@ -1268,10 +1183,7 @@ describe('DiscordBridge expired thread session resume', () => {
             ownerUserId: 'user-1',
         });
 
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        const { cleanup } = mockDiscordRest();
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
@@ -1290,7 +1202,7 @@ describe('DiscordBridge expired thread session resume', () => {
             expect(updatedInfo).toBeDefined();
             expect(updatedInfo.agentName).toBe('FallbackAgent');
         } finally {
-            globalThis.fetch = originalFetch;
+            cleanup();
         }
     });
 });

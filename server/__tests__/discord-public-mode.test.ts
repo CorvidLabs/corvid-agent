@@ -17,6 +17,7 @@ import { PermissionLevel } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { resolvePermissionLevel, checkRateLimit } from '../discord/permissions';
+import { mockDiscordRest } from './helpers/mock-discord-rest';
 
 function createMockProcessManager() {
     return {
@@ -42,21 +43,20 @@ function callHandleMessage(bridge: DiscordBridge, msg: unknown): Promise<void> {
 }
 
 let db: Database;
-let originalFetch: typeof fetch;
+let restCleanup: (() => void) | null = null;
 
 beforeEach(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
-    originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () => {
-        return new Response(JSON.stringify({}), { status: 200 });
-    }) as unknown as typeof fetch;
+    const { cleanup } = mockDiscordRest();
+    restCleanup = cleanup;
 });
 
 afterEach(() => {
     db.close();
-    globalThis.fetch = originalFetch;
+    restCleanup?.();
+    restCleanup = null;
 });
 
 describe('DiscordBridge public mode', () => {
@@ -103,11 +103,9 @@ describe('DiscordBridge public mode', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        restCleanup?.();
+        const { fetchBodies, cleanup } = mockDiscordRest();
+        restCleanup = cleanup;
 
         await callHandleMessage(bridge, {
             id: '200000000000000002',
@@ -353,11 +351,9 @@ describe('DiscordBridge BASIC @mention guidance in public mode', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        restCleanup?.();
+        const { fetchBodies, cleanup } = mockDiscordRest();
+        restCleanup = cleanup;
 
         await callHandleMessage(bridge, {
             id: '200000000000000020',
@@ -430,11 +426,9 @@ describe('DiscordBridge input sanitization', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        const fetchBodies: unknown[] = [];
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
+        restCleanup?.();
+        const { fetchBodies, cleanup } = mockDiscordRest();
+        restCleanup = cleanup;
 
         await callHandleMessage(bridge, {
             id: '200000000000000030',
@@ -480,7 +474,9 @@ describe('DiscordBridge input sanitization', () => {
         const bridge = new DiscordBridge(db, pm, config);
         setBotUserId(bridge, '999000000000000001');
 
-        globalThis.fetch = mock(async () => new Response(JSON.stringify({}), { status: 200 })) as unknown as typeof fetch;
+        restCleanup?.();
+        const { cleanup: rateCleanup } = mockDiscordRest();
+        restCleanup = rateCleanup;
 
         const baseMsg = {
             channel_id: '100000000000000001',

@@ -1,168 +1,181 @@
-import { describe, test, expect, spyOn, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, beforeEach } from 'bun:test';
 import { sendEmbed, sendReplyEmbed, editEmbed } from '../discord/embeds';
 import { DeliveryTracker } from '../lib/delivery-tracker';
+import { _setRestClientForTesting } from '../discord/rest-client';
 
-function mockFetchOk(responseBody: Record<string, unknown> = { id: '12345678901234567' }) {
-    return spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify(responseBody), { status: 200 }),
-    );
+/**
+ * Mock REST client that records calls for assertion.
+ * Each method records { method, args } and returns a fake message with an id.
+ */
+function createMockRestClient() {
+  const calls: Array<{ method: string; args: unknown[] }> = [];
+  return {
+    calls,
+    sendMessage(channelId: string, data: Record<string, unknown>) {
+      calls.push({ method: 'sendMessage', args: [channelId, data] });
+      return Promise.resolve({ id: '12345678901234567' });
+    },
+    editMessage(channelId: string, messageId: string, data: Record<string, unknown>) {
+      calls.push({ method: 'editMessage', args: [channelId, messageId, data] });
+      return Promise.resolve({ id: messageId });
+    },
+    // Stubs for other methods the rest client exposes
+    respondToInteraction() { return Promise.resolve({}); },
+    deferInteraction() { return Promise.resolve(); },
+    editDeferredResponse() { return Promise.resolve({}); },
+    deleteMessage() { return Promise.resolve(); },
+    addReaction() { return Promise.resolve(); },
+    removeReaction() { return Promise.resolve(); },
+    sendTypingIndicator() { return Promise.resolve(); },
+    putCommands() { return Promise.resolve([]); },
+    getGuildRoles() { return Promise.resolve([]); },
+    getGuildChannels() { return Promise.resolve([]); },
+    getGuild() { return Promise.resolve({}); },
+    modifyChannel() { return Promise.resolve({}); },
+    sendMessageWithFiles() { return Promise.resolve({ id: '12345678901234567' }); },
+  };
 }
 
 const CHANNEL_ID = '12345678901234567';
 const MESSAGE_ID = '99999999999999999';
 const BOT_TOKEN = 'test-bot-token';
 
+let mockClient: ReturnType<typeof createMockRestClient>;
+
+beforeEach(() => {
+  mockClient = createMockRestClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _setRestClientForTesting(mockClient as any);
+});
+
+afterEach(() => {
+  _setRestClientForTesting(null);
+});
+
 describe('sendEmbed mention extraction', () => {
-    let tracker: DeliveryTracker;
+  let tracker: DeliveryTracker;
 
-    afterEach(() => {
-        // @ts-expect-error - restore original fetch
-        globalThis.fetch?.mockRestore?.();
+  test('includes content field when embed has mentions', async () => {
+    tracker = new DeliveryTracker();
+    await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+      description: 'Hey <@180715808593281025> check this out',
     });
+    expect(mockClient.calls.length).toBe(1);
+    const [, data] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect(data.content).toBe('<@180715808593281025>');
+    expect(data.embeds).toHaveLength(1);
+  });
 
-    test('includes content field when embed has mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
-            description: 'Hey <@180715808593281025> check this out',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBe('<@180715808593281025>');
-        expect(body.embeds).toHaveLength(1);
-        fetchSpy.mockRestore();
+  test('omits content field when embed has no mentions', async () => {
+    tracker = new DeliveryTracker();
+    await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+      description: 'No mentions here',
     });
+    expect(mockClient.calls.length).toBe(1);
+    const [, data] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect(data.content).toBeUndefined();
+  });
 
-    test('omits content field when embed has no mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
-            description: 'No mentions here',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBeUndefined();
-        fetchSpy.mockRestore();
+  test('strips URLs from embed and sends follow-up message', async () => {
+    tracker = new DeliveryTracker();
+    await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+      description: 'Check this out https://unsplash.com/photos/test',
     });
+    // First call: embed (URLs stripped), second call: URL follow-up
+    expect(mockClient.calls.length).toBe(2);
+    const [, embedData] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect((embedData.embeds as Array<{ description?: string }>)[0].description).toBe(
+      'Check this out',
+    );
+    const [, followUpData] = mockClient.calls[1].args as [string, Record<string, unknown>];
+    expect(followUpData.content).toBe('https://unsplash.com/photos/test');
+    expect(followUpData.embeds).toBeUndefined();
+  });
 
-    test('strips URLs from embed and sends follow-up message', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
-            description: 'Check this out https://unsplash.com/photos/test',
-        });
-        // First call: embed (URLs stripped), second call: URL follow-up
-        expect(fetchSpy).toHaveBeenCalledTimes(2);
-        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(embedBody.embeds[0].description).toBe('Check this out');
-        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
-        expect(followUpBody.content).toBe('https://unsplash.com/photos/test');
-        expect(followUpBody.embeds).toBeUndefined();
-        fetchSpy.mockRestore();
+  test('does not send follow-up when no URLs in embed', async () => {
+    tracker = new DeliveryTracker();
+    await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
+      description: 'Just plain text, no URLs',
     });
-
-    test('does not send follow-up when no URLs in embed', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendEmbed(tracker, BOT_TOKEN, CHANNEL_ID, {
-            description: 'Just plain text, no URLs',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        fetchSpy.mockRestore();
-    });
+    expect(mockClient.calls.length).toBe(1);
+  });
 });
 
 describe('sendReplyEmbed mention extraction', () => {
-    let tracker: DeliveryTracker;
+  let tracker: DeliveryTracker;
 
-    afterEach(() => {
-        // @ts-expect-error - restore original fetch
-        globalThis.fetch?.mockRestore?.();
+  test('includes content field when embed has mentions', async () => {
+    tracker = new DeliveryTracker();
+    await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'Replying to <@180715808593281025>',
     });
+    expect(mockClient.calls.length).toBe(1);
+    const [, data] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect(data.content).toBe('<@180715808593281025>');
+    expect(data.message_reference).toEqual({ message_id: MESSAGE_ID });
+  });
 
-    test('includes content field when embed has mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'Replying to <@180715808593281025>',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBe('<@180715808593281025>');
-        expect(body.message_reference).toEqual({ message_id: MESSAGE_ID });
-        fetchSpy.mockRestore();
+  test('omits content field when embed has no mentions', async () => {
+    tracker = new DeliveryTracker();
+    await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'Just a reply',
     });
+    expect(mockClient.calls.length).toBe(1);
+    const [, data] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect(data.content).toBeUndefined();
+  });
 
-    test('omits content field when embed has no mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'Just a reply',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBeUndefined();
-        fetchSpy.mockRestore();
+  test('strips URLs and sends follow-up for reply embeds', async () => {
+    tracker = new DeliveryTracker();
+    await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'See https://example.com/page',
     });
-
-    test('strips URLs and sends follow-up for reply embeds', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await sendReplyEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'See https://example.com/page',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(2);
-        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(embedBody.embeds[0].description).toBe('See');
-        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
-        expect(followUpBody.content).toBe('https://example.com/page');
-        fetchSpy.mockRestore();
-    });
+    expect(mockClient.calls.length).toBe(2);
+    const [, embedData] = mockClient.calls[0].args as [string, Record<string, unknown>];
+    expect((embedData.embeds as Array<{ description?: string }>)[0].description).toBe('See');
+    const [, followUpData] = mockClient.calls[1].args as [string, Record<string, unknown>];
+    expect(followUpData.content).toBe('https://example.com/page');
+  });
 });
 
 describe('editEmbed mention extraction', () => {
-    let tracker: DeliveryTracker;
+  let tracker: DeliveryTracker;
 
-    afterEach(() => {
-        // @ts-expect-error - restore original fetch
-        globalThis.fetch?.mockRestore?.();
+  test('includes content field when embed has mentions', async () => {
+    tracker = new DeliveryTracker();
+    await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'Updated with <@180715808593281025>',
     });
+    expect(mockClient.calls.length).toBe(1);
+    expect(mockClient.calls[0].method).toBe('editMessage');
+    const [, , data] = mockClient.calls[0].args as [string, string, Record<string, unknown>];
+    expect(data.content).toBe('<@180715808593281025>');
+  });
 
-    test('includes content field when embed has mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'Updated with <@180715808593281025>',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBe('<@180715808593281025>');
-        fetchSpy.mockRestore();
+  test('omits content field when embed has no mentions', async () => {
+    tracker = new DeliveryTracker();
+    await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'Updated without mentions',
     });
+    expect(mockClient.calls.length).toBe(1);
+    const [, , data] = mockClient.calls[0].args as [string, string, Record<string, unknown>];
+    expect(data.content).toBeUndefined();
+  });
 
-    test('omits content field when embed has no mentions', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'Updated without mentions',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(body.content).toBeUndefined();
-        fetchSpy.mockRestore();
+  test('strips URLs and sends follow-up for edited embeds', async () => {
+    tracker = new DeliveryTracker();
+    await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
+      description: 'Updated with https://example.com/link',
     });
-
-    test('strips URLs and sends follow-up for edited embeds', async () => {
-        tracker = new DeliveryTracker();
-        const fetchSpy = mockFetchOk();
-        await editEmbed(tracker, BOT_TOKEN, CHANNEL_ID, MESSAGE_ID, {
-            description: 'Updated with https://example.com/link',
-        });
-        expect(fetchSpy).toHaveBeenCalledTimes(2);
-        const embedBody = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
-        expect(embedBody.embeds[0].description).toBe('Updated with');
-        const followUpBody = JSON.parse(fetchSpy.mock.calls[1][1]!.body as string);
-        expect(followUpBody.content).toBe('https://example.com/link');
-        fetchSpy.mockRestore();
-    });
+    // First call: editMessage, second call: sendMessage (URL follow-up)
+    expect(mockClient.calls.length).toBe(2);
+    expect(mockClient.calls[0].method).toBe('editMessage');
+    const [, , editData] = mockClient.calls[0].args as [string, string, Record<string, unknown>];
+    expect((editData.embeds as Array<{ description?: string }>)[0].description).toBe(
+      'Updated with',
+    );
+    expect(mockClient.calls[1].method).toBe('sendMessage');
+    const [, followUpData] = mockClient.calls[1].args as [string, Record<string, unknown>];
+    expect(followUpData.content).toBe('https://example.com/link');
+  });
 });

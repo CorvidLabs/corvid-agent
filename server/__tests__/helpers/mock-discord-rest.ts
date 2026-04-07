@@ -35,7 +35,12 @@ export function mockDiscordRest(): { fetchBodies: unknown[]; cleanup: () => void
         },
         deleteMessage: async () => {},
         addReaction: async () => {},
+        removeReaction: async () => {},
         sendTypingIndicator: async () => {},
+        sendMessageWithFiles: async (_channelId: string, data: unknown) => {
+            fetchBodies.push(data);
+            return { id: 'mock-msg-1' } as never;
+        },
     };
 
     _setRestClientForTesting(mock as DiscordRestClient);
