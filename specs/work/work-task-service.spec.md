@@ -4,6 +4,10 @@ version: 1
 status: active
 files:
   - server/work/service.ts
+  - server/work/service-drain.ts
+  - server/work/service-recovery.ts
+  - server/work/service-prompt.ts
+  - server/work/service-buddy.ts
   - server/work/validation.ts
   - server/work/repo-map.ts
   - server/work/verification.ts
@@ -33,6 +37,59 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | Type | Definition | Description |
 |------|-----------|-------------|
 | `StatusChangeCallback` | `(task: WorkTask) => void` | Callback fired on work task status transitions (branching, running, validating) |
+
+### Exported Constants (server/work/service-drain.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `DRAIN_POLL_INTERVAL_MS` | `number` (10000) | Polling interval in ms when waiting for active tasks to drain during shutdown |
+
+### Exported Types (server/work/service-drain.ts)
+
+| Type | Description |
+|------|-------------|
+| `DrainContext` | Context for drain operations: `db` (Database) and `cleanupWorktree` callback |
+
+### Exported Functions (server/work/service-drain.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `drainRunningTasks` | `(ctx: DrainContext, pollIntervalMs?: number)` | `Promise<void>` | Drain running tasks during graceful shutdown; polls until all active tasks complete or timeout |
+
+### Exported Types (server/work/service-recovery.ts)
+
+| Type | Description |
+|------|-------------|
+| `RecoveryContext` | Context for recovery operations: `db`, `executeTask`, and `cleanupWorktree` callbacks |
+
+### Exported Functions (server/work/service-recovery.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `recoverStaleTasks` | `(ctx: RecoveryContext)` | `Promise<void>` | Recover tasks left in active states from a previous unclean shutdown; cleans up stale worktrees and retries interrupted tasks |
+| `recoverInterruptedTasks` | `(ctx: RecoveryContext)` | `Promise<void>` | Reset and retry tasks that were interrupted mid-execution, up to max iterations |
+| `pruneStaleWorktrees` | `(db: Database)` | `Promise<void>` | Clean up worktrees for terminal tasks (completed/failed) with leftover worktree_dir |
+
+### Exported Functions (server/work/service-prompt.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `extractReferencedPaths` | `(description: string)` | `string[]` | Extract file paths referenced in a task description (server/, src/, shared/, etc.) |
+| `assessGovernanceImpact` | `(description: string)` | `GovernanceImpact \| null` | Assess governance impact of a work task based on file paths in its description |
+| `buildWorkPrompt` | `(branchName: string, description: string, repoMap?: string, relevantSymbols?: string, governanceImpact?: GovernanceImpact \| null)` | `string` | Build the full work prompt for an agent session including repo map, symbols, and governance context |
+
+### Exported Types (server/work/service-buddy.ts)
+
+| Type | Description |
+|------|-------------|
+| `BuddyConfig` | Buddy review configuration: `buddyAgentId` and optional `maxRounds` |
+
+### Exported Functions (server/work/service-buddy.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `extractBuddyConfig` | `(input: CreateWorkTaskInput)` | `BuddyConfig \| null` | Extract buddy config from work task input if provided |
+| `triggerBuddyReview` | `(task: WorkTask, buddyConfig: BuddyConfig, buddyService: BuddyService)` | `Promise<void>` | Trigger buddy review after a work task completes |
 
 ### Exported Functions (server/work/validation.ts)
 
@@ -293,3 +350,4 @@ The optional `agent_id` parameter on `corvid_create_work_task` allows the callin
 | 2026-03-13 | corvid-agent | Added verification.ts: PR test plan verification tasks — parseTestPlanItems, createVerificationTasks, handleVerificationComplete, and helpers |
 | 2026-03-14 | corvid-agent | Added MCP Tool Interface section: corvid_check_work_status, corvid_list_work_tasks tools; model_tier parameter on corvid_create_work_task for tiered dispatch |
 | 2026-03-28 | corvid-agent | Added agent_id parameter to corvid_create_work_task for delegating task execution and PR attribution to a specific agent |
+| 2026-04-08 | corvid-agent | Added service-drain.ts, service-recovery.ts, service-prompt.ts, service-buddy.ts sub-modules split from service.ts |
