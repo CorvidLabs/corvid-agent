@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.2] - 2026-04-08
+
+### Fixed
+- **Discord: voice re-subscribe after process exit** — voice session callback is re-registered when the agent process exits and a new session starts, preventing silent voice sessions
+
 ## [0.62.1] - 2026-04-08
 
 ### Fixed
