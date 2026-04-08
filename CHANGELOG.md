@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.1] - 2026-04-08
+
+### Fixed
+- **Discord: voice connection reliability** — DAVE encryption enabled by default, pre-flight permission checks, signalling timeout retry logic, enhanced diagnostics
+- **Discord: voice responses in text** — agent responses now posted to text channel alongside TTS so users can read them
+- **Discord: remove `/voice say`** — manual TTS testing command removed; `/voice listen` handles the full conversation loop
+
+### Maintenance
+- Codecov ignore for Discord voice/gateway integration code
+
 ## [0.62.0] - 2026-04-08
 
 ### Added
