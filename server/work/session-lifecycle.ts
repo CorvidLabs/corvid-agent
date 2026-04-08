@@ -21,6 +21,7 @@ export interface SessionLifecycleContext {
     db: Database;
     processManager: ProcessManager;
     notifyCallbacks: (taskId: string) => void;
+    notifyStatusChange: (taskId: string) => void;
     subscribeForCompletion: (taskId: string, sessionId: string) => void;
 }
 
@@ -41,6 +42,7 @@ export async function handleSessionEnd(
 
     // Set status to validating
     updateWorkTaskStatus(ctx.db, taskId, 'validating');
+    ctx.notifyStatusChange(taskId);
     log.info('Running post-session validation', { taskId });
 
     const validation = await runValidation(validationDir);
@@ -67,6 +69,7 @@ export async function handleSessionEnd(
 
     // Spawn a follow-up iteration — increment iteration count in DB
     updateWorkTaskStatus(ctx.db, taskId, 'running', { iterationCount: iteration + 1 });
+    ctx.notifyStatusChange(taskId);
 
     const branchName = task.branchName ?? 'unknown';
     const iterationPrompt = buildIterationPrompt(branchName, validation.output);

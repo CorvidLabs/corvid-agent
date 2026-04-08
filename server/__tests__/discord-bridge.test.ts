@@ -68,6 +68,9 @@ function createMockWorkTaskService() {
         onComplete: mock((taskId: string, callback: (task: WorkTask) => void) => {
             completionCallbacks.set(taskId, callback);
         }),
+        onStatusChange: mock((_taskId: string, _callback: (task: WorkTask) => void) => {
+            // no-op in tests — status change embeds are not tested here
+        }),
         _triggerComplete: (taskId: string, task: WorkTask) => {
             const cb = completionCallbacks.get(taskId);
             if (cb) cb(task);

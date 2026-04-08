@@ -28,6 +28,12 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 |-------|-------------|
 | `WorkTaskService` | Orchestrates the create-branch-execute-validate-PR lifecycle |
 
+### Exported Types
+
+| Type | Definition | Description |
+|------|-----------|-------------|
+| `StatusChangeCallback` | `(task: WorkTask) => void` | Callback fired on work task status transitions (branching, running, validating) |
+
 ### Exported Functions (server/work/validation.ts)
 
 | Function | Parameters | Returns | Description |
@@ -96,6 +102,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `cancelTask` | `(id: string)` | `Promise<WorkTask \| null>` | Stop the session, fail the task, clean up worktree |
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
+| `onStatusChange` | `(taskId: string, callback: StatusChangeCallback) ` | `void` | Register a status-change callback (fires on branching, running, validating) |
 | `pruneStaleWorktrees` | `()` | `Promise<void>` | Clean up worktrees for terminal tasks (completed/failed) with leftover worktree_dir; also runs `git worktree prune` |
 | `startPeriodicCleanup` | `()` | `void` | Start a 6-hour interval timer for stale worktree cleanup |
 | `stopPeriodicCleanup` | `()` | `void` | Stop the periodic cleanup timer |
