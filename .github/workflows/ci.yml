@@ -41,6 +41,9 @@ jobs:
       - name: Unit tests
         run: bun test
 
+      - name: Spec check
+        run: bash scripts/specsync.sh check --strict --require-coverage 100
+
   # macOS (10x multiplier) and Windows (2x) only run on release tags to save CI minutes
   build-cross-platform:
     name: Build & Test (${{ matrix.os }})

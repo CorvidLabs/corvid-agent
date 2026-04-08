@@ -1,4 +1,5 @@
 {
+  "_enforcement_todo": "enable enforce-new once spec-sync#125 lands",
   "excludeDirs": [
     "__tests__",
     "public"
