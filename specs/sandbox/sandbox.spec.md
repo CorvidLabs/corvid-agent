@@ -8,6 +8,7 @@ files:
   - server/sandbox/manager.ts
   - server/sandbox/policy.ts
   - server/sandbox/types.ts
+  - server/db/sandbox.ts
 db_tables:
   - sandbox_configs
 depends_on:
@@ -38,6 +39,14 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 | `setAgentPolicy` | `db: Database`, `agentId: string`, `limits: Partial<ResourceLimits>` | `void` | Upserts custom resource limits for an agent in `sandbox_configs` |
 | `removeAgentPolicy` | `db: Database`, `agentId: string` | `boolean` | Deletes custom policy for an agent; returns `true` if a row was deleted |
 | `listAgentPolicies` | `db: Database` | `SandboxConfigRecord[]` | Returns all agent sandbox policy records ordered by `created_at DESC` |
+
+### Exported Functions (db/sandbox.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `getSandboxConfig` | `db: Database, agentId: string` | `SandboxConfigRecord \| null` | Retrieve sandbox config for an agent |
+| `listSandboxConfigs` | `db: Database` | `SandboxConfigRecord[]` | List all sandbox configs ordered by created_at DESC |
+| `deleteSandboxConfig` | `db: Database, agentId: string` | `boolean` | Delete sandbox config for an agent; returns true if deleted |
 
 ### Exported Types
 

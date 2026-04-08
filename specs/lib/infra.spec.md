@@ -8,6 +8,7 @@ files:
   - server/lib/errors.ts
   - server/lib/response.ts
   - server/lib/validation.ts
+  - server/lib/first-run-banner.ts
 db_tables: []
 depends_on: []
 ---
@@ -48,6 +49,11 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `errorMessage` | `err: unknown` | `string` | Extracts a human-readable error message from an unknown thrown value. |
 | `safeNumParam` | `value: string \| null, defaultValue: number` | `number` | Safely parses a numeric query parameter, returning the default if NaN or missing. |
 | `handleRouteError` | `err: unknown` | `Response` | Standard route error handler. Maps `AppError` subclasses to correct HTTP status and consistent JSON body `{ error, code }`. Falls back to 500 for unknown errors. Includes `retryAfter` for `RateLimitError`. |
+
+#### first-run-banner.ts
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `printFirstRunBanner` | `db: Database, host: string, port: number` | `void` | Prints a friendly welcome banner for first-time users when no agents exist yet. No-ops if agents already created. |
 
 #### validation.ts
 | Function | Parameters | Returns | Description |

@@ -5,6 +5,7 @@ status: draft
 files:
   - server/reputation/scorer.ts
   - server/reputation/types.ts
+  - server/db/reputation.ts
 db_tables:
   - agent_reputation
   - reputation_events
@@ -47,6 +48,15 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 | `getEvents` | `(agentId: string, limit?: number)` | `ReputationEventRecord[]` | Return recent events for agent (default limit 50) |
 | `setAttestationHash` | `(agentId: string, hash: string)` | `void` | Update attestation hash on persisted score |
 | `getHistory` | `(agentId: string, days?: number)` | `ReputationHistoryPoint[]` | Return historical score snapshots for agent (default 90 days) |
+
+### Exported Functions (db/reputation.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `getReputationRecord` | `db: Database, agentId: string` | `ReputationRecord \| null` | Retrieve reputation record for an agent |
+| `listReputationRecords` | `db: Database` | `ReputationRecord[]` | List all reputation records sorted by overall_score DESC |
+| `getReputationEvents` | `db: Database, agentId: string, limit?: number` | `ReputationEventRecord[]` | Get recent reputation events for agent (default limit 50) |
+| `deleteReputationRecord` | `db: Database, agentId: string` | `boolean` | Delete reputation record for an agent; returns true if deleted |
 
 ### Exported Types (from `types.ts`)
 

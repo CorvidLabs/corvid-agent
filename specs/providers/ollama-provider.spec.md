@@ -6,6 +6,7 @@ files:
   - server/providers/ollama/provider.ts
   - server/providers/ollama/tool-parser.ts
   - server/providers/ollama/response-sanitizer.ts
+  - server/lib/ollama-complexity-warning.ts
 db_tables: []
 depends_on:
   - specs/providers/model-capabilities.spec.md
@@ -26,6 +27,13 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 |------|-------------|
 | `ModelPullStatus` | Progress tracking for model downloads: model, status, progress%, bytes, current layer, error |
 | `ModelDetail` | Installed model metadata: name, size, family, capabilities, loaded status |
+
+### Exported Functions (ollama-complexity-warning.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `isOllamaProvider` | `provider: string \| undefined` | `boolean` | Returns true when provider string is `'ollama'` |
+| `buildOllamaComplexityWarning` | `prompt: string, model: string, provider: string \| undefined` | `string \| null` | Builds an advisory warning when an Ollama model is selected for a complex task. Returns null when no warning needed |
 
 ### Exported Functions (tool-parser.ts)
 
