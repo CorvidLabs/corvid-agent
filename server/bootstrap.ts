@@ -70,6 +70,7 @@ import { BrowserService } from './browser/service';
 import { PluginRegistry } from './plugins/registry';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
+import { startProposalExpiryService } from './work/proposal-expiry';
 
 const log = createLogger('Bootstrap');
 
@@ -294,6 +295,10 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const taskQueueService = new TaskQueueService(db, workTaskService);
     workTaskService.setTaskQueueService(taskQueueService);
     taskQueueService.start();
+
+    // Proposal expiry — auto-rejects voting proposals past their deadline
+    const stopProposalExpiry = startProposalExpiryService(db);
+    shutdownCoordinator.register({ name: 'ProposalExpiry', priority: 60, handler: async () => stopProposalExpiry() });
 
     // BuddyService — post-response review system for /message, /session, and /work
     const buddyService = new BuddyService({ db, processManager });
