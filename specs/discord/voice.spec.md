@@ -97,7 +97,6 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 | `/voice status` | Show connection info, STT/TTS state | Admin |
 | `/voice listen` | Start STT transcription | Admin |
 | `/voice deafen` | Stop STT transcription | Admin |
-| `/voice say <text>` | Speak text via TTS in voice channel | Admin |
 | `/voice shutup` | Stop current TTS playback | Admin |
 
 ## Invariants
@@ -122,6 +121,7 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 18. **No feedback loop**: Transcriptions are skipped while the bot is speaking (TTS playback) to prevent the bot from responding to itself.
 19. **Response cleanup for TTS**: Agent responses are stripped of markdown, code blocks, URLs, and Discord mentions before being sent to TTS.
 20. **Session cleanup on leave**: When `/voice leave` is invoked, the voice session is cleaned up (unsubscribed, removed from map).
+21. **Re-subscribe after process exit**: When the SDK process exits (e.g., after responding), `cleanupSessionState` removes all event subscribers. VoiceSessionRouter re-subscribes its callback before resuming or reusing a session whose process has exited.
 
 ## Behavioral Examples
 
@@ -138,14 +138,6 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 - **When** `/voice listen` is invoked in #text-channel
 - **Then** the AudioReceiver starts subscribing to user audio streams
 - **And** transcriptions are posted to #text-channel as `**Voice** (@user, 3s): transcribed text`
-
-### Scenario: Speak via TTS
-
-- **Given** the bot is connected to a voice channel
-- **When** `/voice say Hello everyone` is invoked
-- **Then** TTS audio is synthesized via OpenAI (cached if previously spoken)
-- **And** the bot unmutes, plays the audio, then re-mutes
-- **And** responds "Speaking: Hello everyone"
 
 ### Scenario: Stop playback
 
@@ -173,9 +165,7 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 | Connection timeout (>30s) | Connection destroyed, error reported |
 | Not connected (for listen/speak) | Ephemeral: "Not connected to a voice channel. Use `/voice join` first." |
 | Already listening | Ephemeral: "Already listening and transcribing." |
-| TTS with empty text | Ephemeral: "Please provide text to speak." |
-| OPENAI_API_KEY missing (TTS) | Error logged, ephemeral error to user |
-| TTS text > 4096 chars | Ephemeral: "Text too long (max 4096 characters)." |
+| OPENAI_API_KEY missing (TTS) | Error logged, TTS response skipped |
 
 ## Dependencies
 
