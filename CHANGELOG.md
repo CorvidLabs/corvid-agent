@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.0] - 2026-04-08
+
+### Added
+- **Discord: voice conversation loop** — full STT → agent → TTS pipeline with persistent sessions per guild, feedback loop prevention, and markdown cleanup for spoken output (#1903)
+- **Discord: voice TTS playback** — speak in voice channels via `/voice say` (Phase 3) (#1902)
+- **Discord: voice channel support** — join/leave and STT transcription (Phase 1+2)
+- **Discord: work task progress embeds** — real-time branching/running/validating status updates in Discord (#1887)
+- **Governance: time-bound voting** — voting periods with deadlines and veto mechanism (#1889)
+- **Memory: ARC-69 CRUD** — full create/read/update/delete for on-chain ARC-69 memory store with security hardening (#1861)
+- **UI: 3D comms visualization** — OrbitControls, cubic bezier curves, hover tooltips for agent communication graph (#1624)
+- **UI: design token consistency** — unified colors, spacing, radius, PageShell across all components (#1611, #1872)
+
+### Fixed
+- **Security: 6 CVEs resolved** — tighten Hono dependency overrides (#1892)
+- **Security: 10 CodeQL alerts** — sanitize logged env values, validate URLs, remove unused imports (#1858)
+- **Security: rate limiting** — enforce rate limits for anonymous feedback submissions (#1888)
+- **AlgoChat: duplicate conversations** — prevent duplicate conversation creation (#1878)
+- **Work tasks: conflict handling** — retry scheduler work tasks on conflict instead of rejecting (#1891); queue on concurrency race (#1865)
+- **UI: touch targets** — enforce minimum 44px touch targets across all components (#1882)
+- **UI: mobile spacing** — increase padding/margins across mobile and desktop views (#1883)
+- **Discord: deprecated ephemeral** — replace deprecated ephemeral flag + @defer 3D loading fix
+
+### Refactored
+- **Work service** — split monolithic service.ts into focused sub-modules: buddy, drain, prompt, recovery (#1893)
+- **Settings component** — split 1745-line component into 11 focused sub-components (#1869)
+- **Library 3D** — split 1392-line component into scene service + mesh utils (#1870)
+- **Test suite** — split discord-bridge, discord-command-handlers, and work-task-service tests into focused files (#1871, #1894, #1895)
+
+### Testing
+- Spec invariant tests for algochat, db, process, and providers modules
+- Tool permissions coverage + work task race condition fix (#1873)
+- Route tests for discord-image, flock-testing, marketplace-analytics (#1857, #1868)
+- Contacts pagination coverage (#1859)
+
+### Maintenance
+- **spec-sync** → v3.3.0 with incremental validation (#1860, #1862)
+- **Specs quality pass** — graduate, prune, and add invariant tests (spec-sync#131, #132) (#1885, #1886)
+- **TypeScript 6.0 prep** — remove deprecated baseUrl from client tsconfig (#1867)
+- **Blog** — spec-sync in Practice post (#1874)
+
 ## [0.61.0] - 2026-04-05
 
 ### Added
