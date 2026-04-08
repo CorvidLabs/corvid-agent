@@ -24,8 +24,11 @@ const log = createLogger('VoiceSession');
 /** Max length of text to send to TTS (longer gets truncated). */
 const MAX_TTS_LENGTH = 4000;
 
+/** Quick acknowledgment phrases — played immediately after transcription while the agent thinks. */
+const ACK_PHRASES = ['Got it.', 'On it.', 'Okay.', 'Sure.', 'One sec.', 'Checking.', 'Let me see.', 'Looking into it.'];
+
 /** How long to wait after the last content event before considering the response complete (ms). */
-const RESPONSE_DEBOUNCE_MS = 2000;
+const RESPONSE_DEBOUNCE_MS = 800;
 
 /** Per-guild voice session state. */
 interface GuildVoiceSession {
@@ -41,6 +44,8 @@ interface GuildVoiceSession {
   callback: EventCallback;
   /** Queued transcriptions received while TTS was playing. */
   pendingTranscriptions: { userId: string; text: string }[];
+  /** Round-robin index for acknowledgment phrases. */
+  ackIndex: number;
 }
 
 /**
@@ -105,6 +110,14 @@ export class VoiceSessionRouter {
 
     session.responding = true;
     session.responseBuffer = '';
+
+    // Play a quick acknowledgment so the user knows we heard them
+    const ack = ACK_PHRASES[session.ackIndex % ACK_PHRASES.length];
+    session.ackIndex++;
+    this.voiceManager.speak(guildId, ack).catch((err) => {
+      log.error('Ack TTS failed', { guildId, error: String(err) });
+    });
+    // Don't await — send to agent in parallel so the LLM starts thinking immediately
 
     const sent = this.processManager.sendMessage(session.sessionId, `[Voice from <@${userId}>]: ${text}`);
     if (!sent) {
@@ -216,6 +229,7 @@ export class VoiceSessionRouter {
       debounceTimer: null,
       callback: (_sid, event) => this.handleSessionEvent(guildId, event),
       pendingTranscriptions: [],
+      ackIndex: 0,
     };
 
     this.processManager.subscribe(session.id, voiceSession.callback);
