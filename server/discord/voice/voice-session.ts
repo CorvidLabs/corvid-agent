@@ -58,6 +58,7 @@ export class VoiceSessionRouter {
     private processManager: ProcessManager,
     private voiceManager: VoiceConnectionManager,
     private config: DiscordBridgeConfig,
+    private sendTextMessage?: (channelId: string, content: string) => Promise<void>,
   ) {}
 
   /**
@@ -237,8 +238,20 @@ export class VoiceSessionRouter {
 
     log.info('Voice response → TTS', { guildId, textLength: text.length });
 
+    // Post agent response to the text channel for visibility
+    if (this.sendTextMessage) {
+      const info = this.voiceManager.getConnection(guildId);
+      const textChannelId = info?.transcriptionChannelId;
+      if (textChannelId) {
+        this.sendTextMessage(textChannelId, `**Voice Response**: ${text}`).catch((err) => {
+          log.error('Failed to post voice response to text channel', { guildId, error: String(err) });
+        });
+      }
+    }
+
     this.voiceManager.speak(guildId, text).catch((err) => {
       log.error('TTS playback failed', { guildId, error: String(err) });
+      // If TTS fails, the text channel message above still serves as fallback
     });
   }
 
