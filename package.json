@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.61.0",
+  "version": "0.60.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -104,7 +104,6 @@
     "hono": ">=4.12.12",
     "@hono/node-server": ">=1.19.13",
     "express-rate-limit": ">=8.2.2",
-    "path-to-regexp": ">=8.4.0",
-    "@anthropic-ai/sdk": ">=0.82.0"
+    "path-to-regexp": ">=8.4.0"
   }
 }
