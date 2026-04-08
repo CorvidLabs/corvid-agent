@@ -9,11 +9,13 @@ import { ChannelType, type ChatInputCommandInteraction } from 'discord.js';
 import type { InteractionContext } from '../commands';
 import { respondEphemeral, respondToInteraction } from '../embeds';
 import type { VoiceConnectionManager } from '../voice/connection-manager';
+import type { VoiceSessionRouter } from '../voice/voice-session';
 
 export async function handleVoiceCommand(
   ctx: InteractionContext,
   interaction: ChatInputCommandInteraction,
   voiceManager: VoiceConnectionManager,
+  voiceSessionRouter?: VoiceSessionRouter,
 ): Promise<void> {
   const sub = interaction.options.getSubcommand();
 
@@ -22,7 +24,7 @@ export async function handleVoiceCommand(
       await handleVoiceJoin(ctx, interaction, voiceManager);
       break;
     case 'leave':
-      await handleVoiceLeave(ctx, interaction, voiceManager);
+      await handleVoiceLeave(ctx, interaction, voiceManager, voiceSessionRouter);
       break;
     case 'status':
       await handleVoiceStatus(interaction, voiceManager);
@@ -79,6 +81,7 @@ async function handleVoiceLeave(
   _ctx: InteractionContext,
   interaction: ChatInputCommandInteraction,
   voiceManager: VoiceConnectionManager,
+  voiceSessionRouter?: VoiceSessionRouter,
 ): Promise<void> {
   const guildId = interaction.guildId;
   if (!guildId) {
@@ -87,6 +90,10 @@ async function handleVoiceLeave(
   }
 
   const info = voiceManager.getConnection(guildId);
+
+  // Clean up voice conversation session before disconnecting
+  voiceSessionRouter?.cleanup(guildId);
+
   const left = voiceManager.leave(guildId);
 
   if (left && info) {

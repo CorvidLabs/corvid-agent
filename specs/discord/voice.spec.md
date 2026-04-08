@@ -6,6 +6,7 @@ files:
   - server/discord/voice/connection-manager.ts
   - server/discord/voice/audio-receiver.ts
   - server/discord/voice/audio-player.ts
+  - server/discord/voice/voice-session.ts
   - server/discord/command-handlers/voice-commands.ts
 db_tables: []
 depends_on:
@@ -55,6 +56,15 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 | `stop` | `()` | `void` | Stop current playback |
 | `isPlaying` | (getter) | `boolean` | Whether audio is currently playing |
 
+### VoiceSessionRouter (server/discord/voice/voice-session.ts)
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `handleTranscription` | `(result: TranscriptionResult)` | `Promise<void>` | Route transcription through agent session and play response via TTS |
+| `cleanup` | `(guildId)` | `void` | Clean up voice session for a guild |
+| `cleanupAll` | `()` | `void` | Clean up all voice sessions |
+| `hasSession` | `(guildId)` | `boolean` | Check if guild has an active voice session |
+
 ### Exported Classes
 
 | Export | File | Description |
@@ -62,6 +72,7 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 | `VoiceConnectionManager` | `connection-manager.ts` | Manages voice connections, STT receivers, TTS players per guild |
 | `AudioReceiver` | `audio-receiver.ts` | Subscribes to user audio streams, decodes Opus, transcribes via Whisper |
 | `VoiceAudioPlayer` | `audio-player.ts` | Plays TTS audio buffers into a voice channel |
+| `VoiceSessionRouter` | `voice-session.ts` | Routes STT→agent→TTS conversation loop per guild |
 
 ### Exported Functions
 
@@ -106,6 +117,11 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 13. **Clean shutdown**: `disconnectAll()` stops all audio receivers and destroys all voice connections.
 14. **Guild-only commands**: All `/voice` subcommands require a guild context (no DMs).
 15. **OPENAI_API_KEY required**: Both STT (transcribe) and TTS (speak) require `OPENAI_API_KEY`.
+16. **Voice conversation loop**: When STT is active, transcriptions are routed through an agent session via VoiceSessionRouter and the response is played back via TTS.
+17. **One session per guild**: VoiceSessionRouter maintains one persistent agent session per guild. The session is reused across transcriptions.
+18. **No feedback loop**: Transcriptions are skipped while the bot is speaking (TTS playback) to prevent the bot from responding to itself.
+19. **Response cleanup for TTS**: Agent responses are stripped of markdown, code blocks, URLs, and Discord mentions before being sent to TTS.
+20. **Session cleanup on leave**: When `/voice leave` is invoked, the voice session is cleaned up (unsubscribed, removed from map).
 
 ## Behavioral Examples
 
@@ -137,6 +153,16 @@ Provides Discord voice channel integration: join/leave voice channels, receive a
 - **When** `/voice shutup` is invoked
 - **Then** playback stops immediately
 - **And** the bot re-mutes itself
+
+### Scenario: Voice conversation loop
+
+- **Given** the bot is connected to a voice channel and STT is active
+- **When** a user speaks and the transcription completes
+- **Then** the transcription is posted to the text channel for visibility
+- **And** the transcription is sent to a persistent agent session for the guild
+- **When** the agent responds
+- **Then** the response text is cleaned (markdown/code stripped) and sent to TTS
+- **And** the bot unmutes, plays the TTS audio, then re-mutes
 
 ## Error Cases
 
