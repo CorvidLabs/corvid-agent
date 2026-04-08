@@ -2,12 +2,16 @@ import { test, expect, describe, beforeEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 
-// Mock rest-client module so createRestClient returns our mock
+// Mock rest-client module so createRestClient returns our mock.
+// Spread real exports to avoid breaking other test files that share the Bun module cache.
+const realRestClient = await import('../discord/rest-client');
+
 const mockGetGuildRoles = mock(async (): Promise<unknown[]> => []);
 const mockGetGuildChannels = mock(async (): Promise<unknown[]> => []);
 const mockGetGuild = mock(async (): Promise<Record<string, unknown>> => ({}));
 
 mock.module('../discord/rest-client', () => ({
+    ...realRestClient,
     createRestClient: () => ({
         getGuildRoles: mockGetGuildRoles,
         getGuildChannels: mockGetGuildChannels,
@@ -15,7 +19,9 @@ mock.module('../discord/rest-client', () => ({
     }),
 }));
 
-import {
+import type { GuildRole, GuildChannel } from '../discord/guild-api';
+
+const {
     getRoleName,
     getChannelName,
     isAdminRole,
@@ -25,9 +31,7 @@ import {
     fetchGuildRoles,
     fetchGuildChannels,
     fetchGuildInfo,
-    type GuildRole,
-    type GuildChannel,
-} from '../discord/guild-api';
+} = await import('../discord/guild-api');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
