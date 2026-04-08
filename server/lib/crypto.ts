@@ -33,6 +33,7 @@ const MIN_KEY_LENGTH = 32;
 
 /** Track whether we've already warned about using the default key, to avoid spam. */
 let warnedDefaultKey = false;
+let warnedMnemonicFallback = false;
 
 async function deriveKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
     const encoder = new TextEncoder();
@@ -89,8 +90,11 @@ export function getEncryptionPassphrase(network?: string, serverMnemonic?: strin
                     'This key encrypts wallet mnemonics at rest. Generate one with: openssl rand -hex 32',
                 );
             }
-            // Testnet: allow serverMnemonic as fallback with a warning
-            log.warn('Using server mnemonic as encryption key on testnet — set WALLET_ENCRYPTION_KEY for production');
+            // Testnet: allow serverMnemonic as fallback with a warning (once per process)
+            if (!warnedMnemonicFallback) {
+                log.warn('Using server mnemonic as encryption key on testnet — set WALLET_ENCRYPTION_KEY for production');
+                warnedMnemonicFallback = true;
+            }
             return serverMnemonic.trim();
         }
         throw new Error(
