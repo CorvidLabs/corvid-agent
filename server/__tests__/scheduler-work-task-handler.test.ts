@@ -11,7 +11,7 @@ import type { HandlerContext } from '../scheduler/handlers/types';
 // ─── Mocks ─────────────────────────────────────────────────────────
 
 let mockUpdateStatus: ReturnType<typeof spyOn>;
-const originalSleep = Bun.sleep;
+let mockSleep: ReturnType<typeof spyOn>;
 
 function makeSchedule(overrides?: Partial<AgentSchedule>): AgentSchedule {
     return {
@@ -57,12 +57,12 @@ function makeCtx(workTaskService: any = null): HandlerContext {
 
 beforeEach(() => {
     mockUpdateStatus = spyOn(schedulesModule, 'updateExecutionStatus').mockImplementation(() => {});
-    Bun.sleep = mock(() => Promise.resolve()) as any;
+    mockSleep = spyOn(Bun, 'sleep' as any).mockImplementation(() => Promise.resolve());
 });
 
 afterEach(() => {
+    mockSleep.mockRestore();
     mockUpdateStatus.mockRestore();
-    Bun.sleep = originalSleep;
 });
 
 describe('execWorkTask', () => {

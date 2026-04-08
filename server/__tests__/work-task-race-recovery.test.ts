@@ -50,6 +50,7 @@ let db: Database;
 let service: WorkTaskService;
 let spawnSpy: ReturnType<typeof spyOn>;
 let mockProcessManager: ProcessManager;
+let sleepSpy: ReturnType<typeof spyOn> | null;
 let spawnCalls: Array<{ cmd: string[]; cwd?: string }>;
 let spawnResults: Array<{ exitCode: number; stdout: string; stderr: string }>;
 let subscribeCallbacks: Map<string, Set<(sid: string, event: ClaudeStreamEvent) => void>>;
@@ -63,6 +64,7 @@ beforeEach(() => {
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
 
+    sleepSpy = null;
     spawnCalls = [];
     spawnResults = [];
 
@@ -80,6 +82,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    sleepSpy?.mockRestore();
     db.close();
     spawnSpy.mockRestore();
 });
@@ -162,7 +165,7 @@ describe('Race condition recovery — retry after phantom blocker', () => {
         );
 
         // Override Bun.sleep to clear the phantom during retry delay
-        spyOn(Bun, 'sleep' as any).mockImplementation(async () => {
+        sleepSpy = spyOn(Bun, 'sleep' as any).mockImplementation(async () => {
             // Clear the phantom so retry succeeds
             db.run(`UPDATE work_tasks SET status = 'completed' WHERE id = ?`, [phantomId]);
         });
@@ -210,7 +213,7 @@ describe('Race condition recovery — fallback queue', () => {
         );
 
         // Mock Bun.sleep to not delay
-        spyOn(Bun, 'sleep' as any).mockImplementation(async () => {});
+        sleepSpy = spyOn(Bun, 'sleep' as any).mockImplementation(async () => {});
 
         const task = await service.create({
             agentId: agent.id,
