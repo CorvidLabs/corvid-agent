@@ -135,7 +135,7 @@ interface TooltipState {
                     </div>
                 </div>
             }
-            <div class="network-3d__hint">Drag to orbit &middot; Right-drag/two-finger to pan &middot; Scroll to zoom &middot; Click agent to select</div>
+            <div class="network-3d__hint">Drag to orbit &middot; Right-drag/two-finger to pan &middot; Scroll to zoom &middot; Click to select &middot; Double-click to focus</div>
         </div>
     `,
     styles: `
@@ -389,10 +389,16 @@ export class AgentNetwork3DComponent implements OnDestroy {
     private dragStartY = 0;
     private dragMoved = false;
 
+    /* ── Camera focus animation ──────────────────────────── */
+    private focusCamPos: THREE.Vector3 | null = null;
+    private focusCamLookAt: THREE.Vector3 | null = null;
+    private isFocusing = false;
+
     /* ── Event handlers bound once ──────────────────────── */
     private readonly onPointerDown = (e: PointerEvent) => this.handlePointerDown(e);
     private readonly onPointerMove = (e: PointerEvent) => this.handlePointerMove(e);
     private readonly onPointerUp = (e: PointerEvent) => this.handlePointerUp(e);
+    private readonly onDblClick = (e: MouseEvent) => this.handleDblClick(e);
 
     constructor() {
         // Load Three.js + OrbitControls lazily — separate chunks, zero cost until first render
@@ -425,6 +431,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
             canvas.removeEventListener('pointerdown', this.onPointerDown);
             canvas.removeEventListener('pointermove', this.onPointerMove);
             canvas.removeEventListener('pointerup', this.onPointerUp);
+            canvas.removeEventListener('dblclick', this.onDblClick);
         }
         // Dispose Three.js resources (only if module was loaded)
         if (this.three) {
@@ -549,6 +556,7 @@ export class AgentNetwork3DComponent implements OnDestroy {
         canvas.addEventListener('pointerdown', this.onPointerDown);
         canvas.addEventListener('pointermove', this.onPointerMove);
         canvas.addEventListener('pointerup', this.onPointerUp);
+        canvas.addEventListener('dblclick', this.onDblClick);
 
         // Resize
         this.resizeObserver = new ResizeObserver((entries) => {
@@ -945,10 +953,28 @@ export class AgentNetwork3DComponent implements OnDestroy {
             const dt = clock.getDelta();
             const time = clock.getElapsedTime();
 
+            // Camera focus animation (double-click to zoom in on an agent)
+            if (this.isFocusing && this.focusCamPos && this.focusCamLookAt && this.camera && this.orbitControls) {
+                const lerpSpeed = Math.min(dt * 5, 0.1);
+                this.camera.position.lerp(this.focusCamPos, lerpSpeed);
+                this.orbitControls.target.lerp(this.focusCamLookAt, lerpSpeed);
+
+                // Finish when close enough
+                const posErr = this.camera.position.distanceTo(this.focusCamPos);
+                const tgtErr = (this.orbitControls.target as THREE.Vector3).distanceTo(this.focusCamLookAt);
+                if (posErr < 0.2 && tgtErr < 0.1) {
+                    this.camera.position.copy(this.focusCamPos);
+                    this.orbitControls.target.copy(this.focusCamLookAt);
+                    this.isFocusing = false;
+                    this.focusCamPos = null;
+                    this.focusCamLookAt = null;
+                }
+            }
+
             // OrbitControls handles damping + auto-rotate
             this.orbitControls?.update();
             if (this.orbitControls) {
-                this.orbitControls.autoRotate = !this.isDragging;
+                this.orbitControls.autoRotate = !this.isDragging && !this.isFocusing;
             }
 
             // Animate nodes (pulse glow)
@@ -1105,6 +1131,40 @@ export class AgentNetwork3DComponent implements OnDestroy {
             }
             canvas.style.cursor = this.isDragging ? 'grabbing' : 'crosshair';
         }
+    }
+
+    private handleDblClick(e: MouseEvent): void {
+        if (!this.camera || !this.three) return;
+        const THREE = this.three;
+        const canvas = this.canvasRef().nativeElement;
+        const rect = canvas.getBoundingClientRect();
+
+        const mouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1,
+        );
+        this.raycaster.setFromCamera(mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.agentNodes.map((n) => n.mesh));
+
+        if (intersects.length === 0) return;
+
+        const agentId = intersects[0].object.userData['agentId'] as string;
+        const node = this.nodeMap.get(agentId);
+        if (!node) return;
+
+        // Select the agent
+        this.selectedNodeId = agentId;
+        const agent = this.agents().find((a) => a.id === agentId);
+        this.selectedAgent.set(agent ?? null);
+        this.agentSelected.emit(agentId);
+
+        // Compute zoom-in camera position: offset toward camera at close distance
+        const nodePos = node.mesh.position.clone();
+        const camDir = this.camera.position.clone().sub(nodePos).normalize();
+        const zoomDist = Math.max(this.orbitControls?.minDistance ?? 10, node.baseRadius * 6 + 8);
+        this.focusCamPos = nodePos.clone().add(camDir.multiplyScalar(zoomDist));
+        this.focusCamLookAt = nodePos.clone();
+        this.isFocusing = true;
     }
 
     private handlePointerUp(e: PointerEvent): void {
