@@ -8,6 +8,7 @@
 import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus } from '@discordjs/voice';
 import type { Client } from 'discord.js';
 import { createLogger } from '../../lib/logger';
+import { AudioReceiver, type TranscriptionResult } from './audio-receiver';
 
 const log = createLogger('VoiceConnectionManager');
 
@@ -19,7 +20,12 @@ export interface VoiceChannelInfo {
   channelId: string;
   channelName?: string;
   joinedAt: number;
+  /** Text channel where transcriptions should be posted. */
+  transcriptionChannelId?: string;
 }
+
+/** Callback for transcription results. */
+export type TranscriptionHandler = (result: TranscriptionResult) => void;
 
 /**
  * Manages Discord voice channel connections.
@@ -31,11 +37,71 @@ export class VoiceConnectionManager {
   /** Active voice connections keyed by guild ID. */
   private connections: Map<string, VoiceChannelInfo> = new Map();
 
+  /** Audio receivers per guild. */
+  private receivers: Map<string, AudioReceiver> = new Map();
+
   /** Discord.js client reference (needed for adapter creation). */
   private client: Client | null = null;
 
+  /** Transcription event handler. */
+  private transcriptionHandler: TranscriptionHandler | null = null;
+
   setClient(client: Client): void {
     this.client = client;
+  }
+
+  /** Register a handler for transcription results from all connections. */
+  onTranscription(handler: TranscriptionHandler): void {
+    this.transcriptionHandler = handler;
+  }
+
+  /** Get the audio receiver for a guild (if listening). */
+  getReceiver(guildId: string): AudioReceiver | undefined {
+    return this.receivers.get(guildId);
+  }
+
+  /** Start listening and transcribing audio in a guild's voice channel. */
+  startListening(guildId: string, textChannelId?: string): boolean {
+    const connection = getVoiceConnection(guildId);
+    const info = this.connections.get(guildId);
+    if (!connection || !info) return false;
+
+    // Already listening
+    const existing = this.receivers.get(guildId);
+    if (existing?.isListening) return true;
+
+    // Store which text channel to post transcriptions to
+    if (textChannelId) {
+      info.transcriptionChannelId = textChannelId;
+    }
+
+    const receiver = new AudioReceiver(connection, guildId, info.channelId);
+
+    if (this.transcriptionHandler) {
+      receiver.on('transcription', this.transcriptionHandler);
+    }
+
+    receiver.start();
+    this.receivers.set(guildId, receiver);
+    log.info('Started listening in voice channel', { guildId, channelId: info.channelId });
+    return true;
+  }
+
+  /** Stop listening in a guild's voice channel (stays connected). */
+  stopListening(guildId: string): boolean {
+    const receiver = this.receivers.get(guildId);
+    if (!receiver) return false;
+
+    receiver.stop();
+    receiver.removeAllListeners();
+    this.receivers.delete(guildId);
+    log.info('Stopped listening in voice channel', { guildId });
+    return true;
+  }
+
+  /** Check if currently listening in a guild. */
+  isListening(guildId: string): boolean {
+    return this.receivers.get(guildId)?.isListening ?? false;
   }
 
   /** Get all active voice connections. */
@@ -136,6 +202,9 @@ export class VoiceConnectionManager {
    * @returns true if a connection was destroyed, false if not connected.
    */
   leave(guildId: string): boolean {
+    // Stop audio receiver first
+    this.stopListening(guildId);
+
     const connection = getVoiceConnection(guildId);
     if (!connection) {
       this.connections.delete(guildId);

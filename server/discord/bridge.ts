@@ -145,6 +145,16 @@ export class DiscordBridge {
         const client = this.gateway.discordClient;
         if (client) {
           this.voiceManager.setClient(client);
+          this.voiceManager.onTranscription((result) => {
+            const info = this.voiceManager.getConnection(result.guildId);
+            const textChannelId = info?.transcriptionChannelId;
+            if (!textChannelId) return;
+            const durationSec = Math.round(result.durationMs / 1000);
+            const msg = `**Voice** (<@${result.userId}>, ${durationSec}s): ${result.text}`;
+            this.sendMessage(textChannelId, msg).catch((err) => {
+              log.error('Failed to send voice transcription', { error: String(err) });
+            });
+          });
         }
         log.info('Discord bridge received gateway ready', { sessionId, botUserId });
         this.tsm.recoverSessions();

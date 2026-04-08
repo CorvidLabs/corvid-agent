@@ -295,6 +295,8 @@ function buildCommands(): ReturnType<SlashCommandBuilder['toJSON']>[] {
       )
       .addSubcommand((sub) => sub.setName('leave').setDescription('Leave the current voice channel'))
       .addSubcommand((sub) => sub.setName('status').setDescription('Show current voice connection status'))
+      .addSubcommand((sub) => sub.setName('listen').setDescription('Start transcribing voice audio (STT)'))
+      .addSubcommand((sub) => sub.setName('deafen').setDescription('Stop transcribing voice audio'))
       .toJSON(),
 
     // ─── /mute (admin-only) ───────────────────────────────────────────────────
