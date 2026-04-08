@@ -49,6 +49,7 @@ import {
 import { ThreadSessionManager } from './thread-session-manager';
 import type { BaseInteraction } from 'discord.js';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordReactionData } from './types';
+import { VoiceConnectionManager } from './voice/connection-manager';
 
 const log = createLogger('DiscordBridge');
 
@@ -85,6 +86,9 @@ export class DiscordBridge {
 
   /** Reputation scorer for reaction feedback. Set via setReputationScorer(). */
   private reputationScorer: ReputationScorer | null = null;
+
+  /** Voice connection manager — handles join/leave of voice channels. */
+  private voiceManager: VoiceConnectionManager = new VoiceConnectionManager();
 
   /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
   private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -136,6 +140,11 @@ export class DiscordBridge {
       onReady: (sessionId, botUserId) => {
         if (botUserId) {
           this.botUserId = botUserId;
+        }
+        // Wire up voice manager with the live discord.js Client
+        const client = this.gateway.discordClient;
+        if (client) {
+          this.voiceManager.setClient(client);
         }
         log.info('Discord bridge received gateway ready', { sessionId, botUserId });
         this.tsm.recoverSessions();
@@ -218,6 +227,7 @@ export class DiscordBridge {
 
   stop(): void {
     this.running = false;
+    this.voiceManager.disconnectAll();
     this.gateway.stop();
     if (this.tsmCleanup) {
       this.tsmCleanup();
@@ -378,6 +388,7 @@ export class DiscordBridge {
       userMessageTimestamps: this.userMessageTimestamps,
       rateLimitWindowMs: this.RATE_LIMIT_WINDOW_MS,
       rateLimitMaxMessages: this.RATE_LIMIT_MAX_MESSAGES,
+      voiceManager: this.voiceManager,
     };
     await handleInteractionImpl(ctx, interaction);
   }
