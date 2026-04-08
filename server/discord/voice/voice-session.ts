@@ -171,19 +171,37 @@ export class VoiceSessionRouter {
       }
     }
 
+    // Resolve the text channel ID for hybrid voice+text output
+    const connectionInfo = this.voiceManager.getConnection(guildId);
+    const textChannelId = connectionInfo?.transcriptionChannelId;
+
+    let voicePrompt =
+      'You are in a live voice conversation on Discord. Your responses will be spoken aloud via TTS.\n\n' +
+      'VOICE RULES — follow these strictly:\n' +
+      '- Keep responses to 1-3 SHORT sentences while working. Save detailed summaries for when the task is complete.\n' +
+      '- Talk like a human colleague — casual, direct, no filler. Say "on it" not "I will now proceed to investigate".\n' +
+      '- NEVER use markdown, code blocks, bullet lists, URLs, or formatting of any kind in your spoken response.\n' +
+      '- NEVER use emojis or special characters.\n' +
+      '- If doing a task, give a brief status ("checking that now") and save the full explanation for when you are done.\n' +
+      '- When finished, give a clear summary of what you did and the result.\n';
+
+    if (textChannelId) {
+      voicePrompt +=
+        '\nTEXT CHANNEL OUTPUT:\n' +
+        `Your companion text channel is ${textChannelId}. Use corvid_discord_send_message to post there when you need to share:\n` +
+        '- URLs, PR links, or any links\n' +
+        '- Code snippets or diffs\n' +
+        '- Images (use corvid_discord_send_image)\n' +
+        '- Long detailed output, tables, or formatted content\n' +
+        'Speak a brief summary in voice ("PR is up, posted the link in chat") and put the actual content in the text channel.\n' +
+        'This way users get the conversational voice AND the rich content in text.';
+    }
+
     const session = createSession(this.db, {
       projectId: project.id,
       agentId: agent.id,
       name: `Discord voice:${guildId}`,
-      initialPrompt:
-        'You are in a live voice conversation on Discord. Your responses will be spoken aloud via TTS.\n\n' +
-        'VOICE RULES — follow these strictly:\n' +
-        '- Keep responses to 1-3 SHORT sentences while working. Save detailed summaries for when the task is complete.\n' +
-        '- Talk like a human colleague — casual, direct, no filler. Say "on it" not "I will now proceed to investigate".\n' +
-        '- NEVER use markdown, code blocks, bullet lists, URLs, or formatting of any kind.\n' +
-        '- NEVER use emojis or special characters.\n' +
-        '- If doing a task, give a brief status ("checking that now") and save the full explanation for when you are done.\n' +
-        '- When finished, give a clear summary of what you did and the result.',
+      initialPrompt: voicePrompt,
       source: 'discord' as SessionSource,
       workDir,
     });
@@ -264,6 +282,9 @@ export class VoiceSessionRouter {
 
     if (!text) return;
 
+    // Extract rich content (URLs, code blocks) before cleaning for TTS
+    const richContent = extractRichContent(text);
+
     // Clean up text for TTS: strip markdown, code blocks, etc.
     text = cleanForTts(text);
     if (!text) return;
@@ -283,6 +304,14 @@ export class VoiceSessionRouter {
         this.sendTextMessage(textChannelId, `**Voice Response**: ${text}`).catch((err) => {
           log.error('Failed to post voice response to text channel', { guildId, error: String(err) });
         });
+
+        // Post extracted rich content (URLs, code blocks) separately so they're clickable
+        if (richContent.length > 0) {
+          const richText = richContent.join('\n');
+          this.sendTextMessage(textChannelId, richText).catch((err) => {
+            log.error('Failed to post rich content to text channel', { guildId, error: String(err) });
+          });
+        }
       }
     }
 
@@ -359,6 +388,41 @@ function truncateAtSentence(text: string, maxLength: number): string {
   }
 
   return `${truncated.trim()}...`;
+}
+
+/**
+ * Extract rich content (URLs, code blocks) from response text.
+ * These get posted to the text channel separately so they're clickable/readable.
+ */
+function extractRichContent(text: string): string[] {
+  const items: string[] = [];
+
+  // Extract code blocks
+  const codeBlocks = text.match(/```[\s\S]*?```/g);
+  if (codeBlocks) {
+    for (const block of codeBlocks) {
+      items.push(block);
+    }
+  }
+
+  // Extract standalone URLs (not already in markdown links)
+  const urlPattern = /(?<!\()\bhttps?:\/\/[^\s)<>]+/g;
+  const urls = text.match(urlPattern);
+  if (urls) {
+    // Deduplicate
+    const unique = [...new Set(urls)];
+    for (const url of unique) {
+      items.push(`🔗 ${url}`);
+    }
+  }
+
+  // Extract markdown links [text](url)
+  const mdLinks = text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g);
+  for (const match of mdLinks) {
+    items.push(`🔗 [${match[1]}](${match[2]})`);
+  }
+
+  return items;
 }
 
 /** Strip markdown formatting and code blocks for TTS-friendly output. */
