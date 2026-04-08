@@ -6,6 +6,7 @@ import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { getClientIp } from '../middleware/rate-limit';
 import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema, SubmitFeedbackSchema } from '../lib/validation';
@@ -230,17 +231,19 @@ async function handleSubmitFeedback(
     try {
         const body = await parseBodyOrThrow(req, SubmitFeedbackSchema);
 
-        // Rate limiting: max 10 feedbacks per submitter per agent per day
-        if (body.submittedBy) {
-            const row = db.query(`
-                SELECT COUNT(*) as count FROM response_feedback
-                WHERE submitted_by = ? AND agent_id = ?
-                  AND created_at > datetime('now', '-1 day')
-            `).get(body.submittedBy, body.agentId) as { count: number };
+        // Rate limiting: max 10 feedbacks per submitter per agent per day.
+        // For anonymous submissions (null submittedBy), fall back to IP address as rate-limit key.
+        const clientIp = getClientIp(req);
+        const effectiveSubmitter = body.submittedBy ?? `anon:${clientIp}`;
 
-            if (row.count >= 10) {
-                return json({ error: 'Rate limit exceeded: max 10 feedbacks per agent per day' }, 429);
-            }
+        const row = db.query(`
+            SELECT COUNT(*) as count FROM response_feedback
+            WHERE submitted_by = ? AND agent_id = ?
+              AND created_at > datetime('now', '-1 day')
+        `).get(effectiveSubmitter, body.agentId) as { count: number };
+
+        if (row.count >= 10) {
+            return json({ error: 'Rate limit exceeded: max 10 feedbacks per agent per day' }, 429);
         }
 
         const id = crypto.randomUUID();
@@ -256,7 +259,7 @@ async function handleSubmitFeedback(
             body.sentiment,
             body.category ?? null,
             body.comment ?? null,
-            body.submittedBy ?? null,
+            effectiveSubmitter,
         );
 
         // Record reputation event
