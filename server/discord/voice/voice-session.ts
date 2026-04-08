@@ -39,6 +39,8 @@ interface GuildVoiceSession {
   debounceTimer: ReturnType<typeof setTimeout> | null;
   /** Event callback reference for cleanup. */
   callback: EventCallback;
+  /** Queued transcriptions received while TTS was playing. */
+  pendingTranscriptions: { userId: string; text: string }[];
 }
 
 /**
@@ -70,9 +72,17 @@ export class VoiceSessionRouter {
 
     if (!text.trim()) return;
 
-    // Skip if we're currently speaking (prevents feedback loops)
+    // Queue transcription if we're currently speaking (process after TTS finishes)
     if (this.voiceManager.isSpeaking(guildId)) {
-      log.debug('Ignoring transcription while speaking', { guildId, userId });
+      const existing = this.sessions.get(guildId);
+      if (existing) {
+        existing.pendingTranscriptions.push({ userId, text });
+        log.debug('Queued transcription while speaking', {
+          guildId,
+          userId,
+          queueLength: existing.pendingTranscriptions.length,
+        });
+      }
       return;
     }
 
@@ -161,12 +171,37 @@ export class VoiceSessionRouter {
       }
     }
 
+    // Resolve the text channel ID for hybrid voice+text output
+    const connectionInfo = this.voiceManager.getConnection(guildId);
+    const textChannelId = connectionInfo?.transcriptionChannelId;
+
+    let voicePrompt =
+      'You are in a live voice conversation on Discord. Your responses will be spoken aloud via TTS.\n\n' +
+      'VOICE RULES — follow these strictly:\n' +
+      '- Keep responses to 1-3 SHORT sentences while working. Save detailed summaries for when the task is complete.\n' +
+      '- Talk like a human colleague — casual, direct, no filler. Say "on it" not "I will now proceed to investigate".\n' +
+      '- NEVER use markdown, code blocks, bullet lists, URLs, or formatting of any kind in your spoken response.\n' +
+      '- NEVER use emojis or special characters.\n' +
+      '- If doing a task, give a brief status ("checking that now") and save the full explanation for when you are done.\n' +
+      '- When finished, give a clear summary of what you did and the result.\n';
+
+    if (textChannelId) {
+      voicePrompt +=
+        '\nTEXT CHANNEL OUTPUT:\n' +
+        `Your companion text channel is ${textChannelId}. Use corvid_discord_send_message to post there when you need to share:\n` +
+        '- URLs, PR links, or any links\n' +
+        '- Code snippets or diffs\n' +
+        '- Images (use corvid_discord_send_image)\n' +
+        '- Long detailed output, tables, or formatted content\n' +
+        'Speak a brief summary in voice ("PR is up, posted the link in chat") and put the actual content in the text channel.\n' +
+        'This way users get the conversational voice AND the rich content in text.';
+    }
+
     const session = createSession(this.db, {
       projectId: project.id,
       agentId: agent.id,
       name: `Discord voice:${guildId}`,
-      initialPrompt:
-        'You are in a voice conversation on Discord. Keep responses concise and conversational — they will be spoken aloud via TTS. Avoid code blocks, markdown formatting, URLs, and long lists. Respond naturally as if speaking.',
+      initialPrompt: voicePrompt,
       source: 'discord' as SessionSource,
       workDir,
     });
@@ -180,6 +215,7 @@ export class VoiceSessionRouter {
       responseBuffer: '',
       debounceTimer: null,
       callback: (_sid, event) => this.handleSessionEvent(guildId, event),
+      pendingTranscriptions: [],
     };
 
     this.processManager.subscribe(session.id, voiceSession.callback);
@@ -205,6 +241,17 @@ export class VoiceSessionRouter {
       session.debounceTimer = setTimeout(() => {
         this.flushResponse(guildId);
       }, RESPONSE_DEBOUNCE_MS);
+    }
+
+    // Send text-only status updates for tool use so the user knows we're working
+    if (event.type === 'tool_status' && this.sendTextMessage) {
+      const info = this.voiceManager.getConnection(guildId);
+      const textChannelId = info?.transcriptionChannelId;
+      if (textChannelId && event.statusMessage) {
+        this.sendTextMessage(textChannelId, `*${event.statusMessage}*`).catch((err) => {
+          log.error('Failed to send tool status to text channel', { guildId, error: String(err) });
+        });
+      }
     }
 
     if (event.type === 'result') {
@@ -235,13 +282,16 @@ export class VoiceSessionRouter {
 
     if (!text) return;
 
+    // Extract rich content (URLs, code blocks) before cleaning for TTS
+    const richContent = extractRichContent(text);
+
     // Clean up text for TTS: strip markdown, code blocks, etc.
     text = cleanForTts(text);
     if (!text) return;
 
-    // Truncate if too long
+    // Truncate at a sentence boundary if too long
     if (text.length > MAX_TTS_LENGTH) {
-      text = `${text.slice(0, MAX_TTS_LENGTH)}... (truncated)`;
+      text = truncateAtSentence(text, MAX_TTS_LENGTH);
     }
 
     log.info('Voice response → TTS', { guildId, textLength: text.length });
@@ -254,13 +304,42 @@ export class VoiceSessionRouter {
         this.sendTextMessage(textChannelId, `**Voice Response**: ${text}`).catch((err) => {
           log.error('Failed to post voice response to text channel', { guildId, error: String(err) });
         });
+
+        // Post extracted rich content (URLs, code blocks) separately so they're clickable
+        if (richContent.length > 0) {
+          const richText = richContent.join('\n');
+          this.sendTextMessage(textChannelId, richText).catch((err) => {
+            log.error('Failed to post rich content to text channel', { guildId, error: String(err) });
+          });
+        }
       }
     }
 
-    this.voiceManager.speak(guildId, text).catch((err) => {
-      log.error('TTS playback failed', { guildId, error: String(err) });
-      // If TTS fails, the text channel message above still serves as fallback
-    });
+    this.voiceManager
+      .speak(guildId, text)
+      .then(() => this.drainPendingTranscriptions(guildId))
+      .catch((err) => {
+        log.error('TTS playback failed', { guildId, error: String(err) });
+        // Still drain the queue so queued messages aren't lost
+        this.drainPendingTranscriptions(guildId);
+      });
+  }
+
+  /** Process any transcriptions that were queued while TTS was playing. */
+  private drainPendingTranscriptions(guildId: string): void {
+    const session = this.sessions.get(guildId);
+    if (!session || session.pendingTranscriptions.length === 0) return;
+
+    // Take all pending and clear the queue
+    const pending = session.pendingTranscriptions.splice(0);
+    log.info('Draining queued transcriptions', { guildId, count: pending.length });
+
+    const info = this.voiceManager.getConnection(guildId);
+    const channelId = info?.channelId ?? '';
+
+    for (const { userId, text } of pending) {
+      this.handleTranscription({ guildId, userId, text, channelId, durationMs: 0 });
+    }
   }
 
   /** Clean up a guild's voice session (called on /voice leave). */
@@ -285,6 +364,65 @@ export class VoiceSessionRouter {
   hasSession(guildId: string): boolean {
     return this.sessions.has(guildId);
   }
+}
+
+/**
+ * Truncate text at the last sentence boundary within maxLength.
+ * Falls back to word boundary if no sentence end is found.
+ */
+function truncateAtSentence(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+
+  const truncated = text.slice(0, maxLength);
+
+  // Find the last sentence-ending punctuation followed by a space or end
+  const sentenceEnd = truncated.search(/[.!?][^.!?]*$/);
+  if (sentenceEnd > maxLength * 0.5) {
+    return truncated.slice(0, sentenceEnd + 1).trim();
+  }
+
+  // Fall back to last word boundary
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > maxLength * 0.5) {
+    return `${truncated.slice(0, lastSpace).trim()}...`;
+  }
+
+  return `${truncated.trim()}...`;
+}
+
+/**
+ * Extract rich content (URLs, code blocks) from response text.
+ * These get posted to the text channel separately so they're clickable/readable.
+ */
+function extractRichContent(text: string): string[] {
+  const items: string[] = [];
+
+  // Extract code blocks
+  const codeBlocks = text.match(/```[\s\S]*?```/g);
+  if (codeBlocks) {
+    for (const block of codeBlocks) {
+      items.push(block);
+    }
+  }
+
+  // Extract standalone URLs (not already in markdown links)
+  const urlPattern = /(?<!\()\bhttps?:\/\/[^\s)<>]+/g;
+  const urls = text.match(urlPattern);
+  if (urls) {
+    // Deduplicate
+    const unique = [...new Set(urls)];
+    for (const url of unique) {
+      items.push(`🔗 ${url}`);
+    }
+  }
+
+  // Extract markdown links [text](url)
+  const mdLinks = text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g);
+  for (const match of mdLinks) {
+    items.push(`🔗 [${match[1]}](${match[2]})`);
+  }
+
+  return items;
 }
 
 /** Strip markdown formatting and code blocks for TTS-friendly output. */
