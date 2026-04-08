@@ -5,8 +5,15 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus } from '@discordjs/voice';
-import type { Client } from 'discord.js';
+import {
+  type DiscordGatewayAdapterCreator,
+  type DiscordGatewayAdapterLibraryMethods,
+  entersState,
+  getVoiceConnection,
+  joinVoiceChannel,
+  VoiceConnectionStatus,
+} from '@discordjs/voice';
+import { ChannelType, type Client, PermissionFlagsBits } from 'discord.js';
 import type { VoicePreset } from '../../../shared/types';
 import { createLogger } from '../../lib/logger';
 import { synthesizeWithCache } from '../../voice/tts';
@@ -18,8 +25,11 @@ const log = createLogger('VoiceConnectionManager');
 /** Timeout for voice connection to reach Ready state (ms). */
 const CONNECT_TIMEOUT_MS = 45_000;
 
-/** Whether to use DAVE (Discord Audio Visual Encryption). Disable if voice connections stall. */
-const DAVE_ENCRYPTION = process.env.DISCORD_VOICE_DAVE !== 'false';
+/** Whether to use DAVE (Discord Audio Visual Encryption). Disabled by default — enable with DISCORD_VOICE_DAVE=true. */
+const DAVE_ENCRYPTION = process.env.DISCORD_VOICE_DAVE === 'true';
+
+/** Maximum number of signalling retry attempts before giving up. */
+const MAX_SIGNALLING_RETRIES = 2;
 
 export interface VoiceChannelInfo {
   guildId: string;
@@ -164,21 +174,97 @@ export class VoiceConnectionManager {
 
     log.info('Joining voice channel', { guildId, channelId, channelName });
 
+    if (!this.client.isReady()) {
+      throw new Error('Discord client is not ready — wait for gateway ready event');
+    }
+
     const guild = this.client.guilds.cache.get(guildId);
     if (!guild) {
       throw new Error(`Guild ${guildId} not found in cache`);
     }
 
-    log.info('Creating voice connection', {
+    // Pre-flight: verify the channel exists, is a voice channel, and the bot has Connect permission
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) {
+      throw new Error(
+        `Channel ${channelId} not found in guild cache. The bot may not have access to this channel. ` +
+          `Cached channels: ${[...guild.channels.cache.values()].map((c) => `${c.name}(${c.id})`).join(', ')}`,
+      );
+    }
+    if (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice) {
+      throw new Error(`Channel ${channelId} (${channel.name}) is type ${channel.type}, not a voice channel`);
+    }
+    const botMember = guild.members.me;
+    if (!botMember) {
+      throw new Error('Bot member not found in guild — GuildMembers intent may be required');
+    }
+    const permissions = channel.permissionsFor(botMember);
+    if (!permissions) {
+      throw new Error(`Cannot resolve permissions for bot in channel ${channel.name}`);
+    }
+    const missingPerms: string[] = [];
+    if (!permissions.has(PermissionFlagsBits.Connect)) missingPerms.push('Connect');
+    if (!permissions.has(PermissionFlagsBits.ViewChannel)) missingPerms.push('ViewChannel');
+    if (missingPerms.length > 0) {
+      throw new Error(
+        `Bot is missing permissions in voice channel "${channel.name}": ${missingPerms.join(', ')}. ` +
+          `Update the bot's role or re-invite with correct permissions.`,
+      );
+    }
+
+    log.info('Creating voice connection (pre-flight passed)', {
       guildId,
       channelId,
+      channelName: channel.name,
       daveEncryption: DAVE_ENCRYPTION,
+      shardStatus: guild.shard.status,
+      botPermissions: permissions.bitfield.toString(),
     });
+
+    // Wrap the adapter to log opcode 4 sends and callback invocations
+    const debugAdapterCreator: DiscordGatewayAdapterCreator = (methods: DiscordGatewayAdapterLibraryMethods) => {
+      const wrappedMethods: DiscordGatewayAdapterLibraryMethods = {
+        onVoiceServerUpdate(data: unknown) {
+          log.info('[VoiceAdapter] onVoiceServerUpdate received', { guildId, data });
+          methods.onVoiceServerUpdate(data as Parameters<typeof methods.onVoiceServerUpdate>[0]);
+        },
+        onVoiceStateUpdate(data: unknown) {
+          log.info('[VoiceAdapter] onVoiceStateUpdate received', { guildId, data });
+          methods.onVoiceStateUpdate(data as Parameters<typeof methods.onVoiceStateUpdate>[0]);
+        },
+        destroy() {
+          log.info('[VoiceAdapter] adapter destroy called', { guildId });
+          methods.destroy();
+        },
+      };
+
+      const adapter = guild.voiceAdapterCreator(wrappedMethods);
+      const originalSendPayload = adapter.sendPayload.bind(adapter);
+      adapter.sendPayload = (payload: { op: number; d: Record<string, unknown> }) => {
+        const result = originalSendPayload(payload);
+        log.info('[VoiceAdapter] sendPayload', {
+          guildId,
+          opcode: payload.op,
+          channelId: payload.d?.channel_id,
+          selfDeaf: payload.d?.self_deaf,
+          selfMute: payload.d?.self_mute,
+          sent: result, // false means shard wasn't ready — opcode 4 was NOT actually sent
+        });
+        if (!result) {
+          log.error('[VoiceAdapter] sendPayload FAILED — shard is not in Ready state. Opcode 4 was NOT sent to Discord.', {
+            guildId,
+            shardStatus: guild.shard.status,
+          });
+        }
+        return result;
+      };
+      return adapter;
+    };
 
     const connection = joinVoiceChannel({
       channelId,
       guildId,
-      adapterCreator: guild.voiceAdapterCreator,
+      adapterCreator: debugAdapterCreator,
       selfDeaf: false, // We want to receive audio (for future STT)
       selfMute: true, // Muted — Phase 1 is listen-only
       debug: true,
@@ -200,23 +286,44 @@ export class VoiceConnectionManager {
       log.debug('Voice connection debug', { guildId, channelId, message });
     });
 
-    try {
-      // Wait for the connection to become ready
-      await entersState(connection, VoiceConnectionStatus.Ready, CONNECT_TIMEOUT_MS);
-    } catch {
-      const currentStatus = connection.state.status;
-      log.error('Voice connection timed out', {
+    // Wait for the connection to become ready, with retry on signalling stall
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= MAX_SIGNALLING_RETRIES; attempt++) {
+      try {
+        await entersState(connection, VoiceConnectionStatus.Ready, CONNECT_TIMEOUT_MS);
+        lastError = undefined;
+        break;
+      } catch {
+        const currentStatus = connection.state.status;
+        log.warn('Voice connection attempt failed', {
+          guildId,
+          channelId,
+          stuckInState: currentStatus,
+          attempt: attempt + 1,
+          maxAttempts: MAX_SIGNALLING_RETRIES + 1,
+        });
+
+        if (attempt < MAX_SIGNALLING_RETRIES && currentStatus === VoiceConnectionStatus.Signalling) {
+          // Stuck in signalling — try rejoin which re-sends opcode 4
+          log.info('Retrying voice connection via rejoin', { guildId, channelId, attempt: attempt + 1 });
+          connection.rejoin({ channelId, selfDeaf: false, selfMute: true });
+        } else {
+          lastError = new Error(
+            `Voice connection to ${channelId} timed out after ${CONNECT_TIMEOUT_MS}ms (stuck in state: ${currentStatus})`,
+          );
+        }
+      }
+    }
+
+    if (lastError) {
+      log.error('Voice connection failed after all attempts', {
         guildId,
         channelId,
         channelName,
-        stuckInState: currentStatus,
-        timeoutMs: CONNECT_TIMEOUT_MS,
+        attempts: MAX_SIGNALLING_RETRIES + 1,
       });
-      // Clean up on failure
       connection.destroy();
-      throw new Error(
-        `Voice connection to ${channelId} timed out after ${CONNECT_TIMEOUT_MS}ms (stuck in state: ${currentStatus})`,
-      );
+      throw lastError;
     }
 
     // Track connection lifecycle
