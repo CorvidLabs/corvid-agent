@@ -101,6 +101,8 @@ export class VoiceSessionRouter {
       // Session may have stopped — try resuming
       const dbSession = getSession(this.db, session.sessionId);
       if (dbSession) {
+        // Re-subscribe: cleanupSessionState removes all subscribers when process exits
+        this.processManager.subscribe(session.sessionId, session.callback);
         this.processManager.resumeProcess(dbSession, `[Voice from <@${userId}>]: ${text}`);
       } else {
         // Session is gone — create a new one
@@ -121,7 +123,13 @@ export class VoiceSessionRouter {
     if (existing) {
       // Verify session still exists in DB
       const dbSession = getSession(this.db, existing.sessionId);
-      if (dbSession) return existing;
+      if (dbSession) {
+        // If the process exited, re-subscribe since cleanupSessionState removes subscribers
+        if (!this.processManager.isRunning(existing.sessionId)) {
+          this.processManager.subscribe(existing.sessionId, existing.callback);
+        }
+        return existing;
+      }
       // Session was cleaned up — remove and recreate
       this.cleanup(guildId);
     }
