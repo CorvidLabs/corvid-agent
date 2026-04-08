@@ -493,6 +493,32 @@ async function handleWorkIntake(
       footer: { text: `Status: ${task.status}` },
     });
 
+    ctx.workTaskService.onStatusChange(task.id, (updatedTask) => {
+      const statusMessages: Record<string, { desc: string; color: number }> = {
+        branching: { desc: '⚙️ Setting up workspace and creating branch...', color: 0x5865f2 },
+        running: {
+          desc: `🤖 Agent working${(updatedTask.iterationCount ?? 1) > 1 ? ` (iteration ${updatedTask.iterationCount})` : ''}...`,
+          color: 0x5865f2,
+        },
+        validating: { desc: '🔍 Validating changes...', color: 0xf0b232 },
+      };
+      const statusInfo = statusMessages[updatedTask.status];
+      if (statusInfo) {
+        sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
+          title: 'Task Update',
+          description: `**${updatedTask.id}**\n\n${statusInfo.desc}`,
+          color: statusInfo.color,
+          footer: { text: `Status: ${updatedTask.status}` },
+        }).catch((err) => {
+          log.debug('Failed to send work task status embed', {
+            taskId: updatedTask.id,
+            status: updatedTask.status,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+    });
+
     ctx.workTaskService.onComplete(task.id, (completedTask) => {
       sendTaskResult(ctx, channelId, completedTask).catch((err) => {
         log.error('Failed to send task result to Discord', {

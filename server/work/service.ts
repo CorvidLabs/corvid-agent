@@ -60,6 +60,7 @@ const log = createLogger('WorkTaskService');
 const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
 
 type CompletionCallback = (task: WorkTask) => void;
+export type StatusChangeCallback = (task: WorkTask) => void;
 
 const DRAIN_TIMEOUT_MS = parseInt(process.env.WORK_DRAIN_TIMEOUT_MS ?? '300000', 10); // 5 minutes
 const DRAIN_POLL_INTERVAL_MS = 10_000; // 10 seconds
@@ -71,6 +72,7 @@ export class WorkTaskService {
     private agentMessenger: AgentMessenger | null = null;
     private conflictResolver: FlockConflictResolver | null = null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
+    private statusChangeCallbacks: Map<string, Set<StatusChangeCallback>> = new Map();
     private _shuttingDown = false;
 
     /**
@@ -890,6 +892,7 @@ export class WorkTaskService {
 
         // Update status to branching
         updateWorkTaskStatus(this.db, task.id, 'branching');
+        this.fireStatusChange(task.id);
 
         // Create git worktree (isolated directory — does not touch the main working tree)
         const worktreeResult = await createWorktree({
@@ -925,6 +928,7 @@ export class WorkTaskService {
             worktreeDir,
             iterationCount: 1,
         });
+        this.fireStatusChange(task.id);
 
         // Generate repo map for structural awareness (best-effort)
         const repoMap = this.astParserService
@@ -1098,6 +1102,27 @@ export class WorkTaskService {
         callbacks.add(callback);
     }
 
+    /** Subscribe to status changes for a task (branching, running, validating, etc.). */
+    onStatusChange(taskId: string, callback: StatusChangeCallback): void {
+        let callbacks = this.statusChangeCallbacks.get(taskId);
+        if (!callbacks) {
+            callbacks = new Set();
+            this.statusChangeCallbacks.set(taskId, callbacks);
+        }
+        callbacks.add(callback);
+    }
+
+    /** Fire status-change callbacks for a task. Call after updating task status in DB. */
+    private fireStatusChange(taskId: string): void {
+        const task = getWorkTask(this.db, taskId);
+        if (!task) return;
+        const callbacks = this.statusChangeCallbacks.get(taskId);
+        if (!callbacks) return;
+        for (const cb of callbacks) {
+            try { cb(task); } catch { /* ignore callback errors */ }
+        }
+    }
+
     private subscribeForCompletion(taskId: string, sessionId: string): void {
         let responseBuffer = '';
 
@@ -1227,6 +1252,7 @@ export class WorkTaskService {
             db: this.db,
             processManager: this.processManager,
             notifyCallbacks: (taskId) => this.notifyCallbacks(taskId),
+            notifyStatusChange: (taskId) => this.fireStatusChange(taskId),
             subscribeForCompletion: (taskId, sessionId) => this.subscribeForCompletion(taskId, sessionId),
         };
     }
@@ -1264,6 +1290,7 @@ export class WorkTaskService {
                 }
                 this.completionCallbacks.delete(taskId);
             }
+            this.statusChangeCallbacks.delete(taskId);
 
             // Resume paused tasks and process queue
             this.processQueue(task).catch((err) => {
