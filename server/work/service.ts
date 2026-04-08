@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTask, CreateWorkTaskInput } from '../../shared/types';
@@ -12,10 +11,8 @@ import {
     createWorkTask,
     createWorkTaskAtomic,
     getWorkTask,
-    getActiveWorkTasks,
     updateWorkTaskStatus,
     listWorkTasks as dbListWorkTasks,
-    cleanupStaleWorkTasks,
     resetWorkTaskForRetry,
     getActiveTaskForProject,
     pauseWorkTask,
@@ -23,8 +20,6 @@ import {
     getPendingTasksForProject,
     countQueuedTasks,
     findActiveTasksForIssue,
-    getTerminalTasksWithWorktrees,
-    clearWorktreeDir,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -36,8 +31,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { FlockConflictResolver } from '../flock-directory/conflict-resolver';
 import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
-import { createWorktree, removeWorktree, pruneWorktrees } from '../lib/worktree';
-import { assessImpact, GOVERNANCE_TIERS, type GovernanceImpact } from '../councils/governance';
+import { createWorktree } from '../lib/worktree';
 import {
     StallDetector,
     escalateTier,
@@ -54,16 +48,20 @@ import {
     cleanupWorktree as _cleanupWorktree,
     type SessionLifecycleContext,
 } from './session-lifecycle';
+import { buildWorkPrompt, assessGovernanceImpact } from './service-prompt';
+import {
+    recoverStaleTasks as _recoverStaleTasks,
+    recoverInterruptedTasks as _recoverInterruptedTasks,
+    pruneStaleWorktrees as _pruneStaleWorktrees,
+    type RecoveryContext,
+} from './service-recovery';
+import { drainRunningTasks as _drainRunningTasks, DRAIN_POLL_INTERVAL_MS } from './service-drain';
+import { extractBuddyConfig, triggerBuddyReview, type BuddyConfig } from './service-buddy';
 
 const log = createLogger('WorkTaskService');
 
-const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
-
 type CompletionCallback = (task: WorkTask) => void;
 export type StatusChangeCallback = (task: WorkTask) => void;
-
-const DRAIN_TIMEOUT_MS = parseInt(process.env.WORK_DRAIN_TIMEOUT_MS ?? '300000', 10); // 5 minutes
-const DRAIN_POLL_INTERVAL_MS = 10_000; // 10 seconds
 
 export class WorkTaskService {
     private db: Database;
@@ -129,8 +127,8 @@ export class WorkTaskService {
     /** Buddy service — set after bootstrap. */
     private _buddyService: import('../buddy/service').BuddyService | null = null;
 
-    /** Per-task buddy config. Maps taskId → { buddyAgentId, maxRounds }. */
-    private _buddyConfigMap = new Map<string, { buddyAgentId: string; maxRounds?: number }>();
+    /** Per-task buddy config. Maps taskId → buddy config. */
+    private _buddyConfigMap = new Map<string, BuddyConfig>();
 
     setBuddyService(buddyService: import('../buddy/service').BuddyService): void {
         this._buddyService = buddyService;
@@ -226,63 +224,20 @@ export class WorkTaskService {
         return results.sort((a, b) => a.priority - b.priority || (a.createdAt < b.createdAt ? -1 : 1));
     }
 
+    private _recoveryCtx(): RecoveryContext {
+        return {
+            db: this.db,
+            executeTask: (task, agent, project) => this.executeTask(task, agent, project),
+            cleanupWorktree: (taskId) => this.cleanupWorktree(taskId),
+        };
+    }
+
     /**
      * Recover tasks left in active states from a previous unclean shutdown.
      * Cleans up stale worktrees, then resets and retries interrupted tasks.
      */
     async recoverStaleTasks(): Promise<void> {
-        const staleTasks = cleanupStaleWorkTasks(this.db);
-        if (staleTasks.length === 0) return;
-
-        log.info('Recovering stale work tasks', { count: staleTasks.length });
-
-        // Clean up any leftover worktrees first
-        for (const task of staleTasks) {
-            if (task.worktreeDir) {
-                await this.cleanupWorktree(task.id);
-            }
-        }
-
-        // Reset interrupted tasks to pending and re-execute them
-        for (const task of staleTasks) {
-            try {
-                // If already at max iterations, don't retry — leave as failed
-                if ((task.iterationCount || 0) >= WORK_MAX_ITERATIONS) {
-                    log.warn('Interrupted task at max iterations — not retrying', {
-                        taskId: task.id,
-                        iterationCount: task.iterationCount,
-                        maxIterations: WORK_MAX_ITERATIONS,
-                    });
-                    continue;
-                }
-
-                const agent = getAgent(this.db, task.agentId);
-                const project = getProject(this.db, task.projectId);
-                if (!agent || !project || !project.workingDir) {
-                    log.warn('Cannot retry interrupted task: agent or project missing', { taskId: task.id });
-                    continue;
-                }
-
-                resetWorkTaskForRetry(this.db, task.id);
-                log.info('Retrying interrupted work task', { taskId: task.id, description: task.description.slice(0, 80) });
-
-                const resetTask = getWorkTask(this.db, task.id);
-                if (!resetTask) continue;
-
-                // Fire-and-forget: execute in background so recovery doesn't block startup
-                this.executeTask(resetTask, agent, project).catch((err) => {
-                    log.error('Failed to retry interrupted work task', {
-                        taskId: task.id,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                });
-            } catch (err) {
-                log.error('Failed to reset interrupted work task for retry', {
-                    taskId: task.id,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
+        return _recoverStaleTasks(this._recoveryCtx());
     }
 
     /**
@@ -293,72 +248,7 @@ export class WorkTaskService {
      * task is left as failed.
      */
     async recoverInterruptedTasks(): Promise<void> {
-        const staleTasks = cleanupStaleWorkTasks(this.db);
-        if (staleTasks.length === 0) return;
-
-        log.info('Recovering interrupted work tasks', { count: staleTasks.length });
-
-        for (const task of staleTasks) {
-            try {
-                const worktreeExists = task.worktreeDir ? existsSync(task.worktreeDir) : false;
-                const canRetry = (task.iterationCount ?? 0) < WORK_MAX_ITERATIONS;
-                const neverStarted = !task.worktreeDir && (task.iterationCount ?? 0) === 0;
-
-                // Tasks that never actually started (no worktree, iteration 0) should
-                // always be requeued — they were just in 'branching' when the restart hit.
-                if (neverStarted && canRetry) {
-                    resetWorkTaskForRetry(this.db, task.id);
-                    log.info('Requeuing task that never started', {
-                        taskId: task.id,
-                        description: task.description.slice(0, 80),
-                    });
-                    continue;
-                }
-
-                if (!worktreeExists || !canRetry) {
-                    log.info('Skipping recovery for task (worktree missing or max iterations reached)', {
-                        taskId: task.id,
-                        worktreeExists,
-                        iterationCount: task.iterationCount,
-                    });
-                    // Already marked failed by cleanupStaleWorkTasks — clean up worktree if present
-                    if (task.worktreeDir) {
-                        await this.cleanupWorktree(task.id);
-                    }
-                    continue;
-                }
-
-                const agent = getAgent(this.db, task.agentId);
-                const project = getProject(this.db, task.projectId);
-                if (!agent || !project || !project.workingDir) {
-                    log.warn('Cannot recover interrupted task: agent or project missing', { taskId: task.id });
-                    continue;
-                }
-
-                resetWorkTaskForRetry(this.db, task.id);
-                log.info('Requeuing interrupted work task', {
-                    taskId: task.id,
-                    iterationCount: task.iterationCount,
-                    description: task.description.slice(0, 80),
-                });
-
-                const resetTask = getWorkTask(this.db, task.id);
-                if (!resetTask) continue;
-
-                // Fire-and-forget so recovery doesn't block startup
-                this.executeTask(resetTask, agent, project).catch((err) => {
-                    log.error('Failed to recover interrupted work task', {
-                        taskId: task.id,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                });
-            } catch (err) {
-                log.error('Error during work task recovery', {
-                    taskId: task.id,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
+        return _recoverInterruptedTasks(this._recoveryCtx());
     }
 
     /**
@@ -367,39 +257,7 @@ export class WorkTaskService {
      * stale git-internal worktree references.
      */
     async pruneStaleWorktrees(): Promise<void> {
-        const stale = getTerminalTasksWithWorktrees(this.db);
-        if (stale.length > 0) {
-            log.info('Pruning stale worktrees from terminal tasks', { count: stale.length });
-        }
-
-        const projectDirs = new Set<string>();
-
-        for (const task of stale) {
-            try {
-                const project = getProject(this.db, task.projectId);
-                if (project?.workingDir) {
-                    projectDirs.add(project.workingDir);
-                    await removeWorktree(project.workingDir, task.worktreeDir!);
-                }
-                clearWorktreeDir(this.db, task.id);
-            } catch (err) {
-                log.warn('Failed to prune stale worktree', {
-                    taskId: task.id,
-                    worktreeDir: task.worktreeDir,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
-
-        // Run git worktree prune on each affected project to clean up
-        // git-internal references for directories already deleted on disk.
-        for (const dir of projectDirs) {
-            await pruneWorktrees(dir);
-        }
-
-        if (stale.length > 0) {
-            log.info('Stale worktree pruning complete', { cleaned: stale.length });
-        }
+        return _pruneStaleWorktrees(this.db);
     }
 
     /** Start the periodic stale worktree cleanup timer (every 6 hours). */
@@ -435,44 +293,10 @@ export class WorkTaskService {
     async drainRunningTasks(pollIntervalMs: number = DRAIN_POLL_INTERVAL_MS): Promise<void> {
         this._shuttingDown = true;
         this.stopPeriodicCleanup();
-
-        const activeTasks = getActiveWorkTasks(this.db);
-        if (activeTasks.length === 0) {
-            log.info('No active work tasks to drain');
-            return;
-        }
-
-        log.info('Draining active work tasks', { count: activeTasks.length });
-        const deadline = Date.now() + DRAIN_TIMEOUT_MS;
-
-        while (Date.now() < deadline) {
-            const remaining = getActiveWorkTasks(this.db);
-            if (remaining.length === 0) {
-                log.info('All work tasks drained successfully');
-                return;
-            }
-
-            log.info('Waiting for work tasks to complete', {
-                remaining: remaining.length,
-                timeLeftMs: deadline - Date.now(),
-            });
-
-            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        }
-
-        // Timeout reached — mark remaining active tasks as failed and clean up worktrees
-        const timedOut = getActiveWorkTasks(this.db);
-        if (timedOut.length > 0) {
-            log.warn('Drain timeout reached, marking remaining tasks as failed', { count: timedOut.length });
-            for (const task of timedOut) {
-                updateWorkTaskStatus(this.db, task.id, 'failed', {
-                    error: 'Interrupted by server shutdown (drain timeout)',
-                });
-                if (task.worktreeDir) {
-                    await this.cleanupWorktree(task.id);
-                }
-            }
-        }
+        return _drainRunningTasks(
+            { db: this.db, cleanupWorktree: (id) => this.cleanupWorktree(id) },
+            pollIntervalMs,
+        );
     }
 
     async create(input: CreateWorkTaskInput, tenantId?: string): Promise<WorkTask> {
@@ -821,61 +645,26 @@ export class WorkTaskService {
 
     /** Store buddy config for a task if provided in the input. */
     private storeBuddyConfig(taskId: string, input: CreateWorkTaskInput): void {
-        if (input.buddyConfig?.buddyAgentId) {
-            this._buddyConfigMap.set(taskId, {
-                buddyAgentId: input.buddyConfig.buddyAgentId,
-                maxRounds: input.buddyConfig.maxRounds,
-            });
+        const config = extractBuddyConfig(input);
+        if (!config) return;
 
-            // Register a completion callback that triggers buddy review
-            this.onComplete(taskId, (completedTask) => {
-                this.triggerBuddyReview(completedTask).catch((err) => {
+        this._buddyConfigMap.set(taskId, config);
+
+        // Register a completion callback that triggers buddy review
+        this.onComplete(taskId, (completedTask) => {
+            const buddyConfig = this._buddyConfigMap.get(taskId);
+            if (!buddyConfig || !this._buddyService) return;
+
+            triggerBuddyReview(completedTask, buddyConfig, this._buddyService)
+                .then(() => { this._buddyConfigMap.delete(taskId); })
+                .catch((err) => {
                     log.warn('Failed to trigger buddy review', {
                         taskId: completedTask.id,
                         error: err instanceof Error ? err.message : String(err),
                     });
+                    this._buddyConfigMap.delete(taskId);
                 });
-            });
-        }
-    }
-
-    /** Trigger buddy review after a work task completes. */
-    private async triggerBuddyReview(task: WorkTask): Promise<void> {
-        const buddyConfig = this._buddyConfigMap.get(task.id);
-        if (!buddyConfig || !this._buddyService) return;
-
-        // Only review successful completions
-        if (task.status !== 'completed') {
-            this._buddyConfigMap.delete(task.id);
-            return;
-        }
-
-        log.info('Triggering buddy review', {
-            taskId: task.id,
-            buddyAgentId: buddyConfig.buddyAgentId,
         });
-
-        const reviewPrompt = [
-            `Review this completed work task:`,
-            ``,
-            `**Task:** ${task.description}`,
-            task.branchName ? `**Branch:** ${task.branchName}` : '',
-            task.prUrl ? `**PR:** ${task.prUrl}` : '',
-            task.summary ? `\n**Summary:**\n${task.summary.slice(0, 4000)}` : '',
-            ``,
-            `Please review the work and provide feedback. If the PR URL is available, review the changes.`,
-        ].filter(Boolean).join('\n');
-
-        await this._buddyService.startSession({
-            leadAgentId: task.agentId,
-            buddyAgentId: buddyConfig.buddyAgentId,
-            prompt: reviewPrompt,
-            source: (task.source as 'web' | 'discord' | 'algochat' | 'cli' | 'agent') || 'web',
-            workTaskId: task.id,
-            maxRounds: buddyConfig.maxRounds,
-        });
-
-        this._buddyConfigMap.delete(task.id);
     }
 
     /**
@@ -946,7 +735,7 @@ export class WorkTaskService {
         // which inspects the actual git diff. Blocking here on description text produces
         // false positives (e.g. a task that says "reads from schema.ts" gets killed even
         // though it never modifies the file). See: https://github.com/CorvidLabs/corvid-agent/issues/1766
-        const governanceImpact = this.assessGovernanceImpact(task.description);
+        const governanceImpact = assessGovernanceImpact(task.description);
         if (governanceImpact && governanceImpact.tier < 2) {
             log.warn('Work task description references protected paths (advisory — actual enforcement is on git diff)', {
                 taskId: task.id,
@@ -959,7 +748,7 @@ export class WorkTaskService {
         }
 
         // Build work prompt (includes governance warnings for Layer 1 paths)
-        const prompt = this.buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined, governanceImpact);
+        const prompt = buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined, governanceImpact);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
@@ -1363,67 +1152,4 @@ export class WorkTaskService {
     private async cleanupWorktree(taskId: string): Promise<void> {
         return _cleanupWorktree(this.db, taskId);
     }
-
-    /**
-     * Extract file paths referenced in a task description.
-     * Matches patterns like `server/foo/bar.ts`, `src/component.tsx`, etc.
-     */
-    private extractReferencedPaths(description: string): string[] {
-        const pathPattern = /(?:^|\s|`|"|'|\()((?:server|src|shared|cli|specs|scripts)\/[\w./-]+\.(?:ts|tsx|js|json|md|sql)|(?:CLAUDE\.md|package\.json|tsconfig\.json|\.env\b[\w.]*))/g;
-        const paths = new Set<string>();
-        let match: RegExpExecArray | null;
-        while ((match = pathPattern.exec(description)) !== null) {
-            paths.add(match[1]);
-        }
-        return [...paths];
-    }
-
-    /**
-     * Assess governance impact of a work task based on file paths in its description.
-     */
-    private assessGovernanceImpact(description: string): GovernanceImpact | null {
-        const referencedPaths = this.extractReferencedPaths(description);
-        if (referencedPaths.length === 0) return null;
-        return assessImpact(referencedPaths);
-    }
-
-    private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string, governanceImpact?: GovernanceImpact | null): string {
-        const repoMapSection = repoMap
-            ? `\n## Repository Map\nTop-level exported symbols per file (with line ranges):\n\`\`\`\n${repoMap}\`\`\`\n`
-            : '';
-
-        const relevantSymbolsSection = relevantSymbols
-            ? `\n## Relevant Symbols\nSymbols matching keywords from the task description — likely starting points:\n\`\`\`\n${relevantSymbols}\n\`\`\`\nUse \`corvid_code_symbols\` and \`corvid_find_references\` tools for deeper exploration of these symbols.\n`
-            : '';
-
-        // Build governance warning section if there are restricted paths
-        let governanceSection = '';
-        if (governanceImpact && governanceImpact.tier < 2) {
-            const restrictedPaths = governanceImpact.affectedPaths
-                .filter((p) => p.tier < 2)
-                .map((p) => `- \`${p.path}\` — Layer ${p.tier} (${GOVERNANCE_TIERS[p.tier].label})`)
-                .join('\n');
-            governanceSection = `\n## Governance Restrictions\nThe following files are protected by governance tiers and MUST NOT be modified by automated workflows:\n${restrictedPaths}\nLayer 0 (Constitutional) files require human-only commits. Layer 1 (Structural) files require supermajority council vote + human approval.\nIf your task requires changes to these files, document the needed changes in the PR description but do NOT modify them directly.\n`;
-        }
-
-        return `You are working on a task. A git branch "${branchName}" has been created and checked out.
-
-## Task
-${description}
-${repoMapSection}${relevantSymbolsSection}${governanceSection}
-## Instructions
-1. Explore the codebase as needed to understand the context.
-2. Implement the changes on this branch.
-3. Commit with clear, descriptive messages as you go.
-4. Verify your changes work:
-   bun x tsc --noEmit --skipLibCheck
-   bun test
-   Fix any issues before creating the PR.
-5. When done, create a PR:
-   gh pr create --title "<concise title>" --body "<summary of changes>"
-6. Output the PR URL as the final line of your response.
-
-Important: You MUST create a PR when finished. The PR URL will be captured to report back to the requester.`;
-    }
-
 }
