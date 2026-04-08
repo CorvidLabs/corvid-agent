@@ -740,8 +740,49 @@ export class WorkTaskService {
                 const enriched = getWorkTask(this.db, queued.id) ?? queued;
                 return this.enrichTask(enriched);
             }
-            // Truly unexpected — no active task found but atomic insert still failed
-            throw new ConflictError('Another task is already active on project', { projectId });
+            // Race condition: blocker likely completed between checks. Retry once.
+            await Bun.sleep(100);
+            const retryTask = createWorkTaskAtomic(this.db, {
+                agentId: input.agentId,
+                projectId,
+                description: input.description,
+                source: input.source,
+                sourceId: input.sourceId,
+                requesterInfo: input.requesterInfo,
+                tenantId,
+            });
+            if (retryTask) {
+                this.setTaskPriority(retryTask, priority);
+                this.storeTierOverride(retryTask.id, input.modelTier);
+                this.storeBuddyConfig(retryTask.id, input);
+                log.info('Work task created on atomic retry', {
+                    taskId: retryTask.id, agentId: input.agentId, projectId, priority,
+                });
+                this.emitCreationNotifications(retryTask, input);
+                return this.executeTask(retryTask, agent, project);
+            }
+
+            // Atomic retry also failed — queue as fallback so task is not lost
+            const fallback = createWorkTask(this.db, {
+                agentId: input.agentId,
+                projectId,
+                description: input.description,
+                source: input.source,
+                sourceId: input.sourceId,
+                requesterInfo: input.requesterInfo,
+                priority,
+                tenantId,
+            });
+            updateWorkTaskStatus(this.db, fallback.id, 'queued');
+            this.setTaskPriority(fallback, priority);
+            this.storeTierOverride(fallback.id, input.modelTier);
+            this.storeBuddyConfig(fallback.id, input);
+            log.warn('Work task queued as fallback (atomic retry failed)', {
+                taskId: fallback.id, projectId, priority,
+            });
+            this.emitCreationNotifications(fallback, input);
+            const enrichedFallback = getWorkTask(this.db, fallback.id) ?? fallback;
+            return this.enrichTask(enrichedFallback);
         }
 
         // Track priority in memory
