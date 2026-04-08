@@ -1,7 +1,7 @@
 ---
 module: directory
 version: 1
-status: draft
+status: active
 files:
   - server/algochat/agent-directory.ts
   - server/algochat/agent-wallet.ts

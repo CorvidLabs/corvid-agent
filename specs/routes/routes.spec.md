@@ -1,7 +1,7 @@
 ---
 module: routes
 version: 1
-status: draft
+status: active
 files:
   - server/routes/index.ts
   - server/routes/projects.ts

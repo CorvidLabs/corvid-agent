@@ -1,7 +1,7 @@
 ---
 module: arc69-library
 version: 2
-status: draft
+status: active
 files:
   - server/memory/arc69-library.ts
   - server/memory/library-sync.ts
@@ -263,6 +263,7 @@ Content is **plaintext** — no encryption. For single-page entries, `book`, `pa
 | key | TEXT | NOT NULL, UNIQUE | Unique entry identifier |
 | author_id | TEXT | NOT NULL, FK→agents.id | Agent that created the entry |
 | author_name | TEXT | NOT NULL | Author display name |
+| title | TEXT | DEFAULT NULL | Optional human-readable display title |
 | category | TEXT | NOT NULL, DEFAULT 'reference' | Entry category |
 | tags | TEXT | NOT NULL, DEFAULT '[]' | JSON array of tags |
 | content | TEXT | NOT NULL | Entry content |

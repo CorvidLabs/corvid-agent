@@ -1,7 +1,7 @@
 ---
 module: algochat/conversation-access
 version: 1
-status: draft
+status: active
 files:
   - server/algochat/conversation-access.ts
   - server/db/conversation-access.ts

@@ -1,7 +1,7 @@
 ---
 module: on-chain
 version: 1
-status: draft
+status: active
 files:
   - server/algochat/on-chain-transactor.ts
   - server/algochat/psk.ts

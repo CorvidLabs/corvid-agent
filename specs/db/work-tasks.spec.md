@@ -1,7 +1,7 @@
 ---
 module: work-tasks-db
 version: 1
-status: draft
+status: active
 files:
   - server/db/work-tasks.ts
 db_tables:

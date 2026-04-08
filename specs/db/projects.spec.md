@@ -1,7 +1,7 @@
 ---
 module: projects-db
 version: 1
-status: draft
+status: active
 files:
   - server/db/projects.ts
 db_tables:

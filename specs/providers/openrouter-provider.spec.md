@@ -1,7 +1,7 @@
 ---
 module: openrouter-provider
 version: 1
-status: draft
+status: active
 files:
   - server/providers/openrouter/provider.ts
 db_tables: []

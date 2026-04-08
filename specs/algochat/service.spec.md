@@ -1,7 +1,7 @@
 ---
 module: algochat-service
 version: 1
-status: draft
+status: active
 files:
   - server/algochat/service.ts
   - server/algochat/subscription-manager.ts

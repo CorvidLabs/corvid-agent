@@ -1,7 +1,7 @@
 ---
 module: thread-session-map
 version: 1
-status: draft
+status: active
 files:
   - server/discord/thread-session-map.ts
   - server/db/discord-thread-sessions.ts
