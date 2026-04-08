@@ -48,6 +48,7 @@ import { makeMockProc, createMockProcessManager } from './work-task-test-helpers
 
 let db: Database;
 let service: WorkTaskService;
+let spawnSpy: ReturnType<typeof spyOn>;
 let mockProcessManager: ProcessManager;
 let spawnCalls: Array<{ cmd: string[]; cwd?: string }>;
 let spawnResults: Array<{ exitCode: number; stdout: string; stderr: string }>;
@@ -65,7 +66,7 @@ beforeEach(() => {
     spawnCalls = [];
     spawnResults = [];
 
-    spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
+    spawnSpy = spyOn(Bun, 'spawn').mockImplementation((...args: unknown[]) => {
         const cmd = args[0] as string[];
         const opts = args[1] as { cwd?: string } | undefined;
         spawnCalls.push({ cmd, cwd: opts?.cwd });
@@ -80,7 +81,7 @@ beforeEach(() => {
 
 afterEach(() => {
     db.close();
-    mock.restore();
+    spawnSpy.mockRestore();
 });
 
 // ─── Standard queuing: active task blocks new task ───

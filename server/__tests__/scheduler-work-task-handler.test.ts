@@ -1,22 +1,17 @@
 /**
  * Tests for the scheduler work-task handler retry logic.
  */
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
+import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test';
 import { execWorkTask } from '../scheduler/handlers/work-task';
 import { ConflictError } from '../lib/errors';
+import * as schedulesModule from '../db/schedules';
 import type { AgentSchedule, ScheduleAction } from '../../shared/types';
 import type { HandlerContext } from '../scheduler/handlers/types';
 
 // ─── Mocks ─────────────────────────────────────────────────────────
 
-// Mock updateExecutionStatus
-const mockUpdateStatus = mock((_db: any, _id: string, _status: string, _extras?: any) => {});
-mock.module('../db/schedules', () => ({
-    updateExecutionStatus: mockUpdateStatus,
-}));
-
-// Mock Bun.sleep to avoid real delays
-Bun.sleep = mock(() => Promise.resolve()) as any;
+let mockUpdateStatus: ReturnType<typeof spyOn>;
+const originalSleep = Bun.sleep;
 
 function makeSchedule(overrides?: Partial<AgentSchedule>): AgentSchedule {
     return {
@@ -61,7 +56,13 @@ function makeCtx(workTaskService: any = null): HandlerContext {
 // ─── Tests ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-    mockUpdateStatus.mockClear();
+    mockUpdateStatus = spyOn(schedulesModule, 'updateExecutionStatus').mockImplementation(() => {});
+    Bun.sleep = mock(() => Promise.resolve()) as any;
+});
+
+afterEach(() => {
+    mockUpdateStatus.mockRestore();
+    Bun.sleep = originalSleep;
 });
 
 describe('execWorkTask', () => {
