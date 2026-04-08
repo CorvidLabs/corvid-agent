@@ -1,27 +1,8 @@
-import { test, expect, describe, beforeEach, mock } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
-
-// Mock rest-client module so createRestClient returns our mock.
-// Spread real exports to avoid breaking other test files that share the Bun module cache.
-const realRestClient = await import('../discord/rest-client');
-
-const mockGetGuildRoles = mock(async (): Promise<unknown[]> => []);
-const mockGetGuildChannels = mock(async (): Promise<unknown[]> => []);
-const mockGetGuild = mock(async (): Promise<Record<string, unknown>> => ({}));
-
-mock.module('../discord/rest-client', () => ({
-    ...realRestClient,
-    createRestClient: () => ({
-        getGuildRoles: mockGetGuildRoles,
-        getGuildChannels: mockGetGuildChannels,
-        getGuild: mockGetGuild,
-    }),
-}));
-
-import type { GuildRole, GuildChannel } from '../discord/guild-api';
-
-const {
+import * as restClientModule from '../discord/rest-client';
+import {
     getRoleName,
     getChannelName,
     isAdminRole,
@@ -31,7 +12,17 @@ const {
     fetchGuildRoles,
     fetchGuildChannels,
     fetchGuildInfo,
-} = await import('../discord/guild-api');
+    type GuildRole,
+    type GuildChannel,
+} from '../discord/guild-api';
+
+// Use spyOn instead of mock.module to avoid polluting the global module cache,
+// which breaks _setRestClientForTesting in other test files (e.g. discord-bridge).
+const mockGetGuildRoles = mock(async (): Promise<unknown[]> => []);
+const mockGetGuildChannels = mock(async (): Promise<unknown[]> => []);
+const mockGetGuild = mock(async (): Promise<Record<string, unknown>> => ({}));
+
+let createRestClientSpy: ReturnType<typeof spyOn>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -269,6 +260,20 @@ describe('saveGuildCache / loadGuildCache', () => {
         const cache = loadGuildCache(db);
         expect(cache.roles).toEqual([]);
     });
+});
+
+// ─── Fetch tests (need createRestClient spy) ──────────────────────────────────
+
+beforeEach(() => {
+    createRestClientSpy = spyOn(restClientModule, 'createRestClient').mockReturnValue({
+        getGuildRoles: mockGetGuildRoles,
+        getGuildChannels: mockGetGuildChannels,
+        getGuild: mockGetGuild,
+    } as unknown as restClientModule.DiscordRestClient);
+});
+
+afterEach(() => {
+    createRestClientSpy.mockRestore();
 });
 
 // ─── fetchGuildRoles ────────────────────────────────────────────────────────

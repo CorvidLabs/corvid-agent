@@ -6,8 +6,12 @@
  */
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 
-// Mock embeds module — we only need buildActionRow and assertSnowflake.
+// Spread real exports to avoid breaking other test files that share the Bun module cache.
+const realEmbeds = await import('../discord/embeds');
+
+// Mock only buildActionRow and assertSnowflake; preserve all other embeds exports.
 mock.module('../discord/embeds', () => ({
+    ...realEmbeds,
     buildActionRow: mock((..._args: unknown[]) => ({ type: 1, components: [] })),
     assertSnowflake: (value: string, label: string) => {
         if (!/^\d{17,20}$/.test(value)) {

@@ -1,24 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import type { McpToolContext } from '../mcp/tool-handlers/types';
 import { mockDiscordRest } from './helpers/mock-discord-rest';
+import * as embedsModule from '../discord/embeds';
+import { handleDiscordSendMessage, handleDiscordSendImage } from '../mcp/tool-handlers/discord';
 
-// Create controllable mocks for embeds functions. This is necessary because
-// routes-discord-image.test.ts uses mock.module to replace sendMessageWithFiles,
-// which persists in Bun's module cache and would bypass _setRestClientForTesting.
-// By owning the mock here, we can control return values per-test.
+// Use spyOn instead of mock.module to avoid polluting the global module cache,
+// which breaks sendDiscordMessage in other test files (e.g. discord-bridge).
 const mockSendMessageWithFiles = mock((..._args: unknown[]) => Promise.resolve('mock-msg-1' as string | null));
 const mockSendDiscordMessage = mock((..._args: unknown[]) => Promise.resolve());
 
-const realEmbeds = await import('../discord/embeds');
-mock.module('../discord/embeds', () => ({
-    ...realEmbeds,
-    sendMessageWithFiles: mockSendMessageWithFiles,
-    sendDiscordMessage: mockSendDiscordMessage,
-}));
-
-const { handleDiscordSendMessage, handleDiscordSendImage } = await import('../mcp/tool-handlers/discord');
+let sendMessageWithFilesSpy: ReturnType<typeof spyOn>;
+let sendDiscordMessageSpy: ReturnType<typeof spyOn>;
 
 let db: Database;
 const ORIGINAL_ENV = process.env.DISCORD_BOT_TOKEN;
@@ -42,12 +36,21 @@ beforeEach(() => {
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     const { cleanup } = mockDiscordRest();
     restCleanup = cleanup;
+    // Spy on embeds functions to control behavior per-test without mock.module
+    sendMessageWithFilesSpy = spyOn(embedsModule, 'sendMessageWithFiles').mockImplementation(
+        mockSendMessageWithFiles as unknown as typeof embedsModule.sendMessageWithFiles,
+    );
+    sendDiscordMessageSpy = spyOn(embedsModule, 'sendDiscordMessage').mockImplementation(
+        mockSendDiscordMessage as unknown as typeof embedsModule.sendDiscordMessage,
+    );
     // Reset mocks to default success behavior
     mockSendMessageWithFiles.mockImplementation((..._args: unknown[]) => Promise.resolve('mock-msg-1'));
     mockSendDiscordMessage.mockImplementation((..._args: unknown[]) => Promise.resolve());
 });
 
 afterEach(() => {
+    sendDiscordMessageSpy.mockRestore();
+    sendMessageWithFilesSpy.mockRestore();
     db.close();
     restCleanup?.();
     restCleanup = null;
