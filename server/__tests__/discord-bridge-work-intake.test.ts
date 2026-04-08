@@ -17,12 +17,18 @@ import { createAgent } from '../db/agents';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { mockDiscordRest } from './helpers/mock-discord-rest';
 
+// Track subscribe callbacks so we can drain embed-response timers in afterEach.
+type SubscribeCallback = (sessionId: string, event: { type: string; [key: string]: unknown }) => void;
+const pendingSubscribers: Array<{ sessionId: string; callback: SubscribeCallback }> = [];
+
 function createMockProcessManager() {
     return {
         getActiveSessionIds: () => [] as string[],
         startProcess: mock(() => {}),
         sendMessage: mock(() => true),
-        subscribe: mock(() => {}),
+        subscribe: mock((sessionId: string, callback: SubscribeCallback) => {
+            pendingSubscribers.push({ sessionId, callback });
+        }),
         unsubscribe: mock(() => {}),
         subscribeAll: mock(() => {}),
         unsubscribeAll: mock(() => {}),
@@ -97,6 +103,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    for (const { sessionId, callback } of pendingSubscribers) {
+        try { callback(sessionId, { type: 'result', result: '' }); } catch {}
+    }
+    pendingSubscribers.length = 0;
     db.close();
 });
 
