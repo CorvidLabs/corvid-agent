@@ -10,7 +10,13 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { GuildMember, PermissionFlagsBits, SlashCommandBuilder, type BaseInteraction, type ChatInputCommandInteraction } from 'discord.js';
+import {
+  type BaseInteraction,
+  type ChatInputCommandInteraction,
+  GuildMember,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from 'discord.js';
 import type { BuddyService } from '../buddy/service';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
@@ -37,7 +43,6 @@ import { handleScheduleCommand } from './command-handlers/schedule-commands';
 // Command handler imports
 import { handleSessionCommand, handleWorkCommand } from './command-handlers/session-commands';
 import { handleVoiceCommand } from './command-handlers/voice-commands';
-import type { VoiceConnectionManager } from './voice/connection-manager';
 import { respondEphemeral, respondToInteraction } from './embeds';
 import type { GuildCache } from './guild-api';
 import type { MentionSessionInfo } from './message-handler';
@@ -46,6 +51,7 @@ import { getRestClient } from './rest-client';
 import type { ThreadCallbackInfo, ThreadSessionInfo } from './thread-manager';
 import type { DiscordBridgeConfig } from './types';
 import { PermissionLevel } from './types';
+import type { VoiceConnectionManager } from './voice/connection-manager';
 
 const log = createLogger('DiscordCommands');
 
@@ -297,6 +303,13 @@ function buildCommands(): ReturnType<SlashCommandBuilder['toJSON']>[] {
       .addSubcommand((sub) => sub.setName('status').setDescription('Show current voice connection status'))
       .addSubcommand((sub) => sub.setName('listen').setDescription('Start transcribing voice audio (STT)'))
       .addSubcommand((sub) => sub.setName('deafen').setDescription('Stop transcribing voice audio'))
+      .addSubcommand((sub) =>
+        sub
+          .setName('say')
+          .setDescription('Speak text via TTS in the voice channel')
+          .addStringOption((o) => o.setName('text').setDescription('Text to speak').setRequired(true)),
+      )
+      .addSubcommand((sub) => sub.setName('shutup').setDescription('Stop current TTS playback'))
       .toJSON(),
 
     // ─── /mute (admin-only) ───────────────────────────────────────────────────
@@ -609,24 +622,21 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
   [
     'session',
     {
-      handler: (ctx, interaction, permLevel, userId) =>
-        handleSessionCommand(ctx, interaction, permLevel, userId),
+      handler: (ctx, interaction, permLevel, userId) => handleSessionCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.STANDARD,
     },
   ],
   [
     'message',
     {
-      handler: (ctx, interaction, permLevel, userId) =>
-        handleMessageCommand(ctx, interaction, permLevel, userId),
+      handler: (ctx, interaction, permLevel, userId) => handleMessageCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.BASIC,
     },
   ],
   [
     'work',
     {
-      handler: (ctx, interaction, permLevel, userId) =>
-        handleWorkCommand(ctx, interaction, permLevel, userId),
+      handler: (ctx, interaction, permLevel, userId) => handleWorkCommand(ctx, interaction, permLevel, userId),
       minPermission: PermissionLevel.STANDARD,
     },
   ],

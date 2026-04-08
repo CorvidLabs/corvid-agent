@@ -38,7 +38,6 @@ spec: bridge.spec.md
 
 ## Out of Scope
 
-- Discord voice channel integration (voice is handled by the voice module via Telegram)
 - Direct message (DM) support with Discord users
 - Discord bot sharding for multiple guilds at scale
 - Custom Discord activity/presence status management

@@ -1,13 +1,16 @@
 /**
  * Discord voice connection manager.
  *
- * Handles joining/leaving voice channels using @discordjs/voice.
- * Phase 1: join/leave only (listen silently, no audio output).
+ * Handles joining/leaving voice channels, STT (Phase 2), and TTS playback (Phase 3).
  */
 
+import type { Database } from 'bun:sqlite';
 import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus } from '@discordjs/voice';
 import type { Client } from 'discord.js';
+import type { VoicePreset } from '../../../shared/types';
 import { createLogger } from '../../lib/logger';
+import { synthesizeWithCache } from '../../voice/tts';
+import { VoiceAudioPlayer } from './audio-player';
 import { AudioReceiver, type TranscriptionResult } from './audio-receiver';
 
 const log = createLogger('VoiceConnectionManager');
@@ -40,14 +43,33 @@ export class VoiceConnectionManager {
   /** Audio receivers per guild. */
   private receivers: Map<string, AudioReceiver> = new Map();
 
+  /** Audio players per guild (for TTS output). */
+  private players: Map<string, VoiceAudioPlayer> = new Map();
+
   /** Discord.js client reference (needed for adapter creation). */
   private client: Client | null = null;
+
+  /** Database reference (needed for TTS cache). */
+  private db: Database | null = null;
 
   /** Transcription event handler. */
   private transcriptionHandler: TranscriptionHandler | null = null;
 
+  /** Default voice preset for TTS. */
+  private defaultVoice: VoicePreset = 'onyx';
+
   setClient(client: Client): void {
     this.client = client;
+  }
+
+  /** Set database reference for TTS caching. */
+  setDb(db: Database): void {
+    this.db = db;
+  }
+
+  /** Set default TTS voice preset. */
+  setDefaultVoice(voice: VoicePreset): void {
+    this.defaultVoice = voice;
   }
 
   /** Register a handler for transcription results from all connections. */
@@ -197,12 +219,87 @@ export class VoiceConnectionManager {
   }
 
   /**
+   * Synthesize text and play it as audio in the voice channel.
+   *
+   * Temporarily unmutes the bot during playback, then re-mutes.
+   */
+  async speak(guildId: string, text: string, voice?: VoicePreset): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not available — call setDb() first');
+    }
+
+    const connection = getVoiceConnection(guildId);
+    if (!connection) {
+      throw new Error('Not connected to a voice channel');
+    }
+
+    const preset = voice ?? this.defaultVoice;
+    log.info('Synthesizing TTS for voice channel', { guildId, voice: preset, textLength: text.length });
+
+    // Synthesize (with cache)
+    const result = await synthesizeWithCache(this.db, text, preset);
+
+    // Get or create audio player for this guild
+    let player = this.players.get(guildId);
+    if (!player) {
+      player = new VoiceAudioPlayer(connection);
+      this.players.set(guildId, player);
+    }
+
+    // Unmute for playback
+    connection.rejoin({
+      ...connection.joinConfig,
+      selfMute: false,
+    });
+
+    try {
+      await player.play(result.audio, 'mp3');
+    } finally {
+      // Re-mute after playback
+      connection.rejoin({
+        ...connection.joinConfig,
+        selfMute: true,
+      });
+    }
+
+    log.info('TTS playback complete', { guildId, durationMs: result.durationMs });
+  }
+
+  /** Stop current TTS playback in a guild. */
+  stopSpeaking(guildId: string): boolean {
+    const player = this.players.get(guildId);
+    if (!player?.isPlaying) return false;
+
+    player.stop();
+
+    // Re-mute
+    const connection = getVoiceConnection(guildId);
+    if (connection) {
+      connection.rejoin({
+        ...connection.joinConfig,
+        selfMute: true,
+      });
+    }
+
+    log.info('Stopped TTS playback', { guildId });
+    return true;
+  }
+
+  /** Check if currently speaking (playing TTS) in a guild. */
+  isSpeaking(guildId: string): boolean {
+    return this.players.get(guildId)?.isPlaying ?? false;
+  }
+
+  /**
    * Leave the voice channel in a guild.
    *
    * @returns true if a connection was destroyed, false if not connected.
    */
   leave(guildId: string): boolean {
-    // Stop audio receiver first
+    // Stop audio player and receiver first
+    this.stopSpeaking(guildId);
+    this.players.get(guildId)?.destroy();
+    this.players.delete(guildId);
     this.stopListening(guildId);
 
     const connection = getVoiceConnection(guildId);

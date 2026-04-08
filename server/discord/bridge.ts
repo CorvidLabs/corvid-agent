@@ -17,6 +17,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { BaseInteraction } from 'discord.js';
 import { getDiscordConfig } from '../db/discord-config';
 import { pruneOldThreadSessions } from '../db/discord-thread-sessions';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
@@ -28,7 +29,6 @@ import type { WorkTaskService } from '../work/service';
 import type { InteractionContext } from './commands';
 // Extracted modules
 import { handleInteraction as handleInteractionImpl, registerSlashCommands } from './commands';
-import { initializeRestClient } from './rest-client';
 import {
   addReaction as addReactionImpl,
   removeReaction as removeReactionImpl,
@@ -41,13 +41,13 @@ import type { MessageHandlerContext } from './message-handler';
 import { handleMessage as handleMessageImpl, sendTaskResult as sendTaskResultImpl } from './message-handler';
 import { muteUser as muteUserImpl, unmuteUser as unmuteUserImpl } from './permissions';
 import { handleReaction as handleReactionImpl, type ReactionHandlerContext } from './reaction-handler';
+import { initializeRestClient } from './rest-client';
 import {
   archiveStaleThreads as archiveStaleThreadsImpl,
   createStandaloneThread as createStandaloneThreadImpl,
   subscribeForAdaptiveInlineResponse,
 } from './thread-manager';
 import { ThreadSessionManager } from './thread-session-manager';
-import type { BaseInteraction } from 'discord.js';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordReactionData } from './types';
 import { VoiceConnectionManager } from './voice/connection-manager';
 
@@ -141,10 +141,11 @@ export class DiscordBridge {
         if (botUserId) {
           this.botUserId = botUserId;
         }
-        // Wire up voice manager with the live discord.js Client
+        // Wire up voice manager with the live discord.js Client and DB
         const client = this.gateway.discordClient;
         if (client) {
           this.voiceManager.setClient(client);
+          this.voiceManager.setDb(this.db);
           this.voiceManager.onTranscription((result) => {
             const info = this.voiceManager.getConnection(result.guildId);
             const textChannelId = info?.transcriptionChannelId;
@@ -207,7 +208,11 @@ export class DiscordBridge {
           log.warn('Stale thread check failed', { error: err instanceof Error ? err.message : String(err) });
         });
         // Prune old thread session DB entries (>14 days)
-        try { pruneOldThreadSessions(this.db); } catch { /* non-critical */ }
+        try {
+          pruneOldThreadSessions(this.db);
+        } catch {
+          /* non-critical */
+        }
       },
       10 * 60 * 1000,
     );

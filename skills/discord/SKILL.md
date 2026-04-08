@@ -30,11 +30,24 @@ You CAN send images to Discord! Use the `POST /api/discord/send-image` endpoint:
 - Send reactions or rich embeds
 - Post to specific Discord channels by ID
 - Manage Discord server settings, roles, or permissions
-- Join voice channels
+
+## Voice Channels
+
+The bot supports Discord voice channels via `/voice` slash commands (admin-only):
+
+- `/voice join <channel>` — Join a voice channel (listen-only by default)
+- `/voice leave` — Disconnect from voice
+- `/voice status` — Show connection info, STT/TTS state
+- `/voice listen` — Start transcribing speech (STT via Whisper)
+- `/voice deafen` — Stop STT
+- `/voice say <text>` — Speak text via TTS (OpenAI) in the voice channel
+- `/voice shutup` — Stop current TTS playback
+
+Voice uses `@discordjs/voice` for protocol handling, with the existing `server/voice/` services for STT (Whisper) and TTS (OpenAI tts-1). See `specs/discord/voice.spec.md` for full details.
 
 ## Bridge Architecture
 
-The Discord bridge (`server/discord/bridge.ts`) uses a raw WebSocket gateway connection (no discord.js dependency):
+The Discord bridge (`server/discord/bridge.ts`) uses discord.js Client for gateway and REST:
 
 - Connects to Discord Gateway via WebSocket
 - Handles heartbeat, identify, reconnect lifecycle
