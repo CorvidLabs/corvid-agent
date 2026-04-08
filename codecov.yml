@@ -9,6 +9,10 @@ coverage:
         target: 80%
         threshold: 15%
 
+ignore:
+  - "server/discord/gateway.ts"       # Integration-heavy Discord gateway — requires live connection
+  - "server/discord/voice/**"          # Voice connection/audio — requires live Discord voice
+
 comment:
   layout: "reach,diff,flags,files"
   behavior: default
