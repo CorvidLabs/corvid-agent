@@ -28,9 +28,7 @@ files:
   - server/db/migrations/097_mention_session_conversation_only.ts
   - server/db/migrations/098_schedule_output_destinations.ts
   - server/db/migrations/099_composable_personas.ts
-  - server/db/migrations/100_agent_blocklist.ts
-  - server/db/migrations/100_agent_variants.ts
-  - server/db/migrations/100_pipeline_schedules.ts
+  - server/db/migrations/100_agent_blocklist_variants_pipelines.ts
   - server/db/migrations/101_reputation_history.ts
   - server/db/migrations/102_conversation_access.ts
   - server/db/migrations/103_discord_muted_users.ts
@@ -44,7 +42,8 @@ files:
   - server/db/migrations/112_discord_thread_sessions.ts
   - server/db/migrations/113_memory_decay.ts
   - server/db/migrations/114_proxy_trust_email.ts
-  - server/db/migrations/115_governance_voting_periods_and_vetoes.ts
+  - server/db/migrations/115_algochat_unique_participant.ts
+  - server/db/migrations/116_governance_voting_periods_and_vetoes.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -435,38 +434,16 @@ Migrates agent personas to a composable many-to-many model. Creates a standalone
 | `up` | `(db: Database)` | `void` | Creates `personas` and `agent_persona_assignments` tables, migrates data from `agent_personas`, drops old table |
 | `down` | `(db: Database)` | `void` | Recreates `agent_personas` from `personas` + `agent_persona_assignments`, drops new tables |
 
-### 100_agent_blocklist.ts
+### 100_agent_blocklist_variants_pipelines.ts
 
-Creates the `agent_blocklist` table for the agent kill switch. Tracks blacklisted agents to prevent them from sending or receiving messages.
-
-**Exported Functions:**
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Creates `agent_blocklist` table with `agent_id` as primary key, plus index on `reason` |
-| `down` | `(db: Database)` | `void` | Drops the `agent_blocklist` table |
-
-### 100_agent_variants.ts
-
-Creates `agent_variants` and `agent_variant_assignments` tables for preset skill + persona combination profiles. Depends on migration 099 (composable personas).
+Consolidated migration covering three features: agent blocklist (kill switch for malicious agents), agent variant profiles (preset skill + persona combinations), and pipeline execution support for agent schedules.
 
 **Exported Functions:**
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Creates `agent_variants` table (with unique name constraint) and `agent_variant_assignments` table (1:1 agent → variant), plus index on variant_id |
-| `down` | `(db: Database)` | `void` | Drops `agent_variant_assignments` and `agent_variants` tables |
-
-### 100_pipeline_schedules.ts
-
-Adds pipeline execution support to `agent_schedules` with `execution_mode` and `pipeline_steps` columns for composable multi-action pipelines.
-
-**Exported Functions:**
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Adds `execution_mode` (TEXT, default `'independent'`) and `pipeline_steps` (TEXT, nullable) columns to `agent_schedules` (idempotent — checks column existence first) |
-| `down` | `(db: Database)` | `void` | Drops `execution_mode` and `pipeline_steps` columns from `agent_schedules` |
+| `up` | `(db: Database)` | `void` | Creates `agent_blocklist` table with index on `reason`; creates `agent_variants` and `agent_variant_assignments` tables; adds `execution_mode` and `pipeline_steps` columns to `agent_schedules`. All operations are idempotent |
+| `down` | `(db: Database)` | `void` | Drops pipeline columns from `agent_schedules`, drops variant tables, drops `agent_blocklist` table |
 
 ### 101_reputation_history.ts
 
@@ -600,7 +577,18 @@ Adds `email` column to `tenant_members` table for proxy trust email verification
 | `up` | `(db: Database)` | `void` | Adds `email` TEXT column to `tenant_members` (idempotent — checks column existence first) and creates unique partial index `idx_tenant_members_email` |
 | `down` | `(db: Database)` | `void` | Drops the index and `email` column from `tenant_members` |
 
-### 115_governance_voting_periods_and_vetoes.ts
+### 115_algochat_unique_participant.ts
+
+Deduplicates `algochat_conversations` rows (keeps latest per `participant_addr`) and replaces the non-unique index with a unique one.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Deletes duplicate `algochat_conversations` rows, drops old index, creates `UNIQUE INDEX idx_algochat_participant` |
+| `down` | `(db: Database)` | `void` | Reverts to non-unique index |
+
+### 116_governance_voting_periods_and_vetoes.ts
 
 Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` for time-boxed voting. Creates the `proposal_vetoes` table for recording agent/user vetoes on proposals.
 
@@ -615,6 +603,7 @@ Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` 
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-04-08 | corvid-agent | Fix duplicate migration 115: renumber governance to 116, add algochat_unique_participant spec |
 | 2026-04-08 | corvid-agent | Add migration 115, proposal-expiry to spec coverage |
 | 2026-04-03 | corvid-agent | Add migrations 113, 114 to spec coverage |
 | 2026-03-30 | corvid-agent | Add migration 112 to spec coverage |
