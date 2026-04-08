@@ -17,6 +17,8 @@ export interface STTOptions {
     audio: Buffer;
     format?: 'ogg' | 'mp3' | 'wav' | 'webm';
     language?: string;
+    /** Optional prompt to guide Whisper transcription style and language detection. */
+    prompt?: string;
 }
 
 export interface STTResult {

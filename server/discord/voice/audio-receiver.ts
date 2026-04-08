@@ -162,7 +162,7 @@ export class AudioReceiver extends EventEmitter {
 
   private async transcribeAudio(userId: string, wav: Buffer, durationMs: number): Promise<void> {
     try {
-      const result = await transcribe({ audio: wav, format: 'wav' });
+      const result = await transcribe({ audio: wav, format: 'wav', prompt: 'This is a conversation in English.' });
 
       if (!result.text.trim()) {
         log.debug('Empty transcription', { userId });

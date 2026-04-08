@@ -161,7 +161,7 @@ export class TelegramBridge {
 
             try {
                 const audioBuffer = await this.downloadFile(message.voice.file_id);
-                const result = await transcribe({ audio: audioBuffer, format: 'ogg' });
+                const result = await transcribe({ audio: audioBuffer, format: 'ogg', prompt: 'This is a conversation in English.' });
                 text = result.text;
                 // Echo the transcription so user knows what was heard
                 await this.sendText(message.chat.id, `🎤 _${text}_`, message.message_id);
