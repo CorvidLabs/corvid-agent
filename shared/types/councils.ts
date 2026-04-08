@@ -169,6 +169,18 @@ export interface GovernanceProposal {
     updatedAt: string;
     decidedAt: string | null;
     enactedAt: string | null;
+    /** ISO timestamp when voting was opened (set when transitioning to 'voting'). */
+    votingOpenedAt: string | null;
+    /** ISO timestamp after which the proposal auto-transitions to decided/rejected. */
+    votingDeadline: string | null;
+}
+
+export interface ProposalVeto {
+    id: string;
+    proposalId: string;
+    vetoerId: string;
+    reason: string;
+    vetoedAt: string;
 }
 
 export interface CreateProposalInput {

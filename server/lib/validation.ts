@@ -320,6 +320,13 @@ export const UpdateProposalSchema = z.object({
 export const TransitionProposalSchema = z.object({
     status: z.enum(['draft', 'open', 'voting', 'decided', 'enacted']),
     decision: z.enum(['approved', 'rejected']).optional(),
+    /** Duration in hours for the voting period. Only applicable when transitioning to 'voting'. */
+    votingPeriodHours: z.number().positive().optional(),
+});
+
+export const VetoProposalSchema = z.object({
+    vetoerId: z.string().min(1, 'vetoerId is required'),
+    reason: z.string().optional(),
 });
 
 // ─── Work Tasks ────────────────────────────────────────────────────────────────

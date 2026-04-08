@@ -7,12 +7,13 @@ import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
+import { GovernanceDashboardComponent } from './governance-dashboard.component';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 @Component({
     selector: 'app-council-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective, GovernanceDashboardComponent],
     template: `
         @if (council(); as c) {
             <div class="page">
@@ -77,6 +78,10 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                             (click)="onLaunch()"
                         >{{ launching() ? 'Launching...' : 'Launch Council' }}</button>
                     </div>
+                </div>
+
+                <div class="detail__governance">
+                    <app-governance-dashboard [councilId]="c.id" />
                 </div>
 
                 <div class="detail__launches">
@@ -146,6 +151,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         }
         .launch-select:focus, .launch-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
         .launch-textarea { resize: vertical; min-height: 80px; }
+        .detail__governance { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
         .detail__launches { margin-top: 2rem; }
         .detail__launches h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .detail__empty { color: var(--text-secondary); font-size: 0.85rem; }

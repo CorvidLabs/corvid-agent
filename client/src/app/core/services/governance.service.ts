@@ -9,6 +9,8 @@ import type {
     GovernanceVoteStatusResponse,
     CastVoteResponse,
     GovernanceVoteOption,
+    ProposalVeto,
+    ProposalEvaluationResult,
 } from '../models/governance.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -56,14 +58,37 @@ export class GovernanceService extends EntityStore<GovernanceProposal> {
         id: string,
         status: GovernanceProposal['status'],
         decision?: 'approved' | 'rejected',
+        votingPeriodHours?: number,
     ): Promise<GovernanceProposal> {
         const body: Record<string, unknown> = { status };
         if (decision) body['decision'] = decision;
+        if (votingPeriodHours != null) body['votingPeriodHours'] = votingPeriodHours;
         const proposal = await firstValueFrom(
             this.api.post<GovernanceProposal>(`${this.apiPath}/${id}/transition`, body),
         );
         this.entities.update((list) => list.map((p) => (p.id === id ? proposal : p)));
         return proposal;
+    }
+
+    async evaluateProposal(id: string): Promise<ProposalEvaluationResult> {
+        return firstValueFrom(this.api.get<ProposalEvaluationResult>(`${this.apiPath}/${id}/evaluate`));
+    }
+
+    async vetoProposal(id: string, vetoerId: string, reason?: string): Promise<ProposalVeto> {
+        const body: Record<string, unknown> = { vetoerId };
+        if (reason) body['reason'] = reason;
+        const veto = await firstValueFrom(
+            this.api.post<ProposalVeto>(`${this.apiPath}/${id}/veto`, body),
+        );
+        // Optimistically update the proposal status to decided/rejected
+        this.entities.update((list) =>
+            list.map((p) => (p.id === id ? { ...p, status: 'decided' as const, decision: 'rejected' as const } : p)),
+        );
+        return veto;
+    }
+
+    async listVetoes(id: string): Promise<ProposalVeto[]> {
+        return firstValueFrom(this.api.get<ProposalVeto[]>(`${this.apiPath}/${id}/vetoes`));
     }
 
     // ─── Council Launch Vote Operations ──────────────────────────────────

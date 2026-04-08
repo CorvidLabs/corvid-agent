@@ -71,23 +71,35 @@ export const tables: string[] = [
     )`,
 
     `CREATE TABLE IF NOT EXISTS governance_proposals (
-        id               TEXT PRIMARY KEY,
-        council_id       TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
-        title            TEXT NOT NULL,
-        description      TEXT NOT NULL DEFAULT '',
-        author_id        TEXT NOT NULL,
-        status           TEXT NOT NULL DEFAULT 'draft',
-        decision         TEXT DEFAULT NULL,
-        governance_tier  INTEGER NOT NULL DEFAULT 2,
-        affected_paths   TEXT NOT NULL DEFAULT '[]',
-        quorum_threshold REAL DEFAULT NULL,
-        minimum_voters   INTEGER DEFAULT NULL,
-        launch_id        TEXT DEFAULT NULL,
-        tenant_id        TEXT NOT NULL DEFAULT 'default',
-        created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
-        decided_at       TEXT DEFAULT NULL,
-        enacted_at       TEXT DEFAULT NULL
+        id                TEXT PRIMARY KEY,
+        council_id        TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
+        title             TEXT NOT NULL,
+        description       TEXT NOT NULL DEFAULT '',
+        author_id         TEXT NOT NULL,
+        status            TEXT NOT NULL DEFAULT 'draft',
+        decision          TEXT DEFAULT NULL,
+        governance_tier   INTEGER NOT NULL DEFAULT 2,
+        affected_paths    TEXT NOT NULL DEFAULT '[]',
+        quorum_threshold  REAL DEFAULT NULL,
+        minimum_voters    INTEGER DEFAULT NULL,
+        launch_id         TEXT DEFAULT NULL,
+        tenant_id         TEXT NOT NULL DEFAULT 'default',
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        decided_at        TEXT DEFAULT NULL,
+        enacted_at        TEXT DEFAULT NULL,
+        voting_opened_at  TEXT DEFAULT NULL,
+        voting_deadline   TEXT DEFAULT NULL
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS proposal_vetoes (
+        id          TEXT PRIMARY KEY,
+        proposal_id TEXT NOT NULL REFERENCES governance_proposals(id) ON DELETE CASCADE,
+        vetoer_id   TEXT NOT NULL,
+        reason      TEXT NOT NULL DEFAULT '',
+        vetoed_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        tenant_id   TEXT NOT NULL DEFAULT 'default',
+        UNIQUE(proposal_id, vetoer_id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS governance_votes (
@@ -121,4 +133,6 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_proposal_vetoes_proposal ON proposal_vetoes(proposal_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_proposal_vetoes_tenant ON proposal_vetoes(tenant_id)`,
 ];

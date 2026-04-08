@@ -20,6 +20,26 @@ export interface GovernanceProposal {
     updatedAt: string;
     decidedAt: string | null;
     enactedAt: string | null;
+    votingOpenedAt: string | null;
+    votingDeadline: string | null;
+}
+
+export interface ProposalVeto {
+    id: string;
+    proposalId: string;
+    vetoerId: string;
+    reason: string;
+    vetoedAt: string;
+}
+
+export interface ProposalEvaluationResult {
+    proposalId: string;
+    status: ProposalStatus;
+    decision: ProposalDecision;
+    governanceTier: number;
+    totalMembers: number;
+    votes: WeightedVoteRecord[];
+    evaluation: WeightedGovernanceVoteCheck;
 }
 
 export interface CreateProposalInput {

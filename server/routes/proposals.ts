@@ -9,263 +9,297 @@
  *   DELETE /api/proposals/:id          — delete proposal (only in draft)
  *   POST   /api/proposals/:id/transition — advance proposal lifecycle
  *   GET    /api/proposals/:id/evaluate — evaluate current vote status
+ *   POST   /api/proposals/:id/veto    — veto a proposal (operator tier required)
+ *   GET    /api/proposals/:id/vetoes  — list vetoes for a proposal
  */
 
 import type { Database } from 'bun:sqlite';
 import type { ProposalStatus } from '../../shared/types';
+import { evaluateProposalVote, type GovernanceTier, type WeightedVoteRecord } from '../councils/governance';
+import { getCouncil, getGovernanceMemberVotes, getGovernanceVote } from '../db/councils';
+import {
+  createProposal,
+  createVeto,
+  deleteProposal,
+  getProposal,
+  listProposals,
+  listVetoes,
+  transitionProposal,
+  updateProposal,
+} from '../db/proposals';
+import { checkInjection } from '../lib/injection-guard';
+import { handleRouteError, json } from '../lib/response';
+import {
+  CreateProposalSchema,
+  parseBodyOrThrow,
+  TransitionProposalSchema,
+  UpdateProposalSchema,
+  ValidationError,
+  VetoProposalSchema,
+} from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
-import type { ReputationScorer } from '../reputation/scorer';
 import { tenantRoleGuard } from '../middleware/guards';
 import { PermissionTier, requirePermissionTier } from '../permissions/governance-tier';
-import {
-    parseBodyOrThrow,
-    ValidationError,
-    CreateProposalSchema,
-    UpdateProposalSchema,
-    TransitionProposalSchema,
-} from '../lib/validation';
-import { checkInjection } from '../lib/injection-guard';
-import { json, handleRouteError } from '../lib/response';
-import {
-    createProposal,
-    getProposal,
-    listProposals,
-    updateProposal,
-    deleteProposal,
-    transitionProposal,
-} from '../db/proposals';
-import { getCouncil } from '../db/councils';
-import { getGovernanceVote } from '../db/councils';
-import { getGovernanceMemberVotes } from '../db/councils';
-import {
-    evaluateProposalVote,
-    type GovernanceTier,
-    type WeightedVoteRecord,
-} from '../councils/governance';
+import type { ReputationScorer } from '../reputation/scorer';
 
 export function handleProposalRoutes(
-    req: Request,
-    url: URL,
-    db: Database,
-    context?: RequestContext,
-    reputationScorer?: ReputationScorer | null,
+  req: Request,
+  url: URL,
+  db: Database,
+  context?: RequestContext,
+  reputationScorer?: ReputationScorer | null,
 ): Response | Promise<Response> | null {
-    const path = url.pathname;
-    const method = req.method;
-    const tenantId = context?.tenantId ?? 'default';
+  const path = url.pathname;
+  const method = req.method;
+  const tenantId = context?.tenantId ?? 'default';
 
-    // Collection endpoints
-    if (path === '/api/proposals' && method === 'GET') {
-        if (context) {
-            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
-            if (denied) return denied;
-        }
-        const councilId = url.searchParams.get('councilId') ?? undefined;
-        const status = (url.searchParams.get('status') as ProposalStatus) ?? undefined;
-        return json(listProposals(db, { councilId, status }, tenantId));
+  // Collection endpoints
+  if (path === '/api/proposals' && method === 'GET') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+      if (denied) return denied;
     }
+    const councilId = url.searchParams.get('councilId') ?? undefined;
+    const status = (url.searchParams.get('status') as ProposalStatus) ?? undefined;
+    return json(listProposals(db, { councilId, status }, tenantId));
+  }
 
-    if (path === '/api/proposals' && method === 'POST') {
-        if (context) {
-            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
-            if (denied) return denied;
-            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (roleDenied) return roleDenied;
-        }
-        return handleCreate(req, db, tenantId);
+  if (path === '/api/proposals' && method === 'POST') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
+      if (denied) return denied;
+      const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (roleDenied) return roleDenied;
     }
+    return handleCreate(req, db, tenantId);
+  }
 
-    // Single proposal routes
-    const match = path.match(/^\/api\/proposals\/([^/]+)(\/(.+))?$/);
-    if (!match) return null;
+  // Single proposal routes
+  const match = path.match(/^\/api\/proposals\/([^/]+)(\/(.+))?$/);
+  if (!match) return null;
 
-    const id = match[1];
-    const action = match[3];
+  const id = match[1];
+  const action = match[3];
 
-    if (!action) {
-        if (method === 'GET') {
-            if (context) {
-                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
-                if (denied) return denied;
-            }
-            const proposal = getProposal(db, id, tenantId);
-            return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
-        }
-        if (method === 'PUT') {
-            if (context) {
-                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
-                if (denied) return denied;
-                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (roleDenied) return roleDenied;
-            }
-            return handleUpdate(req, db, id, tenantId);
-        }
-        if (method === 'DELETE') {
-            if (context) {
-                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
-                if (denied) return denied;
-                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (roleDenied) return roleDenied;
-            }
-            return handleDelete(db, id, tenantId);
-        }
+  if (!action) {
+    if (method === 'GET') {
+      if (context) {
+        const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+        if (denied) return denied;
+      }
+      const proposal = getProposal(db, id, tenantId);
+      return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
     }
-
-    if (action === 'transition' && method === 'POST') {
-        if (context) {
-            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
-            if (denied) return denied;
-            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (roleDenied) return roleDenied;
-        }
-        return handleTransition(req, db, id, tenantId);
+    if (method === 'PUT') {
+      if (context) {
+        const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
+        if (denied) return denied;
+        const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (roleDenied) return roleDenied;
+      }
+      return handleUpdate(req, db, id, tenantId);
     }
-
-    if (action === 'evaluate' && method === 'GET') {
-        if (context) {
-            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
-            if (denied) return denied;
-        }
-        return handleEvaluate(db, id, tenantId, reputationScorer);
+    if (method === 'DELETE') {
+      if (context) {
+        const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
+        if (denied) return denied;
+        const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (roleDenied) return roleDenied;
+      }
+      return handleDelete(db, id, tenantId);
     }
+  }
 
-    return null;
+  if (action === 'transition' && method === 'POST') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
+      if (denied) return denied;
+      const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (roleDenied) return roleDenied;
+    }
+    return handleTransition(req, db, id, tenantId);
+  }
+
+  if (action === 'evaluate' && method === 'GET') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+      if (denied) return denied;
+    }
+    return handleEvaluate(db, id, tenantId, reputationScorer);
+  }
+
+  if (action === 'veto' && method === 'POST') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
+      if (denied) return denied;
+      const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (roleDenied) return roleDenied;
+    }
+    return handleVeto(req, db, id, tenantId);
+  }
+
+  if (action === 'vetoes' && method === 'GET') {
+    if (context) {
+      const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+      if (denied) return denied;
+    }
+    return handleListVetoes(db, id);
+  }
+
+  return null;
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 async function handleCreate(req: Request, db: Database, tenantId: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, CreateProposalSchema);
-        const textToScan = [data.title, data.description].filter(Boolean).join(' ');
-        if (textToScan) {
-            const injectionDenied = checkInjection(db, textToScan, 'proposal_create', req);
-            if (injectionDenied) return injectionDenied;
-        }
-
-        // Verify the council exists
-        const council = getCouncil(db, data.councilId, tenantId);
-        if (!council) return json({ error: 'Council not found' }, 404);
-
-        const proposal = createProposal(db, data, tenantId);
-        return json(proposal, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        return handleRouteError(err);
+  try {
+    const data = await parseBodyOrThrow(req, CreateProposalSchema);
+    const textToScan = [data.title, data.description].filter(Boolean).join(' ');
+    if (textToScan) {
+      const injectionDenied = checkInjection(db, textToScan, 'proposal_create', req);
+      if (injectionDenied) return injectionDenied;
     }
+
+    // Verify the council exists
+    const council = getCouncil(db, data.councilId, tenantId);
+    if (!council) return json({ error: 'Council not found' }, 404);
+
+    const proposal = createProposal(db, data, tenantId);
+    return json(proposal, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    return handleRouteError(err);
+  }
 }
 
 async function handleUpdate(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, UpdateProposalSchema);
-        const textToScan = [data.title, data.description].filter(Boolean).join(' ');
-        if (textToScan) {
-            const injectionDenied = checkInjection(db, textToScan, 'proposal_update', req);
-            if (injectionDenied) return injectionDenied;
-        }
-
-        const existing = getProposal(db, id, tenantId);
-        if (!existing) return json({ error: 'Not found' }, 404);
-
-        // Can only update proposals in draft or open status
-        if (existing.status !== 'draft' && existing.status !== 'open') {
-            return json({ error: `Cannot update proposal in '${existing.status}' status` }, 400);
-        }
-
-        const proposal = updateProposal(db, id, data, tenantId);
-        return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        return handleRouteError(err);
+  try {
+    const data = await parseBodyOrThrow(req, UpdateProposalSchema);
+    const textToScan = [data.title, data.description].filter(Boolean).join(' ');
+    if (textToScan) {
+      const injectionDenied = checkInjection(db, textToScan, 'proposal_update', req);
+      if (injectionDenied) return injectionDenied;
     }
-}
 
-function handleDelete(db: Database, id: string, tenantId: string): Response {
     const existing = getProposal(db, id, tenantId);
     if (!existing) return json({ error: 'Not found' }, 404);
 
-    if (existing.status !== 'draft') {
-        return json({ error: 'Can only delete proposals in draft status' }, 400);
+    // Can only update proposals in draft or open status
+    if (existing.status !== 'draft' && existing.status !== 'open') {
+      return json({ error: `Cannot update proposal in '${existing.status}' status` }, 400);
     }
 
-    const deleted = deleteProposal(db, id, tenantId);
-    return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
+    const proposal = updateProposal(db, id, data, tenantId);
+    return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    return handleRouteError(err);
+  }
 }
 
-async function handleTransition(
-    req: Request,
-    db: Database,
-    id: string,
-    tenantId: string,
-): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, TransitionProposalSchema);
-        const proposal = transitionProposal(db, id, data.status, data.decision ?? null, tenantId);
-        return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        if (err instanceof Error && err.message.startsWith('Invalid transition')) {
-            return json({ error: err.message }, 400);
-        }
-        return handleRouteError(err);
+function handleDelete(db: Database, id: string, tenantId: string): Response {
+  const existing = getProposal(db, id, tenantId);
+  if (!existing) return json({ error: 'Not found' }, 404);
+
+  if (existing.status !== 'draft') {
+    return json({ error: 'Can only delete proposals in draft status' }, 400);
+  }
+
+  const deleted = deleteProposal(db, id, tenantId);
+  return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
+}
+
+async function handleTransition(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
+  try {
+    const data = await parseBodyOrThrow(req, TransitionProposalSchema);
+    const proposal = transitionProposal(db, id, data.status, data.decision ?? null, tenantId, data.votingPeriodHours);
+    return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    if (err instanceof Error && err.message.startsWith('Invalid transition')) {
+      return json({ error: err.message }, 400);
     }
+    return handleRouteError(err);
+  }
+}
+
+async function handleVeto(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
+  try {
+    const proposal = getProposal(db, id, tenantId);
+    if (!proposal) return json({ error: 'Not found' }, 404);
+    if (proposal.status === 'decided' || proposal.status === 'enacted') {
+      return json({ error: `Cannot veto a proposal in '${proposal.status}' status` }, 400);
+    }
+
+    const data = await parseBodyOrThrow(req, VetoProposalSchema);
+    const veto = createVeto(db, id, data.vetoerId, data.reason ?? '', tenantId);
+    return json(veto, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    return handleRouteError(err);
+  }
+}
+
+function handleListVetoes(db: Database, id: string): Response {
+  const vetoes = listVetoes(db, id);
+  return json(vetoes);
 }
 
 function handleEvaluate(
-    db: Database,
-    id: string,
-    tenantId: string,
-    reputationScorer?: ReputationScorer | null,
+  db: Database,
+  id: string,
+  tenantId: string,
+  reputationScorer?: ReputationScorer | null,
 ): Response {
-    const proposal = getProposal(db, id, tenantId);
-    if (!proposal) return json({ error: 'Not found' }, 404);
+  const proposal = getProposal(db, id, tenantId);
+  if (!proposal) return json({ error: 'Not found' }, 404);
 
-    const council = getCouncil(db, proposal.councilId, tenantId);
-    if (!council) return json({ error: 'Council not found' }, 404);
+  const council = getCouncil(db, proposal.councilId, tenantId);
+  if (!council) return json({ error: 'Council not found' }, 404);
 
-    const totalMembers = council.agentIds.length;
+  const totalMembers = council.agentIds.length;
 
-    // If proposal has a linked launch with governance votes, use those
-    let weightedVotes: WeightedVoteRecord[] = [];
-    if (proposal.launchId) {
-        const governanceVote = getGovernanceVote(db, proposal.launchId);
-        if (governanceVote) {
-            const memberVotes = getGovernanceMemberVotes(db, governanceVote.id);
-            weightedVotes = memberVotes.map((mv) => {
-                let weight = 50;
-                if (reputationScorer) {
-                    const score = reputationScorer.getCachedScore(mv.agent_id);
-                    if (score) weight = score.overallScore;
-                }
-                return {
-                    agentId: mv.agent_id,
-                    vote: mv.vote as 'approve' | 'reject' | 'abstain',
-                    reason: mv.reason,
-                    votedAt: mv.created_at,
-                    weight,
-                };
-            });
+  // If proposal has a linked launch with governance votes, use those
+  let weightedVotes: WeightedVoteRecord[] = [];
+  if (proposal.launchId) {
+    const governanceVote = getGovernanceVote(db, proposal.launchId);
+    if (governanceVote) {
+      const memberVotes = getGovernanceMemberVotes(db, governanceVote.id);
+      weightedVotes = memberVotes.map((mv) => {
+        let weight = 50;
+        if (reputationScorer) {
+          const score = reputationScorer.getCachedScore(mv.agent_id);
+          if (score) weight = score.overallScore;
         }
+        return {
+          agentId: mv.agent_id,
+          vote: mv.vote as 'approve' | 'reject' | 'abstain',
+          reason: mv.reason,
+          votedAt: mv.created_at,
+          weight,
+        };
+      });
     }
+  }
 
-    const evaluation = evaluateProposalVote(
-        proposal.governanceTier as GovernanceTier,
-        totalMembers,
-        weightedVotes,
-        false, // humanApproved — checked separately
-        {
-            threshold: proposal.quorumThreshold ?? council.quorumThreshold,
-            minimumVoters: proposal.minimumVoters,
-        },
-    );
+  const evaluation = evaluateProposalVote(
+    proposal.governanceTier as GovernanceTier,
+    totalMembers,
+    weightedVotes,
+    false, // humanApproved — checked separately
+    {
+      threshold: proposal.quorumThreshold ?? council.quorumThreshold,
+      minimumVoters: proposal.minimumVoters,
+    },
+  );
 
-    return json({
-        proposalId: proposal.id,
-        status: proposal.status,
-        decision: proposal.decision,
-        governanceTier: proposal.governanceTier,
-        totalMembers,
-        votes: weightedVotes,
-        evaluation,
-    });
+  return json({
+    proposalId: proposal.id,
+    status: proposal.status,
+    decision: proposal.decision,
+    governanceTier: proposal.governanceTier,
+    totalMembers,
+    votes: weightedVotes,
+    evaluation,
+  });
 }
