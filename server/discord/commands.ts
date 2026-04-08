@@ -584,6 +584,8 @@ export interface InteractionContext {
   rateLimitMaxMessages: number;
   /** Voice connection manager (optional — only present when voice is enabled). */
   voiceManager?: VoiceConnectionManager | null;
+  /** Voice session router — manages STT→agent→TTS conversation loop. */
+  voiceSessionRouter?: import('./voice/voice-session').VoiceSessionRouter | null;
 }
 
 /**
@@ -684,7 +686,7 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
           await respondEphemeral(interaction, 'Voice is not available — Discord client not ready.');
           return;
         }
-        await handleVoiceCommand(ctx, interaction, ctx.voiceManager);
+        await handleVoiceCommand(ctx, interaction, ctx.voiceManager, ctx.voiceSessionRouter ?? undefined);
       },
       minPermission: PermissionLevel.ADMIN,
     },

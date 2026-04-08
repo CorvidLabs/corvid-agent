@@ -50,6 +50,7 @@ import {
 import { ThreadSessionManager } from './thread-session-manager';
 import type { DiscordBridgeConfig, DiscordMessageData, DiscordReactionData } from './types';
 import { VoiceConnectionManager } from './voice/connection-manager';
+import { VoiceSessionRouter } from './voice/voice-session';
 
 const log = createLogger('DiscordBridge');
 
@@ -89,6 +90,9 @@ export class DiscordBridge {
 
   /** Voice connection manager — handles join/leave of voice channels. */
   private voiceManager: VoiceConnectionManager = new VoiceConnectionManager();
+
+  /** Voice session router — manages the STT → agent → TTS conversation loop. */
+  private voiceSessionRouter: VoiceSessionRouter | null = null;
 
   /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
   private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -146,14 +150,30 @@ export class DiscordBridge {
         if (client) {
           this.voiceManager.setClient(client);
           this.voiceManager.setDb(this.db);
+
+          // Create voice session router for conversational loop
+          this.voiceSessionRouter = new VoiceSessionRouter(
+            this.db,
+            this.processManager,
+            this.voiceManager,
+            this.config,
+          );
+
           this.voiceManager.onTranscription((result) => {
+            // Post transcription to text channel for visibility
             const info = this.voiceManager.getConnection(result.guildId);
             const textChannelId = info?.transcriptionChannelId;
-            if (!textChannelId) return;
-            const durationSec = Math.round(result.durationMs / 1000);
-            const msg = `**Voice** (<@${result.userId}>, ${durationSec}s): ${result.text}`;
-            this.sendMessage(textChannelId, msg).catch((err) => {
-              log.error('Failed to send voice transcription', { error: String(err) });
+            if (textChannelId) {
+              const durationSec = Math.round(result.durationMs / 1000);
+              const msg = `**Voice** (<@${result.userId}>, ${durationSec}s): ${result.text}`;
+              this.sendMessage(textChannelId, msg).catch((err) => {
+                log.error('Failed to send voice transcription', { error: String(err) });
+              });
+            }
+
+            // Route through agent session for voice response
+            this.voiceSessionRouter?.handleTranscription(result).catch((err) => {
+              log.error('Voice session routing failed', { error: String(err) });
             });
           });
         }
@@ -242,6 +262,7 @@ export class DiscordBridge {
 
   stop(): void {
     this.running = false;
+    this.voiceSessionRouter?.cleanupAll();
     this.voiceManager.disconnectAll();
     this.gateway.stop();
     if (this.tsmCleanup) {
@@ -404,6 +425,7 @@ export class DiscordBridge {
       rateLimitWindowMs: this.RATE_LIMIT_WINDOW_MS,
       rateLimitMaxMessages: this.RATE_LIMIT_MAX_MESSAGES,
       voiceManager: this.voiceManager,
+      voiceSessionRouter: this.voiceSessionRouter,
     };
     await handleInteractionImpl(ctx, interaction);
   }
