@@ -25,8 +25,8 @@ const log = createLogger('VoiceConnectionManager');
 /** Timeout for voice connection to reach Ready state (ms). */
 const CONNECT_TIMEOUT_MS = 45_000;
 
-/** Whether to use DAVE (Discord Audio Visual Encryption). Disabled by default — enable with DISCORD_VOICE_DAVE=true. */
-const DAVE_ENCRYPTION = process.env.DISCORD_VOICE_DAVE === 'true';
+/** Whether to use DAVE (Discord Audio Visual Encryption). Enabled by default — Discord requires DAVE for voice connections since 2025. Disable with DISCORD_VOICE_DAVE=false. */
+const DAVE_ENCRYPTION = process.env.DISCORD_VOICE_DAVE !== 'false';
 
 /** Maximum number of signalling retry attempts before giving up. */
 const MAX_SIGNALLING_RETRIES = 2;
@@ -273,17 +273,35 @@ export class VoiceConnectionManager {
 
     // Log all state transitions for diagnostics
     connection.on('stateChange', (oldState, newState) => {
-      log.info('Voice connection state change', {
+      const extra: Record<string, unknown> = {
         guildId,
         channelId,
         from: oldState.status,
         to: newState.status,
-      });
+      };
+      // Capture close code when networking closes and connection falls back to signalling
+      if (
+        newState.status === VoiceConnectionStatus.Signalling &&
+        oldState.status === VoiceConnectionStatus.Connecting
+      ) {
+        extra.reason = 'Voice WebSocket closed — falling back to signalling (check debug messages for close code)';
+      }
+      // Capture networking state info when available
+      if ('networking' in newState && newState.networking) {
+        const ns = (newState.networking as { state?: { code?: number; ws?: unknown } }).state;
+        if (ns) extra.networkingState = ns.code;
+      }
+      log.info('Voice connection state change', extra);
     });
 
-    // Log debug messages from the voice internals
+    // Log debug messages at INFO level during connection (critical for diagnosing handshake failures)
     connection.on('debug', (message) => {
-      log.debug('Voice connection debug', { guildId, channelId, message });
+      log.info('Voice connection debug', { guildId, channelId, message });
+    });
+
+    // Catch errors on the connection
+    connection.on('error', (error) => {
+      log.error('Voice connection error', { guildId, channelId, error: error.message, stack: error.stack });
     });
 
     // Wait for the connection to become ready, with retry on signalling stall
