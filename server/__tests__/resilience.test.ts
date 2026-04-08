@@ -83,15 +83,17 @@ describe('withRetry', () => {
                 },
                 {
                     maxAttempts: 3,
-                    baseDelayMs: 100,
-                    maxDelayMs: 50,
+                    baseDelayMs: 10,
+                    maxDelayMs: 5,
                     multiplier: 10,
                     jitter: false,
                 },
             ),
         ).rejects.toThrow('fail');
         const elapsed = Date.now() - start;
-        expect(elapsed).toBeLessThan(200);
+        // Without the cap, delays would be 10ms + 100ms = 110ms.
+        // With the cap at 5ms, both delays are 5ms, so total < 50ms.
+        expect(elapsed).toBeLessThan(50);
         expect(calls).toBe(3);
     });
 
