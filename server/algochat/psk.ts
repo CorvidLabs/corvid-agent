@@ -102,8 +102,8 @@ export class PSKManager {
             // Override the PSK with the authoritative value from the caller
             this.contact.initialPSK = pskConfig.psk;
             const pskFp = Array.from(pskConfig.psk.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-            log.info(
-                `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`,
+            log.debug(
+                `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}...`,
                 {
                     network,
                     pskFp,
