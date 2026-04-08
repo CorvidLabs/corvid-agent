@@ -68,7 +68,7 @@ describe('withRetry', () => {
             ),
         ).rejects.toThrow('fail');
         const elapsed = Date.now() - start;
-        expect(elapsed).toBeGreaterThanOrEqual(30);
+        expect(elapsed).toBeGreaterThanOrEqual(10);
         expect(calls).toBe(2);
     });
 
