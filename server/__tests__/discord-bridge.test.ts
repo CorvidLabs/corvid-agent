@@ -37,6 +37,7 @@ function createMockProcessManager() {
 
 function createMockWorkTaskService() {
     const completionCallbacks = new Map<string, (task: WorkTask) => void>();
+    const statusChangeCallbacks = new Map<string, (task: WorkTask) => void>();
     return {
         create: mock(async (input: { description: string; agentId: string }) => ({
             id: 'task-123',
@@ -68,15 +69,20 @@ function createMockWorkTaskService() {
         onComplete: mock((taskId: string, callback: (task: WorkTask) => void) => {
             completionCallbacks.set(taskId, callback);
         }),
-        onStatusChange: mock((_taskId: string, _callback: (task: WorkTask) => void) => {
-            // no-op in tests — status change embeds are not tested here
+        onStatusChange: mock((taskId: string, callback: (task: WorkTask) => void) => {
+            statusChangeCallbacks.set(taskId, callback);
         }),
         _triggerComplete: (taskId: string, task: WorkTask) => {
             const cb = completionCallbacks.get(taskId);
             if (cb) cb(task);
         },
+        _triggerStatusChange: (taskId: string, task: WorkTask) => {
+            const cb = statusChangeCallbacks.get(taskId);
+            if (cb) cb(task);
+        },
     } as unknown as import('../work/service').WorkTaskService & {
         _triggerComplete: (taskId: string, task: WorkTask) => void;
+        _triggerStatusChange: (taskId: string, task: WorkTask) => void;
     };
 }
 
@@ -635,6 +641,199 @@ describe('DiscordBridge work_intake mode', () => {
             const prField = completionEmbed!.embeds[0].fields?.find(f => f.name === 'Pull Request');
             expect(prField).toBeDefined();
             expect(prField!.value).toBe('https://github.com/test/repo/pull/1');
+        } finally {
+            cleanup();
+        }
+    });
+
+    test('work_intake mode sends status change embeds', async () => {
+        const pm = createMockProcessManager();
+        const wts = createMockWorkTaskService();
+
+        createAgent(db, { name: 'TestAgent' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            mode: 'work_intake',
+        };
+        const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
+        setBotUserId(bridge, '999000000000000001');
+
+        const { fetchBodies, cleanup } = mockDiscordRest();
+
+        try {
+            // Create task via @mention
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000010',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: '<@999000000000000001> Status change test',
+                timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+            });
+
+            // onStatusChange should have been registered
+            expect(wts.onStatusChange).toHaveBeenCalledTimes(1);
+
+            // Simulate a 'branching' status change
+            fetchBodies.length = 0;
+            const triggerStatusChange = (wts as unknown as { _triggerStatusChange: (id: string, task: WorkTask) => void })._triggerStatusChange;
+            triggerStatusChange('task-123', {
+                id: 'task-123',
+                agentId: 'agent-1',
+                projectId: 'proj-1',
+                sessionId: 'sess-1',
+                source: 'discord',
+                sourceId: null,
+                requesterInfo: {},
+                description: 'Status change test',
+                branchName: null,
+                status: 'branching',
+                prUrl: null,
+                summary: null,
+                error: null,
+                originalBranch: 'main',
+                worktreeDir: null,
+                iterationCount: 1,
+                maxRetries: 0,
+                retryCount: 0,
+                retryBackoff: 'fixed' as const,
+                lastRetryAt: null,
+                priority: 2 as const,
+                preemptedBy: null,
+                queuedAt: null,
+                createdAt: new Date().toISOString(),
+                completedAt: null,
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const branchingEmbed = fetchBodies.find((b: unknown) => {
+                const body = b as { embeds?: Array<{ title: string }> };
+                return body.embeds?.[0]?.title === 'Task Update';
+            }) as { embeds: Array<{ title: string; description?: string; footer?: { text: string } }> } | undefined;
+            expect(branchingEmbed).toBeDefined();
+            expect(branchingEmbed!.embeds[0].description).toContain('Setting up workspace');
+            expect(branchingEmbed!.embeds[0].footer?.text).toBe('Status: branching');
+
+            // Simulate a 'running' status change with iteration > 1
+            fetchBodies.length = 0;
+            triggerStatusChange('task-123', {
+                id: 'task-123',
+                agentId: 'agent-1',
+                projectId: 'proj-1',
+                sessionId: 'sess-1',
+                source: 'discord',
+                sourceId: null,
+                requesterInfo: {},
+                description: 'Status change test',
+                branchName: 'agent/test/branch',
+                status: 'running',
+                prUrl: null,
+                summary: null,
+                error: null,
+                originalBranch: 'main',
+                worktreeDir: null,
+                iterationCount: 2,
+                maxRetries: 0,
+                retryCount: 0,
+                retryBackoff: 'fixed' as const,
+                lastRetryAt: null,
+                priority: 2 as const,
+                preemptedBy: null,
+                queuedAt: null,
+                createdAt: new Date().toISOString(),
+                completedAt: null,
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const runningEmbed = fetchBodies.find((b: unknown) => {
+                const body = b as { embeds?: Array<{ title: string }> };
+                return body.embeds?.[0]?.title === 'Task Update';
+            }) as { embeds: Array<{ title: string; description?: string }> } | undefined;
+            expect(runningEmbed).toBeDefined();
+            expect(runningEmbed!.embeds[0].description).toContain('iteration 2');
+
+            // Simulate a 'validating' status change
+            fetchBodies.length = 0;
+            triggerStatusChange('task-123', {
+                id: 'task-123',
+                agentId: 'agent-1',
+                projectId: 'proj-1',
+                sessionId: 'sess-1',
+                source: 'discord',
+                sourceId: null,
+                requesterInfo: {},
+                description: 'Status change test',
+                branchName: 'agent/test/branch',
+                status: 'validating',
+                prUrl: null,
+                summary: null,
+                error: null,
+                originalBranch: 'main',
+                worktreeDir: null,
+                iterationCount: 2,
+                maxRetries: 0,
+                retryCount: 0,
+                retryBackoff: 'fixed' as const,
+                lastRetryAt: null,
+                priority: 2 as const,
+                preemptedBy: null,
+                queuedAt: null,
+                createdAt: new Date().toISOString(),
+                completedAt: null,
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const validatingEmbed = fetchBodies.find((b: unknown) => {
+                const body = b as { embeds?: Array<{ title: string }> };
+                return body.embeds?.[0]?.title === 'Task Update';
+            }) as { embeds: Array<{ title: string; description?: string; footer?: { text: string } }> } | undefined;
+            expect(validatingEmbed).toBeDefined();
+            expect(validatingEmbed!.embeds[0].description).toContain('Validating');
+            expect(validatingEmbed!.embeds[0].footer?.text).toBe('Status: validating');
+
+            // Simulate a status with no matching message (e.g. 'completed') — should NOT send embed
+            fetchBodies.length = 0;
+            triggerStatusChange('task-123', {
+                id: 'task-123',
+                agentId: 'agent-1',
+                projectId: 'proj-1',
+                sessionId: 'sess-1',
+                source: 'discord',
+                sourceId: null,
+                requesterInfo: {},
+                description: 'Status change test',
+                branchName: 'agent/test/branch',
+                status: 'completed',
+                prUrl: null,
+                summary: null,
+                error: null,
+                originalBranch: 'main',
+                worktreeDir: null,
+                iterationCount: 2,
+                maxRetries: 0,
+                retryCount: 0,
+                retryBackoff: 'fixed' as const,
+                lastRetryAt: null,
+                priority: 2 as const,
+                preemptedBy: null,
+                queuedAt: null,
+                createdAt: new Date().toISOString(),
+                completedAt: new Date().toISOString(),
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const noEmbed = fetchBodies.find((b: unknown) => {
+                const body = b as { embeds?: Array<{ title: string }> };
+                return body.embeds?.[0]?.title === 'Task Update';
+            });
+            expect(noEmbed).toBeUndefined();
         } finally {
             cleanup();
         }
