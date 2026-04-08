@@ -194,6 +194,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `CreateProposalSchema` | Governance Proposals | Validates proposal creation: `councilId`, `title`, `authorId` (required), optional `description`, `governanceTier` (0-2), `affectedPaths`, `quorumThreshold`, `minimumVoters`. |
 | `UpdateProposalSchema` | Governance Proposals | Validates proposal update: optional `title`, `description`, `affectedPaths`, `quorumThreshold`, `minimumVoters`. |
 | `TransitionProposalSchema` | Governance Proposals | Validates proposal status transition: `status` (draft/open/voting/decided/enacted required), optional `decision` (approved/rejected). |
+| `VetoProposalSchema` | Governance Proposals | Validates proposal veto: `vetoerId` (required), optional `reason`. |
 | `StartTrialSchema` | Marketplace | Validates trial start: `tenantId` (required). |
 | `SubmitFeedbackSchema` | Reputation Feedback | Validates feedback submission: `agentId` (required), `sentiment` (positive/negative required), optional `sessionId`, `source`, `category`, `comment`, `submittedBy`. |
 

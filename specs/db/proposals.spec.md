@@ -31,6 +31,8 @@ Database CRUD and lifecycle management for governance proposals. Proposals follo
 | `transitionProposal` | `(db: Database, id: string, newStatus: ProposalStatus, decision?: ProposalDecision, tenantId?: string)` | `GovernanceProposal \| null` | Transitions a proposal to a new status. Throws if the transition is invalid. Sets `decided_at` when moving to `decided` and `enacted_at` when moving to `enacted` |
 | `linkProposalToLaunch` | `(db: Database, proposalId: string, launchId: string)` | `void` | Associates a proposal with a council launch ID |
 | `checkExpiredProposals` | `(db: Database)` | `number` | Transitions `voting` proposals past their `voting_deadline` to `decided/rejected`. Returns count of expired proposals |
+| `createVeto` | `(db: Database, proposalId: string, vetoerId: string, reason: string, tenantId?: string)` | `ProposalVeto` | Creates a veto record and immediately transitions the proposal to `decided/rejected` |
+| `listVetoes` | `(db: Database, proposalId: string)` | `ProposalVeto[]` | Lists all vetoes for a proposal, ordered by `vetoed_at ASC` |
 
 ### Exported Functions (proposal-expiry.ts)
 
