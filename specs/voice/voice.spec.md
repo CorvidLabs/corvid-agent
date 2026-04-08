@@ -112,6 +112,8 @@ Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI
 | Module | What is used |
 |--------|-------------|
 | `server/telegram/bridge.ts` | `transcribe` for voice note STT, `synthesizeWithCache` for voice responses |
+| `server/discord/voice/audio-receiver.ts` | `transcribe` for Discord voice STT |
+| `server/discord/voice/connection-manager.ts` | `synthesizeWithCache` for Discord voice TTS |
 
 ## Database Tables
 
