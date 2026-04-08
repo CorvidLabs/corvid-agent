@@ -99,6 +99,18 @@ export class DiscordGateway {
       this.handlers.onReady(botUserId, botUserId);
     });
 
+    // Log raw voice gateway events for diagnostics
+    this.client.on('raw', (packet: { t: string; d: Record<string, unknown> }) => {
+      if (packet.t === 'VOICE_STATE_UPDATE' || packet.t === 'VOICE_SERVER_UPDATE') {
+        log.info('Voice gateway event', {
+          type: packet.t,
+          guildId: packet.d?.guild_id,
+          channelId: packet.d?.channel_id,
+          hasEndpoint: packet.t === 'VOICE_SERVER_UPDATE' ? !!packet.d?.endpoint : undefined,
+        });
+      }
+    });
+
     this.client.on('messageCreate', (message: Message) => {
       if (!this._running) return;
       log.debug('MESSAGE_CREATE dispatch', {

@@ -16,7 +16,10 @@ import { AudioReceiver, type TranscriptionResult } from './audio-receiver';
 const log = createLogger('VoiceConnectionManager');
 
 /** Timeout for voice connection to reach Ready state (ms). */
-const CONNECT_TIMEOUT_MS = 30_000;
+const CONNECT_TIMEOUT_MS = 45_000;
+
+/** Whether to use DAVE (Discord Audio Visual Encryption). Disable if voice connections stall. */
+const DAVE_ENCRYPTION = process.env.DISCORD_VOICE_DAVE !== 'false';
 
 export interface VoiceChannelInfo {
   guildId: string;
@@ -166,21 +169,54 @@ export class VoiceConnectionManager {
       throw new Error(`Guild ${guildId} not found in cache`);
     }
 
+    log.info('Creating voice connection', {
+      guildId,
+      channelId,
+      daveEncryption: DAVE_ENCRYPTION,
+    });
+
     const connection = joinVoiceChannel({
       channelId,
       guildId,
       adapterCreator: guild.voiceAdapterCreator,
       selfDeaf: false, // We want to receive audio (for future STT)
       selfMute: true, // Muted — Phase 1 is listen-only
+      debug: true,
+      daveEncryption: DAVE_ENCRYPTION,
+    });
+
+    // Log all state transitions for diagnostics
+    connection.on('stateChange', (oldState, newState) => {
+      log.info('Voice connection state change', {
+        guildId,
+        channelId,
+        from: oldState.status,
+        to: newState.status,
+      });
+    });
+
+    // Log debug messages from the voice internals
+    connection.on('debug', (message) => {
+      log.debug('Voice connection debug', { guildId, channelId, message });
     });
 
     try {
       // Wait for the connection to become ready
       await entersState(connection, VoiceConnectionStatus.Ready, CONNECT_TIMEOUT_MS);
     } catch {
+      const currentStatus = connection.state.status;
+      log.error('Voice connection timed out', {
+        guildId,
+        channelId,
+        channelName,
+        stuckInState: currentStatus,
+        timeoutMs: CONNECT_TIMEOUT_MS,
+      });
       // Clean up on failure
       connection.destroy();
-      throw new Error(`Voice connection to ${channelId} timed out after ${CONNECT_TIMEOUT_MS}ms`);
+      throw new Error(
+        `Voice connection to ${channelId} timed out after ${CONNECT_TIMEOUT_MS}ms (stuck in state: ${currentStatus})`,
+      );
     }
 
     // Track connection lifecycle
