@@ -36,6 +36,8 @@ import { handleScheduleCommand } from './command-handlers/schedule-commands';
 
 // Command handler imports
 import { handleSessionCommand, handleWorkCommand } from './command-handlers/session-commands';
+import { handleVoiceCommand } from './command-handlers/voice-commands';
+import type { VoiceConnectionManager } from './voice/connection-manager';
 import { respondEphemeral, respondToInteraction } from './embeds';
 import type { GuildCache } from './guild-api';
 import type { MentionSessionInfo } from './message-handler';
@@ -278,6 +280,23 @@ function buildCommands(): ReturnType<SlashCommandBuilder['toJSON']>[] {
             { name: 'Code Tools', value: 'code' },
           ),
       )
+      .toJSON(),
+
+    // ─── /voice (admin-only) ──────────────────────────────────────────────────
+    new SlashCommandBuilder()
+      .setName('voice')
+      .setDescription('Manage voice channel presence')
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addSubcommand((sub) =>
+        sub
+          .setName('join')
+          .setDescription('Join a voice channel (listen only)')
+          .addChannelOption((o) => o.setName('channel').setDescription('Voice channel to join').setRequired(true)),
+      )
+      .addSubcommand((sub) => sub.setName('leave').setDescription('Leave the current voice channel'))
+      .addSubcommand((sub) => sub.setName('status').setDescription('Show current voice connection status'))
+      .addSubcommand((sub) => sub.setName('listen').setDescription('Start transcribing voice audio (STT)'))
+      .addSubcommand((sub) => sub.setName('deafen').setDescription('Stop transcribing voice audio'))
       .toJSON(),
 
     // ─── /mute (admin-only) ───────────────────────────────────────────────────
@@ -550,6 +569,8 @@ export interface InteractionContext {
   rateLimitWindowMs: number;
   /** Max messages allowed per window. */
   rateLimitMaxMessages: number;
+  /** Voice connection manager (optional — only present when voice is enabled). */
+  voiceManager?: VoiceConnectionManager | null;
 }
 
 /**
@@ -642,6 +663,19 @@ const COMMAND_HANDLERS = new Map<string, CommandEntry>([
     'unmute',
     {
       handler: (ctx, interaction, permLevel, userId) => handleUnmuteCommand(ctx, interaction, permLevel, userId),
+      minPermission: PermissionLevel.ADMIN,
+    },
+  ],
+  [
+    'voice',
+    {
+      handler: async (ctx, interaction) => {
+        if (!ctx.voiceManager) {
+          await respondEphemeral(interaction, 'Voice is not available — Discord client not ready.');
+          return;
+        }
+        await handleVoiceCommand(ctx, interaction, ctx.voiceManager);
+      },
       minPermission: PermissionLevel.ADMIN,
     },
   ],

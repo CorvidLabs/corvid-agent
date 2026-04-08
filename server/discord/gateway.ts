@@ -68,6 +68,11 @@ export class DiscordGateway {
     return this.config.botToken;
   }
 
+  /** Expose the underlying discord.js Client (needed by @discordjs/voice). */
+  get discordClient(): Client | null {
+    return this.client;
+  }
+
   /** Open the gateway connection. No-op if already running. */
   start(): void {
     if (this._running) return;
@@ -78,6 +83,7 @@ export class DiscordGateway {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildVoiceStates,
     ];
     if (this.config.publicMode) {
       intents.push(GatewayIntentBits.GuildMembers);
