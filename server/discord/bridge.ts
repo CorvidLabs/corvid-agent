@@ -157,6 +157,7 @@ export class DiscordBridge {
             this.processManager,
             this.voiceManager,
             this.config,
+            (channelId, content) => this.sendMessage(channelId, content),
           );
 
           this.voiceManager.onTranscription((result) => {

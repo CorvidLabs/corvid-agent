@@ -2,7 +2,7 @@
  * Discord voice command handlers.
  *
  * Handles `/voice join`, `/voice leave`, `/voice listen`, `/voice deafen`,
- * and `/voice status` subcommands.
+ * `/voice status`, and `/voice shutup` subcommands.
  */
 
 import { ChannelType, type ChatInputCommandInteraction } from 'discord.js';
@@ -34,9 +34,6 @@ export async function handleVoiceCommand(
       break;
     case 'deafen':
       await handleVoiceDeafen(interaction, voiceManager);
-      break;
-    case 'say':
-      await handleVoiceSay(interaction, voiceManager);
       break;
     case 'shutup':
       await handleVoiceShutup(interaction, voiceManager);
@@ -178,46 +175,6 @@ async function handleVoiceStatus(
   });
 
   await respondToInteraction(interaction, `**Voice connections:**\n${lines.join('\n')}`);
-}
-
-async function handleVoiceSay(
-  interaction: ChatInputCommandInteraction,
-  voiceManager: VoiceConnectionManager,
-): Promise<void> {
-  const guildId = interaction.guildId;
-  if (!guildId) {
-    await respondEphemeral(interaction, 'This command can only be used in a server.');
-    return;
-  }
-
-  if (!voiceManager.isConnected(guildId)) {
-    await respondEphemeral(interaction, 'Not connected to a voice channel. Use `/voice join` first.');
-    return;
-  }
-
-  const text = interaction.options.getString('text', true);
-  if (!text.trim()) {
-    await respondEphemeral(interaction, 'Please provide text to speak.');
-    return;
-  }
-
-  if (text.length > 4096) {
-    await respondEphemeral(interaction, 'Text too long (max 4096 characters).');
-    return;
-  }
-
-  // Defer since TTS synthesis + playback takes time
-  await interaction.deferReply();
-
-  try {
-    await voiceManager.speak(guildId, text);
-    const info = voiceManager.getConnection(guildId);
-    const truncated = text.length > 100 ? `${text.substring(0, 100)}…` : text;
-    await interaction.editReply(`Speaking in <#${info?.channelId}>: ${truncated}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await interaction.editReply(`TTS failed: ${msg}`);
-  }
 }
 
 async function handleVoiceShutup(

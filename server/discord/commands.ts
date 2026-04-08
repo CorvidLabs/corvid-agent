@@ -303,12 +303,6 @@ function buildCommands(): ReturnType<SlashCommandBuilder['toJSON']>[] {
       .addSubcommand((sub) => sub.setName('status').setDescription('Show current voice connection status'))
       .addSubcommand((sub) => sub.setName('listen').setDescription('Start transcribing voice audio (STT)'))
       .addSubcommand((sub) => sub.setName('deafen').setDescription('Stop transcribing voice audio'))
-      .addSubcommand((sub) =>
-        sub
-          .setName('say')
-          .setDescription('Speak text via TTS in the voice channel')
-          .addStringOption((o) => o.setName('text').setDescription('Text to speak').setRequired(true)),
-      )
       .addSubcommand((sub) => sub.setName('shutup').setDescription('Stop current TTS playback'))
       .toJSON(),
 

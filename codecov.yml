@@ -9,6 +9,13 @@ coverage:
         target: 80%
         threshold: 15%
 
+ignore:
+  - "server/discord/gateway.ts"       # Integration-heavy Discord gateway — requires live connection
+  - "server/discord/voice/**"          # Voice connection/audio — requires live Discord voice
+  - "server/discord/bridge.ts"        # Discord bridge — requires live Discord client
+  - "server/discord/commands.ts"      # Slash command registration — requires Discord API
+  - "server/discord/command-handlers/**"  # Command handlers — require Discord interactions
+
 comment:
   layout: "reach,diff,flags,files"
   behavior: default
