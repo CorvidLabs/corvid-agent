@@ -44,6 +44,7 @@ files:
   - server/db/migrations/112_discord_thread_sessions.ts
   - server/db/migrations/113_memory_decay.ts
   - server/db/migrations/114_proxy_trust_email.ts
+  - server/db/migrations/115_governance_voting_periods_and_vetoes.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -599,10 +600,22 @@ Adds `email` column to `tenant_members` table for proxy trust email verification
 | `up` | `(db: Database)` | `void` | Adds `email` TEXT column to `tenant_members` (idempotent — checks column existence first) and creates unique partial index `idx_tenant_members_email` |
 | `down` | `(db: Database)` | `void` | Drops the index and `email` column from `tenant_members` |
 
+### 115_governance_voting_periods_and_vetoes.ts
+
+Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` for time-boxed voting. Creates the `proposal_vetoes` table for recording agent/user vetoes on proposals.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` (idempotent), creates `proposal_vetoes` table with indexes on `proposal_id` and `tenant_id` |
+| `down` | `(db: Database)` | `void` | Drops `proposal_vetoes` table and indexes, removes `voting_deadline` and `voting_opened_at` columns from `governance_proposals` |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-04-08 | corvid-agent | Add migration 115, proposal-expiry to spec coverage |
 | 2026-04-03 | corvid-agent | Add migrations 113, 114 to spec coverage |
 | 2026-03-30 | corvid-agent | Add migration 112 to spec coverage |
 | 2026-03-29 | corvid-agent | Add migration 110 to spec coverage |
