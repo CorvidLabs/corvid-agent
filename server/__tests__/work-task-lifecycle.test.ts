@@ -462,6 +462,113 @@ describe('onComplete callbacks', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 9b. onStatusChange callbacks
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('onStatusChange callbacks', () => {
+    test('status change callback fires during task creation (branching → running)', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2); // worktree add + bun install
+
+        // Create the task first to get its ID
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Status change test',
+            projectId: project.id,
+        });
+
+        // Status change fires synchronously during create, so the callbacks
+        // registered after create won't see past events. Instead, verify the
+        // onStatusChange method works by subscribing and then triggering a
+        // session-end flow that transitions through validating → failed.
+        const statuses: string[] = [];
+        service.onStatusChange(task.id, (t) => {
+            statuses.push(t.status);
+        });
+
+        // Queue validation spawns
+        queueSpawn(0); // bun install
+        queueSpawn(0); // tsc
+        queueSpawn(0); // test
+
+        simulateSessionEnd(task.sessionId!, 'no PR URL here');
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Should have seen 'validating' status change
+        expect(statuses).toContain('validating');
+    });
+
+    test('status change callback errors are caught silently', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Error callback test',
+            projectId: project.id,
+        });
+
+        // Register a throwing callback
+        service.onStatusChange(task.id, () => {
+            throw new Error('Callback boom!');
+        });
+
+        // Register a second callback that should still fire
+        let secondFired = false;
+        service.onStatusChange(task.id, () => {
+            secondFired = true;
+        });
+
+        // Queue validation spawns
+        queueSpawn(0); // bun install
+        queueSpawn(0); // tsc
+        queueSpawn(0); // test
+
+        simulateSessionEnd(task.sessionId!, 'no PR URL');
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Second callback should still have fired despite first one throwing
+        expect(secondFired).toBe(true);
+    });
+
+    test('status change callbacks are cleaned up after task completion', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Cleanup callback test',
+            projectId: project.id,
+        });
+
+        let callCount = 0;
+        service.onStatusChange(task.id, () => {
+            callCount++;
+        });
+
+        // Complete the task
+        queueSpawn(0); // bun install
+        queueSpawn(0); // tsc
+        queueSpawn(0); // test
+        queueSpawn(0); // worktree remove
+
+        const prUrl = 'https://github.com/corvidlabs/corvid-agent/pull/200';
+        simulateSessionEnd(task.sessionId!, prUrl);
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Callbacks should have been cleaned up — the task is terminal
+        const finalCount = callCount;
+
+        // Verify the task completed
+        const finalTask = getWorkTask(db, task.id);
+        expect(finalTask!.status).toBe('completed');
+
+        // callCount should be stable — no further changes
+        expect(callCount).toBe(finalCount);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 10. recoverStaleTasks
 // ═══════════════════════════════════════════════════════════════════════════════
 

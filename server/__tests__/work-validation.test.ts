@@ -249,6 +249,94 @@ describe('runValidation', () => {
         expect(result.output).toContain('Security Scan Passed');
     }, 30_000);
 
+    test('allows package.json version bumps in governance scan (CVE fixes)', async () => {
+        // Use hand-formatted JSON so the diff shows only the version line changing
+        const pkgBefore = [
+            '{',
+            '  "name": "test-pkg-bump",',
+            '  "dependencies": {},',
+            '  "overrides": {',
+            '    "hono": ">=4.7.6"',
+            '  }',
+            '}',
+        ].join('\n') + '\n';
+
+        const pkgAfter = [
+            '{',
+            '  "name": "test-pkg-bump",',
+            '  "dependencies": {},',
+            '  "overrides": {',
+            '    "hono": ">=4.7.10"',
+            '  }',
+            '}',
+        ].join('\n') + '\n';
+
+        await writeFile(join(tempDir, 'package.json'), pkgBefore);
+
+        async function gitCmd(...args: string[]) {
+            const p = Bun.spawn(['git', ...args], { cwd: tempDir, stdout: 'pipe', stderr: 'pipe' });
+            await new Response(p.stdout).text();
+            await p.exited;
+        }
+
+        await gitCmd('init', '-b', 'main');
+        await gitCmd('config', 'user.email', 'test@test.com');
+        await gitCmd('config', 'user.name', 'Test');
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'init');
+
+        // Feature branch: bump version in package.json overrides
+        await gitCmd('checkout', '-b', 'feature');
+        await writeFile(join(tempDir, 'package.json'), pkgAfter);
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'bump hono override');
+
+        const result = await runValidation(tempDir);
+        // package.json version bump should NOT trigger governance violation
+        expect(result.output).not.toContain('Governance Tier Violation');
+    }, 30_000);
+
+    test('prefers origin/main over local main for diff baseline', async () => {
+        await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'test-origin', dependencies: {} }));
+        await writeFile(join(tempDir, 'tsconfig.json'), JSON.stringify({
+            compilerOptions: { strict: true, noEmit: true, skipLibCheck: true, module: 'esnext', moduleResolution: 'bundler' },
+        }));
+
+        async function gitCmd(...args: string[]) {
+            const p = Bun.spawn(['git', ...args], { cwd: tempDir, stdout: 'pipe', stderr: 'pipe' });
+            await new Response(p.stdout).text();
+            await p.exited;
+        }
+
+        await gitCmd('init', '-b', 'main');
+        await gitCmd('config', 'user.email', 'test@test.com');
+        await gitCmd('config', 'user.name', 'Test');
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'init');
+
+        // Create a bare remote to have origin/main
+        const { mkdtemp: mkdtempSync } = await import('node:fs/promises');
+        const bareDir = await mkdtempSync(join(tmpdir(), 'bare-'));
+        const bareInit = Bun.spawn(['git', 'init', '--bare'], { cwd: bareDir, stdout: 'pipe', stderr: 'pipe' });
+        await bareInit.exited;
+
+        await gitCmd('remote', 'add', 'origin', bareDir);
+        await gitCmd('push', 'origin', 'main');
+
+        // Create feature branch with a safe change
+        await gitCmd('checkout', '-b', 'feature');
+        await writeFile(join(tempDir, 'safe.ts'), 'export const x = 1;\n');
+        await gitCmd('add', '-A');
+        await gitCmd('commit', '-m', 'add file');
+
+        const result = await runValidation(tempDir);
+        // Should use origin/main and succeed
+        expect(result.output).toContain('Security Scan Passed');
+
+        // Cleanup bare dir
+        await rm(bareDir, { recursive: true, force: true });
+    }, 30_000);
+
     test('detects unapproved fetch calls in diff', async () => {
         await writeFile(join(tempDir, 'package.json'), JSON.stringify({ name: 'test-fetch', dependencies: {} }));
         await writeFile(join(tempDir, 'tsconfig.json'), JSON.stringify({

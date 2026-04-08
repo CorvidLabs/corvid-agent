@@ -40,8 +40,29 @@ export async function runBunInstall(cwd: string): Promise<void> {
 /**
  * Detect the default branch of a git repository (usually 'main' or 'master').
  * Falls back to 'main' if detection fails.
+ *
+ * Prefers `origin/<branch>` over the local branch ref — in long-lived worktrees
+ * the local `main` may lag behind the remote, causing the diff to include commits
+ * already merged to origin and producing spurious governance violations for files
+ * touched in those earlier merges.
  */
 async function detectDefaultBranch(cwd: string): Promise<string> {
+    // Try origin refs first for an accurate baseline
+    for (const ref of ['origin/main', 'origin/master']) {
+        try {
+            const proc = Bun.spawn(['git', 'rev-parse', '--verify', ref], {
+                cwd,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            await new Response(proc.stdout).text();
+            const exitCode = await proc.exited;
+            if (exitCode === 0) return ref;
+        } catch {
+            // continue
+        }
+    }
+    // Fall back to local refs when no origin remote is available
     try {
         const proc = Bun.spawn(['git', 'rev-parse', '--verify', 'main'], {
             cwd,
@@ -186,6 +207,18 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
                 //     (e.g. adding new security infrastructure modules to server/permissions/)
                 //   - Pure additions to existing Layer 0/1 files with no removed lines
                 //     (e.g. adding re-exports to a barrel index.ts)
+                //   - package.json changes where every deleted line is a version-constraint
+                //     string ("pkg": ">=x.y.z") — security CVE fixes that raise minimum
+                //     versions in the overrides section without adding or removing packages.
+
+                if (basename === 'package.json' && !isNewFile && hasDeletions) {
+                    const deletedLines = block.match(/^-(?!--).+/gm) ?? [];
+                    const allVersionBumps = deletedLines.every((line) =>
+                        /^-\s+"[^"]+"\s*:\s*"[><=^~\d][^"]*",?\s*$/.test(line)
+                    );
+                    if (allVersionBumps && deletedLines.length > 0) continue;
+                }
+
                 if (isProtectedByName || (!isNewFile && hasDeletions)) {
                     governanceBlockedPaths.push(filePath);
                 }
