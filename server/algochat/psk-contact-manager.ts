@@ -258,7 +258,11 @@ export class PSKContactManager {
                 this.wirePskManagerCallbacks(mgr, row.id);
             }
 
-            log.info(`PSK manager loaded for "${row.nickname}"`, { id: row.id, hasAddress: !!row.mobile_address });
+            log.debug(`PSK manager loaded for "${row.nickname}"`, { id: row.id, hasAddress: !!row.mobile_address });
+        }
+
+        if (rows.length > 0) {
+            log.info(`Loaded ${rows.length} PSK contact(s)`, { matched: this.pskAddressToId.size });
         }
     }
 

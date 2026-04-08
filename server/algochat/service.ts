@@ -246,7 +246,7 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
             const txid = await algorandService.publishKey(chatAccount);
             log.info(`Published encryption key`, { txid });
         } catch (err) {
-            log.warn('Failed to publish key (may already exist)', { error: err instanceof Error ? err.message : String(err) });
+            log.debug('Failed to publish key (may already exist)', { error: err instanceof Error ? err.message : String(err) });
         }
 
         // Create SyncManager
