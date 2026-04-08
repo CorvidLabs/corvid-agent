@@ -537,7 +537,7 @@ export class AgentWalletService {
             const txid = await this.service.algorandService.publishKey(chatAccount);
             log.info(`Published encryption key for ${agentName}`, { txid, address: chatAccount.address });
         } catch (err) {
-            log.warn(`Failed to publish key for ${agentName} (may already exist)`, {
+            log.debug(`Failed to publish key for ${agentName} (may already exist)`, {
                 error: err instanceof Error ? err.message : String(err),
             });
         }
