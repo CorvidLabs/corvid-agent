@@ -1,7 +1,7 @@
 ---
 module: thread-lifecycle
 version: 1
-status: draft
+status: active
 files:
   - server/discord/thread-lifecycle.ts
 db_tables: []

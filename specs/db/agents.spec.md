@@ -1,7 +1,7 @@
 ---
 module: agents-db
 version: 1
-status: draft
+status: active
 files:
   - server/db/agents.ts
 db_tables:

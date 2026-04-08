@@ -1,7 +1,7 @@
 ---
 module: github-polling
 version: 1
-status: draft
+status: active
 files:
   - server/polling/auto-merge.ts
   - server/polling/auto-update.ts

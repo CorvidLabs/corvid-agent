@@ -1,7 +1,7 @@
 ---
 module: anthropic-provider
 version: 1
-status: draft
+status: active
 files:
   - server/providers/anthropic/provider.ts
 db_tables: []

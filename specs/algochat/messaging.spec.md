@@ -1,7 +1,7 @@
 ---
 module: algochat-messaging
 version: 1
-status: draft
+status: active
 files:
   - server/algochat/agent-messenger.ts
   - server/algochat/group-sender.ts

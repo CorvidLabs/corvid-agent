@@ -1,7 +1,7 @@
 ---
 module: provider-system
 version: 1
-status: draft
+status: active
 files:
   - server/providers/base.ts
   - server/providers/registry.ts

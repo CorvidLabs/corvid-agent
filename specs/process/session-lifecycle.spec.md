@@ -1,7 +1,7 @@
 ---
 module: session-lifecycle
 version: 1
-status: draft
+status: active
 files:
   - server/process/session-lifecycle.ts
 db_tables:
@@ -58,12 +58,13 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | `getStats` | — | `{ activeSessions, totalSessions, sessionsByStatus, oldestSessionAge }` | Returns current session statistics from the database. |
 | `canCreateSession` | `projectId: string` | `boolean` | Returns whether a new session can be created for the given project (under the max limit). |
 | `cleanupSession` | `sessionId: string` | `Promise<boolean>` | Force-deletes a specific session and all related data (messages, escalations, algochat conversation references) in a transaction. |
+| `getAndClearRestartPendingSessions` | — | `string[]` | Returns session IDs marked `restart_pending = 1` (interrupted by server restart) and clears the flag. Called on startup to resume orphaned sessions. |
 
 ## Invariants
 
-1. Sessions in status `'running'` or `'paused'` are never cleaned up by automated expiration or limit enforcement.
+1. Sessions in `'running'` status are never cleaned up by automated expiration or limit enforcement. Sessions in `'paused'` status are protected from TTL expiration but are subject to per-project limit enforcement if older than 24 hours.
 2. Session TTL expiration only applies to sessions in terminal states (`'idle'`, `'completed'`, `'error'`, `'stopped'`).
-3. Per-project session limit enforcement deletes the oldest non-running sessions first, but only those older than 24 hours. Sessions younger than 24 hours are protected from limit-based cleanup to prevent a burst of new sessions from evicting recently-created sessions that users still expect to be resumable.
+3. Per-project session limit enforcement deletes the oldest non-`'running'` sessions first (including `'paused'`), but only those older than 24 hours. Sessions younger than 24 hours are protected from limit-based cleanup to prevent a burst of new sessions from evicting recently-created sessions that users still expect to be resumable.
 4. All session deletions cascade within a transaction: `algochat_conversations` FK nullified, `session_messages` deleted, `escalation_queue` entries deleted, then the session row itself.
 5. The cleanup timer is idempotent: calling `start()` when already running logs a warning and does not create a duplicate timer.
 6. Expired session cleanup is batched (up to 100 per cycle) to avoid blocking the event loop.

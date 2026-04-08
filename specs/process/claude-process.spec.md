@@ -1,7 +1,7 @@
 ---
 module: claude-process
 version: 1
-status: draft
+status: active
 files:
   - server/process/claude-process.ts
   - server/process/cursor-process.ts

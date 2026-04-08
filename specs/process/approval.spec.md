@@ -1,7 +1,7 @@
 ---
 module: approval
 version: 1
-status: draft
+status: active
 files:
   - server/process/approval-manager.ts
   - server/process/approval-types.ts

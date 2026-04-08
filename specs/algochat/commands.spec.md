@@ -1,7 +1,7 @@
 ---
 module: commands
 version: 2
-status: draft
+status: active
 files:
   - server/algochat/command-handler.ts
   - server/algochat/work-command-router.ts
@@ -57,7 +57,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 
 | Class | Description |
 |-------|-------------|
-| `CommandHandler` | Parses, authorizes, and dispatches slash commands from AlgoChat messages; handles `/help`, `/status`, `/stop`, `/agent`, `/queue`, `/approve`, `/deny`, `/mode`, `/credits`, `/history`, `/work`, `/council`, `/extend`, `/schedule` |
+| `CommandHandler` | Parses, authorizes, and dispatches slash commands from AlgoChat messages; handles `/help`, `/status`, `/stop`, `/agent`, `/queue`, `/approve`, `/deny`, `/mode`, `/credits`, `/history`, `/work`, `/council`, `/extend`, `/schedule`, `/message` |
 | `WorkCommandRouter` | Centralizes work task creation from both slash commands (`/work`) and agent-to-agent `[WORK]` messages; delegates to WorkTaskService |
 
 #### CommandHandler Methods
