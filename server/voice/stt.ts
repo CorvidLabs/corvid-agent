@@ -37,6 +37,9 @@ export async function transcribe(options: STTOptions): Promise<STTResult> {
     if (options.language) {
         formData.append('language', options.language);
     }
+    if (options.prompt) {
+        formData.append('prompt', options.prompt);
+    }
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
