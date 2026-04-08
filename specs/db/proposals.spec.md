@@ -4,8 +4,10 @@ version: 1
 status: draft
 files:
   - server/db/proposals.ts
+  - server/work/proposal-expiry.ts
 db_tables:
   - governance_proposals
+  - proposal_vetoes
 depends_on: []
 ---
 
@@ -28,6 +30,15 @@ Database CRUD and lifecycle management for governance proposals. Proposals follo
 | `deleteProposal` | `(db: Database, id: string, tenantId?: string)` | `boolean` | Deletes a proposal. Validates tenant ownership for non-default tenants. Returns `true` if deleted |
 | `transitionProposal` | `(db: Database, id: string, newStatus: ProposalStatus, decision?: ProposalDecision, tenantId?: string)` | `GovernanceProposal \| null` | Transitions a proposal to a new status. Throws if the transition is invalid. Sets `decided_at` when moving to `decided` and `enacted_at` when moving to `enacted` |
 | `linkProposalToLaunch` | `(db: Database, proposalId: string, launchId: string)` | `void` | Associates a proposal with a council launch ID |
+| `checkExpiredProposals` | `(db: Database)` | `number` | Transitions `voting` proposals past their `voting_deadline` to `decided/rejected`. Returns count of expired proposals |
+| `createVeto` | `(db: Database, proposalId: string, vetoerId: string, reason: string, tenantId?: string)` | `ProposalVeto` | Creates a veto record and immediately transitions the proposal to `decided/rejected` |
+| `listVetoes` | `(db: Database, proposalId: string)` | `ProposalVeto[]` | Lists all vetoes for a proposal, ordered by `vetoed_at ASC` |
+
+### Exported Functions (proposal-expiry.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `startProposalExpiryService` | `(db: Database)` | `() => void` | Starts a 60-second interval timer that calls `checkExpiredProposals`. Returns a cleanup function that stops the timer |
 
 ## Invariants
 
@@ -84,6 +95,7 @@ Database CRUD and lifecycle management for governance proposals. Proposals follo
 | Module | What is used |
 |--------|-------------|
 | `server/routes/proposals.ts` | All CRUD and lifecycle functions |
+| `server/work/proposal-expiry.ts` | `checkExpiredProposals` |
 
 ## Database Tables
 
@@ -108,6 +120,19 @@ Database CRUD and lifecycle management for governance proposals. Proposals follo
 | `updated_at` | TEXT | DEFAULT `datetime('now')` | Last update timestamp |
 | `decided_at` | TEXT | (nullable) | Timestamp when decided |
 | `enacted_at` | TEXT | (nullable) | Timestamp when enacted |
+| `voting_opened_at` | TEXT | DEFAULT NULL | Timestamp when voting opened |
+| `voting_deadline` | TEXT | DEFAULT NULL | Deadline for voting; proposals past this are auto-expired |
+
+### proposal_vetoes
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | PRIMARY KEY | UUID |
+| `proposal_id` | TEXT | NOT NULL, FK → governance_proposals(id) ON DELETE CASCADE | Parent proposal |
+| `vetoer_id` | TEXT | NOT NULL | Agent/user who vetoed |
+| `reason` | TEXT | NOT NULL, DEFAULT '' | Veto reason |
+| `vetoed_at` | TEXT | NOT NULL, DEFAULT datetime('now') | Veto timestamp |
+| `tenant_id` | TEXT | NOT NULL, DEFAULT 'default' | Tenant scope |
 
 ## Change Log
 
