@@ -2,6 +2,14 @@
 spec: plugins.spec.md
 ---
 
+## Product Requirements
+
+- Developers can extend the platform with custom tools by publishing npm packages, without needing to modify or fork the core codebase.
+- Each plugin is granted only the specific permissions it needs (such as reading the database or making network calls), keeping third-party code sandboxed and the platform secure.
+- Plugins can be installed, enabled, and disabled at runtime without restarting the server, so the platform evolves without downtime.
+- Plugin tool names are automatically namespaced to avoid conflicts with built-in tools or other plugins, keeping the agent's toolbox organized.
+- Misbehaving plugin tools are automatically timed out after 30 seconds so a broken plugin cannot hang the entire platform indefinitely.
+
 ## User Stories
 
 - As an agent developer, I want to extend corvid-agent with third-party plugins loaded from npm packages so that I can add custom tools without modifying the core codebase.

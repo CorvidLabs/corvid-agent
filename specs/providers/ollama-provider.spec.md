@@ -11,6 +11,7 @@ db_tables: []
 depends_on:
   - specs/providers/model-capabilities.spec.md
   - specs/providers/tool-prompt-templates.spec.md
+tracks: [1500]
 ---
 
 # Ollama Provider

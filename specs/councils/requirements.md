@@ -2,6 +2,14 @@
 spec: councils.spec.md
 ---
 
+## Product Requirements
+
+- Multiple agents can discuss a problem together in a structured council, deliberate across several rounds, and then vote on the best solution — similar to a committee reaching a decision.
+- Higher-reputation agents carry more weight in votes, so the most trusted contributors have proportionally greater influence on outcomes.
+- Critical system changes require unanimous agreement and human approval before they can proceed, preventing any single agent from making unauthorized changes.
+- If a council gets stuck or takes too long, operators can abort it and still receive a summary of what was discussed so far.
+- After a council finishes, operators can continue the conversation with the lead agent to ask follow-up questions about the decision.
+
 ## User Stories
 
 - As an agent operator, I want to launch multi-agent council deliberations so that complex decisions benefit from diverse agent perspectives

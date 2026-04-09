@@ -2,6 +2,14 @@
 spec: bridge.spec.md
 ---
 
+## Product Requirements
+
+- Users can chat with their agents directly in Telegram, managing sessions from any mobile device without installing extra software.
+- Voice notes sent in Telegram are automatically transcribed and forwarded to the agent, and agents can reply with spoken audio — making fully voice-driven interactions possible on mobile.
+- Unauthorized users are blocked from interacting with the bot, so only approved people can access agent functionality through Telegram.
+- Sessions persist across messages so users can have natural back-and-forth conversations without losing context between replies.
+- Simple slash commands (`/start`, `/status`, `/new`) give users clear control over their agent sessions without needing to remember complex syntax.
+
 ## User Stories
 
 - As an agent operator, I want to chat with agents via Telegram so that I can manage agent sessions from my mobile device

@@ -15,6 +15,7 @@ db_tables:
 depends_on:
   - specs/algochat/service.spec.md
   - specs/process/process-manager.spec.md
+tracks: [1458]
 ---
 
 # AlgoChat Messaging

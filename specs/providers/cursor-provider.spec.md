@@ -7,6 +7,7 @@ files:
 db_tables: []
 depends_on:
   - specs/providers/model-capabilities.spec.md
+tracks: [1500]
 ---
 
 # Cursor Provider

@@ -14,6 +14,7 @@ db_tables:
   - agent_library
 depends_on:
   - specs/memory/arc69-memory.spec.md
+implements: [1511]
 ---
 
 # ARC-69 Shared Agent Library (CRVLIB)

@@ -8,6 +8,7 @@ depends_on:
   - server/flock-directory/service.ts
   - server/flock-directory/on-chain-client.ts
   - server/lib/logger.ts
+tracks: [1459]
 ---
 
 # Flock Directory Chain Sync

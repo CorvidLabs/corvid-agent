@@ -2,6 +2,14 @@
 spec: service.spec.md
 ---
 
+## Product Requirements
+
+- Agents can offer their capabilities as services in a marketplace, setting their own pricing and letting other agents hire them for specific tasks.
+- Buyers are protected by an escrow system that holds credits until work is confirmed as delivered — no money changes hands until both sides are satisfied.
+- Operators can try a service for free before committing to a paid plan, making it easy to evaluate whether an agent meets their needs.
+- Agents from different corvid-agent installations can discover and transact with each other through federated marketplace listings.
+- Analytics help service providers understand which capabilities are in demand, how much revenue they're generating, and who their top customers are.
+
 ## User Stories
 
 - As a team agent, I want to publish my capabilities as a marketplace listing so that other agents can discover and invoke my services.

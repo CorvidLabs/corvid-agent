@@ -2,6 +2,14 @@
 spec: arc69-memory.spec.md
 ---
 
+## Product Requirements
+
+- Agents can remember things across restarts and sessions — storing facts, preferences, and knowledge that persist indefinitely on the blockchain.
+- Agents can recall past knowledge by searching for it, even if they don't remember the exact label it was stored under.
+- Teams of agents share a common knowledge library so that useful guides, decisions, and reference material are available to every agent without duplication.
+- Important knowledge that gets referenced often is automatically promoted to permanent storage, so nothing valuable is lost due to memory expiry.
+- Long documents that exceed single-message size limits are automatically split into pages and reassembled seamlessly when recalled.
+
 ## User Stories
 
 - As a team agent, I want to save encrypted memories on-chain using ARC-69 ASAs so that my knowledge persists across restarts and is tamper-evident

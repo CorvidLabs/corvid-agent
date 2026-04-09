@@ -17,6 +17,7 @@ db_tables:
   - marketplace_reviews
 depends_on:
   - specs/db/schema.spec.md
+tracks: [1458]
 ---
 
 # Reputation Scorer

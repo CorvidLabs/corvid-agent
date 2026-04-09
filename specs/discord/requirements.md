@@ -2,6 +2,14 @@
 spec: bridge.spec.md
 ---
 
+## Product Requirements
+
+- Users can chat with their agents directly in Discord, using familiar slash commands and threaded conversations without leaving the app they already use.
+- Agents post their responses as neatly formatted messages in Discord threads, making it easy to follow ongoing work in real time.
+- Administrators can configure each agent's skills and persona on the fly from Discord, without restarting anything.
+- A permission system (Owner, Admin, Member) ensures sensitive commands are only available to authorized Discord users.
+- Agent conversations are automatically organized into threads, keeping different tasks and topics neatly separated in Discord channels.
+
 ## User Stories
 
 - As an agent operator, I want to interact with agents via Discord threads so that I can manage agent sessions from a familiar chat interface

@@ -8,6 +8,7 @@ files:
 db_tables:
   - agent_memories
 depends_on: []
+tracks: [1458, 1511]
 ---
 
 # ARC-69 Long-Term Memory
