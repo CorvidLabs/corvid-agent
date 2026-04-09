@@ -11,13 +11,14 @@
  * @module
  */
 import type { Database } from 'bun:sqlite';
-import type { AlgoChatConfig } from './config';
 import type { ConversationAccessResult, ConversationMode, DenyReason } from '../../shared/types';
+import type { AlgoChatConfig } from './config';
 
 // Re-export types for spec coverage
 export type { ConversationAccessResult, ConversationMode, DenyReason };
+
 import { getAgent } from '../db/agents';
-import { isOnAgentBlocklist, isOnAgentAllowlist, getConversationRateLimit } from '../db/conversation-access';
+import { getConversationRateLimit, isOnAgentAllowlist, isOnAgentBlocklist } from '../db/conversation-access';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ConversationAccess');
@@ -27,69 +28,69 @@ const log = createLogger('ConversationAccess');
  * to the given agent.
  */
 export function checkConversationAccess(
-    db: Database,
-    agentId: string,
-    participant: string,
-    config: AlgoChatConfig,
+  db: Database,
+  agentId: string,
+  participant: string,
+  config: AlgoChatConfig,
 ): ConversationAccessResult {
-    // 1. Owner always passes
-    if (config.ownerAddresses.has(participant)) {
-        return { allowed: true, reason: null };
-    }
-
-    // 2. Agent must exist and be enabled
-    const agent = getAgent(db, agentId);
-    if (!agent || agent.disabled) {
-        return { allowed: false, reason: 'agent_disabled' };
-    }
-
-    // 3. Blocklist check — takes precedence over allowlist
-    if (isOnAgentBlocklist(db, agentId, participant)) {
-        log.info('Conversation blocked (blocklist)', { agentId, address: participant.slice(0, 8) + '...' });
-        return { allowed: false, reason: 'blocked' };
-    }
-
-    // 4. Mode check
-    const mode: ConversationMode = agent.conversationMode || 'private';
-
-    if (mode === 'private') {
-        log.info('Conversation denied (private mode)', { agentId, address: participant.slice(0, 8) + '...' });
-        return { allowed: false, reason: 'private' };
-    }
-
-    if (mode === 'allowlist') {
-        if (!isOnAgentAllowlist(db, agentId, participant)) {
-            log.info('Conversation denied (not on allowlist)', { agentId, address: participant.slice(0, 8) + '...' });
-            return { allowed: false, reason: 'not_on_allowlist' };
-        }
-    }
-
-    // mode === 'public' or passed allowlist check — proceed to rate limit
-
-    // 5. Rate-limit check
-    const windowSeconds = agent.conversationRateLimitWindow || 3600;
-    const maxMessages = agent.conversationRateLimitMax || 10;
-    const rateStatus = getConversationRateLimit(db, agentId, participant, windowSeconds, maxMessages);
-
-    if (!rateStatus.allowed) {
-        log.info('Conversation rate-limited', {
-            agentId,
-            address: participant.slice(0, 8) + '...',
-            remaining: rateStatus.remaining,
-            resetsAt: rateStatus.resetsAt,
-        });
-        return { allowed: false, reason: 'rate_limited' };
-    }
-
+  // 1. Owner always passes
+  if (config.ownerAddresses.has(participant)) {
     return { allowed: true, reason: null };
+  }
+
+  // 2. Agent must exist and be enabled
+  const agent = getAgent(db, agentId);
+  if (!agent || agent.disabled) {
+    return { allowed: false, reason: 'agent_disabled' };
+  }
+
+  // 3. Blocklist check — takes precedence over allowlist
+  if (isOnAgentBlocklist(db, agentId, participant)) {
+    log.info('Conversation blocked (blocklist)', { agentId, address: `${participant.slice(0, 8)}...` });
+    return { allowed: false, reason: 'blocked' };
+  }
+
+  // 4. Mode check
+  const mode: ConversationMode = agent.conversationMode || 'private';
+
+  if (mode === 'private') {
+    log.info('Conversation denied (private mode)', { agentId, address: `${participant.slice(0, 8)}...` });
+    return { allowed: false, reason: 'private' };
+  }
+
+  if (mode === 'allowlist') {
+    if (!isOnAgentAllowlist(db, agentId, participant)) {
+      log.info('Conversation denied (not on allowlist)', { agentId, address: `${participant.slice(0, 8)}...` });
+      return { allowed: false, reason: 'not_on_allowlist' };
+    }
+  }
+
+  // mode === 'public' or passed allowlist check — proceed to rate limit
+
+  // 5. Rate-limit check
+  const windowSeconds = agent.conversationRateLimitWindow || 3600;
+  const maxMessages = agent.conversationRateLimitMax || 10;
+  const rateStatus = getConversationRateLimit(db, agentId, participant, windowSeconds, maxMessages);
+
+  if (!rateStatus.allowed) {
+    log.info('Conversation rate-limited', {
+      agentId,
+      address: `${participant.slice(0, 8)}...`,
+      remaining: rateStatus.remaining,
+      resetsAt: rateStatus.resetsAt,
+    });
+    return { allowed: false, reason: 'rate_limited' };
+  }
+
+  return { allowed: true, reason: null };
 }
 
 /**
  * Get the conversation mode for an agent. Returns 'private' for unknown agents.
  */
 export function getAgentConversationMode(db: Database, agentId: string): ConversationMode {
-    const agent = getAgent(db, agentId);
-    return agent?.conversationMode || 'private';
+  const agent = getAgent(db, agentId);
+  return agent?.conversationMode || 'private';
 }
 
 /**
@@ -97,7 +98,5 @@ export function getAgentConversationMode(db: Database, agentId: string): Convers
  * Does NOT enforce self-protection — the caller (route handler) must check that.
  */
 export function setAgentConversationMode(db: Database, agentId: string, mode: ConversationMode): void {
-    db.query(
-        `UPDATE agents SET conversation_mode = ?, updated_at = datetime('now') WHERE id = ?`,
-    ).run(mode, agentId);
+  db.query(`UPDATE agents SET conversation_mode = ?, updated_at = datetime('now') WHERE id = ?`).run(mode, agentId);
 }

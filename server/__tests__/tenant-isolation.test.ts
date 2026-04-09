@@ -1,24 +1,55 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
-import { TENANT_SCOPED_TABLES } from '../tenant/db-filter';
-import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { TenantService } from '../tenant/context';
-import { withTenantFilter, validateTenantOwnership, enableMultiTenantGuard, resetMultiTenantGuard } from '../tenant/db-filter';
-import { extractTenantId, registerApiKey, registerMemberByEmail } from '../tenant/middleware';
-import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
-import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
-import { createProject, listProjects, getProject } from '../db/projects';
-import { createWorkTask, listWorkTasks, getWorkTask } from '../db/work-tasks';
-import { listCouncils, getCouncil, createCouncil, updateCouncil, deleteCouncil } from '../db/councils';
-import { listSchedules, getSchedule, createSchedule, updateSchedule, deleteSchedule } from '../db/schedules';
-import { listWorkflows, getWorkflow, createWorkflow, updateWorkflow, deleteWorkflow } from '../db/workflows';
-import { listWebhookRegistrations, getWebhookRegistration, createWebhookRegistration, updateWebhookRegistration, deleteWebhookRegistration } from '../db/webhooks';
-import { listMentionPollingConfigs, getMentionPollingConfig, createMentionPollingConfig, updateMentionPollingConfig, deleteMentionPollingConfig } from '../db/mention-polling';
-import { listMcpServerConfigs, getMcpServerConfig, createMcpServerConfig, updateMcpServerConfig, deleteMcpServerConfig } from '../db/mcp-servers';
-import { tenantGuard, tenantRoleGuard, roleGuard, createRequestContext } from '../middleware/guards';
-import { tenantTopic } from '../ws/handler';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { validateUrl } from '../a2a/client';
+import { createAgent, deleteAgent, getAgent, listAgents, updateAgent } from '../db/agents';
+import { createCouncil, deleteCouncil, getCouncil, listCouncils, updateCouncil } from '../db/councils';
+import {
+  createMcpServerConfig,
+  deleteMcpServerConfig,
+  getMcpServerConfig,
+  listMcpServerConfigs,
+  updateMcpServerConfig,
+} from '../db/mcp-servers';
+import {
+  createMentionPollingConfig,
+  deleteMentionPollingConfig,
+  getMentionPollingConfig,
+  listMentionPollingConfigs,
+  updateMentionPollingConfig,
+} from '../db/mention-polling';
+import { createProject, getProject, listProjects } from '../db/projects';
+import { createSchedule, deleteSchedule, getSchedule, listSchedules, updateSchedule } from '../db/schedules';
+import { runMigrations } from '../db/schema';
+import {
+  addSessionMessage,
+  createSession,
+  deleteSession,
+  getSession,
+  getSessionMessages,
+  listSessions,
+  updateSession,
+} from '../db/sessions';
+import {
+  createWebhookRegistration,
+  deleteWebhookRegistration,
+  getWebhookRegistration,
+  listWebhookRegistrations,
+  updateWebhookRegistration,
+} from '../db/webhooks';
+import { createWorkTask, getWorkTask, listWorkTasks } from '../db/work-tasks';
+import { createWorkflow, deleteWorkflow, getWorkflow, listWorkflows, updateWorkflow } from '../db/workflows';
+import { createRequestContext, roleGuard, tenantGuard, tenantRoleGuard } from '../middleware/guards';
+import { TenantService } from '../tenant/context';
+import {
+  enableMultiTenantGuard,
+  resetMultiTenantGuard,
+  TENANT_SCOPED_TABLES,
+  validateTenantOwnership,
+  withTenantFilter,
+} from '../tenant/db-filter';
+import { extractTenantId, registerApiKey, registerMemberByEmail } from '../tenant/middleware';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { tenantTopic } from '../ws/handler';
 
 // ---------------------------------------------------------------------------
 // Fresh database per test
@@ -26,8 +57,8 @@ import { validateUrl } from '../a2a/client';
 
 let db: Database;
 beforeEach(() => {
-    db = new Database(':memory:');
-    runMigrations(db);
+  db = new Database(':memory:');
+  runMigrations(db);
 });
 
 // ---------------------------------------------------------------------------
@@ -41,39 +72,37 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
 // ---------------------------------------------------------------------------
 
 describe('Schema', () => {
-    test('tenant_id column exists on all TENANT_SCOPED_TABLES', () => {
-        for (const table of TENANT_SCOPED_TABLES) {
-            const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
-            const colNames = cols.map((c) => c.name);
-            expect(colNames).toContain('tenant_id');
-        }
-    });
+  test('tenant_id column exists on all TENANT_SCOPED_TABLES', () => {
+    for (const table of TENANT_SCOPED_TABLES) {
+      const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toContain('tenant_id');
+    }
+  });
 
-    test('tenant_members table has correct schema', () => {
-        const cols = db.query('PRAGMA table_info(tenant_members)').all() as {
-            name: string;
-            type: string;
-        }[];
-        const colNames = cols.map((c) => c.name);
-        expect(colNames).toContain('tenant_id');
-        expect(colNames).toContain('key_hash');
-        expect(colNames).toContain('role');
-        expect(colNames).toContain('created_at');
-        expect(colNames).toContain('updated_at');
-    });
+  test('tenant_members table has correct schema', () => {
+    const cols = db.query('PRAGMA table_info(tenant_members)').all() as {
+      name: string;
+      type: string;
+    }[];
+    const colNames = cols.map((c) => c.name);
+    expect(colNames).toContain('tenant_id');
+    expect(colNames).toContain('key_hash');
+    expect(colNames).toContain('role');
+    expect(colNames).toContain('created_at');
+    expect(colNames).toContain('updated_at');
+  });
 
-    test("DEFAULT 'default' is applied to tenant_id", () => {
-        // Insert an agent without explicitly setting tenant_id
-        const id = crypto.randomUUID();
-        db.query(
-            `INSERT INTO agents (id, name) VALUES (?, ?)`,
-        ).run(id, 'No Tenant Agent');
+  test("DEFAULT 'default' is applied to tenant_id", () => {
+    // Insert an agent without explicitly setting tenant_id
+    const id = crypto.randomUUID();
+    db.query(`INSERT INTO agents (id, name) VALUES (?, ?)`).run(id, 'No Tenant Agent');
 
-        const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(id) as {
-            tenant_id: string;
-        };
-        expect(row.tenant_id).toBe('default');
-    });
+    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(id) as {
+      tenant_id: string;
+    };
+    expect(row.tenant_id).toBe('default');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -81,120 +110,124 @@ describe('Schema', () => {
 // ---------------------------------------------------------------------------
 
 describe('Registration', () => {
-    test('successful tenant registration creates tenant, API key, and member', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Acme Corp',
-            slug: 'acme-corp',
-            ownerEmail: 'admin@acme.com',
-        });
-
-        expect(tenant.id).toBeTruthy();
-        expect(tenant.name).toBe('Acme Corp');
-        expect(tenant.slug).toBe('acme-corp');
-
-        // Register an API key for the tenant
-        const apiKey = 'test-api-key-acme';
-        registerApiKey(db, tenant.id, apiKey);
-
-        // Verify API key exists
-        const hasher = new Bun.CryptoHasher('sha256');
-        hasher.update(apiKey);
-        const keyHash = hasher.digest('hex');
-        const keyRow = db.query('SELECT * FROM api_keys WHERE key_hash = ?').get(keyHash) as {
-            tenant_id: string;
-        } | null;
-        expect(keyRow).not.toBeNull();
-        expect(keyRow!.tenant_id).toBe(tenant.id);
-
-        // Insert a tenant member
-        db.query(
-            `INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`,
-        ).run(tenant.id, keyHash, 'owner');
-
-        const member = db.query(
-            'SELECT * FROM tenant_members WHERE tenant_id = ? AND key_hash = ?',
-        ).get(tenant.id, keyHash) as { role: string } | null;
-        expect(member).not.toBeNull();
-        expect(member!.role).toBe('owner');
+  test('successful tenant registration creates tenant, API key, and member', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Acme Corp',
+      slug: 'acme-corp',
+      ownerEmail: 'admin@acme.com',
     });
 
-    test('duplicate slug returns conflict', () => {
-        const tenantService = new TenantService(db, true);
-        tenantService.createTenant({
-            name: 'First Tenant',
-            slug: 'unique-slug',
-            ownerEmail: 'first@example.com',
-        });
+    expect(tenant.id).toBeTruthy();
+    expect(tenant.name).toBe('Acme Corp');
+    expect(tenant.slug).toBe('acme-corp');
 
-        // Attempting to create a second tenant with the same slug should fail
-        // because the slug column has a UNIQUE constraint
-        const existing = tenantService.getTenantBySlug('unique-slug');
-        expect(existing).not.toBeNull();
-        expect(existing!.name).toBe('First Tenant');
+    // Register an API key for the tenant
+    const apiKey = 'test-api-key-acme';
+    registerApiKey(db, tenant.id, apiKey);
 
-        // Direct insert with same slug should throw a constraint error
-        expect(() => {
-            tenantService.createTenant({
-                name: 'Second Tenant',
-                slug: 'unique-slug',
-                ownerEmail: 'second@example.com',
-            });
-        }).toThrow();
+    // Verify API key exists
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(apiKey);
+    const keyHash = hasher.digest('hex');
+    const keyRow = db.query('SELECT * FROM api_keys WHERE key_hash = ?').get(keyHash) as {
+      tenant_id: string;
+    } | null;
+    expect(keyRow).not.toBeNull();
+    expect(keyRow!.tenant_id).toBe(tenant.id);
+
+    // Insert a tenant member
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(
+      tenant.id,
+      keyHash,
+      'owner',
+    );
+
+    const member = db
+      .query('SELECT * FROM tenant_members WHERE tenant_id = ? AND key_hash = ?')
+      .get(tenant.id, keyHash) as { role: string } | null;
+    expect(member).not.toBeNull();
+    expect(member!.role).toBe('owner');
+  });
+
+  test('duplicate slug returns conflict', () => {
+    const tenantService = new TenantService(db, true);
+    tenantService.createTenant({
+      name: 'First Tenant',
+      slug: 'unique-slug',
+      ownerEmail: 'first@example.com',
     });
 
-    test('invalid slug is rejected', () => {
-        const invalidSlugs = [
-            'AB',          // uppercase
-            'has spaces',  // spaces
-            'a',           // too short (needs 3+ chars)
-            'too-long-' + 'x'.repeat(50), // exceeds 48 chars
-            '-starts-dash', // starts with dash
-            'ends-dash-',   // ends with dash
-        ];
+    // Attempting to create a second tenant with the same slug should fail
+    // because the slug column has a UNIQUE constraint
+    const existing = tenantService.getTenantBySlug('unique-slug');
+    expect(existing).not.toBeNull();
+    expect(existing!.name).toBe('First Tenant');
 
-        for (const slug of invalidSlugs) {
-            expect(SLUG_PATTERN.test(slug)).toBe(false);
-        }
+    // Direct insert with same slug should throw a constraint error
+    expect(() => {
+      tenantService.createTenant({
+        name: 'Second Tenant',
+        slug: 'unique-slug',
+        ownerEmail: 'second@example.com',
+      });
+    }).toThrow();
+  });
 
-        // Valid slugs should pass
-        const validSlugs = ['abc', 'my-tenant', 'tenant-123', 'a1b'];
-        for (const slug of validSlugs) {
-            expect(SLUG_PATTERN.test(slug)).toBe(true);
-        }
-    });
+  test('invalid slug is rejected', () => {
+    const invalidSlugs = [
+      'AB', // uppercase
+      'has spaces', // spaces
+      'a', // too short (needs 3+ chars)
+      `too-long-${'x'.repeat(50)}`, // exceeds 48 chars
+      '-starts-dash', // starts with dash
+      'ends-dash-', // ends with dash
+    ];
 
-    test('missing required fields are rejected', () => {
-        const tenantService = new TenantService(db, true);
+    for (const slug of invalidSlugs) {
+      expect(SLUG_PATTERN.test(slug)).toBe(false);
+    }
 
-        // Missing name - SQLite NOT NULL constraint
-        expect(() => {
-            tenantService.createTenant({
-                name: '',
-                slug: 'no-name',
-                ownerEmail: 'test@example.com',
-            });
-        }).not.toThrow(); // empty string is not null, so it works
+    // Valid slugs should pass
+    const validSlugs = ['abc', 'my-tenant', 'tenant-123', 'a1b'];
+    for (const slug of validSlugs) {
+      expect(SLUG_PATTERN.test(slug)).toBe(true);
+    }
+  });
 
-        // Verify that actual null values would be caught by TypeScript types
-        // (runtime enforcement depends on DB constraints)
-        // Test that slug uniqueness is enforced
-        expect(() => {
-            db.query(
-                `INSERT INTO tenants (id, name, slug, owner_email) VALUES (?, ?, NULL, ?)`,
-            ).run(crypto.randomUUID(), 'Test', 'test@example.com');
-        }).toThrow(); // slug is NOT NULL
-    });
+  test('missing required fields are rejected', () => {
+    const tenantService = new TenantService(db, true);
 
-    test('registration disabled when not multi-tenant', () => {
-        const tenantService = new TenantService(db, false);
-        expect(tenantService.isMultiTenant()).toBe(false);
+    // Missing name - SQLite NOT NULL constraint
+    expect(() => {
+      tenantService.createTenant({
+        name: '',
+        slug: 'no-name',
+        ownerEmail: 'test@example.com',
+      });
+    }).not.toThrow(); // empty string is not null, so it works
 
-        // resolveContext should return default tenant
-        const ctx = tenantService.resolveContext();
-        expect(ctx.tenantId).toBe(DEFAULT_TENANT_ID);
-        expect(ctx.plan).toBe('enterprise');
-    });
+    // Verify that actual null values would be caught by TypeScript types
+    // (runtime enforcement depends on DB constraints)
+    // Test that slug uniqueness is enforced
+    expect(() => {
+      db.query(`INSERT INTO tenants (id, name, slug, owner_email) VALUES (?, ?, NULL, ?)`).run(
+        crypto.randomUUID(),
+        'Test',
+        'test@example.com',
+      );
+    }).toThrow(); // slug is NOT NULL
+  });
+
+  test('registration disabled when not multi-tenant', () => {
+    const tenantService = new TenantService(db, false);
+    expect(tenantService.isMultiTenant()).toBe(false);
+
+    // resolveContext should return default tenant
+    const ctx = tenantService.resolveContext();
+    expect(ctx.tenantId).toBe(DEFAULT_TENANT_ID);
+    expect(ctx.plan).toBe('enterprise');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -202,128 +235,128 @@ describe('Registration', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    test('Tenant A cannot list Tenant B agents', () => {
-        createAgent(db, { name: 'Agent A' }, TENANT_A);
-        createAgent(db, { name: 'Agent B' }, TENANT_B);
+  test('Tenant A cannot list Tenant B agents', () => {
+    createAgent(db, { name: 'Agent A' }, TENANT_A);
+    createAgent(db, { name: 'Agent B' }, TENANT_B);
 
-        const agentsA = listAgents(db, TENANT_A);
-        const agentsB = listAgents(db, TENANT_B);
+    const agentsA = listAgents(db, TENANT_A);
+    const agentsB = listAgents(db, TENANT_B);
 
-        expect(agentsA).toHaveLength(1);
-        expect(agentsA[0].name).toBe('Agent A');
-        expect(agentsB).toHaveLength(1);
-        expect(agentsB[0].name).toBe('Agent B');
-    });
+    expect(agentsA).toHaveLength(1);
+    expect(agentsA[0].name).toBe('Agent A');
+    expect(agentsB).toHaveLength(1);
+    expect(agentsB[0].name).toBe('Agent B');
+  });
 
-    test('Tenant A cannot get Tenant B agent by ID', () => {
-        const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
+  test('Tenant A cannot get Tenant B agent by ID', () => {
+    const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
 
-        const result = getAgent(db, agentB.id, TENANT_A);
-        expect(result).toBeNull();
+    const result = getAgent(db, agentB.id, TENANT_A);
+    expect(result).toBeNull();
 
-        // But tenant B can get it
-        const resultB = getAgent(db, agentB.id, TENANT_B);
-        expect(resultB).not.toBeNull();
-        expect(resultB!.name).toBe('Agent B');
-    });
+    // But tenant B can get it
+    const resultB = getAgent(db, agentB.id, TENANT_B);
+    expect(resultB).not.toBeNull();
+    expect(resultB!.name).toBe('Agent B');
+  });
 
-    test('Tenant A cannot update Tenant B agent', () => {
-        const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
+  test('Tenant A cannot update Tenant B agent', () => {
+    const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
 
-        const result = updateAgent(db, agentB.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateAgent(db, agentB.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        // Verify original name is preserved
-        const original = getAgent(db, agentB.id, TENANT_B);
-        expect(original!.name).toBe('Agent B');
-    });
+    // Verify original name is preserved
+    const original = getAgent(db, agentB.id, TENANT_B);
+    expect(original!.name).toBe('Agent B');
+  });
 
-    test('Tenant A cannot delete Tenant B agent', () => {
-        const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
+  test('Tenant A cannot delete Tenant B agent', () => {
+    const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
 
-        const deleted = deleteAgent(db, agentB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteAgent(db, agentB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        // Agent still exists for tenant B
-        const still = getAgent(db, agentB.id, TENANT_B);
-        expect(still).not.toBeNull();
-    });
+    // Agent still exists for tenant B
+    const still = getAgent(db, agentB.id, TENANT_B);
+    expect(still).not.toBeNull();
+  });
 
-    test('Tenant A cannot list Tenant B sessions', () => {
-        createSession(db, { name: 'Session A' }, TENANT_A);
-        createSession(db, { name: 'Session B' }, TENANT_B);
+  test('Tenant A cannot list Tenant B sessions', () => {
+    createSession(db, { name: 'Session A' }, TENANT_A);
+    createSession(db, { name: 'Session B' }, TENANT_B);
 
-        const sessionsA = listSessions(db, undefined, TENANT_A);
-        const sessionsB = listSessions(db, undefined, TENANT_B);
+    const sessionsA = listSessions(db, undefined, TENANT_A);
+    const sessionsB = listSessions(db, undefined, TENANT_B);
 
-        expect(sessionsA).toHaveLength(1);
-        expect(sessionsA[0].name).toBe('Session A');
-        expect(sessionsB).toHaveLength(1);
-        expect(sessionsB[0].name).toBe('Session B');
-    });
+    expect(sessionsA).toHaveLength(1);
+    expect(sessionsA[0].name).toBe('Session A');
+    expect(sessionsB).toHaveLength(1);
+    expect(sessionsB[0].name).toBe('Session B');
+  });
 
-    test('Tenant A cannot get Tenant B session', () => {
-        const sessionB = createSession(db, { name: 'Session B' }, TENANT_B);
+  test('Tenant A cannot get Tenant B session', () => {
+    const sessionB = createSession(db, { name: 'Session B' }, TENANT_B);
 
-        const result = getSession(db, sessionB.id, TENANT_A);
-        expect(result).toBeNull();
+    const result = getSession(db, sessionB.id, TENANT_A);
+    expect(result).toBeNull();
 
-        const resultB = getSession(db, sessionB.id, TENANT_B);
-        expect(resultB).not.toBeNull();
-    });
+    const resultB = getSession(db, sessionB.id, TENANT_B);
+    expect(resultB).not.toBeNull();
+  });
 
-    test('Tenant A cannot delete Tenant B session', () => {
-        const sessionB = createSession(db, { name: 'Session B' }, TENANT_B);
+  test('Tenant A cannot delete Tenant B session', () => {
+    const sessionB = createSession(db, { name: 'Session B' }, TENANT_B);
 
-        const deleted = deleteSession(db, sessionB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteSession(db, sessionB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        // Session still exists for tenant B
-        const still = getSession(db, sessionB.id, TENANT_B);
-        expect(still).not.toBeNull();
-    });
+    // Session still exists for tenant B
+    const still = getSession(db, sessionB.id, TENANT_B);
+    expect(still).not.toBeNull();
+  });
 
-    test('Tenant A cannot list Tenant B projects', () => {
-        createProject(db, { name: 'Project A', workingDir: '/tmp/a' }, TENANT_A);
-        createProject(db, { name: 'Project B', workingDir: '/tmp/b' }, TENANT_B);
+  test('Tenant A cannot list Tenant B projects', () => {
+    createProject(db, { name: 'Project A', workingDir: '/tmp/a' }, TENANT_A);
+    createProject(db, { name: 'Project B', workingDir: '/tmp/b' }, TENANT_B);
 
-        const projectsA = listProjects(db, TENANT_A);
-        const projectsB = listProjects(db, TENANT_B);
+    const projectsA = listProjects(db, TENANT_A);
+    const projectsB = listProjects(db, TENANT_B);
 
-        expect(projectsA).toHaveLength(1);
-        expect(projectsA[0].name).toBe('Project A');
-        expect(projectsB).toHaveLength(1);
-        expect(projectsB[0].name).toBe('Project B');
-    });
+    expect(projectsA).toHaveLength(1);
+    expect(projectsA[0].name).toBe('Project A');
+    expect(projectsB).toHaveLength(1);
+    expect(projectsB[0].name).toBe('Project B');
+  });
 
-    test('Tenant A cannot get Tenant B project', () => {
-        const projectB = createProject(db, { name: 'Project B', workingDir: '/tmp/b' }, TENANT_B);
+  test('Tenant A cannot get Tenant B project', () => {
+    const projectB = createProject(db, { name: 'Project B', workingDir: '/tmp/b' }, TENANT_B);
 
-        const result = getProject(db, projectB.id, TENANT_A);
-        expect(result).toBeNull();
+    const result = getProject(db, projectB.id, TENANT_A);
+    expect(result).toBeNull();
 
-        const resultB = getProject(db, projectB.id, TENANT_B);
-        expect(resultB).not.toBeNull();
-    });
+    const resultB = getProject(db, projectB.id, TENANT_B);
+    expect(resultB).not.toBeNull();
+  });
 
-    test('validateTenantOwnership rejects cross-tenant access', () => {
-        const agent = createAgent(db, { name: 'Owned by A' }, TENANT_A);
+  test('validateTenantOwnership rejects cross-tenant access', () => {
+    const agent = createAgent(db, { name: 'Owned by A' }, TENANT_A);
 
-        // Tenant A owns it
-        const ownsA = validateTenantOwnership(db, 'agents', agent.id, TENANT_A);
-        expect(ownsA).toBe(true);
+    // Tenant A owns it
+    const ownsA = validateTenantOwnership(db, 'agents', agent.id, TENANT_A);
+    expect(ownsA).toBe(true);
 
-        // Tenant B does not
-        const ownsB = validateTenantOwnership(db, 'agents', agent.id, TENANT_B);
-        expect(ownsB).toBe(false);
+    // Tenant B does not
+    const ownsB = validateTenantOwnership(db, 'agents', agent.id, TENANT_B);
+    expect(ownsB).toBe(false);
 
-        // Default tenant always passes (backwards compat)
-        const ownsDefault = validateTenantOwnership(db, 'agents', agent.id, DEFAULT_TENANT_ID);
-        expect(ownsDefault).toBe(true);
-    });
+    // Default tenant always passes (backwards compat)
+    const ownsDefault = validateTenantOwnership(db, 'agents', agent.id, DEFAULT_TENANT_ID);
+    expect(ownsDefault).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -331,148 +364,160 @@ describe('Cross-tenant isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('RBAC', () => {
-    test('owner role is returned for tenant member with owner role', () => {
-        const tenantId = 'rbac-tenant';
-        const keyHash = 'hash-owner-key';
+  test('owner role is returned for tenant member with owner role', () => {
+    const tenantId = 'rbac-tenant';
+    const keyHash = 'hash-owner-key';
 
-        db.query(
-            `INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`,
-        ).run(tenantId, keyHash, 'owner');
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenantId, keyHash, 'owner');
 
-        const member = db.query(
-            'SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?',
-        ).get(tenantId, keyHash) as { role: string } | null;
+    const member = db
+      .query('SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?')
+      .get(tenantId, keyHash) as { role: string } | null;
 
-        expect(member).not.toBeNull();
-        expect(member!.role).toBe('owner');
+    expect(member).not.toBeNull();
+    expect(member!.role).toBe('owner');
+  });
+
+  test('operator role allows agent creation', () => {
+    const tenantId = 'rbac-tenant';
+    const keyHash = 'hash-operator-key';
+
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(
+      tenantId,
+      keyHash,
+      'operator',
+    );
+
+    const member = db
+      .query('SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?')
+      .get(tenantId, keyHash) as { role: string } | null;
+
+    expect(member).not.toBeNull();
+    expect(member!.role).toBe('operator');
+
+    // The operator role should be in the allowed set for agent creation
+    const allowedRoles = ['owner', 'operator'];
+    expect(allowedRoles).toContain(member!.role);
+  });
+
+  test('viewer gets no write access', () => {
+    const guard = tenantRoleGuard('owner', 'operator');
+    const req = new Request('http://localhost/test');
+    const url = new URL(req.url);
+    const context = createRequestContext();
+    context.tenantId = 'test-tenant';
+    context.tenantRole = 'viewer';
+
+    const result = guard(req, url, context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(403);
+  });
+
+  test('unknown key_hash returns no role', () => {
+    const tenantId = 'rbac-tenant';
+    const unknownHash = 'does-not-exist-hash';
+
+    const member = db
+      .query('SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?')
+      .get(tenantId, unknownHash) as { role: string } | null;
+
+    expect(member).toBeNull();
+  });
+
+  // ── Tenant role → context.role mapping (invariant #26) ─────────────────
+
+  test('tenantGuard maps owner → context.role=admin', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Owner Role Tenant',
+      slug: 'owner-role-tenant',
+      ownerEmail: 'owner@example.com',
     });
+    const apiKey = 'owner-role-api-key';
+    // Hash the key ourselves (mirrors tenantGuard's SHA-256)
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(apiKey);
+    const keyHash = hasher.digest('hex');
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(
+      tenant.id,
+      keyHash,
+      'owner',
+    );
 
-    test('operator role allows agent creation', () => {
-        const tenantId = 'rbac-tenant';
-        const keyHash = 'hash-operator-key';
-
-        db.query(
-            `INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`,
-        ).run(tenantId, keyHash, 'operator');
-
-        const member = db.query(
-            'SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?',
-        ).get(tenantId, keyHash) as { role: string } | null;
-
-        expect(member).not.toBeNull();
-        expect(member!.role).toBe('operator');
-
-        // The operator role should be in the allowed set for agent creation
-        const allowedRoles = ['owner', 'operator'];
-        expect(allowedRoles).toContain(member!.role);
+    const req = new Request('http://localhost/api/agents', {
+      headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
     });
+    const context = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    guard(req, new URL(req.url), context);
 
-    test('viewer gets no write access', () => {
-        const guard = tenantRoleGuard('owner', 'operator');
-        const req = new Request('http://localhost/test');
-        const url = new URL(req.url);
-        const context = createRequestContext();
-        context.tenantId = 'test-tenant';
-        context.tenantRole = 'viewer';
+    expect(context.tenantRole).toBe('owner');
+    expect(context.role).toBe('admin');
+  });
 
-        const result = guard(req, url, context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(403);
+  test('tenantGuard maps operator → context.role=user', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Operator Role Tenant',
+      slug: 'operator-role-tenant',
+      ownerEmail: 'operator@example.com',
     });
+    const apiKey = 'operator-role-api-key';
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(apiKey);
+    const keyHash = hasher.digest('hex');
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(
+      tenant.id,
+      keyHash,
+      'operator',
+    );
 
-    test('unknown key_hash returns no role', () => {
-        const tenantId = 'rbac-tenant';
-        const unknownHash = 'does-not-exist-hash';
-
-        const member = db.query(
-            'SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?',
-        ).get(tenantId, unknownHash) as { role: string } | null;
-
-        expect(member).toBeNull();
+    const req = new Request('http://localhost/api/agents', {
+      headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
     });
+    const context = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    guard(req, new URL(req.url), context);
 
-    // ── Tenant role → context.role mapping (invariant #26) ─────────────────
+    expect(context.tenantRole).toBe('operator');
+    expect(context.role).toBe('user');
+  });
 
-    test('tenantGuard maps owner → context.role=admin', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Owner Role Tenant',
-            slug: 'owner-role-tenant',
-            ownerEmail: 'owner@example.com',
-        });
-        const apiKey = 'owner-role-api-key';
-        // Hash the key ourselves (mirrors tenantGuard's SHA-256)
-        const hasher = new Bun.CryptoHasher('sha256');
-        hasher.update(apiKey);
-        const keyHash = hasher.digest('hex');
-        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'owner');
-
-        const req = new Request('http://localhost/api/agents', {
-            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
-        });
-        const context = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        guard(req, new URL(req.url), context);
-
-        expect(context.tenantRole).toBe('owner');
-        expect(context.role).toBe('admin');
+  test('tenantGuard maps viewer → context.role=viewer, and roleGuard blocks write paths', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Viewer Role Tenant',
+      slug: 'viewer-role-tenant',
+      ownerEmail: 'viewer@example.com',
     });
+    const apiKey = 'viewer-role-api-key';
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(apiKey);
+    const keyHash = hasher.digest('hex');
+    db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(
+      tenant.id,
+      keyHash,
+      'viewer',
+    );
 
-    test('tenantGuard maps operator → context.role=user', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Operator Role Tenant',
-            slug: 'operator-role-tenant',
-            ownerEmail: 'operator@example.com',
-        });
-        const apiKey = 'operator-role-api-key';
-        const hasher = new Bun.CryptoHasher('sha256');
-        hasher.update(apiKey);
-        const keyHash = hasher.digest('hex');
-        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'operator');
-
-        const req = new Request('http://localhost/api/agents', {
-            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
-        });
-        const context = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        guard(req, new URL(req.url), context);
-
-        expect(context.tenantRole).toBe('operator');
-        expect(context.role).toBe('user');
+    const req = new Request('http://localhost/api/agents', {
+      headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
     });
+    const context = createRequestContext();
+    context.authenticated = true; // simulate prior authGuard pass
+    const tGuard = tenantGuard(db, tenantService);
+    tGuard(req, new URL(req.url), context);
 
-    test('tenantGuard maps viewer → context.role=viewer, and roleGuard blocks write paths', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Viewer Role Tenant',
-            slug: 'viewer-role-tenant',
-            ownerEmail: 'viewer@example.com',
-        });
-        const apiKey = 'viewer-role-api-key';
-        const hasher = new Bun.CryptoHasher('sha256');
-        hasher.update(apiKey);
-        const keyHash = hasher.digest('hex');
-        db.query(`INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)`).run(tenant.id, keyHash, 'viewer');
+    // tenantGuard should set both fields
+    expect(context.tenantRole).toBe('viewer');
+    expect(context.role).toBe('viewer');
 
-        const req = new Request('http://localhost/api/agents', {
-            headers: { Authorization: `Bearer ${apiKey}`, 'X-Tenant-ID': tenant.id },
-        });
-        const context = createRequestContext();
-        context.authenticated = true; // simulate prior authGuard pass
-        const tGuard = tenantGuard(db, tenantService);
-        tGuard(req, new URL(req.url), context);
-
-        // tenantGuard should set both fields
-        expect(context.tenantRole).toBe('viewer');
-        expect(context.role).toBe('viewer');
-
-        // roleGuard('admin','user') should now block this viewer
-        const rGuard = roleGuard('admin', 'user');
-        const result = rGuard(req, new URL(req.url), context);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(403);
-    });
+    // roleGuard('admin','user') should now block this viewer
+    const rGuard = roleGuard('admin', 'user');
+    const result = rGuard(req, new URL(req.url), context);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(403);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -480,68 +525,68 @@ describe('RBAC', () => {
 // ---------------------------------------------------------------------------
 
 describe('Guard pipeline', () => {
-    test('tenantGuard extracts tenant from X-Tenant-ID header', () => {
-        const tenantService = new TenantService(db, true);
+  test('tenantGuard extracts tenant from X-Tenant-ID header', () => {
+    const tenantService = new TenantService(db, true);
 
-        // Create the tenant so resolveContext can look it up
-        tenantService.createTenant({
-            name: 'Header Tenant',
-            slug: 'header-tenant',
-            ownerEmail: 'header@example.com',
-        });
-
-        const tenant = tenantService.getTenantBySlug('header-tenant')!;
-        const req = new Request('http://localhost/api/agents', {
-            headers: { 'X-Tenant-ID': tenant.id },
-        });
-        const url = new URL(req.url);
-        const context = createRequestContext();
-
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, url, context);
-
-        expect(result).toBeNull(); // no error
-        expect(context.tenantId).toBe(tenant.id);
+    // Create the tenant so resolveContext can look it up
+    tenantService.createTenant({
+      name: 'Header Tenant',
+      slug: 'header-tenant',
+      ownerEmail: 'header@example.com',
     });
 
-    test('tenantGuard extracts tenant from API key', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'API Key Tenant',
-            slug: 'api-key-tenant',
-            ownerEmail: 'apikey@example.com',
-        });
+    const tenant = tenantService.getTenantBySlug('header-tenant')!;
+    const req = new Request('http://localhost/api/agents', {
+      headers: { 'X-Tenant-ID': tenant.id },
+    });
+    const url = new URL(req.url);
+    const context = createRequestContext();
 
-        const apiKey = 'secret-api-key-12345';
-        registerApiKey(db, tenant.id, apiKey);
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, url, context);
 
-        const req = new Request('http://localhost/api/agents', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        const url = new URL(req.url);
-        const context = createRequestContext();
+    expect(result).toBeNull(); // no error
+    expect(context.tenantId).toBe(tenant.id);
+  });
 
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, url, context);
-
-        expect(result).toBeNull();
-        expect(context.tenantId).toBe(tenant.id);
+  test('tenantGuard extracts tenant from API key', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'API Key Tenant',
+      slug: 'api-key-tenant',
+      ownerEmail: 'apikey@example.com',
     });
 
-    test('tenantGuard returns default in single-tenant mode', () => {
-        const tenantService = new TenantService(db, false);
-        const req = new Request('http://localhost/api/agents', {
-            headers: { 'X-Tenant-ID': 'some-tenant' },
-        });
-        const url = new URL(req.url);
-        const context = createRequestContext();
+    const apiKey = 'secret-api-key-12345';
+    registerApiKey(db, tenant.id, apiKey);
 
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, url, context);
-
-        expect(result).toBeNull();
-        expect(context.tenantId).toBe(DEFAULT_TENANT_ID);
+    const req = new Request('http://localhost/api/agents', {
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
+    const url = new URL(req.url);
+    const context = createRequestContext();
+
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, url, context);
+
+    expect(result).toBeNull();
+    expect(context.tenantId).toBe(tenant.id);
+  });
+
+  test('tenantGuard returns default in single-tenant mode', () => {
+    const tenantService = new TenantService(db, false);
+    const req = new Request('http://localhost/api/agents', {
+      headers: { 'X-Tenant-ID': 'some-tenant' },
+    });
+    const url = new URL(req.url);
+    const context = createRequestContext();
+
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, url, context);
+
+    expect(result).toBeNull();
+    expect(context.tenantId).toBe(DEFAULT_TENANT_ID);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -549,35 +594,35 @@ describe('Guard pipeline', () => {
 // ---------------------------------------------------------------------------
 
 describe('Default tenant backwards compat', () => {
-    test('default tenant sees all data in single-tenant mode', () => {
-        // Create data with the default tenant
-        createAgent(db, { name: 'Default Agent' }, DEFAULT_TENANT_ID);
-        createSession(db, { name: 'Default Session' }, DEFAULT_TENANT_ID);
-        createProject(db, { name: 'Default Project', workingDir: '/tmp/default' }, DEFAULT_TENANT_ID);
+  test('default tenant sees all data in single-tenant mode', () => {
+    // Create data with the default tenant
+    createAgent(db, { name: 'Default Agent' }, DEFAULT_TENANT_ID);
+    createSession(db, { name: 'Default Session' }, DEFAULT_TENANT_ID);
+    createProject(db, { name: 'Default Project', workingDir: '/tmp/default' }, DEFAULT_TENANT_ID);
 
-        // Listing with DEFAULT_TENANT_ID should return everything
-        const agents = listAgents(db, DEFAULT_TENANT_ID);
-        expect(agents.length).toBeGreaterThanOrEqual(1);
-        expect(agents.some((a) => a.name === 'Default Agent')).toBe(true);
+    // Listing with DEFAULT_TENANT_ID should return everything
+    const agents = listAgents(db, DEFAULT_TENANT_ID);
+    expect(agents.length).toBeGreaterThanOrEqual(1);
+    expect(agents.some((a) => a.name === 'Default Agent')).toBe(true);
 
-        const sessions = listSessions(db, undefined, DEFAULT_TENANT_ID);
-        expect(sessions.length).toBeGreaterThanOrEqual(1);
-        expect(sessions.some((s) => s.name === 'Default Session')).toBe(true);
+    const sessions = listSessions(db, undefined, DEFAULT_TENANT_ID);
+    expect(sessions.length).toBeGreaterThanOrEqual(1);
+    expect(sessions.some((s) => s.name === 'Default Session')).toBe(true);
 
-        const projects = listProjects(db, DEFAULT_TENANT_ID);
-        expect(projects.length).toBeGreaterThanOrEqual(1);
-        expect(projects.some((p) => p.name === 'Default Project')).toBe(true);
-    });
+    const projects = listProjects(db, DEFAULT_TENANT_ID);
+    expect(projects.length).toBeGreaterThanOrEqual(1);
+    expect(projects.some((p) => p.name === 'Default Project')).toBe(true);
+  });
 
-    test('withTenantFilter is a no-op for DEFAULT_TENANT_ID', () => {
-        const originalQuery = 'SELECT * FROM agents ORDER BY updated_at DESC';
-        const { query, bindings } = withTenantFilter(originalQuery, DEFAULT_TENANT_ID);
+  test('withTenantFilter is a no-op for DEFAULT_TENANT_ID', () => {
+    const originalQuery = 'SELECT * FROM agents ORDER BY updated_at DESC';
+    const { query, bindings } = withTenantFilter(originalQuery, DEFAULT_TENANT_ID);
 
-        // Query should be unchanged
-        expect(query).toBe(originalQuery);
-        // No additional bindings
-        expect(bindings).toEqual([]);
-    });
+    // Query should be unchanged
+    expect(query).toBe(originalQuery);
+    // No additional bindings
+    expect(bindings).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -585,32 +630,32 @@ describe('Default tenant backwards compat', () => {
 // ---------------------------------------------------------------------------
 
 describe('Session ownership validation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    test('getSessionMessages returns empty for cross-tenant session', () => {
-        const session = createSession(db, { name: 'Session B' }, TENANT_B);
-        addSessionMessage(db, session.id, 'user', 'hello');
+  test('getSessionMessages returns empty for cross-tenant session', () => {
+    const session = createSession(db, { name: 'Session B' }, TENANT_B);
+    addSessionMessage(db, session.id, 'user', 'hello');
 
-        // Tenant A should get empty array
-        const messages = getSessionMessages(db, session.id, TENANT_A);
-        expect(messages).toEqual([]);
+    // Tenant A should get empty array
+    const messages = getSessionMessages(db, session.id, TENANT_A);
+    expect(messages).toEqual([]);
 
-        // Tenant B should get the message
-        const messagesB = getSessionMessages(db, session.id, TENANT_B);
-        expect(messagesB).toHaveLength(1);
-    });
+    // Tenant B should get the message
+    const messagesB = getSessionMessages(db, session.id, TENANT_B);
+    expect(messagesB).toHaveLength(1);
+  });
 
-    test('updateSession returns null for cross-tenant session', () => {
-        const session = createSession(db, { name: 'Session B' }, TENANT_B);
+  test('updateSession returns null for cross-tenant session', () => {
+    const session = createSession(db, { name: 'Session B' }, TENANT_B);
 
-        const result = updateSession(db, session.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateSession(db, session.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        // Original name preserved
-        const original = getSession(db, session.id, TENANT_B);
-        expect(original!.name).toBe('Session B');
-    });
+    // Original name preserved
+    const original = getSession(db, session.id, TENANT_B);
+    expect(original!.name).toBe('Session B');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -618,59 +663,59 @@ describe('Session ownership validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('SSRF prevention', () => {
-    test('rejects localhost', () => {
-        expect(() => validateUrl('http://localhost/foo')).toThrow();
-    });
+  test('rejects localhost', () => {
+    expect(() => validateUrl('http://localhost/foo')).toThrow();
+  });
 
-    test('rejects 127.0.0.1', () => {
-        expect(() => validateUrl('http://127.0.0.1/foo')).toThrow();
-    });
+  test('rejects 127.0.0.1', () => {
+    expect(() => validateUrl('http://127.0.0.1/foo')).toThrow();
+  });
 
-    test('rejects ::1', () => {
-        expect(() => validateUrl('http://[::1]/foo')).toThrow();
-    });
+  test('rejects ::1', () => {
+    expect(() => validateUrl('http://[::1]/foo')).toThrow();
+  });
 
-    test('rejects 0.0.0.0', () => {
-        expect(() => validateUrl('http://0.0.0.0/')).toThrow();
-    });
+  test('rejects 0.0.0.0', () => {
+    expect(() => validateUrl('http://0.0.0.0/')).toThrow();
+  });
 
-    test('rejects 10.x.x.x', () => {
-        expect(() => validateUrl('http://10.0.0.1/')).toThrow();
-    });
+  test('rejects 10.x.x.x', () => {
+    expect(() => validateUrl('http://10.0.0.1/')).toThrow();
+  });
 
-    test('rejects 172.16.x.x', () => {
-        expect(() => validateUrl('http://172.16.0.1/')).toThrow();
-    });
+  test('rejects 172.16.x.x', () => {
+    expect(() => validateUrl('http://172.16.0.1/')).toThrow();
+  });
 
-    test('rejects 192.168.x.x', () => {
-        expect(() => validateUrl('http://192.168.1.1/')).toThrow();
-    });
+  test('rejects 192.168.x.x', () => {
+    expect(() => validateUrl('http://192.168.1.1/')).toThrow();
+  });
 
-    test('rejects 169.254.x.x (link-local)', () => {
-        expect(() => validateUrl('http://169.254.169.254/')).toThrow();
-    });
+  test('rejects 169.254.x.x (link-local)', () => {
+    expect(() => validateUrl('http://169.254.169.254/')).toThrow();
+  });
 
-    test('rejects non-http schemes', () => {
-        expect(() => validateUrl('ftp://example.com/')).toThrow();
-        expect(() => validateUrl('file:///etc/passwd')).toThrow();
-    });
+  test('rejects non-http schemes', () => {
+    expect(() => validateUrl('ftp://example.com/')).toThrow();
+    expect(() => validateUrl('file:///etc/passwd')).toThrow();
+  });
 
-    test('rejects hex IP encoding (0x7f000001)', () => {
-        expect(() => validateUrl('http://0x7f000001/')).toThrow();
-    });
+  test('rejects hex IP encoding (0x7f000001)', () => {
+    expect(() => validateUrl('http://0x7f000001/')).toThrow();
+  });
 
-    test('rejects decimal integer IP (2130706433)', () => {
-        expect(() => validateUrl('http://2130706433/')).toThrow();
-    });
+  test('rejects decimal integer IP (2130706433)', () => {
+    expect(() => validateUrl('http://2130706433/')).toThrow();
+  });
 
-    test('rejects octal IP encoding (0177.0.0.1)', () => {
-        expect(() => validateUrl('http://0177.0.0.1/')).toThrow();
-    });
+  test('rejects octal IP encoding (0177.0.0.1)', () => {
+    expect(() => validateUrl('http://0177.0.0.1/')).toThrow();
+  });
 
-    test('allows valid public URLs', () => {
-        expect(() => validateUrl('https://agent.example.com')).not.toThrow();
-        expect(() => validateUrl('http://8.8.8.8/')).not.toThrow();
-    });
+  test('allows valid public URLs', () => {
+    expect(() => validateUrl('https://agent.example.com')).not.toThrow();
+    expect(() => validateUrl('http://8.8.8.8/')).not.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -678,34 +723,34 @@ describe('SSRF prevention', () => {
 // ---------------------------------------------------------------------------
 
 describe('withTenantFilter robustness', () => {
-    test('handles query with existing WHERE and ORDER BY', () => {
-        const { query, bindings } = withTenantFilter(
-            'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC',
-            'tenant-1',
-        );
-        expect(query).toBe('SELECT * FROM sessions WHERE project_id = ? AND tenant_id = ? ORDER BY updated_at DESC');
-        expect(bindings).toEqual(['tenant-1']);
-    });
+  test('handles query with existing WHERE and ORDER BY', () => {
+    const { query, bindings } = withTenantFilter(
+      'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC',
+      'tenant-1',
+    );
+    expect(query).toBe('SELECT * FROM sessions WHERE project_id = ? AND tenant_id = ? ORDER BY updated_at DESC');
+    expect(bindings).toEqual(['tenant-1']);
+  });
 
-    test('handles query with no WHERE', () => {
-        const { query } = withTenantFilter('SELECT * FROM agents ORDER BY updated_at DESC', 'tenant-1');
-        expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ? ORDER BY updated_at DESC');
-    });
+  test('handles query with no WHERE', () => {
+    const { query } = withTenantFilter('SELECT * FROM agents ORDER BY updated_at DESC', 'tenant-1');
+    expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ? ORDER BY updated_at DESC');
+  });
 
-    test('handles query with no WHERE and no ORDER BY', () => {
-        const { query } = withTenantFilter('SELECT * FROM agents', 'tenant-1');
-        expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ?');
-    });
+  test('handles query with no WHERE and no ORDER BY', () => {
+    const { query } = withTenantFilter('SELECT * FROM agents', 'tenant-1');
+    expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ?');
+  });
 
-    test('handles multiple WHERE conditions safely', () => {
-        const { query } = withTenantFilter(
-            "SELECT * FROM sessions WHERE project_id = ? AND status = 'running' ORDER BY created_at",
-            'tenant-1',
-        );
-        // Should append AND tenant_id = ? before ORDER BY, not replace first WHERE
-        expect(query).toContain("WHERE project_id = ? AND status = 'running' AND tenant_id = ?");
-        expect(query).toContain('ORDER BY created_at');
-    });
+  test('handles multiple WHERE conditions safely', () => {
+    const { query } = withTenantFilter(
+      "SELECT * FROM sessions WHERE project_id = ? AND status = 'running' ORDER BY created_at",
+      'tenant-1',
+    );
+    // Should append AND tenant_id = ? before ORDER BY, not replace first WHERE
+    expect(query).toContain("WHERE project_id = ? AND status = 'running' AND tenant_id = ?");
+    expect(query).toContain('ORDER BY created_at');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -713,46 +758,39 @@ describe('withTenantFilter robustness', () => {
 // ---------------------------------------------------------------------------
 
 describe('Multi-tenant runtime guard', () => {
-    afterEach(() => {
-        resetMultiTenantGuard();
-    });
+  afterEach(() => {
+    resetMultiTenantGuard();
+  });
 
-    test('withTenantFilter throws for DEFAULT_TENANT_ID when guard is enabled', () => {
-        enableMultiTenantGuard();
-        expect(() =>
-            withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID),
-        ).toThrow('DEFAULT_TENANT_ID is not allowed');
-    });
+  test('withTenantFilter throws for DEFAULT_TENANT_ID when guard is enabled', () => {
+    enableMultiTenantGuard();
+    expect(() => withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID)).toThrow(
+      'DEFAULT_TENANT_ID is not allowed',
+    );
+  });
 
-    test('withTenantFilter works for real tenant when guard is enabled', () => {
-        enableMultiTenantGuard();
-        const result = withTenantFilter('SELECT * FROM agents', 'tenant-abc');
-        expect(result.query).toContain('tenant_id = ?');
-        expect(result.bindings).toEqual(['tenant-abc']);
-    });
+  test('withTenantFilter works for real tenant when guard is enabled', () => {
+    enableMultiTenantGuard();
+    const result = withTenantFilter('SELECT * FROM agents', 'tenant-abc');
+    expect(result.query).toContain('tenant_id = ?');
+    expect(result.bindings).toEqual(['tenant-abc']);
+  });
 
-    test('validateTenantOwnership throws for DEFAULT_TENANT_ID when guard is enabled', () => {
-        enableMultiTenantGuard();
-        expect(() =>
-            validateTenantOwnership(
-                null as never,
-                'agents',
-                'some-id',
-                DEFAULT_TENANT_ID,
-            ),
-        ).toThrow('DEFAULT_TENANT_ID is not allowed');
-    });
+  test('validateTenantOwnership throws for DEFAULT_TENANT_ID when guard is enabled', () => {
+    enableMultiTenantGuard();
+    expect(() => validateTenantOwnership(null as never, 'agents', 'some-id', DEFAULT_TENANT_ID)).toThrow(
+      'DEFAULT_TENANT_ID is not allowed',
+    );
+  });
 
-    test('resetMultiTenantGuard restores permissive behavior', () => {
-        enableMultiTenantGuard();
-        expect(() =>
-            withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID),
-        ).toThrow();
+  test('resetMultiTenantGuard restores permissive behavior', () => {
+    enableMultiTenantGuard();
+    expect(() => withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID)).toThrow();
 
-        resetMultiTenantGuard();
-        const result = withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID);
-        expect(result.query).toBe('SELECT * FROM agents');
-    });
+    resetMultiTenantGuard();
+    const result = withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID);
+    expect(result.query).toBe('SELECT * FROM agents');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -760,81 +798,81 @@ describe('Multi-tenant runtime guard', () => {
 // ---------------------------------------------------------------------------
 
 describe('extractTenantId priority', () => {
-    test('returns 403 when header and API key tenants mismatch', () => {
-        const tenantService = new TenantService(db, true);
-        tenantService.createTenant({
-            name: 'Key Tenant',
-            slug: 'key-tenant',
-            ownerEmail: 'key@test.com',
-        });
-        const tenant = tenantService.getTenantBySlug('key-tenant')!;
-        const apiKey = 'mismatch-test-key';
-        registerApiKey(db, tenant.id, apiKey);
+  test('returns 403 when header and API key tenants mismatch', () => {
+    const tenantService = new TenantService(db, true);
+    tenantService.createTenant({
+      name: 'Key Tenant',
+      slug: 'key-tenant',
+      ownerEmail: 'key@test.com',
+    });
+    const tenant = tenantService.getTenantBySlug('key-tenant')!;
+    const apiKey = 'mismatch-test-key';
+    registerApiKey(db, tenant.id, apiKey);
 
-        const req = new Request('http://localhost:3000/api/agents', {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'X-Tenant-ID': 'wrong-tenant-id',
-            },
-        });
-
-        const result = extractTenantId(req, db, tenantService);
-        expect(result).toBeInstanceOf(Response);
-        expect((result as Response).status).toBe(403);
+    const req = new Request('http://localhost:3000/api/agents', {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'X-Tenant-ID': 'wrong-tenant-id',
+      },
     });
 
-    test('API key takes precedence over header (matching case succeeds)', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Precedence Tenant',
-            slug: 'precedence-test',
-            ownerEmail: 'prec@test.com',
-        });
-        const apiKey = 'precedence-test-key';
-        registerApiKey(db, tenant.id, apiKey);
+    const result = extractTenantId(req, db, tenantService);
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(403);
+  });
 
-        const req = new Request('http://localhost:3000/api/agents', {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'X-Tenant-ID': tenant.id,
-            },
-        });
+  test('API key takes precedence over header (matching case succeeds)', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Precedence Tenant',
+      slug: 'precedence-test',
+      ownerEmail: 'prec@test.com',
+    });
+    const apiKey = 'precedence-test-key';
+    registerApiKey(db, tenant.id, apiKey);
 
-        const result = extractTenantId(req, db, tenantService);
-        expect(result).not.toBeInstanceOf(Response);
-        expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+    const req = new Request('http://localhost:3000/api/agents', {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'X-Tenant-ID': tenant.id,
+      },
     });
 
-    test('falls through to header when no API key match', () => {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Header Fallback',
-            slug: 'header-fallback',
-            ownerEmail: 'hf@test.com',
-        });
+    const result = extractTenantId(req, db, tenantService);
+    expect(result).not.toBeInstanceOf(Response);
+    expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+  });
 
-        const req = new Request('http://localhost:3000/api/agents', {
-            headers: {
-                'Authorization': 'Bearer unknown-key',
-                'X-Tenant-ID': tenant.id,
-            },
-        });
-
-        const result = extractTenantId(req, db, tenantService);
-        expect(result).not.toBeInstanceOf(Response);
-        expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+  test('falls through to header when no API key match', () => {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Header Fallback',
+      slug: 'header-fallback',
+      ownerEmail: 'hf@test.com',
     });
 
-    test('returns default context in single-tenant mode', () => {
-        const tenantService = new TenantService(db, false);
-        const req = new Request('http://localhost:3000/api/agents', {
-            headers: { 'X-Tenant-ID': 'anything' },
-        });
-
-        const result = extractTenantId(req, db, tenantService);
-        expect(result).not.toBeInstanceOf(Response);
-        expect((result as { tenantId: string }).tenantId).toBe(DEFAULT_TENANT_ID);
+    const req = new Request('http://localhost:3000/api/agents', {
+      headers: {
+        Authorization: 'Bearer unknown-key',
+        'X-Tenant-ID': tenant.id,
+      },
     });
+
+    const result = extractTenantId(req, db, tenantService);
+    expect(result).not.toBeInstanceOf(Response);
+    expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+  });
+
+  test('returns default context in single-tenant mode', () => {
+    const tenantService = new TenantService(db, false);
+    const req = new Request('http://localhost:3000/api/agents', {
+      headers: { 'X-Tenant-ID': 'anything' },
+    });
+
+    const result = extractTenantId(req, db, tenantService);
+    expect(result).not.toBeInstanceOf(Response);
+    expect((result as { tenantId: string }).tenantId).toBe(DEFAULT_TENANT_ID);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -842,19 +880,19 @@ describe('extractTenantId priority', () => {
 // ---------------------------------------------------------------------------
 
 describe('tenantTopic', () => {
-    test('returns flat topic when no tenantId', () => {
-        expect(tenantTopic('council')).toBe('council');
-        expect(tenantTopic('council', undefined)).toBe('council');
-    });
+  test('returns flat topic when no tenantId', () => {
+    expect(tenantTopic('council')).toBe('council');
+    expect(tenantTopic('council', undefined)).toBe('council');
+  });
 
-    test('returns flat topic for default tenant', () => {
-        expect(tenantTopic('council', 'default')).toBe('council');
-    });
+  test('returns flat topic for default tenant', () => {
+    expect(tenantTopic('council', 'default')).toBe('council');
+  });
 
-    test('returns scoped topic for real tenant', () => {
-        expect(tenantTopic('council', 'tenant-abc')).toBe('council:tenant-abc');
-        expect(tenantTopic('algochat', 'tenant-xyz')).toBe('algochat:tenant-xyz');
-    });
+  test('returns scoped topic for real tenant', () => {
+    expect(tenantTopic('council', 'tenant-abc')).toBe('council:tenant-abc');
+    expect(tenantTopic('algochat', 'tenant-xyz')).toBe('algochat:tenant-xyz');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -862,53 +900,53 @@ describe('tenantTopic', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant council isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestCouncil(tenantId: string, name: string) {
-        // Councils need agent IDs — create agents in the same tenant
-        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
-        return createCouncil(db, { name, agentIds: [agent.id] }, tenantId);
-    }
+  function createTestCouncil(tenantId: string, name: string) {
+    // Councils need agent IDs — create agents in the same tenant
+    const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+    return createCouncil(db, { name, agentIds: [agent.id] }, tenantId);
+  }
 
-    test('Tenant A cannot list Tenant B councils', () => {
-        createTestCouncil(TENANT_A, 'Council A');
-        createTestCouncil(TENANT_B, 'Council B');
+  test('Tenant A cannot list Tenant B councils', () => {
+    createTestCouncil(TENANT_A, 'Council A');
+    createTestCouncil(TENANT_B, 'Council B');
 
-        const councilsA = listCouncils(db, TENANT_A);
-        const councilsB = listCouncils(db, TENANT_B);
+    const councilsA = listCouncils(db, TENANT_A);
+    const councilsB = listCouncils(db, TENANT_B);
 
-        expect(councilsA).toHaveLength(1);
-        expect(councilsA[0].name).toBe('Council A');
-        expect(councilsB).toHaveLength(1);
-        expect(councilsB[0].name).toBe('Council B');
-    });
+    expect(councilsA).toHaveLength(1);
+    expect(councilsA[0].name).toBe('Council A');
+    expect(councilsB).toHaveLength(1);
+    expect(councilsB[0].name).toBe('Council B');
+  });
 
-    test('Tenant A cannot get Tenant B council by ID', () => {
-        const councilB = createTestCouncil(TENANT_B, 'Council B');
+  test('Tenant A cannot get Tenant B council by ID', () => {
+    const councilB = createTestCouncil(TENANT_B, 'Council B');
 
-        expect(getCouncil(db, councilB.id, TENANT_A)).toBeNull();
-        expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getCouncil(db, councilB.id, TENANT_A)).toBeNull();
+    expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B council', () => {
-        const councilB = createTestCouncil(TENANT_B, 'Council B');
+  test('Tenant A cannot update Tenant B council', () => {
+    const councilB = createTestCouncil(TENANT_B, 'Council B');
 
-        const result = updateCouncil(db, councilB.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateCouncil(db, councilB.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getCouncil(db, councilB.id, TENANT_B);
-        expect(original!.name).toBe('Council B');
-    });
+    const original = getCouncil(db, councilB.id, TENANT_B);
+    expect(original!.name).toBe('Council B');
+  });
 
-    test('Tenant A cannot delete Tenant B council', () => {
-        const councilB = createTestCouncil(TENANT_B, 'Council B');
+  test('Tenant A cannot delete Tenant B council', () => {
+    const councilB = createTestCouncil(TENANT_B, 'Council B');
 
-        const deleted = deleteCouncil(db, councilB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteCouncil(db, councilB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -916,57 +954,61 @@ describe('Cross-tenant council isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant schedule isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestSchedule(tenantId: string, name: string) {
-        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
-        return createSchedule(db, {
-            agentId: agent.id,
-            name,
-            actions: [{ type: 'prompt', prompt: 'test' }],
-            intervalMs: 3600000,
-        } as any, tenantId);
-    }
+  function createTestSchedule(tenantId: string, name: string) {
+    const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+    return createSchedule(
+      db,
+      {
+        agentId: agent.id,
+        name,
+        actions: [{ type: 'prompt', prompt: 'test' }],
+        intervalMs: 3600000,
+      } as any,
+      tenantId,
+    );
+  }
 
-    test('Tenant A cannot list Tenant B schedules', () => {
-        createTestSchedule(TENANT_A, 'Schedule A');
-        createTestSchedule(TENANT_B, 'Schedule B');
+  test('Tenant A cannot list Tenant B schedules', () => {
+    createTestSchedule(TENANT_A, 'Schedule A');
+    createTestSchedule(TENANT_B, 'Schedule B');
 
-        const schedulesA = listSchedules(db, undefined, TENANT_A);
-        const schedulesB = listSchedules(db, undefined, TENANT_B);
+    const schedulesA = listSchedules(db, undefined, TENANT_A);
+    const schedulesB = listSchedules(db, undefined, TENANT_B);
 
-        expect(schedulesA).toHaveLength(1);
-        expect(schedulesA[0].name).toBe('Schedule A');
-        expect(schedulesB).toHaveLength(1);
-        expect(schedulesB[0].name).toBe('Schedule B');
-    });
+    expect(schedulesA).toHaveLength(1);
+    expect(schedulesA[0].name).toBe('Schedule A');
+    expect(schedulesB).toHaveLength(1);
+    expect(schedulesB[0].name).toBe('Schedule B');
+  });
 
-    test('Tenant A cannot get Tenant B schedule by ID', () => {
-        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+  test('Tenant A cannot get Tenant B schedule by ID', () => {
+    const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
 
-        expect(getSchedule(db, scheduleB.id, TENANT_A)).toBeNull();
-        expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getSchedule(db, scheduleB.id, TENANT_A)).toBeNull();
+    expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B schedule', () => {
-        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+  test('Tenant A cannot update Tenant B schedule', () => {
+    const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
 
-        const result = updateSchedule(db, scheduleB.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateSchedule(db, scheduleB.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getSchedule(db, scheduleB.id, TENANT_B);
-        expect(original!.name).toBe('Schedule B');
-    });
+    const original = getSchedule(db, scheduleB.id, TENANT_B);
+    expect(original!.name).toBe('Schedule B');
+  });
 
-    test('Tenant A cannot delete Tenant B schedule', () => {
-        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+  test('Tenant A cannot delete Tenant B schedule', () => {
+    const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
 
-        const deleted = deleteSchedule(db, scheduleB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteSchedule(db, scheduleB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -974,57 +1016,61 @@ describe('Cross-tenant schedule isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant workflow isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestWorkflow(tenantId: string, name: string) {
-        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
-        return createWorkflow(db, {
-            agentId: agent.id,
-            name,
-            nodes: [],
-            edges: [],
-        }, tenantId);
-    }
+  function createTestWorkflow(tenantId: string, name: string) {
+    const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+    return createWorkflow(
+      db,
+      {
+        agentId: agent.id,
+        name,
+        nodes: [],
+        edges: [],
+      },
+      tenantId,
+    );
+  }
 
-    test('Tenant A cannot list Tenant B workflows', () => {
-        createTestWorkflow(TENANT_A, 'Workflow A');
-        createTestWorkflow(TENANT_B, 'Workflow B');
+  test('Tenant A cannot list Tenant B workflows', () => {
+    createTestWorkflow(TENANT_A, 'Workflow A');
+    createTestWorkflow(TENANT_B, 'Workflow B');
 
-        const workflowsA = listWorkflows(db, undefined, TENANT_A);
-        const workflowsB = listWorkflows(db, undefined, TENANT_B);
+    const workflowsA = listWorkflows(db, undefined, TENANT_A);
+    const workflowsB = listWorkflows(db, undefined, TENANT_B);
 
-        expect(workflowsA).toHaveLength(1);
-        expect(workflowsA[0].name).toBe('Workflow A');
-        expect(workflowsB).toHaveLength(1);
-        expect(workflowsB[0].name).toBe('Workflow B');
-    });
+    expect(workflowsA).toHaveLength(1);
+    expect(workflowsA[0].name).toBe('Workflow A');
+    expect(workflowsB).toHaveLength(1);
+    expect(workflowsB[0].name).toBe('Workflow B');
+  });
 
-    test('Tenant A cannot get Tenant B workflow by ID', () => {
-        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+  test('Tenant A cannot get Tenant B workflow by ID', () => {
+    const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
 
-        expect(getWorkflow(db, workflowB.id, TENANT_A)).toBeNull();
-        expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getWorkflow(db, workflowB.id, TENANT_A)).toBeNull();
+    expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B workflow', () => {
-        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+  test('Tenant A cannot update Tenant B workflow', () => {
+    const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
 
-        const result = updateWorkflow(db, workflowB.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateWorkflow(db, workflowB.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getWorkflow(db, workflowB.id, TENANT_B);
-        expect(original!.name).toBe('Workflow B');
-    });
+    const original = getWorkflow(db, workflowB.id, TENANT_B);
+    expect(original!.name).toBe('Workflow B');
+  });
 
-    test('Tenant A cannot delete Tenant B workflow', () => {
-        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+  test('Tenant A cannot delete Tenant B workflow', () => {
+    const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
 
-        const deleted = deleteWorkflow(db, workflowB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteWorkflow(db, workflowB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1032,59 +1078,63 @@ describe('Cross-tenant workflow isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant webhook isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestWebhook(tenantId: string, repo: string) {
-        const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
-        const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
-        return createWebhookRegistration(db, {
-            agentId: agent.id,
-            repo,
-            events: ['issue_comment'],
-            mentionUsername: 'testbot',
-            projectId: project.id,
-        } as any, tenantId);
-    }
+  function createTestWebhook(tenantId: string, repo: string) {
+    const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
+    const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
+    return createWebhookRegistration(
+      db,
+      {
+        agentId: agent.id,
+        repo,
+        events: ['issue_comment'],
+        mentionUsername: 'testbot',
+        projectId: project.id,
+      } as any,
+      tenantId,
+    );
+  }
 
-    test('Tenant A cannot list Tenant B webhooks', () => {
-        createTestWebhook(TENANT_A, 'owner/repo-a');
-        createTestWebhook(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot list Tenant B webhooks', () => {
+    createTestWebhook(TENANT_A, 'owner/repo-a');
+    createTestWebhook(TENANT_B, 'owner/repo-b');
 
-        const webhooksA = listWebhookRegistrations(db, undefined, TENANT_A);
-        const webhooksB = listWebhookRegistrations(db, undefined, TENANT_B);
+    const webhooksA = listWebhookRegistrations(db, undefined, TENANT_A);
+    const webhooksB = listWebhookRegistrations(db, undefined, TENANT_B);
 
-        expect(webhooksA).toHaveLength(1);
-        expect(webhooksA[0].repo).toBe('owner/repo-a');
-        expect(webhooksB).toHaveLength(1);
-        expect(webhooksB[0].repo).toBe('owner/repo-b');
-    });
+    expect(webhooksA).toHaveLength(1);
+    expect(webhooksA[0].repo).toBe('owner/repo-a');
+    expect(webhooksB).toHaveLength(1);
+    expect(webhooksB[0].repo).toBe('owner/repo-b');
+  });
 
-    test('Tenant A cannot get Tenant B webhook by ID', () => {
-        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot get Tenant B webhook by ID', () => {
+    const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
 
-        expect(getWebhookRegistration(db, webhookB.id, TENANT_A)).toBeNull();
-        expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getWebhookRegistration(db, webhookB.id, TENANT_A)).toBeNull();
+    expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B webhook', () => {
-        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot update Tenant B webhook', () => {
+    const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
 
-        const result = updateWebhookRegistration(db, webhookB.id, { mentionUsername: 'hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateWebhookRegistration(db, webhookB.id, { mentionUsername: 'hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getWebhookRegistration(db, webhookB.id, TENANT_B);
-        expect(original!.mentionUsername).toBe('testbot');
-    });
+    const original = getWebhookRegistration(db, webhookB.id, TENANT_B);
+    expect(original!.mentionUsername).toBe('testbot');
+  });
 
-    test('Tenant A cannot delete Tenant B webhook', () => {
-        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot delete Tenant B webhook', () => {
+    const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
 
-        const deleted = deleteWebhookRegistration(db, webhookB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteWebhookRegistration(db, webhookB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1092,58 +1142,62 @@ describe('Cross-tenant webhook isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant mention-polling isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestPollingConfig(tenantId: string, repo: string) {
-        const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
-        const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
-        return createMentionPollingConfig(db, {
-            agentId: agent.id,
-            repo,
-            mentionUsername: 'testbot',
-            projectId: project.id,
-        }, tenantId);
-    }
+  function createTestPollingConfig(tenantId: string, repo: string) {
+    const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
+    const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
+    return createMentionPollingConfig(
+      db,
+      {
+        agentId: agent.id,
+        repo,
+        mentionUsername: 'testbot',
+        projectId: project.id,
+      },
+      tenantId,
+    );
+  }
 
-    test('Tenant A cannot list Tenant B polling configs', () => {
-        createTestPollingConfig(TENANT_A, 'owner/repo-a');
-        createTestPollingConfig(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot list Tenant B polling configs', () => {
+    createTestPollingConfig(TENANT_A, 'owner/repo-a');
+    createTestPollingConfig(TENANT_B, 'owner/repo-b');
 
-        const configsA = listMentionPollingConfigs(db, undefined, TENANT_A);
-        const configsB = listMentionPollingConfigs(db, undefined, TENANT_B);
+    const configsA = listMentionPollingConfigs(db, undefined, TENANT_A);
+    const configsB = listMentionPollingConfigs(db, undefined, TENANT_B);
 
-        expect(configsA).toHaveLength(1);
-        expect(configsA[0].repo).toBe('owner/repo-a');
-        expect(configsB).toHaveLength(1);
-        expect(configsB[0].repo).toBe('owner/repo-b');
-    });
+    expect(configsA).toHaveLength(1);
+    expect(configsA[0].repo).toBe('owner/repo-a');
+    expect(configsB).toHaveLength(1);
+    expect(configsB[0].repo).toBe('owner/repo-b');
+  });
 
-    test('Tenant A cannot get Tenant B polling config by ID', () => {
-        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot get Tenant B polling config by ID', () => {
+    const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
 
-        expect(getMentionPollingConfig(db, configB.id, TENANT_A)).toBeNull();
-        expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getMentionPollingConfig(db, configB.id, TENANT_A)).toBeNull();
+    expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B polling config', () => {
-        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot update Tenant B polling config', () => {
+    const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
 
-        const result = updateMentionPollingConfig(db, configB.id, { mentionUsername: 'hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateMentionPollingConfig(db, configB.id, { mentionUsername: 'hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getMentionPollingConfig(db, configB.id, TENANT_B);
-        expect(original!.mentionUsername).toBe('testbot');
-    });
+    const original = getMentionPollingConfig(db, configB.id, TENANT_B);
+    expect(original!.mentionUsername).toBe('testbot');
+  });
 
-    test('Tenant A cannot delete Tenant B polling config', () => {
-        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+  test('Tenant A cannot delete Tenant B polling config', () => {
+    const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
 
-        const deleted = deleteMentionPollingConfig(db, configB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteMentionPollingConfig(db, configB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1151,58 +1205,62 @@ describe('Cross-tenant mention-polling isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant MCP server config isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestMcpConfig(tenantId: string, name: string) {
-        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
-        return createMcpServerConfig(db, {
-            agentId: agent.id,
-            name,
-            command: 'echo',
-            args: [],
-            envVars: {},
-        }, tenantId);
-    }
+  function createTestMcpConfig(tenantId: string, name: string) {
+    const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+    return createMcpServerConfig(
+      db,
+      {
+        agentId: agent.id,
+        name,
+        command: 'echo',
+        args: [],
+        envVars: {},
+      },
+      tenantId,
+    );
+  }
 
-    test('Tenant A cannot list Tenant B MCP configs', () => {
-        createTestMcpConfig(TENANT_A, 'MCP A');
-        createTestMcpConfig(TENANT_B, 'MCP B');
+  test('Tenant A cannot list Tenant B MCP configs', () => {
+    createTestMcpConfig(TENANT_A, 'MCP A');
+    createTestMcpConfig(TENANT_B, 'MCP B');
 
-        const configsA = listMcpServerConfigs(db, undefined, TENANT_A);
-        const configsB = listMcpServerConfigs(db, undefined, TENANT_B);
+    const configsA = listMcpServerConfigs(db, undefined, TENANT_A);
+    const configsB = listMcpServerConfigs(db, undefined, TENANT_B);
 
-        expect(configsA).toHaveLength(1);
-        expect(configsA[0].name).toBe('MCP A');
-        expect(configsB).toHaveLength(1);
-        expect(configsB[0].name).toBe('MCP B');
-    });
+    expect(configsA).toHaveLength(1);
+    expect(configsA[0].name).toBe('MCP A');
+    expect(configsB).toHaveLength(1);
+    expect(configsB[0].name).toBe('MCP B');
+  });
 
-    test('Tenant A cannot get Tenant B MCP config by ID', () => {
-        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+  test('Tenant A cannot get Tenant B MCP config by ID', () => {
+    const configB = createTestMcpConfig(TENANT_B, 'MCP B');
 
-        expect(getMcpServerConfig(db, configB.id, TENANT_A)).toBeNull();
-        expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getMcpServerConfig(db, configB.id, TENANT_A)).toBeNull();
+    expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
+  });
 
-    test('Tenant A cannot update Tenant B MCP config', () => {
-        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+  test('Tenant A cannot update Tenant B MCP config', () => {
+    const configB = createTestMcpConfig(TENANT_B, 'MCP B');
 
-        const result = updateMcpServerConfig(db, configB.id, { name: 'Hacked' }, TENANT_A);
-        expect(result).toBeNull();
+    const result = updateMcpServerConfig(db, configB.id, { name: 'Hacked' }, TENANT_A);
+    expect(result).toBeNull();
 
-        const original = getMcpServerConfig(db, configB.id, TENANT_B);
-        expect(original!.name).toBe('MCP B');
-    });
+    const original = getMcpServerConfig(db, configB.id, TENANT_B);
+    expect(original!.name).toBe('MCP B');
+  });
 
-    test('Tenant A cannot delete Tenant B MCP config', () => {
-        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+  test('Tenant A cannot delete Tenant B MCP config', () => {
+    const configB = createTestMcpConfig(TENANT_B, 'MCP B');
 
-        const deleted = deleteMcpServerConfig(db, configB.id, TENANT_A);
-        expect(deleted).toBe(false);
+    const deleted = deleteMcpServerConfig(db, configB.id, TENANT_A);
+    expect(deleted).toBe(false);
 
-        expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
-    });
+    expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1210,39 +1268,39 @@ describe('Cross-tenant MCP server config isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant work task isolation', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    function createTestWorkTask(tenantId: string, description: string) {
-        const agent = createAgent(db, { name: `Agent for ${description}` }, tenantId);
-        const project = createProject(db, { name: `Project for ${description}`, workingDir: '/tmp/test' }, tenantId);
-        return createWorkTask(db, {
-            agentId: agent.id,
-            projectId: project.id,
-            description,
-            tenantId,
-        });
-    }
-
-    test('Tenant A cannot list Tenant B work tasks', () => {
-        createTestWorkTask(TENANT_A, 'Task A');
-        createTestWorkTask(TENANT_B, 'Task B');
-
-        const tasksA = listWorkTasks(db, undefined, TENANT_A);
-        const tasksB = listWorkTasks(db, undefined, TENANT_B);
-
-        expect(tasksA).toHaveLength(1);
-        expect(tasksA[0].description).toBe('Task A');
-        expect(tasksB).toHaveLength(1);
-        expect(tasksB[0].description).toBe('Task B');
+  function createTestWorkTask(tenantId: string, description: string) {
+    const agent = createAgent(db, { name: `Agent for ${description}` }, tenantId);
+    const project = createProject(db, { name: `Project for ${description}`, workingDir: '/tmp/test' }, tenantId);
+    return createWorkTask(db, {
+      agentId: agent.id,
+      projectId: project.id,
+      description,
+      tenantId,
     });
+  }
 
-    test('Tenant A cannot get Tenant B work task by ID', () => {
-        const taskB = createTestWorkTask(TENANT_B, 'Task B');
+  test('Tenant A cannot list Tenant B work tasks', () => {
+    createTestWorkTask(TENANT_A, 'Task A');
+    createTestWorkTask(TENANT_B, 'Task B');
 
-        expect(getWorkTask(db, taskB.id, TENANT_A)).toBeNull();
-        expect(getWorkTask(db, taskB.id, TENANT_B)).not.toBeNull();
-    });
+    const tasksA = listWorkTasks(db, undefined, TENANT_A);
+    const tasksB = listWorkTasks(db, undefined, TENANT_B);
+
+    expect(tasksA).toHaveLength(1);
+    expect(tasksA[0].description).toBe('Task A');
+    expect(tasksB).toHaveLength(1);
+    expect(tasksB[0].description).toBe('Task B');
+  });
+
+  test('Tenant A cannot get Tenant B work task by ID', () => {
+    const taskB = createTestWorkTask(TENANT_B, 'Task B');
+
+    expect(getWorkTask(db, taskB.id, TENANT_A)).toBeNull();
+    expect(getWorkTask(db, taskB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1250,17 +1308,17 @@ describe('Cross-tenant work task isolation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Cross-tenant persona access via agent ownership', () => {
-    const TENANT_A = 'tenant-a';
-    const TENANT_B = 'tenant-b';
+  const TENANT_A = 'tenant-a';
+  const TENANT_B = 'tenant-b';
 
-    test('getAgent with wrong tenant returns null (blocks persona CRUD)', () => {
-        const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
+  test('getAgent with wrong tenant returns null (blocks persona CRUD)', () => {
+    const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
 
-        // Tenant A trying to access Tenant B's agent
-        expect(getAgent(db, agentB.id, TENANT_A)).toBeNull();
-        // Tenant B can access their own agent
-        expect(getAgent(db, agentB.id, TENANT_B)).not.toBeNull();
-    });
+    // Tenant A trying to access Tenant B's agent
+    expect(getAgent(db, agentB.id, TENANT_A)).toBeNull();
+    // Tenant B can access their own agent
+    expect(getAgent(db, agentB.id, TENANT_B)).not.toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1268,45 +1326,55 @@ describe('Cross-tenant persona access via agent ownership', () => {
 // ---------------------------------------------------------------------------
 
 describe('Default tenant backwards compatibility', () => {
-    test('Resources created without tenant use DEFAULT_TENANT_ID', () => {
-        const agent = createAgent(db, { name: 'Default Agent' });
-        const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agent.id) as { tenant_id: string };
-        expect(row.tenant_id).toBe(DEFAULT_TENANT_ID);
-    });
+  test('Resources created without tenant use DEFAULT_TENANT_ID', () => {
+    const agent = createAgent(db, { name: 'Default Agent' });
+    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agent.id) as { tenant_id: string };
+    expect(row.tenant_id).toBe(DEFAULT_TENANT_ID);
+  });
 
-    test('Default tenant can access resources with DEFAULT_TENANT_ID', () => {
-        const agent = createAgent(db, { name: 'Default Agent' });
-        expect(getAgent(db, agent.id, DEFAULT_TENANT_ID)).not.toBeNull();
-        expect(getAgent(db, agent.id)).not.toBeNull(); // omit param = default
-    });
+  test('Default tenant can access resources with DEFAULT_TENANT_ID', () => {
+    const agent = createAgent(db, { name: 'Default Agent' });
+    expect(getAgent(db, agent.id, DEFAULT_TENANT_ID)).not.toBeNull();
+    expect(getAgent(db, agent.id)).not.toBeNull(); // omit param = default
+  });
 
-    test('Newly-scoped tables have tenant_id column', () => {
-        const newlyScoped = [
-            'councils', 'council_launches',
-            'agent_schedules', 'schedule_executions',
-            'workflows', 'workflow_runs',
-            'mention_polling_configs', 'mcp_server_configs', 'webhook_registrations',
-        ];
-        for (const table of newlyScoped) {
-            const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
-            const colNames = cols.map((c) => c.name);
-            expect(colNames).toContain('tenant_id');
-        }
-    });
+  test('Newly-scoped tables have tenant_id column', () => {
+    const newlyScoped = [
+      'councils',
+      'council_launches',
+      'agent_schedules',
+      'schedule_executions',
+      'workflows',
+      'workflow_runs',
+      'mention_polling_configs',
+      'mcp_server_configs',
+      'webhook_registrations',
+    ];
+    for (const table of newlyScoped) {
+      const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+      const colNames = cols.map((c) => c.name);
+      expect(colNames).toContain('tenant_id');
+    }
+  });
 
-    test('Newly-scoped tables have tenant_id index', () => {
-        const newlyScoped = [
-            'councils', 'council_launches',
-            'agent_schedules', 'schedule_executions',
-            'workflows', 'workflow_runs',
-            'mention_polling_configs', 'mcp_server_configs', 'webhook_registrations',
-        ];
-        for (const table of newlyScoped) {
-            const indexes = db.query(`PRAGMA index_list(${table})`).all() as { name: string }[];
-            const indexNames = indexes.map((i) => i.name);
-            expect(indexNames.some(n => n.includes('tenant'))).toBe(true);
-        }
-    });
+  test('Newly-scoped tables have tenant_id index', () => {
+    const newlyScoped = [
+      'councils',
+      'council_launches',
+      'agent_schedules',
+      'schedule_executions',
+      'workflows',
+      'workflow_runs',
+      'mention_polling_configs',
+      'mcp_server_configs',
+      'webhook_registrations',
+    ];
+    for (const table of newlyScoped) {
+      const indexes = db.query(`PRAGMA index_list(${table})`).all() as { name: string }[];
+      const indexNames = indexes.map((i) => i.name);
+      expect(indexNames.some((n) => n.includes('tenant'))).toBe(true);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1314,68 +1382,67 @@ describe('Default tenant backwards compatibility', () => {
 // ---------------------------------------------------------------------------
 
 describe('tenantGuard maps tenantRole to context.role', () => {
-    function makeTenantWithMember(role: 'owner' | 'operator' | 'viewer') {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Role Test Tenant',
-            slug: `role-test-${role}-${Date.now()}`,
-            ownerEmail: `owner-${role}@example.com`,
-        });
-        const apiKey = `test-key-${role}-${Date.now()}`;
-        registerApiKey(db, tenant.id, apiKey);
-        const hasher = new Bun.CryptoHasher('sha256');
-        hasher.update(apiKey);
-        const keyHash = hasher.digest('hex');
-        db.query('INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)')
-            .run(tenant.id, keyHash, role);
-        return { tenant, tenantService, apiKey };
-    }
-
-    test('owner tenant member maps to context.role = admin', () => {
-        const { tenantService, apiKey } = makeTenantWithMember('owner');
-        const req = new Request('http://localhost/', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        const ctx = createRequestContext();
-        ctx.authenticated = true;
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        expect(result).toBeNull();
-        expect(ctx.tenantRole).toBe('owner');
-        expect(ctx.role).toBe('admin');
+  function makeTenantWithMember(role: 'owner' | 'operator' | 'viewer') {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Role Test Tenant',
+      slug: `role-test-${role}-${Date.now()}`,
+      ownerEmail: `owner-${role}@example.com`,
     });
+    const apiKey = `test-key-${role}-${Date.now()}`;
+    registerApiKey(db, tenant.id, apiKey);
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(apiKey);
+    const keyHash = hasher.digest('hex');
+    db.query('INSERT INTO tenant_members (tenant_id, key_hash, role) VALUES (?, ?, ?)').run(tenant.id, keyHash, role);
+    return { tenant, tenantService, apiKey };
+  }
 
-    test('operator tenant member maps to context.role = user', () => {
-        const { tenantService, apiKey } = makeTenantWithMember('operator');
-        const req = new Request('http://localhost/', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        const ctx = createRequestContext();
-        ctx.authenticated = true;
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        expect(result).toBeNull();
-        expect(ctx.tenantRole).toBe('operator');
-        expect(ctx.role).toBe('user');
+  test('owner tenant member maps to context.role = admin', () => {
+    const { tenantService, apiKey } = makeTenantWithMember('owner');
+    const req = new Request('http://localhost/', {
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
+    const ctx = createRequestContext();
+    ctx.authenticated = true;
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    expect(result).toBeNull();
+    expect(ctx.tenantRole).toBe('owner');
+    expect(ctx.role).toBe('admin');
+  });
 
-    test('viewer tenant member maps to context.role = viewer and roleGuard blocks admin', () => {
-        const { tenantService, apiKey } = makeTenantWithMember('viewer');
-        const req = new Request('http://localhost/', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        const ctx = createRequestContext();
-        ctx.authenticated = true;
-        const guard = tenantGuard(db, tenantService);
-        guard(req, new URL('http://localhost/'), ctx);
-        expect(ctx.tenantRole).toBe('viewer');
-        expect(ctx.role).toBe('viewer');
-
-        // roleGuard('admin') should block viewer
-        const blocked = roleGuard('admin')(req, new URL('http://localhost/admin'), ctx);
-        expect(blocked).not.toBeNull();
-        expect(blocked!.status).toBe(403);
+  test('operator tenant member maps to context.role = user', () => {
+    const { tenantService, apiKey } = makeTenantWithMember('operator');
+    const req = new Request('http://localhost/', {
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
+    const ctx = createRequestContext();
+    ctx.authenticated = true;
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    expect(result).toBeNull();
+    expect(ctx.tenantRole).toBe('operator');
+    expect(ctx.role).toBe('user');
+  });
+
+  test('viewer tenant member maps to context.role = viewer and roleGuard blocks admin', () => {
+    const { tenantService, apiKey } = makeTenantWithMember('viewer');
+    const req = new Request('http://localhost/', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    const ctx = createRequestContext();
+    ctx.authenticated = true;
+    const guard = tenantGuard(db, tenantService);
+    guard(req, new URL('http://localhost/'), ctx);
+    expect(ctx.tenantRole).toBe('viewer');
+    expect(ctx.role).toBe('viewer');
+
+    // roleGuard('admin') should block viewer
+    const blocked = roleGuard('admin')(req, new URL('http://localhost/admin'), ctx);
+    expect(blocked).not.toBeNull();
+    expect(blocked!.status).toBe(403);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1383,100 +1450,100 @@ describe('tenantGuard maps tenantRole to context.role', () => {
 // ---------------------------------------------------------------------------
 
 describe('tenantGuard proxy trust mode (TRUST_PROXY=1)', () => {
-    const savedTrustProxy = process.env.TRUST_PROXY;
+  const savedTrustProxy = process.env.TRUST_PROXY;
 
-    afterEach(() => {
-        if (savedTrustProxy === undefined) {
-            delete process.env.TRUST_PROXY;
-        } else {
-            process.env.TRUST_PROXY = savedTrustProxy;
-        }
-    });
-
-    function makeTenantWithEmailMember(email: string, role: 'owner' | 'operator' | 'viewer' = 'operator') {
-        const tenantService = new TenantService(db, true);
-        const tenant = tenantService.createTenant({
-            name: 'Proxy Trust Tenant',
-            slug: `proxy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            ownerEmail: email,
-        });
-        registerMemberByEmail(db, tenant.id, email, role);
-        return { tenant, tenantService };
+  afterEach(() => {
+    if (savedTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = savedTrustProxy;
     }
+  });
 
-    test('TRUST_PROXY=1 with valid X-Forwarded-Email resolves tenant member', () => {
-        process.env.TRUST_PROXY = '1';
-        const email = 'alice@example.com';
-        const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
-        const req = new Request('http://localhost/', {
-            headers: {
-                'x-forwarded-email': email,
-                'x-tenant-id': tenant.id,
-            },
-        });
-        const ctx = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        expect(result).toBeNull();
-        expect(ctx.tenantRole).toBe('owner');
-        expect(ctx.role).toBe('admin');
-        expect(ctx.authenticated).toBe(true);
+  function makeTenantWithEmailMember(email: string, role: 'owner' | 'operator' | 'viewer' = 'operator') {
+    const tenantService = new TenantService(db, true);
+    const tenant = tenantService.createTenant({
+      name: 'Proxy Trust Tenant',
+      slug: `proxy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      ownerEmail: email,
     });
+    registerMemberByEmail(db, tenant.id, email, role);
+    return { tenant, tenantService };
+  }
 
-    test('TRUST_PROXY=1 with unregistered email returns 401', () => {
-        process.env.TRUST_PROXY = '1';
-        const { tenant, tenantService } = makeTenantWithEmailMember('registered@example.com', 'operator');
-        const req = new Request('http://localhost/', {
-            headers: {
-                'x-forwarded-email': 'unknown@example.com',
-                'x-tenant-id': tenant.id,
-            },
-        });
-        const ctx = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        expect(result).not.toBeNull();
-        expect(result!.status).toBe(401);
+  test('TRUST_PROXY=1 with valid X-Forwarded-Email resolves tenant member', () => {
+    process.env.TRUST_PROXY = '1';
+    const email = 'alice@example.com';
+    const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
+    const req = new Request('http://localhost/', {
+      headers: {
+        'x-forwarded-email': email,
+        'x-tenant-id': tenant.id,
+      },
     });
+    const ctx = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    expect(result).toBeNull();
+    expect(ctx.tenantRole).toBe('owner');
+    expect(ctx.role).toBe('admin');
+    expect(ctx.authenticated).toBe(true);
+  });
 
-    test('TRUST_PROXY not set: X-Forwarded-Email header is ignored', () => {
-        delete process.env.TRUST_PROXY;
-        const email = 'alice@example.com';
-        const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
-        const req = new Request('http://localhost/', {
-            headers: {
-                'x-forwarded-email': email,
-                'x-tenant-id': tenant.id,
-            },
-        });
-        const ctx = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        // No API key and TRUST_PROXY not set — no 401 (guard doesn't enforce auth)
-        expect(result).toBeNull();
-        expect(ctx.tenantRole).toBeUndefined();
+  test('TRUST_PROXY=1 with unregistered email returns 401', () => {
+    process.env.TRUST_PROXY = '1';
+    const { tenant, tenantService } = makeTenantWithEmailMember('registered@example.com', 'operator');
+    const req = new Request('http://localhost/', {
+      headers: {
+        'x-forwarded-email': 'unknown@example.com',
+        'x-tenant-id': tenant.id,
+      },
     });
+    const ctx = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
+  });
 
-    test('TRUST_PROXY=1 with malformed email is ignored (no lookup attempt)', () => {
-        process.env.TRUST_PROXY = '1';
-        const { tenant, tenantService } = makeTenantWithEmailMember('valid@example.com', 'owner');
-        const req = new Request('http://localhost/', {
-            headers: {
-                'x-forwarded-email': 'not-an-email',
-                'x-tenant-id': tenant.id,
-            },
-        });
-        const ctx = createRequestContext();
-        const guard = tenantGuard(db, tenantService);
-        const result = guard(req, new URL('http://localhost/'), ctx);
-        // Malformed email passes through without setting role or returning error
-        expect(result).toBeNull();
-        expect(ctx.tenantRole).toBeUndefined();
+  test('TRUST_PROXY not set: X-Forwarded-Email header is ignored', () => {
+    delete process.env.TRUST_PROXY;
+    const email = 'alice@example.com';
+    const { tenant, tenantService } = makeTenantWithEmailMember(email, 'owner');
+    const req = new Request('http://localhost/', {
+      headers: {
+        'x-forwarded-email': email,
+        'x-tenant-id': tenant.id,
+      },
     });
+    const ctx = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    // No API key and TRUST_PROXY not set — no 401 (guard doesn't enforce auth)
+    expect(result).toBeNull();
+    expect(ctx.tenantRole).toBeUndefined();
+  });
 
-    test('tenant_members email column exists after migration', () => {
-        const cols = db.query('PRAGMA table_info(tenant_members)').all() as { name: string }[];
-        const colNames = cols.map((c) => c.name);
-        expect(colNames).toContain('email');
+  test('TRUST_PROXY=1 with malformed email is ignored (no lookup attempt)', () => {
+    process.env.TRUST_PROXY = '1';
+    const { tenant, tenantService } = makeTenantWithEmailMember('valid@example.com', 'owner');
+    const req = new Request('http://localhost/', {
+      headers: {
+        'x-forwarded-email': 'not-an-email',
+        'x-tenant-id': tenant.id,
+      },
     });
+    const ctx = createRequestContext();
+    const guard = tenantGuard(db, tenantService);
+    const result = guard(req, new URL('http://localhost/'), ctx);
+    // Malformed email passes through without setting role or returning error
+    expect(result).toBeNull();
+    expect(ctx.tenantRole).toBeUndefined();
+  });
+
+  test('tenant_members email column exists after migration', () => {
+    const cols = db.query('PRAGMA table_info(tenant_members)').all() as { name: string }[];
+    const colNames = cols.map((c) => c.name);
+    expect(colNames).toContain('email');
+  });
 });

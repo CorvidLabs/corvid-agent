@@ -1,481 +1,488 @@
-import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
-import { listProjects, getProject, createProject, updateProject, deleteProject } from '../db/projects';
-import { listAgents, getAgent, createAgent, updateAgent, deleteAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding } from '../db/agents';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
-    listSessions,
-    getSession as _getSession,
-    createSession,
-    updateSession as _updateSession,
-    deleteSession,
-    getSessionMessages,
-    addSessionMessage,
-    listSessionsByCouncilLaunch,
-} from '../db/sessions';
+  addAgentFunding,
+  createAgent,
+  deleteAgent,
+  getAgent,
+  getAgentWalletMnemonic,
+  listAgents,
+  setAgentWallet,
+  updateAgent,
+} from '../db/agents';
 import {
-    listCouncils,
-    getCouncil,
-    createCouncil,
-    updateCouncil,
-    deleteCouncil,
-    createCouncilLaunch,
-    getCouncilLaunch,
-    listCouncilLaunches,
-    updateCouncilLaunchStage,
-} from '../db/councils';
-import {
-    listAllowlist,
-    getAllowlistEntry,
-    addToAllowlist,
-    updateAllowlistEntry,
-    removeFromAllowlist,
-    isAllowed,
+  addToAllowlist,
+  getAllowlistEntry,
+  isAllowed,
+  listAllowlist,
+  removeFromAllowlist,
+  updateAllowlistEntry,
 } from '../db/allowlist';
+import {
+  createCouncil,
+  createCouncilLaunch,
+  deleteCouncil,
+  getCouncil,
+  getCouncilLaunch,
+  listCouncilLaunches,
+  listCouncils,
+  updateCouncil,
+  updateCouncilLaunchStage,
+} from '../db/councils';
+import { createProject, deleteProject, getProject, listProjects, updateProject } from '../db/projects';
+import { runMigrations } from '../db/schema';
+import {
+  addSessionMessage,
+  createSession,
+  deleteSession,
+  getSessionMessages,
+  listSessions,
+  listSessionsByCouncilLaunch,
+} from '../db/sessions';
 
 let db: Database;
 
 beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    runMigrations(db);
+  db = new Database(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  runMigrations(db);
 });
 
 afterEach(() => {
-    db.close();
+  db.close();
 });
 
 describe('Projects CRUD', () => {
-    test('create and list projects', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        expect(project.name).toBe('Test');
-        expect(project.workingDir).toBe('/tmp');
-        expect(project.id).toBeTruthy();
+  test('create and list projects', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    expect(project.name).toBe('Test');
+    expect(project.workingDir).toBe('/tmp');
+    expect(project.id).toBeTruthy();
 
-        const all = listProjects(db);
-        expect(all).toHaveLength(1);
-        expect(all[0].id).toBe(project.id);
+    const all = listProjects(db);
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(project.id);
+  });
+
+  test('get project by id', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const found = getProject(db, project.id);
+    expect(found?.name).toBe('Test');
+
+    const notFound = getProject(db, 'nonexistent');
+    expect(notFound).toBeNull();
+  });
+
+  test('update project', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const updated = updateProject(db, project.id, { name: 'Updated' });
+    expect(updated?.name).toBe('Updated');
+    expect(updated?.workingDir).toBe('/tmp');
+  });
+
+  test('delete project', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    expect(deleteProject(db, project.id)).toBe(true);
+    expect(getProject(db, project.id)).toBeNull();
+    expect(deleteProject(db, 'nonexistent')).toBe(false);
+  });
+
+  test('create project with env vars', () => {
+    const project = createProject(db, {
+      name: 'Test',
+      workingDir: '/tmp',
+      envVars: { API_KEY: 'secret' },
     });
-
-    test('get project by id', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const found = getProject(db, project.id);
-        expect(found?.name).toBe('Test');
-
-        const notFound = getProject(db, 'nonexistent');
-        expect(notFound).toBeNull();
-    });
-
-    test('update project', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const updated = updateProject(db, project.id, { name: 'Updated' });
-        expect(updated?.name).toBe('Updated');
-        expect(updated?.workingDir).toBe('/tmp');
-    });
-
-    test('delete project', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        expect(deleteProject(db, project.id)).toBe(true);
-        expect(getProject(db, project.id)).toBeNull();
-        expect(deleteProject(db, 'nonexistent')).toBe(false);
-    });
-
-    test('create project with env vars', () => {
-        const project = createProject(db, {
-            name: 'Test',
-            workingDir: '/tmp',
-            envVars: { API_KEY: 'secret' },
-        });
-        expect(project.envVars).toEqual({ API_KEY: 'secret' });
-    });
+    expect(project.envVars).toEqual({ API_KEY: 'secret' });
+  });
 });
 
 describe('Agents CRUD', () => {
-    test('create and list agents', () => {
-        const agent = createAgent(db, { name: 'Agent 1', model: 'opus' });
-        expect(agent.name).toBe('Agent 1');
-        expect(agent.model).toBe('opus');
+  test('create and list agents', () => {
+    const agent = createAgent(db, { name: 'Agent 1', model: 'opus' });
+    expect(agent.name).toBe('Agent 1');
+    expect(agent.model).toBe('opus');
 
-        const all = listAgents(db);
-        expect(all).toHaveLength(1);
+    const all = listAgents(db);
+    expect(all).toHaveLength(1);
+  });
+
+  test('update agent with algochat settings', () => {
+    const agent = createAgent(db, { name: 'Agent 1' });
+    const updated = updateAgent(db, agent.id, {
+      algochatEnabled: true,
+      algochatAuto: true,
     });
+    expect(updated?.algochatEnabled).toBe(true);
+    expect(updated?.algochatAuto).toBe(true);
+  });
 
-    test('update agent with algochat settings', () => {
-        const agent = createAgent(db, { name: 'Agent 1' });
-        const updated = updateAgent(db, agent.id, {
-            algochatEnabled: true,
-            algochatAuto: true,
-        });
-        expect(updated?.algochatEnabled).toBe(true);
-        expect(updated?.algochatAuto).toBe(true);
-    });
+  test('delete agent', () => {
+    const agent = createAgent(db, { name: 'Agent 1' });
+    expect(deleteAgent(db, agent.id)).toBe(true);
+    expect(getAgent(db, agent.id)).toBeNull();
+  });
 
-    test('delete agent', () => {
-        const agent = createAgent(db, { name: 'Agent 1' });
-        expect(deleteAgent(db, agent.id)).toBe(true);
-        expect(getAgent(db, agent.id)).toBeNull();
-    });
+  test('set and get agent wallet', () => {
+    const agent = createAgent(db, { name: 'Wallet Agent' });
+    expect(agent.walletAddress).toBeNull();
+    expect(agent.walletFundedAlgo).toBe(0);
 
-    test('set and get agent wallet', () => {
-        const agent = createAgent(db, { name: 'Wallet Agent' });
-        expect(agent.walletAddress).toBeNull();
-        expect(agent.walletFundedAlgo).toBe(0);
+    setAgentWallet(db, agent.id, 'TESTADDR123', 'encrypted-mnemonic-data');
+    const updated = getAgent(db, agent.id);
+    expect(updated?.walletAddress).toBe('TESTADDR123');
 
-        setAgentWallet(db, agent.id, 'TESTADDR123', 'encrypted-mnemonic-data');
-        const updated = getAgent(db, agent.id);
-        expect(updated?.walletAddress).toBe('TESTADDR123');
+    const mnemonic = getAgentWalletMnemonic(db, agent.id);
+    expect(mnemonic).toBe('encrypted-mnemonic-data');
+  });
 
-        const mnemonic = getAgentWalletMnemonic(db, agent.id);
-        expect(mnemonic).toBe('encrypted-mnemonic-data');
-    });
+  test('add agent funding accumulates', () => {
+    const agent = createAgent(db, { name: 'Fund Agent' });
+    addAgentFunding(db, agent.id, 10);
+    addAgentFunding(db, agent.id, 5);
 
-    test('add agent funding accumulates', () => {
-        const agent = createAgent(db, { name: 'Fund Agent' });
-        addAgentFunding(db, agent.id, 10);
-        addAgentFunding(db, agent.id, 5);
+    const updated = getAgent(db, agent.id);
+    expect(updated?.walletFundedAlgo).toBe(15);
+  });
 
-        const updated = getAgent(db, agent.id);
-        expect(updated?.walletFundedAlgo).toBe(15);
-    });
-
-    test('migration 3 adds wallet columns', () => {
-        const agent = createAgent(db, { name: 'Migration Test' });
-        expect(agent.walletAddress).toBeNull();
-        expect(agent.walletFundedAlgo).toBe(0);
-    });
+  test('migration 3 adds wallet columns', () => {
+    const agent = createAgent(db, { name: 'Migration Test' });
+    expect(agent.walletAddress).toBeNull();
+    expect(agent.walletFundedAlgo).toBe(0);
+  });
 });
 
 describe('Sessions CRUD', () => {
-    test('create session requires project', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const session = createSession(db, { projectId: project.id, name: 'Session 1' });
+  test('create session requires project', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const session = createSession(db, { projectId: project.id, name: 'Session 1' });
 
-        expect(session.projectId).toBe(project.id);
-        expect(session.status).toBe('idle');
-        expect(session.source).toBe('web');
+    expect(session.projectId).toBe(project.id);
+    expect(session.status).toBe('idle');
+    expect(session.source).toBe('web');
+  });
+
+  test('list sessions by project', () => {
+    const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/1' });
+    const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/2' });
+
+    createSession(db, { projectId: p1.id });
+    createSession(db, { projectId: p1.id });
+    createSession(db, { projectId: p2.id });
+
+    expect(listSessions(db, p1.id)).toHaveLength(2);
+    expect(listSessions(db, p2.id)).toHaveLength(1);
+    expect(listSessions(db)).toHaveLength(3);
+  });
+
+  test('session messages', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const session = createSession(db, { projectId: project.id });
+
+    addSessionMessage(db, session.id, 'user', 'Hello');
+    addSessionMessage(db, session.id, 'assistant', 'Hi there', 0.01);
+
+    const messages = getSessionMessages(db, session.id);
+    expect(messages).toHaveLength(2);
+    expect(messages[0].role).toBe('user');
+    expect(messages[1].costUsd).toBe(0.01);
+  });
+
+  test('delete session cascades messages', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const session = createSession(db, { projectId: project.id });
+    addSessionMessage(db, session.id, 'user', 'Hello');
+
+    deleteSession(db, session.id);
+    expect(getSessionMessages(db, session.id)).toHaveLength(0);
+  });
+
+  test('create session with council fields', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const launchId = crypto.randomUUID();
+    createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
+
+    const session = createSession(db, {
+      projectId: project.id,
+      councilLaunchId: launchId,
+      councilRole: 'member',
     });
+    expect(session.councilLaunchId).toBe(launchId);
+    expect(session.councilRole).toBe('member');
+  });
 
-    test('list sessions by project', () => {
-        const p1 = createProject(db, { name: 'P1', workingDir: '/tmp/1' });
-        const p2 = createProject(db, { name: 'P2', workingDir: '/tmp/2' });
-
-        createSession(db, { projectId: p1.id });
-        createSession(db, { projectId: p1.id });
-        createSession(db, { projectId: p2.id });
-
-        expect(listSessions(db, p1.id)).toHaveLength(2);
-        expect(listSessions(db, p2.id)).toHaveLength(1);
-        expect(listSessions(db)).toHaveLength(3);
-    });
-
-    test('session messages', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const session = createSession(db, { projectId: project.id });
-
-        addSessionMessage(db, session.id, 'user', 'Hello');
-        addSessionMessage(db, session.id, 'assistant', 'Hi there', 0.01);
-
-        const messages = getSessionMessages(db, session.id);
-        expect(messages).toHaveLength(2);
-        expect(messages[0].role).toBe('user');
-        expect(messages[1].costUsd).toBe(0.01);
-    });
-
-    test('delete session cascades messages', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const session = createSession(db, { projectId: project.id });
-        addSessionMessage(db, session.id, 'user', 'Hello');
-
-        deleteSession(db, session.id);
-        expect(getSessionMessages(db, session.id)).toHaveLength(0);
-    });
-
-    test('create session with council fields', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const launchId = crypto.randomUUID();
-        createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
-
-        const session = createSession(db, {
-            projectId: project.id,
-            councilLaunchId: launchId,
-            councilRole: 'member',
-        });
-        expect(session.councilLaunchId).toBe(launchId);
-        expect(session.councilRole).toBe('member');
-    });
-
-    test('session without council fields has null', () => {
-        const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
-        const session = createSession(db, { projectId: project.id });
-        expect(session.councilLaunchId).toBeNull();
-        expect(session.councilRole).toBeNull();
-    });
+  test('session without council fields has null', () => {
+    const project = createProject(db, { name: 'Test', workingDir: '/tmp' });
+    const session = createSession(db, { projectId: project.id });
+    expect(session.councilLaunchId).toBeNull();
+    expect(session.councilRole).toBeNull();
+  });
 });
 
 describe('Councils CRUD', () => {
-    test('create and list councils', () => {
-        const agent1 = createAgent(db, { name: 'A1' });
-        const agent2 = createAgent(db, { name: 'A2' });
+  test('create and list councils', () => {
+    const agent1 = createAgent(db, { name: 'A1' });
+    const agent2 = createAgent(db, { name: 'A2' });
 
-        const council = createCouncil(db, {
-            name: 'Test Council',
-            description: 'A council',
-            agentIds: [agent1.id, agent2.id],
-            chairmanAgentId: agent1.id,
-        });
-
-        expect(council.name).toBe('Test Council');
-        expect(council.description).toBe('A council');
-        expect(council.agentIds).toHaveLength(2);
-        expect(council.chairmanAgentId).toBe(agent1.id);
-        expect(council.id).toBeTruthy();
-
-        const all = listCouncils(db);
-        expect(all).toHaveLength(1);
-        expect(all[0].agentIds).toHaveLength(2);
+    const council = createCouncil(db, {
+      name: 'Test Council',
+      description: 'A council',
+      agentIds: [agent1.id, agent2.id],
+      chairmanAgentId: agent1.id,
     });
 
-    test('get council by id', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    expect(council.name).toBe('Test Council');
+    expect(council.description).toBe('A council');
+    expect(council.agentIds).toHaveLength(2);
+    expect(council.chairmanAgentId).toBe(agent1.id);
+    expect(council.id).toBeTruthy();
 
-        const found = getCouncil(db, council.id);
-        expect(found?.name).toBe('C1');
-        expect(found?.agentIds).toEqual([agent.id]);
+    const all = listCouncils(db);
+    expect(all).toHaveLength(1);
+    expect(all[0].agentIds).toHaveLength(2);
+  });
 
-        expect(getCouncil(db, 'nonexistent')).toBeNull();
+  test('get council by id', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+
+    const found = getCouncil(db, council.id);
+    expect(found?.name).toBe('C1');
+    expect(found?.agentIds).toEqual([agent.id]);
+
+    expect(getCouncil(db, 'nonexistent')).toBeNull();
+  });
+
+  test('update council name and members', () => {
+    const agent1 = createAgent(db, { name: 'A1' });
+    const agent2 = createAgent(db, { name: 'A2' });
+    const agent3 = createAgent(db, { name: 'A3' });
+
+    const council = createCouncil(db, { name: 'Original', agentIds: [agent1.id, agent2.id] });
+
+    const updated = updateCouncil(db, council.id, {
+      name: 'Updated',
+      agentIds: [agent2.id, agent3.id],
+      chairmanAgentId: agent3.id,
     });
 
-    test('update council name and members', () => {
-        const agent1 = createAgent(db, { name: 'A1' });
-        const agent2 = createAgent(db, { name: 'A2' });
-        const agent3 = createAgent(db, { name: 'A3' });
+    expect(updated?.name).toBe('Updated');
+    expect(updated?.agentIds).toHaveLength(2);
+    expect(updated?.agentIds).toContain(agent2.id);
+    expect(updated?.agentIds).toContain(agent3.id);
+    expect(updated?.chairmanAgentId).toBe(agent3.id);
+  });
 
-        const council = createCouncil(db, { name: 'Original', agentIds: [agent1.id, agent2.id] });
+  test('update nonexistent council returns null', () => {
+    expect(updateCouncil(db, 'nonexistent', { name: 'X' })).toBeNull();
+  });
 
-        const updated = updateCouncil(db, council.id, {
-            name: 'Updated',
-            agentIds: [agent2.id, agent3.id],
-            chairmanAgentId: agent3.id,
-        });
+  test('delete council', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
 
-        expect(updated?.name).toBe('Updated');
-        expect(updated?.agentIds).toHaveLength(2);
-        expect(updated?.agentIds).toContain(agent2.id);
-        expect(updated?.agentIds).toContain(agent3.id);
-        expect(updated?.chairmanAgentId).toBe(agent3.id);
-    });
+    expect(deleteCouncil(db, council.id)).toBe(true);
+    expect(getCouncil(db, council.id)).toBeNull();
+    expect(deleteCouncil(db, 'nonexistent')).toBe(false);
+  });
 
-    test('update nonexistent council returns null', () => {
-        expect(updateCouncil(db, 'nonexistent', { name: 'X' })).toBeNull();
-    });
+  test('delete council cascades members', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
 
-    test('delete council', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    deleteCouncil(db, council.id);
 
-        expect(deleteCouncil(db, council.id)).toBe(true);
-        expect(getCouncil(db, council.id)).toBeNull();
-        expect(deleteCouncil(db, 'nonexistent')).toBe(false);
-    });
+    // Verify member rows are gone
+    const rows = db.query('SELECT * FROM council_members WHERE council_id = ?').all(council.id);
+    expect(rows).toHaveLength(0);
+  });
 
-    test('delete council cascades members', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+  test('create council without chairman', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'No Chair', agentIds: [agent.id] });
 
-        deleteCouncil(db, council.id);
+    expect(council.chairmanAgentId).toBeNull();
+  });
 
-        // Verify member rows are gone
-        const rows = db.query('SELECT * FROM council_members WHERE council_id = ?').all(council.id);
-        expect(rows).toHaveLength(0);
-    });
+  test('member sort order is preserved', () => {
+    const agent1 = createAgent(db, { name: 'First' });
+    const agent2 = createAgent(db, { name: 'Second' });
+    const agent3 = createAgent(db, { name: 'Third' });
 
-    test('create council without chairman', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'No Chair', agentIds: [agent.id] });
+    const council = createCouncil(db, { name: 'Ordered', agentIds: [agent3.id, agent1.id, agent2.id] });
 
-        expect(council.chairmanAgentId).toBeNull();
-    });
-
-    test('member sort order is preserved', () => {
-        const agent1 = createAgent(db, { name: 'First' });
-        const agent2 = createAgent(db, { name: 'Second' });
-        const agent3 = createAgent(db, { name: 'Third' });
-
-        const council = createCouncil(db, { name: 'Ordered', agentIds: [agent3.id, agent1.id, agent2.id] });
-
-        expect(council.agentIds[0]).toBe(agent3.id);
-        expect(council.agentIds[1]).toBe(agent1.id);
-        expect(council.agentIds[2]).toBe(agent2.id);
-    });
+    expect(council.agentIds[0]).toBe(agent3.id);
+    expect(council.agentIds[1]).toBe(agent1.id);
+    expect(council.agentIds[2]).toBe(agent2.id);
+  });
 });
 
 describe('Council Launches', () => {
-    test('create and get launch', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
+  test('create and get launch', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
 
-        const launchId = crypto.randomUUID();
-        createCouncilLaunch(db, {
-            id: launchId,
-            councilId: council.id,
-            projectId: project.id,
-            prompt: 'Hello council',
-        });
-
-        const launch = getCouncilLaunch(db, launchId);
-        expect(launch).not.toBeNull();
-        expect(launch?.councilId).toBe(council.id);
-        expect(launch?.prompt).toBe('Hello council');
-        expect(launch?.stage).toBe('responding');
-        expect(launch?.synthesis).toBeNull();
-        expect(launch?.sessionIds).toHaveLength(0);
+    const launchId = crypto.randomUUID();
+    createCouncilLaunch(db, {
+      id: launchId,
+      councilId: council.id,
+      projectId: project.id,
+      prompt: 'Hello council',
     });
 
-    test('launch includes associated sessions', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
+    const launch = getCouncilLaunch(db, launchId);
+    expect(launch).not.toBeNull();
+    expect(launch?.councilId).toBe(council.id);
+    expect(launch?.prompt).toBe('Hello council');
+    expect(launch?.stage).toBe('responding');
+    expect(launch?.synthesis).toBeNull();
+    expect(launch?.sessionIds).toHaveLength(0);
+  });
 
-        const launchId = crypto.randomUUID();
-        createCouncilLaunch(db, {
-            id: launchId,
-            councilId: council.id,
-            projectId: project.id,
-            prompt: 'test',
-        });
+  test('launch includes associated sessions', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
 
-        // Create sessions linked to this launch
-        createSession(db, {
-            projectId: project.id,
-            agentId: agent.id,
-            councilLaunchId: launchId,
-            councilRole: 'member',
-        });
-
-        const launch = getCouncilLaunch(db, launchId);
-        expect(launch?.sessionIds).toHaveLength(1);
+    const launchId = crypto.randomUUID();
+    createCouncilLaunch(db, {
+      id: launchId,
+      councilId: council.id,
+      projectId: project.id,
+      prompt: 'test',
     });
 
-    test('list launches filters by council', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const c1 = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const c2 = createCouncil(db, { name: 'C2', agentIds: [agent.id] });
-        const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
-
-        createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c1.id, projectId: project.id, prompt: 'q1' });
-        createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c1.id, projectId: project.id, prompt: 'q2' });
-        createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c2.id, projectId: project.id, prompt: 'q3' });
-
-        expect(listCouncilLaunches(db, c1.id)).toHaveLength(2);
-        expect(listCouncilLaunches(db, c2.id)).toHaveLength(1);
-        expect(listCouncilLaunches(db)).toHaveLength(3);
+    // Create sessions linked to this launch
+    createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      councilLaunchId: launchId,
+      councilRole: 'member',
     });
 
-    test('update launch stage and synthesis', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
+    const launch = getCouncilLaunch(db, launchId);
+    expect(launch?.sessionIds).toHaveLength(1);
+  });
 
-        const launchId = crypto.randomUUID();
-        createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
+  test('list launches filters by council', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const c1 = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const c2 = createCouncil(db, { name: 'C2', agentIds: [agent.id] });
+    const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
 
-        updateCouncilLaunchStage(db, launchId, 'reviewing');
-        let launch = getCouncilLaunch(db, launchId);
-        expect(launch?.stage).toBe('reviewing');
+    createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c1.id, projectId: project.id, prompt: 'q1' });
+    createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c1.id, projectId: project.id, prompt: 'q2' });
+    createCouncilLaunch(db, { id: crypto.randomUUID(), councilId: c2.id, projectId: project.id, prompt: 'q3' });
 
-        updateCouncilLaunchStage(db, launchId, 'complete', 'Final synthesis result');
-        launch = getCouncilLaunch(db, launchId);
-        expect(launch?.stage).toBe('complete');
-        expect(launch?.synthesis).toBe('Final synthesis result');
-    });
+    expect(listCouncilLaunches(db, c1.id)).toHaveLength(2);
+    expect(listCouncilLaunches(db, c2.id)).toHaveLength(1);
+    expect(listCouncilLaunches(db)).toHaveLength(3);
+  });
 
-    test('listSessionsByCouncilLaunch returns correct sessions', () => {
-        const agent = createAgent(db, { name: 'A1' });
-        const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
-        const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
+  test('update launch stage and synthesis', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
 
-        const launchId = crypto.randomUUID();
-        createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
+    const launchId = crypto.randomUUID();
+    createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
 
-        const s1 = createSession(db, { projectId: project.id, councilLaunchId: launchId, councilRole: 'member' });
-        const s2 = createSession(db, { projectId: project.id, councilLaunchId: launchId, councilRole: 'reviewer' });
-        createSession(db, { projectId: project.id }); // unrelated session
+    updateCouncilLaunchStage(db, launchId, 'reviewing');
+    let launch = getCouncilLaunch(db, launchId);
+    expect(launch?.stage).toBe('reviewing');
 
-        const sessions = listSessionsByCouncilLaunch(db, launchId);
-        expect(sessions).toHaveLength(2);
-        expect(sessions.map(s => s.id)).toContain(s1.id);
-        expect(sessions.map(s => s.id)).toContain(s2.id);
-    });
+    updateCouncilLaunchStage(db, launchId, 'complete', 'Final synthesis result');
+    launch = getCouncilLaunch(db, launchId);
+    expect(launch?.stage).toBe('complete');
+    expect(launch?.synthesis).toBe('Final synthesis result');
+  });
+
+  test('listSessionsByCouncilLaunch returns correct sessions', () => {
+    const agent = createAgent(db, { name: 'A1' });
+    const council = createCouncil(db, { name: 'C1', agentIds: [agent.id] });
+    const project = createProject(db, { name: 'P1', workingDir: '/tmp' });
+
+    const launchId = crypto.randomUUID();
+    createCouncilLaunch(db, { id: launchId, councilId: council.id, projectId: project.id, prompt: 'test' });
+
+    const s1 = createSession(db, { projectId: project.id, councilLaunchId: launchId, councilRole: 'member' });
+    const s2 = createSession(db, { projectId: project.id, councilLaunchId: launchId, councilRole: 'reviewer' });
+    createSession(db, { projectId: project.id }); // unrelated session
+
+    const sessions = listSessionsByCouncilLaunch(db, launchId);
+    expect(sessions).toHaveLength(2);
+    expect(sessions.map((s) => s.id)).toContain(s1.id);
+    expect(sessions.map((s) => s.id)).toContain(s2.id);
+  });
 });
 
 describe('Allowlist CRUD', () => {
-    const ADDR1 = 'A'.repeat(58).replace(/A/g, (_, i) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[i % 32]);
-    const ADDR2 = 'B'.repeat(58).replace(/B/g, (_, i) => 'ZABCDEFGHIJKLMNOPQRSTUVWXY234567'[i % 32]);
+  const ADDR1 = 'A'.repeat(58).replace(/A/g, (_, i) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[i % 32]);
+  const ADDR2 = 'B'.repeat(58).replace(/B/g, (_, i) => 'ZABCDEFGHIJKLMNOPQRSTUVWXY234567'[i % 32]);
 
-    test('list returns empty initially', () => {
-        expect(listAllowlist(db)).toEqual([]);
-    });
+  test('list returns empty initially', () => {
+    expect(listAllowlist(db)).toEqual([]);
+  });
 
-    test('add and get entry', () => {
-        const entry = addToAllowlist(db, ADDR1, 'Alice');
-        expect(entry.address).toBe(ADDR1);
-        expect(entry.label).toBe('Alice');
-        expect(entry.createdAt).toBeTruthy();
+  test('add and get entry', () => {
+    const entry = addToAllowlist(db, ADDR1, 'Alice');
+    expect(entry.address).toBe(ADDR1);
+    expect(entry.label).toBe('Alice');
+    expect(entry.createdAt).toBeTruthy();
 
-        const fetched = getAllowlistEntry(db, ADDR1);
-        expect(fetched).not.toBeNull();
-        expect(fetched!.label).toBe('Alice');
-    });
+    const fetched = getAllowlistEntry(db, ADDR1);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.label).toBe('Alice');
+  });
 
-    test('add without label defaults to empty string', () => {
-        const entry = addToAllowlist(db, ADDR1);
-        expect(entry.label).toBe('');
-    });
+  test('add without label defaults to empty string', () => {
+    const entry = addToAllowlist(db, ADDR1);
+    expect(entry.label).toBe('');
+  });
 
-    test('add duplicate address updates label', () => {
-        addToAllowlist(db, ADDR1, 'Old');
-        const updated = addToAllowlist(db, ADDR1, 'New');
-        expect(updated.label).toBe('New');
-        expect(listAllowlist(db)).toHaveLength(1);
-    });
+  test('add duplicate address updates label', () => {
+    addToAllowlist(db, ADDR1, 'Old');
+    const updated = addToAllowlist(db, ADDR1, 'New');
+    expect(updated.label).toBe('New');
+    expect(listAllowlist(db)).toHaveLength(1);
+  });
 
-    test('update entry label', () => {
-        addToAllowlist(db, ADDR1, 'Original');
-        const updated = updateAllowlistEntry(db, ADDR1, 'Updated');
-        expect(updated).not.toBeNull();
-        expect(updated!.label).toBe('Updated');
-    });
+  test('update entry label', () => {
+    addToAllowlist(db, ADDR1, 'Original');
+    const updated = updateAllowlistEntry(db, ADDR1, 'Updated');
+    expect(updated).not.toBeNull();
+    expect(updated!.label).toBe('Updated');
+  });
 
-    test('update non-existent entry returns null', () => {
-        expect(updateAllowlistEntry(db, ADDR1, 'label')).toBeNull();
-    });
+  test('update non-existent entry returns null', () => {
+    expect(updateAllowlistEntry(db, ADDR1, 'label')).toBeNull();
+  });
 
-    test('remove entry', () => {
-        addToAllowlist(db, ADDR1);
-        expect(removeFromAllowlist(db, ADDR1)).toBe(true);
-        expect(getAllowlistEntry(db, ADDR1)).toBeNull();
-        expect(removeFromAllowlist(db, ADDR1)).toBe(false);
-    });
+  test('remove entry', () => {
+    addToAllowlist(db, ADDR1);
+    expect(removeFromAllowlist(db, ADDR1)).toBe(true);
+    expect(getAllowlistEntry(db, ADDR1)).toBeNull();
+    expect(removeFromAllowlist(db, ADDR1)).toBe(false);
+  });
 
-    test('isAllowed returns true when allowlist is empty (open mode)', () => {
-        expect(isAllowed(db, ADDR1)).toBe(true);
-        expect(isAllowed(db, ADDR2)).toBe(true);
-    });
+  test('isAllowed returns true when allowlist is empty (open mode)', () => {
+    expect(isAllowed(db, ADDR1)).toBe(true);
+    expect(isAllowed(db, ADDR2)).toBe(true);
+  });
 
-    test('isAllowed returns true only for listed addresses when non-empty', () => {
-        addToAllowlist(db, ADDR1);
-        expect(isAllowed(db, ADDR1)).toBe(true);
-        expect(isAllowed(db, ADDR2)).toBe(false);
-    });
+  test('isAllowed returns true only for listed addresses when non-empty', () => {
+    addToAllowlist(db, ADDR1);
+    expect(isAllowed(db, ADDR1)).toBe(true);
+    expect(isAllowed(db, ADDR2)).toBe(false);
+  });
 
-    test('isAllowed returns true again after removing last entry', () => {
-        addToAllowlist(db, ADDR1);
-        expect(isAllowed(db, ADDR2)).toBe(false);
-        removeFromAllowlist(db, ADDR1);
-        expect(isAllowed(db, ADDR2)).toBe(true);
-    });
+  test('isAllowed returns true again after removing last entry', () => {
+    addToAllowlist(db, ADDR1);
+    expect(isAllowed(db, ADDR2)).toBe(false);
+    removeFromAllowlist(db, ADDR1);
+    expect(isAllowed(db, ADDR2)).toBe(true);
+  });
 });

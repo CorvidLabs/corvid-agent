@@ -12,10 +12,7 @@ process.env.BUN_TEST = '1';
  * should not fail unrelated tests. See #1891.
  */
 process.on('unhandledRejection', (reason) => {
-    if (
-        reason instanceof Error &&
-        reason.message.includes('REST client not initialized')
-    ) {
-        return; // swallow — expected in tests
-    }
+  if (reason instanceof Error && reason.message.includes('REST client not initialized')) {
+    return; // swallow — expected in tests
+  }
 });

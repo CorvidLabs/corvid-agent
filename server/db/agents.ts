@@ -1,338 +1,338 @@
-import { Database, type SQLQueryBindings } from 'bun:sqlite';
-import { writeTransaction } from './pool';
+import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/types';
 import { NotFoundError } from '../lib/errors';
+import { validateTenantOwnership, withTenantFilter } from '../tenant/db-filter';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+import { writeTransaction } from './pool';
 
 interface AgentRow {
-    id: string;
-    name: string;
-    description: string;
-    system_prompt: string;
-    append_prompt: string;
-    model: string;
-    provider: string;
-    allowed_tools: string;
-    disallowed_tools: string;
-    permission_mode: string;
-    max_budget_usd: number | null;
-    algochat_enabled: number;
-    algochat_auto: number;
-    custom_flags: string;
-    default_project_id: string | null;
-    mcp_tool_permissions: string | null;
-    voice_enabled: number;
-    voice_preset: string;
-    wallet_address: string | null;
-    wallet_mnemonic_encrypted: string | null;
-    wallet_funded_algo: number;
-    display_color: string | null;
-    display_icon: string | null;
-    avatar_url: string | null;
-    conversation_mode: string;
-    conversation_rate_limit_window: number;
-    conversation_rate_limit_max: number;
-    disabled: number;
-    created_at: string;
-    updated_at: string;
+  id: string;
+  name: string;
+  description: string;
+  system_prompt: string;
+  append_prompt: string;
+  model: string;
+  provider: string;
+  allowed_tools: string;
+  disallowed_tools: string;
+  permission_mode: string;
+  max_budget_usd: number | null;
+  algochat_enabled: number;
+  algochat_auto: number;
+  custom_flags: string;
+  default_project_id: string | null;
+  mcp_tool_permissions: string | null;
+  voice_enabled: number;
+  voice_preset: string;
+  wallet_address: string | null;
+  wallet_mnemonic_encrypted: string | null;
+  wallet_funded_algo: number;
+  display_color: string | null;
+  display_icon: string | null;
+  avatar_url: string | null;
+  conversation_mode: string;
+  conversation_rate_limit_window: number;
+  conversation_rate_limit_max: number;
+  disabled: number;
+  created_at: string;
+  updated_at: string;
 }
 
 function rowToAgent(row: AgentRow): Agent {
-    return {
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        systemPrompt: row.system_prompt,
-        appendPrompt: row.append_prompt,
-        model: row.model,
-        provider: row.provider || undefined,
-        allowedTools: row.allowed_tools,
-        disallowedTools: row.disallowed_tools,
-        permissionMode: row.permission_mode as Agent['permissionMode'],
-        maxBudgetUsd: row.max_budget_usd,
-        algochatEnabled: row.algochat_enabled === 1,
-        algochatAuto: row.algochat_auto === 1,
-        customFlags: JSON.parse(row.custom_flags),
-        defaultProjectId: row.default_project_id ?? null,
-        mcpToolPermissions: row.mcp_tool_permissions ? JSON.parse(row.mcp_tool_permissions) : null,
-        voiceEnabled: row.voice_enabled === 1,
-        voicePreset: (row.voice_preset || 'alloy') as Agent['voicePreset'],
-        walletAddress: row.wallet_address ?? null,
-        walletFundedAlgo: row.wallet_funded_algo ?? 0,
-        displayColor: row.display_color ?? null,
-        displayIcon: row.display_icon ?? null,
-        avatarUrl: row.avatar_url ?? null,
-        conversationMode: (row.conversation_mode || 'private') as Agent['conversationMode'],
-        conversationRateLimitWindow: row.conversation_rate_limit_window ?? 3600,
-        conversationRateLimitMax: row.conversation_rate_limit_max ?? 10,
-        disabled: row.disabled === 1,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-    };
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    systemPrompt: row.system_prompt,
+    appendPrompt: row.append_prompt,
+    model: row.model,
+    provider: row.provider || undefined,
+    allowedTools: row.allowed_tools,
+    disallowedTools: row.disallowed_tools,
+    permissionMode: row.permission_mode as Agent['permissionMode'],
+    maxBudgetUsd: row.max_budget_usd,
+    algochatEnabled: row.algochat_enabled === 1,
+    algochatAuto: row.algochat_auto === 1,
+    customFlags: JSON.parse(row.custom_flags),
+    defaultProjectId: row.default_project_id ?? null,
+    mcpToolPermissions: row.mcp_tool_permissions ? JSON.parse(row.mcp_tool_permissions) : null,
+    voiceEnabled: row.voice_enabled === 1,
+    voicePreset: (row.voice_preset || 'alloy') as Agent['voicePreset'],
+    walletAddress: row.wallet_address ?? null,
+    walletFundedAlgo: row.wallet_funded_algo ?? 0,
+    displayColor: row.display_color ?? null,
+    displayIcon: row.display_icon ?? null,
+    avatarUrl: row.avatar_url ?? null,
+    conversationMode: (row.conversation_mode || 'private') as Agent['conversationMode'],
+    conversationRateLimitWindow: row.conversation_rate_limit_window ?? 3600,
+    conversationRateLimitMax: row.conversation_rate_limit_max ?? 10,
+    disabled: row.disabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function listAgents(
-    db: Database,
-    tenantId: string = DEFAULT_TENANT_ID,
-    options?: { includeDisabled?: boolean },
+  db: Database,
+  tenantId: string = DEFAULT_TENANT_ID,
+  options?: { includeDisabled?: boolean },
 ): Agent[] {
-    const baseQuery = options?.includeDisabled
-        ? 'SELECT * FROM agents ORDER BY updated_at DESC'
-        : 'SELECT * FROM agents WHERE disabled = 0 ORDER BY updated_at DESC';
-    const { query, bindings } = withTenantFilter(baseQuery, tenantId);
-    const rows = db.query(query).all(...bindings) as AgentRow[];
-    return rows.map(rowToAgent);
+  const baseQuery = options?.includeDisabled
+    ? 'SELECT * FROM agents ORDER BY updated_at DESC'
+    : 'SELECT * FROM agents WHERE disabled = 0 ORDER BY updated_at DESC';
+  const { query, bindings } = withTenantFilter(baseQuery, tenantId);
+  const rows = db.query(query).all(...bindings) as AgentRow[];
+  return rows.map(rowToAgent);
 }
 
 export function getAgent(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Agent | null {
-    if (!validateTenantOwnership(db, 'agents', id, tenantId)) return null;
-    const row = db.query('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | null;
-    return row ? rowToAgent(row) : null;
+  if (!validateTenantOwnership(db, 'agents', id, tenantId)) return null;
+  const row = db.query('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | null;
+  return row ? rowToAgent(row) : null;
 }
 
 export function getAgentByWalletAddress(db: Database, walletAddress: string): Agent | null {
-    const row = db.query('SELECT * FROM agents WHERE wallet_address = ? LIMIT 1').get(walletAddress) as AgentRow | null;
-    return row ? rowToAgent(row) : null;
+  const row = db.query('SELECT * FROM agents WHERE wallet_address = ? LIMIT 1').get(walletAddress) as AgentRow | null;
+  return row ? rowToAgent(row) : null;
 }
 
 export function createAgent(db: Database, input: CreateAgentInput, tenantId: string = DEFAULT_TENANT_ID): Agent {
-    const id = crypto.randomUUID();
-    const customFlags = JSON.stringify(input.customFlags ?? {});
+  const id = crypto.randomUUID();
+  const customFlags = JSON.stringify(input.customFlags ?? {});
 
-    const mcpToolPermissions = input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null;
+  const mcpToolPermissions = input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null;
 
-    db.query(
-        `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
+  db.query(
+    `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
          algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions,
          voice_enabled, voice_preset, display_color, display_icon, avatar_url,
          conversation_mode, conversation_rate_limit_window, conversation_rate_limit_max, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-        id,
-        input.name,
-        input.description ?? '',
-        input.systemPrompt ?? '',
-        input.appendPrompt ?? '',
-        input.model ?? '',
-        input.provider ?? '',
-        input.allowedTools ?? '',
-        input.disallowedTools ?? '',
-        input.permissionMode ?? 'default',
-        input.maxBudgetUsd ?? null,
-        (input.algochatEnabled ?? true) ? 1 : 0,
-        (input.algochatAuto ?? true) ? 1 : 0,
-        customFlags,
-        input.defaultProjectId ?? null,
-        mcpToolPermissions,
-        input.voiceEnabled ? 1 : 0,
-        input.voicePreset ?? 'alloy',
-        input.displayColor ?? null,
-        input.displayIcon ?? null,
-        input.avatarUrl ?? null,
-        input.conversationMode ?? 'private',
-        input.conversationRateLimitWindow ?? 3600,
-        input.conversationRateLimitMax ?? 10,
-        tenantId,
-    );
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.name,
+    input.description ?? '',
+    input.systemPrompt ?? '',
+    input.appendPrompt ?? '',
+    input.model ?? '',
+    input.provider ?? '',
+    input.allowedTools ?? '',
+    input.disallowedTools ?? '',
+    input.permissionMode ?? 'default',
+    input.maxBudgetUsd ?? null,
+    (input.algochatEnabled ?? true) ? 1 : 0,
+    (input.algochatAuto ?? true) ? 1 : 0,
+    customFlags,
+    input.defaultProjectId ?? null,
+    mcpToolPermissions,
+    input.voiceEnabled ? 1 : 0,
+    input.voicePreset ?? 'alloy',
+    input.displayColor ?? null,
+    input.displayIcon ?? null,
+    input.avatarUrl ?? null,
+    input.conversationMode ?? 'private',
+    input.conversationRateLimitWindow ?? 3600,
+    input.conversationRateLimitMax ?? 10,
+    tenantId,
+  );
 
-    const created = getAgent(db, id);
-    if (!created) throw new NotFoundError('Agent', id);
-    return created;
+  const created = getAgent(db, id);
+  if (!created) throw new NotFoundError('Agent', id);
+  return created;
 }
 
-export function updateAgent(db: Database, id: string, input: UpdateAgentInput, tenantId: string = DEFAULT_TENANT_ID): Agent | null {
-    const existing = getAgent(db, id, tenantId);
-    if (!existing) return null;
+export function updateAgent(
+  db: Database,
+  id: string,
+  input: UpdateAgentInput,
+  tenantId: string = DEFAULT_TENANT_ID,
+): Agent | null {
+  const existing = getAgent(db, id, tenantId);
+  if (!existing) return null;
 
-    const fields: string[] = [];
-    const values: unknown[] = [];
+  const fields: string[] = [];
+  const values: unknown[] = [];
 
-    const stringFields: Array<[keyof UpdateAgentInput, string]> = [
-        ['name', 'name'],
-        ['description', 'description'],
-        ['systemPrompt', 'system_prompt'],
-        ['appendPrompt', 'append_prompt'],
-        ['model', 'model'],
-        ['provider', 'provider'],
-        ['allowedTools', 'allowed_tools'],
-        ['disallowedTools', 'disallowed_tools'],
-        ['permissionMode', 'permission_mode'],
-    ];
+  const stringFields: Array<[keyof UpdateAgentInput, string]> = [
+    ['name', 'name'],
+    ['description', 'description'],
+    ['systemPrompt', 'system_prompt'],
+    ['appendPrompt', 'append_prompt'],
+    ['model', 'model'],
+    ['provider', 'provider'],
+    ['allowedTools', 'allowed_tools'],
+    ['disallowedTools', 'disallowed_tools'],
+    ['permissionMode', 'permission_mode'],
+  ];
 
-    for (const [inputKey, dbCol] of stringFields) {
-        if (input[inputKey] !== undefined) {
-            fields.push(`${dbCol} = ?`);
-            values.push(input[inputKey]);
-        }
+  for (const [inputKey, dbCol] of stringFields) {
+    if (input[inputKey] !== undefined) {
+      fields.push(`${dbCol} = ?`);
+      values.push(input[inputKey]);
     }
+  }
 
-    if (input.maxBudgetUsd !== undefined) {
-        fields.push('max_budget_usd = ?');
-        values.push(input.maxBudgetUsd);
-    }
-    if (input.algochatEnabled !== undefined) {
-        fields.push('algochat_enabled = ?');
-        values.push(input.algochatEnabled ? 1 : 0);
-    }
-    if (input.algochatAuto !== undefined) {
-        fields.push('algochat_auto = ?');
-        values.push(input.algochatAuto ? 1 : 0);
-    }
-    if (input.customFlags !== undefined) {
-        fields.push('custom_flags = ?');
-        values.push(JSON.stringify(input.customFlags));
-    }
-    if (input.defaultProjectId !== undefined) {
-        fields.push('default_project_id = ?');
-        values.push(input.defaultProjectId);
-    }
-    if (input.mcpToolPermissions !== undefined) {
-        fields.push('mcp_tool_permissions = ?');
-        values.push(input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null);
-    }
-    if (input.voiceEnabled !== undefined) {
-        fields.push('voice_enabled = ?');
-        values.push(input.voiceEnabled ? 1 : 0);
-    }
-    if (input.voicePreset !== undefined) {
-        fields.push('voice_preset = ?');
-        values.push(input.voicePreset);
-    }
-    if (input.displayColor !== undefined) {
-        fields.push('display_color = ?');
-        values.push(input.displayColor);
-    }
-    if (input.displayIcon !== undefined) {
-        fields.push('display_icon = ?');
-        values.push(input.displayIcon);
-    }
-    if (input.avatarUrl !== undefined) {
-        fields.push('avatar_url = ?');
-        values.push(input.avatarUrl);
-    }
-    if (input.conversationMode !== undefined) {
-        fields.push('conversation_mode = ?');
-        values.push(input.conversationMode);
-    }
-    if (input.conversationRateLimitWindow !== undefined) {
-        fields.push('conversation_rate_limit_window = ?');
-        values.push(input.conversationRateLimitWindow);
-    }
-    if (input.conversationRateLimitMax !== undefined) {
-        fields.push('conversation_rate_limit_max = ?');
-        values.push(input.conversationRateLimitMax);
-    }
-    if (input.disabled !== undefined) {
-        fields.push('disabled = ?');
-        values.push(input.disabled ? 1 : 0);
-    }
+  if (input.maxBudgetUsd !== undefined) {
+    fields.push('max_budget_usd = ?');
+    values.push(input.maxBudgetUsd);
+  }
+  if (input.algochatEnabled !== undefined) {
+    fields.push('algochat_enabled = ?');
+    values.push(input.algochatEnabled ? 1 : 0);
+  }
+  if (input.algochatAuto !== undefined) {
+    fields.push('algochat_auto = ?');
+    values.push(input.algochatAuto ? 1 : 0);
+  }
+  if (input.customFlags !== undefined) {
+    fields.push('custom_flags = ?');
+    values.push(JSON.stringify(input.customFlags));
+  }
+  if (input.defaultProjectId !== undefined) {
+    fields.push('default_project_id = ?');
+    values.push(input.defaultProjectId);
+  }
+  if (input.mcpToolPermissions !== undefined) {
+    fields.push('mcp_tool_permissions = ?');
+    values.push(input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null);
+  }
+  if (input.voiceEnabled !== undefined) {
+    fields.push('voice_enabled = ?');
+    values.push(input.voiceEnabled ? 1 : 0);
+  }
+  if (input.voicePreset !== undefined) {
+    fields.push('voice_preset = ?');
+    values.push(input.voicePreset);
+  }
+  if (input.displayColor !== undefined) {
+    fields.push('display_color = ?');
+    values.push(input.displayColor);
+  }
+  if (input.displayIcon !== undefined) {
+    fields.push('display_icon = ?');
+    values.push(input.displayIcon);
+  }
+  if (input.avatarUrl !== undefined) {
+    fields.push('avatar_url = ?');
+    values.push(input.avatarUrl);
+  }
+  if (input.conversationMode !== undefined) {
+    fields.push('conversation_mode = ?');
+    values.push(input.conversationMode);
+  }
+  if (input.conversationRateLimitWindow !== undefined) {
+    fields.push('conversation_rate_limit_window = ?');
+    values.push(input.conversationRateLimitWindow);
+  }
+  if (input.conversationRateLimitMax !== undefined) {
+    fields.push('conversation_rate_limit_max = ?');
+    values.push(input.conversationRateLimitMax);
+  }
+  if (input.disabled !== undefined) {
+    fields.push('disabled = ?');
+    values.push(input.disabled ? 1 : 0);
+  }
 
-    if (fields.length === 0) return existing;
+  if (fields.length === 0) return existing;
 
-    fields.push("updated_at = datetime('now')");
-    values.push(id);
+  fields.push("updated_at = datetime('now')");
+  values.push(id);
 
-    db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getAgent(db, id, tenantId);
+  db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
+  return getAgent(db, id, tenantId);
 }
 
 export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
-    const existing = getAgent(db, id, tenantId);
-    if (!existing) return false;
+  const existing = getAgent(db, id, tenantId);
+  if (!existing) return false;
 
-    writeTransaction(db, (db) => {
-        // Delete dependent records that reference this agent
-        // Order matters: delete children before parents
+  writeTransaction(db, (db) => {
+    // Delete dependent records that reference this agent
+    // Order matters: delete children before parents
 
-        // work_tasks (required FK, no cascade)
-        db.query('DELETE FROM work_tasks WHERE agent_id = ?').run(id);
+    // work_tasks (required FK, no cascade)
+    db.query('DELETE FROM work_tasks WHERE agent_id = ?').run(id);
 
-        // agent_messages (from/to agent, no explicit FK but logically linked)
-        db.query('DELETE FROM agent_messages WHERE from_agent_id = ? OR to_agent_id = ?').run(id, id);
+    // agent_messages (from/to agent, no explicit FK but logically linked)
+    db.query('DELETE FROM agent_messages WHERE from_agent_id = ? OR to_agent_id = ?').run(id, id);
 
-        // owner_questions (no cascade)
-        db.query('DELETE FROM owner_questions WHERE agent_id = ?').run(id);
+    // owner_questions (no cascade)
+    db.query('DELETE FROM owner_questions WHERE agent_id = ?').run(id);
 
-        // notification_channels + owner_notifications (no cascade on agent_id)
-        db.query('DELETE FROM notification_channels WHERE agent_id = ?').run(id);
-        db.query('DELETE FROM owner_notifications WHERE agent_id = ?').run(id);
+    // notification_channels + owner_notifications (no cascade on agent_id)
+    db.query('DELETE FROM notification_channels WHERE agent_id = ?').run(id);
+    db.query('DELETE FROM owner_notifications WHERE agent_id = ?').run(id);
 
-        // sandbox_configs (no cascade)
-        db.query('DELETE FROM sandbox_configs WHERE agent_id = ?').run(id);
+    // sandbox_configs (no cascade)
+    db.query('DELETE FROM sandbox_configs WHERE agent_id = ?').run(id);
 
-        // marketplace_listings (no cascade)
-        db.query('DELETE FROM marketplace_listings WHERE agent_id = ?').run(id);
+    // marketplace_listings (no cascade)
+    db.query('DELETE FROM marketplace_listings WHERE agent_id = ?').run(id);
 
-        // reputation tables (no cascade)
-        db.query('DELETE FROM reputation_attestations WHERE agent_id = ?').run(id);
-        db.query('DELETE FROM reputation_events WHERE agent_id = ?').run(id);
-        db.query('DELETE FROM agent_reputation WHERE agent_id = ?').run(id);
+    // reputation tables (no cascade)
+    db.query('DELETE FROM reputation_attestations WHERE agent_id = ?').run(id);
+    db.query('DELETE FROM reputation_events WHERE agent_id = ?').run(id);
+    db.query('DELETE FROM agent_reputation WHERE agent_id = ?').run(id);
 
-        // health_snapshots (no cascade)
-        db.query('DELETE FROM health_snapshots WHERE agent_id = ?').run(id);
+    // health_snapshots (no cascade)
+    db.query('DELETE FROM health_snapshots WHERE agent_id = ?').run(id);
 
-        // conversation access control (ON DELETE CASCADE, but explicit for safety)
-        db.query('DELETE FROM agent_conversation_allowlist WHERE agent_id = ?').run(id);
-        db.query('DELETE FROM agent_conversation_blocklist WHERE agent_id = ?').run(id);
-        db.query('DELETE FROM agent_conversation_rate_limits WHERE agent_id = ?').run(id);
+    // conversation access control (ON DELETE CASCADE, but explicit for safety)
+    db.query('DELETE FROM agent_conversation_allowlist WHERE agent_id = ?').run(id);
+    db.query('DELETE FROM agent_conversation_blocklist WHERE agent_id = ?').run(id);
+    db.query('DELETE FROM agent_conversation_rate_limits WHERE agent_id = ?').run(id);
 
-        // Nullify optional FKs rather than delete entire records
-        db.query('UPDATE councils SET chairman_agent_id = NULL WHERE chairman_agent_id = ?').run(id);
-        db.query('UPDATE algochat_conversations SET agent_id = NULL WHERE agent_id = ?').run(id);
+    // Nullify optional FKs rather than delete entire records
+    db.query('UPDATE councils SET chairman_agent_id = NULL WHERE chairman_agent_id = ?').run(id);
+    db.query('UPDATE algochat_conversations SET agent_id = NULL WHERE agent_id = ?').run(id);
 
-        // session_messages (child of sessions that reference this agent)
-        db.query(`DELETE FROM session_messages WHERE session_id IN
+    // session_messages (child of sessions that reference this agent)
+    db.query(`DELETE FROM session_messages WHERE session_id IN
             (SELECT id FROM sessions WHERE agent_id = ?)`).run(id);
 
-        // algochat_conversations.session_id FK -> sessions (NO ACTION, blocks session deletion)
-        db.query(`UPDATE algochat_conversations SET session_id = NULL WHERE session_id IN
+    // algochat_conversations.session_id FK -> sessions (NO ACTION, blocks session deletion)
+    db.query(`UPDATE algochat_conversations SET session_id = NULL WHERE session_id IN
             (SELECT id FROM sessions WHERE agent_id = ?)`).run(id);
 
-        // sessions (optional FK but still blocks deletion)
-        db.query('DELETE FROM sessions WHERE agent_id = ?').run(id);
+    // sessions (optional FK but still blocks deletion)
+    db.query('DELETE FROM sessions WHERE agent_id = ?').run(id);
 
-        // The following have ON DELETE CASCADE and will auto-delete:
-        //   agent_memories, council_members, council_discussion_messages,
-        //   agent_schedules, schedule_executions, webhook_registrations,
-        //   mention_polling_configs, workflows, workflow_runs,
-        //   agent_persona_assignments, agent_skills, mcp_server_configs
+    // The following have ON DELETE CASCADE and will auto-delete:
+    //   agent_memories, council_members, council_discussion_messages,
+    //   agent_schedules, schedule_executions, webhook_registrations,
+    //   mention_polling_configs, workflows, workflow_runs,
+    //   agent_persona_assignments, agent_skills, mcp_server_configs
 
-        // Finally delete the agent
-        db.query('DELETE FROM agents WHERE id = ?').run(id);
-    });
+    // Finally delete the agent
+    db.query('DELETE FROM agents WHERE id = ?').run(id);
+  });
 
-    return true;
+  return true;
 }
 
-export function setAgentWallet(
-    db: Database,
-    agentId: string,
-    walletAddress: string,
-    encryptedMnemonic: string,
-): void {
-    db.query(
-        `UPDATE agents SET wallet_address = ?, wallet_mnemonic_encrypted = ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(walletAddress, encryptedMnemonic, agentId);
+export function setAgentWallet(db: Database, agentId: string, walletAddress: string, encryptedMnemonic: string): void {
+  db.query(
+    `UPDATE agents SET wallet_address = ?, wallet_mnemonic_encrypted = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(walletAddress, encryptedMnemonic, agentId);
 }
 
 export function getAgentWalletMnemonic(db: Database, agentId: string): string | null {
-    const row = db.query(
-        'SELECT wallet_mnemonic_encrypted FROM agents WHERE id = ?'
-    ).get(agentId) as { wallet_mnemonic_encrypted: string | null } | null;
-    return row?.wallet_mnemonic_encrypted ?? null;
+  const row = db.query('SELECT wallet_mnemonic_encrypted FROM agents WHERE id = ?').get(agentId) as {
+    wallet_mnemonic_encrypted: string | null;
+  } | null;
+  return row?.wallet_mnemonic_encrypted ?? null;
 }
 
 export function addAgentFunding(db: Database, agentId: string, algoAmount: number): void {
-    db.query(
-        `UPDATE agents SET wallet_funded_algo = wallet_funded_algo + ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(algoAmount, agentId);
+  db.query(
+    `UPDATE agents SET wallet_funded_algo = wallet_funded_algo + ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(algoAmount, agentId);
 }
 
 export function getAlgochatEnabledAgents(db: Database): Agent[] {
-    const rows = db.query(
-        'SELECT * FROM agents WHERE algochat_enabled = 1 AND disabled = 0 ORDER BY updated_at DESC'
-    ).all() as AgentRow[];
-    return rows.map(rowToAgent);
+  const rows = db
+    .query('SELECT * FROM agents WHERE algochat_enabled = 1 AND disabled = 0 ORDER BY updated_at DESC')
+    .all() as AgentRow[];
+  return rows.map(rowToAgent);
 }

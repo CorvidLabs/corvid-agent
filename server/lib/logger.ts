@@ -4,24 +4,24 @@ import { sanitizeLogMessage } from './secure-mnemonic';
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
-    debug: 0,
-    info: 1,
-    warn: 2,
-    error: 3,
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
 };
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
-    debug: 'DEBUG',
-    info: 'INFO ',
-    warn: 'WARN ',
-    error: 'ERROR',
+  debug: 'DEBUG',
+  info: 'INFO ',
+  warn: 'WARN ',
+  error: 'ERROR',
 };
 
 // Default to JSON in production, text otherwise. Explicit LOG_FORMAT overrides.
 const LOG_FORMAT = (() => {
-    const explicit = process.env.LOG_FORMAT?.toLowerCase();
-    if (explicit === 'json' || explicit === 'text') return explicit;
-    return process.env.NODE_ENV === 'production' ? 'json' : 'text';
+  const explicit = process.env.LOG_FORMAT?.toLowerCase();
+  if (explicit === 'json' || explicit === 'text') return explicit;
+  return process.env.NODE_ENV === 'production' ? 'json' : 'text';
 })();
 
 const HOST = hostname();
@@ -33,27 +33,27 @@ const _origStdoutWrite = process.stdout.write.bind(process.stdout);
 const _origStderrWrite = process.stderr.write.bind(process.stderr);
 
 function writeStdout(line: string): void {
-    const w = process.stdout.write;
-    if (typeof w === 'function') {
-        w.call(process.stdout, line);
-    } else {
-        _origStdoutWrite(line);
-    }
+  const w = process.stdout.write;
+  if (typeof w === 'function') {
+    w.call(process.stdout, line);
+  } else {
+    _origStdoutWrite(line);
+  }
 }
 
 function writeStderr(line: string): void {
-    const w = process.stderr.write;
-    if (typeof w === 'function') {
-        w.call(process.stderr, line);
-    } else {
-        _origStderrWrite(line);
-    }
+  const w = process.stderr.write;
+  if (typeof w === 'function') {
+    w.call(process.stderr, line);
+  } else {
+    _origStderrWrite(line);
+  }
 }
 
 function getMinLevel(): LogLevel {
-    const env = process.env.LOG_LEVEL?.toLowerCase();
-    if (env && env in LEVEL_ORDER) return env as LogLevel;
-    return 'info';
+  const env = process.env.LOG_LEVEL?.toLowerCase();
+  if (env && env in LEVEL_ORDER) return env as LogLevel;
+  return 'info';
 }
 
 /**
@@ -61,22 +61,22 @@ function getMinLevel(): LogLevel {
  * that looks like a mnemonic or private key material.
  */
 function sanitizeContext(ctx: Record<string, unknown>): Record<string, unknown> {
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(ctx)) {
-        if (typeof value === 'string') {
-            cleaned[key] = sanitizeLogMessage(value);
-        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-            cleaned[key] = sanitizeContext(value as Record<string, unknown>);
-        } else {
-            cleaned[key] = value;
-        }
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(ctx)) {
+    if (typeof value === 'string') {
+      cleaned[key] = sanitizeLogMessage(value);
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      cleaned[key] = sanitizeContext(value as Record<string, unknown>);
+    } else {
+      cleaned[key] = value;
     }
-    return cleaned;
+  }
+  return cleaned;
 }
 
 function formatContext(ctx?: Record<string, unknown>): string {
-    if (!ctx || Object.keys(ctx).length === 0) return '';
-    return ' ' + JSON.stringify(sanitizeContext(ctx));
+  if (!ctx || Object.keys(ctx).length === 0) return '';
+  return ` ${JSON.stringify(sanitizeContext(ctx))}`;
 }
 
 /**
@@ -89,52 +89,52 @@ let _getRequestId: (() => string | undefined) | null = null;
 let _traceContextLoaded = false;
 
 function loadTraceContext(): void {
-    if (_traceContextLoaded) return;
-    _traceContextLoaded = true;
-    try {
-        // Dynamic require to avoid circular dependency at module load time.
-        // The observability/trace-context module is side-effect-free.
-        const mod = require('../observability/trace-context');
-        _getTraceId = mod.getTraceId;
-        _getRequestId = mod.getRequestId;
-    } catch {
-        // Trace context not available — that's fine
-    }
+  if (_traceContextLoaded) return;
+  _traceContextLoaded = true;
+  try {
+    // Dynamic require to avoid circular dependency at module load time.
+    // The observability/trace-context module is side-effect-free.
+    const mod = require('../observability/trace-context');
+    _getTraceId = mod.getTraceId;
+    _getRequestId = mod.getRequestId;
+  } catch {
+    // Trace context not available — that's fine
+  }
 }
 
 function getTraceContext(): { traceId?: string; requestId?: string } {
-    loadTraceContext();
-    return {
-        traceId: _getTraceId?.(),
-        requestId: _getRequestId?.(),
-    };
+  loadTraceContext();
+  return {
+    traceId: _getTraceId?.(),
+    requestId: _getRequestId?.(),
+  };
 }
 
 function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<string, unknown>): string {
-    const traceCtx = getTraceContext();
-    // Defense-in-depth: sanitize the message to redact mnemonics and private keys
-    const safeMsg = sanitizeLogMessage(msg);
+  const traceCtx = getTraceContext();
+  // Defense-in-depth: sanitize the message to redact mnemonics and private keys
+  const safeMsg = sanitizeLogMessage(msg);
 
-    if (LOG_FORMAT === 'json') {
-        const entry: Record<string, unknown> = {
-            timestamp: new Date().toISOString(),
-            level,
-            module,
-            message: safeMsg,
-            pid: PID,
-            hostname: HOST,
-        };
-        if (traceCtx.traceId) entry.traceId = traceCtx.traceId;
-        if (traceCtx.requestId) entry.requestId = traceCtx.requestId;
-        if (ctx && Object.keys(ctx).length > 0) {
-            Object.assign(entry, sanitizeContext(ctx));
-        }
-        return JSON.stringify(entry);
+  if (LOG_FORMAT === 'json') {
+    const entry: Record<string, unknown> = {
+      timestamp: new Date().toISOString(),
+      level,
+      module,
+      message: safeMsg,
+      pid: PID,
+      hostname: HOST,
+    };
+    if (traceCtx.traceId) entry.traceId = traceCtx.traceId;
+    if (traceCtx.requestId) entry.requestId = traceCtx.requestId;
+    if (ctx && Object.keys(ctx).length > 0) {
+      Object.assign(entry, sanitizeContext(ctx));
     }
+    return JSON.stringify(entry);
+  }
 
-    const ts = new Date().toISOString();
-    const tracePrefix = traceCtx.traceId ? ` trace=${traceCtx.traceId.slice(0, 8)}` : '';
-    return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${safeMsg}${formatContext(ctx)}`;
+  const ts = new Date().toISOString();
+  const tracePrefix = traceCtx.traceId ? ` trace=${traceCtx.traceId.slice(0, 8)}` : '';
+  return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${safeMsg}${formatContext(ctx)}`;
 }
 
 /**
@@ -142,11 +142,11 @@ function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<s
  * All log methods automatically sanitize messages to redact sensitive material.
  */
 export interface Logger {
-    debug(msg: string, ctx?: Record<string, unknown>): void;
-    info(msg: string, ctx?: Record<string, unknown>): void;
-    warn(msg: string, ctx?: Record<string, unknown>): void;
-    error(msg: string, ctx?: Record<string, unknown>): void;
-    child(module: string): Logger;
+  debug(msg: string, ctx?: Record<string, unknown>): void;
+  info(msg: string, ctx?: Record<string, unknown>): void;
+  warn(msg: string, ctx?: Record<string, unknown>): void;
+  error(msg: string, ctx?: Record<string, unknown>): void;
+  child(module: string): Logger;
 }
 
 /**
@@ -158,35 +158,35 @@ export interface Logger {
  * @returns A {@link Logger} instance with debug, info, warn, error, and child methods.
  */
 export function createLogger(module: string): Logger {
-    const minLevel = getMinLevel();
+  const minLevel = getMinLevel();
 
-    function shouldLog(level: LogLevel): boolean {
-        return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
-    }
+  function shouldLog(level: LogLevel): boolean {
+    return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
+  }
 
-    return {
-        debug(msg: string, ctx?: Record<string, unknown>): void {
-            if (!shouldLog('debug')) return;
-            writeStdout(formatLine('debug', module, msg, ctx) + '\n');
-        },
+  return {
+    debug(msg: string, ctx?: Record<string, unknown>): void {
+      if (!shouldLog('debug')) return;
+      writeStdout(`${formatLine('debug', module, msg, ctx)}\n`);
+    },
 
-        info(msg: string, ctx?: Record<string, unknown>): void {
-            if (!shouldLog('info')) return;
-            writeStdout(formatLine('info', module, msg, ctx) + '\n');
-        },
+    info(msg: string, ctx?: Record<string, unknown>): void {
+      if (!shouldLog('info')) return;
+      writeStdout(`${formatLine('info', module, msg, ctx)}\n`);
+    },
 
-        warn(msg: string, ctx?: Record<string, unknown>): void {
-            if (!shouldLog('warn')) return;
-            writeStderr(formatLine('warn', module, msg, ctx) + '\n');
-        },
+    warn(msg: string, ctx?: Record<string, unknown>): void {
+      if (!shouldLog('warn')) return;
+      writeStderr(`${formatLine('warn', module, msg, ctx)}\n`);
+    },
 
-        error(msg: string, ctx?: Record<string, unknown>): void {
-            if (!shouldLog('error')) return;
-            writeStderr(formatLine('error', module, msg, ctx) + '\n');
-        },
+    error(msg: string, ctx?: Record<string, unknown>): void {
+      if (!shouldLog('error')) return;
+      writeStderr(`${formatLine('error', module, msg, ctx)}\n`);
+    },
 
-        child(childModule: string): Logger {
-            return createLogger(`${module}:${childModule}`);
-        },
-    };
+    child(childModule: string): Logger {
+      return createLogger(`${module}:${childModule}`);
+    },
+  };
 }

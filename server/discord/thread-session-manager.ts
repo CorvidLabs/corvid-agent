@@ -52,12 +52,7 @@ export class ThreadSessionManager {
   private readonly delivery: DeliveryTracker;
   private readonly botToken: string;
 
-  constructor(
-    db: Database,
-    processManager: ProcessManager,
-    delivery: DeliveryTracker,
-    botToken: string,
-  ) {
+  constructor(db: Database, processManager: ProcessManager, delivery: DeliveryTracker, botToken: string) {
     this.db = db;
     this.processManager = processManager;
     this.delivery = delivery;
@@ -139,10 +134,8 @@ export class ThreadSessionManager {
       this.threadSessions,
       this.threadCallbacks,
     );
-    recoverActiveMentionSessions(
-      this.db,
-      this.mentionSessions,
-      (botMessageId, info, createdAt) => this.trackMentionSession(botMessageId, info, createdAt),
+    recoverActiveMentionSessions(this.db, this.mentionSessions, (botMessageId, info, createdAt) =>
+      this.trackMentionSession(botMessageId, info, createdAt),
     );
   }
 
@@ -196,9 +189,12 @@ export class ThreadSessionManager {
 
     this.threadSessions.set(threadId, threadInfo);
     try {
-      const { saveThreadSession } = require('../db/discord-thread-sessions') as typeof import('../db/discord-thread-sessions');
+      const { saveThreadSession } =
+        require('../db/discord-thread-sessions') as typeof import('../db/discord-thread-sessions');
       saveThreadSession(this.db, threadId, threadInfo);
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
 
     this.subscribeThread(sessionId, threadId, agentName, agentModel, projectName, displayColor, displayIcon, avatarUrl);
     return true;

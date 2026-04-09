@@ -1,374 +1,396 @@
 import type { Database } from 'bun:sqlite';
-import type { SchedulerService } from '../scheduler/service';
+import {
+  createSchedule,
+  deleteSchedule,
+  getExecution,
+  getSchedule,
+  listExecutions,
+  listExecutionsFiltered,
+  listSchedules,
+  updateSchedule,
+  updateScheduleNextRun,
+} from '../db/schedules';
+import { isGitHubConfigured } from '../github/operations';
+import { createLogger } from '../lib/logger';
+import { scanForInjection } from '../lib/prompt-injection';
+import { badRequest, handleRouteError, json, safeNumParam } from '../lib/response';
+import {
+  BulkScheduleActionSchema,
+  CreateScheduleSchema,
+  parseBodyOrThrow,
+  ScheduleApprovalSchema,
+  UpdateScheduleSchema,
+  ValidationError,
+} from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
-import { validateScheduleFrequency } from '../scheduler/service';
-import {
-    listSchedules,
-    getSchedule,
-    createSchedule,
-    updateSchedule,
-    deleteSchedule,
-    listExecutions,
-    listExecutionsFiltered,
-    getExecution,
-    updateScheduleNextRun,
-} from '../db/schedules';
 import { getNextCronDate } from '../scheduler/cron-parser';
-import { listPipelineTemplates, getPipelineTemplate } from '../scheduler/pipeline';
-import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema, BulkScheduleActionSchema } from '../lib/validation';
-import { isGitHubConfigured } from '../github/operations';
-import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
-import { scanForInjection } from '../lib/prompt-injection';
-import { createLogger } from '../lib/logger';
+import { getPipelineTemplate, listPipelineTemplates } from '../scheduler/pipeline';
+import type { SchedulerService } from '../scheduler/service';
+import { validateScheduleFrequency } from '../scheduler/service';
 
 const log = createLogger('ScheduleRoutes');
 
 export function handleScheduleRoutes(
-    req: Request,
-    url: URL,
-    db: Database,
-    schedulerService: SchedulerService | null,
-    context?: RequestContext,
+  req: Request,
+  url: URL,
+  db: Database,
+  schedulerService: SchedulerService | null,
+  context?: RequestContext,
 ): Response | Promise<Response> | null {
-    const tenantId = context?.tenantId ?? 'default';
+  const tenantId = context?.tenantId ?? 'default';
 
-    // List schedules
-    if (url.pathname === '/api/schedules' && req.method === 'GET') {
-        const agentId = url.searchParams.get('agentId') ?? undefined;
-        const schedules = listSchedules(db, agentId, tenantId);
-        return json(schedules);
+  // List schedules
+  if (url.pathname === '/api/schedules' && req.method === 'GET') {
+    const agentId = url.searchParams.get('agentId') ?? undefined;
+    const schedules = listSchedules(db, agentId, tenantId);
+    return json(schedules);
+  }
+
+  // Create schedule
+  if (url.pathname === '/api/schedules' && req.method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleCreateSchedule(req, db, tenantId);
+  }
 
-    // Create schedule
-    if (url.pathname === '/api/schedules' && req.method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleCreateSchedule(req, db, tenantId);
+  // Get single schedule
+  const scheduleMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)$/);
+  if (scheduleMatch && req.method === 'GET') {
+    const schedule = getSchedule(db, scheduleMatch[1], tenantId);
+    if (!schedule) return json({ error: 'Schedule not found' }, 404);
+    return json(schedule);
+  }
+
+  // Update schedule
+  if (scheduleMatch && req.method === 'PUT') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleUpdateSchedule(req, db, scheduleMatch[1], tenantId);
+  }
 
-    // Get single schedule
-    const scheduleMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)$/);
-    if (scheduleMatch && req.method === 'GET') {
-        const schedule = getSchedule(db, scheduleMatch[1], tenantId);
-        if (!schedule) return json({ error: 'Schedule not found' }, 404);
-        return json(schedule);
+  // Delete schedule
+  if (scheduleMatch && req.method === 'DELETE') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    const deleted = deleteSchedule(db, scheduleMatch[1], tenantId);
+    if (!deleted) return json({ error: 'Schedule not found' }, 404);
+    return json({ ok: true });
+  }
 
-    // Update schedule
-    if (scheduleMatch && req.method === 'PUT') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleUpdateSchedule(req, db, scheduleMatch[1], tenantId);
+  // List executions for a schedule
+  const execsMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/executions$/);
+  if (execsMatch && req.method === 'GET') {
+    const limit = safeNumParam(url.searchParams.get('limit'), 50);
+    const executions = listExecutions(db, execsMatch[1], limit, tenantId);
+    return json(executions);
+  }
+
+  // List all executions (with optional filters)
+  if (url.pathname === '/api/schedule-executions' && req.method === 'GET') {
+    const status = url.searchParams.get('status') ?? undefined;
+    const actionType = url.searchParams.get('actionType') ?? undefined;
+    const since = url.searchParams.get('since') ?? undefined;
+    const until = url.searchParams.get('until') ?? undefined;
+    const offset = safeNumParam(url.searchParams.get('offset'), 0);
+    const limit = safeNumParam(url.searchParams.get('limit'), 50);
+
+    // If any filter params are present, use filtered query
+    if (status || actionType || since || until || offset > 0) {
+      const result = listExecutionsFiltered(db, { status, actionType, since, until, limit, offset });
+      return json(result);
     }
+    // Backwards-compatible: plain array when no filters
+    const executions = listExecutions(db, undefined, limit, tenantId);
+    return json(executions);
+  }
 
-    // Delete schedule
-    if (scheduleMatch && req.method === 'DELETE') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        const deleted = deleteSchedule(db, scheduleMatch[1], tenantId);
-        if (!deleted) return json({ error: 'Schedule not found' }, 404);
-        return json({ ok: true });
+  // Cancel a running execution
+  const cancelMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/cancel$/);
+  if (cancelMatch && req.method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
+    const execution = schedulerService.cancelExecution(cancelMatch[1]);
+    if (!execution) return json({ error: 'Execution not found or not running' }, 404);
+    return json(execution);
+  }
 
-    // List executions for a schedule
-    const execsMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/executions$/);
-    if (execsMatch && req.method === 'GET') {
-        const limit = safeNumParam(url.searchParams.get('limit'), 50);
-        const executions = listExecutions(db, execsMatch[1], limit, tenantId);
-        return json(executions);
+  // Get single execution
+  const execMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)$/);
+  if (execMatch && req.method === 'GET') {
+    const execution = getExecution(db, execMatch[1]);
+    if (!execution) return json({ error: 'Execution not found' }, 404);
+    return json(execution);
+  }
+
+  // Bulk schedule actions (pause/resume/delete)
+  if (url.pathname === '/api/schedules/bulk' && req.method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleBulkAction(req, db);
+  }
 
-    // List all executions (with optional filters)
-    if (url.pathname === '/api/schedule-executions' && req.method === 'GET') {
-        const status = url.searchParams.get('status') ?? undefined;
-        const actionType = url.searchParams.get('actionType') ?? undefined;
-        const since = url.searchParams.get('since') ?? undefined;
-        const until = url.searchParams.get('until') ?? undefined;
-        const offset = safeNumParam(url.searchParams.get('offset'), 0);
-        const limit = safeNumParam(url.searchParams.get('limit'), 50);
-
-        // If any filter params are present, use filtered query
-        if (status || actionType || since || until || offset > 0) {
-            const result = listExecutionsFiltered(db, { status, actionType, since, until, limit, offset });
-            return json(result);
-        }
-        // Backwards-compatible: plain array when no filters
-        const executions = listExecutions(db, undefined, limit, tenantId);
-        return json(executions);
+  // Trigger schedule now
+  const triggerMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/trigger$/);
+  if (triggerMatch && req.method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
+    return handleTriggerNow(triggerMatch[1], schedulerService);
+  }
 
-    // Cancel a running execution
-    const cancelMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/cancel$/);
-    if (cancelMatch && req.method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
-        const execution = schedulerService.cancelExecution(cancelMatch[1]);
-        if (!execution) return json({ error: 'Execution not found or not running' }, 404);
-        return json(execution);
+  // Approve/deny execution
+  const approvalMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/resolve$/);
+  if (approvalMatch && req.method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleResolveApproval(req, db, approvalMatch[1], schedulerService);
+  }
 
-    // Get single execution
-    const execMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)$/);
-    if (execMatch && req.method === 'GET') {
-        const execution = getExecution(db, execMatch[1]);
-        if (!execution) return json({ error: 'Execution not found' }, 404);
-        return json(execution);
+  // Scheduler health
+  if (url.pathname === '/api/scheduler/health' && req.method === 'GET') {
+    if (!schedulerService) {
+      return json({
+        running: false,
+        activeSchedules: 0,
+        pausedSchedules: 0,
+        runningExecutions: 0,
+        maxConcurrent: 0,
+        recentFailures: 0,
+        systemState: null,
+        priorityRules: {},
+      });
     }
+    return json(schedulerService.getStats());
+  }
 
-    // Bulk schedule actions (pause/resume/delete)
-    if (url.pathname === '/api/schedules/bulk' && req.method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleBulkAction(req, db);
+  // System state (live evaluation)
+  if (url.pathname === '/api/scheduler/system-state' && req.method === 'GET') {
+    if (!schedulerService) {
+      return json({ states: ['healthy'], details: {}, evaluatedAt: new Date().toISOString(), cached: false });
     }
+    return schedulerService.getSystemState().then((state) => json(state));
+  }
 
-    // Trigger schedule now
-    const triggerMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/trigger$/);
-    if (triggerMatch && req.method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
-        return handleTriggerNow(triggerMatch[1], schedulerService);
-    }
+  // GitHub status
+  if (url.pathname === '/api/github/status' && req.method === 'GET') {
+    return json({ configured: isGitHubConfigured() });
+  }
 
-    // Approve/deny execution
-    const approvalMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/resolve$/);
-    if (approvalMatch && req.method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleResolveApproval(req, db, approvalMatch[1], schedulerService);
-    }
+  // List pipeline templates
+  if (url.pathname === '/api/schedules/pipeline-templates' && req.method === 'GET') {
+    return json(listPipelineTemplates());
+  }
 
-    // Scheduler health
-    if (url.pathname === '/api/scheduler/health' && req.method === 'GET') {
-        if (!schedulerService) {
-            return json({ running: false, activeSchedules: 0, pausedSchedules: 0, runningExecutions: 0, maxConcurrent: 0, recentFailures: 0, systemState: null, priorityRules: {} });
-        }
-        return json(schedulerService.getStats());
-    }
+  // Get single pipeline template
+  const templateMatch = url.pathname.match(/^\/api\/schedules\/pipeline-templates\/([^/]+)$/);
+  if (templateMatch && req.method === 'GET') {
+    const template = getPipelineTemplate(templateMatch[1]);
+    if (!template) return json({ error: 'Template not found' }, 404);
+    return json(template);
+  }
 
-    // System state (live evaluation)
-    if (url.pathname === '/api/scheduler/system-state' && req.method === 'GET') {
-        if (!schedulerService) {
-            return json({ states: ['healthy'], details: {}, evaluatedAt: new Date().toISOString(), cached: false });
-        }
-        return schedulerService.getSystemState().then(state => json(state));
-    }
-
-    // GitHub status
-    if (url.pathname === '/api/github/status' && req.method === 'GET') {
-        return json({ configured: isGitHubConfigured() });
-    }
-
-    // List pipeline templates
-    if (url.pathname === '/api/schedules/pipeline-templates' && req.method === 'GET') {
-        return json(listPipelineTemplates());
-    }
-
-    // Get single pipeline template
-    const templateMatch = url.pathname.match(/^\/api\/schedules\/pipeline-templates\/([^/]+)$/);
-    if (templateMatch && req.method === 'GET') {
-        const template = getPipelineTemplate(templateMatch[1]);
-        if (!template) return json({ error: 'Template not found' }, 404);
-        return json(template);
-    }
-
-    return null;
+  return null;
 }
 
 /**
  * Scan all prompt/description fields in schedule actions for injection patterns.
  * Returns an error message if blocked, or null if safe.
  */
-function scanScheduleActions(actions: Array<{ prompt?: string; description?: string; message?: string }>): string | null {
-    for (const action of actions) {
-        for (const field of ['prompt', 'description', 'message'] as const) {
-            const value = action[field];
-            if (!value) continue;
-            const result = scanForInjection(value);
-            if (result.blocked) {
-                const categories = [...new Set(result.matches.map((m) => m.category))].join(', ');
-                log.warn('Schedule action blocked by injection scanner', {
-                    field,
-                    confidence: result.confidence,
-                    categories,
-                    preview: value.slice(0, 80),
-                });
-                return `Schedule action ${field} was rejected: suspicious content detected (${categories})`;
-            }
-        }
+function scanScheduleActions(
+  actions: Array<{ prompt?: string; description?: string; message?: string }>,
+): string | null {
+  for (const action of actions) {
+    for (const field of ['prompt', 'description', 'message'] as const) {
+      const value = action[field];
+      if (!value) continue;
+      const result = scanForInjection(value);
+      if (result.blocked) {
+        const categories = [...new Set(result.matches.map((m) => m.category))].join(', ');
+        log.warn('Schedule action blocked by injection scanner', {
+          field,
+          confidence: result.confidence,
+          categories,
+          preview: value.slice(0, 80),
+        });
+        return `Schedule action ${field} was rejected: suspicious content detected (${categories})`;
+      }
     }
-    return null;
+  }
+  return null;
 }
 
 async function handleCreateSchedule(req: Request, db: Database, tenantId: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, CreateScheduleSchema);
+  try {
+    const data = await parseBodyOrThrow(req, CreateScheduleSchema);
 
-        // Only validate frequency if cron/interval is provided (event-only schedules skip this)
-        const isEventOnly = !data.cronExpression && !data.intervalMs && data.triggerEvents && data.triggerEvents.length > 0;
-        if (!isEventOnly) {
-            validateScheduleFrequency(data.cronExpression, data.intervalMs);
-        }
-
-        const injectionError = scanScheduleActions(data.actions);
-        if (injectionError) return badRequest(injectionError);
-
-        // Also scan pipeline step actions if present
-        if (data.pipelineSteps?.length) {
-            const pipelineInjectionError = scanScheduleActions(data.pipelineSteps.map((s: { action: { prompt?: string; description?: string; message?: string } }) => s.action));
-            if (pipelineInjectionError) return badRequest(pipelineInjectionError);
-        }
-
-        const schedule = createSchedule(db, data, tenantId);
-
-        // Compute and persist next_run_at so the scheduler picks it up (null for event-only)
-        const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
-        if (nextRun) {
-            updateScheduleNextRun(db, schedule.id, nextRun);
-            schedule.nextRunAt = nextRun;
-        }
-
-        return json(schedule, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
-        return handleRouteError(err);
+    // Only validate frequency if cron/interval is provided (event-only schedules skip this)
+    const isEventOnly = !data.cronExpression && !data.intervalMs && data.triggerEvents && data.triggerEvents.length > 0;
+    if (!isEventOnly) {
+      validateScheduleFrequency(data.cronExpression, data.intervalMs);
     }
+
+    const injectionError = scanScheduleActions(data.actions);
+    if (injectionError) return badRequest(injectionError);
+
+    // Also scan pipeline step actions if present
+    if (data.pipelineSteps?.length) {
+      const pipelineInjectionError = scanScheduleActions(
+        data.pipelineSteps.map(
+          (s: { action: { prompt?: string; description?: string; message?: string } }) => s.action,
+        ),
+      );
+      if (pipelineInjectionError) return badRequest(pipelineInjectionError);
+    }
+
+    const schedule = createSchedule(db, data, tenantId);
+
+    // Compute and persist next_run_at so the scheduler picks it up (null for event-only)
+    const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
+    if (nextRun) {
+      updateScheduleNextRun(db, schedule.id, nextRun);
+      schedule.nextRunAt = nextRun;
+    }
+
+    return json(schedule, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return badRequest(err.detail);
+    if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
+    return handleRouteError(err);
+  }
 }
 
 /** Check if an error is a known schedule frequency validation error. */
 function isScheduleFrequencyError(err: unknown): boolean {
-    if (!(err instanceof Error)) return false;
-    const msg = err.message;
-    return msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short');
+  if (!(err instanceof Error)) return false;
+  const msg = err.message;
+  return msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short');
 }
 
 async function handleUpdateSchedule(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, UpdateScheduleSchema);
+  try {
+    const data = await parseBodyOrThrow(req, UpdateScheduleSchema);
 
-        // Validate frequency constraints if cron/interval is being updated
-        if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
-            const existing = getSchedule(db, id, tenantId);
-            if (!existing) return json({ error: 'Schedule not found' }, 404);
-            const effectiveCron = data.cronExpression ?? existing.cronExpression;
-            const effectiveInterval = data.intervalMs ?? existing.intervalMs;
-            validateScheduleFrequency(effectiveCron, effectiveInterval ?? undefined);
-        }
-
-        if (data.actions) {
-            const injectionError = scanScheduleActions(data.actions);
-            if (injectionError) return badRequest(injectionError);
-        }
-
-        const schedule = updateSchedule(db, id, data, tenantId);
-        if (!schedule) return json({ error: 'Schedule not found' }, 404);
-
-        // Recompute next_run_at if cron/interval changed
-        if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
-            const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
-            if (nextRun) {
-                updateScheduleNextRun(db, schedule.id, nextRun);
-                schedule.nextRunAt = nextRun;
-            }
-        }
-
-        return json(schedule);
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
-        return handleRouteError(err);
+    // Validate frequency constraints if cron/interval is being updated
+    if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
+      const existing = getSchedule(db, id, tenantId);
+      if (!existing) return json({ error: 'Schedule not found' }, 404);
+      const effectiveCron = data.cronExpression ?? existing.cronExpression;
+      const effectiveInterval = data.intervalMs ?? existing.intervalMs;
+      validateScheduleFrequency(effectiveCron, effectiveInterval ?? undefined);
     }
+
+    if (data.actions) {
+      const injectionError = scanScheduleActions(data.actions);
+      if (injectionError) return badRequest(injectionError);
+    }
+
+    const schedule = updateSchedule(db, id, data, tenantId);
+    if (!schedule) return json({ error: 'Schedule not found' }, 404);
+
+    // Recompute next_run_at if cron/interval changed
+    if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
+      const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
+      if (nextRun) {
+        updateScheduleNextRun(db, schedule.id, nextRun);
+        schedule.nextRunAt = nextRun;
+      }
+    }
+
+    return json(schedule);
+  } catch (err) {
+    if (err instanceof ValidationError) return badRequest(err.detail);
+    if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
+    return handleRouteError(err);
+  }
 }
 
 async function handleResolveApproval(
-    req: Request,
-    db: Database,
-    executionId: string,
-    schedulerService: SchedulerService | null,
+  req: Request,
+  db: Database,
+  executionId: string,
+  schedulerService: SchedulerService | null,
 ): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, ScheduleApprovalSchema);
+  try {
+    const data = await parseBodyOrThrow(req, ScheduleApprovalSchema);
 
-        if (schedulerService) {
-            const execution = schedulerService.resolveApproval(executionId, data.approved);
-            if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
-            return json(execution);
-        }
-
-        // Fallback: just update DB status
-        const { resolveScheduleApproval } = await import('../db/schedules');
-        const execution = resolveScheduleApproval(db, executionId, data.approved);
-        if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
-        return json(execution);
-    } catch (err) {
-        return handleRouteError(err);
+    if (schedulerService) {
+      const execution = schedulerService.resolveApproval(executionId, data.approved);
+      if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
+      return json(execution);
     }
+
+    // Fallback: just update DB status
+    const { resolveScheduleApproval } = await import('../db/schedules');
+    const execution = resolveScheduleApproval(db, executionId, data.approved);
+    if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
+    return json(execution);
+  } catch (err) {
+    return handleRouteError(err);
+  }
 }
 
 async function handleTriggerNow(scheduleId: string, schedulerService: SchedulerService): Promise<Response> {
-    try {
-        await schedulerService.triggerNow(scheduleId);
-        return json({ ok: true });
-    } catch (err) {
-        return handleRouteError(err);
-    }
+  try {
+    await schedulerService.triggerNow(scheduleId);
+    return json({ ok: true });
+  } catch (err) {
+    return handleRouteError(err);
+  }
 }
 
 async function handleBulkAction(req: Request, db: Database): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, BulkScheduleActionSchema);
-        const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  try {
+    const data = await parseBodyOrThrow(req, BulkScheduleActionSchema);
+    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
 
-        for (const id of data.ids) {
-            try {
-                if (data.action === 'delete') {
-                    const deleted = deleteSchedule(db, id);
-                    results.push({ id, ok: deleted, error: deleted ? undefined : 'Not found' });
-                } else {
-                    const status = data.action === 'pause' ? 'paused' : 'active';
-                    const schedule = updateSchedule(db, id, { status });
-                    results.push({ id, ok: !!schedule, error: schedule ? undefined : 'Not found' });
-                }
-            } catch (err) {
-                results.push({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
-            }
+    for (const id of data.ids) {
+      try {
+        if (data.action === 'delete') {
+          const deleted = deleteSchedule(db, id);
+          results.push({ id, ok: deleted, error: deleted ? undefined : 'Not found' });
+        } else {
+          const status = data.action === 'pause' ? 'paused' : 'active';
+          const schedule = updateSchedule(db, id, { status });
+          results.push({ id, ok: !!schedule, error: schedule ? undefined : 'Not found' });
         }
-
-        return json({ results });
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        return handleRouteError(err);
+      } catch (err) {
+        results.push({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
     }
+
+    return json({ results });
+  } catch (err) {
+    if (err instanceof ValidationError) return badRequest(err.detail);
+    return handleRouteError(err);
+  }
 }
 
 function computeNextRun(cronExpression: string | null, intervalMs: number | null): string | null {
-    if (cronExpression) {
-        try {
-            return getNextCronDate(cronExpression).toISOString();
-        } catch {
-            return null;
-        }
+  if (cronExpression) {
+    try {
+      return getNextCronDate(cronExpression).toISOString();
+    } catch {
+      return null;
     }
-    if (intervalMs && intervalMs > 0) {
-        return new Date(Date.now() + intervalMs).toISOString();
-    }
-    return null;
+  }
+  if (intervalMs && intervalMs > 0) {
+    return new Date(Date.now() + intervalMs).toISOString();
+  }
+  return null;
 }

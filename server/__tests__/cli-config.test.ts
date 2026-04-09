@@ -1,65 +1,65 @@
-import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('CLI Config', () => {
-    let testDir: string;
-    let configFile: string;
+  let testDir: string;
+  let configFile: string;
 
-    beforeEach(() => {
-        testDir = mkdtempSync(join(tmpdir(), 'corvid-cli-test-'));
-        configFile = join(testDir, 'config.json');
-    });
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), 'corvid-cli-test-'));
+    configFile = join(testDir, 'config.json');
+  });
 
-    afterEach(() => {
-        if (existsSync(testDir)) rmSync(testDir, { recursive: true });
-    });
+  afterEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true });
+  });
 
-    test('default config values', async () => {
-        const { loadConfig } = await import('../../cli/config');
-        const config = loadConfig();
-        // loadConfig reads the real ~/.corvid/config.json so we only check types/structure
-        expect(typeof config.serverUrl).toBe('string');
-        expect(config.serverUrl).toMatch(/^https?:\/\//);
-        expect(config.authToken === null || typeof config.authToken === 'string').toBe(true);
-        expect(config.defaultAgent === null || typeof config.defaultAgent === 'string').toBe(true);
-        expect(config.defaultProject === null || typeof config.defaultProject === 'string').toBe(true);
-        expect(config.defaultModel === null || typeof config.defaultModel === 'string').toBe(true);
-    });
+  test('default config values', async () => {
+    const { loadConfig } = await import('../../cli/config');
+    const config = loadConfig();
+    // loadConfig reads the real ~/.corvid/config.json so we only check types/structure
+    expect(typeof config.serverUrl).toBe('string');
+    expect(config.serverUrl).toMatch(/^https?:\/\//);
+    expect(config.authToken === null || typeof config.authToken === 'string').toBe(true);
+    expect(config.defaultAgent === null || typeof config.defaultAgent === 'string').toBe(true);
+    expect(config.defaultProject === null || typeof config.defaultProject === 'string').toBe(true);
+    expect(config.defaultModel === null || typeof config.defaultModel === 'string').toBe(true);
+  });
 
-    test('config read/write roundtrip', () => {
-        const config = {
-            serverUrl: 'http://example.com:8080',
-            authToken: 'test-token-123',
-            defaultAgent: 'agent-1',
-            defaultProject: 'proj-1',
-            defaultModel: 'claude-sonnet-4-5-20250929',
-        };
+  test('config read/write roundtrip', () => {
+    const config = {
+      serverUrl: 'http://example.com:8080',
+      authToken: 'test-token-123',
+      defaultAgent: 'agent-1',
+      defaultProject: 'proj-1',
+      defaultModel: 'claude-sonnet-4-5-20250929',
+    };
 
-        writeFileSync(configFile, JSON.stringify(config, null, 2));
-        const raw = readFileSync(configFile, 'utf-8');
-        const parsed = JSON.parse(raw);
+    writeFileSync(configFile, JSON.stringify(config, null, 2));
+    const raw = readFileSync(configFile, 'utf-8');
+    const parsed = JSON.parse(raw);
 
-        expect(parsed.serverUrl).toBe('http://example.com:8080');
-        expect(parsed.authToken).toBe('test-token-123');
-        expect(parsed.defaultAgent).toBe('agent-1');
-        expect(parsed.defaultProject).toBe('proj-1');
-        expect(parsed.defaultModel).toBe('claude-sonnet-4-5-20250929');
-    });
+    expect(parsed.serverUrl).toBe('http://example.com:8080');
+    expect(parsed.authToken).toBe('test-token-123');
+    expect(parsed.defaultAgent).toBe('agent-1');
+    expect(parsed.defaultProject).toBe('proj-1');
+    expect(parsed.defaultModel).toBe('claude-sonnet-4-5-20250929');
+  });
 
-    test('config handles malformed JSON gracefully', async () => {
-        const { loadConfig } = await import('../../cli/config');
-        const config = loadConfig();
-        expect(config).toBeDefined();
-        expect(typeof config.serverUrl).toBe('string');
-    });
+  test('config handles malformed JSON gracefully', async () => {
+    const { loadConfig } = await import('../../cli/config');
+    const config = loadConfig();
+    expect(config).toBeDefined();
+    expect(typeof config.serverUrl).toBe('string');
+  });
 
-    test('getConfigPath returns a string path', async () => {
-        const { getConfigPath } = await import('../../cli/config');
-        const path = getConfigPath();
-        expect(typeof path).toBe('string');
-        expect(path).toContain('.corvid');
-        expect(path).toContain('config.json');
-    });
+  test('getConfigPath returns a string path', async () => {
+    const { getConfigPath } = await import('../../cli/config');
+    const path = getConfigPath();
+    expect(typeof path).toBe('string');
+    expect(path).toContain('.corvid');
+    expect(path).toContain('config.json');
+  });
 });

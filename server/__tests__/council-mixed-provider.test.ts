@@ -1125,11 +1125,7 @@ describe('council mixed-provider smoke tests', () => {
 
       const startTime = Date.now();
       // 150ms simulates the ≤ 30s requirement in fast test time
-      const result = await waitForSessions(
-        pm,
-        ['cursor-1-fail', 'cursor-2-fail', 'ollama-3-fail'],
-        150,
-      );
+      const result = await waitForSessions(pm, ['cursor-1-fail', 'cursor-2-fail', 'ollama-3-fail'], 150);
       const elapsed = Date.now() - startTime;
 
       // All sessions timed out — none completed
@@ -1154,10 +1150,7 @@ describe('council mixed-provider smoke tests', () => {
       const registry = createMockRegistry([cursorFail, ollamaFail]);
       const manager = new FallbackManager(registry);
 
-      const chain = makeChain(
-        { provider: 'cursor', model: 'cursor-fast' },
-        { provider: 'ollama', model: 'qwen3:14b' },
-      );
+      const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' }, { provider: 'ollama', model: 'qwen3:14b' });
 
       await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
       assertProviderUsed(cursorFail);

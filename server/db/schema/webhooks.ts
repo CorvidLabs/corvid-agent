@@ -1,7 +1,7 @@
 /** Webhook registrations, deliveries, and mention polling configs. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS mention_polling_configs (
+  `CREATE TABLE IF NOT EXISTS mention_polling_configs (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         repo             TEXT NOT NULL,
@@ -20,7 +20,7 @@ export const tables: string[] = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  `CREATE TABLE IF NOT EXISTS webhook_deliveries (
         id              TEXT PRIMARY KEY,
         registration_id TEXT NOT NULL REFERENCES webhook_registrations(id) ON DELETE CASCADE,
         event           TEXT NOT NULL,
@@ -36,7 +36,7 @@ export const tables: string[] = [
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS webhook_registrations (
+  `CREATE TABLE IF NOT EXISTS webhook_registrations (
         id               TEXT PRIMARY KEY,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         repo             TEXT NOT NULL,
@@ -52,14 +52,14 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_tenant ON mention_polling_configs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_registration ON webhook_deliveries(registration_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_agent ON webhook_registrations(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_repo ON webhook_registrations(repo)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_status ON webhook_registrations(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_tenant ON mention_polling_configs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_registration ON webhook_deliveries(registration_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_agent ON webhook_registrations(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_repo ON webhook_registrations(repo)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_status ON webhook_registrations(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
 ];

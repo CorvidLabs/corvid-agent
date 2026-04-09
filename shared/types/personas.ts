@@ -1,38 +1,38 @@
 export type PersonaArchetype = 'custom' | 'professional' | 'friendly' | 'technical' | 'creative' | 'formal';
 
 export interface Persona {
-    id: string;
-    name: string;
-    archetype: PersonaArchetype;
-    traits: string[];
-    voiceGuidelines: string;
-    background: string;
-    exampleMessages: string[];
-    createdAt: string;
-    updatedAt: string;
+  id: string;
+  name: string;
+  archetype: PersonaArchetype;
+  traits: string[];
+  voiceGuidelines: string;
+  background: string;
+  exampleMessages: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreatePersonaInput {
-    name: string;
-    archetype?: PersonaArchetype;
-    traits?: string[];
-    voiceGuidelines?: string;
-    background?: string;
-    exampleMessages?: string[];
+  name: string;
+  archetype?: PersonaArchetype;
+  traits?: string[];
+  voiceGuidelines?: string;
+  background?: string;
+  exampleMessages?: string[];
 }
 
 export interface UpdatePersonaInput {
-    name?: string;
-    archetype?: PersonaArchetype;
-    traits?: string[];
-    voiceGuidelines?: string;
-    background?: string;
-    exampleMessages?: string[];
+  name?: string;
+  archetype?: PersonaArchetype;
+  traits?: string[];
+  voiceGuidelines?: string;
+  background?: string;
+  exampleMessages?: string[];
 }
 
 export interface AssignPersonaInput {
-    personaId: string;
-    sortOrder?: number;
+  personaId: string;
+  sortOrder?: number;
 }
 
 /** @deprecated Use Persona instead — kept for backward compatibility */

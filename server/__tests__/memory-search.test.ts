@@ -1,12 +1,12 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { AgentMemory } from '../../shared/types';
 import { saveMemory } from '../db/agent-memories';
 import { createAgent } from '../db/agents';
 import { runMigrations } from '../db/schema';
 import { ensureMemorySchema } from '../memory/schema';
 import type { DeepSearchFn, ScoredMemory } from '../memory/semantic-search';
 import { deepSearch, fastSearch, search } from '../memory/semantic-search';
-import type { AgentMemory } from '../../shared/types';
 
 let db: Database;
 let agentId: string;
@@ -110,7 +110,11 @@ describe('deepSearch', () => {
     saveMemory(db, { agentId, key: 'mem-a', content: 'apple fruit orchard' });
     saveMemory(db, { agentId, key: 'mem-b', content: 'apple fruit orchard tree' });
 
-    const mockFn: DeepSearchFn = async (_query: string, candidates: AgentMemory[], _limit: number): Promise<ScoredMemory[]> => {
+    const mockFn: DeepSearchFn = async (
+      _query: string,
+      candidates: AgentMemory[],
+      _limit: number,
+    ): Promise<ScoredMemory[]> => {
       // Return reversed order to verify LLM re-ranking is used
       return candidates.map((m, i) => ({ memory: m, score: candidates.length - i, source: 'llm' as const }));
     };

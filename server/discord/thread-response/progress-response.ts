@@ -1,20 +1,20 @@
-import type { ProcessManager } from '../../process/manager';
-import type { EventCallback } from '../../process/interfaces';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
-import { extractContentText, extractContentImageUrls } from '../../process/types';
 import { createLogger } from '../../lib/logger';
+import type { EventCallback } from '../../process/interfaces';
+import type { ProcessManager } from '../../process/manager';
+import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
-  sendEmbed,
-  sendReplyEmbed,
-  editEmbed,
-  sendEmbedWithFiles,
-  sendTypingIndicator,
   agentColor,
-  hexColorToInt,
-  collapseCodeBlocks,
-  buildFooterText,
   buildAgentAuthor,
+  buildFooterText,
+  collapseCodeBlocks,
   type DiscordFileAttachment,
+  editEmbed,
+  hexColorToInt,
+  sendEmbed,
+  sendEmbedWithFiles,
+  sendReplyEmbed,
+  sendTypingIndicator,
 } from '../embeds';
 import { visibleEmbedParts } from './utils';
 

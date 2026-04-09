@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 089: Add tables for Flock Directory automated agent testing.
@@ -8,7 +8,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS flock_test_results (
             id              TEXT PRIMARY KEY,
             agent_id        TEXT NOT NULL,
@@ -23,7 +23,7 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS flock_test_challenge_results (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             test_result_id   TEXT NOT NULL REFERENCES flock_test_results(id) ON DELETE CASCADE,
@@ -38,12 +38,14 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_flock_test_results_agent ON flock_test_results(agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_flock_test_results_completed ON flock_test_results(completed_at)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_flock_test_challenge_results_test ON flock_test_challenge_results(test_result_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_flock_test_results_agent ON flock_test_results(agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_flock_test_results_completed ON flock_test_results(completed_at)`);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_flock_test_challenge_results_test ON flock_test_challenge_results(test_result_id)`,
+  );
 }
 
 export function down(db: Database): void {
-    db.exec(`DROP TABLE IF EXISTS flock_test_challenge_results`);
-    db.exec(`DROP TABLE IF EXISTS flock_test_results`);
+  db.exec(`DROP TABLE IF EXISTS flock_test_challenge_results`);
+  db.exec(`DROP TABLE IF EXISTS flock_test_results`);
 }

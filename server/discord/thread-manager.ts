@@ -9,18 +9,18 @@
  * Response subscription implementations → thread-response/
  */
 
-// Re-export from focused sub-modules so existing consumers don't need to update imports.
-export type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-session-map';
-export { normalizeTimestamp, formatDuration, tryRecoverThread } from './thread-session-map';
-export { archiveThread, archiveStaleThreads, createStandaloneThread } from './thread-lifecycle';
-export { sessionErrorEmbed } from './thread-response/utils';
+export { archiveStaleThreads, archiveThread, createStandaloneThread } from './thread-lifecycle';
+export { subscribeForAdaptiveInlineResponse } from './thread-response/adaptive-response';
 export { subscribeForResponseWithEmbed } from './thread-response/embed-response';
 export { subscribeForInlineResponse } from './thread-response/inline-response';
-export { subscribeForAdaptiveInlineResponse } from './thread-response/adaptive-response';
 export { subscribeForInlineProgressResponse } from './thread-response/progress-response';
 export {
-  recoverActiveThreadSubscriptions,
   recoverActiveMentionSessions,
   recoverActiveThreadSessions,
+  recoverActiveThreadSubscriptions,
   resolveDefaultAgent,
 } from './thread-response/recovery';
+export { sessionErrorEmbed } from './thread-response/utils';
+// Re-export from focused sub-modules so existing consumers don't need to update imports.
+export type { ThreadCallbackInfo, ThreadSessionInfo } from './thread-session-map';
+export { formatDuration, normalizeTimestamp, tryRecoverThread } from './thread-session-map';

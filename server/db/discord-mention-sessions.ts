@@ -110,13 +110,10 @@ export function getRecentMentionSessions(
 /**
  * Update the last_activity_at timestamp for a mention session.
  */
-export function updateMentionSessionActivity(
-    db: Database,
-    botMessageId: string,
-): void {
-    db.query(
-        `UPDATE discord_mention_sessions SET last_activity_at = datetime('now') WHERE bot_message_id = ?`,
-    ).run(botMessageId);
+export function updateMentionSessionActivity(db: Database, botMessageId: string): void {
+  db.query(`UPDATE discord_mention_sessions SET last_activity_at = datetime('now') WHERE bot_message_id = ?`).run(
+    botMessageId,
+  );
 }
 
 /**

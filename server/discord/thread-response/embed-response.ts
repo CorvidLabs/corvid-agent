@@ -1,26 +1,26 @@
 import type { Database } from 'bun:sqlite';
-import type { ProcessManager } from '../../process/manager';
-import { ButtonStyle } from '../types';
-import type { EventCallback } from '../../process/interfaces';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
-import { extractContentText, extractContentImageUrls } from '../../process/types';
 import { createLogger } from '../../lib/logger';
+import type { EventCallback } from '../../process/interfaces';
+import type { ProcessManager } from '../../process/manager';
+import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
+  agentColor,
+  buildActionRow,
+  buildAgentAuthor,
+  buildFooterText,
+  buildFooterWithStats,
+  collapseCodeBlocks,
+  type DiscordFileAttachment,
+  hexColorToInt,
   sendEmbed,
   sendEmbedWithButtons,
   sendEmbedWithFiles,
-  buildActionRow,
   sendTypingIndicator,
-  agentColor,
-  hexColorToInt,
-  collapseCodeBlocks,
-  buildFooterText,
-  buildFooterWithStats,
-  buildAgentAuthor,
-  type DiscordFileAttachment,
 } from '../embeds';
 import type { ThreadCallbackInfo } from '../thread-session-map';
-import { normalizeTimestamp, formatDuration } from '../thread-session-map';
+import { formatDuration, normalizeTimestamp } from '../thread-session-map';
+import { ButtonStyle } from '../types';
 import { sessionErrorEmbed, visibleEmbedParts } from './utils';
 
 const log = createLogger('DiscordThreadManager');

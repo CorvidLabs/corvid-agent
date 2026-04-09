@@ -1,7 +1,7 @@
-import { describe, test, expect, afterEach, beforeEach } from 'bun:test';
-import { sendEmbed, sendReplyEmbed, editEmbed } from '../discord/embeds';
-import { DeliveryTracker } from '../lib/delivery-tracker';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { editEmbed, sendEmbed, sendReplyEmbed } from '../discord/embeds';
 import { _setRestClientForTesting } from '../discord/rest-client';
+import { DeliveryTracker } from '../lib/delivery-tracker';
 
 /**
  * Mock REST client that records calls for assertion.
@@ -20,19 +20,45 @@ function createMockRestClient() {
       return Promise.resolve({ id: messageId });
     },
     // Stubs for other methods the rest client exposes
-    respondToInteraction() { return Promise.resolve({}); },
-    deferInteraction() { return Promise.resolve(); },
-    editDeferredResponse() { return Promise.resolve({}); },
-    deleteMessage() { return Promise.resolve(); },
-    addReaction() { return Promise.resolve(); },
-    removeReaction() { return Promise.resolve(); },
-    sendTypingIndicator() { return Promise.resolve(); },
-    putCommands() { return Promise.resolve([]); },
-    getGuildRoles() { return Promise.resolve([]); },
-    getGuildChannels() { return Promise.resolve([]); },
-    getGuild() { return Promise.resolve({}); },
-    modifyChannel() { return Promise.resolve({}); },
-    sendMessageWithFiles() { return Promise.resolve({ id: '12345678901234567' }); },
+    respondToInteraction() {
+      return Promise.resolve({});
+    },
+    deferInteraction() {
+      return Promise.resolve();
+    },
+    editDeferredResponse() {
+      return Promise.resolve({});
+    },
+    deleteMessage() {
+      return Promise.resolve();
+    },
+    addReaction() {
+      return Promise.resolve();
+    },
+    removeReaction() {
+      return Promise.resolve();
+    },
+    sendTypingIndicator() {
+      return Promise.resolve();
+    },
+    putCommands() {
+      return Promise.resolve([]);
+    },
+    getGuildRoles() {
+      return Promise.resolve([]);
+    },
+    getGuildChannels() {
+      return Promise.resolve([]);
+    },
+    getGuild() {
+      return Promise.resolve({});
+    },
+    modifyChannel() {
+      return Promise.resolve({});
+    },
+    sendMessageWithFiles() {
+      return Promise.resolve({ id: '12345678901234567' });
+    },
   };
 }
 
@@ -84,9 +110,7 @@ describe('sendEmbed mention extraction', () => {
     // First call: embed (URLs stripped), second call: URL follow-up
     expect(mockClient.calls.length).toBe(2);
     const [, embedData] = mockClient.calls[0].args as [string, Record<string, unknown>];
-    expect((embedData.embeds as Array<{ description?: string }>)[0].description).toBe(
-      'Check this out',
-    );
+    expect((embedData.embeds as Array<{ description?: string }>)[0].description).toBe('Check this out');
     const [, followUpData] = mockClient.calls[1].args as [string, Record<string, unknown>];
     expect(followUpData.content).toBe('https://unsplash.com/photos/test');
     expect(followUpData.embeds).toBeUndefined();
@@ -171,9 +195,7 @@ describe('editEmbed mention extraction', () => {
     expect(mockClient.calls.length).toBe(2);
     expect(mockClient.calls[0].method).toBe('editMessage');
     const [, , editData] = mockClient.calls[0].args as [string, string, Record<string, unknown>];
-    expect((editData.embeds as Array<{ description?: string }>)[0].description).toBe(
-      'Updated with',
-    );
+    expect((editData.embeds as Array<{ description?: string }>)[0].description).toBe('Updated with');
     expect(mockClient.calls[1].method).toBe('sendMessage');
     const [, followUpData] = mockClient.calls[1].args as [string, Record<string, unknown>];
     expect(followUpData.content).toBe('https://example.com/link');

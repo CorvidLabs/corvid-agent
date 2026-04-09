@@ -78,8 +78,8 @@ import { handleFeedbackRoutes } from './feedback';
 import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleFlockTestingRoutes } from './flock-testing';
 import { handleGitHubAllowlistRoutes } from './github-allowlist';
-import { handleLibraryRoutes } from './library';
 import { handleGitHubPRDiffRoutes } from './github-pr-diff';
+import { handleLibraryRoutes } from './library';
 import { handleMarketplaceRoutes } from './marketplace';
 import { handleMarketplaceAnalyticsRoutes } from './marketplace-analytics';
 import { handleMcpApiRoutes } from './mcp-api';
@@ -869,7 +869,7 @@ async function handleMemoryBackfill(db: Database, agentMessenger: AgentMessenger
         updateMemoryTxid(db, row.id, txid);
       }
       results.push({ id: row.id, key: row.key, agentId: row.agent_id, txid });
-    } catch (err) {
+    } catch (_err) {
       results.push({
         id: row.id,
         key: row.key,

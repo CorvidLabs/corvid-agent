@@ -457,7 +457,7 @@ export function buildCorsHeaders(req: Request, config: AuthConfig): Record<strin
   };
 
   if (allowOrigin !== '*') {
-    headers['Vary'] = 'Origin';
+    headers.Vary = 'Origin';
   }
 
   return headers;

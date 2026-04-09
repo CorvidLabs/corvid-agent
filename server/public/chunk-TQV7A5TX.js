@@ -1,1 +1,99 @@
-import{a as l}from"./chunk-OFKXBWQC.js";import{b as a}from"./chunk-D6WCRQHB.js";import{O as d,T as r,ja as o,q as u}from"./chunk-LF4EWAJA.js";var h=class c{api=r(a);ws=r(l);schedules=o([]);executions=o([]);pendingApprovals=o([]);loading=o(!1);unsubscribeWs=null;startListening(){this.unsubscribeWs||(this.unsubscribeWs=this.ws.onMessage(e=>{if(e.type==="schedule_update"){let t=e.schedule;this.schedules.update(s=>{let i=s.findIndex(n=>n.id===t.id);if(i>=0){let n=[...s];return n[i]=t,n}return[t,...s]})}if(e.type==="schedule_execution_update"){let t=e.execution;this.executions.update(s=>{let i=s.findIndex(n=>n.id===t.id);if(i>=0){let n=[...s];return n[i]=t,n}return[t,...s]}),t.status==="awaiting_approval"?this.pendingApprovals.update(s=>s.some(i=>i.id===t.id)?s:[t,...s]):this.pendingApprovals.update(s=>s.filter(i=>i.id!==t.id))}}))}stopListening(){this.unsubscribeWs?.(),this.unsubscribeWs=null}async loadSchedules(e){this.loading.set(!0);try{let t=e?`/schedules?agentId=${e}`:"/schedules",s=await u(this.api.get(t));this.schedules.set(s)}finally{this.loading.set(!1)}}async getSchedule(e){return u(this.api.get(`/schedules/${e}`))}async createSchedule(e){let t=await u(this.api.post("/schedules",e));return this.schedules.update(s=>[t,...s]),t}async updateSchedule(e,t){let s=await u(this.api.put(`/schedules/${e}`,t));return this.schedules.update(i=>i.map(n=>n.id===e?s:n)),s}async deleteSchedule(e){await u(this.api.delete(`/schedules/${e}`)),this.schedules.update(t=>t.filter(s=>s.id!==e))}async getScheduleExecutions(e,t=20){return u(this.api.get(`/schedules/${e}/executions?limit=${t}`))}async loadExecutions(e,t=50){let s=e?`/schedules/${e}/executions?limit=${t}`:`/schedule-executions?limit=${t}`,i=await u(this.api.get(s)),n=Array.isArray(i)?i:i.executions;this.executions.set(n)}async cancelExecution(e){return await u(this.api.post(`/schedule-executions/${e}/cancel`,{}))}async bulkAction(e,t){return u(this.api.post("/schedules/bulk",{action:e,ids:t}))}async resolveApproval(e,t){let s=await u(this.api.post(`/schedule-executions/${e}/resolve`,{approved:t}));return this.pendingApprovals.update(i=>i.filter(n=>n.id!==e)),s}async triggerNow(e){await u(this.api.post(`/schedules/${e}/trigger`,{}))}async getGithubStatus(){return u(this.api.get("/github/status"))}static \u0275fac=function(t){return new(t||c)};static \u0275prov=d({token:c,factory:c.\u0275fac,providedIn:"root"})};export{h as a};
+import { b as a } from './chunk-D6WCRQHB.js';
+import { O as d, ja as o, T as r, q as u } from './chunk-LF4EWAJA.js';
+import { a as l } from './chunk-OFKXBWQC.js';
+
+var h = class c {
+  api = r(a);
+  ws = r(l);
+  schedules = o([]);
+  executions = o([]);
+  pendingApprovals = o([]);
+  loading = o(!1);
+  unsubscribeWs = null;
+  startListening() {
+    this.unsubscribeWs ||
+      (this.unsubscribeWs = this.ws.onMessage((e) => {
+        if (e.type === 'schedule_update') {
+          const t = e.schedule;
+          this.schedules.update((s) => {
+            const i = s.findIndex((n) => n.id === t.id);
+            if (i >= 0) {
+              const n = [...s];
+              return (n[i] = t), n;
+            }
+            return [t, ...s];
+          });
+        }
+        if (e.type === 'schedule_execution_update') {
+          const t = e.execution;
+          this.executions.update((s) => {
+            const i = s.findIndex((n) => n.id === t.id);
+            if (i >= 0) {
+              const n = [...s];
+              return (n[i] = t), n;
+            }
+            return [t, ...s];
+          }),
+            t.status === 'awaiting_approval'
+              ? this.pendingApprovals.update((s) => (s.some((i) => i.id === t.id) ? s : [t, ...s]))
+              : this.pendingApprovals.update((s) => s.filter((i) => i.id !== t.id));
+        }
+      }));
+  }
+  stopListening() {
+    this.unsubscribeWs?.(), (this.unsubscribeWs = null);
+  }
+  async loadSchedules(e) {
+    this.loading.set(!0);
+    try {
+      const t = e ? `/schedules?agentId=${e}` : '/schedules',
+        s = await u(this.api.get(t));
+      this.schedules.set(s);
+    } finally {
+      this.loading.set(!1);
+    }
+  }
+  async getSchedule(e) {
+    return u(this.api.get(`/schedules/${e}`));
+  }
+  async createSchedule(e) {
+    const t = await u(this.api.post('/schedules', e));
+    return this.schedules.update((s) => [t, ...s]), t;
+  }
+  async updateSchedule(e, t) {
+    const s = await u(this.api.put(`/schedules/${e}`, t));
+    return this.schedules.update((i) => i.map((n) => (n.id === e ? s : n))), s;
+  }
+  async deleteSchedule(e) {
+    await u(this.api.delete(`/schedules/${e}`)), this.schedules.update((t) => t.filter((s) => s.id !== e));
+  }
+  async getScheduleExecutions(e, t = 20) {
+    return u(this.api.get(`/schedules/${e}/executions?limit=${t}`));
+  }
+  async loadExecutions(e, t = 50) {
+    const s = e ? `/schedules/${e}/executions?limit=${t}` : `/schedule-executions?limit=${t}`,
+      i = await u(this.api.get(s)),
+      n = Array.isArray(i) ? i : i.executions;
+    this.executions.set(n);
+  }
+  async cancelExecution(e) {
+    return await u(this.api.post(`/schedule-executions/${e}/cancel`, {}));
+  }
+  async bulkAction(e, t) {
+    return u(this.api.post('/schedules/bulk', { action: e, ids: t }));
+  }
+  async resolveApproval(e, t) {
+    const s = await u(this.api.post(`/schedule-executions/${e}/resolve`, { approved: t }));
+    return this.pendingApprovals.update((i) => i.filter((n) => n.id !== e)), s;
+  }
+  async triggerNow(e) {
+    await u(this.api.post(`/schedules/${e}/trigger`, {}));
+  }
+  async getGithubStatus() {
+    return u(this.api.get('/github/status'));
+  }
+  static \u0275fac = (t) => new (t || c)();
+  static \u0275prov = d({ token: c, factory: c.\u0275fac, providedIn: 'root' });
+};
+
+export { h as a };

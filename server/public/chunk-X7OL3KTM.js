@@ -1,3 +1,285 @@
-import{a as q}from"./chunk-4V35P7HZ.js";import{a as $}from"./chunk-355WLUEG.js";import{a as G}from"./chunk-2EJE5M6O.js";import{a as j}from"./chunk-FGNIWOFY.js";import{b as N,d as z,f as D,k as V,l as R,m as Q,r as W}from"./chunk-AF4UDQOX.js";import"./chunk-G7DVZDMF.js";import"./chunk-GH246MXO.js";import"./chunk-D6WCRQHB.js";import"./chunk-GEI46CGR.js";import{$b as E,Bb as d,Mb as I,Na as r,Ob as l,Pb as s,Qb as f,Rb as T,T as w,Tb as v,Ub as h,Vb as x,Y as M,Z as S,_a as O,ac as F,fc as A,hb as P,ib as _,ja as L,jb as m,lb as k,mb as y,nb as b,ob as u,pb as o,qb as i,rb as C,vb as B,zb as g}from"./chunk-LF4EWAJA.js";var H=(t,n)=>n.value,J=(t,n)=>n.id;function K(t,n){if(t&1&&(o(0,"option",6),l(1),i()),t&2){let e=n.$implicit;u("value",e.value),r(),s(e.label)}}function X(t,n){t&1&&C(0,"app-skeleton",7),t&2&&u("count",5)}function Y(t,n){t&1&&C(0,"app-empty-state",8)}function Z(t,n){t&1&&(o(0,"p",9),l(1,"No entries match your filter."),i())}function ee(t,n){if(t&1&&(o(0,"span",19),l(1),i()),t&2){let e=d().$implicit;r(),f("ASA #",e.asaId)}}function te(t,n){if(t&1&&(o(0,"span",20),l(1),i()),t&2){let e=d().$implicit;r(),T("",e.book," p.",e.page)}}function ne(t,n){if(t&1&&(o(0,"span",23),l(1),i()),t&2){let e=n.$implicit;r(),s(e)}}function re(t,n){if(t&1&&(o(0,"div",21),y(1,ne,2,1,"span",23,k),i()),t&2){let e=d().$implicit;r(),b(e.tags)}}function ae(t,n){if(t&1&&(o(0,"div",22)(1,"pre"),l(2),i()()),t&2){let e=d().$implicit;r(2),s(e.content)}}function ie(t,n){if(t&1){let e=B();o(0,"div",12),g("click",function(){let p=M(e).$implicit,c=d(2);return S(c.toggle(p.id))}),o(1,"div",13)(2,"span",14),l(3),i(),o(4,"span",15),l(5),i()(),o(6,"div",16)(7,"span",17),l(8),i(),o(9,"span",18),l(10),E(11,"relativeTime"),i(),_(12,ee,2,1,"span",19),_(13,te,2,2,"span",20),i(),_(14,re,3,0,"div",21),_(15,ae,3,1,"div",22),i()}if(t&2){let e=n.$implicit,a=d(2);I("entry-card--expanded",a.expandedId()===e.id),r(3),s(e.key),r(),P("data-category",e.category),r(),s(e.category),r(3),s(e.authorName||"Unknown"),r(2),s(F(11,11,e.updatedAt)),r(2),m(e.asaId?12:-1),r(),m(e.book?13:-1),r(),m(e.tags.length>0?14:-1),r(),m(a.expandedId()===e.id?15:-1)}}function oe(t,n){if(t&1&&(o(0,"div",10),y(1,ie,16,13,"div",11,J),i()),t&2){let e=d();r(),b(e.filtered())}}var ce=[{value:"",label:"All Categories"},{value:"guide",label:"Guides"},{value:"reference",label:"References"},{value:"decision",label:"Decisions"},{value:"standard",label:"Standards"},{value:"runbook",label:"Runbooks"}],U=class t{libraryService=w(q);categories=ce;searchQuery="";categoryFilter="";expandedId=L(null);filtered=A(()=>{let n=this.libraryService.entries(),e=this.searchQuery.toLowerCase();return e&&(n=n.filter(a=>a.key.toLowerCase().includes(e)||a.content.toLowerCase().includes(e))),n});ngOnInit(){this.libraryService.load()}refresh(){let n=this.categoryFilter;this.libraryService.load(n?{category:n}:void 0)}onCategoryChange(n){this.categoryFilter=n,this.refresh()}toggle(n){this.expandedId.set(this.expandedId()===n?null:n)}static \u0275fac=function(e){return new(e||t)};static \u0275cmp=O({type:t,selectors:[["app-library-browser"]],decls:15,vars:5,consts:[[1,"page"],[1,"page__header"],[1,"btn","btn--primary","btn--sm",3,"click","disabled"],[1,"toolbar"],["placeholder","Filter by key or content...",1,"search-input",3,"ngModelChange","input","ngModel"],[1,"category-select",3,"ngModelChange","ngModel"],[3,"value"],["variant","table",3,"count"],["icon",`  [LIB]
+import { a as G } from './chunk-2EJE5M6O.js';
+import { a as q } from './chunk-4V35P7HZ.js';
+import { a as $ } from './chunk-355WLUEG.js';
+import { f as D, b as N, m as Q, l as R, k as V, r as W, d as z } from './chunk-AF4UDQOX.js';
+import { a as j } from './chunk-FGNIWOFY.js';
+import './chunk-G7DVZDMF.js';
+import './chunk-GH246MXO.js';
+import './chunk-D6WCRQHB.js';
+import './chunk-GEI46CGR.js';
+import {
+  ib as _,
+  fc as A,
+  vb as B,
+  nb as b,
+  rb as C,
+  Bb as d,
+  $b as E,
+  ac as F,
+  Qb as f,
+  zb as g,
+  Ub as h,
+  Mb as I,
+  qb as i,
+  lb as k,
+  ja as L,
+  Ob as l,
+  Y as M,
+  jb as m,
+  _a as O,
+  pb as o,
+  hb as P,
+  Na as r,
+  Z as S,
+  Pb as s,
+  Rb as T,
+  ob as u,
+  Tb as v,
+  T as w,
+  Vb as x,
+  mb as y,
+} from './chunk-LF4EWAJA.js';
+
+var H = (_t, n) => n.value,
+  J = (_t, n) => n.id;
+function K(t, n) {
+  if ((t & 1 && (o(0, 'option', 6), l(1), i()), t & 2)) {
+    const e = n.$implicit;
+    u('value', e.value), r(), s(e.label);
+  }
+}
+function X(t, _n) {
+  t & 1 && C(0, 'app-skeleton', 7), t & 2 && u('count', 5);
+}
+function Y(t, _n) {
+  t & 1 && C(0, 'app-empty-state', 8);
+}
+function Z(t, _n) {
+  t & 1 && (o(0, 'p', 9), l(1, 'No entries match your filter.'), i());
+}
+function ee(t, _n) {
+  if ((t & 1 && (o(0, 'span', 19), l(1), i()), t & 2)) {
+    const e = d().$implicit;
+    r(), f('ASA #', e.asaId);
+  }
+}
+function te(t, _n) {
+  if ((t & 1 && (o(0, 'span', 20), l(1), i()), t & 2)) {
+    const e = d().$implicit;
+    r(), T('', e.book, ' p.', e.page);
+  }
+}
+function ne(t, n) {
+  if ((t & 1 && (o(0, 'span', 23), l(1), i()), t & 2)) {
+    const e = n.$implicit;
+    r(), s(e);
+  }
+}
+function re(t, _n) {
+  if ((t & 1 && (o(0, 'div', 21), y(1, ne, 2, 1, 'span', 23, k), i()), t & 2)) {
+    const e = d().$implicit;
+    r(), b(e.tags);
+  }
+}
+function ae(t, _n) {
+  if ((t & 1 && (o(0, 'div', 22)(1, 'pre'), l(2), i()()), t & 2)) {
+    const e = d().$implicit;
+    r(2), s(e.content);
+  }
+}
+function ie(t, n) {
+  if (t & 1) {
+    const e = B();
+    o(0, 'div', 12),
+      g('click', () => {
+        const p = M(e).$implicit,
+          c = d(2);
+        return S(c.toggle(p.id));
+      }),
+      o(1, 'div', 13)(2, 'span', 14),
+      l(3),
+      i(),
+      o(4, 'span', 15),
+      l(5),
+      i()(),
+      o(6, 'div', 16)(7, 'span', 17),
+      l(8),
+      i(),
+      o(9, 'span', 18),
+      l(10),
+      E(11, 'relativeTime'),
+      i(),
+      _(12, ee, 2, 1, 'span', 19),
+      _(13, te, 2, 2, 'span', 20),
+      i(),
+      _(14, re, 3, 0, 'div', 21),
+      _(15, ae, 3, 1, 'div', 22),
+      i();
+  }
+  if (t & 2) {
+    const e = n.$implicit,
+      a = d(2);
+    I('entry-card--expanded', a.expandedId() === e.id),
+      r(3),
+      s(e.key),
+      r(),
+      P('data-category', e.category),
+      r(),
+      s(e.category),
+      r(3),
+      s(e.authorName || 'Unknown'),
+      r(2),
+      s(F(11, 11, e.updatedAt)),
+      r(2),
+      m(e.asaId ? 12 : -1),
+      r(),
+      m(e.book ? 13 : -1),
+      r(),
+      m(e.tags.length > 0 ? 14 : -1),
+      r(),
+      m(a.expandedId() === e.id ? 15 : -1);
+  }
+}
+function oe(t, _n) {
+  if ((t & 1 && (o(0, 'div', 10), y(1, ie, 16, 13, 'div', 11, J), i()), t & 2)) {
+    const e = d();
+    r(), b(e.filtered());
+  }
+}
+var ce = [
+    { value: '', label: 'All Categories' },
+    { value: 'guide', label: 'Guides' },
+    { value: 'reference', label: 'References' },
+    { value: 'decision', label: 'Decisions' },
+    { value: 'standard', label: 'Standards' },
+    { value: 'runbook', label: 'Runbooks' },
+  ],
+  U = class t {
+    libraryService = w(q);
+    categories = ce;
+    searchQuery = '';
+    categoryFilter = '';
+    expandedId = L(null);
+    filtered = A(() => {
+      let n = this.libraryService.entries(),
+        e = this.searchQuery.toLowerCase();
+      return e && (n = n.filter((a) => a.key.toLowerCase().includes(e) || a.content.toLowerCase().includes(e))), n;
+    });
+    ngOnInit() {
+      this.libraryService.load();
+    }
+    refresh() {
+      const n = this.categoryFilter;
+      this.libraryService.load(n ? { category: n } : void 0);
+    }
+    onCategoryChange(n) {
+      (this.categoryFilter = n), this.refresh();
+    }
+    toggle(n) {
+      this.expandedId.set(this.expandedId() === n ? null : n);
+    }
+    static \u0275fac = (e) => new (e || t)();
+    static \u0275cmp = O({
+      type: t,
+      selectors: [['app-library-browser']],
+      decls: 15,
+      vars: 5,
+      consts: [
+        [1, 'page'],
+        [1, 'page__header'],
+        [1, 'btn', 'btn--primary', 'btn--sm', 3, 'click', 'disabled'],
+        [1, 'toolbar'],
+        ['placeholder', 'Filter by key or content...', 1, 'search-input', 3, 'ngModelChange', 'input', 'ngModel'],
+        [1, 'category-select', 3, 'ngModelChange', 'ngModel'],
+        [3, 'value'],
+        ['variant', 'table', 3, 'count'],
+        [
+          'icon',
+          `  [LIB]
   [===]
-  [___]`,"title","No library entries yet.","description","Library entries are shared knowledge published by agents via CRVLIB on-chain ASAs.","actionLabel","View Agents","actionRoute","/agents","actionAriaLabel","View agents that can publish to the library"],[1,"empty"],[1,"entry-list","stagger-children"],[1,"entry-card","card-lift",3,"entry-card--expanded"],[1,"entry-card","card-lift",3,"click"],[1,"entry-card__header"],[1,"entry-card__key"],[1,"entry-card__category"],[1,"entry-card__meta"],[1,"entry-card__author"],[1,"entry-card__time"],[1,"entry-card__asa"],[1,"entry-card__book"],[1,"entry-card__tags"],[1,"entry-card__content"],[1,"tag"]],template:function(e,a){e&1&&(o(0,"div",0)(1,"div",1)(2,"h2"),l(3,"Shared Library (CRVLIB)"),i(),o(4,"button",2),g("click",function(){return a.refresh()}),l(5),i()(),o(6,"div",3)(7,"input",4),x("ngModelChange",function(c){return h(a.searchQuery,c)||(a.searchQuery=c),c}),g("input",function(c){return a.searchQuery=c.target.value}),i(),o(8,"select",5),x("ngModelChange",function(c){return h(a.categoryFilter,c)||(a.categoryFilter=c),c}),g("ngModelChange",function(c){return a.onCategoryChange(c)}),y(9,K,2,2,"option",6,H),i()(),_(11,X,1,1,"app-skeleton",7)(12,Y,1,0,"app-empty-state",8)(13,Z,2,0,"p",9)(14,oe,3,0,"div",10),i()),e&2&&(r(4),u("disabled",a.libraryService.loading()),r(),f(" ",a.libraryService.loading()?"Loading...":"Refresh"," "),r(2),v("ngModel",a.searchQuery),r(),v("ngModel",a.categoryFilter),r(),b(a.categories),r(2),m(a.libraryService.loading()?11:a.libraryService.entries().length===0?12:a.filtered().length===0?13:14))},dependencies:[W,R,Q,N,V,z,D,G,j,$],styles:[".page__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin:0}.toolbar[_ngcontent-%COMP%]{display:flex;gap:.5rem;margin-bottom:1rem}.search-input[_ngcontent-%COMP%]{flex:1;padding:.5rem .75rem;border:1px solid var(--border-bright);border-radius:var(--radius);font-size:.85rem;font-family:inherit;background:var(--bg-input);color:var(--text-primary);box-sizing:border-box}.search-input[_ngcontent-%COMP%]:focus{border-color:var(--accent-cyan);box-shadow:var(--glow-cyan);outline:none}.category-select[_ngcontent-%COMP%]{padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);color:var(--text-secondary);font-size:.85rem;font-family:inherit}.empty[_ngcontent-%COMP%]{color:var(--text-tertiary);font-size:.85rem}.entry-list[_ngcontent-%COMP%]{display:flex;flex-direction:column;gap:.5rem}.entry-card[_ngcontent-%COMP%]{border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;cursor:pointer;transition:border-color .15s,background .15s}.entry-card[_ngcontent-%COMP%]:hover{border-color:var(--border-bright);background:var(--bg-hover)}.entry-card--expanded[_ngcontent-%COMP%]{border-color:var(--accent-cyan)}.entry-card__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}.entry-card__key[_ngcontent-%COMP%]{font-weight:600;color:var(--accent-cyan);font-size:.85rem}.entry-card__category[_ngcontent-%COMP%]{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .4rem;border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-secondary)}.entry-card__category[data-category=guide][_ngcontent-%COMP%]{color:var(--accent-green)}.entry-card__category[data-category=reference][_ngcontent-%COMP%]{color:var(--accent-cyan)}.entry-card__category[data-category=decision][_ngcontent-%COMP%]{color:var(--accent-amber)}.entry-card__category[data-category=standard][_ngcontent-%COMP%]{color:var(--accent-purple, #a78bfa)}.entry-card__category[data-category=runbook][_ngcontent-%COMP%]{color:var(--accent-red)}.entry-card__meta[_ngcontent-%COMP%]{display:flex;gap:.75rem;font-size:.7rem;color:var(--text-tertiary);margin-bottom:.25rem}.entry-card__asa[_ngcontent-%COMP%]{font-family:monospace;color:var(--accent-green)}.entry-card__book[_ngcontent-%COMP%]{color:var(--accent-purple, #a78bfa)}.entry-card__tags[_ngcontent-%COMP%]{display:flex;gap:.25rem;flex-wrap:wrap;margin-top:.25rem}.tag[_ngcontent-%COMP%]{font-size:.6rem;padding:.1rem .35rem;border-radius:var(--radius-sm);background:var(--accent-cyan-dim);color:var(--accent-cyan);font-weight:600}.entry-card__content[_ngcontent-%COMP%]{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}.entry-card__content[_ngcontent-%COMP%]   pre[_ngcontent-%COMP%]{font-size:.8rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;line-height:1.5}@media(max-width:767px){.toolbar[_ngcontent-%COMP%]{flex-direction:column}.entry-card__meta[_ngcontent-%COMP%]{flex-wrap:wrap;gap:.5rem}}"],changeDetection:0})};export{U as LibraryBrowserComponent};
+  [___]`,
+          'title',
+          'No library entries yet.',
+          'description',
+          'Library entries are shared knowledge published by agents via CRVLIB on-chain ASAs.',
+          'actionLabel',
+          'View Agents',
+          'actionRoute',
+          '/agents',
+          'actionAriaLabel',
+          'View agents that can publish to the library',
+        ],
+        [1, 'empty'],
+        [1, 'entry-list', 'stagger-children'],
+        [1, 'entry-card', 'card-lift', 3, 'entry-card--expanded'],
+        [1, 'entry-card', 'card-lift', 3, 'click'],
+        [1, 'entry-card__header'],
+        [1, 'entry-card__key'],
+        [1, 'entry-card__category'],
+        [1, 'entry-card__meta'],
+        [1, 'entry-card__author'],
+        [1, 'entry-card__time'],
+        [1, 'entry-card__asa'],
+        [1, 'entry-card__book'],
+        [1, 'entry-card__tags'],
+        [1, 'entry-card__content'],
+        [1, 'tag'],
+      ],
+      template: (e, a) => {
+        e & 1 &&
+          (o(0, 'div', 0)(1, 'div', 1)(2, 'h2'),
+          l(3, 'Shared Library (CRVLIB)'),
+          i(),
+          o(4, 'button', 2),
+          g('click', () => a.refresh()),
+          l(5),
+          i()(),
+          o(6, 'div', 3)(7, 'input', 4),
+          x('ngModelChange', (c) => (h(a.searchQuery, c) || (a.searchQuery = c), c)),
+          g('input', (c) => (a.searchQuery = c.target.value)),
+          i(),
+          o(8, 'select', 5),
+          x('ngModelChange', (c) => (h(a.categoryFilter, c) || (a.categoryFilter = c), c)),
+          g('ngModelChange', (c) => a.onCategoryChange(c)),
+          y(9, K, 2, 2, 'option', 6, H),
+          i()(),
+          _(11, X, 1, 1, 'app-skeleton', 7)(12, Y, 1, 0, 'app-empty-state', 8)(13, Z, 2, 0, 'p', 9)(
+            14,
+            oe,
+            3,
+            0,
+            'div',
+            10,
+          ),
+          i()),
+          e & 2 &&
+            (r(4),
+            u('disabled', a.libraryService.loading()),
+            r(),
+            f(' ', a.libraryService.loading() ? 'Loading...' : 'Refresh', ' '),
+            r(2),
+            v('ngModel', a.searchQuery),
+            r(),
+            v('ngModel', a.categoryFilter),
+            r(),
+            b(a.categories),
+            r(2),
+            m(
+              a.libraryService.loading()
+                ? 11
+                : a.libraryService.entries().length === 0
+                  ? 12
+                  : a.filtered().length === 0
+                    ? 13
+                    : 14,
+            ));
+      },
+      dependencies: [W, R, Q, N, V, z, D, G, j, $],
+      styles: [
+        '.page__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin:0}.toolbar[_ngcontent-%COMP%]{display:flex;gap:.5rem;margin-bottom:1rem}.search-input[_ngcontent-%COMP%]{flex:1;padding:.5rem .75rem;border:1px solid var(--border-bright);border-radius:var(--radius);font-size:.85rem;font-family:inherit;background:var(--bg-input);color:var(--text-primary);box-sizing:border-box}.search-input[_ngcontent-%COMP%]:focus{border-color:var(--accent-cyan);box-shadow:var(--glow-cyan);outline:none}.category-select[_ngcontent-%COMP%]{padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);color:var(--text-secondary);font-size:.85rem;font-family:inherit}.empty[_ngcontent-%COMP%]{color:var(--text-tertiary);font-size:.85rem}.entry-list[_ngcontent-%COMP%]{display:flex;flex-direction:column;gap:.5rem}.entry-card[_ngcontent-%COMP%]{border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;cursor:pointer;transition:border-color .15s,background .15s}.entry-card[_ngcontent-%COMP%]:hover{border-color:var(--border-bright);background:var(--bg-hover)}.entry-card--expanded[_ngcontent-%COMP%]{border-color:var(--accent-cyan)}.entry-card__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}.entry-card__key[_ngcontent-%COMP%]{font-weight:600;color:var(--accent-cyan);font-size:.85rem}.entry-card__category[_ngcontent-%COMP%]{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .4rem;border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-secondary)}.entry-card__category[data-category=guide][_ngcontent-%COMP%]{color:var(--accent-green)}.entry-card__category[data-category=reference][_ngcontent-%COMP%]{color:var(--accent-cyan)}.entry-card__category[data-category=decision][_ngcontent-%COMP%]{color:var(--accent-amber)}.entry-card__category[data-category=standard][_ngcontent-%COMP%]{color:var(--accent-purple, #a78bfa)}.entry-card__category[data-category=runbook][_ngcontent-%COMP%]{color:var(--accent-red)}.entry-card__meta[_ngcontent-%COMP%]{display:flex;gap:.75rem;font-size:.7rem;color:var(--text-tertiary);margin-bottom:.25rem}.entry-card__asa[_ngcontent-%COMP%]{font-family:monospace;color:var(--accent-green)}.entry-card__book[_ngcontent-%COMP%]{color:var(--accent-purple, #a78bfa)}.entry-card__tags[_ngcontent-%COMP%]{display:flex;gap:.25rem;flex-wrap:wrap;margin-top:.25rem}.tag[_ngcontent-%COMP%]{font-size:.6rem;padding:.1rem .35rem;border-radius:var(--radius-sm);background:var(--accent-cyan-dim);color:var(--accent-cyan);font-weight:600}.entry-card__content[_ngcontent-%COMP%]{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}.entry-card__content[_ngcontent-%COMP%]   pre[_ngcontent-%COMP%]{font-size:.8rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;line-height:1.5}@media(max-width:767px){.toolbar[_ngcontent-%COMP%]{flex-direction:column}.entry-card__meta[_ngcontent-%COMP%]{flex-wrap:wrap;gap:.5rem}}',
+      ],
+      changeDetection: 0,
+    });
+  };
+
+export { U as LibraryBrowserComponent };

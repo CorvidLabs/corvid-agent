@@ -5,9 +5,9 @@
  * for CLI-to-server authentication.
  */
 import type { Database } from 'bun:sqlite';
-import { json } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, DeviceTokenSchema, DeviceAuthorizeSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { json } from '../lib/response';
+import { DeviceAuthorizeSchema, DeviceTokenSchema, parseBodyOrThrow, ValidationError } from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
 
 const log = createLogger('AuthFlow');
@@ -16,13 +16,13 @@ const DEVICE_CODE_EXPIRY_MS = 600_000; // 10 minutes
 const USER_CODE_LENGTH = 8;
 
 interface PendingAuth {
-    deviceCode: string;
-    userCode: string;
-    expiresAt: number;
-    tenantId: string | null;
-    accessToken: string | null;
-    email: string | null;
-    status: 'pending' | 'authorized' | 'denied' | 'expired';
+  deviceCode: string;
+  userCode: string;
+  expiresAt: number;
+  tenantId: string | null;
+  accessToken: string | null;
+  email: string | null;
+  status: 'pending' | 'authorized' | 'denied' | 'expired';
 }
 
 // In-memory store for pending device auth flows.
@@ -31,226 +31,226 @@ const MAX_PENDING_AUTHS = 100;
 const pendingAuths = new Map<string, PendingAuth>();
 
 function generateCode(length: number): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No ambiguous chars (0/O, 1/I)
-    // Use rejection sampling to avoid modulo bias (CodeQL js/biased-cryptographic-random)
-    const maxUnbiased = Math.floor(256 / chars.length) * chars.length; // 240 for 30 chars
-    let code = '';
-    while (code.length < length) {
-        const bytes = crypto.getRandomValues(new Uint8Array(length - code.length + 8));
-        for (let i = 0; i < bytes.length && code.length < length; i++) {
-            if (bytes[i] < maxUnbiased) {
-                code += chars[bytes[i] % chars.length];
-            }
-        }
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No ambiguous chars (0/O, 1/I)
+  // Use rejection sampling to avoid modulo bias (CodeQL js/biased-cryptographic-random)
+  const maxUnbiased = Math.floor(256 / chars.length) * chars.length; // 240 for 30 chars
+  let code = '';
+  while (code.length < length) {
+    const bytes = crypto.getRandomValues(new Uint8Array(length - code.length + 8));
+    for (let i = 0; i < bytes.length && code.length < length; i++) {
+      if (bytes[i] < maxUnbiased) {
+        code += chars[bytes[i] % chars.length];
+      }
     }
-    return code;
+  }
+  return code;
 }
 
 function cleanupExpired(): void {
-    const now = Date.now();
-    for (const [code, auth] of pendingAuths) {
-        if (auth.expiresAt < now) {
-            pendingAuths.delete(code);
-        }
+  const now = Date.now();
+  for (const [code, auth] of pendingAuths) {
+    if (auth.expiresAt < now) {
+      pendingAuths.delete(code);
     }
+  }
 }
 
 export function handleAuthFlowRoutes(
-    req: Request,
-    url: URL,
-    db: Database,
-    context?: RequestContext,
+  req: Request,
+  url: URL,
+  db: Database,
+  context?: RequestContext,
 ): Response | Promise<Response> | null {
-    const path = url.pathname;
-    const method = req.method;
+  const path = url.pathname;
+  const method = req.method;
 
-    // Initiate device auth
-    if (path === '/api/auth/device' && method === 'POST') {
-        return handleDeviceAuth(db);
-    }
+  // Initiate device auth
+  if (path === '/api/auth/device' && method === 'POST') {
+    return handleDeviceAuth(db);
+  }
 
-    // Poll for token
-    if (path === '/api/auth/device/token' && method === 'POST') {
-        return handleDeviceToken(req);
-    }
+  // Poll for token
+  if (path === '/api/auth/device/token' && method === 'POST') {
+    return handleDeviceToken(req);
+  }
 
-    // Authorize a device (called from web UI after user logs in)
-    if (path === '/api/auth/device/authorize' && method === 'POST') {
-        return handleDeviceAuthorize(req);
-    }
+  // Authorize a device (called from web UI after user logs in)
+  if (path === '/api/auth/device/authorize' && method === 'POST') {
+    return handleDeviceAuthorize(req);
+  }
 
-    // Verify page (shows user code input)
-    if (path === '/api/auth/verify' && method === 'GET') {
-        return handleVerifyPage(req, url, context?.tenantId ?? 'default');
-    }
+  // Verify page (shows user code input)
+  if (path === '/api/auth/verify' && method === 'GET') {
+    return handleVerifyPage(req, url, context?.tenantId ?? 'default');
+  }
 
-    return null;
+  return null;
 }
 
 function handleDeviceAuth(_db: Database): Response {
-    cleanupExpired();
+  cleanupExpired();
 
-    // Enforce cap to prevent unbounded memory growth
-    if (pendingAuths.size >= MAX_PENDING_AUTHS) {
-        return json({ error: 'Too many pending device authorizations. Try again later.' }, 429);
-    }
+  // Enforce cap to prevent unbounded memory growth
+  if (pendingAuths.size >= MAX_PENDING_AUTHS) {
+    return json({ error: 'Too many pending device authorizations. Try again later.' }, 429);
+  }
 
-    const deviceCode = crypto.randomUUID();
-    const userCode = generateCode(USER_CODE_LENGTH);
+  const deviceCode = crypto.randomUUID();
+  const userCode = generateCode(USER_CODE_LENGTH);
 
-    const auth: PendingAuth = {
-        deviceCode,
-        userCode,
-        expiresAt: Date.now() + DEVICE_CODE_EXPIRY_MS,
-        tenantId: null,
-        accessToken: null,
-        email: null,
-        status: 'pending',
-    };
+  const auth: PendingAuth = {
+    deviceCode,
+    userCode,
+    expiresAt: Date.now() + DEVICE_CODE_EXPIRY_MS,
+    tenantId: null,
+    accessToken: null,
+    email: null,
+    status: 'pending',
+  };
 
-    pendingAuths.set(deviceCode, auth);
+  pendingAuths.set(deviceCode, auth);
 
-    log.info('Device auth initiated', { userCode });
+  log.info('Device auth initiated', { userCode });
 
-    // In production, verificationUrl would point to the web dashboard
-    const baseUrl = process.env.PUBLIC_URL ?? 'http://localhost:3578';
+  // In production, verificationUrl would point to the web dashboard
+  const baseUrl = process.env.PUBLIC_URL ?? 'http://localhost:3578';
 
-    return json({
-        deviceCode,
-        userCode,
-        verificationUrl: `${baseUrl}/api/auth/verify?code=${userCode}`,
-        expiresIn: DEVICE_CODE_EXPIRY_MS / 1000,
-        interval: 2,
-    });
+  return json({
+    deviceCode,
+    userCode,
+    verificationUrl: `${baseUrl}/api/auth/verify?code=${userCode}`,
+    expiresIn: DEVICE_CODE_EXPIRY_MS / 1000,
+    interval: 2,
+  });
 }
 
 async function handleDeviceToken(req: Request): Promise<Response> {
-    let data: { deviceCode: string };
-    try {
-        data = await parseBodyOrThrow(req, DeviceTokenSchema);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
-    }
+  let data: { deviceCode: string };
+  try {
+    data = await parseBodyOrThrow(req, DeviceTokenSchema);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 
-    const auth = pendingAuths.get(data.deviceCode);
-    if (!auth) {
-        return json({ error: 'expired', error_description: 'Device code expired or invalid' }, 400);
-    }
+  const auth = pendingAuths.get(data.deviceCode);
+  if (!auth) {
+    return json({ error: 'expired', error_description: 'Device code expired or invalid' }, 400);
+  }
 
-    if (auth.expiresAt < Date.now()) {
-        pendingAuths.delete(data.deviceCode);
-        return json({ error: 'expired', error_description: 'Device code expired' }, 400);
-    }
+  if (auth.expiresAt < Date.now()) {
+    pendingAuths.delete(data.deviceCode);
+    return json({ error: 'expired', error_description: 'Device code expired' }, 400);
+  }
 
-    if (auth.status === 'denied') {
-        pendingAuths.delete(data.deviceCode);
-        return json({ error: 'denied', error_description: 'Authorization denied' }, 400);
-    }
+  if (auth.status === 'denied') {
+    pendingAuths.delete(data.deviceCode);
+    return json({ error: 'denied', error_description: 'Authorization denied' }, 400);
+  }
 
-    if (auth.status === 'pending') {
-        return json({ error: 'authorization_pending' }, 400);
-    }
-
-    if (auth.status === 'authorized' && auth.accessToken) {
-        // Success! Return the token and clean up
-        const response = {
-            accessToken: auth.accessToken,
-            tenantId: auth.tenantId,
-            tenantName: auth.tenantId ?? 'default',
-            email: auth.email ?? '',
-        };
-        pendingAuths.delete(data.deviceCode);
-        return json(response);
-    }
-
+  if (auth.status === 'pending') {
     return json({ error: 'authorization_pending' }, 400);
+  }
+
+  if (auth.status === 'authorized' && auth.accessToken) {
+    // Success! Return the token and clean up
+    const response = {
+      accessToken: auth.accessToken,
+      tenantId: auth.tenantId,
+      tenantName: auth.tenantId ?? 'default',
+      email: auth.email ?? '',
+    };
+    pendingAuths.delete(data.deviceCode);
+    return json(response);
+  }
+
+  return json({ error: 'authorization_pending' }, 400);
 }
 
 async function handleDeviceAuthorize(req: Request): Promise<Response> {
-    let data: { userCode: string; tenantId: string; email: string; approve: boolean };
-    try {
-        data = await parseBodyOrThrow(req, DeviceAuthorizeSchema);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
+  let data: { userCode: string; tenantId: string; email: string; approve: boolean };
+  try {
+    data = await parseBodyOrThrow(req, DeviceAuthorizeSchema);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
+
+  // Find the pending auth by user code
+  let found: PendingAuth | null = null;
+  for (const auth of pendingAuths.values()) {
+    if (auth.userCode === data.userCode && auth.status === 'pending') {
+      found = auth;
+      break;
     }
+  }
 
-    // Find the pending auth by user code
-    let found: PendingAuth | null = null;
-    for (const auth of pendingAuths.values()) {
-        if (auth.userCode === data.userCode && auth.status === 'pending') {
-            found = auth;
-            break;
-        }
-    }
+  if (!found) {
+    return json({ error: 'Invalid or expired user code' }, 404);
+  }
 
-    if (!found) {
-        return json({ error: 'Invalid or expired user code' }, 404);
-    }
+  if (!data.approve) {
+    found.status = 'denied';
+    return json({ ok: true, status: 'denied' });
+  }
 
-    if (!data.approve) {
-        found.status = 'denied';
-        return json({ ok: true, status: 'denied' });
-    }
+  // Generate an access token
+  const accessToken = `ca_${crypto.randomUUID().replace(/-/g, '')}`;
+  found.status = 'authorized';
+  found.tenantId = data.tenantId;
+  found.accessToken = accessToken;
+  found.email = data.email;
 
-    // Generate an access token
-    const accessToken = `ca_${crypto.randomUUID().replace(/-/g, '')}`;
-    found.status = 'authorized';
-    found.tenantId = data.tenantId;
-    found.accessToken = accessToken;
-    found.email = data.email;
+  log.info('Device authorized', { userCode: data.userCode, tenantId: data.tenantId });
 
-    log.info('Device authorized', { userCode: data.userCode, tenantId: data.tenantId });
-
-    return json({ ok: true, status: 'authorized' });
+  return json({ ok: true, status: 'authorized' });
 }
 
 function escapeHtml(str: string): string {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** Runtime check — evaluated on each request so tests can toggle via process.env. */
 function isTrustProxy(): boolean {
-    return process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
+  return process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
 }
 
 /** Basic email format check — must contain exactly one @ with non-empty local and domain parts. */
 function isValidEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function handleVerifyPage(req: Request, url: URL, tenantId: string): Response {
-    const rawCode = url.searchParams.get('code') ?? '';
-    // Validate: user codes are uppercase alphanumeric only
-    const code = /^[A-Z0-9]{0,16}$/.test(rawCode) ? rawCode : '';
-    const safeCode = escapeHtml(code);
-    const safeTenantId = JSON.stringify(tenantId);
+  const rawCode = url.searchParams.get('code') ?? '';
+  // Validate: user codes are uppercase alphanumeric only
+  const code = /^[A-Z0-9]{0,16}$/.test(rawCode) ? rawCode : '';
+  const safeCode = escapeHtml(code);
+  const safeTenantId = JSON.stringify(tenantId);
 
-    // When behind a trusted proxy, read the email the OAuth provider resolved.
-    // Otherwise leave empty — the user fills it in on the form.
-    let proxyEmail = '';
-    if (isTrustProxy()) {
-        const forwarded = req.headers.get('x-forwarded-email') ?? '';
-        if (isValidEmail(forwarded)) {
-            proxyEmail = forwarded;
-        }
+  // When behind a trusted proxy, read the email the OAuth provider resolved.
+  // Otherwise leave empty — the user fills it in on the form.
+  let proxyEmail = '';
+  if (isTrustProxy()) {
+    const forwarded = req.headers.get('x-forwarded-email') ?? '';
+    if (isValidEmail(forwarded)) {
+      proxyEmail = forwarded;
     }
-    const safeProxyEmail = escapeHtml(proxyEmail);
+  }
+  const safeProxyEmail = escapeHtml(proxyEmail);
 
-    // Whether email is locked (proxy-supplied) or editable (manual entry)
-    const emailReadonly = proxyEmail ? 'readonly' : '';
-    const emailPlaceholder = proxyEmail ? '' : 'your@email.com';
-    const proxyNote = proxyEmail
-        ? '<p class="info">Identity confirmed by your login provider.</p>'
-        : '<p class="info">Enter your email to identify yourself for this authorization.</p>';
+  // Whether email is locked (proxy-supplied) or editable (manual entry)
+  const emailReadonly = proxyEmail ? 'readonly' : '';
+  const emailPlaceholder = proxyEmail ? '' : 'your@email.com';
+  const proxyNote = proxyEmail
+    ? '<p class="info">Identity confirmed by your login provider.</p>'
+    : '<p class="info">Enter your email to identify yourself for this authorization.</p>';
 
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html><head><title>CorvidAgent - Device Authorization</title>
 <style>
   body { font-family: system-ui; max-width: 400px; margin: 80px auto; padding: 0 20px; }
@@ -291,7 +291,7 @@ async function authorize() {
 </script>
 </body></html>`;
 
-    return new Response(html, {
-        headers: { 'Content-Type': 'text/html' },
-    });
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html' },
+  });
 }
