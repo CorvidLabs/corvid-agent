@@ -79,7 +79,13 @@ export class VoiceSessionRouter {
     const connectionInfo = this.voiceManager.getConnection(guildId);
     const textChannelId = connectionInfo?.transcriptionChannelId;
     const channelSuffix = textChannelId ? ` in channel ${textChannelId}` : '';
-    const voicePrefix = `[Voice from <@${userId}>${channelSuffix}]`;
+    // Resolve Discord ID to display name so the agent knows who's speaking
+    // without relying on Whisper's (often garbled) name recognition
+    const contact = findContactByPlatformId(this.db, 'default', 'discord', userId);
+    const speakerLabel = contact?.displayName
+      ? `${contact.displayName} (<@${userId}>)`
+      : `<@${userId}>`;
+    const voicePrefix = `[Voice from ${speakerLabel}${channelSuffix}]`;
 
     // Queue transcription if we're currently speaking (process after TTS finishes)
     if (this.voiceManager.isSpeaking(guildId)) {
