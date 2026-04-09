@@ -2,6 +2,14 @@
 spec: service.spec.md
 ---
 
+## Product Requirements
+
+- Agents can alert operators wherever they are — via Discord, Telegram, Slack, GitHub, WhatsApp, Signal, or blockchain message — so important updates are never missed regardless of which app the operator is using.
+- Each agent can be configured to send notifications to different channels independently, so teams can route alerts exactly where they need them.
+- If a notification fails to deliver, the system automatically retries so that transient outages (a Telegram API hiccup, a Discord rate limit) don't result in silently dropped alerts.
+- When agents need a human decision, they can ask a question across multiple channels simultaneously and act on the first response they receive — no need to answer on every platform.
+- Every notification delivery attempt is tracked with its status and any error details, giving operators a full audit trail of what was sent and what failed.
+
 ## User Stories
 
 - As an agent operator, I want notifications dispatched to multiple channels (Discord, Telegram, Slack, GitHub, AlgoChat, WhatsApp, Signal, WebSocket) so that I am alerted wherever I am

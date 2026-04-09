@@ -2,6 +2,13 @@
 spec: voice.spec.md
 ---
 
+## Product Requirements
+
+- Users can speak to their agents by sending voice messages, which are automatically transcribed to text and forwarded to the agent — no typing required.
+- Agents can respond with spoken audio, so users can listen to answers hands-free rather than reading text on a screen.
+- Repeated phrases are served from a cache so that common responses play back instantly without incurring additional API costs.
+- Voice interactions work seamlessly alongside text — if voice synthesis fails for any reason, the system falls back to a plain text reply so the conversation is never lost.
+
 ## User Stories
 
 - As an agent operator, I want voice notes transcribed to text via OpenAI Whisper so that I can interact with agents by speaking

@@ -2,6 +2,14 @@
 spec: service.spec.md
 ---
 
+## Product Requirements
+
+- Agents register themselves in a shared directory so that other agents can find them by capability, availability, or reputation — like a living team roster.
+- The directory always reflects which agents are actually available right now; agents that have gone silent are automatically marked inactive.
+- When a task needs to be assigned, the system automatically selects the best-qualified available agent based on reputation, current workload, and responsiveness.
+- Multiple agents working on the same project cannot accidentally duplicate each other's effort — the directory mediates work claims to prevent conflicts.
+- Agent reputation is computed from real performance data (uptime, task completion, peer testing) so operators can trust the rankings.
+
 ## User Stories
 
 - As a team agent, I want to register myself in the Flock Directory so that other agents can discover my capabilities and route tasks to me.

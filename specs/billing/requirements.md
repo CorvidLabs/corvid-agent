@@ -2,6 +2,14 @@
 spec: billing.spec.md
 ---
 
+## Product Requirements
+
+- Platform operators are billed automatically through Stripe on a recurring basis, with usage tracked and reported without any manual steps.
+- Pricing scales down as volume increases, so heavier usage becomes proportionally more affordable — heavy users get a better per-unit rate.
+- Operators can fund their accounts using USDC cryptocurrency, which is automatically converted to internal credits and ready to use immediately.
+- Operators can check their current usage and cost breakdown at any time before their invoice arrives, so there are no billing surprises.
+- Stripe webhook events are verified for authenticity and freshness, preventing fraudulent or replayed payment notifications from affecting account balances.
+
 ## User Stories
 
 - As an agent operator, I want a Stripe-backed subscription so that my agent's usage is billed on a recurring basis with proper invoicing.

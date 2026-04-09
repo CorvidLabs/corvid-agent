@@ -11,6 +11,7 @@ db_tables:
 depends_on:
   - specs/db/credits.spec.md
   - specs/lib/infra.spec.md
+tracks: [1689]
 ---
 
 # USDC Deposit Watcher

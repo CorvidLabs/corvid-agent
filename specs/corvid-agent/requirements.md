@@ -2,6 +2,13 @@
 spec: corvid-agent.spec.md
 ---
 
+## Product Requirements
+
+- The platform refuses to start if it detects insecure configuration, protecting operators from accidentally exposing their agents to the internet with weak credentials.
+- When something goes wrong at startup, the server logs a clear, specific error message so developers can diagnose and fix the problem quickly.
+- In-flight conversations and requests are completed gracefully when the server shuts down — agents don't drop mid-response when the platform is restarted.
+- The platform runs as a single, self-contained server that handles both the web dashboard and agent communication on one port, keeping deployment simple.
+
 ## User Stories
 
 - As an operator, I want the server to refuse to start with insecure configuration so that production is never accidentally exposed

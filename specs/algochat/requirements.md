@@ -2,6 +2,14 @@
 spec: bridge.spec.md
 ---
 
+## Product Requirements
+
+- Agents and users can send encrypted messages to each other over the Algorand blockchain, creating a tamper-proof, verifiable record of every conversation.
+- Users can control their agents remotely using simple commands (like `/status` or `/stop`) sent directly from any Algorand wallet app.
+- Operators can decide who is allowed to talk to each agent — keeping some agents private, others open to a specific list, or fully public.
+- New mobile users are automatically discovered and securely onboarded without any manual setup, lowering the barrier to connecting with an agent.
+- Agents can collaborate with each other by sending tasks over the blockchain, enabling multi-agent workflows that are transparent and auditable.
+
 ## User Stories
 
 - As an agent operator, I want to send and receive encrypted messages over the Algorand blockchain so that agent conversations are tamper-proof and verifiable on-chain

@@ -2,6 +2,14 @@
 spec: work-task-service.spec.md
 ---
 
+## Product Requirements
+
+- Agents autonomously write code, run tests, and create pull requests — all in isolated environments that cannot break the main codebase.
+- If an agent's code fails tests or type checks, it automatically tries again (up to a configurable number of times) before giving up, reducing the need for human intervention.
+- Less capable (local/intern-tier) models are blocked from publishing code to GitHub, ensuring only quality-checked work reaches the team's repositories.
+- When many tasks arrive at once, they are queued and run in a controlled order so the system stays responsive and doesn't get overwhelmed.
+- Operators can cancel any running task at any time, and the system will clean up after itself without leaving behind broken branches or dangling files.
+
 ## User Stories
 
 - As a team agent, I want to create autonomous work tasks that spawn sessions in isolated git worktrees so that my code changes do not interfere with the main working tree or other tasks

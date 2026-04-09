@@ -2,6 +2,14 @@
 spec: scheduler-service.spec.md
 ---
 
+## Product Requirements
+
+- Agents can be set to automatically perform tasks on a recurring schedule — like reviewing pull requests every morning or auditing the codebase every week — without anyone needing to trigger them manually.
+- The scheduler is aware of the system's health: if tests are failing or there's an urgent issue open, it will skip or reprioritize lower-priority scheduled work accordingly.
+- High-impact scheduled actions (like creating pull requests or suggesting code changes) require explicit approval before they run, keeping humans in control of consequential automation.
+- Complex multi-step workflows — such as "audit the codebase, then post a summary to Discord" — can be expressed as a single scheduled pipeline that runs automatically.
+- Schedules that fail repeatedly are automatically paused so that broken automations don't silently waste resources.
+
 ## User Stories
 
 - As an agent operator, I want to schedule recurring agent actions using cron expressions or intervals so that agents can proactively perform tasks (PR reviews, codebase audits, status check-ins) without manual triggering

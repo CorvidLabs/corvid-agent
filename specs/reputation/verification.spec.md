@@ -15,6 +15,7 @@ db_tables:
 depends_on:
   - specs/lib/infra.spec.md
   - specs/reputation/scorer.spec.md
+tracks: [1458]
 ---
 
 # Reputation Verification

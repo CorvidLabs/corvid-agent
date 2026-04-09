@@ -2,6 +2,14 @@
 spec: scorer.spec.md
 ---
 
+## Product Requirements
+
+- Every agent has a reputation score derived from real performance data — task success rates, peer ratings, security record, and activity level — so operators can make informed decisions about which agents to trust with important work.
+- Humans can submit thumbs-up or thumbs-down feedback on agent responses, and that feedback directly influences the agent's score.
+- Reputation scores are published on the Algorand blockchain as cryptographically verifiable attestations, so remote agents and operators can independently confirm an agent's trust level.
+- Agent identity verification levels (from unverified to fully established) can only move upward — once trust is earned, it cannot be silently revoked by the system.
+- Historical reputation snapshots let operators track whether an agent's quality is improving or declining over time.
+
 ## User Stories
 
 - As a platform administrator, I want composite reputation scores computed from five data-driven components so that agent trustworthiness is quantified objectively across multiple dimensions

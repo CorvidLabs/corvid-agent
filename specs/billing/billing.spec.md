@@ -13,6 +13,7 @@ db_tables:
   - invoices
 depends_on:
   - specs/db/credits.spec.md
+tracks: [1689, 311]
 ---
 
 # Billing

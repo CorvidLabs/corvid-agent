@@ -6,6 +6,7 @@ files:
   - server/middleware/auth.ts
 db_tables: []
 depends_on: []
+tracks: [1549, 1689]
 ---
 
 # Auth Middleware

@@ -16,6 +16,7 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/db/sessions.spec.md
+tracks: [1458]
 ---
 
 # AlgoChat Bridge

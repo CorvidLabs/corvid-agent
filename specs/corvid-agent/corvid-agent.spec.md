@@ -15,6 +15,7 @@ depends_on:
   - specs/db/connection.spec.md
   - specs/algochat/service.spec.md
   - specs/middleware/auth.spec.md
+tracks: [311, 1460, 1487]
 ---
 
 # Corvid Agent

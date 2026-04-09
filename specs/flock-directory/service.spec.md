@@ -11,6 +11,7 @@ depends_on:
   - server/flock-directory/on-chain-client.ts
   - server/db/types.ts
   - server/lib/logger.ts
+tracks: [1459]
 ---
 
 # Flock Directory Service
