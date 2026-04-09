@@ -451,20 +451,7 @@ const TABLES = [
         created_at       TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
         decided_at       TEXT DEFAULT NULL,
-        enacted_at       TEXT DEFAULT NULL,
-        voting_opened_at TEXT DEFAULT NULL,
-        voting_deadline  TEXT DEFAULT NULL
-    )`,
-
-    // --- proposal_vetoes ---
-    `CREATE TABLE IF NOT EXISTS proposal_vetoes (
-        id          TEXT PRIMARY KEY,
-        proposal_id TEXT NOT NULL REFERENCES governance_proposals(id) ON DELETE CASCADE,
-        vetoer_id   TEXT NOT NULL,
-        reason      TEXT NOT NULL DEFAULT '',
-        vetoed_at   TEXT NOT NULL DEFAULT (datetime('now')),
-        tenant_id   TEXT NOT NULL DEFAULT 'default',
-        UNIQUE(proposal_id, vetoer_id)
+        enacted_at       TEXT DEFAULT NULL
     )`,
 
     // --- governance_votes ---
@@ -1230,8 +1217,6 @@ const INDEXES = [
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
     `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_proposal_vetoes_proposal ON proposal_vetoes(proposal_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_proposal_vetoes_tenant ON proposal_vetoes(tenant_id)`,
     `CREATE INDEX IF NOT EXISTS idx_health_snap_agent ON health_snapshots(agent_id, project_id)`,
     `CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id)`,
     `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_agent ON marketplace_listings(agent_id)`,
@@ -1373,7 +1358,6 @@ const DROP_ORDER = [
     'council_launch_logs',
     'governance_member_votes',
     'governance_votes',
-    'proposal_vetoes',
     'governance_proposals',
     'workflow_node_runs',
     'workflow_runs',
