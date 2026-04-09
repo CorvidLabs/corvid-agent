@@ -5,153 +5,153 @@ export type TrustLevel = 'untrusted' | 'low' | 'medium' | 'high' | 'verified' | 
 // ─── Reputation Score ───────────────────────────────────────────────────────
 
 export interface ReputationScore {
-    agentId: string;
-    /** Overall composite score (0-100) */
-    overallScore: number;
-    /** Derived trust level */
-    trustLevel: TrustLevel;
-    /** Component scores */
-    components: ReputationComponents;
-    /** On-chain attestation hash (if published) */
-    attestationHash: string | null;
-    /** When the score was last computed */
-    computedAt: string;
-    /** Whether the agent has any real activity backing the scores */
-    hasActivity: boolean;
+  agentId: string;
+  /** Overall composite score (0-100) */
+  overallScore: number;
+  /** Derived trust level */
+  trustLevel: TrustLevel;
+  /** Component scores */
+  components: ReputationComponents;
+  /** On-chain attestation hash (if published) */
+  attestationHash: string | null;
+  /** When the score was last computed */
+  computedAt: string;
+  /** Whether the agent has any real activity backing the scores */
+  hasActivity: boolean;
 }
 
 export interface ReputationComponents {
-    /** Task completion rate (0-100) */
-    taskCompletion: number;
-    /** Average peer ratings from marketplace reviews (0-100) */
-    peerRating: number;
-    /** Credit spending patterns score (0-100) — higher = more responsible */
-    creditPattern: number;
-    /** Security compliance score (0-100) — penalized for violations */
-    securityCompliance: number;
-    /** Activity level score (0-100) — based on recent sessions/tasks */
-    activityLevel: number;
+  /** Task completion rate (0-100) */
+  taskCompletion: number;
+  /** Average peer ratings from marketplace reviews (0-100) */
+  peerRating: number;
+  /** Credit spending patterns score (0-100) — higher = more responsible */
+  creditPattern: number;
+  /** Security compliance score (0-100) — penalized for violations */
+  securityCompliance: number;
+  /** Activity level score (0-100) — based on recent sessions/tasks */
+  activityLevel: number;
 }
 
 // ─── Reputation Events ──────────────────────────────────────────────────────
 
 export type ReputationEventType =
-    | 'task_completed'
-    | 'task_failed'
-    | 'review_received'
-    | 'credit_spent'
-    | 'credit_earned'
-    | 'security_violation'
-    | 'session_completed'
-    | 'attestation_published'
-    | 'improvement_loop_completed'
-    | 'improvement_loop_failed'
-    | 'feedback_received'
-    | 'agent_blacklisted'
-    | 'agent_unblacklisted';
+  | 'task_completed'
+  | 'task_failed'
+  | 'review_received'
+  | 'credit_spent'
+  | 'credit_earned'
+  | 'security_violation'
+  | 'session_completed'
+  | 'attestation_published'
+  | 'improvement_loop_completed'
+  | 'improvement_loop_failed'
+  | 'feedback_received'
+  | 'agent_blacklisted'
+  | 'agent_unblacklisted';
 
 export interface ReputationEvent {
-    id: string;
-    agentId: string;
-    eventType: ReputationEventType;
-    /** Positive or negative score impact */
-    scoreImpact: number;
-    /** Extra context */
-    metadata: Record<string, unknown>;
-    createdAt: string;
+  id: string;
+  agentId: string;
+  eventType: ReputationEventType;
+  /** Positive or negative score impact */
+  scoreImpact: number;
+  /** Extra context */
+  metadata: Record<string, unknown>;
+  createdAt: string;
 }
 
 // ─── Score Weights ──────────────────────────────────────────────────────────
 
 export interface ScoreWeights {
-    taskCompletion: number;
-    peerRating: number;
-    creditPattern: number;
-    securityCompliance: number;
-    activityLevel: number;
+  taskCompletion: number;
+  peerRating: number;
+  creditPattern: number;
+  securityCompliance: number;
+  activityLevel: number;
 }
 
 export const DEFAULT_WEIGHTS: ScoreWeights = {
-    taskCompletion: 0.30,
-    peerRating: 0.25,
-    creditPattern: 0.15,
-    securityCompliance: 0.20,
-    activityLevel: 0.10,
+  taskCompletion: 0.3,
+  peerRating: 0.25,
+  creditPattern: 0.15,
+  securityCompliance: 0.2,
+  activityLevel: 0.1,
 };
 
 // ─── DB Records ─────────────────────────────────────────────────────────────
 
 export interface ReputationRecord {
-    agent_id: string;
-    overall_score: number;
-    trust_level: string;
-    task_completion: number;
-    peer_rating: number;
-    credit_pattern: number;
-    security_compliance: number;
-    activity_level: number;
-    attestation_hash: string | null;
-    computed_at: string;
+  agent_id: string;
+  overall_score: number;
+  trust_level: string;
+  task_completion: number;
+  peer_rating: number;
+  credit_pattern: number;
+  security_compliance: number;
+  activity_level: number;
+  attestation_hash: string | null;
+  computed_at: string;
 }
 
 export interface ReputationEventRecord {
-    id: string;
-    agent_id: string;
-    event_type: string;
-    score_impact: number;
-    metadata: string;
-    created_at: string;
+  id: string;
+  agent_id: string;
+  event_type: string;
+  score_impact: number;
+  metadata: string;
+  created_at: string;
 }
 
 // ─── Score Explanation ──────────────────────────────────────────────────────
 
 export interface ComponentExplanation {
-    /** Component name */
-    component: keyof ReputationComponents;
-    /** Computed score (0-100) */
-    score: number;
-    /** Weight in overall calculation */
-    weight: number;
-    /** Weighted contribution to overall score */
-    weightedContribution: number;
-    /** Whether this is a default value due to insufficient data */
-    isDefault: boolean;
-    /** Human-readable reason for the score */
-    reason: string;
-    /** Raw evidence behind the score */
-    evidence: Record<string, unknown>;
-    /** Recent events that influenced this component */
-    recentEvents: ReputationEventRecord[];
+  /** Component name */
+  component: keyof ReputationComponents;
+  /** Computed score (0-100) */
+  score: number;
+  /** Weight in overall calculation */
+  weight: number;
+  /** Weighted contribution to overall score */
+  weightedContribution: number;
+  /** Whether this is a default value due to insufficient data */
+  isDefault: boolean;
+  /** Human-readable reason for the score */
+  reason: string;
+  /** Raw evidence behind the score */
+  evidence: Record<string, unknown>;
+  /** Recent events that influenced this component */
+  recentEvents: ReputationEventRecord[];
 }
 
 export interface ScoreExplanation {
-    agentId: string;
-    overallScore: number;
-    trustLevel: TrustLevel;
-    /** Decay factor applied (1.0 = no decay) */
-    decayFactor: number;
-    /** Raw score before decay */
-    rawScore: number;
-    /** Per-component explanations */
-    components: ComponentExplanation[];
-    /** When computed */
-    computedAt: string;
+  agentId: string;
+  overallScore: number;
+  trustLevel: TrustLevel;
+  /** Decay factor applied (1.0 = no decay) */
+  decayFactor: number;
+  /** Raw score before decay */
+  rawScore: number;
+  /** Per-component explanations */
+  components: ComponentExplanation[];
+  /** When computed */
+  computedAt: string;
 }
 
 // ─── History ────────────────────────────────────────────────────────────────
 
 export interface ReputationHistoryPoint {
-    overallScore: number;
-    trustLevel: string;
-    components: ReputationComponents;
-    computedAt: string;
+  overallScore: number;
+  trustLevel: string;
+  components: ReputationComponents;
+  computedAt: string;
 }
 
 // ─── Input Types ────────────────────────────────────────────────────────────
 
 export interface RecordEventInput {
-    agentId: string;
-    eventType: ReputationEventType;
-    scoreImpact: number;
-    metadata?: Record<string, unknown>;
+  agentId: string;
+  eventType: ReputationEventType;
+  scoreImpact: number;
+  metadata?: Record<string, unknown>;
 }

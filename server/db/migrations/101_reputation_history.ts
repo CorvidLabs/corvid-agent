@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 101: Reputation score history — track score snapshots over time.
@@ -8,11 +8,11 @@ import { Database } from 'bun:sqlite';
  */
 
 export function down(db: Database): void {
-    db.exec('DROP TABLE IF EXISTS reputation_history');
+  db.exec('DROP TABLE IF EXISTS reputation_history');
 }
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS reputation_history (
             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
             agent_id            TEXT NOT NULL,
@@ -26,7 +26,7 @@ export function up(db: Database): void {
             computed_at         TEXT NOT NULL DEFAULT (datetime('now'))
         )
     `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_agent ON reputation_history(agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_computed ON reputation_history(computed_at)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_agent_time ON reputation_history(agent_id, computed_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_agent ON reputation_history(agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_computed ON reputation_history(computed_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_reputation_history_agent_time ON reputation_history(agent_id, computed_at)`);
 }

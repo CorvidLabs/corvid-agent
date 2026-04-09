@@ -6,98 +6,82 @@
  * continue to resolve without changes.
  */
 
-// ─── Shared types & helpers ──────────────────────────────────────────────────
-export { type McpToolContext, textResult, errorResult } from './types';
-
-// ─── Messaging ───────────────────────────────────────────────────────────────
-export { handleSendMessage, handleListAgents } from './messaging';
-
-// ─── Memory ──────────────────────────────────────────────────────────────────
-export { handleSaveMemory, handlePromoteMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories } from './memory';
-
-// ─── Session ─────────────────────────────────────────────────────────────────
-export { handleExtendTimeout } from './session';
-
-// ─── Credits ─────────────────────────────────────────────────────────────────
-export { handleCheckCredits, handleGrantCredits, handleCreditConfig } from './credits';
-
-// ─── Projects ────────────────────────────────────────────────────────────────
-export { handleListProjects, handleCurrentProject } from './projects';
-
-// ─── Work tasks ──────────────────────────────────────────────────────────────
-export { handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks } from './work';
-
-// ─── Scheduling ──────────────────────────────────────────────────────────────
-export { handleManageSchedule } from './scheduling';
-
-// ─── Workflows ───────────────────────────────────────────────────────────────
-export { handleManageWorkflow } from './workflow';
-
-// ─── Web search ──────────────────────────────────────────────────────────────
-export { handleWebSearch, handleDeepResearch } from './search';
-
-// ─── GitHub ──────────────────────────────────────────────────────────────────
-export {
-    handleGitHubStarRepo,
-    handleGitHubUnstarRepo,
-    handleGitHubForkRepo,
-    handleGitHubListPrs,
-    handleGitHubCreatePr,
-    handleGitHubReviewPr,
-    handleGitHubCreateIssue,
-    handleGitHubListIssues,
-    handleGitHubRepoInfo,
-    handleGitHubGetPrDiff,
-    handleGitHubCommentOnPr,
-    handleGitHubFollowUser,
-} from './github';
-
 // ─── A2A ─────────────────────────────────────────────────────────────────────
 export { handleDiscoverAgent, handleInvokeRemoteAgent } from './a2a';
-
-// ─── Owner communication ─────────────────────────────────────────────────────
-export { handleNotifyOwner, handleAskOwner } from './owner';
-
-// ─── Notification configuration ──────────────────────────────────────────────
-export { handleConfigureNotifications } from './notifications';
-
-// ─── Reputation & trust ──────────────────────────────────────────────────────
-export {
-    handleCheckReputation,
-    handleCheckHealthTrends,
-    handlePublishAttestation,
-    handleVerifyAgentReputation,
-} from './reputation';
-
-// ─── Councils ─────────────────────────────────────────────────────────────────
-export { handleLaunchCouncil } from './councils';
-
-// ─── Flock Directory ────────────────────────────────────────────────────────
-export { handleFlockDirectory } from './flock-directory';
-
-// ─── Contacts / identity ────────────────────────────────────────────────────
-export { handleLookupContact } from './contacts';
-
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
-
-// ─── Discord messaging ─────────────────────────────────────────────────────
-export { handleDiscordSendMessage, handleDiscordSendImage } from './discord';
-
 // ─── Browser automation ────────────────────────────────────────────────────
 export { handleBrowser } from './browser';
-
+// ─── Contacts / identity ────────────────────────────────────────────────────
+export { handleLookupContact } from './contacts';
+// ─── Councils ─────────────────────────────────────────────────────────────────
+export { handleLaunchCouncil } from './councils';
+// ─── Credits ─────────────────────────────────────────────────────────────────
+export { handleCheckCredits, handleCreditConfig, handleGrantCredits } from './credits';
+// ─── Discord messaging ─────────────────────────────────────────────────────
+export { handleDiscordSendImage, handleDiscordSendMessage } from './discord';
+// ─── Flock Directory ────────────────────────────────────────────────────────
+export { handleFlockDirectory } from './flock-directory';
+// ─── GitHub ──────────────────────────────────────────────────────────────────
+export {
+  handleGitHubCommentOnPr,
+  handleGitHubCreateIssue,
+  handleGitHubCreatePr,
+  handleGitHubFollowUser,
+  handleGitHubForkRepo,
+  handleGitHubGetPrDiff,
+  handleGitHubListIssues,
+  handleGitHubListPrs,
+  handleGitHubRepoInfo,
+  handleGitHubReviewPr,
+  handleGitHubStarRepo,
+  handleGitHubUnstarRepo,
+} from './github';
+// ─── Shared library (CRVLIB) ──────────────────────────────────────────────
+export { handleLibraryDelete, handleLibraryListOnChain, handleLibraryRead, handleLibraryWrite } from './library';
+// ─── Memory ──────────────────────────────────────────────────────────────────
+export {
+  handleDeleteMemory,
+  handlePromoteMemory,
+  handleReadOnChainMemories,
+  handleRecallMemory,
+  handleSaveMemory,
+  handleSyncOnChainMemories,
+} from './memory';
+// ─── Messaging ───────────────────────────────────────────────────────────────
+export { handleListAgents, handleSendMessage } from './messaging';
+// ─── Notification configuration ──────────────────────────────────────────────
+export { handleConfigureNotifications } from './notifications';
 // ─── Observations (memory graduation) ──────────────────────────────────────
 export {
-    handleRecordObservation,
-    handleListObservations,
-    handleBoostObservation,
-    handleDismissObservation,
-    handleObservationStats,
+  handleBoostObservation,
+  handleDismissObservation,
+  handleListObservations,
+  handleObservationStats,
+  handleRecordObservation,
 } from './observations';
-
-// ─── Shared library (CRVLIB) ──────────────────────────────────────────────
-export { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './library';
-
+// ─── Owner communication ─────────────────────────────────────────────────────
+export { handleAskOwner, handleNotifyOwner } from './owner';
+// ─── Projects ────────────────────────────────────────────────────────────────
+export { handleCurrentProject, handleListProjects } from './projects';
+// ─── Reputation & trust ──────────────────────────────────────────────────────
+export {
+  handleCheckHealthTrends,
+  handleCheckReputation,
+  handlePublishAttestation,
+  handleVerifyAgentReputation,
+} from './reputation';
+// ─── Scheduling ──────────────────────────────────────────────────────────────
+export { handleManageSchedule } from './scheduling';
+// ─── Web search ──────────────────────────────────────────────────────────────
+export { handleDeepResearch, handleWebSearch } from './search';
 // ─── Server operations ────────────────────────────────────────────────────
 export { handleRestartServer } from './server-ops';
+// ─── Session ─────────────────────────────────────────────────────────────────
+export { handleExtendTimeout } from './session';
+// ─── Shared types & helpers ──────────────────────────────────────────────────
+export { errorResult, type McpToolContext, textResult } from './types';
+// ─── Work tasks ──────────────────────────────────────────────────────────────
+export { handleCheckWorkStatus, handleCreateWorkTask, handleListWorkTasks } from './work';
+// ─── Workflows ───────────────────────────────────────────────────────────────
+export { handleManageWorkflow } from './workflow';

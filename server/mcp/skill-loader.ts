@@ -16,8 +16,8 @@
  * 2. When a skill is activated (matched by name or trigger), load the full body.
  */
 
-import { readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('SkillLoader');
@@ -25,25 +25,25 @@ const log = createLogger('SkillLoader');
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface SkillFrontmatter {
-    name: string;
-    description: string;
-    metadata?: Record<string, string>;
+  name: string;
+  description: string;
+  metadata?: Record<string, string>;
 }
 
 export interface SkillEntry {
-    /** Skill name from frontmatter. */
-    name: string;
-    /** Short description for discovery/matching. */
-    description: string;
-    /** Optional metadata (author, version, etc). */
-    metadata: Record<string, string>;
-    /** Absolute path to the SKILL.md file. */
-    filePath: string;
+  /** Skill name from frontmatter. */
+  name: string;
+  /** Short description for discovery/matching. */
+  description: string;
+  /** Optional metadata (author, version, etc). */
+  metadata: Record<string, string>;
+  /** Absolute path to the SKILL.md file. */
+  filePath: string;
 }
 
 export interface LoadedSkill extends SkillEntry {
-    /** Full markdown body (everything after frontmatter). */
-    body: string;
+  /** Full markdown body (everything after frontmatter). */
+  body: string;
 }
 
 // ─── Frontmatter Parsing ────────────────────────────────────────────────────
@@ -54,42 +54,42 @@ export interface LoadedSkill extends SkillEntry {
  * Returns null if frontmatter is invalid or missing required fields.
  */
 export function parseSkillFrontmatter(content: string): { frontmatter: SkillFrontmatter; body: string } | null {
-    const normalized = content.replace(/\r\n/g, '\n');
-    if (!normalized.startsWith('---\n')) return null;
+  const normalized = content.replace(/\r\n/g, '\n');
+  if (!normalized.startsWith('---\n')) return null;
 
-    const endIdx = normalized.indexOf('\n---', 4);
-    if (endIdx === -1) return null;
+  const endIdx = normalized.indexOf('\n---', 4);
+  if (endIdx === -1) return null;
 
-    const fmBlock = normalized.slice(4, endIdx);
-    const body = normalized.slice(endIdx + 4).trim();
+  const fmBlock = normalized.slice(4, endIdx);
+  const body = normalized.slice(endIdx + 4).trim();
 
-    // Simple YAML key-value parser (no nested objects needed)
-    const fields: Record<string, string> = {};
-    for (const line of fmBlock.split('\n')) {
-        const colonIdx = line.indexOf(':');
-        if (colonIdx === -1) continue;
-        const key = line.slice(0, colonIdx).trim();
-        let value = line.slice(colonIdx + 1).trim();
-        // Strip optional quotes
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-        fields[key] = value;
+  // Simple YAML key-value parser (no nested objects needed)
+  const fields: Record<string, string> = {};
+  for (const line of fmBlock.split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    let value = line.slice(colonIdx + 1).trim();
+    // Strip optional quotes
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
     }
+    fields[key] = value;
+  }
 
-    if (!fields.name || !fields.description) return null;
+  if (!fields.name || !fields.description) return null;
 
-    const metadata: Record<string, string> = {};
-    for (const [k, v] of Object.entries(fields)) {
-        if (k !== 'name' && k !== 'description') {
-            metadata[k] = v;
-        }
+  const metadata: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (k !== 'name' && k !== 'description') {
+      metadata[k] = v;
     }
+  }
 
-    return {
-        frontmatter: { name: fields.name, description: fields.description, metadata },
-        body,
-    };
+  return {
+    frontmatter: { name: fields.name, description: fields.description, metadata },
+    body,
+  };
 }
 
 // ─── Directory Scanning ─────────────────────────────────────────────────────
@@ -105,62 +105,62 @@ export const SKILL_DIRECTORY_NAMES = ['.skills', 'skills'] as const;
  * @returns Array of discovered skill entries (frontmatter only, body not loaded).
  */
 export function discoverSkills(skillsDir: string): SkillEntry[] {
-    const entries: SkillEntry[] = [];
+  const entries: SkillEntry[] = [];
 
-    try {
-        const items = readdirSync(skillsDir, { withFileTypes: true });
+  try {
+    const items = readdirSync(skillsDir, { withFileTypes: true });
 
-        for (const item of items) {
-            const fullPath = join(skillsDir, item.name);
+    for (const item of items) {
+      const fullPath = join(skillsDir, item.name);
 
-            if (item.isDirectory()) {
-                // Look for SKILL.md inside the subdirectory
-                // parseSkillFile has its own try/catch — no need for existsSync
-                const skillFile = join(fullPath, 'SKILL.md');
-                const entry = parseSkillFile(skillFile);
-                if (entry) entries.push(entry);
-            } else if (item.isFile() && item.name.endsWith('.md') && item.name !== 'README.md') {
-                // Top-level markdown files are also valid skills
-                const entry = parseSkillFile(fullPath);
-                if (entry) entries.push(entry);
-            }
-        }
-    } catch (err) {
-        // ENOENT for non-existent dir, or other FS errors
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code !== 'ENOENT') {
-            const msg = err instanceof Error ? err.message : String(err);
-            log.warn('Failed to scan skills directory', { dir: skillsDir, error: msg });
-        }
+      if (item.isDirectory()) {
+        // Look for SKILL.md inside the subdirectory
+        // parseSkillFile has its own try/catch — no need for existsSync
+        const skillFile = join(fullPath, 'SKILL.md');
+        const entry = parseSkillFile(skillFile);
+        if (entry) entries.push(entry);
+      } else if (item.isFile() && item.name.endsWith('.md') && item.name !== 'README.md') {
+        // Top-level markdown files are also valid skills
+        const entry = parseSkillFile(fullPath);
+        if (entry) entries.push(entry);
+      }
     }
+  } catch (err) {
+    // ENOENT for non-existent dir, or other FS errors
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.warn('Failed to scan skills directory', { dir: skillsDir, error: msg });
+    }
+  }
 
-    log.info(`Discovered ${entries.length} skills`, { dir: skillsDir, skills: entries.map(e => e.name).join(', ') });
-    return entries;
+  log.info(`Discovered ${entries.length} skills`, { dir: skillsDir, skills: entries.map((e) => e.name).join(', ') });
+  return entries;
 }
 
 /**
  * Parse a single SKILL.md file and return a SkillEntry (frontmatter only).
  */
 function parseSkillFile(filePath: string): SkillEntry | null {
-    try {
-        const content = readFileSync(filePath, 'utf-8');
-        const parsed = parseSkillFrontmatter(content);
-        if (!parsed) {
-            log.warn('Invalid skill frontmatter', { filePath });
-            return null;
-        }
-
-        return {
-            name: parsed.frontmatter.name,
-            description: parsed.frontmatter.description,
-            metadata: parsed.frontmatter.metadata ?? {},
-            filePath,
-        };
-    } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.warn('Failed to read skill file', { filePath, error: msg });
-        return null;
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parsed = parseSkillFrontmatter(content);
+    if (!parsed) {
+      log.warn('Invalid skill frontmatter', { filePath });
+      return null;
     }
+
+    return {
+      name: parsed.frontmatter.name,
+      description: parsed.frontmatter.description,
+      metadata: parsed.frontmatter.metadata ?? {},
+      filePath,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn('Failed to read skill file', { filePath, error: msg });
+    return null;
+  }
 }
 
 // ─── Full Skill Loading ─────────────────────────────────────────────────────
@@ -170,17 +170,17 @@ function parseSkillFile(filePath: string): SkillEntry | null {
  * Used when a skill is activated (matched by user request).
  */
 export function loadSkillBody(entry: SkillEntry): LoadedSkill | null {
-    try {
-        const content = readFileSync(entry.filePath, 'utf-8');
-        const parsed = parseSkillFrontmatter(content);
-        if (!parsed) return null;
+  try {
+    const content = readFileSync(entry.filePath, 'utf-8');
+    const parsed = parseSkillFrontmatter(content);
+    if (!parsed) return null;
 
-        return { ...entry, body: parsed.body };
-    } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.warn('Failed to load skill body', { name: entry.name, error: msg });
-        return null;
-    }
+    return { ...entry, body: parsed.body };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn('Failed to load skill body', { name: entry.name, error: msg });
+    return null;
+  }
 }
 
 /**
@@ -189,16 +189,16 @@ export function loadSkillBody(entry: SkillEntry): LoadedSkill | null {
  * Only includes names and descriptions (~100 tokens per skill).
  */
 export function buildSkillDiscoveryPrompt(entries: SkillEntry[]): string {
-    if (entries.length === 0) return '';
+  if (entries.length === 0) return '';
 
-    const lines = ['## Available Skills', ''];
-    for (const entry of entries) {
-        lines.push(`- **${entry.name}**: ${entry.description}`);
-    }
-    lines.push('');
-    lines.push('When a user request matches a skill, load its full instructions for detailed guidance.');
+  const lines = ['## Available Skills', ''];
+  for (const entry of entries) {
+    lines.push(`- **${entry.name}**: ${entry.description}`);
+  }
+  lines.push('');
+  lines.push('When a user request matches a skill, load its full instructions for detailed guidance.');
 
-    return lines.join('\n');
+  return lines.join('\n');
 }
 
 /**
@@ -206,11 +206,11 @@ export function buildSkillDiscoveryPrompt(entries: SkillEntry[]): string {
  * Checks .skills/ first, then falls back to skills/.
  */
 export function discoverProjectSkills(projectRoot: string): SkillEntry[] {
-    for (const dirName of SKILL_DIRECTORY_NAMES) {
-        const dir = join(projectRoot, dirName);
-        // discoverSkills handles ENOENT gracefully — no need for existsSync
-        const skills = discoverSkills(dir);
-        if (skills.length > 0) return skills;
-    }
-    return [];
+  for (const dirName of SKILL_DIRECTORY_NAMES) {
+    const dir = join(projectRoot, dirName);
+    // discoverSkills handles ENOENT gracefully — no need for existsSync
+    const skills = discoverSkills(dir);
+    if (skills.length > 0) return skills;
+  }
+  return [];
 }

@@ -1,7 +1,7 @@
 /** Agent core tables + indexes. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS agents (
+  `CREATE TABLE IF NOT EXISTS agents (
         id                        TEXT PRIMARY KEY,
         name                      TEXT NOT NULL,
         description               TEXT DEFAULT '',
@@ -35,7 +35,7 @@ export const tables: string[] = [
         updated_at                TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_daily_spending (
+  `CREATE TABLE IF NOT EXISTS agent_daily_spending (
         agent_id   TEXT    NOT NULL,
         date       TEXT    NOT NULL,
         algo_micro INTEGER NOT NULL DEFAULT 0,
@@ -44,7 +44,7 @@ export const tables: string[] = [
         FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_identity (
+  `CREATE TABLE IF NOT EXISTS agent_identity (
         agent_id               TEXT PRIMARY KEY,
         tier                   TEXT NOT NULL DEFAULT 'UNVERIFIED',
         verified_at            TEXT DEFAULT NULL,
@@ -52,7 +52,7 @@ export const tables: string[] = [
         updated_at             TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_messages (
+  `CREATE TABLE IF NOT EXISTS agent_messages (
         id               TEXT PRIMARY KEY,
         from_agent_id    TEXT NOT NULL,
         to_agent_id      TEXT NOT NULL,
@@ -73,7 +73,7 @@ export const tables: string[] = [
         completed_at     TEXT DEFAULT NULL
     )`,
 
-    `CREATE TABLE IF NOT EXISTS personas (
+  `CREATE TABLE IF NOT EXISTS personas (
         id               TEXT PRIMARY KEY,
         name             TEXT NOT NULL,
         archetype        TEXT DEFAULT 'custom',
@@ -85,21 +85,21 @@ export const tables: string[] = [
         updated_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_persona_assignments (
+  `CREATE TABLE IF NOT EXISTS agent_persona_assignments (
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         persona_id TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
         sort_order INTEGER DEFAULT 0,
         PRIMARY KEY (agent_id, persona_id)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_skills (
+  `CREATE TABLE IF NOT EXISTS agent_skills (
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         bundle_id  TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
         sort_order INTEGER DEFAULT 0,
         PRIMARY KEY (agent_id, bundle_id)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_variants (
+  `CREATE TABLE IF NOT EXISTS agent_variants (
         id               TEXT PRIMARY KEY,
         name             TEXT UNIQUE NOT NULL,
         description      TEXT DEFAULT '',
@@ -110,13 +110,13 @@ export const tables: string[] = [
         updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_variant_assignments (
+  `CREATE TABLE IF NOT EXISTS agent_variant_assignments (
         agent_id   TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
         variant_id TEXT NOT NULL REFERENCES agent_variants(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_spending_caps (
+  `CREATE TABLE IF NOT EXISTS agent_spending_caps (
         agent_id               TEXT PRIMARY KEY,
         daily_limit_microalgos INTEGER NOT NULL DEFAULT 5000000,
         daily_limit_usdc       INTEGER NOT NULL DEFAULT 0,
@@ -125,7 +125,7 @@ export const tables: string[] = [
         FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
+  `CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         amount_micro   INTEGER NOT NULL,
@@ -136,7 +136,7 @@ export const tables: string[] = [
         created_at     TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_conversation_allowlist (
+  `CREATE TABLE IF NOT EXISTS agent_conversation_allowlist (
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         address    TEXT NOT NULL,
         label      TEXT DEFAULT '',
@@ -144,7 +144,7 @@ export const tables: string[] = [
         PRIMARY KEY (agent_id, address)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_conversation_blocklist (
+  `CREATE TABLE IF NOT EXISTS agent_conversation_blocklist (
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         address    TEXT NOT NULL,
         reason     TEXT DEFAULT 'manual',
@@ -152,7 +152,7 @@ export const tables: string[] = [
         PRIMARY KEY (agent_id, address)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agent_conversation_rate_limits (
+  `CREATE TABLE IF NOT EXISTS agent_conversation_rate_limits (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id   TEXT NOT NULL,
         address    TEXT NOT NULL,
@@ -161,19 +161,19 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_from ON agent_messages(from_agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_persona_assignments_agent ON agent_persona_assignments(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_variant_assignments_variant ON agent_variant_assignments(variant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
-    `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_conv_allow_agent ON agent_conversation_allowlist(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_conv_block_agent ON agent_conversation_blocklist(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_agent_conv_rate_agent_addr ON agent_conversation_rate_limits(agent_id, address)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_identity_tier ON agent_identity(tier)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_from ON agent_messages(from_agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_persona_assignments_agent ON agent_persona_assignments(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_variant_assignments_variant ON agent_variant_assignments(variant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
+  `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_conv_allow_agent ON agent_conversation_allowlist(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_conv_block_agent ON agent_conversation_blocklist(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_conv_rate_agent_addr ON agent_conversation_rate_limits(agent_id, address)`,
 ];

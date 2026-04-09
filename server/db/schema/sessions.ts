@@ -1,7 +1,7 @@
 /** Sessions, session messages, and session metrics. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS session_messages (
+  `CREATE TABLE IF NOT EXISTS session_messages (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL REFERENCES sessions(id),
         role       TEXT NOT NULL,
@@ -11,7 +11,7 @@ export const tables: string[] = [
         timestamp  TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS session_metrics (
+  `CREATE TABLE IF NOT EXISTS session_metrics (
         id                      INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id              TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         model                   TEXT NOT NULL DEFAULT '',
@@ -30,7 +30,7 @@ export const tables: string[] = [
         created_at              TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS sessions (
+  `CREATE TABLE IF NOT EXISTS sessions (
         id                TEXT PRIMARY KEY,
         project_id        TEXT REFERENCES projects(id),
         agent_id          TEXT REFERENCES agents(id),
@@ -56,15 +56,15 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_messages_session_timestamp ON session_messages(session_id, timestamp ASC)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model)`,
-    `CREATE INDEX IF NOT EXISTS idx_session_metrics_created ON session_metrics(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
+  `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_messages_session_timestamp ON session_messages(session_id, timestamp ASC)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model)`,
+  `CREATE INDEX IF NOT EXISTS idx_session_metrics_created ON session_metrics(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_restart_pending ON sessions(restart_pending) WHERE restart_pending = 1`,
 ];

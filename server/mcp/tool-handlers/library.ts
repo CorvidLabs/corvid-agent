@@ -306,10 +306,15 @@ async function writeBook(
   for (let i = 0; i < totalPages - 1; i++) {
     const existing = await readLibraryEntry(libCtx, pageAsaIds[i]);
     if (existing) {
-      await updateLibraryEntry(libCtx, pageAsaIds[i], {
-        key: existing.key,
-        next: pageAsaIds[i + 1],
-      }, existing);
+      await updateLibraryEntry(
+        libCtx,
+        pageAsaIds[i],
+        {
+          key: existing.key,
+          next: pageAsaIds[i + 1],
+        },
+        existing,
+      );
     }
   }
 

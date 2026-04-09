@@ -9,8 +9,8 @@
  * bypassing the review gate. This guard closes that path.
  */
 
-import { getModelPricing } from '../providers/cost-table';
 import { createLogger } from '../lib/logger';
+import { getModelPricing } from '../providers/cost-table';
 
 const log = createLogger('InternGuard');
 

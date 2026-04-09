@@ -12,48 +12,48 @@ let cachedSpec: string | null = null;
 let cachedSpecObj: Record<string, unknown> | null = null;
 
 function getSpec(serverUrl: string): string {
-    if (!cachedSpec) {
-        cachedSpecObj = generateOpenApiSpec({ serverUrl }) as unknown as Record<string, unknown>;
-        cachedSpec = JSON.stringify(cachedSpecObj, null, 2);
-    }
-    return cachedSpec;
+  if (!cachedSpec) {
+    cachedSpecObj = generateOpenApiSpec({ serverUrl }) as unknown as Record<string, unknown>;
+    cachedSpec = JSON.stringify(cachedSpecObj, null, 2);
+  }
+  return cachedSpec;
 }
 
 /** Handle OpenAPI-related routes. Returns null if path doesn't match. */
 export function handleOpenApiRoutes(req: Request, url: URL): Response | null {
-    const path = url.pathname;
-    const method = req.method;
+  const path = url.pathname;
+  const method = req.method;
 
-    if (path === '/api/openapi.json' && method === 'GET') {
-        const serverUrl = `${url.protocol}//${url.host}`;
-        const spec = getSpec(serverUrl);
-        return new Response(spec, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=60',
-                'Access-Control-Allow-Origin': '*',
-            },
-        });
-    }
+  if (path === '/api/openapi.json' && method === 'GET') {
+    const serverUrl = `${url.protocol}//${url.host}`;
+    const spec = getSpec(serverUrl);
+    return new Response(spec, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=60',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
 
-    if (path === '/api/docs' && method === 'GET') {
-        const serverUrl = `${url.protocol}//${url.host}`;
-        // Ensure spec is generated (side effect: caches it)
-        getSpec(serverUrl);
-        return new Response(swaggerUiHtml(serverUrl), {
-            headers: {
-                'Content-Type': 'text/html',
-                'Cache-Control': 'public, max-age=300',
-            },
-        });
-    }
+  if (path === '/api/docs' && method === 'GET') {
+    const serverUrl = `${url.protocol}//${url.host}`;
+    // Ensure spec is generated (side effect: caches it)
+    getSpec(serverUrl);
+    return new Response(swaggerUiHtml(serverUrl), {
+      headers: {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'public, max-age=300',
+      },
+    });
+  }
 
-    return null;
+  return null;
 }
 
 /** Generate a self-contained Swagger UI HTML page using CDN assets. */
 function swaggerUiHtml(serverUrl: string): string {
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">

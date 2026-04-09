@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 103: Persist Discord muted users across restarts.
@@ -8,7 +8,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS discord_muted_users (
             user_id    TEXT PRIMARY KEY,
             muted_by   TEXT,
@@ -18,5 +18,5 @@ export function up(db: Database): void {
 }
 
 export function down(db: Database): void {
-    db.exec('DROP TABLE IF EXISTS discord_muted_users');
+  db.exec('DROP TABLE IF EXISTS discord_muted_users');
 }

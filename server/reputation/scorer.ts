@@ -9,21 +9,21 @@
  * - Activity level (recent sessions/tasks)
  */
 import type { Database } from 'bun:sqlite';
+import { addToAgentBlocklist, isAgentBlocked } from '../db/agent-blocklist';
+import { createLogger } from '../lib/logger';
 import type {
-    ReputationScore,
-    ReputationComponents,
-    TrustLevel,
-    ScoreWeights,
-    ReputationRecord,
-    ReputationEventRecord,
-    RecordEventInput,
-    ComponentExplanation,
-    ScoreExplanation,
-    ReputationHistoryPoint,
+  ComponentExplanation,
+  RecordEventInput,
+  ReputationComponents,
+  ReputationEventRecord,
+  ReputationHistoryPoint,
+  ReputationRecord,
+  ReputationScore,
+  ScoreExplanation,
+  ScoreWeights,
+  TrustLevel,
 } from './types';
 import { DEFAULT_WEIGHTS } from './types';
-import { isAgentBlocked, addToAgentBlocklist } from '../db/agent-blocklist';
-import { createLogger } from '../lib/logger';
 
 const log = createLogger('ReputationScorer');
 
@@ -39,12 +39,12 @@ const REPUTATION_FLOOR = 0.1;
 // ─── Trust Level Thresholds ──────────────────────────────────────────────────
 
 function computeTrustLevel(score: number, isBlacklisted = false): TrustLevel {
-    if (isBlacklisted) return 'blacklisted';
-    if (score >= 90) return 'verified';
-    if (score >= 70) return 'high';
-    if (score >= 50) return 'medium';
-    if (score >= 25) return 'low';
-    return 'untrusted';
+  if (isBlacklisted) return 'blacklisted';
+  if (score >= 90) return 'verified';
+  if (score >= 70) return 'high';
+  if (score >= 50) return 'medium';
+  if (score >= 25) return 'low';
+  return 'untrusted';
 }
 
 // ─── Component Computation ───────────────────────────────────────────────────
@@ -54,17 +54,19 @@ function computeTrustLevel(score: number, isBlacklisted = false): TrustLevel {
  * Score = (completed / total) * 100, with a minimum of 3 tasks for meaningful data.
  */
 function computeTaskCompletion(db: Database, agentId: string): number {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT
             COUNT(*) as total,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
         FROM work_tasks
         WHERE agent_id = ?
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { total: number; completed: number } | null;
+    `)
+    .get(agentId) as { total: number; completed: number } | null;
 
-    if (!row || row.total < 3) return 50; // Default for insufficient data
-    return Math.round((row.completed / row.total) * 100);
+  if (!row || row.total < 3) return 50; // Default for insufficient data
+  return Math.round((row.completed / row.total) * 100);
 }
 
 /**
@@ -72,18 +74,20 @@ function computeTaskCompletion(db: Database, agentId: string): number {
  * Returns null if fewer than 3 feedbacks (not enough data).
  */
 function computeFeedbackScore(db: Database, agentId: string): number | null {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT
             COUNT(*) as total,
             SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive
         FROM response_feedback
         WHERE agent_id = ?
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { total: number; positive: number } | null;
+    `)
+    .get(agentId) as { total: number; positive: number } | null;
 
-    if (!row || row.total < 3) return null;
-    const positiveRatio = (row.positive ?? 0) / row.total;
-    return Math.round(positiveRatio * 100);
+  if (!row || row.total < 3) return null;
+  const positiveRatio = (row.positive ?? 0) / row.total;
+  return Math.round(positiveRatio * 100);
 }
 
 /**
@@ -94,24 +98,26 @@ function computeFeedbackScore(db: Database, agentId: string): number | null {
  * - Neither: 50 (default)
  */
 function computePeerRating(db: Database, agentId: string): number {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT AVG(r.rating) as avg_rating, COUNT(*) as count
         FROM marketplace_reviews r
         JOIN marketplace_listings l ON l.id = r.listing_id
         WHERE l.agent_id = ?
-    `).get(agentId) as { avg_rating: number | null; count: number } | null;
+    `)
+    .get(agentId) as { avg_rating: number | null; count: number } | null;
 
-    const hasMarketplace = row && row.count > 0 && row.avg_rating !== null;
-    const marketplaceScore = hasMarketplace ? Math.round(((row!.avg_rating! - 1) / 4) * 100) : null;
+  const hasMarketplace = row && row.count > 0 && row.avg_rating !== null;
+  const marketplaceScore = hasMarketplace ? Math.round(((row!.avg_rating! - 1) / 4) * 100) : null;
 
-    const feedbackScore = computeFeedbackScore(db, agentId);
+  const feedbackScore = computeFeedbackScore(db, agentId);
 
-    if (marketplaceScore !== null && feedbackScore !== null) {
-        return Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
-    }
-    if (marketplaceScore !== null) return marketplaceScore;
-    if (feedbackScore !== null) return feedbackScore;
-    return 50;
+  if (marketplaceScore !== null && feedbackScore !== null) {
+    return Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
+  }
+  if (marketplaceScore !== null) return marketplaceScore;
+  if (feedbackScore !== null) return feedbackScore;
+  return 50;
 }
 
 /**
@@ -119,26 +125,28 @@ function computePeerRating(db: Database, agentId: string): number {
  * Agents that earn more than they spend are rated higher.
  */
 function computeCreditPattern(db: Database, agentId: string): number {
-    const events = db.query(`
+  const events = db
+    .query(`
         SELECT event_type, SUM(ABS(score_impact)) as total
         FROM reputation_events
         WHERE agent_id = ?
           AND event_type IN ('credit_spent', 'credit_earned')
           AND created_at > datetime('now', '-90 days')
         GROUP BY event_type
-    `).all(agentId) as { event_type: string; total: number }[];
+    `)
+    .all(agentId) as { event_type: string; total: number }[];
 
-    let earned = 0;
-    let spent = 0;
-    for (const row of events) {
-        if (row.event_type === 'credit_earned') earned = row.total;
-        if (row.event_type === 'credit_spent') spent = row.total;
-    }
+  let earned = 0;
+  let spent = 0;
+  for (const row of events) {
+    if (row.event_type === 'credit_earned') earned = row.total;
+    if (row.event_type === 'credit_spent') spent = row.total;
+  }
 
-    if (earned === 0 && spent === 0) return 50;
-    // Ratio-based: earning >> spending = high score
-    const ratio = spent > 0 ? earned / spent : earned > 0 ? 2.0 : 1.0;
-    return Math.min(100, Math.round(ratio * 50));
+  if (earned === 0 && spent === 0) return 50;
+  // Ratio-based: earning >> spending = high score
+  const ratio = spent > 0 ? earned / spent : earned > 0 ? 2.0 : 1.0;
+  return Math.min(100, Math.round(ratio * 50));
 }
 
 /**
@@ -146,16 +154,18 @@ function computeCreditPattern(db: Database, agentId: string): number {
  * Starts at 100, each violation in the last 90 days deducts 20 points.
  */
 function computeSecurityCompliance(db: Database, agentId: string): number {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT COUNT(*) as violations
         FROM reputation_events
         WHERE agent_id = ?
           AND event_type = 'security_violation'
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { violations: number } | null;
+    `)
+    .get(agentId) as { violations: number } | null;
 
-    const violations = row?.violations ?? 0;
-    return Math.max(0, 100 - violations * 20);
+  const violations = row?.violations ?? 0;
+  return Math.max(0, 100 - violations * 20);
 }
 
 /**
@@ -163,30 +173,33 @@ function computeSecurityCompliance(db: Database, agentId: string): number {
  * More active agents get higher scores, capped at 100.
  */
 function computeActivityLevel(db: Database, agentId: string): number {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT COUNT(*) as sessions
         FROM sessions
         WHERE agent_id = ?
           AND created_at > datetime('now', '-30 days')
-    `).get(agentId) as { sessions: number } | null;
+    `)
+    .get(agentId) as { sessions: number } | null;
 
-    const sessions = row?.sessions ?? 0;
-    if (sessions === 0) return 0;
-    // 10+ sessions in 30 days = full score
-    return Math.min(100, sessions * 10);
+  const sessions = row?.sessions ?? 0;
+  if (sessions === 0) return 0;
+  // 10+ sessions in 30 days = full score
+  return Math.min(100, sessions * 10);
 }
 
 // ─── Component Explanation Helpers ───────────────────────────────────────────
 
 interface ComponentDetail {
-    score: number;
-    isDefault: boolean;
-    reason: string;
-    evidence: Record<string, unknown>;
+  score: number;
+  isDefault: boolean;
+  reason: string;
+  evidence: Record<string, unknown>;
 }
 
 function explainTaskCompletion(db: Database, agentId: string): ComponentDetail {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT
             COUNT(*) as total,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -194,41 +207,46 @@ function explainTaskCompletion(db: Database, agentId: string): ComponentDetail {
         FROM work_tasks
         WHERE agent_id = ?
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { total: number; completed: number; failed: number } | null;
+    `)
+    .get(agentId) as { total: number; completed: number; failed: number } | null;
 
-    const total = row?.total ?? 0;
-    const completed = row?.completed ?? 0;
-    const failed = row?.failed ?? 0;
+  const total = row?.total ?? 0;
+  const completed = row?.completed ?? 0;
+  const failed = row?.failed ?? 0;
 
-    if (total < 3) {
-        return {
-            score: 50,
-            isDefault: true,
-            reason: total === 0
-                ? 'No tasks in last 90 days. Default score of 50 applied.'
-                : `Only ${total} task${total === 1 ? '' : 's'} in last 90 days (minimum 3 needed). Default score of 50 applied.`,
-            evidence: { total, completed, failed, window: '90 days', minimumRequired: 3 },
-        };
-    }
-
-    const score = Math.round((completed / total) * 100);
+  if (total < 3) {
     return {
-        score,
-        isDefault: false,
-        reason: `${completed}/${total} tasks completed (${score}%). ${failed > 0 ? `${failed} failed.` : 'No failures.'}`,
-        evidence: { total, completed, failed, window: '90 days' },
+      score: 50,
+      isDefault: true,
+      reason:
+        total === 0
+          ? 'No tasks in last 90 days. Default score of 50 applied.'
+          : `Only ${total} task${total === 1 ? '' : 's'} in last 90 days (minimum 3 needed). Default score of 50 applied.`,
+      evidence: { total, completed, failed, window: '90 days', minimumRequired: 3 },
     };
+  }
+
+  const score = Math.round((completed / total) * 100);
+  return {
+    score,
+    isDefault: false,
+    reason: `${completed}/${total} tasks completed (${score}%). ${failed > 0 ? `${failed} failed.` : 'No failures.'}`,
+    evidence: { total, completed, failed, window: '90 days' },
+  };
 }
 
 function explainPeerRating(db: Database, agentId: string): ComponentDetail {
-    const marketRow = db.query(`
+  const marketRow = db
+    .query(`
         SELECT AVG(r.rating) as avg_rating, COUNT(*) as count
         FROM marketplace_reviews r
         JOIN marketplace_listings l ON l.id = r.listing_id
         WHERE l.agent_id = ?
-    `).get(agentId) as { avg_rating: number | null; count: number } | null;
+    `)
+    .get(agentId) as { avg_rating: number | null; count: number } | null;
 
-    const feedbackRow = db.query(`
+  const feedbackRow = db
+    .query(`
         SELECT
             COUNT(*) as total,
             SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
@@ -236,151 +254,159 @@ function explainPeerRating(db: Database, agentId: string): ComponentDetail {
         FROM response_feedback
         WHERE agent_id = ?
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { total: number; positive: number; negative: number } | null;
+    `)
+    .get(agentId) as { total: number; positive: number; negative: number } | null;
 
-    const hasMarketplace = marketRow && marketRow.count > 0 && marketRow.avg_rating !== null;
-    const marketplaceScore = hasMarketplace ? Math.round(((marketRow!.avg_rating! - 1) / 4) * 100) : null;
-    const marketCount = marketRow?.count ?? 0;
+  const hasMarketplace = marketRow && marketRow.count > 0 && marketRow.avg_rating !== null;
+  const marketplaceScore = hasMarketplace ? Math.round(((marketRow!.avg_rating! - 1) / 4) * 100) : null;
+  const marketCount = marketRow?.count ?? 0;
 
-    const feedbackTotal = feedbackRow?.total ?? 0;
-    const feedbackPositive = feedbackRow?.positive ?? 0;
-    const feedbackNegative = feedbackRow?.negative ?? 0;
-    const hasFeedback = feedbackTotal >= 3;
-    const feedbackScore = hasFeedback ? Math.round((feedbackPositive / feedbackTotal) * 100) : null;
+  const feedbackTotal = feedbackRow?.total ?? 0;
+  const feedbackPositive = feedbackRow?.positive ?? 0;
+  const feedbackNegative = feedbackRow?.negative ?? 0;
+  const hasFeedback = feedbackTotal >= 3;
+  const feedbackScore = hasFeedback ? Math.round((feedbackPositive / feedbackTotal) * 100) : null;
 
-    const evidence: Record<string, unknown> = {
-        marketplaceReviews: marketCount,
-        marketplaceAvgRating: marketRow?.avg_rating ?? null,
-        feedbackTotal,
-        feedbackPositive,
-        feedbackNegative,
-        feedbackMinimum: 3,
-    };
+  const evidence: Record<string, unknown> = {
+    marketplaceReviews: marketCount,
+    marketplaceAvgRating: marketRow?.avg_rating ?? null,
+    feedbackTotal,
+    feedbackPositive,
+    feedbackNegative,
+    feedbackMinimum: 3,
+  };
 
-    if (marketplaceScore !== null && feedbackScore !== null) {
-        const score = Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
-        return {
-            score,
-            isDefault: false,
-            reason: `Blended: ${marketCount} marketplace reviews (avg ${marketRow!.avg_rating!.toFixed(1)}/5) + ${feedbackTotal} feedbacks (${feedbackPositive} positive, ${feedbackNegative} negative).`,
-            evidence,
-        };
-    }
-    if (marketplaceScore !== null) {
-        return {
-            score: marketplaceScore,
-            isDefault: false,
-            reason: `${marketCount} marketplace reviews, avg ${marketRow!.avg_rating!.toFixed(1)}/5. No sufficient feedback data (${feedbackTotal}/${3} minimum).`,
-            evidence,
-        };
-    }
-    if (feedbackScore !== null) {
-        return {
-            score: feedbackScore,
-            isDefault: false,
-            reason: `${feedbackTotal} feedbacks: ${feedbackPositive} positive, ${feedbackNegative} negative (${feedbackScore}% positive). No marketplace reviews.`,
-            evidence,
-        };
-    }
-
-    const parts: string[] = [];
-    if (marketCount === 0) parts.push('No marketplace reviews');
-    if (feedbackTotal === 0) {
-        parts.push('no response feedback');
-    } else {
-        parts.push(`only ${feedbackTotal} feedback${feedbackTotal === 1 ? '' : 's'} (need 3+)`);
-    }
+  if (marketplaceScore !== null && feedbackScore !== null) {
+    const score = Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
     return {
-        score: 50,
-        isDefault: true,
-        reason: `${parts.join(', ')}. Default score of 50 applied.`,
-        evidence,
+      score,
+      isDefault: false,
+      reason: `Blended: ${marketCount} marketplace reviews (avg ${marketRow!.avg_rating!.toFixed(1)}/5) + ${feedbackTotal} feedbacks (${feedbackPositive} positive, ${feedbackNegative} negative).`,
+      evidence,
     };
+  }
+  if (marketplaceScore !== null) {
+    return {
+      score: marketplaceScore,
+      isDefault: false,
+      reason: `${marketCount} marketplace reviews, avg ${marketRow!.avg_rating!.toFixed(1)}/5. No sufficient feedback data (${feedbackTotal}/${3} minimum).`,
+      evidence,
+    };
+  }
+  if (feedbackScore !== null) {
+    return {
+      score: feedbackScore,
+      isDefault: false,
+      reason: `${feedbackTotal} feedbacks: ${feedbackPositive} positive, ${feedbackNegative} negative (${feedbackScore}% positive). No marketplace reviews.`,
+      evidence,
+    };
+  }
+
+  const parts: string[] = [];
+  if (marketCount === 0) parts.push('No marketplace reviews');
+  if (feedbackTotal === 0) {
+    parts.push('no response feedback');
+  } else {
+    parts.push(`only ${feedbackTotal} feedback${feedbackTotal === 1 ? '' : 's'} (need 3+)`);
+  }
+  return {
+    score: 50,
+    isDefault: true,
+    reason: `${parts.join(', ')}. Default score of 50 applied.`,
+    evidence,
+  };
 }
 
 function explainCreditPattern(db: Database, agentId: string): ComponentDetail {
-    const events = db.query(`
+  const events = db
+    .query(`
         SELECT event_type, SUM(ABS(score_impact)) as total
         FROM reputation_events
         WHERE agent_id = ?
           AND event_type IN ('credit_spent', 'credit_earned')
           AND created_at > datetime('now', '-90 days')
         GROUP BY event_type
-    `).all(agentId) as { event_type: string; total: number }[];
+    `)
+    .all(agentId) as { event_type: string; total: number }[];
 
-    let earned = 0;
-    let spent = 0;
-    for (const row of events) {
-        if (row.event_type === 'credit_earned') earned = row.total;
-        if (row.event_type === 'credit_spent') spent = row.total;
-    }
+  let earned = 0;
+  let spent = 0;
+  for (const row of events) {
+    if (row.event_type === 'credit_earned') earned = row.total;
+    if (row.event_type === 'credit_spent') spent = row.total;
+  }
 
-    if (earned === 0 && spent === 0) {
-        return {
-            score: 50,
-            isDefault: true,
-            reason: 'No credit activity in last 90 days. Default score of 50 applied.',
-            evidence: { earned: 0, spent: 0, window: '90 days' },
-        };
-    }
-
-    const ratio = spent > 0 ? earned / spent : earned > 0 ? 2.0 : 1.0;
-    const score = Math.min(100, Math.round(ratio * 50));
+  if (earned === 0 && spent === 0) {
     return {
-        score,
-        isDefault: false,
-        reason: `Earned ${earned}, spent ${spent} (ratio: ${ratio.toFixed(2)}). ${ratio >= 1 ? 'Earning more than spending.' : 'Spending exceeds earning.'}`,
-        evidence: { earned, spent, ratio: Math.round(ratio * 100) / 100, window: '90 days' },
+      score: 50,
+      isDefault: true,
+      reason: 'No credit activity in last 90 days. Default score of 50 applied.',
+      evidence: { earned: 0, spent: 0, window: '90 days' },
     };
+  }
+
+  const ratio = spent > 0 ? earned / spent : earned > 0 ? 2.0 : 1.0;
+  const score = Math.min(100, Math.round(ratio * 50));
+  return {
+    score,
+    isDefault: false,
+    reason: `Earned ${earned}, spent ${spent} (ratio: ${ratio.toFixed(2)}). ${ratio >= 1 ? 'Earning more than spending.' : 'Spending exceeds earning.'}`,
+    evidence: { earned, spent, ratio: Math.round(ratio * 100) / 100, window: '90 days' },
+  };
 }
 
 function explainSecurityCompliance(db: Database, agentId: string): ComponentDetail {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT COUNT(*) as violations
         FROM reputation_events
         WHERE agent_id = ?
           AND event_type = 'security_violation'
           AND created_at > datetime('now', '-90 days')
-    `).get(agentId) as { violations: number } | null;
+    `)
+    .get(agentId) as { violations: number } | null;
 
-    const violations = row?.violations ?? 0;
-    const score = Math.max(0, 100 - violations * 20);
+  const violations = row?.violations ?? 0;
+  const score = Math.max(0, 100 - violations * 20);
 
-    return {
-        score,
-        isDefault: false,
-        reason: violations === 0
-            ? 'No security violations in last 90 days. Perfect compliance.'
-            : `${violations} security violation${violations === 1 ? '' : 's'} in last 90 days (-${violations * 20} points).`,
-        evidence: { violations, penaltyPerViolation: 20, window: '90 days' },
-    };
+  return {
+    score,
+    isDefault: false,
+    reason:
+      violations === 0
+        ? 'No security violations in last 90 days. Perfect compliance.'
+        : `${violations} security violation${violations === 1 ? '' : 's'} in last 90 days (-${violations * 20} points).`,
+    evidence: { violations, penaltyPerViolation: 20, window: '90 days' },
+  };
 }
 
 function explainActivityLevel(db: Database, agentId: string): ComponentDetail {
-    const row = db.query(`
+  const row = db
+    .query(`
         SELECT COUNT(*) as sessions
         FROM sessions
         WHERE agent_id = ?
           AND created_at > datetime('now', '-30 days')
-    `).get(agentId) as { sessions: number } | null;
+    `)
+    .get(agentId) as { sessions: number } | null;
 
-    const sessions = row?.sessions ?? 0;
-    if (sessions === 0) {
-        return {
-            score: 0,
-            isDefault: false,
-            reason: 'No sessions in last 30 days. Score: 0.',
-            evidence: { sessions: 0, window: '30 days', maxSessions: 10 },
-        };
-    }
-
-    const score = Math.min(100, sessions * 10);
+  const sessions = row?.sessions ?? 0;
+  if (sessions === 0) {
     return {
-        score,
-        isDefault: false,
-        reason: `${sessions} session${sessions === 1 ? '' : 's'} in last 30 days (${score}/100, max at 10+ sessions).`,
-        evidence: { sessions, window: '30 days', maxSessions: 10 },
+      score: 0,
+      isDefault: false,
+      reason: 'No sessions in last 30 days. Score: 0.',
+      evidence: { sessions: 0, window: '30 days', maxSessions: 10 },
     };
+  }
+
+  const score = Math.min(100, sessions * 10);
+  return {
+    score,
+    isDefault: false,
+    reason: `${sessions} session${sessions === 1 ? '' : 's'} in last 30 days (${score}/100, max at 10+ sessions).`,
+    evidence: { sessions, window: '30 days', maxSessions: 10 },
+  };
 }
 
 // ─── Reputation Decay ────────────────────────────────────────────────────────
@@ -393,8 +419,9 @@ function explainActivityLevel(db: Database, agentId: string): ComponentDetail {
  * Returns a multiplier in the range [REPUTATION_FLOOR, 1.0].
  */
 function computeDecayFactor(db: Database, agentId: string): number {
-    // Find the most recent positive signal: completed task or positive attestation
-    const lastActivity = db.query(`
+  // Find the most recent positive signal: completed task or positive attestation
+  const lastActivity = db
+    .query(`
         SELECT MAX(latest) as last_active FROM (
             SELECT MAX(created_at) as latest FROM work_tasks
             WHERE agent_id = ? AND status = 'completed'
@@ -402,47 +429,49 @@ function computeDecayFactor(db: Database, agentId: string): number {
             SELECT MAX(created_at) as latest FROM reputation_events
             WHERE agent_id = ? AND event_type IN ('task_completed', 'attestation_published')
         )
-    `).get(agentId, agentId) as { last_active: string | null } | null;
+    `)
+    .get(agentId, agentId) as { last_active: string | null } | null;
 
-    if (!lastActivity?.last_active) {
-        // No activity at all — check if agent even exists
-        const agent = db.query('SELECT created_at FROM agents WHERE id = ?').get(agentId) as { created_at: string } | null;
-        if (!agent) return 1.0; // Unknown agent, no decay
-        // Use agent creation date as baseline
-        const ageDays = (Date.now() - new Date(agent.created_at).getTime()) / (1000 * 60 * 60 * 24);
-        if (ageDays <= DECAY_GRACE_DAYS) return 1.0;
-        const weeksInactive = (ageDays - DECAY_GRACE_DAYS) / 7;
-        return Math.max(REPUTATION_FLOOR, Math.pow(DECAY_RATE_PER_WEEK, weeksInactive));
-    }
+  if (!lastActivity?.last_active) {
+    // No activity at all — check if agent even exists
+    const agent = db.query('SELECT created_at FROM agents WHERE id = ?').get(agentId) as { created_at: string } | null;
+    if (!agent) return 1.0; // Unknown agent, no decay
+    // Use agent creation date as baseline
+    const ageDays = (Date.now() - new Date(agent.created_at).getTime()) / (1000 * 60 * 60 * 24);
+    if (ageDays <= DECAY_GRACE_DAYS) return 1.0;
+    const weeksInactive = (ageDays - DECAY_GRACE_DAYS) / 7;
+    return Math.max(REPUTATION_FLOOR, DECAY_RATE_PER_WEEK ** weeksInactive);
+  }
 
-    const lastActiveDate = new Date(lastActivity.last_active);
-    if (isNaN(lastActiveDate.getTime())) return 1.0; // Invalid date, no decay
+  const lastActiveDate = new Date(lastActivity.last_active);
+  if (Number.isNaN(lastActiveDate.getTime())) return 1.0; // Invalid date, no decay
 
-    const daysSinceActivity = (Date.now() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceActivity <= DECAY_GRACE_DAYS) return 1.0;
+  const daysSinceActivity = (Date.now() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSinceActivity <= DECAY_GRACE_DAYS) return 1.0;
 
-    const weeksInactive = (daysSinceActivity - DECAY_GRACE_DAYS) / 7;
-    return Math.max(REPUTATION_FLOOR, Math.pow(DECAY_RATE_PER_WEEK, weeksInactive));
+  const weeksInactive = (daysSinceActivity - DECAY_GRACE_DAYS) / 7;
+  return Math.max(REPUTATION_FLOOR, DECAY_RATE_PER_WEEK ** weeksInactive);
 }
 
 // ─── Scorer Service ──────────────────────────────────────────────────────────
 
 export class ReputationScorer {
-    private db: Database;
-    private weights: ScoreWeights;
+  private db: Database;
+  private weights: ScoreWeights;
 
-    constructor(db: Database, weights: ScoreWeights = DEFAULT_WEIGHTS) {
-        this.db = db;
-        this.weights = weights;
-    }
+  constructor(db: Database, weights: ScoreWeights = DEFAULT_WEIGHTS) {
+    this.db = db;
+    this.weights = weights;
+  }
 
-    /**
-     * Check whether an agent has any real activity backing scores.
-     * Returns true if the agent has reputation events, work tasks, sessions,
-     * or response feedback within the relevant time windows.
-     */
-    checkHasActivity(agentId: string): boolean {
-        const row = this.db.query(`
+  /**
+   * Check whether an agent has any real activity backing scores.
+   * Returns true if the agent has reputation events, work tasks, sessions,
+   * or response feedback within the relevant time windows.
+   */
+  checkHasActivity(agentId: string): boolean {
+    const row = this.db
+      .query(`
             SELECT EXISTS(
                 SELECT 1 FROM reputation_events WHERE agent_id = ? AND created_at > datetime('now', '-90 days')
                 UNION ALL
@@ -452,15 +481,17 @@ export class ReputationScorer {
                 UNION ALL
                 SELECT 1 FROM response_feedback WHERE agent_id = ? AND created_at > datetime('now', '-90 days')
             ) as has_activity
-        `).get(agentId, agentId, agentId, agentId) as { has_activity: number };
-        return row.has_activity === 1;
-    }
+        `)
+      .get(agentId, agentId, agentId, agentId) as { has_activity: number };
+    return row.has_activity === 1;
+  }
 
-    /**
-     * Batch query: returns the set of all agent IDs that have any activity.
-     */
-    getActiveAgentIds(): Set<string> {
-        const rows = this.db.query(`
+  /**
+   * Batch query: returns the set of all agent IDs that have any activity.
+   */
+  getActiveAgentIds(): Set<string> {
+    const rows = this.db
+      .query(`
             SELECT DISTINCT agent_id FROM (
                 SELECT agent_id FROM reputation_events WHERE created_at > datetime('now', '-90 days')
                 UNION
@@ -470,431 +501,440 @@ export class ReputationScorer {
                 UNION
                 SELECT agent_id FROM response_feedback WHERE created_at > datetime('now', '-90 days')
             )
-        `).all() as { agent_id: string }[];
-        return new Set(rows.map(r => r.agent_id));
-    }
+        `)
+      .all() as { agent_id: string }[];
+    return new Set(rows.map((r) => r.agent_id));
+  }
 
-    /**
-     * Compute the full reputation score for an agent.
-     */
-    computeScore(agentId: string): ReputationScore {
-        // Kill switch: blacklisted agents always get score 0
-        const blacklisted = isAgentBlocked(this.db, agentId);
+  /**
+   * Compute the full reputation score for an agent.
+   */
+  computeScore(agentId: string): ReputationScore {
+    // Kill switch: blacklisted agents always get score 0
+    const blacklisted = isAgentBlocked(this.db, agentId);
 
-        const components = this.computeComponents(agentId);
-        const rawScore = this.computeOverall(components);
+    const components = this.computeComponents(agentId);
+    const rawScore = this.computeOverall(components);
 
-        // Apply time-based decay for inactive agents
-        const decayFactor = computeDecayFactor(this.db, agentId);
-        const overallScore = blacklisted ? 0 : Math.max(
-            1, // Never fully zero — minimum floor
-            Math.round(rawScore * decayFactor),
+    // Apply time-based decay for inactive agents
+    const decayFactor = computeDecayFactor(this.db, agentId);
+    const overallScore = blacklisted
+      ? 0
+      : Math.max(
+          1, // Never fully zero — minimum floor
+          Math.round(rawScore * decayFactor),
         );
-        const trustLevel = computeTrustLevel(overallScore, blacklisted);
+    const trustLevel = computeTrustLevel(overallScore, blacklisted);
 
-        // Check for existing attestation hash
-        const existing = this.db.query(
-            'SELECT attestation_hash FROM agent_reputation WHERE agent_id = ?',
-        ).get(agentId) as { attestation_hash: string | null } | null;
+    // Check for existing attestation hash
+    const existing = this.db.query('SELECT attestation_hash FROM agent_reputation WHERE agent_id = ?').get(agentId) as {
+      attestation_hash: string | null;
+    } | null;
 
-        const hasActivity = this.checkHasActivity(agentId);
+    const hasActivity = this.checkHasActivity(agentId);
 
-        const score: ReputationScore = {
-            agentId,
-            overallScore,
-            trustLevel,
-            components,
-            attestationHash: existing?.attestation_hash ?? null,
-            computedAt: new Date().toISOString(),
-            hasActivity,
-        };
+    const score: ReputationScore = {
+      agentId,
+      overallScore,
+      trustLevel,
+      components,
+      attestationHash: existing?.attestation_hash ?? null,
+      computedAt: new Date().toISOString(),
+      hasActivity,
+    };
 
-        // Persist
-        this.saveScore(score);
+    // Persist
+    this.saveScore(score);
 
-        return score;
-    }
+    return score;
+  }
 
-    /**
-     * Get the cached reputation score (without recomputing).
-     */
-    getCachedScore(agentId: string): ReputationScore | null {
-        const row = this.db.query(
-            'SELECT * FROM agent_reputation WHERE agent_id = ?',
-        ).get(agentId) as ReputationRecord | null;
+  /**
+   * Get the cached reputation score (without recomputing).
+   */
+  getCachedScore(agentId: string): ReputationScore | null {
+    const row = this.db
+      .query('SELECT * FROM agent_reputation WHERE agent_id = ?')
+      .get(agentId) as ReputationRecord | null;
 
-        if (!row) return null;
+    if (!row) return null;
 
-        return {
-            agentId: row.agent_id,
-            overallScore: row.overall_score,
-            trustLevel: row.trust_level as TrustLevel,
-            components: {
-                taskCompletion: row.task_completion,
-                peerRating: row.peer_rating,
-                creditPattern: row.credit_pattern,
-                securityCompliance: row.security_compliance,
-                activityLevel: row.activity_level,
-            },
-            attestationHash: row.attestation_hash,
-            computedAt: row.computed_at,
-            hasActivity: this.checkHasActivity(row.agent_id),
-        };
-    }
+    return {
+      agentId: row.agent_id,
+      overallScore: row.overall_score,
+      trustLevel: row.trust_level as TrustLevel,
+      components: {
+        taskCompletion: row.task_completion,
+        peerRating: row.peer_rating,
+        creditPattern: row.credit_pattern,
+        securityCompliance: row.security_compliance,
+        activityLevel: row.activity_level,
+      },
+      attestationHash: row.attestation_hash,
+      computedAt: row.computed_at,
+      hasActivity: this.checkHasActivity(row.agent_id),
+    };
+  }
 
-    /**
-     * Record a reputation event.
-     */
-    recordEvent(input: RecordEventInput): void {
-        const id = crypto.randomUUID();
+  /**
+   * Record a reputation event.
+   */
+  recordEvent(input: RecordEventInput): void {
+    const id = crypto.randomUUID();
 
-        this.db.query(`
+    this.db
+      .query(`
             INSERT INTO reputation_events (id, agent_id, event_type, score_impact, metadata)
             VALUES (?, ?, ?, ?, ?)
-        `).run(
-            id,
-            input.agentId,
-            input.eventType,
-            input.scoreImpact,
-            JSON.stringify(input.metadata ?? {}),
-        );
+        `)
+      .run(id, input.agentId, input.eventType, input.scoreImpact, JSON.stringify(input.metadata ?? {}));
 
-        log.debug('Recorded reputation event', { id, agentId: input.agentId, type: input.eventType });
+    log.debug('Recorded reputation event', { id, agentId: input.agentId, type: input.eventType });
 
-        // ── Kill switch: auto-blacklist on critical security violations ──
-        if (input.eventType === 'security_violation') {
-            const severity = (input.metadata as Record<string, unknown>)?.severity;
-            if (severity === 'critical') {
-                // Instant blacklist — one confirmed malicious action = game over
-                if (!isAgentBlocked(this.db, input.agentId)) {
-                    const detail = (input.metadata as Record<string, unknown>)?.detail as string ?? 'Critical security violation';
-                    addToAgentBlocklist(this.db, input.agentId, {
-                        reason: 'security_violation',
-                        detail,
-                        blockedBy: 'kill-switch',
-                    });
-                    this.db.query(`
+    // ── Kill switch: auto-blacklist on critical security violations ──
+    if (input.eventType === 'security_violation') {
+      const severity = (input.metadata as Record<string, unknown>)?.severity;
+      if (severity === 'critical') {
+        // Instant blacklist — one confirmed malicious action = game over
+        if (!isAgentBlocked(this.db, input.agentId)) {
+          const detail =
+            ((input.metadata as Record<string, unknown>)?.detail as string) ?? 'Critical security violation';
+          addToAgentBlocklist(this.db, input.agentId, {
+            reason: 'security_violation',
+            detail,
+            blockedBy: 'kill-switch',
+          });
+          this.db
+            .query(`
                         INSERT INTO reputation_events (id, agent_id, event_type, score_impact, metadata)
                         VALUES (?, ?, 'agent_blacklisted', -100, ?)
-                    `).run(
-                        crypto.randomUUID(),
-                        input.agentId,
-                        JSON.stringify({ triggeredBy: id, severity: 'critical', detail }),
-                    );
-                    this.computeScore(input.agentId);
-                    log.warn('KILL SWITCH: Agent blacklisted due to critical security violation', {
-                        agentId: input.agentId,
-                        eventId: id,
-                        detail,
-                    });
-                }
-            }
+                    `)
+            .run(crypto.randomUUID(), input.agentId, JSON.stringify({ triggeredBy: id, severity: 'critical', detail }));
+          this.computeScore(input.agentId);
+          log.warn('KILL SWITCH: Agent blacklisted due to critical security violation', {
+            agentId: input.agentId,
+            eventId: id,
+            detail,
+          });
+        }
+      }
 
-            // Also check for accumulated violations — 3+ in 24 hours = auto-blacklist
-            const recentViolations = this.db.query(`
+      // Also check for accumulated violations — 3+ in 24 hours = auto-blacklist
+      const recentViolations = this.db
+        .query(`
                 SELECT COUNT(*) as count FROM reputation_events
                 WHERE agent_id = ? AND event_type = 'security_violation'
                 AND created_at > datetime('now', '-1 day')
-            `).get(input.agentId) as { count: number };
+            `)
+        .get(input.agentId) as { count: number };
 
-            if (recentViolations.count >= 3 && !isAgentBlocked(this.db, input.agentId)) {
-                addToAgentBlocklist(this.db, input.agentId, {
-                    reason: 'security_violation',
-                    detail: `${recentViolations.count} security violations in 24 hours`,
-                    blockedBy: 'kill-switch',
-                });
-                this.db.query(`
+      if (recentViolations.count >= 3 && !isAgentBlocked(this.db, input.agentId)) {
+        addToAgentBlocklist(this.db, input.agentId, {
+          reason: 'security_violation',
+          detail: `${recentViolations.count} security violations in 24 hours`,
+          blockedBy: 'kill-switch',
+        });
+        this.db
+          .query(`
                     INSERT INTO reputation_events (id, agent_id, event_type, score_impact, metadata)
                     VALUES (?, ?, 'agent_blacklisted', -100, ?)
-                `).run(
-                    crypto.randomUUID(),
-                    input.agentId,
-                    JSON.stringify({ triggeredBy: id, reason: 'accumulated_violations', count: recentViolations.count }),
-                );
-                this.computeScore(input.agentId);
-                log.warn('KILL SWITCH: Agent blacklisted due to accumulated security violations', {
-                    agentId: input.agentId,
-                    violationCount: recentViolations.count,
-                });
-            }
-        }
+                `)
+          .run(
+            crypto.randomUUID(),
+            input.agentId,
+            JSON.stringify({ triggeredBy: id, reason: 'accumulated_violations', count: recentViolations.count }),
+          );
+        this.computeScore(input.agentId);
+        log.warn('KILL SWITCH: Agent blacklisted due to accumulated security violations', {
+          agentId: input.agentId,
+          violationCount: recentViolations.count,
+        });
+      }
     }
+  }
 
-    /**
-     * Get reputation events for an agent.
-     */
-    getEvents(agentId: string, limit: number = 50): ReputationEventRecord[] {
-        const effectiveLimit = limit === 0 ? 10000 : limit;
-        return this.db.query(`
+  /**
+   * Get reputation events for an agent.
+   */
+  getEvents(agentId: string, limit: number = 50): ReputationEventRecord[] {
+    const effectiveLimit = limit === 0 ? 10000 : limit;
+    return this.db
+      .query(`
             SELECT * FROM reputation_events
             WHERE agent_id = ?
             ORDER BY created_at DESC
             LIMIT ?
-        `).all(agentId, effectiveLimit) as ReputationEventRecord[];
+        `)
+      .all(agentId, effectiveLimit) as ReputationEventRecord[];
+  }
+
+  /**
+   * Compute scores for all agents that are stale or missing.
+   * Staleness threshold: 5 minutes.
+   */
+  computeAllIfStale(): ReputationScore[] {
+    const STALE_MINUTES = 5;
+    const now = Date.now();
+    const threshold = STALE_MINUTES * 60 * 1000;
+
+    // Batch-fetch all agents and their cached computed_at timestamps in two queries
+    const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+    const cachedRows = this.db.query('SELECT agent_id, computed_at FROM agent_reputation').all() as {
+      agent_id: string;
+      computed_at: string;
+    }[];
+
+    const computedAtMap = new Map<string, string>();
+    for (const row of cachedRows) {
+      computedAtMap.set(row.agent_id, row.computed_at);
     }
 
-    /**
-     * Compute scores for all agents that are stale or missing.
-     * Staleness threshold: 5 minutes.
-     */
-    computeAllIfStale(): ReputationScore[] {
-        const STALE_MINUTES = 5;
-        const now = Date.now();
-        const threshold = STALE_MINUTES * 60 * 1000;
+    const results: ReputationScore[] = [];
 
-        // Batch-fetch all agents and their cached computed_at timestamps in two queries
-        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
-        const cachedRows = this.db.query(
-            'SELECT agent_id, computed_at FROM agent_reputation',
-        ).all() as { agent_id: string; computed_at: string }[];
+    for (const agent of agents) {
+      const cachedTime = computedAtMap.get(agent.id);
+      let isStale = true;
+      if (cachedTime) {
+        const computedAt = new Date(cachedTime).getTime();
+        // Treat invalid/NaN dates as stale
+        isStale = !Number.isFinite(computedAt) || now - computedAt > threshold;
+      }
 
-        const computedAtMap = new Map<string, string>();
-        for (const row of cachedRows) {
-            computedAtMap.set(row.agent_id, row.computed_at);
-        }
-
-        const results: ReputationScore[] = [];
-
-        for (const agent of agents) {
-            const cachedTime = computedAtMap.get(agent.id);
-            let isStale = true;
-            if (cachedTime) {
-                const computedAt = new Date(cachedTime).getTime();
-                // Treat invalid/NaN dates as stale
-                isStale = !Number.isFinite(computedAt) || (now - computedAt) > threshold;
-            }
-
-            if (isStale) {
-                results.push(this.computeScore(agent.id));
-            } else {
-                results.push(this.getCachedScore(agent.id)!);
-            }
-        }
-
-        // Sort by score descending
-        results.sort((a, b) => b.overallScore - a.overallScore);
-        return results;
+      if (isStale) {
+        results.push(this.computeScore(agent.id));
+      } else {
+        results.push(this.getCachedScore(agent.id)!);
+      }
     }
 
-    /**
-     * Force-recompute scores for all agents.
-     */
-    computeAll(): ReputationScore[] {
-        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
-        const results = agents.map((a) => this.computeScore(a.id));
-        results.sort((a, b) => b.overallScore - a.overallScore);
-        return results;
+    // Sort by score descending
+    results.sort((a, b) => b.overallScore - a.overallScore);
+    return results;
+  }
+
+  /**
+   * Force-recompute scores for all agents.
+   */
+  computeAll(): ReputationScore[] {
+    const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+    const results = agents.map((a) => this.computeScore(a.id));
+    results.sort((a, b) => b.overallScore - a.overallScore);
+    return results;
+  }
+
+  /**
+   * Get reputation scores for all agents.
+   */
+  getAllScores(): ReputationScore[] {
+    const rows = this.db
+      .query('SELECT * FROM agent_reputation ORDER BY overall_score DESC')
+      .all() as ReputationRecord[];
+
+    const activeIds = this.getActiveAgentIds();
+
+    return rows.map((row) => ({
+      agentId: row.agent_id,
+      overallScore: row.overall_score,
+      trustLevel: row.trust_level as TrustLevel,
+      components: {
+        taskCompletion: row.task_completion,
+        peerRating: row.peer_rating,
+        creditPattern: row.credit_pattern,
+        securityCompliance: row.security_compliance,
+        activityLevel: row.activity_level,
+      },
+      attestationHash: row.attestation_hash,
+      computedAt: row.computed_at,
+      hasActivity: activeIds.has(row.agent_id),
+    }));
+  }
+
+  /**
+   * Update the attestation hash for an agent's reputation.
+   */
+  setAttestationHash(agentId: string, hash: string): void {
+    this.db.query('UPDATE agent_reputation SET attestation_hash = ? WHERE agent_id = ?').run(hash, agentId);
+  }
+
+  /**
+   * Compute a full explanation of how an agent's reputation score was derived.
+   * Returns per-component reasoning, evidence, and relevant events.
+   */
+  computeExplanation(agentId: string): ScoreExplanation {
+    const explanations: { key: keyof ReputationComponents; detail: ComponentDetail }[] = [
+      { key: 'taskCompletion', detail: explainTaskCompletion(this.db, agentId) },
+      { key: 'peerRating', detail: explainPeerRating(this.db, agentId) },
+      { key: 'creditPattern', detail: explainCreditPattern(this.db, agentId) },
+      { key: 'securityCompliance', detail: explainSecurityCompliance(this.db, agentId) },
+      { key: 'activityLevel', detail: explainActivityLevel(this.db, agentId) },
+    ];
+
+    // Map event types to components for grouping
+    const eventTypeToComponent: Record<string, keyof ReputationComponents> = {
+      task_completed: 'taskCompletion',
+      task_failed: 'taskCompletion',
+      review_received: 'peerRating',
+      feedback_received: 'peerRating',
+      credit_spent: 'creditPattern',
+      credit_earned: 'creditPattern',
+      security_violation: 'securityCompliance',
+      session_completed: 'activityLevel',
+    };
+
+    // Fetch recent events for grouping
+    const allEvents = this.getEvents(agentId, 100);
+    const eventsByComponent = new Map<keyof ReputationComponents, ReputationEventRecord[]>();
+    for (const event of allEvents) {
+      const comp = eventTypeToComponent[event.event_type];
+      if (comp) {
+        if (!eventsByComponent.has(comp)) eventsByComponent.set(comp, []);
+        eventsByComponent.get(comp)!.push(event);
+      }
     }
 
-    /**
-     * Get reputation scores for all agents.
-     */
-    getAllScores(): ReputationScore[] {
-        const rows = this.db.query(
-            'SELECT * FROM agent_reputation ORDER BY overall_score DESC',
-        ).all() as ReputationRecord[];
+    const components: ComponentExplanation[] = explanations.map(({ key, detail }) => ({
+      component: key,
+      score: detail.score,
+      weight: this.weights[key],
+      weightedContribution: Math.round(detail.score * this.weights[key] * 100) / 100,
+      isDefault: detail.isDefault,
+      reason: detail.reason,
+      evidence: detail.evidence,
+      recentEvents: (eventsByComponent.get(key) ?? []).slice(0, 10),
+    }));
 
-        const activeIds = this.getActiveAgentIds();
+    const rawScore = Math.round(components.reduce((sum, c) => sum + c.score * c.weight, 0));
+    const decayFactor = computeDecayFactor(this.db, agentId);
+    const overallScore = Math.max(1, Math.round(rawScore * decayFactor));
 
-        return rows.map((row) => ({
-            agentId: row.agent_id,
-            overallScore: row.overall_score,
-            trustLevel: row.trust_level as TrustLevel,
-            components: {
-                taskCompletion: row.task_completion,
-                peerRating: row.peer_rating,
-                creditPattern: row.credit_pattern,
-                securityCompliance: row.security_compliance,
-                activityLevel: row.activity_level,
-            },
-            attestationHash: row.attestation_hash,
-            computedAt: row.computed_at,
-            hasActivity: activeIds.has(row.agent_id),
-        }));
-    }
+    return {
+      agentId,
+      overallScore,
+      trustLevel: computeTrustLevel(overallScore),
+      decayFactor: Math.round(decayFactor * 1000) / 1000,
+      rawScore,
+      components,
+      computedAt: new Date().toISOString(),
+    };
+  }
 
-    /**
-     * Update the attestation hash for an agent's reputation.
-     */
-    setAttestationHash(agentId: string, hash: string): void {
-        this.db.query(
-            'UPDATE agent_reputation SET attestation_hash = ? WHERE agent_id = ?',
-        ).run(hash, agentId);
-    }
+  // ─── Private ─────────────────────────────────────────────────────────────
 
-    /**
-     * Compute a full explanation of how an agent's reputation score was derived.
-     * Returns per-component reasoning, evidence, and relevant events.
-     */
-    computeExplanation(agentId: string): ScoreExplanation {
-        const explanations: { key: keyof ReputationComponents; detail: ComponentDetail }[] = [
-            { key: 'taskCompletion', detail: explainTaskCompletion(this.db, agentId) },
-            { key: 'peerRating', detail: explainPeerRating(this.db, agentId) },
-            { key: 'creditPattern', detail: explainCreditPattern(this.db, agentId) },
-            { key: 'securityCompliance', detail: explainSecurityCompliance(this.db, agentId) },
-            { key: 'activityLevel', detail: explainActivityLevel(this.db, agentId) },
-        ];
+  private computeComponents(agentId: string): ReputationComponents {
+    return {
+      taskCompletion: computeTaskCompletion(this.db, agentId),
+      peerRating: computePeerRating(this.db, agentId),
+      creditPattern: computeCreditPattern(this.db, agentId),
+      securityCompliance: computeSecurityCompliance(this.db, agentId),
+      activityLevel: computeActivityLevel(this.db, agentId),
+    };
+  }
 
-        // Map event types to components for grouping
-        const eventTypeToComponent: Record<string, keyof ReputationComponents> = {
-            task_completed: 'taskCompletion',
-            task_failed: 'taskCompletion',
-            review_received: 'peerRating',
-            feedback_received: 'peerRating',
-            credit_spent: 'creditPattern',
-            credit_earned: 'creditPattern',
-            security_violation: 'securityCompliance',
-            session_completed: 'activityLevel',
-        };
+  private computeOverall(components: ReputationComponents): number {
+    const weighted =
+      components.taskCompletion * this.weights.taskCompletion +
+      components.peerRating * this.weights.peerRating +
+      components.creditPattern * this.weights.creditPattern +
+      components.securityCompliance * this.weights.securityCompliance +
+      components.activityLevel * this.weights.activityLevel;
 
-        // Fetch recent events for grouping
-        const allEvents = this.getEvents(agentId, 100);
-        const eventsByComponent = new Map<keyof ReputationComponents, ReputationEventRecord[]>();
-        for (const event of allEvents) {
-            const comp = eventTypeToComponent[event.event_type];
-            if (comp) {
-                if (!eventsByComponent.has(comp)) eventsByComponent.set(comp, []);
-                eventsByComponent.get(comp)!.push(event);
-            }
-        }
+    return Math.round(Math.max(0, Math.min(100, weighted)));
+  }
 
-        const components: ComponentExplanation[] = explanations.map(({ key, detail }) => ({
-            component: key,
-            score: detail.score,
-            weight: this.weights[key],
-            weightedContribution: Math.round(detail.score * this.weights[key] * 100) / 100,
-            isDefault: detail.isDefault,
-            reason: detail.reason,
-            evidence: detail.evidence,
-            recentEvents: (eventsByComponent.get(key) ?? []).slice(0, 10),
-        }));
-
-        const rawScore = Math.round(
-            components.reduce((sum, c) => sum + c.score * c.weight, 0),
-        );
-        const decayFactor = computeDecayFactor(this.db, agentId);
-        const overallScore = Math.max(1, Math.round(rawScore * decayFactor));
-
-        return {
-            agentId,
-            overallScore,
-            trustLevel: computeTrustLevel(overallScore),
-            decayFactor: Math.round(decayFactor * 1000) / 1000,
-            rawScore,
-            components,
-            computedAt: new Date().toISOString(),
-        };
-    }
-
-    // ─── Private ─────────────────────────────────────────────────────────────
-
-    private computeComponents(agentId: string): ReputationComponents {
-        return {
-            taskCompletion: computeTaskCompletion(this.db, agentId),
-            peerRating: computePeerRating(this.db, agentId),
-            creditPattern: computeCreditPattern(this.db, agentId),
-            securityCompliance: computeSecurityCompliance(this.db, agentId),
-            activityLevel: computeActivityLevel(this.db, agentId),
-        };
-    }
-
-    private computeOverall(components: ReputationComponents): number {
-        const weighted =
-            components.taskCompletion * this.weights.taskCompletion +
-            components.peerRating * this.weights.peerRating +
-            components.creditPattern * this.weights.creditPattern +
-            components.securityCompliance * this.weights.securityCompliance +
-            components.activityLevel * this.weights.activityLevel;
-
-        return Math.round(Math.max(0, Math.min(100, weighted)));
-    }
-
-    private saveScore(score: ReputationScore): void {
-        this.db.query(`
+  private saveScore(score: ReputationScore): void {
+    this.db
+      .query(`
             INSERT OR REPLACE INTO agent_reputation
                 (agent_id, overall_score, trust_level, task_completion, peer_rating,
                  credit_pattern, security_compliance, activity_level, attestation_hash, computed_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-            score.agentId,
-            score.overallScore,
-            score.trustLevel,
-            score.components.taskCompletion,
-            score.components.peerRating,
-            score.components.creditPattern,
-            score.components.securityCompliance,
-            score.components.activityLevel,
-            score.attestationHash,
-            score.computedAt,
-        );
+        `)
+      .run(
+        score.agentId,
+        score.overallScore,
+        score.trustLevel,
+        score.components.taskCompletion,
+        score.components.peerRating,
+        score.components.creditPattern,
+        score.components.securityCompliance,
+        score.components.activityLevel,
+        score.attestationHash,
+        score.computedAt,
+      );
 
-        // Record history snapshot (throttled to at most one per hour per agent)
-        this.recordHistorySnapshot(score);
-    }
+    // Record history snapshot (throttled to at most one per hour per agent)
+    this.recordHistorySnapshot(score);
+  }
 
-    private recordHistorySnapshot(score: ReputationScore): void {
-        try {
-            const recent = this.db.query(`
+  private recordHistorySnapshot(score: ReputationScore): void {
+    try {
+      const recent = this.db
+        .query(`
                 SELECT id FROM reputation_history
                 WHERE agent_id = ? AND computed_at > datetime('now', '-1 hour')
                 LIMIT 1
-            `).get(score.agentId) as { id: number } | null;
+            `)
+        .get(score.agentId) as { id: number } | null;
 
-            if (recent) return; // Already have a recent snapshot
+      if (recent) return; // Already have a recent snapshot
 
-            this.db.query(`
+      this.db
+        .query(`
                 INSERT INTO reputation_history
                     (agent_id, overall_score, trust_level, task_completion, peer_rating,
                      credit_pattern, security_compliance, activity_level, computed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-                score.agentId,
-                score.overallScore,
-                score.trustLevel,
-                score.components.taskCompletion,
-                score.components.peerRating,
-                score.components.creditPattern,
-                score.components.securityCompliance,
-                score.components.activityLevel,
-                score.computedAt,
-            );
-        } catch {
-            // Non-critical — don't fail score computation if history recording fails
-        }
+            `)
+        .run(
+          score.agentId,
+          score.overallScore,
+          score.trustLevel,
+          score.components.taskCompletion,
+          score.components.peerRating,
+          score.components.creditPattern,
+          score.components.securityCompliance,
+          score.components.activityLevel,
+          score.computedAt,
+        );
+    } catch {
+      // Non-critical — don't fail score computation if history recording fails
     }
+  }
 
-    /**
-     * Get reputation score history for an agent over the specified number of days.
-     */
-    getHistory(agentId: string, days = 90): ReputationHistoryPoint[] {
-        const rows = this.db.query(`
+  /**
+   * Get reputation score history for an agent over the specified number of days.
+   */
+  getHistory(agentId: string, days = 90): ReputationHistoryPoint[] {
+    const rows = this.db
+      .query(`
             SELECT overall_score, trust_level, task_completion, peer_rating,
                    credit_pattern, security_compliance, activity_level, computed_at
             FROM reputation_history
             WHERE agent_id = ? AND computed_at > datetime('now', '-' || ? || ' days')
             ORDER BY computed_at ASC
-        `).all(agentId, days) as {
-            overall_score: number;
-            trust_level: string;
-            task_completion: number;
-            peer_rating: number;
-            credit_pattern: number;
-            security_compliance: number;
-            activity_level: number;
-            computed_at: string;
-        }[];
+        `)
+      .all(agentId, days) as {
+      overall_score: number;
+      trust_level: string;
+      task_completion: number;
+      peer_rating: number;
+      credit_pattern: number;
+      security_compliance: number;
+      activity_level: number;
+      computed_at: string;
+    }[];
 
-        return rows.map(row => ({
-            overallScore: row.overall_score,
-            trustLevel: row.trust_level,
-            components: {
-                taskCompletion: row.task_completion,
-                peerRating: row.peer_rating,
-                creditPattern: row.credit_pattern,
-                securityCompliance: row.security_compliance,
-                activityLevel: row.activity_level,
-            },
-            computedAt: row.computed_at,
-        }));
-    }
+    return rows.map((row) => ({
+      overallScore: row.overall_score,
+      trustLevel: row.trust_level,
+      components: {
+        taskCompletion: row.task_completion,
+        peerRating: row.peer_rating,
+        creditPattern: row.credit_pattern,
+        securityCompliance: row.security_compliance,
+        activityLevel: row.activity_level,
+      },
+      computedAt: row.computed_at,
+    }));
+  }
 }

@@ -1,7 +1,7 @@
 /** Workflow definitions, runs, and node execution. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS workflow_node_runs (
+  `CREATE TABLE IF NOT EXISTS workflow_node_runs (
         id           TEXT PRIMARY KEY,
         run_id       TEXT NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
         node_id      TEXT NOT NULL,
@@ -16,7 +16,7 @@ export const tables: string[] = [
         completed_at TEXT DEFAULT NULL
     )`,
 
-    `CREATE TABLE IF NOT EXISTS workflow_runs (
+  `CREATE TABLE IF NOT EXISTS workflow_runs (
         id               TEXT PRIMARY KEY,
         workflow_id      TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
         agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -31,7 +31,7 @@ export const tables: string[] = [
         completed_at     TEXT DEFAULT NULL
     )`,
 
-    `CREATE TABLE IF NOT EXISTS workflows (
+  `CREATE TABLE IF NOT EXISTS workflows (
         id                 TEXT PRIMARY KEY,
         agent_id           TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
         name               TEXT NOT NULL,
@@ -48,14 +48,14 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_started ON workflow_runs(workflow_id, started_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_started ON workflow_runs(workflow_id, started_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
 ];

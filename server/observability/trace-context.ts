@@ -9,8 +9,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface TraceContextData {
-    traceId?: string;
-    requestId?: string;
+  traceId?: string;
+  requestId?: string;
 }
 
 export const traceContext = new AsyncLocalStorage<TraceContextData>();
@@ -19,14 +19,14 @@ export const traceContext = new AsyncLocalStorage<TraceContextData>();
  * Get the current trace ID from AsyncLocalStorage, or undefined if not set.
  */
 export function getTraceId(): string | undefined {
-    return traceContext.getStore()?.traceId;
+  return traceContext.getStore()?.traceId;
 }
 
 /**
  * Get the current request ID from AsyncLocalStorage, or undefined if not set.
  */
 export function getRequestId(): string | undefined {
-    return traceContext.getStore()?.requestId;
+  return traceContext.getStore()?.requestId;
 }
 
 /**
@@ -35,5 +35,5 @@ export function getRequestId(): string | undefined {
  * descendants of the callback.
  */
 export function runWithTraceId<T>(traceId: string, fn: () => T, requestId?: string): T {
-    return traceContext.run({ traceId, requestId }, fn);
+  return traceContext.run({ traceId, requestId }, fn);
 }

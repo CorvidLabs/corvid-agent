@@ -1,206 +1,225 @@
 import type { Database } from 'bun:sqlite';
-import type { RequestContext } from '../middleware/guards';
-import { tenantRoleGuard } from '../middleware/guards';
-import {
-    listBundles, getBundle, createBundle, updateBundle, deleteBundle,
-    getAgentBundles, assignBundle, unassignBundle,
-    getProjectBundles, assignProjectBundle, unassignProjectBundle,
-} from '../db/skill-bundles';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
+import {
+  assignBundle,
+  assignProjectBundle,
+  createBundle,
+  deleteBundle,
+  getAgentBundles,
+  getBundle,
+  getProjectBundles,
+  listBundles,
+  unassignBundle,
+  unassignProjectBundle,
+  updateBundle,
+} from '../db/skill-bundles';
 import { checkInjection } from '../lib/injection-guard';
-import { parseBodyOrThrow, ValidationError, CreateSkillBundleSchema, UpdateSkillBundleSchema, AssignSkillBundleSchema } from '../lib/validation';
 import { json } from '../lib/response';
+import {
+  AssignSkillBundleSchema,
+  CreateSkillBundleSchema,
+  parseBodyOrThrow,
+  UpdateSkillBundleSchema,
+  ValidationError,
+} from '../lib/validation';
+import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 
 export function handleSkillBundleRoutes(
-    req: Request,
-    url: URL,
-    db: Database,
-    context?: RequestContext,
+  req: Request,
+  url: URL,
+  db: Database,
+  context?: RequestContext,
 ): Response | Promise<Response> | null {
-    const path = url.pathname;
-    const method = req.method;
-    const tenantId = context?.tenantId ?? 'default';
+  const path = url.pathname;
+  const method = req.method;
+  const tenantId = context?.tenantId ?? 'default';
 
-    // ─── Bundle CRUD ──────────────────────────────────────────────────────
+  // ─── Bundle CRUD ──────────────────────────────────────────────────────
 
-    // GET /api/skill-bundles
-    if (path === '/api/skill-bundles' && method === 'GET') {
-        return json(listBundles(db));
+  // GET /api/skill-bundles
+  if (path === '/api/skill-bundles' && method === 'GET') {
+    return json(listBundles(db));
+  }
+
+  // POST /api/skill-bundles
+  if (path === '/api/skill-bundles' && method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleCreateBundle(req, db);
+  }
+
+  // GET/PUT/DELETE /api/skill-bundles/:id
+  const bundleMatch = path.match(/^\/api\/skill-bundles\/([^/]+)$/);
+  if (bundleMatch) {
+    const id = bundleMatch[1];
+
+    if (method === 'GET') {
+      const bundle = getBundle(db, id);
+      return bundle ? json(bundle) : json({ error: 'Not found' }, 404);
     }
 
-    // POST /api/skill-bundles
-    if (path === '/api/skill-bundles' && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleCreateBundle(req, db);
+    if (method === 'PUT') {
+      if (context) {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+      }
+      return handleUpdateBundle(req, db, id);
     }
 
-    // GET/PUT/DELETE /api/skill-bundles/:id
-    const bundleMatch = path.match(/^\/api\/skill-bundles\/([^/]+)$/);
-    if (bundleMatch) {
-        const id = bundleMatch[1];
-
-        if (method === 'GET') {
-            const bundle = getBundle(db, id);
-            return bundle ? json(bundle) : json({ error: 'Not found' }, 404);
-        }
-
-        if (method === 'PUT') {
-            if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (denied) return denied;
-            }
-            return handleUpdateBundle(req, db, id);
-        }
-
-        if (method === 'DELETE') {
-            if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (denied) return denied;
-            }
-            const deleted = deleteBundle(db, id);
-            if (!deleted) return json({ error: 'Not found or is a preset bundle' }, 404);
-            return json({ ok: true });
-        }
+    if (method === 'DELETE') {
+      if (context) {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
+      }
+      const deleted = deleteBundle(db, id);
+      if (!deleted) return json({ error: 'Not found or is a preset bundle' }, 404);
+      return json({ ok: true });
     }
+  }
 
-    // ─── Agent-Bundle Assignment ──────────────────────────────────────────
+  // ─── Agent-Bundle Assignment ──────────────────────────────────────────
 
-    // GET /api/agents/:id/skills
-    const agentSkillsGet = path.match(/^\/api\/agents\/([^/]+)\/skills$/);
-    if (agentSkillsGet && method === 'GET') {
-        const agentId = agentSkillsGet[1];
-        const agent = getAgent(db, agentId, tenantId);
-        if (!agent) return json({ error: 'Agent not found' }, 404);
-        return json(getAgentBundles(db, agentId));
+  // GET /api/agents/:id/skills
+  const agentSkillsGet = path.match(/^\/api\/agents\/([^/]+)\/skills$/);
+  if (agentSkillsGet && method === 'GET') {
+    const agentId = agentSkillsGet[1];
+    const agent = getAgent(db, agentId, tenantId);
+    if (!agent) return json({ error: 'Agent not found' }, 404);
+    return json(getAgentBundles(db, agentId));
+  }
+
+  // POST /api/agents/:id/skills
+  if (agentSkillsGet && method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleAssignBundle(req, db, agentSkillsGet[1], tenantId);
+  }
 
-    // POST /api/agents/:id/skills
-    if (agentSkillsGet && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleAssignBundle(req, db, agentSkillsGet[1], tenantId);
+  // DELETE /api/agents/:id/skills/:bundleId
+  const agentSkillDelete = path.match(/^\/api\/agents\/([^/]+)\/skills\/([^/]+)$/);
+  if (agentSkillDelete && method === 'DELETE') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    const agentId = agentSkillDelete[1];
+    const bundleId = agentSkillDelete[2];
+    const agent = getAgent(db, agentId, tenantId);
+    if (!agent) return json({ error: 'Agent not found' }, 404);
 
-    // DELETE /api/agents/:id/skills/:bundleId
-    const agentSkillDelete = path.match(/^\/api\/agents\/([^/]+)\/skills\/([^/]+)$/);
-    if (agentSkillDelete && method === 'DELETE') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        const agentId = agentSkillDelete[1];
-        const bundleId = agentSkillDelete[2];
-        const agent = getAgent(db, agentId, tenantId);
-        if (!agent) return json({ error: 'Agent not found' }, 404);
+    const removed = unassignBundle(db, agentId, bundleId);
+    if (!removed) return json({ error: 'Assignment not found' }, 404);
+    return json({ ok: true });
+  }
 
-        const removed = unassignBundle(db, agentId, bundleId);
-        if (!removed) return json({ error: 'Assignment not found' }, 404);
-        return json({ ok: true });
+  // ─── Project-Bundle Assignment ────────────────────────────────────────
+
+  // GET /api/projects/:id/skills
+  const projectSkillsGet = path.match(/^\/api\/projects\/([^/]+)\/skills$/);
+  if (projectSkillsGet && method === 'GET') {
+    const projectId = projectSkillsGet[1];
+    const project = getProject(db, projectId, tenantId);
+    if (!project) return json({ error: 'Project not found' }, 404);
+    return json(getProjectBundles(db, projectId));
+  }
+
+  // POST /api/projects/:id/skills
+  if (projectSkillsGet && method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleAssignProjectBundle(req, db, projectSkillsGet[1], tenantId);
+  }
 
-    // ─── Project-Bundle Assignment ────────────────────────────────────────
-
-    // GET /api/projects/:id/skills
-    const projectSkillsGet = path.match(/^\/api\/projects\/([^/]+)\/skills$/);
-    if (projectSkillsGet && method === 'GET') {
-        const projectId = projectSkillsGet[1];
-        const project = getProject(db, projectId, tenantId);
-        if (!project) return json({ error: 'Project not found' }, 404);
-        return json(getProjectBundles(db, projectId));
+  // DELETE /api/projects/:id/skills/:bundleId
+  const projectSkillDelete = path.match(/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/);
+  if (projectSkillDelete && method === 'DELETE') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    const projectId = projectSkillDelete[1];
+    const bundleId = projectSkillDelete[2];
+    const project = getProject(db, projectId, tenantId);
+    if (!project) return json({ error: 'Project not found' }, 404);
 
-    // POST /api/projects/:id/skills
-    if (projectSkillsGet && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleAssignProjectBundle(req, db, projectSkillsGet[1], tenantId);
-    }
+    const removed = unassignProjectBundle(db, projectId, bundleId);
+    if (!removed) return json({ error: 'Assignment not found' }, 404);
+    return json({ ok: true });
+  }
 
-    // DELETE /api/projects/:id/skills/:bundleId
-    const projectSkillDelete = path.match(/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/);
-    if (projectSkillDelete && method === 'DELETE') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        const projectId = projectSkillDelete[1];
-        const bundleId = projectSkillDelete[2];
-        const project = getProject(db, projectId, tenantId);
-        if (!project) return json({ error: 'Project not found' }, 404);
-
-        const removed = unassignProjectBundle(db, projectId, bundleId);
-        if (!removed) return json({ error: 'Assignment not found' }, 404);
-        return json({ ok: true });
-    }
-
-    return null;
+  return null;
 }
 
 async function handleCreateBundle(req: Request, db: Database): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, CreateSkillBundleSchema);
-        if (data.promptAdditions) {
-            const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_create', req);
-            if (injectionDenied) return injectionDenied;
-        }
-        const bundle = createBundle(db, data);
-        return json(bundle, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
+  try {
+    const data = await parseBodyOrThrow(req, CreateSkillBundleSchema);
+    if (data.promptAdditions) {
+      const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_create', req);
+      if (injectionDenied) return injectionDenied;
     }
+    const bundle = createBundle(db, data);
+    return json(bundle, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }
 
 async function handleUpdateBundle(req: Request, db: Database, id: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, UpdateSkillBundleSchema);
-        if (data.promptAdditions) {
-            const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_update', req);
-            if (injectionDenied) return injectionDenied;
-        }
-        const bundle = updateBundle(db, id, data);
-        if (!bundle) return json({ error: 'Not found' }, 404);
-        return json(bundle);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
+  try {
+    const data = await parseBodyOrThrow(req, UpdateSkillBundleSchema);
+    if (data.promptAdditions) {
+      const injectionDenied = checkInjection(db, data.promptAdditions, 'skill_bundle_update', req);
+      if (injectionDenied) return injectionDenied;
     }
+    const bundle = updateBundle(db, id, data);
+    if (!bundle) return json({ error: 'Not found' }, 404);
+    return json(bundle);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }
 
 async function handleAssignBundle(req: Request, db: Database, agentId: string, tenantId: string): Promise<Response> {
-    try {
-        const agent = getAgent(db, agentId, tenantId);
-        if (!agent) return json({ error: 'Agent not found' }, 404);
+  try {
+    const agent = getAgent(db, agentId, tenantId);
+    if (!agent) return json({ error: 'Agent not found' }, 404);
 
-        const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
-        const assigned = assignBundle(db, agentId, data.bundleId, data.sortOrder ?? 0);
-        if (!assigned) return json({ error: 'Bundle not found' }, 404);
-        return json({ ok: true }, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
-    }
+    const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
+    const assigned = assignBundle(db, agentId, data.bundleId, data.sortOrder ?? 0);
+    if (!assigned) return json({ error: 'Bundle not found' }, 404);
+    return json({ ok: true }, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }
 
-async function handleAssignProjectBundle(req: Request, db: Database, projectId: string, tenantId: string): Promise<Response> {
-    try {
-        const project = getProject(db, projectId, tenantId);
-        if (!project) return json({ error: 'Project not found' }, 404);
+async function handleAssignProjectBundle(
+  req: Request,
+  db: Database,
+  projectId: string,
+  tenantId: string,
+): Promise<Response> {
+  try {
+    const project = getProject(db, projectId, tenantId);
+    if (!project) return json({ error: 'Project not found' }, 404);
 
-        const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
-        const assigned = assignProjectBundle(db, projectId, data.bundleId, data.sortOrder ?? 0);
-        if (!assigned) return json({ error: 'Bundle not found' }, 404);
-        return json({ ok: true }, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
-    }
+    const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
+    const assigned = assignProjectBundle(db, projectId, data.bundleId, data.sortOrder ?? 0);
+    if (!assigned) return json({ error: 'Bundle not found' }, 404);
+    return json({ ok: true }, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }

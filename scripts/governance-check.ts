@@ -26,31 +26,31 @@
 let classifyPath: typeof import('../server/councils/governance').classifyPath;
 
 try {
-    const governance = await import('../server/councils/governance');
-    classifyPath = governance.classifyPath;
+  const governance = await import('../server/councils/governance');
+  classifyPath = governance.classifyPath;
 } catch (err) {
-    console.error(
-        '✗ FATAL: Failed to load governance module — fail-closed.\n' +
-        '  Cannot verify path safety without governance tier definitions.\n' +
-        '  Error:',
-        err instanceof Error ? err.message : String(err),
-    );
-    process.exit(1);
+  console.error(
+    '✗ FATAL: Failed to load governance module — fail-closed.\n' +
+      '  Cannot verify path safety without governance tier definitions.\n' +
+      '  Error:',
+    err instanceof Error ? err.message : String(err),
+  );
+  process.exit(1);
 }
 
 // ─── Known automated actors ─────────────────────────────────────────────────
 
 const AUTOMATED_ACTORS = new Set([
-    'corvid-agent',
-    'corvid-agent[bot]',
-    'github-actions[bot]',
-    'dependabot[bot]',
-    'renovate[bot]',
+  'corvid-agent',
+  'corvid-agent[bot]',
+  'github-actions[bot]',
+  'dependabot[bot]',
+  'renovate[bot]',
 ]);
 
 function isAutomatedActor(actor: string | undefined): boolean {
-    if (!actor) return false;
-    return AUTOMATED_ACTORS.has(actor) || actor.endsWith('[bot]');
+  if (!actor) return false;
+  return AUTOMATED_ACTORS.has(actor) || actor.endsWith('[bot]');
 }
 
 // ─── Automated branch prefix detection ──────────────────────────────────────
@@ -59,21 +59,21 @@ function isAutomatedActor(actor: string | undefined): boolean {
 const AUTOMATED_BRANCH_PREFIXES = ['agent/', 'chat/'];
 
 function isAutomatedBranch(headRef: string | undefined): boolean {
-    if (!headRef) return false;
-    return AUTOMATED_BRANCH_PREFIXES.some((prefix) => headRef.startsWith(prefix));
+  if (!headRef) return false;
+  return AUTOMATED_BRANCH_PREFIXES.some((prefix) => headRef.startsWith(prefix));
 }
 
 // ─── Extract changed files from diff ─────────────────────────────────────────
 
 function extractChangedFiles(diffOutput: string): string[] {
-    return diffOutput
-        .split('\n')
-        .filter((line) => line.startsWith('diff --git'))
-        .map((line) => {
-            const match = line.match(/b\/(.+)$/);
-            return match?.[1] ?? '';
-        })
-        .filter(Boolean);
+  return diffOutput
+    .split('\n')
+    .filter((line) => line.startsWith('diff --git'))
+    .map((line) => {
+      const match = line.match(/b\/(.+)$/);
+      return match?.[1] ?? '';
+    })
+    .filter(Boolean);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -86,41 +86,39 @@ const isAutomatedByBranch = isAutomatedBranch(headRef);
 const isAutomated = isAutomatedByActor || isAutomatedByBranch;
 
 // Get diff
-const diffArgs = baseRef
-    ? ['git', 'diff', `origin/${baseRef}...HEAD`]
-    : ['git', 'diff', 'HEAD~1'];
+const diffArgs = baseRef ? ['git', 'diff', `origin/${baseRef}...HEAD`] : ['git', 'diff', 'HEAD~1'];
 
 let diffOutput = '';
 try {
-    const diffProc = Bun.spawn(diffArgs, { stdout: 'pipe', stderr: 'pipe' });
-    diffOutput = await new Response(diffProc.stdout).text();
-    const exitCode = await diffProc.exited;
+  const diffProc = Bun.spawn(diffArgs, { stdout: 'pipe', stderr: 'pipe' });
+  diffOutput = await new Response(diffProc.stdout).text();
+  const exitCode = await diffProc.exited;
 
-    if (exitCode !== 0) {
-        const fallbackProc = Bun.spawn(['git', 'diff', '--cached'], { stdout: 'pipe', stderr: 'pipe' });
-        diffOutput = await new Response(fallbackProc.stdout).text();
-        await fallbackProc.exited;
-    }
+  if (exitCode !== 0) {
+    const fallbackProc = Bun.spawn(['git', 'diff', '--cached'], { stdout: 'pipe', stderr: 'pipe' });
+    diffOutput = await new Response(fallbackProc.stdout).text();
+    await fallbackProc.exited;
+  }
 } catch (err) {
-    console.error('Failed to get diff:', err instanceof Error ? err.message : String(err));
-    process.exit(1);
+  console.error('Failed to get diff:', err instanceof Error ? err.message : String(err));
+  process.exit(1);
 }
 
 if (!diffOutput.trim()) {
-    console.log('✓ No changes detected — governance check passed');
-    process.exit(0);
+  console.log('✓ No changes detected — governance check passed');
+  process.exit(0);
 }
 
 const changedFiles = extractChangedFiles(diffOutput);
 if (changedFiles.length === 0) {
-    console.log('✓ No file changes detected — governance check passed');
-    process.exit(0);
+  console.log('✓ No file changes detected — governance check passed');
+  process.exit(0);
 }
 
 // Classify all changed files
 const classified = changedFiles.map((path) => ({
-    path,
-    tier: classifyPath(path),
+  path,
+  tier: classifyPath(path),
 }));
 
 const layer0Files = classified.filter((f) => f.tier === 0);
@@ -131,59 +129,59 @@ const layer2Files = classified.filter((f) => f.tier === 2);
 console.log(`Governance Tier Check — ${changedFiles.length} file(s) changed`);
 console.log(`  Actor: ${actor ?? '(local)'} ${isAutomatedByActor ? '(automated)' : '(human)'}`);
 console.log(`  Branch: ${headRef ?? '(unknown)'} ${isAutomatedByBranch ? '(automated prefix)' : '(manual)'}`);
-console.log(`  Automated: ${isAutomated ? 'YES' : 'no'}${isAutomated ? ` (${[isAutomatedByActor && 'actor', isAutomatedByBranch && 'branch'].filter(Boolean).join(' + ')})` : ''}`);
+console.log(
+  `  Automated: ${isAutomated ? 'YES' : 'no'}${isAutomated ? ` (${[isAutomatedByActor && 'actor', isAutomatedByBranch && 'branch'].filter(Boolean).join(' + ')})` : ''}`,
+);
 console.log(`  Layer 0 (Constitutional): ${layer0Files.length}`);
 console.log(`  Layer 1 (Structural):     ${layer1Files.length}`);
 console.log(`  Layer 2 (Operational):    ${layer2Files.length}`);
 
 if (layer0Files.length > 0) {
-    console.log('\nLayer 0 (Constitutional) paths — NO council jurisdiction, human-only commits:');
-    for (const f of layer0Files) {
-        console.log(`  ✗ ${f.path}`);
-    }
+  console.log('\nLayer 0 (Constitutional) paths — NO council jurisdiction, human-only commits:');
+  for (const f of layer0Files) {
+    console.log(`  ✗ ${f.path}`);
+  }
 }
 
 if (layer1Files.length > 0) {
-    console.log('\nLayer 1 (Structural) paths — supermajority + human approval required:');
-    for (const f of layer1Files) {
-        console.log(`  ⚠ ${f.path}`);
-    }
+  console.log('\nLayer 1 (Structural) paths — supermajority + human approval required:');
+  for (const f of layer1Files) {
+    console.log(`  ⚠ ${f.path}`);
+  }
 }
 
 // Enforcement
 let exitCode = 0;
 
 if (layer0Files.length > 0 && isAutomated) {
-    const signals = [
-        isAutomatedByActor && `actor "${actor}"`,
-        isAutomatedByBranch && `branch "${headRef}"`,
-    ].filter(Boolean).join(' + ');
-    console.error(
-        `\n✗ BLOCKED: Automated workflow (${signals}) cannot modify Layer 0 (Constitutional) paths.` +
-        '\n  These paths require human-only commits to main.' +
-        '\n  See: https://github.com/CorvidLabs/corvid-agent/issues/1357',
-    );
-    exitCode = 1;
+  const signals = [isAutomatedByActor && `actor "${actor}"`, isAutomatedByBranch && `branch "${headRef}"`]
+    .filter(Boolean)
+    .join(' + ');
+  console.error(
+    `\n✗ BLOCKED: Automated workflow (${signals}) cannot modify Layer 0 (Constitutional) paths.` +
+      '\n  These paths require human-only commits to main.' +
+      '\n  See: https://github.com/CorvidLabs/corvid-agent/issues/1357',
+  );
+  exitCode = 1;
 } else if (layer0Files.length > 0 && !isAutomated) {
-    console.log(
-        `\n⚠ WARNING: PR modifies Layer 0 (Constitutional) paths.` +
-        '\n  These changes require careful human review — no council jurisdiction.',
-    );
+  console.log(
+    `\n⚠ WARNING: PR modifies Layer 0 (Constitutional) paths.` +
+      '\n  These changes require careful human review — no council jurisdiction.',
+  );
 }
 
 if (layer1Files.length > 0 && isAutomated) {
-    const signals = [
-        isAutomatedByActor && `actor "${actor}"`,
-        isAutomatedByBranch && `branch "${headRef}"`,
-    ].filter(Boolean).join(' + ');
-    console.log(
-        `\n⚠ WARNING: Automated workflow (${signals}) is modifying Layer 1 (Structural) paths.` +
-        '\n  These changes require supermajority council vote + human approval.',
-    );
+  const signals = [isAutomatedByActor && `actor "${actor}"`, isAutomatedByBranch && `branch "${headRef}"`]
+    .filter(Boolean)
+    .join(' + ');
+  console.log(
+    `\n⚠ WARNING: Automated workflow (${signals}) is modifying Layer 1 (Structural) paths.` +
+      '\n  These changes require supermajority council vote + human approval.',
+  );
 }
 
 if (exitCode === 0) {
-    console.log('\n✓ Governance check passed');
+  console.log('\n✓ Governance check passed');
 }
 
 process.exit(exitCode);

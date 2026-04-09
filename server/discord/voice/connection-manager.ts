@@ -288,10 +288,13 @@ export class VoiceConnectionManager {
           sent: result, // false means shard wasn't ready — opcode 4 was NOT actually sent
         });
         if (!result) {
-          log.error('[VoiceAdapter] sendPayload FAILED — shard is not in Ready state. Opcode 4 was NOT sent to Discord.', {
-            guildId,
-            shardStatus: guild.shard.status,
-          });
+          log.error(
+            '[VoiceAdapter] sendPayload FAILED — shard is not in Ready state. Opcode 4 was NOT sent to Discord.',
+            {
+              guildId,
+              shardStatus: guild.shard.status,
+            },
+          );
         }
         return result;
       };

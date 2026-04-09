@@ -16,10 +16,10 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { scanForInjection } from './prompt-injection';
 import { recordAudit } from '../db/audit';
-import { createLogger } from './logger';
 import { getClientIp } from '../middleware/rate-limit';
+import { createLogger } from './logger';
+import { scanForInjection } from './prompt-injection';
 
 const log = createLogger('InjectionGuard');
 
@@ -35,44 +35,39 @@ const log = createLogger('InjectionGuard');
  * @param req     The original request (for client IP extraction)
  * @returns A 403 Response if blocked, or null if clean
  */
-export function checkInjection(
-    db: Database,
-    content: string,
-    channel: string,
-    req: Request,
-): Response | null {
-    const result = scanForInjection(content);
-    if (!result.blocked) return null;
+export function checkInjection(db: Database, content: string, channel: string, req: Request): Response | null {
+  const result = scanForInjection(content);
+  if (!result.blocked) return null;
 
-    const clientIp = getClientIp(req);
-    log.warn('Blocked API request: prompt injection detected', {
-        channel,
-        clientIp,
-        confidence: result.confidence,
-        patterns: result.matches.map((m) => m.pattern),
-        scanTimeMs: result.scanTimeMs,
-        contentPreview: content.slice(0, 100),
-    });
+  const clientIp = getClientIp(req);
+  log.warn('Blocked API request: prompt injection detected', {
+    channel,
+    clientIp,
+    confidence: result.confidence,
+    patterns: result.matches.map((m) => m.pattern),
+    scanTimeMs: result.scanTimeMs,
+    contentPreview: content.slice(0, 100),
+  });
 
-    recordAudit(
-        db,
-        'injection_blocked',
-        clientIp,
-        'api_request',
-        null,
-        JSON.stringify({
-            channel,
-            confidence: result.confidence,
-            patterns: result.matches.map((m) => m.pattern),
-            contentPreview: content.slice(0, 200),
-        }),
-    );
+  recordAudit(
+    db,
+    'injection_blocked',
+    clientIp,
+    'api_request',
+    null,
+    JSON.stringify({
+      channel,
+      confidence: result.confidence,
+      patterns: result.matches.map((m) => m.pattern),
+      contentPreview: content.slice(0, 200),
+    }),
+  );
 
-    return new Response(
-        JSON.stringify({
-            error: 'Content policy violation',
-            code: 'INJECTION_BLOCKED',
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } },
-    );
+  return new Response(
+    JSON.stringify({
+      error: 'Content policy violation',
+      code: 'INJECTION_BLOCKED',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } },
+  );
 }

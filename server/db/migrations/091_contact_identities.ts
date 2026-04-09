@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 091: Add cross-platform contact identity mapping.
@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS contacts (
             id           TEXT PRIMARY KEY,
             tenant_id    TEXT NOT NULL DEFAULT '',
@@ -20,7 +20,7 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS contact_platform_links (
             id          TEXT PRIMARY KEY,
             tenant_id   TEXT NOT NULL DEFAULT '',
@@ -32,12 +32,14 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, display_name)`);
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_platform_links_unique ON contact_platform_links(tenant_id, platform, platform_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_contact_platform_links_contact ON contact_platform_links(contact_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, display_name)`);
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_platform_links_unique ON contact_platform_links(tenant_id, platform, platform_id)`,
+  );
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_contact_platform_links_contact ON contact_platform_links(contact_id)`);
 }
 
 export function down(db: Database): void {
-    db.exec(`DROP TABLE IF EXISTS contact_platform_links`);
-    db.exec(`DROP TABLE IF EXISTS contacts`);
+  db.exec(`DROP TABLE IF EXISTS contact_platform_links`);
+  db.exec(`DROP TABLE IF EXISTS contacts`);
 }

@@ -49,110 +49,112 @@ Key rotation:
 `.trim();
 
 async function main(): Promise<void> {
-    const args = process.argv.slice(2);
+  const args = process.argv.slice(2);
 
-    if (args.includes('--help') || args.includes('-h')) {
-        console.log(USAGE);
-        process.exit(0);
-    }
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(USAGE);
+    process.exit(0);
+  }
 
-    const dbPath = process.env.DB_PATH ?? './corvid-agent.db';
-    const network = process.env.ALGORAND_NETWORK ?? 'localnet';
+  const dbPath = process.env.DB_PATH ?? './corvid-agent.db';
+  const network = process.env.ALGORAND_NETWORK ?? 'localnet';
 
-    if (args.includes('--check')) {
-        await checkKeyConfig(dbPath, network);
-        return;
-    }
+  if (args.includes('--check')) {
+    await checkKeyConfig(dbPath, network);
+    return;
+  }
 
-    // Default: key rotation
-    await rotateKeys(dbPath, network);
+  // Default: key rotation
+  await rotateKeys(dbPath, network);
 }
 
 async function checkKeyConfig(dbPath: string, network: string): Promise<void> {
-    console.log('=== Wallet Key Configuration Check ===\n');
-    console.log(`Network:  ${network}`);
-    console.log(`DB path:  ${dbPath}`);
+  console.log('=== Wallet Key Configuration Check ===\n');
+  console.log(`Network:  ${network}`);
+  console.log(`DB path:  ${dbPath}`);
 
-    // Check encryption key source
-    const hasEnvKey = !!process.env.WALLET_ENCRYPTION_KEY?.trim();
-    const allowPlaintext = process.env.ALLOW_PLAINTEXT_KEYS === 'true' || process.env.ALLOW_PLAINTEXT_KEYS === '1';
+  // Check encryption key source
+  const hasEnvKey = !!process.env.WALLET_ENCRYPTION_KEY?.trim();
+  const allowPlaintext = process.env.ALLOW_PLAINTEXT_KEYS === 'true' || process.env.ALLOW_PLAINTEXT_KEYS === '1';
 
-    console.log(`\nKey source: ${hasEnvKey ? 'WALLET_ENCRYPTION_KEY (env var)' : 'default/server-mnemonic fallback'}`);
+  console.log(`\nKey source: ${hasEnvKey ? 'WALLET_ENCRYPTION_KEY (env var)' : 'default/server-mnemonic fallback'}`);
 
-    if (allowPlaintext) {
-        console.log('\n⚠  ALLOW_PLAINTEXT_KEYS is set but deprecated (#924). Remove it from your environment.');
-    }
+  if (allowPlaintext) {
+    console.log('\n⚠  ALLOW_PLAINTEXT_KEYS is set but deprecated (#924). Remove it from your environment.');
+  }
 
-    if (network === 'mainnet' && !hasEnvKey) {
-        console.log('\n⚠  WARNING: Server will refuse to start on mainnet without WALLET_ENCRYPTION_KEY.');
-        console.log('   Generate one with: openssl rand -hex 32');
-    }
+  if (network === 'mainnet' && !hasEnvKey) {
+    console.log('\n⚠  WARNING: Server will refuse to start on mainnet without WALLET_ENCRYPTION_KEY.');
+    console.log('   Generate one with: openssl rand -hex 32');
+  }
 
-    if (hasEnvKey) {
-        const keyLen = process.env.WALLET_ENCRYPTION_KEY!.trim().length;
-        console.log(`Key length: ${keyLen} chars${keyLen < 32 ? ' (WARNING: below 32-char minimum)' : ''}`);
-    }
+  if (hasEnvKey) {
+    const keyLen = process.env.WALLET_ENCRYPTION_KEY!.trim().length;
+    console.log(`Key length: ${keyLen} chars${keyLen < 32 ? ' (WARNING: below 32-char minimum)' : ''}`);
+  }
 
-    // Check keystore
-    const keystoreData = readKeystore();
-    const keystoreCount = Object.keys(keystoreData).length;
-    console.log(`\nKeystore entries: ${keystoreCount}`);
+  // Check keystore
+  const keystoreData = readKeystore();
+  const keystoreCount = Object.keys(keystoreData).length;
+  console.log(`\nKeystore entries: ${keystoreCount}`);
 
-    // Check DB
-    try {
-        const db = new Database(dbPath, { readonly: true });
-        const row = db.query('SELECT COUNT(*) as cnt FROM agents WHERE wallet_mnemonic_encrypted IS NOT NULL').get() as { cnt: number };
-        console.log(`DB encrypted wallets: ${row.cnt}`);
-        db.close();
-    } catch (err) {
-        console.log(`DB: could not open (${err instanceof Error ? err.message : String(err)})`);
-    }
+  // Check DB
+  try {
+    const db = new Database(dbPath, { readonly: true });
+    const row = db.query('SELECT COUNT(*) as cnt FROM agents WHERE wallet_mnemonic_encrypted IS NOT NULL').get() as {
+      cnt: number;
+    };
+    console.log(`DB encrypted wallets: ${row.cnt}`);
+    db.close();
+  } catch (err) {
+    console.log(`DB: could not open (${err instanceof Error ? err.message : String(err)})`);
+  }
 
-    console.log('\n=== Check complete ===');
+  console.log('\n=== Check complete ===');
 }
 
 async function rotateKeys(dbPath: string, network: string): Promise<void> {
-    const oldKey = process.env.WALLET_ENCRYPTION_KEY?.trim();
-    const newKey = process.env.WALLET_ENCRYPTION_KEY_NEW?.trim();
+  const oldKey = process.env.WALLET_ENCRYPTION_KEY?.trim();
+  const newKey = process.env.WALLET_ENCRYPTION_KEY_NEW?.trim();
 
-    if (!oldKey) {
-        console.error('ERROR: WALLET_ENCRYPTION_KEY must be set (current passphrase)');
-        process.exit(1);
+  if (!oldKey) {
+    console.error('ERROR: WALLET_ENCRYPTION_KEY must be set (current passphrase)');
+    process.exit(1);
+  }
+
+  if (!newKey) {
+    console.error('ERROR: WALLET_ENCRYPTION_KEY_NEW must be set (new passphrase)');
+    console.error('Generate one with: openssl rand -hex 32');
+    process.exit(1);
+  }
+
+  console.log('=== Wallet Encryption Key Rotation ===\n');
+  console.log(`Network: ${network}`);
+  console.log(`DB path: ${dbPath}`);
+  console.log(`New key length: ${newKey.length} chars`);
+  console.log('');
+
+  const db = new Database(dbPath);
+  try {
+    const result = await rotateWalletEncryptionKey(db, oldKey, newKey, network);
+
+    if (result.success) {
+      console.log('Key rotation successful!');
+      console.log(`  Agents rotated: ${result.agentsRotated}`);
+      console.log(`  Keystore entries rotated: ${result.keystoreEntriesRotated}`);
+      console.log('');
+      console.log('IMPORTANT: Update your WALLET_ENCRYPTION_KEY environment variable');
+      console.log('to the new passphrase value before restarting the server.');
+    } else {
+      console.error(`Key rotation FAILED: ${result.error}`);
+      process.exit(1);
     }
-
-    if (!newKey) {
-        console.error('ERROR: WALLET_ENCRYPTION_KEY_NEW must be set (new passphrase)');
-        console.error('Generate one with: openssl rand -hex 32');
-        process.exit(1);
-    }
-
-    console.log('=== Wallet Encryption Key Rotation ===\n');
-    console.log(`Network: ${network}`);
-    console.log(`DB path: ${dbPath}`);
-    console.log(`New key length: ${newKey.length} chars`);
-    console.log('');
-
-    const db = new Database(dbPath);
-    try {
-        const result = await rotateWalletEncryptionKey(db, oldKey, newKey, network);
-
-        if (result.success) {
-            console.log('Key rotation successful!');
-            console.log(`  Agents rotated: ${result.agentsRotated}`);
-            console.log(`  Keystore entries rotated: ${result.keystoreEntriesRotated}`);
-            console.log('');
-            console.log('IMPORTANT: Update your WALLET_ENCRYPTION_KEY environment variable');
-            console.log('to the new passphrase value before restarting the server.');
-        } else {
-            console.error(`Key rotation FAILED: ${result.error}`);
-            process.exit(1);
-        }
-    } finally {
-        db.close();
-    }
+  } finally {
+    db.close();
+  }
 }
 
 main().catch((err) => {
-    console.error('Fatal error:', err instanceof Error ? err.message : String(err));
-    process.exit(1);
+  console.error('Fatal error:', err instanceof Error ? err.message : String(err));
+  process.exit(1);
 });

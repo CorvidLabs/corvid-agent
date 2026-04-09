@@ -19,7 +19,7 @@ const log = createLogger('WalletKeystore');
 
 /** Read the keystore path lazily so env overrides work even with module caching. */
 export function getKeystorePath(): string {
-    return process.env.WALLET_KEYSTORE_PATH ?? './wallet-keystore.json';
+  return process.env.WALLET_KEYSTORE_PATH ?? './wallet-keystore.json';
 }
 
 /** Required file mode: owner read/write only (0o600). */
@@ -29,8 +29,8 @@ const REQUIRED_MODE = 0o600;
 const IS_WINDOWS = process.platform === 'win32';
 
 export interface KeystoreEntry {
-    address: string;
-    encryptedMnemonic: string;
+  address: string;
+  encryptedMnemonic: string;
 }
 
 export type KeystoreData = Record<string, KeystoreEntry>;
@@ -45,71 +45,72 @@ export type KeystoreData = Record<string, KeystoreEntry>;
  * entirely. Windows uses ACLs for file security instead.
  */
 function verifyFilePermissions(): boolean {
-    if (IS_WINDOWS) return true;
+  if (IS_WINDOWS) return true;
 
-    try {
-        const fs = require('node:fs') as typeof import('node:fs');
-        const path = getKeystorePath();
-        const stat = fs.statSync(path);
-        const mode = stat.mode & 0o777; // Extract permission bits
+  try {
+    const fs = require('node:fs') as typeof import('node:fs');
+    const path = getKeystorePath();
+    const stat = fs.statSync(path);
+    const mode = stat.mode & 0o777; // Extract permission bits
 
-        if (mode !== REQUIRED_MODE) {
-            log.warn('Keystore file has overly permissive permissions — fixing', {
-                path,
-                currentMode: '0o' + mode.toString(8),
-                requiredMode: '0o' + REQUIRED_MODE.toString(8),
-            });
-            // Auto-fix: tighten permissions
-            try {
-                fs.chmodSync(path, REQUIRED_MODE);
-                log.info('Fixed keystore file permissions', { mode: '0o' + REQUIRED_MODE.toString(8) });
-            } catch (chmodErr) {
-                log.error('Failed to fix keystore permissions — refusing to read', {
-                    error: chmodErr instanceof Error ? chmodErr.message : String(chmodErr),
-                });
-                return false;
-            }
-        }
-        return true;
-    } catch {
-        // File doesn't exist yet — that's fine
-        return true;
+    if (mode !== REQUIRED_MODE) {
+      log.warn('Keystore file has overly permissive permissions — fixing', {
+        path,
+        currentMode: `0o${mode.toString(8)}`,
+        requiredMode: `0o${REQUIRED_MODE.toString(8)}`,
+      });
+      // Auto-fix: tighten permissions
+      try {
+        fs.chmodSync(path, REQUIRED_MODE);
+        log.info('Fixed keystore file permissions', { mode: `0o${REQUIRED_MODE.toString(8)}` });
+      } catch (chmodErr) {
+        log.error('Failed to fix keystore permissions — refusing to read', {
+          error: chmodErr instanceof Error ? chmodErr.message : String(chmodErr),
+        });
+        return false;
+      }
     }
+    return true;
+  } catch {
+    // File doesn't exist yet — that's fine
+    return true;
+  }
 }
 
 export function readKeystore(): KeystoreData {
-    try {
-        if (!verifyFilePermissions()) {
-            return {};
-        }
-        const fs = require('node:fs') as typeof import('node:fs');
-        const text = fs.readFileSync(getKeystorePath(), 'utf-8');
-        const parsed = JSON.parse(text);
-
-        // Basic schema validation: must be a plain object with string-keyed entries
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-            log.error('Keystore file has invalid format (expected JSON object)');
-            return {};
-        }
-
-        // Validate each entry has the expected shape
-        const data: KeystoreData = {};
-        for (const [key, value] of Object.entries(parsed)) {
-            if (
-                typeof value === 'object' && value !== null &&
-                typeof (value as KeystoreEntry).address === 'string' &&
-                typeof (value as KeystoreEntry).encryptedMnemonic === 'string'
-            ) {
-                data[key] = value as KeystoreEntry;
-            } else {
-                log.warn(`Keystore entry "${key}" has invalid shape — skipping`);
-            }
-        }
-
-        return data;
-    } catch {
-        return {};
+  try {
+    if (!verifyFilePermissions()) {
+      return {};
     }
+    const fs = require('node:fs') as typeof import('node:fs');
+    const text = fs.readFileSync(getKeystorePath(), 'utf-8');
+    const parsed = JSON.parse(text);
+
+    // Basic schema validation: must be a plain object with string-keyed entries
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      log.error('Keystore file has invalid format (expected JSON object)');
+      return {};
+    }
+
+    // Validate each entry has the expected shape
+    const data: KeystoreData = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        typeof (value as KeystoreEntry).address === 'string' &&
+        typeof (value as KeystoreEntry).encryptedMnemonic === 'string'
+      ) {
+        data[key] = value as KeystoreEntry;
+      } else {
+        log.warn(`Keystore entry "${key}" has invalid shape — skipping`);
+      }
+    }
+
+    return data;
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -117,57 +118,57 @@ export function readKeystore(): KeystoreData {
  * This prevents corruption if the process crashes mid-write.
  */
 function writeKeystore(data: KeystoreData): void {
-    const path = getKeystorePath();
-    const tmpPath = path + '.tmp';
-    try {
-        const fs = require('node:fs') as typeof import('node:fs');
-        const content = JSON.stringify(data, null, 2);
+  const path = getKeystorePath();
+  const tmpPath = `${path}.tmp`;
+  try {
+    const fs = require('node:fs') as typeof import('node:fs');
+    const content = JSON.stringify(data, null, 2);
 
-        // Write to temp file with restrictive permissions from the start
-        // (mode option is ignored on Windows, but harmless to pass)
-        fs.writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: REQUIRED_MODE });
+    // Write to temp file with restrictive permissions from the start
+    // (mode option is ignored on Windows, but harmless to pass)
+    fs.writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: REQUIRED_MODE });
 
-        // Atomic rename
-        fs.renameSync(tmpPath, path);
+    // Atomic rename
+    fs.renameSync(tmpPath, path);
 
-        // Ensure final file has correct permissions (rename preserves source perms,
-        // but belt-and-suspenders for cross-platform safety).
-        // Skip on Windows where chmod is a no-op.
-        if (!IS_WINDOWS) {
-            fs.chmodSync(path, REQUIRED_MODE);
-        }
-    } catch (err) {
-        log.error('Failed to write wallet keystore', {
-            path,
-            error: err instanceof Error ? err.message : String(err),
-        });
-        // Clean up temp file on failure
-        try {
-            const fs = require('node:fs') as typeof import('node:fs');
-            fs.unlinkSync(tmpPath);
-        } catch {
-            // Ignore cleanup errors
-        }
+    // Ensure final file has correct permissions (rename preserves source perms,
+    // but belt-and-suspenders for cross-platform safety).
+    // Skip on Windows where chmod is a no-op.
+    if (!IS_WINDOWS) {
+      fs.chmodSync(path, REQUIRED_MODE);
     }
+  } catch (err) {
+    log.error('Failed to write wallet keystore', {
+      path,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // Clean up temp file on failure
+    try {
+      const fs = require('node:fs') as typeof import('node:fs');
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
 }
 
 export function getKeystoreEntry(agentName: string): KeystoreEntry | null {
-    const data = readKeystore();
-    return data[agentName] ?? null;
+  const data = readKeystore();
+  return data[agentName] ?? null;
 }
 
 export function saveKeystoreEntry(agentName: string, address: string, encryptedMnemonic: string): void {
-    const data = readKeystore();
-    data[agentName] = { address, encryptedMnemonic };
-    writeKeystore(data);
-    log.info(`Saved wallet to keystore for "${agentName}"`);
+  const data = readKeystore();
+  data[agentName] = { address, encryptedMnemonic };
+  writeKeystore(data);
+  log.info(`Saved wallet to keystore for "${agentName}"`);
 }
 
 export function removeKeystoreEntry(agentName: string): void {
-    const data = readKeystore();
-    if (agentName in data) {
-        delete data[agentName];
-        writeKeystore(data);
-        log.info(`Removed wallet from keystore for "${agentName}"`);
-    }
+  const data = readKeystore();
+  if (agentName in data) {
+    delete data[agentName];
+    writeKeystore(data);
+    log.info(`Removed wallet from keystore for "${agentName}"`);
+  }
 }

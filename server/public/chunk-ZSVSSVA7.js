@@ -1,2 +1,72 @@
-import{g as p,h as d}from"./chunk-G7DVZDMF.js";import"./chunk-GH246MXO.js";import"./chunk-GEI46CGR.js";import{Na as c,Ob as r,Pb as m,T as i,_a as s,pb as t,qb as e,zb as l}from"./chunk-LF4EWAJA.js";var _=class o{router=i(p);asciiIcon=["    \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557    ","    \u2551  \u2573    \u2573  \u2551    ","    \u2551    \u2584\u2584    \u2551    ","    \u2551   \u2571  \u2572   \u2551    ","    \u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D    ","     \u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551     ","   \u250C\u2500\u2518        \u2514\u2500\u2510  ","   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 "].join(`
-`);retry(){this.router.navigateByUrl(this.router.url)}static \u0275fac=function(n){return new(n||o)};static \u0275cmp=s({type:o,selectors:[["app-route-error"]],decls:16,vars:1,consts:[["role","alert","aria-live","assertive",1,"route-error"],["aria-hidden","true",1,"route-error__icon"],[1,"route-error__title"],["aria-hidden","true",1,"route-error__glitch"],[1,"route-error__desc"],[1,"route-error__actions"],["aria-label","Retry loading this route",1,"route-error__btn","route-error__btn--primary",3,"click"],["routerLink","/chat","aria-label","Go back to home",1,"route-error__btn","route-error__btn--secondary"],[1,"route-error__hint"]],template:function(n,a){n&1&&(t(0,"div",0)(1,"pre",1),r(2),e(),t(3,"h1",2)(4,"span",3),r(5,"ROUTE_FAULT"),e(),r(6," Route failed to load "),e(),t(7,"p",4),r(8," The requested module could not be resolved. This may be a network issue or a broken deployment. "),e(),t(9,"div",5)(10,"button",6),l("click",function(){return a.retry()}),r(11," > Retry "),e(),t(12,"a",7),r(13," > Go Home "),e()(),t(14,"p",8),r(15,"ERR::CHUNK_LOAD_FAILED"),e()()),n&2&&(c(2),m(a.asciiIcon))},dependencies:[d],styles:['[_nghost-%COMP%]{display:flex;align-items:center;justify-content:center;min-height:100%;padding:2rem}.route-error[_ngcontent-%COMP%]{display:flex;flex-direction:column;align-items:center;text-align:center;padding:3rem 2rem;max-width:480px;border:1px solid var(--accent-red, #ff3c5f);border-radius:var(--radius-lg, 12px);background:var(--bg-surface, #12131e);position:relative;overflow:hidden}.route-error[_ngcontent-%COMP%]:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,60,95,.03) 2px,rgba(255,60,95,.03) 4px);pointer-events:none}.route-error__icon[_ngcontent-%COMP%]{margin:0 0 1.5rem;font-family:monospace;font-size:.55rem;line-height:1.3;color:var(--accent-red, #ff3c5f);-webkit-user-select:none;user-select:none;animation:_ngcontent-%COMP%_glitchShift 4s ease-in-out infinite}@keyframes _ngcontent-%COMP%_glitchShift{0%,to{transform:translate(0)}20%{transform:translate(-2px,1px)}22%{transform:translate(2px,-1px)}24%{transform:translate(0)}70%{transform:translate(0)}72%{transform:translate(1px,2px)}74%{transform:translate(-1px,-1px)}76%{transform:translate(0)}}.route-error__title[_ngcontent-%COMP%]{margin:0 0 .75rem;font-size:1.1rem;font-weight:700;color:var(--text-primary, #e4e6f0);line-height:1.4}.route-error__glitch[_ngcontent-%COMP%]{display:block;font-size:.65rem;font-weight:600;font-family:monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--accent-red, #ff3c5f);margin-bottom:.25rem;animation:_ngcontent-%COMP%_glitchFlicker 3s steps(1) infinite}@keyframes _ngcontent-%COMP%_glitchFlicker{0%,to{opacity:1}42%{opacity:1}43%{opacity:.2}44%{opacity:1}85%{opacity:1}86%{opacity:.3}87%{opacity:1}}.route-error__desc[_ngcontent-%COMP%]{margin:0 0 1.75rem;font-size:.8rem;color:var(--text-secondary, #9498b3);max-width:360px;line-height:1.7}.route-error__actions[_ngcontent-%COMP%]{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}.route-error__btn[_ngcontent-%COMP%]{display:inline-block;padding:.6rem 1.25rem;border-radius:var(--radius, 8px);font-size:.8rem;font-weight:600;font-family:monospace;text-decoration:none;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s,transform .15s}.route-error__btn--primary[_ngcontent-%COMP%]{border:1px solid var(--accent-cyan, #00e5ff);background:transparent;color:var(--accent-cyan, #00e5ff)}.route-error__btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan, #00e5ff);color:var(--bg-deep, #0a0b14);box-shadow:var(--glow-cyan, 0 0 12px rgba(0, 229, 255, .35));transform:translateY(-1px)}.route-error__btn--primary[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.route-error__btn--secondary[_ngcontent-%COMP%]{border:1px solid var(--border, #2a2d45);background:transparent;color:var(--text-secondary, #9498b3)}.route-error__btn--secondary[_ngcontent-%COMP%]:hover{border-color:var(--text-secondary, #9498b3);color:var(--text-primary, #e4e6f0);transform:translateY(-1px)}.route-error__btn--secondary[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.route-error__btn[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan, #00e5ff);outline-offset:2px}.route-error__hint[_ngcontent-%COMP%]{margin:1.5rem 0 0;font-size:.6rem;font-family:monospace;color:var(--text-tertiary, #555770);letter-spacing:.1em}@media(prefers-reduced-motion:reduce){.route-error__icon[_ngcontent-%COMP%], .route-error__glitch[_ngcontent-%COMP%]{animation:none}.route-error__btn[_ngcontent-%COMP%]:hover, .route-error__btn[_ngcontent-%COMP%]:active{transform:none}}@media(max-width:767px){[_nghost-%COMP%]{padding:1.5rem}.route-error[_ngcontent-%COMP%]{padding:2rem 1.5rem}}'],changeDetection:0})};export{_ as RouteErrorComponent};
+import { h as d, g as p } from './chunk-G7DVZDMF.js';
+import './chunk-GH246MXO.js';
+import './chunk-GEI46CGR.js';
+import { Na as c, qb as e, T as i, zb as l, Pb as m, Ob as r, _a as s, pb as t } from './chunk-LF4EWAJA.js';
+
+var _ = class o {
+  router = i(p);
+  asciiIcon = [
+    '    \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557    ',
+    '    \u2551  \u2573    \u2573  \u2551    ',
+    '    \u2551    \u2584\u2584    \u2551    ',
+    '    \u2551   \u2571  \u2572   \u2551    ',
+    '    \u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D    ',
+    '     \u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551\u2551     ',
+    '   \u250C\u2500\u2518        \u2514\u2500\u2510  ',
+    '   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ',
+  ].join(`
+`);
+  retry() {
+    this.router.navigateByUrl(this.router.url);
+  }
+  static \u0275fac = (n) => new (n || o)();
+  static \u0275cmp = s({
+    type: o,
+    selectors: [['app-route-error']],
+    decls: 16,
+    vars: 1,
+    consts: [
+      ['role', 'alert', 'aria-live', 'assertive', 1, 'route-error'],
+      ['aria-hidden', 'true', 1, 'route-error__icon'],
+      [1, 'route-error__title'],
+      ['aria-hidden', 'true', 1, 'route-error__glitch'],
+      [1, 'route-error__desc'],
+      [1, 'route-error__actions'],
+      ['aria-label', 'Retry loading this route', 1, 'route-error__btn', 'route-error__btn--primary', 3, 'click'],
+      ['routerLink', '/chat', 'aria-label', 'Go back to home', 1, 'route-error__btn', 'route-error__btn--secondary'],
+      [1, 'route-error__hint'],
+    ],
+    template: (n, a) => {
+      n & 1 &&
+        (t(0, 'div', 0)(1, 'pre', 1),
+        r(2),
+        e(),
+        t(3, 'h1', 2)(4, 'span', 3),
+        r(5, 'ROUTE_FAULT'),
+        e(),
+        r(6, ' Route failed to load '),
+        e(),
+        t(7, 'p', 4),
+        r(8, ' The requested module could not be resolved. This may be a network issue or a broken deployment. '),
+        e(),
+        t(9, 'div', 5)(10, 'button', 6),
+        l('click', () => a.retry()),
+        r(11, ' > Retry '),
+        e(),
+        t(12, 'a', 7),
+        r(13, ' > Go Home '),
+        e()(),
+        t(14, 'p', 8),
+        r(15, 'ERR::CHUNK_LOAD_FAILED'),
+        e()()),
+        n & 2 && (c(2), m(a.asciiIcon));
+    },
+    dependencies: [d],
+    styles: [
+      '[_nghost-%COMP%]{display:flex;align-items:center;justify-content:center;min-height:100%;padding:2rem}.route-error[_ngcontent-%COMP%]{display:flex;flex-direction:column;align-items:center;text-align:center;padding:3rem 2rem;max-width:480px;border:1px solid var(--accent-red, #ff3c5f);border-radius:var(--radius-lg, 12px);background:var(--bg-surface, #12131e);position:relative;overflow:hidden}.route-error[_ngcontent-%COMP%]:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,60,95,.03) 2px,rgba(255,60,95,.03) 4px);pointer-events:none}.route-error__icon[_ngcontent-%COMP%]{margin:0 0 1.5rem;font-family:monospace;font-size:.55rem;line-height:1.3;color:var(--accent-red, #ff3c5f);-webkit-user-select:none;user-select:none;animation:_ngcontent-%COMP%_glitchShift 4s ease-in-out infinite}@keyframes _ngcontent-%COMP%_glitchShift{0%,to{transform:translate(0)}20%{transform:translate(-2px,1px)}22%{transform:translate(2px,-1px)}24%{transform:translate(0)}70%{transform:translate(0)}72%{transform:translate(1px,2px)}74%{transform:translate(-1px,-1px)}76%{transform:translate(0)}}.route-error__title[_ngcontent-%COMP%]{margin:0 0 .75rem;font-size:1.1rem;font-weight:700;color:var(--text-primary, #e4e6f0);line-height:1.4}.route-error__glitch[_ngcontent-%COMP%]{display:block;font-size:.65rem;font-weight:600;font-family:monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--accent-red, #ff3c5f);margin-bottom:.25rem;animation:_ngcontent-%COMP%_glitchFlicker 3s steps(1) infinite}@keyframes _ngcontent-%COMP%_glitchFlicker{0%,to{opacity:1}42%{opacity:1}43%{opacity:.2}44%{opacity:1}85%{opacity:1}86%{opacity:.3}87%{opacity:1}}.route-error__desc[_ngcontent-%COMP%]{margin:0 0 1.75rem;font-size:.8rem;color:var(--text-secondary, #9498b3);max-width:360px;line-height:1.7}.route-error__actions[_ngcontent-%COMP%]{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}.route-error__btn[_ngcontent-%COMP%]{display:inline-block;padding:.6rem 1.25rem;border-radius:var(--radius, 8px);font-size:.8rem;font-weight:600;font-family:monospace;text-decoration:none;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s,transform .15s}.route-error__btn--primary[_ngcontent-%COMP%]{border:1px solid var(--accent-cyan, #00e5ff);background:transparent;color:var(--accent-cyan, #00e5ff)}.route-error__btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan, #00e5ff);color:var(--bg-deep, #0a0b14);box-shadow:var(--glow-cyan, 0 0 12px rgba(0, 229, 255, .35));transform:translateY(-1px)}.route-error__btn--primary[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.route-error__btn--secondary[_ngcontent-%COMP%]{border:1px solid var(--border, #2a2d45);background:transparent;color:var(--text-secondary, #9498b3)}.route-error__btn--secondary[_ngcontent-%COMP%]:hover{border-color:var(--text-secondary, #9498b3);color:var(--text-primary, #e4e6f0);transform:translateY(-1px)}.route-error__btn--secondary[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.route-error__btn[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan, #00e5ff);outline-offset:2px}.route-error__hint[_ngcontent-%COMP%]{margin:1.5rem 0 0;font-size:.6rem;font-family:monospace;color:var(--text-tertiary, #555770);letter-spacing:.1em}@media(prefers-reduced-motion:reduce){.route-error__icon[_ngcontent-%COMP%], .route-error__glitch[_ngcontent-%COMP%]{animation:none}.route-error__btn[_ngcontent-%COMP%]:hover, .route-error__btn[_ngcontent-%COMP%]:active{transform:none}}@media(max-width:767px){[_nghost-%COMP%]{padding:1.5rem}.route-error[_ngcontent-%COMP%]{padding:2rem 1.5rem}}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { _ as RouteErrorComponent };

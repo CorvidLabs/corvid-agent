@@ -1,13 +1,13 @@
 /** AlgoChat messaging + PSK contact tables. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS algochat_allowlist (
+  `CREATE TABLE IF NOT EXISTS algochat_allowlist (
         address    TEXT PRIMARY KEY,
         label      TEXT DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS algochat_conversations (
+  `CREATE TABLE IF NOT EXISTS algochat_conversations (
         id               TEXT PRIMARY KEY,
         participant_addr TEXT NOT NULL,
         agent_id         TEXT REFERENCES agents(id),
@@ -16,7 +16,7 @@ export const tables: string[] = [
         created_at       TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS algochat_messages (
+  `CREATE TABLE IF NOT EXISTS algochat_messages (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         participant TEXT NOT NULL,
         content     TEXT NOT NULL,
@@ -27,7 +27,7 @@ export const tables: string[] = [
         created_at  TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS algochat_psk_state (
+  `CREATE TABLE IF NOT EXISTS algochat_psk_state (
         address           TEXT NOT NULL,
         network           TEXT NOT NULL DEFAULT 'testnet',
         initial_psk       BLOB NOT NULL,
@@ -41,7 +41,7 @@ export const tables: string[] = [
         PRIMARY KEY (address, network)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS psk_contacts (
+  `CREATE TABLE IF NOT EXISTS psk_contacts (
         id             TEXT PRIMARY KEY,
         nickname       TEXT NOT NULL,
         network        TEXT NOT NULL,
@@ -54,10 +54,10 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_conversations_created ON algochat_conversations(created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
-    `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
-    `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_conversations_created ON algochat_conversations(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
+  `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
+  `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
 ];

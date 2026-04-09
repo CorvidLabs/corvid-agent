@@ -1,1 +1,48 @@
-import{b as h}from"./chunk-D6WCRQHB.js";import{T as o,fc as r,ja as a,q as n}from"./chunk-LF4EWAJA.js";var p=class{api=o(h);entities=a([]);loading=a(!1);count=r(()=>this.entities().length);hasEntities=r(()=>this.entities().length>0);async load(){this.loading.set(!0);try{let t=await n(this.api.get(this.apiPath));this.entities.set(t)}finally{this.loading.set(!1)}}async getById(t){return n(this.api.get(`${this.apiPath}/${t}`))}async create(t){let i=await n(this.api.post(this.apiPath,t));return this.entities.update(e=>[...e,i]),i}async update(t,i){let e=await n(this.api.put(`${this.apiPath}/${t}`,i));return this.entities.update(s=>s.map(d=>d.id===t?e:d)),e}async remove(t){await n(this.api.delete(`${this.apiPath}/${t}`)),this.entities.update(i=>i.filter(e=>e.id!==t))}findById(t){return this.entities().find(i=>i.id===t)}upsert(t){this.entities.update(i=>{let e=i.findIndex(s=>s.id===t.id);if(e>=0){let s=[...i];return s[e]=t,s}return[t,...i]})}};export{p as a};
+import { b as h } from './chunk-D6WCRQHB.js';
+import { ja as a, q as n, T as o, fc as r } from './chunk-LF4EWAJA.js';
+
+var p = class {
+  api = o(h);
+  entities = a([]);
+  loading = a(!1);
+  count = r(() => this.entities().length);
+  hasEntities = r(() => this.entities().length > 0);
+  async load() {
+    this.loading.set(!0);
+    try {
+      const t = await n(this.api.get(this.apiPath));
+      this.entities.set(t);
+    } finally {
+      this.loading.set(!1);
+    }
+  }
+  async getById(t) {
+    return n(this.api.get(`${this.apiPath}/${t}`));
+  }
+  async create(t) {
+    const i = await n(this.api.post(this.apiPath, t));
+    return this.entities.update((e) => [...e, i]), i;
+  }
+  async update(t, i) {
+    const e = await n(this.api.put(`${this.apiPath}/${t}`, i));
+    return this.entities.update((s) => s.map((d) => (d.id === t ? e : d))), e;
+  }
+  async remove(t) {
+    await n(this.api.delete(`${this.apiPath}/${t}`)), this.entities.update((i) => i.filter((e) => e.id !== t));
+  }
+  findById(t) {
+    return this.entities().find((i) => i.id === t);
+  }
+  upsert(t) {
+    this.entities.update((i) => {
+      const e = i.findIndex((s) => s.id === t.id);
+      if (e >= 0) {
+        const s = [...i];
+        return (s[e] = t), s;
+      }
+      return [t, ...i];
+    });
+  }
+};
+
+export { p as a };

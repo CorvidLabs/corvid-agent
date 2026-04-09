@@ -141,7 +141,7 @@ export class BrowserService {
               ? ` "${(node.childNodes[0].textContent ?? '').trim().slice(0, 80)}"`
               : '';
           const href = node.getAttribute('href') ? ` href="${node.getAttribute('href')}"` : '';
-          lines.push('  '.repeat(depth) + `<${tag}${id}${cls}${href}>${text}`);
+          lines.push(`${'  '.repeat(depth)}<${tag}${id}${cls}${href}>${text}`);
           for (const child of node.children) walk(child, depth + 1);
         };
         walk(el, 0);
@@ -179,7 +179,7 @@ export class BrowserService {
       let count = 0;
       while (walker.nextNode() && count < 20) {
         const node = walker.currentNode;
-        if (node.textContent && node.textContent.toLowerCase().includes(q.toLowerCase())) {
+        if (node.textContent?.toLowerCase().includes(q.toLowerCase())) {
           const parent = node.parentElement;
           const tag = parent?.tagName.toLowerCase() ?? '?';
           matches.push(`[${count}] <${tag}> "${node.textContent.trim().slice(0, 100)}"`);

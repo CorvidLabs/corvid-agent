@@ -5,24 +5,25 @@
  * - policy.ts: Per-agent resource limits
  * - lifecycle-adapter.ts: Event-bus driven sandbox ↔ session wiring
  */
-import { test, expect, describe, beforeEach } from 'bun:test';
+
 import { Database } from 'bun:sqlite';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { runMigrations } from '../db/schema';
-import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
-import { DEFAULT_RESOURCE_LIMITS, DEFAULT_POOL_CONFIG } from '../sandbox/types';
-import { SandboxLifecycleAdapter } from '../sandbox/lifecycle-adapter';
 import { SessionEventBus } from '../process/event-bus';
+import { SandboxLifecycleAdapter } from '../sandbox/lifecycle-adapter';
+import { getAgentPolicy, listAgentPolicies, removeAgentPolicy, setAgentPolicy } from '../sandbox/policy';
+import { DEFAULT_POOL_CONFIG, DEFAULT_RESOURCE_LIMITS } from '../sandbox/types';
 
 // ─── DB Setup ───────────────────────────────────────────────────────────────
 
 let db: Database;
 
 function setupDb(): Database {
-    const d = new Database(':memory:');
-    runMigrations(d);
+  const d = new Database(':memory:');
+  runMigrations(d);
 
-    // Migration 40 tables
-    d.exec(`
+  // Migration 40 tables
+  d.exec(`
         CREATE TABLE IF NOT EXISTS sandbox_configs (
             id TEXT PRIMARY KEY,
             agent_id TEXT NOT NULL UNIQUE,
@@ -38,235 +39,235 @@ function setupDb(): Database {
         )
     `);
 
-    return d;
+  return d;
 }
 
 // ─── Policy Tests ────────────────────────────────────────────────────────────
 
 describe('Sandbox Policy', () => {
-    beforeEach(() => {
-        db = setupDb();
+  beforeEach(() => {
+    db = setupDb();
+  });
+
+  test('returns defaults for unconfigured agent', () => {
+    const policy = getAgentPolicy(db, 'agent-unknown');
+    expect(policy.cpuLimit).toBe(DEFAULT_RESOURCE_LIMITS.cpuLimit);
+    expect(policy.memoryLimitMb).toBe(DEFAULT_RESOURCE_LIMITS.memoryLimitMb);
+    expect(policy.networkPolicy).toBe(DEFAULT_RESOURCE_LIMITS.networkPolicy);
+    expect(policy.timeoutSeconds).toBe(DEFAULT_RESOURCE_LIMITS.timeoutSeconds);
+  });
+
+  test('setAgentPolicy creates new config', () => {
+    setAgentPolicy(db, 'agent-1', {
+      cpuLimit: 2.0,
+      memoryLimitMb: 1024,
     });
 
-    test('returns defaults for unconfigured agent', () => {
-        const policy = getAgentPolicy(db, 'agent-unknown');
-        expect(policy.cpuLimit).toBe(DEFAULT_RESOURCE_LIMITS.cpuLimit);
-        expect(policy.memoryLimitMb).toBe(DEFAULT_RESOURCE_LIMITS.memoryLimitMb);
-        expect(policy.networkPolicy).toBe(DEFAULT_RESOURCE_LIMITS.networkPolicy);
-        expect(policy.timeoutSeconds).toBe(DEFAULT_RESOURCE_LIMITS.timeoutSeconds);
-    });
+    const policy = getAgentPolicy(db, 'agent-1');
+    expect(policy.cpuLimit).toBe(2.0);
+    expect(policy.memoryLimitMb).toBe(1024);
+    // Defaults for unset values
+    expect(policy.networkPolicy).toBe('restricted');
+  });
 
-    test('setAgentPolicy creates new config', () => {
-        setAgentPolicy(db, 'agent-1', {
-            cpuLimit: 2.0,
-            memoryLimitMb: 1024,
-        });
+  test('setAgentPolicy updates existing config', () => {
+    setAgentPolicy(db, 'agent-1', { cpuLimit: 1.0 });
+    setAgentPolicy(db, 'agent-1', { cpuLimit: 4.0 });
 
-        const policy = getAgentPolicy(db, 'agent-1');
-        expect(policy.cpuLimit).toBe(2.0);
-        expect(policy.memoryLimitMb).toBe(1024);
-        // Defaults for unset values
-        expect(policy.networkPolicy).toBe('restricted');
-    });
+    const policy = getAgentPolicy(db, 'agent-1');
+    expect(policy.cpuLimit).toBe(4.0);
+  });
 
-    test('setAgentPolicy updates existing config', () => {
-        setAgentPolicy(db, 'agent-1', { cpuLimit: 1.0 });
-        setAgentPolicy(db, 'agent-1', { cpuLimit: 4.0 });
+  test('removeAgentPolicy removes config', () => {
+    setAgentPolicy(db, 'agent-1', { cpuLimit: 2.0 });
+    expect(removeAgentPolicy(db, 'agent-1')).toBe(true);
 
-        const policy = getAgentPolicy(db, 'agent-1');
-        expect(policy.cpuLimit).toBe(4.0);
-    });
+    const policy = getAgentPolicy(db, 'agent-1');
+    // Should be defaults again
+    expect(policy.cpuLimit).toBe(DEFAULT_RESOURCE_LIMITS.cpuLimit);
+  });
 
-    test('removeAgentPolicy removes config', () => {
-        setAgentPolicy(db, 'agent-1', { cpuLimit: 2.0 });
-        expect(removeAgentPolicy(db, 'agent-1')).toBe(true);
+  test('removeAgentPolicy returns false for non-existent', () => {
+    expect(removeAgentPolicy(db, 'nonexistent')).toBe(false);
+  });
 
-        const policy = getAgentPolicy(db, 'agent-1');
-        // Should be defaults again
-        expect(policy.cpuLimit).toBe(DEFAULT_RESOURCE_LIMITS.cpuLimit);
-    });
+  test('listAgentPolicies returns all configs', () => {
+    setAgentPolicy(db, 'agent-1', { cpuLimit: 1.0 });
+    setAgentPolicy(db, 'agent-2', { cpuLimit: 2.0 });
 
-    test('removeAgentPolicy returns false for non-existent', () => {
-        expect(removeAgentPolicy(db, 'nonexistent')).toBe(false);
-    });
-
-    test('listAgentPolicies returns all configs', () => {
-        setAgentPolicy(db, 'agent-1', { cpuLimit: 1.0 });
-        setAgentPolicy(db, 'agent-2', { cpuLimit: 2.0 });
-
-        const policies = listAgentPolicies(db);
-        expect(policies.length).toBe(2);
-    });
+    const policies = listAgentPolicies(db);
+    expect(policies.length).toBe(2);
+  });
 });
 
 // ─── Type Defaults Tests ─────────────────────────────────────────────────────
 
 describe('Sandbox Defaults', () => {
-    test('DEFAULT_RESOURCE_LIMITS has expected values', () => {
-        expect(DEFAULT_RESOURCE_LIMITS.cpuLimit).toBe(1.0);
-        expect(DEFAULT_RESOURCE_LIMITS.memoryLimitMb).toBe(512);
-        expect(DEFAULT_RESOURCE_LIMITS.networkPolicy).toBe('restricted');
-        expect(DEFAULT_RESOURCE_LIMITS.timeoutSeconds).toBe(600);
-        expect(DEFAULT_RESOURCE_LIMITS.pidsLimit).toBe(100);
-        expect(DEFAULT_RESOURCE_LIMITS.storageLimitMb).toBe(1024);
-    });
+  test('DEFAULT_RESOURCE_LIMITS has expected values', () => {
+    expect(DEFAULT_RESOURCE_LIMITS.cpuLimit).toBe(1.0);
+    expect(DEFAULT_RESOURCE_LIMITS.memoryLimitMb).toBe(512);
+    expect(DEFAULT_RESOURCE_LIMITS.networkPolicy).toBe('restricted');
+    expect(DEFAULT_RESOURCE_LIMITS.timeoutSeconds).toBe(600);
+    expect(DEFAULT_RESOURCE_LIMITS.pidsLimit).toBe(100);
+    expect(DEFAULT_RESOURCE_LIMITS.storageLimitMb).toBe(1024);
+  });
 
-    test('DEFAULT_POOL_CONFIG has expected values', () => {
-        expect(DEFAULT_POOL_CONFIG.warmPoolSize).toBe(2);
-        expect(DEFAULT_POOL_CONFIG.maxContainers).toBe(10);
-        expect(DEFAULT_POOL_CONFIG.idleTimeoutMs).toBe(300_000);
-        expect(DEFAULT_POOL_CONFIG.defaultImage).toBe('corvid-agent-sandbox:latest');
-    });
+  test('DEFAULT_POOL_CONFIG has expected values', () => {
+    expect(DEFAULT_POOL_CONFIG.warmPoolSize).toBe(2);
+    expect(DEFAULT_POOL_CONFIG.maxContainers).toBe(10);
+    expect(DEFAULT_POOL_CONFIG.idleTimeoutMs).toBe(300_000);
+    expect(DEFAULT_POOL_CONFIG.defaultImage).toBe('corvid-agent-sandbox:latest');
+  });
 });
 
 // ─── Container Module Tests (no Docker required) ─────────────────────────────
 
 describe('Container Module Exports', () => {
-    test('exports required functions', async () => {
-        const container = await import('../sandbox/container');
-        expect(typeof container.createContainer).toBe('function');
-        expect(typeof container.startContainer).toBe('function');
-        expect(typeof container.stopContainer).toBe('function');
-        expect(typeof container.removeContainer).toBe('function');
-        expect(typeof container.execInContainer).toBe('function');
-        expect(typeof container.getContainerStatus).toBe('function');
-        expect(typeof container.isDockerAvailable).toBe('function');
-        expect(typeof container.listSandboxContainers).toBe('function');
-    });
+  test('exports required functions', async () => {
+    const container = await import('../sandbox/container');
+    expect(typeof container.createContainer).toBe('function');
+    expect(typeof container.startContainer).toBe('function');
+    expect(typeof container.stopContainer).toBe('function');
+    expect(typeof container.removeContainer).toBe('function');
+    expect(typeof container.execInContainer).toBe('function');
+    expect(typeof container.getContainerStatus).toBe('function');
+    expect(typeof container.isDockerAvailable).toBe('function');
+    expect(typeof container.listSandboxContainers).toBe('function');
+  });
 });
 
 // ─── Manager Module Tests (no Docker required) ───────────────────────────────
 
 describe('SandboxManager', () => {
-    test('exports SandboxManager class', async () => {
-        const mod = await import('../sandbox/manager');
-        expect(typeof mod.SandboxManager).toBe('function');
-    });
+  test('exports SandboxManager class', async () => {
+    const mod = await import('../sandbox/manager');
+    expect(typeof mod.SandboxManager).toBe('function');
+  });
 
-    test('can instantiate with defaults', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb());
-        expect(manager.isEnabled()).toBe(false);
-    });
+  test('can instantiate with defaults', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb());
+    expect(manager.isEnabled()).toBe(false);
+  });
 
-    test('getPoolStats returns disabled state before init', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb());
-        const stats = manager.getPoolStats();
-        expect(stats.enabled).toBe(false);
-        expect(stats.total).toBe(0);
-        expect(stats.warm).toBe(0);
-        expect(stats.assigned).toBe(0);
-    });
+  test('getPoolStats returns disabled state before init', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb());
+    const stats = manager.getPoolStats();
+    expect(stats.enabled).toBe(false);
+    expect(stats.total).toBe(0);
+    expect(stats.warm).toBe(0);
+    expect(stats.assigned).toBe(0);
+  });
 
-    test('assignContainer throws when not enabled', async () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb());
+  test('assignContainer throws when not enabled', async () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb());
 
-        try {
-            await manager.assignContainer('agent-1', 'session-1');
-            expect(true).toBe(false); // Should not reach here
-        } catch (err: unknown) {
-            expect((err as Error).message).toContain('not enabled');
-        }
-    });
+    try {
+      await manager.assignContainer('agent-1', 'session-1');
+      expect(true).toBe(false); // Should not reach here
+    } catch (err: unknown) {
+      expect((err as Error).message).toContain('not enabled');
+    }
+  });
 
-    test('getContainerForSession returns null when no containers', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb());
-        expect(manager.getContainerForSession('session-1')).toBeNull();
-    });
+  test('getContainerForSession returns null when no containers', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb());
+    expect(manager.getContainerForSession('session-1')).toBeNull();
+  });
 
-    test('shutdown is idempotent', async () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb());
-        // Shutdown twice should not throw
-        await manager.shutdown();
-        await manager.shutdown();
-        expect(manager.isEnabled()).toBe(false);
-    });
+  test('shutdown is idempotent', async () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb());
+    // Shutdown twice should not throw
+    await manager.shutdown();
+    await manager.shutdown();
+    expect(manager.isEnabled()).toBe(false);
+  });
 
-    test('pool stats reflect maxContainers from config', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const manager = new SandboxManager(setupDb(), {
-            ...DEFAULT_POOL_CONFIG,
-            maxContainers: 5,
-        });
-        const stats = manager.getPoolStats();
-        expect(stats.maxContainers).toBe(5);
+  test('pool stats reflect maxContainers from config', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const manager = new SandboxManager(setupDb(), {
+      ...DEFAULT_POOL_CONFIG,
+      maxContainers: 5,
     });
+    const stats = manager.getPoolStats();
+    expect(stats.maxContainers).toBe(5);
+  });
 });
 
 // ─── SandboxLifecycleAdapter Tests ───────────────────────────────────────────
 
 describe('SandboxLifecycleAdapter', () => {
-    let testDb: Database;
+  let testDb: Database;
 
-    beforeEach(() => {
-        testDb = setupDb();
-    });
+  beforeEach(() => {
+    testDb = setupDb();
+  });
 
-    test('start subscribes to event bus', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const sm = new SandboxManager(testDb);
-        const eventBus = new SessionEventBus();
+  test('start subscribes to event bus', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const sm = new SandboxManager(testDb);
+    const eventBus = new SessionEventBus();
 
-        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
-        adapter.start();
+    const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+    adapter.start();
 
-        expect(eventBus.getGlobalSubscriberCount()).toBe(1);
-        adapter.stop();
-    });
+    expect(eventBus.getGlobalSubscriberCount()).toBe(1);
+    adapter.stop();
+  });
 
-    test('stop unsubscribes from event bus', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const sm = new SandboxManager(testDb);
-        const eventBus = new SessionEventBus();
+  test('stop unsubscribes from event bus', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const sm = new SandboxManager(testDb);
+    const eventBus = new SessionEventBus();
 
-        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
-        adapter.start();
-        adapter.stop();
+    const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+    adapter.start();
+    adapter.stop();
 
-        expect(eventBus.getGlobalSubscriberCount()).toBe(0);
-    });
+    expect(eventBus.getGlobalSubscriberCount()).toBe(0);
+  });
 
-    test('getSessionContainer returns null when no containers', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const sm = new SandboxManager(testDb);
-        const eventBus = new SessionEventBus();
+  test('getSessionContainer returns null when no containers', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const sm = new SandboxManager(testDb);
+    const eventBus = new SessionEventBus();
 
-        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
-        expect(adapter.getSessionContainer('session-1')).toBeNull();
-    });
+    const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+    expect(adapter.getSessionContainer('session-1')).toBeNull();
+  });
 
-    test('handles session events gracefully when sandbox not enabled', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const sm = new SandboxManager(testDb);
-        const eventBus = new SessionEventBus();
+  test('handles session events gracefully when sandbox not enabled', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const sm = new SandboxManager(testDb);
+    const eventBus = new SessionEventBus();
 
-        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
-        adapter.start();
+    const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+    adapter.start();
 
-        // Emit session events — should not throw (sandbox not enabled)
-        eventBus.emit('session-1', { type: 'session_started', session_id: 'session-1' } as any);
-        eventBus.emit('session-1', { type: 'session_stopped', session_id: 'session-1' } as any);
-        eventBus.emit('session-1', { type: 'session_exited', session_id: 'session-1' } as any);
+    // Emit session events — should not throw (sandbox not enabled)
+    eventBus.emit('session-1', { type: 'session_started', session_id: 'session-1' } as any);
+    eventBus.emit('session-1', { type: 'session_stopped', session_id: 'session-1' } as any);
+    eventBus.emit('session-1', { type: 'session_exited', session_id: 'session-1' } as any);
 
-        adapter.stop();
-    });
+    adapter.stop();
+  });
 
-    test('ignores non-lifecycle events', () => {
-        const { SandboxManager } = require('../sandbox/manager');
-        const sm = new SandboxManager(testDb);
-        const eventBus = new SessionEventBus();
+  test('ignores non-lifecycle events', () => {
+    const { SandboxManager } = require('../sandbox/manager');
+    const sm = new SandboxManager(testDb);
+    const eventBus = new SessionEventBus();
 
-        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
-        adapter.start();
+    const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+    adapter.start();
 
-        // Non-lifecycle events should be silently ignored
-        eventBus.emit('session-1', { type: 'assistant', session_id: 'session-1' } as any);
-        eventBus.emit('session-1', { type: 'tool_use', session_id: 'session-1' } as any);
+    // Non-lifecycle events should be silently ignored
+    eventBus.emit('session-1', { type: 'assistant', session_id: 'session-1' } as any);
+    eventBus.emit('session-1', { type: 'tool_use', session_id: 'session-1' } as any);
 
-        adapter.stop();
-    });
+    adapter.stop();
+  });
 });

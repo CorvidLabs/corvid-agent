@@ -1,22 +1,22 @@
 import type { Database } from 'bun:sqlite';
-import { statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import type { HealthStatus, DependencyHealth, HealthCheckResult } from './types';
-import { hasClaudeAccess } from '../providers/router';
+import { statSync } from 'node:fs';
 import type { AuthConfig } from '../middleware/auth';
-import { isApiKeyExpired, getApiKeyExpiryWarning } from '../middleware/auth';
+import { getApiKeyExpiryWarning, isApiKeyExpired } from '../middleware/auth';
+import { hasClaudeAccess } from '../providers/router';
+import type { DependencyHealth, HealthCheckResult, HealthStatus } from './types';
 
 export interface HealthCheckDeps {
-    db: Database;
-    startTime: number;
-    version: string;
-    getActiveSessions: () => string[];
-    isAlgoChatConnected: () => boolean;
-    isShuttingDown: () => boolean;
-    getSchedulerStats: () => Record<string, unknown>;
-    getMentionPollingStats: () => Record<string, unknown>;
-    getWorkflowStats: () => Record<string, unknown>;
-    getAuthConfig?: () => AuthConfig | null;
+  db: Database;
+  startTime: number;
+  version: string;
+  getActiveSessions: () => string[];
+  isAlgoChatConnected: () => boolean;
+  isShuttingDown: () => boolean;
+  getSchedulerStats: () => Record<string, unknown>;
+  getMentionPollingStats: () => Record<string, unknown>;
+  getWorkflowStats: () => Record<string, unknown>;
+  getAuthConfig?: () => AuthConfig | null;
 }
 
 /** Cached health check result with TTL. */
@@ -25,235 +25,252 @@ let cacheExpiry = 0;
 const CACHE_TTL_MS = 5_000; // 5-second TTL to prevent thundering herd
 
 async function checkDatabase(db: Database): Promise<DependencyHealth> {
-    const start = performance.now();
-    try {
-        const row = db.query('SELECT 1 AS ok').get() as { ok: number } | null;
-        const latency_ms = Math.round((performance.now() - start) * 100) / 100;
-        if (row?.ok === 1) {
-            return { status: 'healthy', latency_ms };
-        }
-        return { status: 'unhealthy', latency_ms, error: 'unexpected query result' };
-    } catch (err) {
-        const latency_ms = Math.round((performance.now() - start) * 100) / 100;
-        return { status: 'unhealthy', latency_ms, error: err instanceof Error ? err.message : String(err) };
+  const start = performance.now();
+  try {
+    const row = db.query('SELECT 1 AS ok').get() as { ok: number } | null;
+    const latency_ms = Math.round((performance.now() - start) * 100) / 100;
+    if (row?.ok === 1) {
+      return { status: 'healthy', latency_ms };
     }
+    return { status: 'unhealthy', latency_ms, error: 'unexpected query result' };
+  } catch (err) {
+    const latency_ms = Math.round((performance.now() - start) * 100) / 100;
+    return { status: 'unhealthy', latency_ms, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 async function checkGitHub(): Promise<DependencyHealth> {
-    const token = process.env.GH_TOKEN;
-    if (!token) {
-        return { status: 'healthy', configured: false };
+  const token = process.env.GH_TOKEN;
+  if (!token) {
+    return { status: 'healthy', configured: false };
+  }
+  const start = performance.now();
+  try {
+    const resp = await fetch('https://api.github.com/rate_limit', {
+      headers: { Authorization: `token ${token}`, 'User-Agent': 'corvid-agent' },
+      signal: AbortSignal.timeout(5_000),
+    });
+    const latency_ms = Math.round((performance.now() - start) * 100) / 100;
+    if (resp.ok) {
+      const data = (await resp.json()) as { rate?: { remaining?: number; limit?: number } };
+      return {
+        status: 'healthy',
+        latency_ms,
+        rate_limit_remaining: data.rate?.remaining,
+        rate_limit_total: data.rate?.limit,
+      };
     }
-    const start = performance.now();
-    try {
-        const resp = await fetch('https://api.github.com/rate_limit', {
-            headers: { Authorization: `token ${token}`, 'User-Agent': 'corvid-agent' },
-            signal: AbortSignal.timeout(5_000),
-        });
-        const latency_ms = Math.round((performance.now() - start) * 100) / 100;
-        if (resp.ok) {
-            const data = (await resp.json()) as { rate?: { remaining?: number; limit?: number } };
-            return {
-                status: 'healthy',
-                latency_ms,
-                rate_limit_remaining: data.rate?.remaining,
-                rate_limit_total: data.rate?.limit,
-            };
-        }
-        return { status: 'degraded', latency_ms, error: `HTTP ${resp.status}` };
-    } catch (err) {
-        const latency_ms = Math.round((performance.now() - start) * 100) / 100;
-        return { status: 'degraded', latency_ms, error: err instanceof Error ? err.message : String(err) };
-    }
+    return { status: 'degraded', latency_ms, error: `HTTP ${resp.status}` };
+  } catch (err) {
+    const latency_ms = Math.round((performance.now() - start) * 100) / 100;
+    return { status: 'degraded', latency_ms, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 async function checkAlgorand(isConnected: boolean): Promise<DependencyHealth> {
-    if (!isConnected) {
-        return { status: 'healthy', configured: false };
-    }
-    return { status: 'healthy', configured: true };
+  if (!isConnected) {
+    return { status: 'healthy', configured: false };
+  }
+  return { status: 'healthy', configured: true };
 }
 
 async function checkLlmProviders(): Promise<DependencyHealth> {
-    const hasAnthropic = hasClaudeAccess();
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+  const hasAnthropic = hasClaudeAccess();
+  const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
-    // Check Ollama connectivity (lightweight, local)
-    let ollamaStatus: 'healthy' | 'unhealthy' = 'unhealthy';
-    try {
-        const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
-        if (resp.ok) ollamaStatus = 'healthy';
-    } catch {
-        // Ollama not running is fine if Anthropic is available
-    }
+  // Check Ollama connectivity (lightweight, local)
+  let ollamaStatus: 'healthy' | 'unhealthy' = 'unhealthy';
+  try {
+    const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
+    if (resp.ok) ollamaStatus = 'healthy';
+  } catch {
+    // Ollama not running is fine if Anthropic is available
+  }
 
-    if (hasAnthropic || ollamaStatus === 'healthy') {
-        return {
-            status: 'healthy',
-            anthropic: hasAnthropic ? 'healthy' : 'not_configured',
-            ollama: ollamaStatus,
-        };
-    }
+  if (hasAnthropic || ollamaStatus === 'healthy') {
     return {
-        status: 'degraded',
-        error: 'no LLM provider available',
-        anthropic: 'not_configured',
-        ollama: ollamaStatus,
+      status: 'healthy',
+      anthropic: hasAnthropic ? 'healthy' : 'not_configured',
+      ollama: ollamaStatus,
     };
+  }
+  return {
+    status: 'degraded',
+    error: 'no LLM provider available',
+    anthropic: 'not_configured',
+    ollama: ollamaStatus,
+  };
 }
 
 function checkDiskAndWal(db: Database): DependencyHealth {
+  try {
+    let walSizeBytes = 0;
     try {
-        let walSizeBytes = 0;
+      const dbPath = (db.query('PRAGMA database_list').all() as Array<{ file: string }>)[0]?.file;
+      if (dbPath) {
         try {
-            const dbPath = (db.query("PRAGMA database_list").all() as Array<{ file: string }>)[0]?.file;
-            if (dbPath) {
-                try { walSizeBytes = statSync(dbPath + '-wal').size; } catch { /* no WAL file */ }
-            }
-        } catch { /* ignore */ }
-
-        let freeBytes = -1;
-        try {
-            const cmd = process.platform === 'win32'
-                ? 'wmic logicaldisk where "DeviceID=C:" get FreeSpace /value 2>nul'
-                : 'df -k . 2>/dev/null | tail -1';
-            const output = execSync(cmd, { encoding: 'utf-8', timeout: 3000 });
-            if (process.platform === 'win32') {
-                const match = output.match(/FreeSpace=(\d+)/);
-                freeBytes = match ? parseInt(match[1], 10) : -1;
-            } else {
-                const parts = output.trim().split(/\s+/);
-                freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
-            }
-        } catch { /* ignore — disk check unavailable */ }
-
-        const freeMB = freeBytes >= 0 ? Math.round(freeBytes / (1024 * 1024)) : -1;
-        const walMB = Math.round(walSizeBytes / (1024 * 1024) * 100) / 100;
-
-        if (freeMB < 0) {
-            // Disk check unavailable (e.g. command not found) — not a health issue
-            return walMB > 100
-                ? { status: 'degraded', warning: `Large WAL (${walMB}MB), disk check unavailable`, wal_mb: walMB }
-                : { status: 'healthy', free_mb: 'unknown', wal_mb: walMB };
+          walSizeBytes = statSync(`${dbPath}-wal`).size;
+        } catch {
+          /* no WAL file */
         }
-        if (freeMB < 100) {
-            return { status: 'unhealthy', error: `Critical: only ${freeMB}MB disk free`, free_mb: freeMB, wal_mb: walMB };
-        }
-        if (freeMB < 500 || walMB > 100) {
-            return { status: 'degraded', warning: `Low disk (${freeMB}MB free) or large WAL (${walMB}MB)`, free_mb: freeMB, wal_mb: walMB };
-        }
-        return { status: 'healthy', free_mb: freeMB, wal_mb: walMB };
-    } catch (err) {
-        return { status: 'degraded', error: err instanceof Error ? err.message : String(err) };
+      }
+    } catch {
+      /* ignore */
     }
+
+    let freeBytes = -1;
+    try {
+      const cmd =
+        process.platform === 'win32'
+          ? 'wmic logicaldisk where "DeviceID=C:" get FreeSpace /value 2>nul'
+          : 'df -k . 2>/dev/null | tail -1';
+      const output = execSync(cmd, { encoding: 'utf-8', timeout: 3000 });
+      if (process.platform === 'win32') {
+        const match = output.match(/FreeSpace=(\d+)/);
+        freeBytes = match ? parseInt(match[1], 10) : -1;
+      } else {
+        const parts = output.trim().split(/\s+/);
+        freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
+      }
+    } catch {
+      /* ignore — disk check unavailable */
+    }
+
+    const freeMB = freeBytes >= 0 ? Math.round(freeBytes / (1024 * 1024)) : -1;
+    const walMB = Math.round((walSizeBytes / (1024 * 1024)) * 100) / 100;
+
+    if (freeMB < 0) {
+      // Disk check unavailable (e.g. command not found) — not a health issue
+      return walMB > 100
+        ? { status: 'degraded', warning: `Large WAL (${walMB}MB), disk check unavailable`, wal_mb: walMB }
+        : { status: 'healthy', free_mb: 'unknown', wal_mb: walMB };
+    }
+    if (freeMB < 100) {
+      return { status: 'unhealthy', error: `Critical: only ${freeMB}MB disk free`, free_mb: freeMB, wal_mb: walMB };
+    }
+    if (freeMB < 500 || walMB > 100) {
+      return {
+        status: 'degraded',
+        warning: `Low disk (${freeMB}MB free) or large WAL (${walMB}MB)`,
+        free_mb: freeMB,
+        wal_mb: walMB,
+      };
+    }
+    return { status: 'healthy', free_mb: freeMB, wal_mb: walMB };
+  } catch (err) {
+    return { status: 'degraded', error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 function checkApiKey(getAuthConfig?: () => AuthConfig | null): DependencyHealth {
-    if (!getAuthConfig) {
-        return { status: 'healthy', configured: false };
-    }
-    const config = getAuthConfig();
-    if (!config || !config.apiKey) {
-        return { status: 'healthy', configured: false };
-    }
-    if (!config.apiKeyExpiresAt) {
-        return { status: 'healthy', configured: true, expiry: 'none' };
-    }
+  if (!getAuthConfig) {
+    return { status: 'healthy', configured: false };
+  }
+  const config = getAuthConfig();
+  if (!config?.apiKey) {
+    return { status: 'healthy', configured: false };
+  }
+  if (!config.apiKeyExpiresAt) {
+    return { status: 'healthy', configured: true, expiry: 'none' };
+  }
 
-    if (isApiKeyExpired(config)) {
-        return { status: 'unhealthy', error: 'API key expired — rotation required' };
-    }
+  if (isApiKeyExpired(config)) {
+    return { status: 'unhealthy', error: 'API key expired — rotation required' };
+  }
 
-    const warning = getApiKeyExpiryWarning(config);
-    if (warning) {
-        const daysRemaining = Math.ceil((config.apiKeyExpiresAt - Date.now()) / (24 * 60 * 60 * 1000));
-        return { status: 'degraded', warning, days_remaining: daysRemaining };
-    }
+  const warning = getApiKeyExpiryWarning(config);
+  if (warning) {
+    const daysRemaining = Math.ceil((config.apiKeyExpiresAt - Date.now()) / (24 * 60 * 60 * 1000));
+    return { status: 'degraded', warning, days_remaining: daysRemaining };
+  }
 
-    return { status: 'healthy', configured: true };
+  return { status: 'healthy', configured: true };
 }
 
 function deriveOverallStatus(deps: Record<string, DependencyHealth>): HealthStatus {
-    let hasDegraded = false;
-    for (const dep of Object.values(deps)) {
-        // Database is critical - if it's unhealthy, the whole system is unhealthy
-        if (dep.status === 'unhealthy') return 'unhealthy';
-        if (dep.status === 'degraded') hasDegraded = true;
-    }
-    return hasDegraded ? 'degraded' : 'healthy';
+  let hasDegraded = false;
+  for (const dep of Object.values(deps)) {
+    // Database is critical - if it's unhealthy, the whole system is unhealthy
+    if (dep.status === 'unhealthy') return 'unhealthy';
+    if (dep.status === 'degraded') hasDegraded = true;
+  }
+  return hasDegraded ? 'degraded' : 'healthy';
 }
 
 export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheckResult> {
-    const now = Date.now();
-    if (cachedResult && now < cacheExpiry) {
-        return cachedResult;
-    }
+  const now = Date.now();
+  if (cachedResult && now < cacheExpiry) {
+    return cachedResult;
+  }
 
-    const [database, github, algorand, llm] = await Promise.all([
-        checkDatabase(deps.db),
-        checkGitHub(),
-        checkAlgorand(deps.isAlgoChatConnected()),
-        checkLlmProviders(),
-    ]);
+  const [database, github, algorand, llm] = await Promise.all([
+    checkDatabase(deps.db),
+    checkGitHub(),
+    checkAlgorand(deps.isAlgoChatConnected()),
+    checkLlmProviders(),
+  ]);
 
-    const apiKey = checkApiKey(deps.getAuthConfig);
-    const diskWal = checkDiskAndWal(deps.db);
+  const apiKey = checkApiKey(deps.getAuthConfig);
+  const diskWal = checkDiskAndWal(deps.db);
 
-    const dependencies: Record<string, DependencyHealth> = {
-        database,
-        github,
-        algorand,
-        llm,
-        apiKey,
-        diskWal,
-    };
+  const dependencies: Record<string, DependencyHealth> = {
+    database,
+    github,
+    algorand,
+    llm,
+    apiKey,
+    diskWal,
+  };
 
-    const derivedStatus = deps.isShuttingDown() ? 'unhealthy' as HealthStatus : deriveOverallStatus(dependencies);
+  const derivedStatus = deps.isShuttingDown() ? ('unhealthy' as HealthStatus) : deriveOverallStatus(dependencies);
 
-    const result: HealthCheckResult = {
-        status: derivedStatus,
-        version: deps.version,
-        uptime: Math.round((now - deps.startTime) / 1000),
-        timestamp: new Date(now).toISOString(),
-        tryMode: process.env.TRY_MODE === 'true',
-        dependencies,
-    };
+  const result: HealthCheckResult = {
+    status: derivedStatus,
+    version: deps.version,
+    uptime: Math.round((now - deps.startTime) / 1000),
+    timestamp: new Date(now).toISOString(),
+    tryMode: process.env.TRY_MODE === 'true',
+    dependencies,
+  };
 
-    cachedResult = result;
-    cacheExpiry = now + CACHE_TTL_MS;
+  cachedResult = result;
+  cacheExpiry = now + CACHE_TTL_MS;
 
-    return result;
+  return result;
 }
 
 /** Liveness check - is the process alive and able to respond? */
 export function getLivenessCheck(): { status: 'ok' } {
-    return { status: 'ok' };
+  return { status: 'ok' };
 }
 
 /** Readiness check - is the service ready to accept traffic? */
-export function getReadinessCheck(deps: HealthCheckDeps): { status: 'ready' | 'not_ready'; checks: Record<string, boolean> } {
-    let dbReady = false;
-    try {
-        const row = deps.db.query('SELECT 1 AS ok').get() as { ok: number } | null;
-        dbReady = row?.ok === 1;
-    } catch {
-        dbReady = false;
-    }
+export function getReadinessCheck(deps: HealthCheckDeps): {
+  status: 'ready' | 'not_ready';
+  checks: Record<string, boolean>;
+} {
+  let dbReady = false;
+  try {
+    const row = deps.db.query('SELECT 1 AS ok').get() as { ok: number } | null;
+    dbReady = row?.ok === 1;
+  } catch {
+    dbReady = false;
+  }
 
-    const checks = {
-        database: dbReady,
-        not_shutting_down: !deps.isShuttingDown(),
-    };
-    const allReady = Object.values(checks).every(Boolean);
+  const checks = {
+    database: dbReady,
+    not_shutting_down: !deps.isShuttingDown(),
+  };
+  const allReady = Object.values(checks).every(Boolean);
 
-    return {
-        status: allReady ? 'ready' : 'not_ready',
-        checks,
-    };
+  return {
+    status: allReady ? 'ready' : 'not_ready',
+    checks,
+  };
 }
 
 /** Reset the cache (for testing). */
 export function resetHealthCache(): void {
-    cachedResult = null;
-    cacheExpiry = 0;
+  cachedResult = null;
+  cacheExpiry = 0;
 }

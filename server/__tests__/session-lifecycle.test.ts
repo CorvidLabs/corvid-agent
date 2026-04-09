@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { runMigrations } from '../db/schema';
 import { SessionLifecycleManager } from '../process/session-lifecycle';
 
@@ -14,294 +14,302 @@ let db: Database;
 let manager: SessionLifecycleManager;
 
 function insertProject(id = 'proj-1') {
-    db.query("INSERT OR IGNORE INTO projects (id, name, working_dir) VALUES (?, ?, '/tmp')").run(id, `Project-${id}`);
+  db.query("INSERT OR IGNORE INTO projects (id, name, working_dir) VALUES (?, ?, '/tmp')").run(id, `Project-${id}`);
 }
 
 function insertSession(id: string, projectId = 'proj-1', status = 'idle', updatedAt?: string) {
-    db.query(
-        "INSERT INTO sessions (id, project_id, status, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), ?)",
-    ).run(id, projectId, status, updatedAt ?? new Date().toISOString().replace('T', ' ').replace('Z', ''));
+  db.query(
+    "INSERT INTO sessions (id, project_id, status, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), ?)",
+  ).run(id, projectId, status, updatedAt ?? new Date().toISOString().replace('T', ' ').replace('Z', ''));
 }
 
 function insertSessionMessage(sessionId: string, content = 'test') {
-    db.query(
-        "INSERT INTO session_messages (session_id, role, content) VALUES (?, 'user', ?)",
-    ).run(sessionId, content);
+  db.query("INSERT INTO session_messages (session_id, role, content) VALUES (?, 'user', ?)").run(sessionId, content);
 }
 
 function countSessions(): number {
-    return (db.query('SELECT COUNT(*) as c FROM sessions').get() as { c: number }).c;
+  return (db.query('SELECT COUNT(*) as c FROM sessions').get() as { c: number }).c;
 }
 
 function countMessages(): number {
-    return (db.query('SELECT COUNT(*) as c FROM session_messages').get() as { c: number }).c;
+  return (db.query('SELECT COUNT(*) as c FROM session_messages').get() as { c: number }).c;
 }
 
 beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec('PRAGMA foreign_keys = ON');
-    runMigrations(db);
-    insertProject('proj-1');
-    insertProject('proj-2');
+  db = new Database(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  runMigrations(db);
+  insertProject('proj-1');
+  insertProject('proj-2');
 });
 
 afterEach(() => {
-    manager?.stop();
-    db.close();
+  manager?.stop();
+  db.close();
 });
 
 // ─── runCleanup ────────────────────────────────────────────────────────────
 
 describe('runCleanup', () => {
-    it('removes expired sessions older than TTL', async () => {
-        manager = new SessionLifecycleManager(db, { sessionTtlMs: 1000, cleanupIntervalMs: 999999 });
+  it('removes expired sessions older than TTL', async () => {
+    manager = new SessionLifecycleManager(db, { sessionTtlMs: 1000, cleanupIntervalMs: 999999 });
 
-        // Insert a session with old updated_at
-        const oldDate = new Date(Date.now() - 10_000).toISOString().replace('T', ' ').replace('Z', '');
-        insertSession('old-sess', 'proj-1', 'idle', oldDate);
-        insertSessionMessage('old-sess');
+    // Insert a session with old updated_at
+    const oldDate = new Date(Date.now() - 10_000).toISOString().replace('T', ' ').replace('Z', '');
+    insertSession('old-sess', 'proj-1', 'idle', oldDate);
+    insertSessionMessage('old-sess');
 
-        // Insert a recent session
-        insertSession('new-sess', 'proj-1', 'idle');
+    // Insert a recent session
+    insertSession('new-sess', 'proj-1', 'idle');
 
-        expect(countSessions()).toBe(2);
-        expect(countMessages()).toBe(1);
+    expect(countSessions()).toBe(2);
+    expect(countMessages()).toBe(1);
 
-        await manager.runCleanup();
+    await manager.runCleanup();
 
-        // Old session and its messages should be gone
-        // Note: The cleanup uses SQLite datetime comparison, which may not work perfectly
-        // with in-memory tests due to timing. But the recent session should survive.
-        expect(countSessions()).toBeGreaterThanOrEqual(1);
-    });
+    // Old session and its messages should be gone
+    // Note: The cleanup uses SQLite datetime comparison, which may not work perfectly
+    // with in-memory tests due to timing. But the recent session should survive.
+    expect(countSessions()).toBeGreaterThanOrEqual(1);
+  });
 
-    it('removes orphaned messages with no parent session', async () => {
-        manager = new SessionLifecycleManager(db, { sessionTtlMs: 999999, cleanupIntervalMs: 999999 });
+  it('removes orphaned messages with no parent session', async () => {
+    manager = new SessionLifecycleManager(db, { sessionTtlMs: 999999, cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1', 'idle');
-        insertSessionMessage('sess-1');
+    insertSession('sess-1', 'proj-1', 'idle');
+    insertSessionMessage('sess-1');
 
-        // Insert orphaned message (no matching session) — need to disable FK for this
-        db.exec('PRAGMA foreign_keys = OFF');
-        db.query("INSERT INTO session_messages (session_id, role, content) VALUES ('ghost', 'user', 'orphan')").run();
-        db.exec('PRAGMA foreign_keys = ON');
+    // Insert orphaned message (no matching session) — need to disable FK for this
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.query("INSERT INTO session_messages (session_id, role, content) VALUES ('ghost', 'user', 'orphan')").run();
+    db.exec('PRAGMA foreign_keys = ON');
 
-        expect(countMessages()).toBe(2);
+    expect(countMessages()).toBe(2);
 
-        await manager.runCleanup();
+    await manager.runCleanup();
 
-        // Orphaned message should be removed
-        expect(countMessages()).toBe(1);
-    });
+    // Orphaned message should be removed
+    expect(countMessages()).toBe(1);
+  });
 });
 
 // ─── canCreateSession ──────────────────────────────────────────────────────
 
 describe('canCreateSession', () => {
-    it('returns true when under limit', () => {
-        manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 5, cleanupIntervalMs: 999999 });
+  it('returns true when under limit', () => {
+    manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 5, cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1');
-        insertSession('sess-2', 'proj-1');
+    insertSession('sess-1', 'proj-1');
+    insertSession('sess-2', 'proj-1');
 
-        expect(manager.canCreateSession('proj-1')).toBe(true);
-    });
+    expect(manager.canCreateSession('proj-1')).toBe(true);
+  });
 
-    it('returns false when at limit', () => {
-        manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 2, cleanupIntervalMs: 999999 });
+  it('returns false when at limit', () => {
+    manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 2, cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1');
-        insertSession('sess-2', 'proj-1');
+    insertSession('sess-1', 'proj-1');
+    insertSession('sess-2', 'proj-1');
 
-        expect(manager.canCreateSession('proj-1')).toBe(false);
-    });
+    expect(manager.canCreateSession('proj-1')).toBe(false);
+  });
 
-    it('checks per-project, not global', () => {
-        manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 2, cleanupIntervalMs: 999999 });
+  it('checks per-project, not global', () => {
+    manager = new SessionLifecycleManager(db, { maxSessionsPerProject: 2, cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1');
-        insertSession('sess-2', 'proj-1');
-        insertSession('sess-3', 'proj-2');
+    insertSession('sess-1', 'proj-1');
+    insertSession('sess-2', 'proj-1');
+    insertSession('sess-3', 'proj-2');
 
-        expect(manager.canCreateSession('proj-1')).toBe(false);
-        expect(manager.canCreateSession('proj-2')).toBe(true);
-    });
+    expect(manager.canCreateSession('proj-1')).toBe(false);
+    expect(manager.canCreateSession('proj-2')).toBe(true);
+  });
 });
 
 // ─── cleanupSession ────────────────────────────────────────────────────────
 
 describe('cleanupSession', () => {
-    it('deletes a specific session and its messages', async () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('deletes a specific session and its messages', async () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1');
-        insertSession('sess-2', 'proj-1');
-        insertSessionMessage('sess-1');
-        insertSessionMessage('sess-1');
-        insertSessionMessage('sess-2');
+    insertSession('sess-1', 'proj-1');
+    insertSession('sess-2', 'proj-1');
+    insertSessionMessage('sess-1');
+    insertSessionMessage('sess-1');
+    insertSessionMessage('sess-2');
 
-        const result = await manager.cleanupSession('sess-1');
+    const result = await manager.cleanupSession('sess-1');
 
-        expect(result).toBe(true);
-        expect(countSessions()).toBe(1);
-        expect(countMessages()).toBe(1); // Only sess-2's message remains
-    });
+    expect(result).toBe(true);
+    expect(countSessions()).toBe(1);
+    expect(countMessages()).toBe(1); // Only sess-2's message remains
+  });
 
-    it('returns false for non-existent session', async () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('returns false for non-existent session', async () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        const result = await manager.cleanupSession('nonexistent');
-        expect(result).toBe(false);
-    });
+    const result = await manager.cleanupSession('nonexistent');
+    expect(result).toBe(false);
+  });
 
-    it('deletes escalation queue entries for the session', async () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('deletes escalation queue entries for the session', async () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1');
-        db.query(
-            "INSERT INTO escalation_queue (session_id, tool_name, tool_input, status) VALUES ('sess-1', 'Bash', '{\"cmd\":\"rm -rf\"}', 'pending')",
-        ).run();
+    insertSession('sess-1', 'proj-1');
+    db.query(
+      "INSERT INTO escalation_queue (session_id, tool_name, tool_input, status) VALUES ('sess-1', 'Bash', '{\"cmd\":\"rm -rf\"}', 'pending')",
+    ).run();
 
-        const queueBefore = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
-        expect(queueBefore).toBe(1);
+    const queueBefore = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+    expect(queueBefore).toBe(1);
 
-        await manager.cleanupSession('sess-1');
+    await manager.cleanupSession('sess-1');
 
-        const queueAfter = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
-        expect(queueAfter).toBe(0);
-    });
+    const queueAfter = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+    expect(queueAfter).toBe(0);
+  });
 });
 
 // ─── getStats ──────────────────────────────────────────────────────────────
 
 describe('getStats', () => {
-    it('returns correct counts with no sessions', () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('returns correct counts with no sessions', () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        const stats = manager.getStats();
-        expect(stats.totalSessions).toBe(0);
-        expect(stats.activeSessions).toBe(0);
-        expect(stats.sessionsByStatus).toEqual({});
-        expect(stats.oldestSessionAge).toBe(0);
-    });
+    const stats = manager.getStats();
+    expect(stats.totalSessions).toBe(0);
+    expect(stats.activeSessions).toBe(0);
+    expect(stats.sessionsByStatus).toEqual({});
+    expect(stats.oldestSessionAge).toBe(0);
+  });
 
-    it('returns correct counts by status', () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('returns correct counts by status', () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1', 'idle');
-        insertSession('sess-2', 'proj-1', 'running');
-        insertSession('sess-3', 'proj-1', 'running');
-        insertSession('sess-4', 'proj-2', 'error');
+    insertSession('sess-1', 'proj-1', 'idle');
+    insertSession('sess-2', 'proj-1', 'running');
+    insertSession('sess-3', 'proj-1', 'running');
+    insertSession('sess-4', 'proj-2', 'error');
 
-        const stats = manager.getStats();
-        expect(stats.totalSessions).toBe(4);
-        expect(stats.sessionsByStatus.idle).toBe(1);
-        expect(stats.sessionsByStatus.running).toBe(2);
-        expect(stats.sessionsByStatus.error).toBe(1);
-    });
+    const stats = manager.getStats();
+    expect(stats.totalSessions).toBe(4);
+    expect(stats.sessionsByStatus.idle).toBe(1);
+    expect(stats.sessionsByStatus.running).toBe(2);
+    expect(stats.sessionsByStatus.error).toBe(1);
+  });
 
-    it('reports oldest session age', () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
+  it('reports oldest session age', () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 999999 });
 
-        insertSession('sess-1', 'proj-1', 'idle');
+    insertSession('sess-1', 'proj-1', 'idle');
 
-        const stats = manager.getStats();
-        // Session was just created, age should be small (< 5 seconds)
-        expect(stats.oldestSessionAge).toBeGreaterThanOrEqual(0);
-        expect(stats.oldestSessionAge).toBeLessThan(5000);
-    });
+    const stats = manager.getStats();
+    // Session was just created, age should be small (< 5 seconds)
+    expect(stats.oldestSessionAge).toBeGreaterThanOrEqual(0);
+    expect(stats.oldestSessionAge).toBeLessThan(5000);
+  });
 });
 
 // ─── start / stop ──────────────────────────────────────────────────────────
 
 describe('start / stop', () => {
-    it('starts and stops cleanup interval', () => {
-        manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 60_000 });
+  it('starts and stops cleanup interval', () => {
+    manager = new SessionLifecycleManager(db, { cleanupIntervalMs: 60_000 });
 
-        manager.start();
-        // Starting again should not create a second timer
-        manager.start();
+    manager.start();
+    // Starting again should not create a second timer
+    manager.start();
 
-        manager.stop();
-        // Stopping again should be safe
-        manager.stop();
-    });
+    manager.stop();
+    // Stopping again should be safe
+    manager.stop();
+  });
 });
 
 // ─── enforceSessionLimits ──────────────────────────────────────────────────
 
 describe('enforceSessionLimits (via runCleanup)', () => {
-    it('deletes oldest excess sessions per project', async () => {
-        manager = new SessionLifecycleManager(db, {
-            maxSessionsPerProject: 2,
-            sessionTtlMs: 999999999, // Don't expire by TTL
-            cleanupIntervalMs: 999999,
-        });
-
-        // Insert 4 sessions for proj-1 — all older than 24h so they're eligible for limit cleanup
-        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-        for (let i = 0; i < 4; i++) {
-            const updatedAt = new Date(twoDaysAgo + i * 1000).toISOString().replace('T', ' ').replace('Z', '');
-            insertSession(`sess-${i}`, 'proj-1', 'idle', updatedAt);
-        }
-
-        expect(countSessions()).toBe(4);
-
-        await manager.runCleanup();
-
-        // Should keep only 2 newest
-        expect(countSessions()).toBe(2);
+  it('deletes oldest excess sessions per project', async () => {
+    manager = new SessionLifecycleManager(db, {
+      maxSessionsPerProject: 2,
+      sessionTtlMs: 999999999, // Don't expire by TTL
+      cleanupIntervalMs: 999999,
     });
 
-    it('protects sessions younger than 24 hours from limit cleanup', async () => {
-        manager = new SessionLifecycleManager(db, {
-            maxSessionsPerProject: 2,
-            sessionTtlMs: 999999999,
-            cleanupIntervalMs: 999999,
-        });
+    // Insert 4 sessions for proj-1 — all older than 24h so they're eligible for limit cleanup
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    for (let i = 0; i < 4; i++) {
+      const updatedAt = new Date(twoDaysAgo + i * 1000).toISOString().replace('T', ' ').replace('Z', '');
+      insertSession(`sess-${i}`, 'proj-1', 'idle', updatedAt);
+    }
 
-        // Insert 2 old sessions (eligible for cleanup) and 2 young sessions (protected)
-        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-        insertSession('old-1', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
-        insertSession('old-2', 'proj-1', 'idle', new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''));
-        // Young sessions — updated_at is recent
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString().replace('T', ' ').replace('Z', '');
-        insertSession('young-1', 'proj-1', 'idle', oneHourAgo);
-        insertSession('young-2', 'proj-1', 'idle', oneHourAgo);
+    expect(countSessions()).toBe(4);
 
-        expect(countSessions()).toBe(4);
+    await manager.runCleanup();
 
-        await manager.runCleanup();
+    // Should keep only 2 newest
+    expect(countSessions()).toBe(2);
+  });
 
-        // Only the 2 old sessions should be deleted; young ones are protected
-        expect(countSessions()).toBe(2);
-        const remaining = db.query('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>;
-        expect(remaining.map(r => r.id)).toEqual(['young-1', 'young-2']);
+  it('protects sessions younger than 24 hours from limit cleanup', async () => {
+    manager = new SessionLifecycleManager(db, {
+      maxSessionsPerProject: 2,
+      sessionTtlMs: 999999999,
+      cleanupIntervalMs: 999999,
     });
 
-    it('deletes escalation queue entries for excess sessions', async () => {
-        manager = new SessionLifecycleManager(db, {
-            maxSessionsPerProject: 1,
-            sessionTtlMs: 999999999,
-            cleanupIntervalMs: 999999,
-        });
+    // Insert 2 old sessions (eligible for cleanup) and 2 young sessions (protected)
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    insertSession('old-1', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
+    insertSession(
+      'old-2',
+      'proj-1',
+      'idle',
+      new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''),
+    );
+    // Young sessions — updated_at is recent
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString().replace('T', ' ').replace('Z', '');
+    insertSession('young-1', 'proj-1', 'idle', oneHourAgo);
+    insertSession('young-2', 'proj-1', 'idle', oneHourAgo);
 
-        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-        insertSession('old-sess', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
-        insertSession('new-sess', 'proj-1', 'idle', new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''));
+    expect(countSessions()).toBe(4);
 
-        // Add escalation queue entry for the session that will be deleted
-        db.query(
-            "INSERT INTO escalation_queue (session_id, tool_name, tool_input, status) VALUES ('old-sess', 'Bash', '{\"cmd\":\"ls\"}', 'pending')",
-        ).run();
+    await manager.runCleanup();
 
-        const queueBefore = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
-        expect(queueBefore).toBe(1);
+    // Only the 2 old sessions should be deleted; young ones are protected
+    expect(countSessions()).toBe(2);
+    const remaining = db.query('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>;
+    expect(remaining.map((r) => r.id)).toEqual(['young-1', 'young-2']);
+  });
 
-        await manager.runCleanup();
-
-        expect(countSessions()).toBe(1);
-        const queueAfter = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
-        expect(queueAfter).toBe(0);
+  it('deletes escalation queue entries for excess sessions', async () => {
+    manager = new SessionLifecycleManager(db, {
+      maxSessionsPerProject: 1,
+      sessionTtlMs: 999999999,
+      cleanupIntervalMs: 999999,
     });
+
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    insertSession('old-sess', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
+    insertSession(
+      'new-sess',
+      'proj-1',
+      'idle',
+      new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''),
+    );
+
+    // Add escalation queue entry for the session that will be deleted
+    db.query(
+      "INSERT INTO escalation_queue (session_id, tool_name, tool_input, status) VALUES ('old-sess', 'Bash', '{\"cmd\":\"ls\"}', 'pending')",
+    ).run();
+
+    const queueBefore = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+    expect(queueBefore).toBe(1);
+
+    await manager.runCleanup();
+
+    expect(countSessions()).toBe(1);
+    const queueAfter = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+    expect(queueAfter).toBe(0);
+  });
 });

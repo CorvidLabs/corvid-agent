@@ -1,4 +1,4 @@
-import type { ClaudeStreamEvent, ContentBlock, AssistantEvent, ContentBlockStartEvent } from '../process/types';
+import type { AssistantEvent, ClaudeStreamEvent, ContentBlock, ContentBlockStartEvent } from '../process/types';
 import { extractContentText } from '../process/types';
 
 // ── Heuristic patterns ───────────────────────────────────────────────────
@@ -8,11 +8,11 @@ import { extractContentText } from '../process/types';
  * to do something rather than actually doing it.
  */
 const FORWARD_COMMIT_PATTERNS: RegExp[] = [
-    /\bi'?ll\s+(look\s+into|investigate|check|explore|work\s+on|get\s+started|handle|take\s+care|do\s+that|do\s+this|start|begin|proceed)\b/i,
-    /\blet\s+me\s+(look\s+into|investigate|check|explore|get\s+started|work\s+on|start|begin)\b/i,
-    /\bi'?m\s+going\s+to\s+(look\s+into|investigate|check|explore|start|begin|work\s+on)\b/i,
-    /\bright\s+(away|on\s+it)\b/i,
-    /\bon\s+it\b/i,
+  /\bi'?ll\s+(look\s+into|investigate|check|explore|work\s+on|get\s+started|handle|take\s+care|do\s+that|do\s+this|start|begin|proceed)\b/i,
+  /\blet\s+me\s+(look\s+into|investigate|check|explore|get\s+started|work\s+on|start|begin)\b/i,
+  /\bi'?m\s+going\s+to\s+(look\s+into|investigate|check|explore|start|begin|work\s+on)\b/i,
+  /\bright\s+(away|on\s+it)\b/i,
+  /\bon\s+it\b/i,
 ];
 
 /**
@@ -20,11 +20,11 @@ const FORWARD_COMMIT_PATTERNS: RegExp[] = [
  * any substantive content following.
  */
 const ENTHUSIASM_PATTERNS: RegExp[] = [
-    /\b(great|excellent|perfect|wonderful|fantastic|amazing|brilliant)\s*(idea|plan|point|suggestion|thinking|question|call)?\b/i,
-    /\bsounds\s+(good|great|perfect|excellent|wonderful)\b/i,
-    /\b(absolutely|certainly|of\s+course|gladly)\b/i,
-    /\bhappy\s+to\s+(help|assist|work\s+on|handle|do\s+that)\b/i,
-    /\bno\s+problem\b/i,
+  /\b(great|excellent|perfect|wonderful|fantastic|amazing|brilliant)\s*(idea|plan|point|suggestion|thinking|question|call)?\b/i,
+  /\bsounds\s+(good|great|perfect|excellent|wonderful)\b/i,
+  /\b(absolutely|certainly|of\s+course|gladly)\b/i,
+  /\bhappy\s+to\s+(help|assist|work\s+on|handle|do\s+that)\b/i,
+  /\bno\s+problem\b/i,
 ];
 
 /**
@@ -33,10 +33,10 @@ const ENTHUSIASM_PATTERNS: RegExp[] = [
  * flagged as cheerleading even without tool calls.
  */
 const SUBSTANTIVE_PATTERNS: RegExp[] = [
-    /```/,             // code block fence
-    /^\s*\d+\.\s+\S/m, // numbered list item
-    /^\s*[-*]\s+\S/m,  // bullet list item
-    /^\s*#{1,6}\s+\S/m, // markdown heading
+  /```/, // code block fence
+  /^\s*\d+\.\s+\S/m, // numbered list item
+  /^\s*[-*]\s+\S/m, // bullet list item
+  /^\s*#{1,6}\s+\S/m, // markdown heading
 ];
 
 /** Responses longer than this character count are considered substantive. */
@@ -48,35 +48,35 @@ const MAX_CHEERLEADING_LENGTH = 200;
  * Normalize text for comparison: lowercase, collapse whitespace, strip punctuation.
  */
 function normalizeForComparison(text: string): string {
-    return text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
  * Extract character trigrams from normalized text.
  */
 function extractTrigrams(text: string): Set<string> {
-    const trigrams = new Set<string>();
-    for (let i = 0; i <= text.length - 3; i++) {
-        trigrams.add(text.slice(i, i + 3));
-    }
-    return trigrams;
+  const trigrams = new Set<string>();
+  for (let i = 0; i <= text.length - 3; i++) {
+    trigrams.add(text.slice(i, i + 3));
+  }
+  return trigrams;
 }
 
 /**
  * Compute Jaccard similarity between two trigram sets (0.0 – 1.0).
  */
 function trigramSimilarity(a: Set<string>, b: Set<string>): number {
-    if (a.size === 0 && b.size === 0) return 1.0;
-    if (a.size === 0 || b.size === 0) return 0.0;
-    let intersection = 0;
-    for (const t of a) {
-        if (b.has(t)) intersection++;
-    }
-    return intersection / (a.size + b.size - intersection);
+  if (a.size === 0 && b.size === 0) return 1.0;
+  if (a.size === 0 || b.size === 0) return 0.0;
+  let intersection = 0;
+  for (const t of a) {
+    if (b.has(t)) intersection++;
+  }
+  return intersection / (a.size + b.size - intersection);
 }
 
 /**
@@ -103,24 +103,24 @@ export const REPETITION_WINDOW = 3;
  * @param threshold    Similarity threshold (default REPETITION_SIMILARITY_THRESHOLD).
  */
 export function isRepetitiveResponse(
-    currentText: string,
-    recentTexts: string[],
-    threshold = REPETITION_SIMILARITY_THRESHOLD,
+  currentText: string,
+  recentTexts: string[],
+  threshold = REPETITION_SIMILARITY_THRESHOLD,
 ): boolean {
-    const currentNorm = normalizeForComparison(currentText);
-    if (currentNorm.length < 20) return false; // Too short to meaningfully compare
+  const currentNorm = normalizeForComparison(currentText);
+  if (currentNorm.length < 20) return false; // Too short to meaningfully compare
 
-    const currentTrigrams = extractTrigrams(currentNorm);
+  const currentTrigrams = extractTrigrams(currentNorm);
 
-    for (const prev of recentTexts) {
-        const prevNorm = normalizeForComparison(prev);
-        if (prevNorm.length < 20) continue;
-        const prevTrigrams = extractTrigrams(prevNorm);
-        if (trigramSimilarity(currentTrigrams, prevTrigrams) >= threshold) {
-            return true;
-        }
+  for (const prev of recentTexts) {
+    const prevNorm = normalizeForComparison(prev);
+    if (prevNorm.length < 20) continue;
+    const prevTrigrams = extractTrigrams(prevNorm);
+    if (trigramSimilarity(currentTrigrams, prevTrigrams) >= threshold) {
+      return true;
     }
-    return false;
+  }
+  return false;
 }
 
 // ── Core detection ───────────────────────────────────────────────────────
@@ -130,23 +130,23 @@ export function isRepetitiveResponse(
  * started (either via content_block_start or embedded in assistant content).
  */
 function hasToolUseInTurn(events: ClaudeStreamEvent[]): boolean {
-    for (const event of events) {
-        // SDK path: explicit content_block_start with type tool_use
-        if (event.type === 'content_block_start') {
-            const cbs = event as ContentBlockStartEvent;
-            if (cbs.content_block?.type === 'tool_use') return true;
-        }
-        // Direct-process path: tool_use blocks embedded in assistant content
-        if (event.type === 'assistant') {
-            const ae = event as AssistantEvent;
-            const content = ae.message.content;
-            if (Array.isArray(content)) {
-                const blocks = content as ContentBlock[];
-                if (blocks.some((b) => b.type === 'tool_use')) return true;
-            }
-        }
+  for (const event of events) {
+    // SDK path: explicit content_block_start with type tool_use
+    if (event.type === 'content_block_start') {
+      const cbs = event as ContentBlockStartEvent;
+      if (cbs.content_block?.type === 'tool_use') return true;
     }
-    return false;
+    // Direct-process path: tool_use blocks embedded in assistant content
+    if (event.type === 'assistant') {
+      const ae = event as AssistantEvent;
+      const content = ae.message.content;
+      if (Array.isArray(content)) {
+        const blocks = content as ContentBlock[];
+        if (blocks.some((b) => b.type === 'tool_use')) return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -155,12 +155,12 @@ function hasToolUseInTurn(events: ClaudeStreamEvent[]): boolean {
  * accumulation for SDK streaming paths.
  */
 function extractTurnText(events: ClaudeStreamEvent[]): string {
-    // Prefer the assistant event (complete response, available in both paths)
-    const assistantEvent = events.find((e) => e.type === 'assistant') as AssistantEvent | undefined;
-    if (assistantEvent) {
-        return extractContentText(assistantEvent.message.content);
-    }
-    return '';
+  // Prefer the assistant event (complete response, available in both paths)
+  const assistantEvent = events.find((e) => e.type === 'assistant') as AssistantEvent | undefined;
+  if (assistantEvent) {
+    return extractContentText(assistantEvent.message.content);
+  }
+  return '';
 }
 
 /**
@@ -179,27 +179,27 @@ function extractTurnText(events: ClaudeStreamEvent[]): string {
  * @returns `true` if the turn looks like cheerleading, `false` otherwise.
  */
 export function isCheerleadingResponse(events: ClaudeStreamEvent[]): boolean {
-    // Tool calls always indicate real work
-    if (hasToolUseInTurn(events)) return false;
+  // Tool calls always indicate real work
+  if (hasToolUseInTurn(events)) return false;
 
-    const text = extractTurnText(events);
-    if (!text) return false;
+  const text = extractTurnText(events);
+  if (!text) return false;
 
-    // Responses longer than the threshold are considered substantive
-    if (text.length > MAX_CHEERLEADING_LENGTH) return false;
+  // Responses longer than the threshold are considered substantive
+  if (text.length > MAX_CHEERLEADING_LENGTH) return false;
 
-    // Structured content (code, lists, headers) indicates real work
-    if (SUBSTANTIVE_PATTERNS.some((p) => p.test(text))) return false;
+  // Structured content (code, lists, headers) indicates real work
+  if (SUBSTANTIVE_PATTERNS.some((p) => p.test(text))) return false;
 
-    // Primary signal: forward-commitment without action
-    const hasForwardCommit = FORWARD_COMMIT_PATTERNS.some((p) => p.test(text));
-    if (hasForwardCommit) return true;
+  // Primary signal: forward-commitment without action
+  const hasForwardCommit = FORWARD_COMMIT_PATTERNS.some((p) => p.test(text));
+  if (hasForwardCommit) return true;
 
-    // Secondary signal: enthusiasm + very short response (pure filler)
-    const hasEnthusiasm = ENTHUSIASM_PATTERNS.some((p) => p.test(text));
-    if (hasEnthusiasm && text.length < 80) return true;
+  // Secondary signal: enthusiasm + very short response (pure filler)
+  const hasEnthusiasm = ENTHUSIASM_PATTERNS.some((p) => p.test(text));
+  if (hasEnthusiasm && text.length < 80) return true;
 
-    return false;
+  return false;
 }
 
 /**
@@ -231,8 +231,8 @@ export const MIN_SUBSTANTIVE_LENGTH = 100;
  * @returns `true` if the turn looks like a stall.
  */
 export function isStallTurn(events: ClaudeStreamEvent[]): boolean {
-    if (isCheerleadingResponse(events)) return true;
-    if (hasToolUseInTurn(events)) return false;
-    const text = extractTurnText(events);
-    return text.length < MIN_SUBSTANTIVE_LENGTH;
+  if (isCheerleadingResponse(events)) return true;
+  if (hasToolUseInTurn(events)) return false;
+  const text = extractTurnText(events);
+  return text.length < MIN_SUBSTANTIVE_LENGTH;
 }

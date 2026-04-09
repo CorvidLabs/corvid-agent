@@ -3,156 +3,180 @@
  * Requires GH_TOKEN env var to be set.
  */
 
-import { createLogger } from '../lib/logger';
 import { buildSafeGhEnv } from '../lib/env';
+import { createLogger } from '../lib/logger';
 
 const log = createLogger('GitHubOps');
 
 function hasGhToken(): boolean {
-    return !!process.env.GH_TOKEN;
+  return !!process.env.GH_TOKEN;
 }
 
 async function runGh(args: string[], cwd?: string): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-    if (!hasGhToken()) {
-        return { ok: false, stdout: '', stderr: 'GH_TOKEN not configured' };
-    }
+  if (!hasGhToken()) {
+    return { ok: false, stdout: '', stderr: 'GH_TOKEN not configured' };
+  }
 
-    try {
-        const proc = Bun.spawn(['gh', ...args], {
-            cwd: cwd ?? process.cwd(),
-            stdout: 'pipe',
-            stderr: 'pipe',
-            env: buildSafeGhEnv(),
-        });
+  try {
+    const proc = Bun.spawn(['gh', ...args], {
+      cwd: cwd ?? process.cwd(),
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: buildSafeGhEnv(),
+    });
 
-        const stdout = await new Response(proc.stdout).text();
-        const stderr = await new Response(proc.stderr).text();
-        const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
 
-        return { ok: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() };
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { ok: false, stdout: '', stderr: message };
-    }
+    return { ok: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, stdout: '', stderr: message };
+  }
 }
 
 // ─── Star / Unstar ───────────────────────────────────────────────────────────
 
 export async function starRepo(repo: string): Promise<{ ok: boolean; message: string }> {
-    log.info('Starring repo', { repo });
-    // gh doesn't have a direct star command — use the REST API
-    const apiResult = await runGh(['api', '-X', 'PUT', `/user/starred/${repo}`]);
-    if (apiResult.ok) {
-        log.info('Starred repo successfully', { repo });
-        return { ok: true, message: `Starred ${repo}` };
-    }
-    log.warn('Failed to star repo', { repo, error: apiResult.stderr });
-    return { ok: false, message: `Failed to star ${repo}: ${apiResult.stderr}` };
+  log.info('Starring repo', { repo });
+  // gh doesn't have a direct star command — use the REST API
+  const apiResult = await runGh(['api', '-X', 'PUT', `/user/starred/${repo}`]);
+  if (apiResult.ok) {
+    log.info('Starred repo successfully', { repo });
+    return { ok: true, message: `Starred ${repo}` };
+  }
+  log.warn('Failed to star repo', { repo, error: apiResult.stderr });
+  return { ok: false, message: `Failed to star ${repo}: ${apiResult.stderr}` };
 }
 
 export async function unstarRepo(repo: string): Promise<{ ok: boolean; message: string }> {
-    const result = await runGh(['api', '-X', 'DELETE', `/user/starred/${repo}`]);
-    return result.ok
-        ? { ok: true, message: `Unstarred ${repo}` }
-        : { ok: false, message: `Failed to unstar ${repo}: ${result.stderr}` };
+  const result = await runGh(['api', '-X', 'DELETE', `/user/starred/${repo}`]);
+  return result.ok
+    ? { ok: true, message: `Unstarred ${repo}` }
+    : { ok: false, message: `Failed to unstar ${repo}: ${result.stderr}` };
 }
 
 // ─── Fork ────────────────────────────────────────────────────────────────────
 
-export async function forkRepo(repo: string, org?: string): Promise<{ ok: boolean; message: string; forkUrl?: string }> {
-    log.info('Forking repo', { repo, org });
-    const args = ['repo', 'fork', repo, '--clone=false'];
-    if (org) args.push(`--org=${org}`);
+export async function forkRepo(
+  repo: string,
+  org?: string,
+): Promise<{ ok: boolean; message: string; forkUrl?: string }> {
+  log.info('Forking repo', { repo, org });
+  const args = ['repo', 'fork', repo, '--clone=false'];
+  if (org) args.push(`--org=${org}`);
 
-    const result = await runGh(args);
-    if (result.ok || result.stderr.includes('already exists')) {
-        // Extract fork URL from output
-        const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/) ||
-                         result.stderr.match(/https:\/\/github\.com\/[^\s]+/);
-        const forkUrl = urlMatch?.[0];
-        log.info('Forked repo successfully', { repo, forkUrl });
-        return { ok: true, message: `Forked ${repo}`, forkUrl };
-    }
-    log.warn('Failed to fork repo', { repo, error: result.stderr });
-    return { ok: false, message: `Failed to fork ${repo}: ${result.stderr}` };
+  const result = await runGh(args);
+  if (result.ok || result.stderr.includes('already exists')) {
+    // Extract fork URL from output
+    const urlMatch =
+      result.stdout.match(/https:\/\/github\.com\/[^\s]+/) || result.stderr.match(/https:\/\/github\.com\/[^\s]+/);
+    const forkUrl = urlMatch?.[0];
+    log.info('Forked repo successfully', { repo, forkUrl });
+    return { ok: true, message: `Forked ${repo}`, forkUrl };
+  }
+  log.warn('Failed to fork repo', { repo, error: result.stderr });
+  return { ok: false, message: `Failed to fork ${repo}: ${result.stderr}` };
 }
 
 // ─── Review PRs ──────────────────────────────────────────────────────────────
 
 export interface PullRequest {
-    number: number;
-    title: string;
-    url: string;
-    author: string;
-    state: string;
-    headBranch: string;
-    baseBranch: string;
-    body: string;
-    createdAt: string;
-    additions: number;
-    deletions: number;
-    changedFiles: number;
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  state: string;
+  headBranch: string;
+  baseBranch: string;
+  body: string;
+  createdAt: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
 }
 
-export async function listOpenPrs(repo: string, maxPrs: number = 10): Promise<{ ok: boolean; prs: PullRequest[]; error?: string }> {
-    log.info('Listing open PRs', { repo, maxPrs });
-    const result = await runGh([
-        'pr', 'list', '--repo', repo, '--state', 'open', '--limit', String(maxPrs),
-        '--json', 'number,title,url,author,state,headRefName,baseRefName,body,createdAt,additions,deletions,changedFiles',
-    ]);
+export async function listOpenPrs(
+  repo: string,
+  maxPrs: number = 10,
+): Promise<{ ok: boolean; prs: PullRequest[]; error?: string }> {
+  log.info('Listing open PRs', { repo, maxPrs });
+  const result = await runGh([
+    'pr',
+    'list',
+    '--repo',
+    repo,
+    '--state',
+    'open',
+    '--limit',
+    String(maxPrs),
+    '--json',
+    'number,title,url,author,state,headRefName,baseRefName,body,createdAt,additions,deletions,changedFiles',
+  ]);
 
-    if (!result.ok) {
-        return { ok: false, prs: [], error: result.stderr };
-    }
+  if (!result.ok) {
+    return { ok: false, prs: [], error: result.stderr };
+  }
 
-    try {
-        const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-        const prs: PullRequest[] = raw.map((pr) => ({
-            number: pr.number as number,
-            title: pr.title as string,
-            url: pr.url as string,
-            author: ((pr.author as Record<string, unknown>)?.login as string) ?? 'unknown',
-            state: pr.state as string,
-            headBranch: pr.headRefName as string,
-            baseBranch: pr.baseRefName as string,
-            body: (pr.body as string) ?? '',
-            createdAt: pr.createdAt as string,
-            additions: (pr.additions as number) ?? 0,
-            deletions: (pr.deletions as number) ?? 0,
-            changedFiles: (pr.changedFiles as number) ?? 0,
-        }));
-        return { ok: true, prs };
-    } catch {
-        return { ok: false, prs: [], error: 'Failed to parse PR list' };
-    }
+  try {
+    const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+    const prs: PullRequest[] = raw.map((pr) => ({
+      number: pr.number as number,
+      title: pr.title as string,
+      url: pr.url as string,
+      author: ((pr.author as Record<string, unknown>)?.login as string) ?? 'unknown',
+      state: pr.state as string,
+      headBranch: pr.headRefName as string,
+      baseBranch: pr.baseRefName as string,
+      body: (pr.body as string) ?? '',
+      createdAt: pr.createdAt as string,
+      additions: (pr.additions as number) ?? 0,
+      deletions: (pr.deletions as number) ?? 0,
+      changedFiles: (pr.changedFiles as number) ?? 0,
+    }));
+    return { ok: true, prs };
+  } catch {
+    return { ok: false, prs: [], error: 'Failed to parse PR list' };
+  }
 }
 
-export async function getPrDiff(repo: string, prNumber: number): Promise<{ ok: boolean; diff: string; error?: string }> {
-    const result = await runGh(['pr', 'diff', String(prNumber), '--repo', repo]);
-    return result.ok
-        ? { ok: true, diff: result.stdout }
-        : { ok: false, diff: '', error: result.stderr };
+export async function getPrDiff(
+  repo: string,
+  prNumber: number,
+): Promise<{ ok: boolean; diff: string; error?: string }> {
+  const result = await runGh(['pr', 'diff', String(prNumber), '--repo', repo]);
+  return result.ok ? { ok: true, diff: result.stdout } : { ok: false, diff: '', error: result.stderr };
 }
 
-export async function addPrComment(repo: string, prNumber: number, body: string): Promise<{ ok: boolean; error?: string }> {
-    log.info('Adding PR comment', { repo, prNumber });
-    const result = await runGh(['pr', 'comment', String(prNumber), '--repo', repo, '--body', body]);
-    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+export async function addPrComment(
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  log.info('Adding PR comment', { repo, prNumber });
+  const result = await runGh(['pr', 'comment', String(prNumber), '--repo', repo, '--body', body]);
+  return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
 export async function addPrReview(
-    repo: string,
-    prNumber: number,
-    event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT',
-    body: string,
+  repo: string,
+  prNumber: number,
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT',
+  body: string,
 ): Promise<{ ok: boolean; error?: string }> {
-    log.info('Adding PR review', { repo, prNumber, event });
-    const result = await runGh([
-        'pr', 'review', String(prNumber), '--repo', repo,
-        `--${event.toLowerCase().replace('_', '-')}`,
-        '--body', body,
-    ]);
-    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+  log.info('Adding PR review', { repo, prNumber, event });
+  const result = await runGh([
+    'pr',
+    'review',
+    String(prNumber),
+    '--repo',
+    repo,
+    `--${event.toLowerCase().replace('_', '-')}`,
+    '--body',
+    body,
+  ]);
+  return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
 /**
@@ -160,327 +184,397 @@ export async function addPrReview(
  * Returns matching PRs so callers can deduplicate before creating new work.
  */
 export async function searchOpenPrsForIssue(
-    repo: string,
-    issueNumber: number,
+  repo: string,
+  issueNumber: number,
 ): Promise<{ ok: boolean; prs: PullRequest[]; error?: string }> {
-    const result = await runGh([
-        'pr', 'list', '--repo', repo, '--state', 'open',
-        '--search', String(issueNumber),
-        '--json', 'number,title,url,author,state,headRefName,baseRefName,body,createdAt,additions,deletions,changedFiles',
-    ]);
+  const result = await runGh([
+    'pr',
+    'list',
+    '--repo',
+    repo,
+    '--state',
+    'open',
+    '--search',
+    String(issueNumber),
+    '--json',
+    'number,title,url,author,state,headRefName,baseRefName,body,createdAt,additions,deletions,changedFiles',
+  ]);
 
-    if (!result.ok) {
-        return { ok: false, prs: [], error: result.stderr };
-    }
+  if (!result.ok) {
+    return { ok: false, prs: [], error: result.stderr };
+  }
 
-    try {
-        const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-        // Match PRs that close/fix/resolve the issue (body) or mention it in the title.
-        // Body pattern: "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive).
-        // Title pattern: any mention of "#N".
-        const issueRef = `#${issueNumber}`;
-        const bodyPattern = new RegExp(`(closes|fixes|resolves)\\s+#${issueNumber}\\b`, 'i');
-        const prs: PullRequest[] = raw
-            .filter((pr) => {
-                const title = (pr.title as string) ?? '';
-                const body = (pr.body as string) ?? '';
-                return title.includes(issueRef) || bodyPattern.test(body);
-            })
-            .map((pr) => ({
-                number: pr.number as number,
-                title: pr.title as string,
-                url: pr.url as string,
-                author: ((pr.author as Record<string, unknown>)?.login as string) ?? 'unknown',
-                state: pr.state as string,
-                headBranch: pr.headRefName as string,
-                baseBranch: pr.baseRefName as string,
-                body: (pr.body as string) ?? '',
-                createdAt: pr.createdAt as string,
-                additions: (pr.additions as number) ?? 0,
-                deletions: (pr.deletions as number) ?? 0,
-                changedFiles: (pr.changedFiles as number) ?? 0,
-            }));
-        return { ok: true, prs };
-    } catch {
-        return { ok: false, prs: [], error: 'Failed to parse PR search results' };
-    }
+  try {
+    const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+    // Match PRs that close/fix/resolve the issue (body) or mention it in the title.
+    // Body pattern: "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive).
+    // Title pattern: any mention of "#N".
+    const issueRef = `#${issueNumber}`;
+    const bodyPattern = new RegExp(`(closes|fixes|resolves)\\s+#${issueNumber}\\b`, 'i');
+    const prs: PullRequest[] = raw
+      .filter((pr) => {
+        const title = (pr.title as string) ?? '';
+        const body = (pr.body as string) ?? '';
+        return title.includes(issueRef) || bodyPattern.test(body);
+      })
+      .map((pr) => ({
+        number: pr.number as number,
+        title: pr.title as string,
+        url: pr.url as string,
+        author: ((pr.author as Record<string, unknown>)?.login as string) ?? 'unknown',
+        state: pr.state as string,
+        headBranch: pr.headRefName as string,
+        baseBranch: pr.baseRefName as string,
+        body: (pr.body as string) ?? '',
+        createdAt: pr.createdAt as string,
+        additions: (pr.additions as number) ?? 0,
+        deletions: (pr.deletions as number) ?? 0,
+        changedFiles: (pr.changedFiles as number) ?? 0,
+      }));
+    return { ok: true, prs };
+  } catch {
+    return { ok: false, prs: [], error: 'Failed to parse PR search results' };
+  }
 }
 
 // ─── Create PR ───────────────────────────────────────────────────────────────
 
 export async function createPr(
-    repo: string,
-    title: string,
-    body: string,
-    headBranch: string,
-    baseBranch: string = 'main',
-    cwd?: string,
+  repo: string,
+  title: string,
+  body: string,
+  headBranch: string,
+  baseBranch: string = 'main',
+  cwd?: string,
 ): Promise<{ ok: boolean; prUrl?: string; error?: string }> {
-    log.info('Creating PR', { repo, title, headBranch, baseBranch });
-    const result = await runGh([
-        'pr', 'create',
-        '--repo', repo,
-        '--title', title,
-        '--body', body,
-        '--head', headBranch,
-        '--base', baseBranch,
-    ], cwd);
+  log.info('Creating PR', { repo, title, headBranch, baseBranch });
+  const result = await runGh(
+    ['pr', 'create', '--repo', repo, '--title', title, '--body', body, '--head', headBranch, '--base', baseBranch],
+    cwd,
+  );
 
-    if (result.ok) {
-        const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/);
-        return { ok: true, prUrl: urlMatch?.[0] ?? result.stdout };
-    }
-    return { ok: false, error: result.stderr };
+  if (result.ok) {
+    const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/);
+    return { ok: true, prUrl: urlMatch?.[0] ?? result.stdout };
+  }
+  return { ok: false, error: result.stderr };
 }
 
 // ─── Repo info ───────────────────────────────────────────────────────────────
 
-export async function getRepoInfo(repo: string): Promise<{ ok: boolean; info?: Record<string, unknown>; error?: string }> {
-    const result = await runGh([
-        'repo', 'view', repo, '--json',
-        'name,owner,description,url,stargazerCount,forkCount,isArchived,defaultBranchRef',
-    ]);
+export async function getRepoInfo(
+  repo: string,
+): Promise<{ ok: boolean; info?: Record<string, unknown>; error?: string }> {
+  const result = await runGh([
+    'repo',
+    'view',
+    repo,
+    '--json',
+    'name,owner,description,url,stargazerCount,forkCount,isArchived,defaultBranchRef',
+  ]);
 
-    if (!result.ok) return { ok: false, error: result.stderr };
+  if (!result.ok) return { ok: false, error: result.stderr };
 
-    try {
-        const info = JSON.parse(result.stdout);
-        return { ok: true, info };
-    } catch {
-        return { ok: false, error: 'Failed to parse repo info' };
-    }
+  try {
+    const info = JSON.parse(result.stdout);
+    return { ok: true, info };
+  } catch {
+    return { ok: false, error: 'Failed to parse repo info' };
+  }
 }
 
 // ─── Follow / Unfollow ───────────────────────────────────────────────────────
 
 export async function followUser(username: string): Promise<{ ok: boolean; message: string }> {
-    log.info('Following user', { username });
-    const result = await runGh(['api', '-X', 'PUT', `/user/following/${username}`]);
-    if (result.ok) {
-        log.info('Followed user successfully', { username });
-        return { ok: true, message: `Followed ${username}` };
-    }
-    log.warn('Failed to follow user', { username, error: result.stderr });
-    return { ok: false, message: `Failed to follow ${username}: ${result.stderr}` };
+  log.info('Following user', { username });
+  const result = await runGh(['api', '-X', 'PUT', `/user/following/${username}`]);
+  if (result.ok) {
+    log.info('Followed user successfully', { username });
+    return { ok: true, message: `Followed ${username}` };
+  }
+  log.warn('Failed to follow user', { username, error: result.stderr });
+  return { ok: false, message: `Failed to follow ${username}: ${result.stderr}` };
 }
 
 // ─── Issues ──────────────────────────────────────────────────────────────────
 
 export interface Issue {
-    number: number;
-    title: string;
-    state: string;
-    labels: Array<{ name: string }>;
-    url: string;
+  number: number;
+  title: string;
+  state: string;
+  labels: Array<{ name: string }>;
+  url: string;
 }
 
 export async function createIssue(
-    repo: string,
-    title: string,
-    body: string,
-    labels?: string[],
+  repo: string,
+  title: string,
+  body: string,
+  labels?: string[],
 ): Promise<{ ok: boolean; issueUrl?: string; error?: string }> {
-    log.info('Creating issue', { repo, title });
-    const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', body];
-    if (labels?.length) {
-        for (const label of labels) {
-            args.push('--label', label);
-        }
+  log.info('Creating issue', { repo, title });
+  const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', body];
+  if (labels?.length) {
+    for (const label of labels) {
+      args.push('--label', label);
     }
+  }
 
-    const result = await runGh(args);
-    if (result.ok) {
-        const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/);
-        const issueUrl = urlMatch?.[0] ?? result.stdout;
-        log.info('Created issue successfully', { repo, issueUrl });
-        return { ok: true, issueUrl };
-    }
-    log.warn('Failed to create issue', { repo, error: result.stderr });
-    return { ok: false, error: result.stderr };
+  const result = await runGh(args);
+  if (result.ok) {
+    const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/);
+    const issueUrl = urlMatch?.[0] ?? result.stdout;
+    log.info('Created issue successfully', { repo, issueUrl });
+    return { ok: true, issueUrl };
+  }
+  log.warn('Failed to create issue', { repo, error: result.stderr });
+  return { ok: false, error: result.stderr };
 }
 
 export async function listIssues(
-    repo: string,
-    state: 'open' | 'closed' | 'all' = 'open',
-    limit: number = 30,
+  repo: string,
+  state: 'open' | 'closed' | 'all' = 'open',
+  limit: number = 30,
 ): Promise<{ ok: boolean; issues: Issue[]; error?: string }> {
-    log.info('Listing issues', { repo, state, limit });
-    const result = await runGh([
-        'issue', 'list', '--repo', repo, '--state', state, '--limit', String(limit),
-        '--json', 'number,title,state,labels,url',
-    ]);
+  log.info('Listing issues', { repo, state, limit });
+  const result = await runGh([
+    'issue',
+    'list',
+    '--repo',
+    repo,
+    '--state',
+    state,
+    '--limit',
+    String(limit),
+    '--json',
+    'number,title,state,labels,url',
+  ]);
 
-    if (!result.ok) {
-        return { ok: false, issues: [], error: result.stderr };
-    }
+  if (!result.ok) {
+    return { ok: false, issues: [], error: result.stderr };
+  }
 
-    try {
-        const issues = JSON.parse(result.stdout) as Issue[];
-        return { ok: true, issues };
-    } catch {
-        return { ok: false, issues: [], error: 'Failed to parse issue list' };
-    }
+  try {
+    const issues = JSON.parse(result.stdout) as Issue[];
+    return { ok: true, issues };
+  } catch {
+    return { ok: false, issues: [], error: 'Failed to parse issue list' };
+  }
 }
 
 /**
  * Find open issues with similar titles (keyword overlap).
  */
 export async function findSimilarIssues(
-    repo: string,
-    title: string,
-    threshold: number = 0.5,
+  repo: string,
+  title: string,
+  threshold: number = 0.5,
 ): Promise<{ hasSimilar: boolean; matches: Issue[] }> {
-    const result = await listIssues(repo, 'open', 100);
-    if (!result.ok || result.issues.length === 0) {
-        return { hasSimilar: false, matches: [] };
+  const result = await listIssues(repo, 'open', 100);
+  if (!result.ok || result.issues.length === 0) {
+    return { hasSimilar: false, matches: [] };
+  }
+  const titleWords = normalizeWords(title);
+  if (titleWords.size === 0) return { hasSimilar: false, matches: [] };
+  const matches = result.issues.filter((issue) => {
+    const issueWords = normalizeWords(issue.title);
+    if (issueWords.size === 0) return false;
+    let intersection = 0;
+    for (const word of titleWords) {
+      if (issueWords.has(word)) intersection++;
     }
-    const titleWords = normalizeWords(title);
-    if (titleWords.size === 0) return { hasSimilar: false, matches: [] };
-    const matches = result.issues.filter(issue => {
-        const issueWords = normalizeWords(issue.title);
-        if (issueWords.size === 0) return false;
-        let intersection = 0;
-        for (const word of titleWords) {
-            if (issueWords.has(word)) intersection++;
-        }
-        const union = new Set([...titleWords, ...issueWords]).size;
-        return (intersection / union) >= threshold;
-    });
-    return { hasSimilar: matches.length > 0, matches };
+    const union = new Set([...titleWords, ...issueWords]).size;
+    return intersection / union >= threshold;
+  });
+  return { hasSimilar: matches.length > 0, matches };
 }
 
 function normalizeWords(text: string): Set<string> {
-    const stopWords = new Set(['a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been',
-        'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-        'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for', 'on', 'with',
-        'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after',
-        'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either', 'neither',
-        'this', 'that', 'these', 'those', 'it', 'its']);
-    return new Set(
-        text.toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, ' ')
-            .split(/\s+/)
-            .filter(w => w.length > 1 && !stopWords.has(w))
-    );
+  const stopWords = new Set([
+    'a',
+    'an',
+    'the',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'been',
+    'being',
+    'have',
+    'has',
+    'had',
+    'do',
+    'does',
+    'did',
+    'will',
+    'would',
+    'could',
+    'should',
+    'may',
+    'might',
+    'can',
+    'shall',
+    'to',
+    'of',
+    'in',
+    'for',
+    'on',
+    'with',
+    'at',
+    'by',
+    'from',
+    'as',
+    'into',
+    'through',
+    'during',
+    'before',
+    'after',
+    'and',
+    'but',
+    'or',
+    'nor',
+    'not',
+    'so',
+    'yet',
+    'both',
+    'either',
+    'neither',
+    'this',
+    'that',
+    'these',
+    'those',
+    'it',
+    'its',
+  ]);
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !stopWords.has(w)),
+  );
 }
 
 /**
  * Create an issue with automatic dedup check.
  */
 export async function createIssueWithDedup(
-    repo: string,
-    title: string,
-    body: string,
-    labels?: string[],
+  repo: string,
+  title: string,
+  body: string,
+  labels?: string[],
 ): Promise<{ ok: boolean; issueUrl?: string; error?: string; deduplicated?: boolean }> {
-    const similar = await findSimilarIssues(repo, title);
-    if (similar.hasSimilar) {
-        const existing = similar.matches[0];
-        log.info('Issue dedup: similar issue already exists', {
-            repo,
-            newTitle: title,
-            existingTitle: existing.title,
-            existingUrl: existing.url,
-        });
-        return { ok: true, issueUrl: existing.url, deduplicated: true };
-    }
-    const result = await createIssue(repo, title, body, labels);
-    return { ...result, deduplicated: false };
+  const similar = await findSimilarIssues(repo, title);
+  if (similar.hasSimilar) {
+    const existing = similar.matches[0];
+    log.info('Issue dedup: similar issue already exists', {
+      repo,
+      newTitle: title,
+      existingTitle: existing.title,
+      existingUrl: existing.url,
+    });
+    return { ok: true, issueUrl: existing.url, deduplicated: true };
+  }
+  const result = await createIssue(repo, title, body, labels);
+  return { ...result, deduplicated: false };
 }
 
 // ─── Issue Comments & Lifecycle ──────────────────────────────────────────
 
 export interface IssueComment {
-    id: number;
-    body: string;
-    author: string;
-    createdAt: string;
+  id: number;
+  body: string;
+  author: string;
+  createdAt: string;
 }
 
 export async function listIssueComments(
-    repo: string,
-    issueNumber: number,
-    since?: string,
+  repo: string,
+  issueNumber: number,
+  since?: string,
 ): Promise<{ ok: boolean; comments: IssueComment[]; error?: string }> {
-    // Use the API directly with optional since filter
-    const apiArgs = since
-        ? ['api', `/repos/${repo}/issues/${issueNumber}/comments?since=${since}`]
-        : ['api', `/repos/${repo}/issues/${issueNumber}/comments`];
+  // Use the API directly with optional since filter
+  const apiArgs = since
+    ? ['api', `/repos/${repo}/issues/${issueNumber}/comments?since=${since}`]
+    : ['api', `/repos/${repo}/issues/${issueNumber}/comments`];
 
-    const result = await runGh(apiArgs);
-    if (!result.ok) {
-        return { ok: false, comments: [], error: result.stderr };
-    }
+  const result = await runGh(apiArgs);
+  if (!result.ok) {
+    return { ok: false, comments: [], error: result.stderr };
+  }
 
-    try {
-        const raw = JSON.parse(result.stdout || '[]') as Array<Record<string, unknown>>;
-        const comments: IssueComment[] = raw.map((c) => ({
-            id: c.id as number,
-            body: (c.body as string) ?? '',
-            author: ((c.user as Record<string, unknown>)?.login as string) ?? 'unknown',
-            createdAt: (c.created_at as string) ?? '',
-        }));
-        return { ok: true, comments };
-    } catch {
-        return { ok: false, comments: [], error: 'Failed to parse issue comments' };
-    }
+  try {
+    const raw = JSON.parse(result.stdout || '[]') as Array<Record<string, unknown>>;
+    const comments: IssueComment[] = raw.map((c) => ({
+      id: c.id as number,
+      body: (c.body as string) ?? '',
+      author: ((c.user as Record<string, unknown>)?.login as string) ?? 'unknown',
+      createdAt: (c.created_at as string) ?? '',
+    }));
+    return { ok: true, comments };
+  } catch {
+    return { ok: false, comments: [], error: 'Failed to parse issue comments' };
+  }
 }
 
-export async function closeIssue(
-    repo: string,
-    issueNumber: number,
-): Promise<{ ok: boolean; error?: string }> {
-    log.info('Closing issue', { repo, issueNumber });
-    const result = await runGh(['issue', 'close', String(issueNumber), '--repo', repo]);
-    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+export async function closeIssue(repo: string, issueNumber: number): Promise<{ ok: boolean; error?: string }> {
+  log.info('Closing issue', { repo, issueNumber });
+  const result = await runGh(['issue', 'close', String(issueNumber), '--repo', repo]);
+  return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
 export async function addIssueComment(
-    repo: string,
-    issueNumber: number,
-    body: string,
+  repo: string,
+  issueNumber: number,
+  body: string,
 ): Promise<{ ok: boolean; error?: string }> {
-    log.info('Adding issue comment', { repo, issueNumber });
-    const result = await runGh(['issue', 'comment', String(issueNumber), '--repo', repo, '--body', body]);
-    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+  log.info('Adding issue comment', { repo, issueNumber });
+  const result = await runGh(['issue', 'comment', String(issueNumber), '--repo', repo, '--body', body]);
+  return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
 export interface PrViewResult {
-    state: 'OPEN' | 'CLOSED' | 'MERGED';
-    mergedAt: string | null;
-    closedAt: string | null;
-    statusCheckRollup: string | null;
-    reviewDecision: string | null;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  mergedAt: string | null;
+  closedAt: string | null;
+  statusCheckRollup: string | null;
+  reviewDecision: string | null;
 }
 
 export async function getPrState(
-    repo: string,
-    prNumber: number,
+  repo: string,
+  prNumber: number,
 ): Promise<{ ok: boolean; pr?: PrViewResult; error?: string }> {
-    const result = await runGh([
-        'pr', 'view', String(prNumber), '--repo', repo,
-        '--json', 'state,mergedAt,closedAt,statusCheckRollup,reviewDecision',
-    ]);
+  const result = await runGh([
+    'pr',
+    'view',
+    String(prNumber),
+    '--repo',
+    repo,
+    '--json',
+    'state,mergedAt,closedAt,statusCheckRollup,reviewDecision',
+  ]);
 
-    if (!result.ok) return { ok: false, error: result.stderr };
+  if (!result.ok) return { ok: false, error: result.stderr };
 
-    try {
-        const raw = JSON.parse(result.stdout) as Record<string, unknown>;
-        return {
-            ok: true,
-            pr: {
-                state: raw.state as PrViewResult['state'],
-                mergedAt: (raw.mergedAt as string) ?? null,
-                closedAt: (raw.closedAt as string) ?? null,
-                statusCheckRollup: raw.statusCheckRollup ? String(raw.statusCheckRollup) : null,
-                reviewDecision: (raw.reviewDecision as string) ?? null,
-            },
-        };
-    } catch {
-        return { ok: false, error: 'Failed to parse PR view output' };
-    }
+  try {
+    const raw = JSON.parse(result.stdout) as Record<string, unknown>;
+    return {
+      ok: true,
+      pr: {
+        state: raw.state as PrViewResult['state'],
+        mergedAt: (raw.mergedAt as string) ?? null,
+        closedAt: (raw.closedAt as string) ?? null,
+        statusCheckRollup: raw.statusCheckRollup ? String(raw.statusCheckRollup) : null,
+        reviewDecision: (raw.reviewDecision as string) ?? null,
+      },
+    };
+  } catch {
+    return { ok: false, error: 'Failed to parse PR view output' };
+  }
 }
 
 export function isGitHubConfigured(): boolean {
-    return hasGhToken();
+  return hasGhToken();
 }

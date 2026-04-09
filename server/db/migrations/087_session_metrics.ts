@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 087: Create session_metrics table for tool-chain analytics.
@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS session_metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -29,11 +29,11 @@ export function up(db: Database): void {
             created_at TEXT DEFAULT (datetime('now'))
         )
     `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_created ON session_metrics(created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_created ON session_metrics(created_at)`);
 }
 
 export function down(db: Database): void {
-    db.exec(`DROP TABLE IF EXISTS session_metrics`);
+  db.exec(`DROP TABLE IF EXISTS session_metrics`);
 }

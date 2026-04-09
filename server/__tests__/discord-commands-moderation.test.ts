@@ -23,12 +23,10 @@ import {
   handleMuteCommand,
   handleUnmuteCommand,
 } from '../discord/command-handlers/moderation-commands';
-import { type InteractionContext } from '../discord/commands';
+import type { InteractionContext } from '../discord/commands';
 import type { DiscordBridgeConfig } from '../discord/types';
 import { PermissionLevel } from '../discord/types';
-import {
-  makeMockChatInteraction,
-} from './helpers/mock-discord-interaction';
+import { makeMockChatInteraction } from './helpers/mock-discord-interaction';
 
 let db: Database;
 const originalFetch = globalThis.fetch;

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * Create a new migration file.
  *
@@ -8,10 +9,10 @@
  * Creates: server/db/migrations/NNN_add_user_preferences.ts
  */
 
-import { resolve } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import { discoverMigrations } from './migrate';
+import { resolve } from 'node:path';
 import { createLogger } from '../lib/logger';
+import { discoverMigrations } from './migrate';
 
 const log = createLogger('migrate-create');
 
@@ -19,15 +20,15 @@ const MIGRATION_DIR = resolve(import.meta.dir, 'migrations');
 
 const name = process.argv[2];
 if (!name) {
-    log.error('Usage: bun run migrate:create <name>');
-    log.error('  e.g. bun run migrate:create add_user_preferences');
-    process.exit(1);
+  log.error('Usage: bun run migrate:create <name>');
+  log.error('  e.g. bun run migrate:create add_user_preferences');
+  process.exit(1);
 }
 
 // Validate name
 if (!/^[a-z][a-z0-9_]*$/.test(name)) {
-    log.error('Migration name must be lowercase alphanumeric with underscores (e.g. add_user_preferences)');
-    process.exit(1);
+  log.error('Migration name must be lowercase alphanumeric with underscores (e.g. add_user_preferences)');
+  process.exit(1);
 }
 
 // Determine next version number

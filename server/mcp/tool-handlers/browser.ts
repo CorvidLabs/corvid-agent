@@ -80,7 +80,7 @@ export async function handleBrowser(
         if (args.tab_id == null) return errorResult('tab_id is required for get_page_text');
         ctx.emitStatus?.('Reading page text...');
         const text = await svc.getPageText(args.tab_id);
-        const truncated = text.length > 50_000 ? text.slice(0, 50_000) + '\n...(truncated)' : text;
+        const truncated = text.length > 50_000 ? `${text.slice(0, 50_000)}\n...(truncated)` : text;
         return textResult(truncated);
       }
 

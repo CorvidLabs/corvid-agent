@@ -26,9 +26,9 @@ export type CommunicationTier = 'top' | 'mid' | 'bottom';
  * top can reach down to mid and bottom; mid can reach down to bottom.
  */
 const TIER_RANK: Record<CommunicationTier, number> = {
-    top: 3,
-    mid: 2,
-    bottom: 1,
+  top: 3,
+  mid: 2,
+  bottom: 1,
 };
 
 // ─── Agent → tier mapping ────────────────────────────────────────────────
@@ -40,19 +40,19 @@ const TIER_RANK: Record<CommunicationTier, number> = {
  * (conservative — new agents must be explicitly promoted).
  */
 const AGENT_COMMUNICATION_TIERS: Record<string, CommunicationTier> = {
-    // Top tier — lead/chairman, can message anyone
-    'corvidagent': 'top',
+  // Top tier — lead/chairman, can message anyone
+  corvidagent: 'top',
 
-    // Mid tier — capable agents that receive delegated work
-    'rook': 'mid',
-    'jackdaw': 'mid',
-    'kite': 'mid',
-    'condor': 'mid',
+  // Mid tier — capable agents that receive delegated work
+  rook: 'mid',
+  jackdaw: 'mid',
+  kite: 'mid',
+  condor: 'mid',
 
-    // Bottom tier — juniors, scouts, first responders
-    'magpie': 'bottom',
-    'starling': 'bottom',
-    'merlin': 'bottom',
+  // Bottom tier — juniors, scouts, first responders
+  magpie: 'bottom',
+  starling: 'bottom',
+  merlin: 'bottom',
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ const AGENT_COMMUNICATION_TIERS: Record<string, CommunicationTier> = {
  * Returns 'bottom' for unknown agents (safe default).
  */
 export function getCommunicationTier(agentName: string): CommunicationTier {
-    return AGENT_COMMUNICATION_TIERS[agentName.toLowerCase()] ?? 'bottom';
+  return AGENT_COMMUNICATION_TIERS[agentName.toLowerCase()] ?? 'bottom';
 }
 
 /**
@@ -76,33 +76,30 @@ export function getCommunicationTier(agentName: string): CommunicationTier {
  *
  * @returns null if allowed, or an error message string if blocked.
  */
-export function checkCommunicationTier(
-    fromAgentName: string,
-    toAgentName: string,
-): string | null {
-    const fromTier = getCommunicationTier(fromAgentName);
-    const toTier = getCommunicationTier(toAgentName);
+export function checkCommunicationTier(fromAgentName: string, toAgentName: string): string | null {
+  const fromTier = getCommunicationTier(fromAgentName);
+  const toTier = getCommunicationTier(toAgentName);
 
-    const fromRank = TIER_RANK[fromTier];
-    const toRank = TIER_RANK[toTier];
+  const fromRank = TIER_RANK[fromTier];
+  const toRank = TIER_RANK[toTier];
 
-    // Can message same tier or below
-    if (fromRank >= toRank) {
-        return null;
-    }
+  // Can message same tier or below
+  if (fromRank >= toRank) {
+    return null;
+  }
 
-    log.warn('Communication tier violation', {
-        from: fromAgentName,
-        fromTier,
-        to: toAgentName,
-        toTier,
-    });
+  log.warn('Communication tier violation', {
+    from: fromAgentName,
+    fromTier,
+    to: toAgentName,
+    toTier,
+  });
 
-    return (
-        `Communication tier violation: ${fromAgentName} (${fromTier}) cannot message ` +
-        `${toAgentName} (${toTier}). Messages flow downward — ${fromTier}-tier agents ` +
-        `can only message agents at the same tier or below.`
-    );
+  return (
+    `Communication tier violation: ${fromAgentName} (${fromTier}) cannot message ` +
+    `${toAgentName} (${toTier}). Messages flow downward — ${fromTier}-tier agents ` +
+    `can only message agents at the same tier or below.`
+  );
 }
 
 /**
@@ -110,15 +107,15 @@ export function checkCommunicationTier(
  * Higher tiers get more messaging capacity.
  */
 export function getTierMessageLimits(tier: CommunicationTier): {
-    maxMessagesPerSession: number;
-    maxUniqueTargetsPerSession: number;
+  maxMessagesPerSession: number;
+  maxUniqueTargetsPerSession: number;
 } {
-    switch (tier) {
-        case 'top':
-            return { maxMessagesPerSession: 20, maxUniqueTargetsPerSession: 10 };
-        case 'mid':
-            return { maxMessagesPerSession: 10, maxUniqueTargetsPerSession: 5 };
-        case 'bottom':
-            return { maxMessagesPerSession: 5, maxUniqueTargetsPerSession: 2 };
-    }
+  switch (tier) {
+    case 'top':
+      return { maxMessagesPerSession: 20, maxUniqueTargetsPerSession: 10 };
+    case 'mid':
+      return { maxMessagesPerSession: 10, maxUniqueTargetsPerSession: 5 };
+    case 'bottom':
+      return { maxMessagesPerSession: 5, maxUniqueTargetsPerSession: 2 };
+  }
 }

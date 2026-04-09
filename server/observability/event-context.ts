@@ -9,21 +9,21 @@
  * Built on top of the existing AsyncLocalStorage-based tracing in trace-context.ts.
  */
 
-import { generateTraceId } from './tracing';
 import { getTraceId, runWithTraceId } from './trace-context';
+import { generateTraceId } from './tracing';
 
 /** Source system that originated the event. */
 export type EventSource =
-    | 'web'
-    | 'algochat'
-    | 'agent'
-    | 'telegram'
-    | 'discord'
-    | 'scheduler'
-    | 'webhook'
-    | 'workflow'
-    | 'council'
-    | 'polling';
+  | 'web'
+  | 'algochat'
+  | 'agent'
+  | 'telegram'
+  | 'discord'
+  | 'scheduler'
+  | 'webhook'
+  | 'workflow'
+  | 'council'
+  | 'polling';
 
 /**
  * Correlation context threaded through all agent-to-agent calls.
@@ -33,14 +33,14 @@ export type EventSource =
  * can be correlated via `traceId`.
  */
 export interface EventContext {
-    /** 32 hex-char trace identifier, from generateTraceId(). */
-    traceId: string;
-    /** Optional parent span/request ID for nesting within a trace. */
-    parentId?: string;
-    /** Date.now() when the context was created. */
-    timestamp: number;
-    /** Which entry-point system originated this context. */
-    source: EventSource;
+  /** 32 hex-char trace identifier, from generateTraceId(). */
+  traceId: string;
+  /** Optional parent span/request ID for nesting within a trace. */
+  parentId?: string;
+  /** Date.now() when the context was created. */
+  timestamp: number;
+  /** Which entry-point system originated this context. */
+  source: EventSource;
 }
 
 /**
@@ -51,13 +51,13 @@ export interface EventContext {
  * context (from a parent call) it will be used as `parentId`.
  */
 export function createEventContext(source: EventSource, existingTraceId?: string): EventContext {
-    const currentTraceId = getTraceId();
-    return {
-        traceId: existingTraceId ?? currentTraceId ?? generateTraceId(),
-        parentId: currentTraceId && currentTraceId !== existingTraceId ? currentTraceId : undefined,
-        timestamp: Date.now(),
-        source,
-    };
+  const currentTraceId = getTraceId();
+  return {
+    traceId: existingTraceId ?? currentTraceId ?? generateTraceId(),
+    parentId: currentTraceId && currentTraceId !== existingTraceId ? currentTraceId : undefined,
+    timestamp: Date.now(),
+    source,
+  };
 }
 
 /**
@@ -67,5 +67,5 @@ export function createEventContext(source: EventSource, existingTraceId?: string
  * EventContext's traceId, ensuring all async descendants inherit the ID.
  */
 export function runWithEventContext<T>(ctx: EventContext, fn: () => T): T {
-    return runWithTraceId(ctx.traceId, fn);
+  return runWithTraceId(ctx.traceId, fn);
 }

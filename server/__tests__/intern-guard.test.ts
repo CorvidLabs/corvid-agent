@@ -5,8 +5,8 @@
  * across known model names, ollama local vs cloud, and edge cases.
  */
 
-import { describe, test, expect } from 'bun:test';
-import { isInternTierModel, checkInternPrGuard } from '../work/intern-guard';
+import { describe, expect, test } from 'bun:test';
+import { checkInternPrGuard, isInternTierModel } from '../work/intern-guard';
 
 // ─── isInternTierModel ────────────────────────────────────────────────────────
 

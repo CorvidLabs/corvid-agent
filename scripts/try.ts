@@ -14,9 +14,9 @@
  * Part of #595 (onboarding epic), closes #596.
  */
 
-import { spawn, type Subprocess } from 'bun';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { type Subprocess, spawn } from 'bun';
 
 const PORT = process.env.PORT ?? '3000';
 const HOST = '127.0.0.1';
@@ -25,70 +25,68 @@ const BASE_URL = `http://${HOST}:${PORT}`;
 // ── Provider detection ──────────────────────────────────────────────────────
 
 interface DetectedProvider {
-    name: string;
-    type: 'anthropic' | 'ollama' | 'openrouter' | 'none';
-    model: string;
-    /** Extra env vars to pass to the server for this provider. */
-    env: Record<string, string>;
+  name: string;
+  type: 'anthropic' | 'ollama' | 'openrouter' | 'none';
+  model: string;
+  /** Extra env vars to pass to the server for this provider. */
+  env: Record<string, string>;
 }
 
 async function detectProvider(): Promise<DetectedProvider> {
-    // 1. Check for ANTHROPIC_API_KEY
-    if (process.env.ANTHROPIC_API_KEY) {
-        console.log('  ✓ Anthropic API key detected');
-        return { name: 'Anthropic (API key)', type: 'anthropic', model: 'claude-sonnet-4-20250514', env: {} };
-    }
+  // 1. Check for ANTHROPIC_API_KEY
+  if (process.env.ANTHROPIC_API_KEY) {
+    console.log('  ✓ Anthropic API key detected');
+    return { name: 'Anthropic (API key)', type: 'anthropic', model: 'claude-sonnet-4-20250514', env: {} };
+  }
 
-    // 2. Check for Claude CLI
-    if (Bun.which('claude')) {
-        console.log('  ✓ Claude CLI detected');
-        return { name: 'Claude (CLI)', type: 'anthropic', model: 'claude-sonnet-4-20250514', env: {} };
-    }
+  // 2. Check for Claude CLI
+  if (Bun.which('claude')) {
+    console.log('  ✓ Claude CLI detected');
+    return { name: 'Claude (CLI)', type: 'anthropic', model: 'claude-sonnet-4-20250514', env: {} };
+  }
 
-    // 3. Check for OpenRouter API key
-    if (process.env.OPENROUTER_API_KEY) {
-        console.log('  ✓ OpenRouter API key detected');
-        return { name: 'OpenRouter', type: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514', env: {} };
-    }
+  // 3. Check for OpenRouter API key
+  if (process.env.OPENROUTER_API_KEY) {
+    console.log('  ✓ OpenRouter API key detected');
+    return { name: 'OpenRouter', type: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514', env: {} };
+  }
 
-    // 4. Check for Ollama
-    const ollamaHost = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
-    try {
-        const res = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
-        if (res.ok) {
-            const data = (await res.json()) as { models?: Array<{ name: string }> };
-            const models = data.models ?? [];
-            // Pick a reasonable default model from what's available
-            const preferred = ['llama3.1', 'llama3', 'qwen2.5', 'mistral', 'gemma2'];
-            const match = preferred.find((p) => models.some((m) => m.name.startsWith(p)));
-            const model = match
-                ? models.find((m) => m.name.startsWith(match))!.name
-                : models[0]?.name ?? 'llama3.1';
-            console.log(`  ✓ Ollama detected (${models.length} model${models.length !== 1 ? 's' : ''} available)`);
-            return {
-                name: 'Ollama (local)',
-                type: 'ollama',
-                model,
-                env: { OLLAMA_LOCAL_EXPERIMENTAL: 'true' },
-            };
-        }
-    } catch {
-        // Ollama not running
+  // 4. Check for Ollama
+  const ollamaHost = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
+  try {
+    const res = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
+    if (res.ok) {
+      const data = (await res.json()) as { models?: Array<{ name: string }> };
+      const models = data.models ?? [];
+      // Pick a reasonable default model from what's available
+      const preferred = ['llama3.1', 'llama3', 'qwen2.5', 'mistral', 'gemma2'];
+      const match = preferred.find((p) => models.some((m) => m.name.startsWith(p)));
+      const model = match ? models.find((m) => m.name.startsWith(match))!.name : (models[0]?.name ?? 'llama3.1');
+      console.log(`  ✓ Ollama detected (${models.length} model${models.length !== 1 ? 's' : ''} available)`);
+      return {
+        name: 'Ollama (local)',
+        type: 'ollama',
+        model,
+        env: { OLLAMA_LOCAL_EXPERIMENTAL: 'true' },
+      };
     }
+  } catch {
+    // Ollama not running
+  }
 
-    // 5. No provider found
-    console.log('  ⚠ No AI provider detected');
-    console.log('    The dashboard will work, but chat requires an AI provider.');
-    console.log('    Options:');
-    console.log('      • Set ANTHROPIC_API_KEY in your environment');
-    console.log('      • Install Claude CLI: npm i -g @anthropic-ai/claude-code');
-    console.log('      • Start Ollama: ollama serve');
-    return { name: 'none', type: 'none', model: 'none', env: {} };
+  // 5. No provider found
+  console.log('  ⚠ No AI provider detected');
+  console.log('    The dashboard will work, but chat requires an AI provider.');
+  console.log('    Options:');
+  console.log('      • Set ANTHROPIC_API_KEY in your environment');
+  console.log('      • Install Claude CLI: npm i -g @anthropic-ai/claude-code');
+  console.log('      • Start Ollama: ollama serve');
+  return { name: 'none', type: 'none', model: 'none', env: {} };
 }
 
 // ── Banner ──────────────────────────────────────────────────────────────────
 function printBanner(): void {
-    console.log(`
+  console.log(`
   ╔══════════════════════════════════════════════════╗
   ║            corvid-agent — try mode               ║
   ║                                                  ║
@@ -101,39 +99,41 @@ function printBanner(): void {
 
 // ── Health polling ──────────────────────────────────────────────────────────
 async function waitForServer(maxWaitMs = 30_000): Promise<boolean> {
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-        try {
-            const res = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(2_000) });
-            if (res.ok) return true;
-        } catch {
-            // Server not ready yet
-        }
-        await Bun.sleep(500);
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(2_000) });
+      if (res.ok) return true;
+    } catch {
+      // Server not ready yet
     }
-    return false;
+    await Bun.sleep(500);
+  }
+  return false;
 }
 
 // ── Demo data seeding ───────────────────────────────────────────────────────
-async function seedDemoData(provider: DetectedProvider): Promise<{ agentId: string; sessionId: string; projectId: string }> {
-    // Create a project
-    const projectRes = await fetch(`${BASE_URL}/api/projects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: 'Demo Project',
-            description: 'A sample project to explore corvid-agent',
-            workingDir: process.cwd(),
-        }),
-    });
-    if (!projectRes.ok) throw new Error(`Failed to create project: ${await projectRes.text()}`);
-    const project = (await projectRes.json()) as { id: string };
+async function seedDemoData(
+  provider: DetectedProvider,
+): Promise<{ agentId: string; sessionId: string; projectId: string }> {
+  // Create a project
+  const projectRes = await fetch(`${BASE_URL}/api/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Demo Project',
+      description: 'A sample project to explore corvid-agent',
+      workingDir: process.cwd(),
+    }),
+  });
+  if (!projectRes.ok) throw new Error(`Failed to create project: ${await projectRes.text()}`);
+  const project = (await projectRes.json()) as { id: string };
 
-    // Create a demo agent configured for the detected provider
-    const agentBody: Record<string, unknown> = {
-        name: 'Corvid',
-        description: 'A friendly demo agent that shows what corvid-agent can do',
-        systemPrompt: `You are Corvid, a helpful AI assistant running inside corvid-agent. You are friendly, concise, and technically capable. When users ask what you can do, explain that corvid-agent is an AI agent framework that can:
+  // Create a demo agent configured for the detected provider
+  const agentBody: Record<string, unknown> = {
+    name: 'Corvid',
+    description: 'A friendly demo agent that shows what corvid-agent can do',
+    systemPrompt: `You are Corvid, a helpful AI assistant running inside corvid-agent. You are friendly, concise, and technically capable. When users ask what you can do, explain that corvid-agent is an AI agent framework that can:
 - Run AI sessions with Claude or local models via Ollama
 - Review PRs and triage GitHub issues automatically
 - Execute scheduled tasks (daily reviews, test runs)
@@ -141,57 +141,59 @@ async function seedDemoData(provider: DetectedProvider): Promise<{ agentId: stri
 - Coordinate multiple agents via councils
 
 You're currently running in try mode — an in-memory sandbox so users can explore the dashboard and chat with you without any configuration.`,
-        model: provider.model,
-    };
+    model: provider.model,
+  };
 
-    // Set the provider field for non-anthropic providers so the process manager
-    // routes to the correct execution engine
-    if (provider.type === 'ollama') {
-        agentBody.provider = 'ollama';
-    } else if (provider.type === 'openrouter') {
-        agentBody.provider = 'openrouter';
-    }
+  // Set the provider field for non-anthropic providers so the process manager
+  // routes to the correct execution engine
+  if (provider.type === 'ollama') {
+    agentBody.provider = 'ollama';
+  } else if (provider.type === 'openrouter') {
+    agentBody.provider = 'openrouter';
+  }
 
-    const agentRes = await fetch(`${BASE_URL}/api/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(agentBody),
-    });
-    if (!agentRes.ok) throw new Error(`Failed to create agent: ${await agentRes.text()}`);
-    const agent = (await agentRes.json()) as { id: string };
+  const agentRes = await fetch(`${BASE_URL}/api/agents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(agentBody),
+  });
+  if (!agentRes.ok) throw new Error(`Failed to create agent: ${await agentRes.text()}`);
+  const agent = (await agentRes.json()) as { id: string };
 
-    // Create a session
-    const sessionRes = await fetch(`${BASE_URL}/api/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            projectId: project.id,
-            agentId: agent.id,
-            name: 'Welcome Session',
-            source: 'web',
-        }),
-    });
-    if (!sessionRes.ok) throw new Error(`Failed to create session: ${await sessionRes.text()}`);
-    const session = (await sessionRes.json()) as { id: string };
+  // Create a session
+  const sessionRes = await fetch(`${BASE_URL}/api/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Welcome Session',
+      source: 'web',
+    }),
+  });
+  if (!sessionRes.ok) throw new Error(`Failed to create session: ${await sessionRes.text()}`);
+  const session = (await sessionRes.json()) as { id: string };
 
-    // Seed a welcome message so users see a live conversation immediately
-    const providerLine = provider.type !== 'none'
-        ? `**AI Provider:** ${provider.name} (model: \`${provider.model}\`) — ready to chat!`
-        : `**AI Provider:** None detected — you can explore the dashboard, but chat requires a provider.\n> Set \`ANTHROPIC_API_KEY\` in your environment, install the [Claude CLI](https://docs.anthropic.com/en/docs/claude-code), or start [Ollama](https://ollama.com) and re-run \`bun run try\`.`;
+  // Seed a welcome message so users see a live conversation immediately
+  const providerLine =
+    provider.type !== 'none'
+      ? `**AI Provider:** ${provider.name} (model: \`${provider.model}\`) — ready to chat!`
+      : `**AI Provider:** None detected — you can explore the dashboard, but chat requires a provider.\n> Set \`ANTHROPIC_API_KEY\` in your environment, install the [Claude CLI](https://docs.anthropic.com/en/docs/claude-code), or start [Ollama](https://ollama.com) and re-run \`bun run try\`.`;
 
-    const chatSuggestions = provider.type !== 'none'
-        ? `Try asking me something like:
+  const chatSuggestions =
+    provider.type !== 'none'
+      ? `Try asking me something like:
 - *"What can you do?"*
 - *"Explain the corvid-agent architecture"*
 - *"How do I set up a real agent?"*`
-        : `Once you have an AI provider configured, restart \`bun run try\` and you'll be able to chat here.
+      : `Once you have an AI provider configured, restart \`bun run try\` and you'll be able to chat here.
 
 In the meantime, explore the dashboard:
 - Browse the **Agents** and **Sessions** pages
 - Check **Settings** to see configuration options
 - Visit the **API docs** at ${BASE_URL}/api-docs`;
 
-    const welcomeContent = `Welcome to **corvid-agent** try mode!
+  const welcomeContent = `Welcome to **corvid-agent** try mode!
 
 You're running in a sandboxed environment — no data is persisted and no API keys are required.
 
@@ -208,105 +210,105 @@ ${chatSuggestions}
 
 > **Sandbox mode** — nothing you do here is saved. Restart \`bun run try\` to reset.`;
 
-    await fetch(`${BASE_URL}/api/sessions/${session.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'assistant', content: welcomeContent }),
-    });
+  await fetch(`${BASE_URL}/api/sessions/${session.id}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'assistant', content: welcomeContent }),
+  });
 
-    return { agentId: agent.id, sessionId: session.id, projectId: project.id };
+  return { agentId: agent.id, sessionId: session.id, projectId: project.id };
 }
 
 // ── Browser opener ──────────────────────────────────────────────────────────
 function openBrowser(url: string): void {
-    const platform = process.platform;
-    const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
-    try {
-        spawn([cmd, url], { stdio: ['ignore', 'ignore', 'ignore'] });
-    } catch {
-        // Non-fatal — user can open manually
-    }
+  const platform = process.platform;
+  const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
+  try {
+    spawn([cmd, url], { stdio: ['ignore', 'ignore', 'ignore'] });
+  } catch {
+    // Non-fatal — user can open manually
+  }
 }
 
 // ── Check for built client ──────────────────────────────────────────────────
 function checkClientBuild(): boolean {
-    const clientDist = join(import.meta.dir, '..', 'client', 'dist', 'client', 'browser', 'index.html');
-    return existsSync(clientDist);
+  const clientDist = join(import.meta.dir, '..', 'client', 'dist', 'client', 'browser', 'index.html');
+  return existsSync(clientDist);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main(): Promise<void> {
-    printBanner();
+  printBanner();
 
-    // Detect available AI provider before starting the server
-    console.log('  Detecting AI providers...');
-    const provider = await detectProvider();
+  // Detect available AI provider before starting the server
+  console.log('  Detecting AI providers...');
+  const provider = await detectProvider();
 
-    // Check if client is built
-    if (!checkClientBuild()) {
-        console.log('\n  Dashboard not built yet. Building...');
-        const buildResult = spawn(['bun', 'run', 'build:client'], {
-            cwd: join(import.meta.dir, '..'),
-            stdio: ['ignore', 'inherit', 'inherit'],
-        });
-        const exitCode = await buildResult.exited;
-        if (exitCode !== 0) {
-            console.log('  Warning: Dashboard build failed. The API will still work,');
-            console.log('  but you won\'t see the web UI. Run `bun run build:client` to fix.\n');
-        }
-    }
-
-    // Start the server with TRY_MODE
-    console.log('\n  Starting server...');
-    const serverProcess: Subprocess = spawn(['bun', 'server/index.ts'], {
-        cwd: join(import.meta.dir, '..'),
-        env: {
-            ...process.env,
-            TRY_MODE: 'true',
-            PORT,
-            BIND_HOST: HOST,
-            LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
-            // Disable services that require external config
-            ALGOCHAT_MNEMONIC: '',
-            SANDBOX_ENABLED: 'false',
-            MULTI_TENANT: 'false',
-            // Pass through provider-specific env vars
-            ...provider.env,
-        },
-        stdio: ['ignore', 'inherit', 'inherit'],
+  // Check if client is built
+  if (!checkClientBuild()) {
+    console.log('\n  Dashboard not built yet. Building...');
+    const buildResult = spawn(['bun', 'run', 'build:client'], {
+      cwd: join(import.meta.dir, '..'),
+      stdio: ['ignore', 'inherit', 'inherit'],
     });
-
-    // Handle cleanup
-    const cleanup = (): void => {
-        serverProcess.kill();
-    };
-    process.on('SIGINT', () => {
-        console.log('\n  Shutting down try mode...');
-        cleanup();
-        process.exit(0);
-    });
-    process.on('SIGTERM', cleanup);
-
-    // Wait for server to be ready
-    console.log('  Waiting for server...');
-    const ready = await waitForServer();
-    if (!ready) {
-        console.error('  Server failed to start within 30 seconds.');
-        cleanup();
-        process.exit(1);
+    const exitCode = await buildResult.exited;
+    if (exitCode !== 0) {
+      console.log('  Warning: Dashboard build failed. The API will still work,');
+      console.log("  but you won't see the web UI. Run `bun run build:client` to fix.\n");
     }
+  }
 
-    // Seed demo data with the detected provider
-    console.log('  Seeding demo data...');
-    try {
-        const { agentId, sessionId } = await seedDemoData(provider);
-        console.log(`  Demo agent created: ${agentId.slice(0, 8)}...`);
-        console.log(`  Welcome session created: ${sessionId.slice(0, 8)}...`);
-    } catch (err) {
-        console.error(`  Warning: Failed to seed demo data: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  // Start the server with TRY_MODE
+  console.log('\n  Starting server...');
+  const serverProcess: Subprocess = spawn(['bun', 'server/index.ts'], {
+    cwd: join(import.meta.dir, '..'),
+    env: {
+      ...process.env,
+      TRY_MODE: 'true',
+      PORT,
+      BIND_HOST: HOST,
+      LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
+      // Disable services that require external config
+      ALGOCHAT_MNEMONIC: '',
+      SANDBOX_ENABLED: 'false',
+      MULTI_TENANT: 'false',
+      // Pass through provider-specific env vars
+      ...provider.env,
+    },
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
 
-    console.log(`
+  // Handle cleanup
+  const cleanup = (): void => {
+    serverProcess.kill();
+  };
+  process.on('SIGINT', () => {
+    console.log('\n  Shutting down try mode...');
+    cleanup();
+    process.exit(0);
+  });
+  process.on('SIGTERM', cleanup);
+
+  // Wait for server to be ready
+  console.log('  Waiting for server...');
+  const ready = await waitForServer();
+  if (!ready) {
+    console.error('  Server failed to start within 30 seconds.');
+    cleanup();
+    process.exit(1);
+  }
+
+  // Seed demo data with the detected provider
+  console.log('  Seeding demo data...');
+  try {
+    const { agentId, sessionId } = await seedDemoData(provider);
+    console.log(`  Demo agent created: ${agentId.slice(0, 8)}...`);
+    console.log(`  Welcome session created: ${sessionId.slice(0, 8)}...`);
+  } catch (err) {
+    console.error(`  Warning: Failed to seed demo data: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  console.log(`
   ────────────────────────────────────────────────────
   Dashboard:  ${BASE_URL}
   API docs:   ${BASE_URL}/api-docs
@@ -317,14 +319,14 @@ async function main(): Promise<void> {
   Press Ctrl+C to stop.
 `);
 
-    // Open browser
-    openBrowser(BASE_URL);
+  // Open browser
+  openBrowser(BASE_URL);
 
-    // Keep alive until interrupted
-    await serverProcess.exited;
+  // Keep alive until interrupted
+  await serverProcess.exited;
 }
 
 main().catch((err) => {
-    console.error('Try mode failed:', err);
-    process.exit(1);
+  console.error('Try mode failed:', err);
+  process.exit(1);
 });

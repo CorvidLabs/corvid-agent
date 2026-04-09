@@ -14,13 +14,13 @@
  * through the system.
  */
 export interface SessionMessage {
-    id: string;
-    channelType: string;
-    participant: string;
-    content: string;
-    direction: 'inbound' | 'outbound';
-    timestamp: Date;
-    metadata?: Record<string, unknown>;
+  id: string;
+  channelType: string;
+  participant: string;
+  content: string;
+  direction: 'inbound' | 'outbound';
+  timestamp: Date;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -29,10 +29,10 @@ export interface SessionMessage {
  * and may include additional data in `details`.
  */
 export interface ChannelStatus {
-    channelType: string;
-    enabled: boolean;
-    connected: boolean;
-    details?: Record<string, unknown>;
+  channelType: string;
+  enabled: boolean;
+  connected: boolean;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -44,21 +44,21 @@ export interface ChannelStatus {
  * message encoding, transport) while exposing a uniform API.
  */
 export interface ChannelAdapter {
-    /** Identifier for the channel type (e.g., 'algochat', 'slack', 'discord'). */
-    readonly channelType: string;
+  /** Identifier for the channel type (e.g., 'algochat', 'slack', 'discord'). */
+  readonly channelType: string;
 
-    /** Send an outbound message to a participant. */
-    sendMessage(participant: string, content: string): Promise<void>;
+  /** Send an outbound message to a participant. */
+  sendMessage(participant: string, content: string): Promise<void>;
 
-    /** Register a handler for inbound messages. */
-    onMessage(handler: (msg: SessionMessage) => void): void;
+  /** Register a handler for inbound messages. */
+  onMessage(handler: (msg: SessionMessage) => void): void;
 
-    /** Start the channel adapter (begin listening for messages). */
-    start(): void;
+  /** Start the channel adapter (begin listening for messages). */
+  start(): void;
 
-    /** Stop the channel adapter (cease listening, clean up resources). */
-    stop(): void;
+  /** Stop the channel adapter (cease listening, clean up resources). */
+  stop(): void;
 
-    /** Get the current health/status of the channel. */
-    getStatus(): Promise<ChannelStatus>;
+  /** Get the current health/status of the channel. */
+  getStatus(): Promise<ChannelStatus>;
 }
