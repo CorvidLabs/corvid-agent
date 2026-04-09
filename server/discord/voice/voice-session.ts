@@ -25,16 +25,6 @@ const log = createLogger('VoiceSession');
 /** Max length of text to send to TTS (longer gets truncated). */
 const MAX_TTS_LENGTH = 4000;
 
-/** Quick acknowledgment phrases — played immediately after transcription while the agent thinks. */
-const ACK_PHRASES = ['Got it.', 'On it.', 'Okay.', 'Sure.', 'One sec.', 'Checking.', 'Let me see.', 'Looking into it.'];
-
-/**
- * Minimum word count to trigger an acknowledgment before responding.
- * Short conversational messages (greetings, yes/no, quick questions) don't need
- * an ack — the real response arrives fast enough. Longer task-like messages benefit
- * from an ack so the user knows they were heard while the agent works.
- */
-const ACK_WORD_THRESHOLD = 6;
 
 /** How long to wait after the last content event before considering the response complete (ms). */
 const RESPONSE_DEBOUNCE_MS = 800;
@@ -54,7 +44,6 @@ interface GuildVoiceSession {
   /** Queued transcriptions received while TTS was playing. */
   pendingTranscriptions: { userId: string; text: string }[];
   /** Round-robin index for acknowledgment phrases. */
-  ackIndex: number;
 }
 
 /**
@@ -126,17 +115,6 @@ export class VoiceSessionRouter {
     session.responding = true;
     session.responseBuffer = '';
 
-    // Only play ack for longer task-like messages — short conversational exchanges
-    // (greetings, yes/no, quick questions) get the real response fast enough
-    const wordCount = text.trim().split(/\s+/).length;
-    if (wordCount >= ACK_WORD_THRESHOLD) {
-      const ack = ACK_PHRASES[session.ackIndex % ACK_PHRASES.length];
-      session.ackIndex++;
-      this.voiceManager.speak(guildId, ack).catch((err) => {
-        log.error('Ack TTS failed', { guildId, error: String(err) });
-      });
-      // Don't await — send to agent in parallel so the LLM starts thinking immediately
-    }
 
     const sent = this.processManager.sendMessage(session.sessionId, `${voicePrefix}: ${text}`);
     if (!sent) {
@@ -261,7 +239,6 @@ export class VoiceSessionRouter {
       debounceTimer: null,
       callback: (_sid, event) => this.handleSessionEvent(guildId, event),
       pendingTranscriptions: [],
-      ackIndex: 0,
     };
 
     this.processManager.subscribe(session.id, voiceSession.callback);
