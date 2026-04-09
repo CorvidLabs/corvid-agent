@@ -77,7 +77,7 @@ const WHISPER_HALLUCINATIONS = new Set([
 ]);
 
 /** Maximum audio duration (ms) — flush buffer if someone talks too long. */
-const MAX_AUDIO_DURATION_MS = 60_000;
+const MAX_AUDIO_DURATION_MS = 180_000;
 
 /** Silence duration (ms) before ending a user's audio stream. */
 const SILENCE_DURATION_MS = 700;
