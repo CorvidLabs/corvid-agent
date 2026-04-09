@@ -472,7 +472,9 @@ export function isClientMessage(data: unknown): data is ClientMessage {
       return typeof msg['agentId'] === 'string' && typeof msg['microAlgos'] === 'number';
     case 'agent_invoke':
       return (
-        typeof msg['fromAgentId'] === 'string' && typeof msg['toAgentId'] === 'string' && typeof msg['content'] === 'string'
+        typeof msg['fromAgentId'] === 'string' &&
+        typeof msg['toAgentId'] === 'string' &&
+        typeof msg['content'] === 'string'
       );
     case 'approval_response':
       return typeof msg['requestId'] === 'string' && (msg['behavior'] === 'allow' || msg['behavior'] === 'deny');
