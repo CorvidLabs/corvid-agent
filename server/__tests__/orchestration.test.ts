@@ -334,6 +334,28 @@ describe('handleRepoLocking', () => {
         expect(lockA).toBeNull();
     });
 
+    test('skips repo locking for work_task actions (uses service-level queuing)', () => {
+        insertExecution('exec-1');
+        insertExecution('exec-2');
+
+        // Lock the project with a non-work_task execution
+        handleRepoLocking(
+            db, makeSchedule(), makeExecution({ id: 'exec-1' }),
+            makeAction({ type: 'review_prs', repos: [], projectId: 'proj-1' }), noopEmit,
+        );
+
+        // work_task action should bypass repo locking entirely
+        const result = handleRepoLocking(
+            db, makeSchedule(), makeExecution({ id: 'exec-2' }),
+            makeAction({ type: 'work_task', repos: [], projectId: 'proj-1' }), noopEmit,
+        );
+        expect(result).toBe(false);
+
+        // Execution should still be running (not cancelled)
+        const exec = db.query('SELECT status FROM schedule_executions WHERE id = ?').get('exec-2') as { status: string };
+        expect(exec.status).toBe('running');
+    });
+
     test('uses projectId fallback when repos is empty', () => {
         insertExecution('exec-1');
         const result = handleRepoLocking(
