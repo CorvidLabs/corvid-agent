@@ -161,6 +161,12 @@ export class DiscordBridge {
           );
 
           this.voiceManager.onTranscription((result) => {
+            // Drop transcriptions that arrived after deafen (in-flight audio)
+            if (this.voiceManager.isDeafened(result.guildId)) {
+              log.debug('Dropping transcription — bot is deafened', { guildId: result.guildId });
+              return;
+            }
+
             // Post transcription to text channel for visibility
             const info = this.voiceManager.getConnection(result.guildId);
             const textChannelId = info?.transcriptionChannelId;
