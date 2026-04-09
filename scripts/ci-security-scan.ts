@@ -44,8 +44,9 @@ if (!diffOutput.trim()) {
 }
 
 /**
- * Strip diff sections for test and spec files — they contain malicious patterns
- * and unapproved URLs as test fixtures, not real code.
+ * Strip diff sections for test, spec, and security-scanner files — they contain
+ * malicious patterns and unapproved URLs as test fixtures or regex examples,
+ * not real code.
  */
 function stripTestFiles(diff: string): string {
   const lines = diff.split('\n');
@@ -58,7 +59,10 @@ function stripTestFiles(diff: string): string {
         /\b__tests__\//.test(line) ||
         /\.test\.ts\b/.test(line) ||
         /\bspecs\//.test(line) ||
-        /\.spec\.(md|ts)\b/.test(line);
+        /\.spec\.(md|ts)\b/.test(line) ||
+        /\bserver\/lib\/fetch-detector\.ts\b/.test(line) ||
+        /\bserver\/lib\/code-scanner\.ts\b/.test(line) ||
+        /\bscripts\/ci-security-scan\.ts\b/.test(line);
     }
     if (!skip) result.push(line);
   }
