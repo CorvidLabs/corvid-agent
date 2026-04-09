@@ -9,8 +9,8 @@ files:
 db_tables:
   - agent_usdc_revenue
 depends_on:
-  - specs/db/credits.spec.md
-  - specs/lib/infra.spec.md
+  - specs/db/operations/credits.spec.md
+  - specs/lib/infra/infra.spec.md
 tracks: [1689]
 ---
 

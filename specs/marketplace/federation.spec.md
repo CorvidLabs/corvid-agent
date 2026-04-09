@@ -10,7 +10,7 @@ db_tables:
 depends_on:
   - specs/marketplace/service.spec.md
   - specs/db/schema.spec.md
-  - specs/lib/security.spec.md
+  - specs/lib/security/security.spec.md
 ---
 
 # Marketplace Federation

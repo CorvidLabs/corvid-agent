@@ -8,7 +8,7 @@ db_tables: []
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/process/session-lifecycle.spec.md
-  - specs/db/memory-sync.spec.md
+  - specs/db/agents/memory-sync.spec.md
   - specs/algochat/bridge.spec.md
   - specs/algochat/config.spec.md
   - specs/buddy/service.spec.md

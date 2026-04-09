@@ -12,7 +12,7 @@ db_tables:
   - api_keys
 depends_on:
   - specs/db/connection.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Tenant

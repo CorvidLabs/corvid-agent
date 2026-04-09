@@ -13,7 +13,7 @@ depends_on:
   - specs/providers/provider-system.spec.md
   - specs/middleware/middleware-pipeline.spec.md
   - specs/db/connection.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Health

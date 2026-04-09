@@ -7,7 +7,7 @@ files:
 db_tables: []
 depends_on:
   - specs/flock-directory/service.spec.md
-  - specs/flock-directory/testing-runner.spec.md
+  - specs/flock-directory/testing/testing-runner.spec.md
 ---
 
 # Flock Directory A2A Test Transport

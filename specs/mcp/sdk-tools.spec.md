@@ -8,7 +8,7 @@ files:
   - server/mcp/schemas/memory-tools.ts
 db_tables: []
 depends_on:
-  - specs/mcp/tool-handlers.spec.md
+  - specs/mcp/tools/tool-handlers.spec.md
 ---
 
 # MCP SDK Tools
@@ -60,13 +60,14 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 
 ## Invariants
 
-1. **DEFAULT_ALLOWED_TOOLS**: 35 tools available to all agents when `mcp_tool_permissions` is NULL. Privileged tools (`corvid_grant_credits`, `corvid_credit_config`) are excluded from this set
+1. **DEFAULT_ALLOWED_TOOLS**: 48 tools available to all agents when `mcp_tool_permissions` is NULL (defined in `tool-permissions.ts`). Privileged tools (`corvid_grant_credits`, `corvid_credit_config`) are excluded from this set
 2. **Tiered scheduler tool gating**: Uses `SCHEDULER_ALWAYS_BLOCKED` (4 tools: `corvid_grant_credits`, `corvid_credit_config`, `corvid_github_fork_repo`, `corvid_ask_owner`) and `SCHEDULER_GATED_TOOLS` (4 tools allowed for specific action types: `corvid_github_create_issue` for daily_review/improvement_loop/custom, `corvid_github_create_pr` for work_task/improvement_loop/codebase_review, `corvid_github_comment_on_pr` for review_prs/daily_review, `corvid_send_message` for send_message/status_checkin/daily_review/custom). Defined in `scheduler-tool-gating.ts`
-3. **Permission resolution**: Web-source sessions get all tools. Non-web sessions are filtered by `ctx.resolvedToolPermissions` (agent base + skill bundle tools + project bundle tools). If no permissions are set, `DEFAULT_ALLOWED_TOOLS` is used
+3. **Permission resolution**: Web-source sessions get all tools. Non-web sessions use `resolveAllowedTools()` from `tool-permissions.ts` which checks `ctx.resolvedToolPermissions` first (agent base + skill bundle tools + project bundle tools), then falls back to agent's `mcpToolPermissions` from the database. If no permissions are set, `DEFAULT_ALLOWED_TOOLS` is used
 4. **Scheduler mode filtering**: When `ctx.schedulerMode` is true, `isToolBlockedForScheduler(toolName, ctx.schedulerActionType)` determines which tools are removed. Always-blocked tools are removed unconditionally; gated tools are allowed only when the action type is in the tool's allowed set
-5. **Plugin tool injection**: Optional `pluginTools` parameter allows dynamically loaded plugin tools to be added to the MCP server alongside built-in tools
-6. **Zod schema validation**: Every tool has a Zod v4 input schema. Invalid inputs are rejected before the handler is called
-7. **Conditional tool registration**: `corvid_create_work_task` is only registered when `ctx.workTaskService` is available. `corvid_code_symbols` and `corvid_find_references` are only registered when `ctx.astParserService` is available. `corvid_launch_council` is only registered when `ctx.processManager` is available. All other tools are registered unconditionally
+5. **Tool guardrails**: After permission and scheduler filtering, `filterToolsByGuardrail()` from `tool-guardrails.ts` hides expensive networking tools (e.g., `corvid_send_message`, `corvid_invoke_remote_agent`, `corvid_list_agents`) from sessions that don't need them, based on `toolAccessConfig` or the resolved policy for the session source. This prevents small models from autonomously attempting agent-to-agent networking.
+6. **Plugin tool injection**: Optional `pluginTools` parameter allows dynamically loaded plugin tools to be added to the MCP server alongside built-in tools
+7. **Zod schema validation**: Every tool has a Zod v4 input schema. Invalid inputs are rejected before the handler is called
+8. **Conditional tool registration**: `corvid_create_work_task`, `corvid_check_work_status`, and `corvid_list_work_tasks` are only registered when `ctx.workTaskService` is available. `corvid_code_symbols` and `corvid_find_references` are only registered when `ctx.astParserService` is available. `corvid_launch_council` is only registered when `ctx.processManager` is available. `corvid_browser` is only registered when `ctx.browserService` is available. All other tools are registered unconditionally
 
 ## Behavioral Examples
 
@@ -74,7 +75,7 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 
 - **Given** an agent with `mcp_tool_permissions = NULL`
 - **When** `createCorvidMcpServer` is called
-- **Then** all 35 `DEFAULT_ALLOWED_TOOLS` are registered (minus any conditionally unavailable tools), privileged tools are excluded
+- **Then** all 48 `DEFAULT_ALLOWED_TOOLS` are registered (minus any conditionally unavailable tools), privileged tools are excluded
 
 ### Scenario: Agent with explicit permissions
 
@@ -113,8 +114,15 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 
 | Module | What is used |
 |--------|-------------|
-| `server/mcp/tool-handlers/index.ts` | All 36 `handle*` functions and `McpToolContext` type (barrel re-export) |
-| `server/db/agents.ts` | `getAgent` (for permission lookup) |
+| `server/mcp/tool-handlers/index.ts` | All `handle*` functions and `McpToolContext` type (barrel re-export) |
+| `server/mcp/tool-handlers/contacts.ts` | `handleLookupContact` |
+| `server/mcp/tool-handlers/discord.ts` | `handleDiscordSendMessage`, `handleDiscordSendImage` |
+| `server/mcp/tool-handlers/library.ts` | `handleLibraryWrite`, `handleLibraryRead`, `handleLibraryListOnChain`, `handleLibraryDelete` |
+| `server/mcp/tool-handlers/repo-blocklist.ts` | `handleManageRepoBlocklist` |
+| `server/mcp/scheduler-tool-gating.ts` | `isToolBlockedForScheduler` |
+| `server/mcp/tool-guardrails.ts` | `filterToolsByGuardrail`, `resolveToolAccessPolicy`, `ToolAccessConfig` |
+| `server/mcp/tool-permissions.ts` | `resolveAllowedTools` |
+| `server/db/agents.ts` | `getAgent` (for permission lookup fallback) |
 | `@anthropic-ai/claude-agent-sdk` | `createSdkMcpServer`, `tool` |
 | `zod/v4` | `z` for input schema definitions |
 
@@ -132,3 +140,4 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 | 2026-02-24 | corvid-agent | Updated dependency path after tool-handlers refactor (#233) |
 | 2026-03-05 | corvid-agent | Document scheduler-tool-gating exports: 3 functions, 7 constants (#591) |
 | 2026-03-18 | corvid-agent | Move corvid_send_message from always-blocked to gated with tiered access (#1155) |
+| 2026-04-09 | corvid-agent | Update DEFAULT_ALLOWED_TOOLS count to 48, add tool guardrails filtering, add conditional browser registration, document new tool handler imports (contacts, discord, library, repo-blocklist), add tool-permissions/tool-guardrails dependencies |

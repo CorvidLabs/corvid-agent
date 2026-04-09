@@ -29,8 +29,8 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `createWebSocketHandler` | `(processManager, getBridge, authConfig, getMessenger?, getWorkTaskService?, getSchedulerService?, getOwnerQuestionManager?)` | `{ open, message, close }` | Factory returning Bun WebSocket handler callbacks |
-| `broadcastAlgoChatMessage` | `(server, participant, content, direction)` | `void` | Publish an AlgoChat message to all WebSocket clients subscribed to the `algochat` topic |
+| `createWebSocketHandler` | `(processManager, getBridge, authConfig, getMessenger?, getWorkTaskService?, getSchedulerService?, getOwnerQuestionManager?, getDb?)` | `{ open, message, close }` | Factory returning Bun WebSocket handler callbacks |
+| `broadcastAlgoChatMessage` | `(server, participant, content, direction, tenantId?)` | `void` | Publish an AlgoChat message to all WebSocket clients subscribed to the `algochat` topic (tenant-scoped) |
 | `tenantTopic` | `(base: string, tenantId?: string)` | `string` | Build tenant-scoped topic string for pub/sub routing |
 
 ### Exported Types (from shared/ws-protocol.ts)
@@ -75,7 +75,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `GovernanceQuorumReachedMessage` | `{ type: 'governance_quorum_reached'; launchId; weightedApprovalRatio; threshold }` |
 | `PingMessage` | `{ type: 'ping'; serverTime }` |
 | `WelcomeMessage` | `{ type: 'welcome'; serverTime }` |
-| `ErrorMessage` | `{ type: 'error'; message; severity?; errorCode? }` |
+| `ErrorMessage` | `{ type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }` |
 | `ServerShutdownMessage` | `{ type: 'server_shutdown'; signal; activeSessions; message }` |
 | `SessionErrorMessage` | `{ type: 'session_error'; sessionId; error: SessionErrorInfo }` |
 | `CouncilAgentErrorMessage` | `{ type: 'council_agent_error'; launchId; agentId; agentName; error: CouncilAgentErrorInfo }` |
@@ -111,7 +111,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `subscribe` | `sessionId: string` | Subscribe to session events for a given session |
 | `unsubscribe` | `sessionId: string` | Unsubscribe from session events |
 | `send_message` | `sessionId: string, content: string` | Send user input to a running session |
-| `chat_send` | `agentId: string, content: string, projectId?: string` | Send a message via the local AlgoChat bridge |
+| `chat_send` | `agentId: string, content: string, projectId?: string, tools?: string[]` | Send a message via the local AlgoChat bridge |
 | `agent_invoke` | `fromAgentId, toAgentId, content, paymentMicro?, projectId?` | Invoke one agent from another |
 | `approval_response` | `requestId: string, behavior: 'allow' \| 'deny', message?` | Respond to a tool approval request |
 | `create_work_task` | `agentId, description, projectId?` | Create a new work task |
@@ -147,7 +147,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 5. **Timing-safe key comparison**: API key validation uses `timingSafeEqual` to prevent timing attacks
 6. **Subscription cleanup on close**: When a WebSocket disconnects, all session subscriptions are cleaned up via `processManager.unsubscribe`
 7. **Idempotent subscribe**: If a client subscribes to the same session twice, the second subscribe is silently ignored
-8. **Broadcast topics**: Authenticated clients are subscribed to five pub/sub topics: `council`, `algochat`, `scheduler`, `ollama`, `owner`
+8. **Broadcast topics**: Authenticated clients are subscribed to six pub/sub topics: `council`, `algochat`, `scheduler`, `ollama`, `owner`, `sessions`
 9. **Safe send**: All outbound messages use `safeSend` which catches and ignores errors from already-closed connections
 10. **Agent reward bounds**: `agent_reward` validates `microAlgos` is between 1,000 and 100,000,000 (1 mAlgo to 100 ALGO)
 11. **Message validation**: Incoming messages are validated via `isClientMessage` from `shared/ws-protocol.ts`. Invalid JSON or unknown message types are rejected with an error
@@ -247,7 +247,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `auth` sent when already authenticated | Error message: `"Already authenticated"` |
 | `auth` with invalid key | Error message `"Invalid API key"`, connection closed with code 4001 |
 | Non-auth message before authentication | Error message: `"Authentication required..."` |
-| `send_message` to non-running session | Error message: `"Session {id} is not running"` |
+| `send_message` to non-running session | Auto-resumes if session exists in DB; error message `"Session {id} not found"` only if session is not in DB |
 | `chat_send` when bridge is null | Error message: `"AlgoChat is not available"` |
 | `agent_invoke` when messenger is null | Error message: `"Agent messaging not available"` |
 | `create_work_task` when service is null | Error message: `"Work task service not available"` |
@@ -288,3 +288,4 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Added `sessions` as 6th broadcast topic, `getDb` parameter to createWebSocketHandler, `tools` field on chat_send ClientMessage, auto-resume for idle sessions on send_message, tenantId on broadcastAlgoChatMessage, structured error codes on sendError |

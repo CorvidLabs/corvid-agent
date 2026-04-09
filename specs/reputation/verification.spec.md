@@ -13,7 +13,7 @@ db_tables:
   - agents
   - work_tasks
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/reputation/scorer.spec.md
 tracks: [1458]
 ---

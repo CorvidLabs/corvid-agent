@@ -8,8 +8,8 @@ files:
   - server/lib/wait-sessions.ts
 db_tables: []
 depends_on:
-  - specs/lib/infra.spec.md
-  - specs/lib/resilience.spec.md
+  - specs/lib/infra/infra.spec.md
+  - specs/lib/infra/resilience.spec.md
 ---
 
 # Session

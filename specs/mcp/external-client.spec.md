@@ -41,15 +41,19 @@ Manages connections to third-party MCP servers via stdio transport, discovers th
 
 ## Stdio Server (server/mcp/stdio-server.ts)
 
-The stdio server is a standalone Bun script (not a module with traditional exports). It registers MCP tools that proxy to the corvid-agent HTTP API. It reads `CORVID_AGENT_ID` and `CORVID_API_URL` from environment variables and exits if either is missing.
+The stdio server is a standalone Bun script (not a module with traditional exports). It registers MCP tools that proxy to the corvid-agent HTTP API. It reads `CORVID_API_URL` from environment variables and exits if missing. `CORVID_AGENT_ID` is optional — if not set, the server auto-discovers the agent ID by querying `GET /api/agents` on the running server.
 
 ### Registered Tools
 
 | Tool Name | Parameters | Description |
 |-----------|-----------|-------------|
 | `corvid_send_message` | `to_agent: string`, `message: string` | Send a message to another agent via the HTTP API. |
-| `corvid_save_memory` | `key: string`, `content: string` | Save an encrypted memory via the HTTP API. |
+| `corvid_save_memory` | `key: string`, `content: string` | Save a memory to short-term local storage via the HTTP API. |
 | `corvid_recall_memory` | `key?: string`, `query?: string` | Recall memories via the HTTP API. |
+| `corvid_read_on_chain_memories` | `search?: string`, `limit?: number` | Read memories directly from on-chain storage via the HTTP API. |
+| `corvid_sync_on_chain_memories` | `limit?: number` | Sync on-chain memories back to local SQLite cache via the HTTP API. |
+| `corvid_delete_memory` | `key: string`, `mode?: 'soft' \| 'hard'` | Delete a long-term ARC-69 memory via the HTTP API. |
+| `corvid_promote_memory` | `key: string` | Promote a short-term memory to long-term on-chain storage via the HTTP API. |
 | `corvid_list_agents` | (none) | List available agents via the HTTP API. |
 
 ### Internal Functions (stdio-server.ts)
@@ -57,6 +61,7 @@ The stdio server is a standalone Bun script (not a module with traditional expor
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `callApi` | `path: string, body?: Record<string, unknown>` | `Promise<{ response: string; isError?: boolean }>` | Calls the corvid-agent HTTP API. Uses GET when no body is provided, POST otherwise. Returns parsed JSON response or error text. |
+| `resolveAgentId` | (none) | `Promise<string>` | Resolves agent ID from `CORVID_AGENT_ID` env var, or auto-discovers by querying `GET /api/agents` and using the first agent. Exits with code 1 if neither succeeds. |
 
 ## Invariants
 
@@ -64,7 +69,7 @@ The stdio server is a standalone Bun script (not a module with traditional expor
 2. Connection to each external MCP server has a 30-second timeout; if the server does not respond within that window the connection attempt fails.
 3. `connectAll` never throws -- individual server failures are logged as warnings and skipped. The method always returns an array (possibly empty) of successful connections.
 4. `disconnectAll` never throws -- individual transport close errors are logged as warnings and processing continues for remaining connections.
-5. The stdio server requires both `CORVID_AGENT_ID` and `CORVID_API_URL` environment variables; it exits with code 1 if either is missing.
+5. The stdio server requires `CORVID_API_URL` environment variable; it exits with code 1 if missing. `CORVID_AGENT_ID` is optional — if not set, the server auto-discovers the agent ID by querying `GET /api/agents` on the running server (uses the first agent returned). Exits with code 1 if auto-discovery also fails.
 6. The stdio server uses `@modelcontextprotocol/sdk` McpServer and StdioServerTransport for standards-compliant MCP communication.
 7. Tool proxies extract only `type: "text"` content items from external MCP results; non-text content is ignored (falls back to JSON.stringify of the full result if no text parts exist).
 8. The `ExternalMcpClientManager` merges `process.env` with each server config's `envVars`, with config values taking precedence.
@@ -98,7 +103,17 @@ The stdio server is a standalone Bun script (not a module with traditional expor
 - **Then** the server POSTs `{ agentId: "agent-1", toAgent: "helper", message: "hello" }` to `http://localhost:3000/api/mcp/send-message` and returns the response text as MCP content.
 
 ### Scenario: Stdio server missing environment variables
-- **Given** `CORVID_AGENT_ID` is not set
+- **Given** `CORVID_API_URL` is not set
+- **When** the stdio server script starts
+- **Then** it prints an error to stderr and exits with code 1.
+
+### Scenario: Stdio server auto-discovers agent ID
+- **Given** `CORVID_AGENT_ID` is not set but `CORVID_API_URL` is set and the server is running with at least one agent
+- **When** the stdio server script starts
+- **Then** it queries `GET /api/agents`, uses the first agent's ID, and logs the auto-discovered ID to stderr.
+
+### Scenario: Stdio server auto-discovery fails
+- **Given** `CORVID_AGENT_ID` is not set and the server is unreachable
 - **When** the stdio server script starts
 - **Then** it prints an error to stderr and exits with code 1.
 
@@ -111,7 +126,8 @@ The stdio server is a standalone Bun script (not a module with traditional expor
 | External tool call throws | Returns `{ text: "External MCP tool error (server/tool): ...", isError: true }` |
 | External tool returns no text content | Falls back to `JSON.stringify(result)` as the text value |
 | Transport close fails during `disconnectAll` | Warning logged, remaining connections still closed |
-| Stdio server: missing `CORVID_AGENT_ID` or `CORVID_API_URL` | Prints error to stderr, `process.exit(1)` |
+| Stdio server: missing `CORVID_API_URL` | Prints error to stderr, `process.exit(1)` |
+| Stdio server: `CORVID_AGENT_ID` not set and auto-discovery fails | Prints error to stderr, `process.exit(1)` |
 | Stdio server: HTTP API returns non-OK status | Returns `{ response: "API error (status): body", isError: true }` |
 
 ## Dependencies
@@ -141,3 +157,4 @@ The stdio server is a standalone Bun script (not a module with traditional expor
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Update stdio server: auto-discover agent ID, add 4 new memory tools (read_on_chain, sync, delete, promote), update env var requirements |

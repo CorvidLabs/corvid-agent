@@ -16,7 +16,7 @@ depends_on:
   - specs/process/process-manager.spec.md
   - specs/work/work-task-service.spec.md
   - specs/db/connection.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/feedback/feedback.spec.md
 ---
 

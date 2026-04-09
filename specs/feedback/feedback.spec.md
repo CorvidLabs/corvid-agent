@@ -6,11 +6,11 @@ files:
   - server/feedback/outcome-tracker.ts
 db_tables: []
 depends_on:
-  - specs/db/pr-outcomes.spec.md
-  - specs/db/work-tasks.spec.md
+  - specs/db/operations/pr-outcomes.spec.md
+  - specs/db/operations/work-tasks.spec.md
   - specs/github/github.spec.md
   - specs/memory/memory.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Outcome Tracker (Feedback)

@@ -10,7 +10,7 @@ db_tables:
   - session_messages
 depends_on:
   - specs/process/process-manager.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/voice/voice.spec.md
 ---
 

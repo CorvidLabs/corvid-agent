@@ -6,7 +6,7 @@ files:
   - server/lib/response-quality.ts
 db_tables: []
 depends_on:
-  - specs/lib/session-analysis.spec.md
+  - specs/lib/session/session-analysis.spec.md
 ---
 
 # Response Quality

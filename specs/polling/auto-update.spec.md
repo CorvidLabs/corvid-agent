@@ -7,7 +7,7 @@ files:
 db_tables:
   - sessions
 depends_on:
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 ---
 
 # Auto Update

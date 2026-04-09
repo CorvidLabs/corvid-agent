@@ -7,11 +7,13 @@ files:
   - server/db/schema/agents.ts
   - server/db/schema/algochat.ts
   - server/db/schema/auth.ts
+  - server/db/schema/buddy.ts
   - server/db/schema/contacts.ts
   - server/db/schema/councils.ts
   - server/db/schema/credits.ts
   - server/db/schema/discord.ts
   - server/db/schema/flock.ts
+  - server/db/schema/library.ts
   - server/db/schema/marketplace.ts
   - server/db/schema/memory.ts
   - server/db/schema/model-exams.ts
@@ -24,33 +26,66 @@ files:
   - server/db/schema/webhooks.ts
   - server/db/schema/work.ts
   - server/db/schema/workflows.ts
-  - server/db/schema/buddy.ts
 db_tables:
   - schema_version
   - projects
   - agents
+  - agent_daily_spending
+  - agent_identity
+  - agent_messages
+  - agent_skills
+  - agent_usdc_revenue
+  - agent_conversation_allowlist
+  - agent_conversation_blocklist
+  - agent_conversation_rate_limits
+  - agent_spending_caps
+  - agent_variants
+  - agent_variant_assignments
+  - personas
+  - agent_persona_assignments
   - sessions
   - session_messages
+  - session_metrics
   - algochat_conversations
   - algochat_psk_state
-  - agent_messages
+  - algochat_messages
+  - algochat_allowlist
+  - psk_contacts
+  - contacts
+  - contact_platform_links
   - councils
   - council_members
   - council_launches
   - council_launch_logs
   - council_discussion_messages
+  - governance_proposals
+  - governance_votes
+  - governance_member_votes
+  - proposal_vetoes
   - work_tasks
+  - pr_outcomes
+  - repo_blocklist
   - agent_memories
   - agent_memories_fts
+  - memory_observations
+  - agent_library
   - daily_spending
-  - escalation_queue
-  - algochat_messages
-  - algochat_allowlist
   - credit_ledger
   - credit_transactions
   - credit_config
+  - subscriptions
+  - subscription_items
+  - usage_records
+  - invoices
   - agent_schedules
   - schedule_executions
+  - repo_locks
+  - escalation_queue
+  - owner_questions
+  - owner_question_dispatches
+  - notification_channels
+  - owner_notifications
+  - notification_deliveries
   - webhook_registrations
   - webhook_deliveries
   - mention_polling_configs
@@ -58,35 +93,49 @@ db_tables:
   - workflow_runs
   - workflow_node_runs
   - audit_log
-  - owner_questions
-  - notification_channels
-  - owner_notifications
-  - notification_deliveries
-  - owner_question_dispatches
+  - health_snapshots
+  - server_health_snapshots
+  - performance_metrics
+  - dedup_state
+  - rate_limit_state
+  - sandbox_configs
+  - voice_cache
   - plugins
   - plugin_capabilities
-  - sandbox_configs
+  - skill_bundles
+  - project_skills
+  - mcp_server_configs
   - marketplace_listings
   - marketplace_reviews
+  - marketplace_pricing_tiers
+  - marketplace_subscriptions
+  - marketplace_trials
+  - marketplace_usage_events
+  - escrow_transactions
   - federated_instances
   - agent_reputation
   - reputation_events
   - reputation_attestations
+  - reputation_history
+  - response_feedback
+  - agent_blocklist
   - tenants
+  - tenant_members
   - api_keys
-  - subscriptions
-  - usage_records
-  - invoices
-  - health_snapshots
-  - agent_personas
-  - skill_bundles
-  - agent_skills
-  - voice_cache
-  - psk_contacts
-  - mcp_server_configs
-  - project_skills
-  - agent_usdc_revenue
+  - github_allowlist
+  - permission_checks
+  - permission_grants
+  - discord_config
   - discord_muted_users
+  - discord_mention_sessions
+  - discord_processed_messages
+  - discord_thread_sessions
+  - flock_agents
+  - flock_directory_config
+  - flock_test_results
+  - flock_test_challenge_results
+  - model_exam_runs
+  - model_exam_results
   - buddy_pairings
   - buddy_sessions
   - buddy_messages
@@ -105,7 +154,7 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `runMigrations` | `(db: Database)` | `void` | Apply all pending migrations up to SCHEMA_VERSION in a single transaction |
+| `runMigrations` | `(db: Database)` | `void` | Apply all pending migrations up to SCHEMA_VERSION in a single transaction, then run `reconcileTables()` as a safety net to ensure all idempotent CREATE/INDEX/TRIGGER/INSERT statements are applied |
 
 ### Exported Constants (per domain file)
 
@@ -119,16 +168,19 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 ## Invariants
 
-1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 70) is the target. Versions must never be renumbered (version 11 was intentionally skipped)
+1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 116) is the target. Versions must never be renumbered (version 11 was intentionally skipped; versions 52-67 and 71-77 were collapsed into the v78 baseline)
 2. **Single-transaction atomicity**: All pending migrations run inside a single `db.transaction()` call. Either all succeed or none apply
-3. **Idempotent ALTER TABLE**: Before executing `ALTER TABLE ADD COLUMN`, `hasColumn()` checks if the column already exists. This prevents errors on re-runs
+3. **Idempotent ALTER TABLE**: Before executing `ALTER TABLE ADD COLUMN`, `hasColumn()` checks if the column already exists. `hasColumn()` validates table names against a `SAFE_SQL_IDENTIFIER` regex to prevent SQL injection
 4. **CREATE TABLE IF NOT EXISTS**: All table creation statements use `IF NOT EXISTS` for safety
 5. **Forward-only migrations**: No rollback mechanism. Migrations only move forward from `currentVersion` to `SCHEMA_VERSION`
 6. **Version tracking**: The `schema_version` table stores a single row with the current version. Created if missing, inserted on first run, updated on subsequent runs
-7. **FTS sync triggers**: `agent_memories_fts` (migration 29) has `AFTER INSERT/DELETE/UPDATE` triggers to keep the FTS5 index in sync with the `agent_memories` table
-8. **Seed data**: Migration 46 and 51 insert preset skill bundles. Migration 20 inserts default credit config values. All use `INSERT OR IGNORE` for idempotency
-9. **Table recreation pattern**: When a table needs schema changes that SQLite's `ALTER TABLE` cannot handle (e.g. migration 48 for sessions, migration 23 for PSK state), the pattern is: create new table, copy data, drop old table, rename
+7. **FTS sync triggers**: `agent_memories_fts` has `AFTER INSERT/DELETE/UPDATE` triggers to keep the FTS5 index in sync with the `agent_memories` table
+8. **Seed data**: Domain files may include `seedData` arrays with `INSERT OR IGNORE` statements for preset data (e.g., skill bundles, credit config defaults)
+9. **Table recreation pattern**: When a table needs schema changes that SQLite's `ALTER TABLE` cannot handle, the pattern is: create new table, copy data, drop old table, rename
 10. **No data deletion migrations**: Migrations add tables and columns but never drop existing user data
+11. **Collapsed baseline**: Migration v78 is a collapsed baseline containing all idempotent CREATE TABLE/INDEX/VIRTUAL TABLE/TRIGGER and seed data statements from all domain files. Prior individual migrations (1-77) are no longer present as separate entries
+12. **Reconciliation safety net**: After applying pending migrations, `reconcileTables()` re-runs all idempotent statements (CREATE TABLE/INDEX/VIRTUAL TABLE/TRIGGER IF NOT EXISTS, INSERT OR IGNORE) to catch tables missed when schema_version was bumped by file-based migrations before inline migrations were added
+13. **Domain-based schema organization**: Table and index definitions are organized into co-located domain files (e.g., `agents.ts`, `councils.ts`, `library.ts`) each exporting `tables`, `indexes`, and optionally `virtualTables`, `triggers`, `seedData`
 
 ## Behavioral Examples
 
@@ -136,19 +188,19 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 - **Given** a new empty database
 - **When** `runMigrations(db)` is called
-- **Then** `schema_version` table is created, all 70 migrations run, version is set to 70
+- **Then** `schema_version` table is created, all migrations from v78 baseline through v116 run, version is set to 116, then `reconcileTables()` runs as a safety net
 
 ### Scenario: Incremental migration
 
-- **Given** a database at version 67
+- **Given** a database at version 112
 - **When** `runMigrations(db)` is called
-- **Then** only migrations 68, 69, 70 are applied, version is updated to 70
+- **Then** only migrations 113-116 are applied, version is updated to 116, then `reconcileTables()` runs
 
 ### Scenario: Already at current version
 
-- **Given** a database at version 70
+- **Given** a database at version 116
 - **When** `runMigrations(db)` is called
-- **Then** returns immediately (no-op)
+- **Then** skips the migration transaction (no-op), but still runs `reconcileTables()` to ensure all idempotent statements are applied
 
 ### Scenario: Column already exists
 
@@ -186,72 +238,49 @@ Defines and manages the SQLite database schema through a sequential migration sy
 |--------|------|-------------|-------------|
 | version | INTEGER | NOT NULL | Current schema version |
 
-Note: This module defines all other database tables in the system. Individual table schemas are documented in the specs of their consuming modules (e.g. `specs/db/sessions.spec.md`, `specs/db/credits.spec.md`).
+Note: This module defines all other database tables in the system. Individual table schemas are documented in the specs of their consuming modules (e.g. `specs/db/sessions/sessions.spec.md`, `specs/db/operations/credits.spec.md`).
 
 ## Configuration
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `SCHEMA_VERSION` | `70` | Target schema version |
+| `SCHEMA_VERSION` | `116` | Target schema version |
 
 ## Migration Summary
 
 | Version | Tables/Changes |
 |---------|---------------|
-| 1 | `projects`, `agents`, `sessions`, `session_messages`, `algochat_conversations` + indexes |
-| 2 | `algochat_psk_state` |
-| 3 | `agents` wallet columns |
-| 4 | `agent_messages` + indexes |
-| 5 | `councils`, `council_members`, `council_launches` + session council columns |
-| 6 | `council_launch_logs` |
-| 7 | `agents.default_project_id` |
-| 8 | `work_tasks` + indexes |
-| 9 | `council_discussion_messages` + council discussion columns |
-| 10 | `agent_memories` + FTS prep |
-| 12 | `agent_messages.thread_id` |
-| 13 | `daily_spending` |
-| 14 | `escalation_queue` |
-| 15 | `sessions.total_algo_spent` |
-| 16 | `algochat_messages` |
-| 17 | `work_tasks` iteration columns |
-| 18 | `work_tasks.worktree_dir`, `sessions.work_dir` |
-| 19 | `algochat_allowlist` |
-| 20 | `credit_ledger`, `credit_transactions`, `credit_config` + defaults |
-| 21 | `agents.mcp_tool_permissions` |
-| 22 | `council_launches.chat_session_id` |
-| 23 | `algochat_psk_state` network-aware (table recreation) |
-| 24 | `agent_schedules`, `schedule_executions` |
-| 25 | `schedule_executions.config_snapshot` |
-| 26 | Provider columns on agents/messages |
-| 27 | `agent_schedules.notify_address` |
-| 28 | `agent_memories.status` + index |
-| 29 | `agent_memories_fts` (FTS5) + sync triggers |
-| 30 | `psk_contacts` + migration from legacy PSK |
-| 31 | `webhook_registrations`, `webhook_deliveries` |
-| 32 | `mention_polling_configs` |
-| 33 | `mention_polling_configs.processed_ids` |
-| 34 | `workflows`, `workflow_runs`, `workflow_node_runs` |
-| 35 | `audit_log` |
-| 36 | `owner_questions` |
-| 37 | `notification_channels`, `owner_notifications`, `notification_deliveries` |
-| 38 | `owner_question_dispatches` |
-| 39 | `plugins`, `plugin_capabilities` |
-| 40 | `sandbox_configs` |
-| 41 | `marketplace_listings`, `marketplace_reviews`, `federated_instances` |
-| 42 | `agent_reputation`, `reputation_events`, `reputation_attestations` |
-| 43 | `tenants`, `api_keys`, `subscriptions`, `usage_records`, `invoices` |
-| 44 | `health_snapshots`, `agent_memories.archived` |
-| 45 | `agent_personas` |
-| 46 | `skill_bundles`, `agent_skills` + preset bundles |
-| 47 | `agents` voice columns, `voice_cache` |
-| 48 | `sessions` table recreation (nullable project_id) |
-| 49 | `mcp_server_configs` |
-| 50 | `owner_question_dispatches.answered_at` |
-| 51 | `project_skills` + new preset skill bundles |
-| 68 | `councils.on_chain_mode`, `council_launches.synthesis_txid` |
-| 69 | `agent_usdc_revenue` table |
-| 70 | AlgoChat defaults: update existing agents to `algochat_enabled=1`, councils to `on_chain_mode='full'` |
+| 78 | **Collapsed baseline** — all idempotent CREATE TABLE/INDEX/VIRTUAL TABLE/TRIGGER and seed data from all domain files (replaces individual migrations 1-77) |
+| 79 | `flock_directory_config` |
+| 80 | `discord_config` |
+| 84 | `model_exam_runs`, `model_exam_results` + indexes |
+| 89 | `flock_test_results`, `flock_test_challenge_results` + indexes |
+| 90 | `response_feedback` + indexes |
+| 91 | `contacts`, `contact_platform_links` + indexes |
+| 92 | `discord_mention_sessions` + indexes |
+| 93 | `discord_mention_sessions.project_name` |
+| 94 | `agent_memories.asa_id` (ARC-69 long-term memory) |
+| 95 | `memory_observations` + indexes |
+| 96 | `discord_mention_sessions.channel_id` |
+| 97 | `discord_mention_sessions.conversation_only` |
+| 98 | `agent_schedules.output_destinations` |
+| 99 | `personas`, `agent_persona_assignments` (composable personas) |
+| 100 | `agent_variants`, `agent_variant_assignments` |
+| 102 | `agents.conversation_mode`, `agents.conversation_rate_limit_window`, `agents.conversation_rate_limit_max`, `agent_conversation_allowlist`, `agent_conversation_blocklist`, `agent_conversation_rate_limits` |
 | 103 | `discord_muted_users` — persist Discord mutes across restarts |
+| 104 | `buddy_pairings`, `buddy_sessions`, `buddy_messages` |
+| 105 | `sessions.restart_pending` + partial index |
+| 106 | `agent_library` (CRVLIB shared agent knowledge library) |
+| 107 | `sessions.server_restart_initiated_at` |
+| 108 | `agent_memories.book`, `agent_memories.page` + book/page index and trigger |
+| 109 | `discord_processed_messages` + indexes |
+| 110 | `sessions.conversation_summary` |
+| 111 | `agent_library.title` |
+| 112 | `discord_thread_sessions` + indexes, `discord_mention_sessions.last_activity_at` |
+| 113 | `agent_memories.expires_at` + index, `agent_memories.access_count` (short-term memory decay) |
+| 114 | `tenant_members.email` + unique index (proxy trust mode) |
+| 115 | Deduplicate AlgoChat conversations: enforce unique `participant_addr` index |
+| 116 | `governance_proposals.voting_opened_at`, `governance_proposals.voting_deadline`, `proposal_vetoes` + indexes |
 
 ## Change Log
 
@@ -259,3 +288,4 @@ Note: This module defines all other database tables in the system. Individual ta
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Added migrations 68-70: council on-chain mode, USDC revenue tracking, AlgoChat defaults. |
+| 2026-04-09 | corvid-agent | Major update: SCHEMA_VERSION 70->116, collapsed baseline at v78, added library.ts domain file, reconcileTables() safety net, 40+ new migrations (79-116), updated db_tables list with all current tables, updated invariants for new architecture. |

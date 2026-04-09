@@ -12,7 +12,7 @@ files:
 db_tables:
   - sandbox_configs
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Sandbox

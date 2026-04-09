@@ -31,7 +31,7 @@ files:
   - server/mcp/tool-handlers/server-ops.ts
 db_tables: []
 depends_on:
-  - specs/db/credits.spec.md
+  - specs/db/operations/credits.spec.md
   - specs/work/work-task-service.spec.md
   - specs/scheduler/scheduler-service.spec.md
 ---

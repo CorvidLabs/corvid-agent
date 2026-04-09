@@ -8,7 +8,7 @@ db_tables:
   - agent_schedules
   - schedule_executions
 depends_on:
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/work/work-task-service.spec.md
   - specs/process/process-manager.spec.md
 ---

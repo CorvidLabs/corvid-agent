@@ -12,9 +12,9 @@ db_tables:
   - sessions
   - plugins
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/db/connection.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/process/process-manager.spec.md
 ---
 

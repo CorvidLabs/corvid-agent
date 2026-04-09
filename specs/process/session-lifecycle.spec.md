@@ -11,8 +11,8 @@ db_tables:
   - algochat_conversations
 depends_on:
   - specs/db/connection.spec.md
-  - specs/lib/infra.spec.md
-  - specs/lib/security.spec.md
+  - specs/lib/infra/infra.spec.md
+  - specs/lib/security/security.spec.md
   - specs/process/protected-paths.spec.md
 ---
 

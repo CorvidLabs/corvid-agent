@@ -56,7 +56,7 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 1. `runAction` always removes the execution from `runningExecutions` and releases all repo locks in the `finally` block, regardless of success or failure.
 2. After `MAX_CONSECUTIVE_FAILURES` (5), the schedule is auto-paused and `consecutiveFailures` is reset.
 3. On successful completion, `consecutiveFailures` for that schedule is cleared.
-4. AlgoChat broadcast is only sent for action types in `BROADCAST_ACTION_TYPES`: `work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`.
+4. AlgoChat broadcast is only sent for action types in `BROADCAST_ACTION_TYPES`: `work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`, `flock_testing`.
 5. Notifications to `notifyAddress` are fire-and-forget; failures are logged but do not affect execution status.
 6. Unknown action types result in the execution being marked as `failed`.
 7. `needsApproval` returns false for `auto` policy, checks destructive actions list for `owner_approve`, and returns true for `council_approve`.
@@ -64,6 +64,7 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 9. Health gating only applies when a `SystemStateResult` is available; if null, the action proceeds.
 10. When health gate skips an action, the execution status is set to `cancelled` (not `failed`), and an audit record is created.
 11. Repo locking is all-or-nothing: if any repo lock fails, all previously acquired locks for that execution are released.
+12. `work_task` actions skip repo locking entirely (`SELF_CONTENTION_ACTIONS`) — they handle contention via `WorkTaskService` queuing instead, so they can queue behind active tasks instead of being cancelled outright.
 
 ## Behavioral Examples
 
@@ -113,7 +114,7 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 
 | Module | What is used |
 |--------|-------------|
-| `server/scheduler/handlers` | All `exec*` handler functions via `dispatchAction` |
+| `server/scheduler/handlers` | All `exec*` handler functions via `dispatchAction` (star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, improvement_loop, memory_maintenance, reputation_attestation, flock_reputation_refresh, outcome_analysis, daily_review, status_checkin, marketplace_billing, flock_testing, discord_post, github_comment_monitor, custom) |
 | `server/scheduler/handlers/types` | `HandlerContext` interface |
 | `server/scheduler/priority-rules` | `evaluateAction` for health gating |
 | `server/scheduler/system-state` | `SystemStateResult` type |
@@ -135,3 +136,4 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-13 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Added `flock_testing` to BROADCAST_ACTION_TYPES, added `discord_post` and `github_comment_monitor` handlers, work_task now skips repo locking (SELF_CONTENTION_ACTIONS), added output destination delivery (Discord channels, AlgoChat agents/addresses) |

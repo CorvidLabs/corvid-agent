@@ -28,6 +28,7 @@ Council decision 2026-03-13 (5-0): Structured Claude-First — Opus/Sonnet/Haiku
 | Heavy | `OPUS` | claude-opus-4-6 | Architecture decisions, multi-file refactors, spec authoring, security-sensitive work, council sessions, complex reasoning |
 | Standard | `SONNET` | claude-sonnet-4-6 | Work tasks, code generation, single-file changes, routine fixes, test additions, specialist agent sessions |
 | Light | `HAIKU` | claude-haiku-4-5-20251001 | Routing decisions, triage, classification, ticket labeling, README updates, trivial edits, formatting |
+| Intern | `INTERN` | claude-haiku-4-5-20251001 | Local/external models — restricted from git push and PR creation. Maps to Haiku for any fallback escalation path |
 
 ## Public API
 
@@ -35,8 +36,8 @@ Council decision 2026-03-13 (5-0): Structured Claude-First — Opus/Sonnet/Haiku
 
 | Type | Description |
 |------|-------------|
-| `ModelTier` | Enum: `opus`, `sonnet`, `haiku` — semantic task tier |
-| `LlmProviderType` | Type: `'anthropic' \| 'openai' \| 'ollama'` — supported LLM providers |
+| `ModelTier` | Enum: `opus`, `sonnet`, `haiku`, `intern` — semantic task tier. INTERN maps to Haiku for fallback but is restricted from git push and PR creation |
+| `LlmProviderType` | Type: `'anthropic' \| 'openai' \| 'openrouter' \| 'ollama' \| 'cursor'` — supported LLM providers |
 | `ExecutionMode` | Type: `'managed' \| 'direct'` — session execution mode |
 | `JsonSchemaProperty` | Interface for JSON schema property definitions used in tool schemas |
 | `JsonSchemaObject` | Interface for JSON schema object definitions used in tool schemas |
@@ -68,7 +69,7 @@ Council decision 2026-03-13 (5-0): Structured Claude-First — Opus/Sonnet/Haiku
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `CLAUDE_TIER_MODELS` | `Record<ModelTier, string>` | Maps each tier to its canonical Claude model ID |
+| `CLAUDE_TIER_MODELS` | `Record<ModelTier, string>` | Maps each tier to its canonical Claude model ID. INTERN maps to Haiku (`claude-haiku-4-5-20251001`) |
 
 ### Exported Functions (server/providers/cost-table.ts)
 
@@ -86,7 +87,7 @@ Council decision 2026-03-13 (5-0): Structured Claude-First — Opus/Sonnet/Haiku
 
 | Type | Description |
 |------|-------------|
-| `ModelPricing` | Interface for model pricing data (model, provider, costs, capabilities) |
+| `ModelPricing` | Interface for model pricing data (model, provider, displayName, costs per million tokens, maxContextTokens, maxOutputTokens, capabilityTier, supportsTools, supportsThinking, supportsSubagents?, supportsWebSearch?, isCloud?) |
 
 ### Exported Constants (server/providers/cost-table.ts)
 
@@ -189,3 +190,4 @@ Council decision 2026-03-13 (5-0): Structured Claude-First — Opus/Sonnet/Haiku
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-14 | corvid-agent | Initial spec — codifies council decision 2026-03-13 tiered dispatch strategy |
+| 2026-04-09 | corvid-agent | Added INTERN tier (restricted from git push/PR), expanded LlmProviderType to include 'openrouter' and 'cursor', updated ModelPricing interface with subagent/webSearch/cloud fields |

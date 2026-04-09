@@ -11,7 +11,7 @@ db_tables:
   - plugins
   - plugin_capabilities
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/db/connection.spec.md
 implements: [1489]
 ---

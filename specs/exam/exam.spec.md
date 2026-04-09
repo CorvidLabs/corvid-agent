@@ -13,10 +13,10 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/process/claude-process.spec.md
-  - specs/db/projects.spec.md
-  - specs/db/agents.spec.md
-  - specs/db/sessions.spec.md
-  - specs/lib/infra.spec.md
+  - specs/db/operations/projects.spec.md
+  - specs/db/agents/agents.spec.md
+  - specs/db/sessions/sessions.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Exam

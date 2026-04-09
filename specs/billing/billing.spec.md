@@ -12,7 +12,7 @@ db_tables:
   - usage_records
   - invoices
 depends_on:
-  - specs/db/credits.spec.md
+  - specs/db/operations/credits.spec.md
 tracks: [1689, 311]
 ---
 

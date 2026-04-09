@@ -8,7 +8,7 @@ db_tables:
   - discord_config
 depends_on:
   - specs/discord/bridge.spec.md
-  - specs/db/discord-config.spec.md
+  - specs/db/sessions/discord-config.spec.md
 ---
 
 # Discord Guild API

@@ -7,7 +7,7 @@ files:
   - server/lib/shutdown-coordinator.ts
 db_tables: []
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Resilience

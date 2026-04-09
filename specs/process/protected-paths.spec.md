@@ -6,7 +6,7 @@ files:
   - server/process/protected-paths.ts
 db_tables: []
 depends_on:
-  - specs/lib/security.spec.md
+  - specs/lib/security/security.spec.md
   - specs/councils/councils.spec.md
 ---
 

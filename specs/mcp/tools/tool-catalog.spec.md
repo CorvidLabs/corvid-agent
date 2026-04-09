@@ -41,6 +41,18 @@ Provides a structured, categorized view of all available MCP tools for API endpo
 | `TOOL_CATEGORIES` | `ToolCategory[]` | Tool category definitions |
 | `toolCatalogRoutes` | `RouteEntry[]` | OpenAPI route definitions for `GET /api/tools` |
 
+## Categories
+
+| Name | Label | Description |
+|------|-------|-------------|
+| `communication` | Communication & Memory | Send messages, save/recall memories, manage on-chain storage |
+| `agents` | Agent Management | List agents, discover remote agents, launch councils, manage contacts |
+| `work` | Session & Work | Manage sessions, credits, projects, work tasks, schedules, and workflows |
+| `research` | Research | Web search, deep research, browser automation |
+| `github` | GitHub | Star, fork, PRs, issues, reviews, and repo management |
+| `notifications` | Notifications & Reputation | Owner notifications, reputation scoring, attestations |
+| `code` | Code Tools | AST navigation, file operations, repo blocklist |
+
 ## Invariants
 
 1. **Complete coverage**: Every tool in `DEFAULT_CORE_TOOLS` has a corresponding catalog entry
@@ -82,8 +94,19 @@ Provides a structured, categorized view of all available MCP tools for API endpo
 | `server/routes/index.ts` | `handleToolCatalogRoutes` for REST API |
 | `server/openapi/route-registry.ts` | `toolCatalogRoutes` for OpenAPI spec |
 
+## Tool Count
+
+The catalog contains 55+ tools across 7 categories. Key additions since initial spec:
+- `corvid_library_write/read/list/delete` (CRVLIB shared library tools, category: communication)
+- `corvid_discord_send_message/send_image` (Discord messaging, category: communication)
+- `corvid_promote_memory` (promote short-term to on-chain, category: communication)
+- `corvid_manage_workflow` (graph-based workflows, category: work)
+- `corvid_grant_credits`, `corvid_credit_config` (restricted credit admin tools, category: work)
+- `read_file`, `write_file`, `edit_file`, `run_command`, `list_files`, `search_files` (code tools for built-in file operations, category: code)
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-24 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Added 7 categories table, updated tool count to 55+, documented CRVLIB library tools, Discord messaging tools, promote_memory, workflow management, credit admin tools, and built-in file/code tools |

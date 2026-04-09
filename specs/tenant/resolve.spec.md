@@ -6,7 +6,7 @@ files:
   - server/tenant/resolve.ts
 depends_on:
   - specs/tenant/tenant.spec.md
-  - specs/db/agents.spec.md
+  - specs/db/agents/agents.spec.md
 ---
 
 # Tenant Resolution
