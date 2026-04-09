@@ -38,6 +38,8 @@ export interface VoiceChannelInfo {
   joinedAt: number;
   /** Text channel where transcriptions should be posted. */
   transcriptionChannelId?: string;
+  /** Whether the bot is currently deafened (not receiving audio). */
+  selfDeaf: boolean;
 }
 
 /** Callback for transcription results. */
@@ -137,6 +139,40 @@ export class VoiceConnectionManager {
   /** Check if currently listening in a guild. */
   isListening(guildId: string): boolean {
     return this.receivers.get(guildId)?.isListening ?? false;
+  }
+
+  /**
+   * Toggle the bot's deafened state on Discord.
+   *
+   * When deafened, the bot icon shows as deafened to all users in the channel
+   * and STT listening is stopped. When undeafened, listening resumes if a
+   * transcription channel was previously set.
+   */
+  toggleDeafen(guildId: string): boolean {
+    const connection = getVoiceConnection(guildId);
+    const info = this.connections.get(guildId);
+    if (!connection || !info) return false;
+
+    const newDeaf = !info.selfDeaf;
+    info.selfDeaf = newDeaf;
+
+    connection.rejoin({
+      ...connection.joinConfig,
+      selfDeaf: newDeaf,
+    });
+
+    if (newDeaf) {
+      // Stop STT when deafened
+      this.stopListening(guildId);
+    }
+
+    log.info('Toggled voice deafen', { guildId, selfDeaf: newDeaf });
+    return true;
+  }
+
+  /** Check if currently deafened in a guild. */
+  isDeafened(guildId: string): boolean {
+    return this.connections.get(guildId)?.selfDeaf ?? false;
   }
 
   /** Get all active voice connections. */
@@ -372,6 +408,7 @@ export class VoiceConnectionManager {
       channelId,
       channelName,
       joinedAt: Date.now(),
+      selfDeaf: false,
     };
     this.connections.set(guildId, info);
 

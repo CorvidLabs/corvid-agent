@@ -144,11 +144,22 @@ async function handleVoiceDeafen(
     return;
   }
 
-  const stopped = voiceManager.stopListening(guildId);
-  if (stopped) {
-    await respondToInteraction(interaction, 'Stopped listening. Still connected to voice channel.');
+  if (!voiceManager.isConnected(guildId)) {
+    await respondEphemeral(interaction, 'Not connected to a voice channel.');
+    return;
+  }
+
+  const toggled = voiceManager.toggleDeafen(guildId);
+  if (!toggled) {
+    await respondEphemeral(interaction, 'Failed to toggle deafen state.');
+    return;
+  }
+
+  const isDeaf = voiceManager.isDeafened(guildId);
+  if (isDeaf) {
+    await respondToInteraction(interaction, 'Deafened — not listening. Use `/voice deafen` again to undeafen.');
   } else {
-    await respondEphemeral(interaction, 'Not currently listening.');
+    await respondToInteraction(interaction, 'Undeafened — listening again.');
   }
 }
 
@@ -167,7 +178,9 @@ async function handleVoiceStatus(
     const duration = Math.round((Date.now() - c.joinedAt) / 60_000);
     const listening = voiceManager.isListening(c.guildId);
     const speaking = voiceManager.isSpeaking(c.guildId);
+    const deafened = voiceManager.isDeafened(c.guildId);
     const labels: string[] = [];
+    if (deafened) labels.push('deafened');
     if (listening) labels.push('STT active');
     if (speaking) labels.push('TTS playing');
     const suffix = labels.length > 0 ? ` | ${labels.join(', ')}` : '';
