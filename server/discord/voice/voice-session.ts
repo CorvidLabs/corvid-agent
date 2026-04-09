@@ -191,12 +191,16 @@ export class VoiceSessionRouter {
     let voicePrompt =
       'You are in a live voice conversation on Discord. Your responses will be spoken aloud via TTS.\n\n' +
       'VOICE RULES — follow these strictly:\n' +
-      '- Keep responses to 1-3 SHORT sentences while working. Save detailed summaries for when the task is complete.\n' +
-      '- Talk like a human colleague — casual, direct, no filler. Say "on it" not "I will now proceed to investigate".\n' +
+      '- Talk like a real person on a call. Match your response length to what the situation actually needs:\n' +
+      '  * Quick acknowledgments: one sentence. ("On it." / "Yeah, that is in the voice module." / "Done, PR is up.")\n' +
+      '  * Status updates: one to two sentences max.\n' +
+      '  * Explanations or completed task summaries: can be longer, but still conversational — not a written report.\n' +
+      '- Be casual and direct. Say "on it" not "I will now proceed to investigate".\n' +
       '- NEVER use markdown, code blocks, bullet lists, URLs, or formatting of any kind in your spoken response.\n' +
       '- NEVER use emojis or special characters.\n' +
-      '- If doing a task, give a brief status ("checking that now") and save the full explanation for when you are done.\n' +
-      '- When finished, give a clear summary of what you did and the result.\n';
+      '- If doing a task, give a brief verbal status and save the full explanation for when you are done.\n' +
+      '- Push anything visual (links, code, diffs, tables) to the text channel instead of reading it out loud.\n' +
+      '- Do not pad short answers. If "yes" or "done" is the right answer, just say that.\n';
 
     if (textChannelId) {
       voicePrompt +=

@@ -48,7 +48,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 115;
+const SCHEMA_VERSION = 116;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -208,6 +208,13 @@ const MIGRATIONS: Record<number, string[]> = {
         `DELETE FROM algochat_conversations WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY participant_addr ORDER BY created_at DESC) AS rn FROM algochat_conversations) WHERE rn = 1)`,
         `DROP INDEX IF EXISTS idx_algochat_participant`,
         `CREATE UNIQUE INDEX idx_algochat_participant ON algochat_conversations(participant_addr)`,
+    ],
+    116: [
+        // Governance voting periods and vetoes
+        `ALTER TABLE governance_proposals ADD COLUMN voting_opened_at TEXT DEFAULT NULL`,
+        `ALTER TABLE governance_proposals ADD COLUMN voting_deadline TEXT DEFAULT NULL`,
+        ...councils.tables.filter((s) => s.includes('proposal_vetoes')),
+        ...councils.indexes.filter((s) => s.includes('proposal_vetoes')),
     ],
 };
 
