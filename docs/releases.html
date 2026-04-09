@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.62.2</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.62.3</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -958,7 +958,7 @@
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
           <div class="era-date">Mar 21 – Apr 8, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.62.2</div>
+        <div class="era-versions">v0.42.0 – v0.62.3</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -1002,6 +1002,15 @@
             <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
             <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.62.3</span>
+            <span class="release-date">Apr 8</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-fix">fix</span> <strong>Whisper language misdetection</strong> — prompt hint biases STT toward English without forcing it, fixing false Korean detection in mixed-language voice sessions</li>
           </ul>
         </div>
         <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">

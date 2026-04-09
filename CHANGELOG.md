@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.3] - 2026-04-08
+
+### Fixed
+- **Voice: Whisper language misdetection** — added prompt hint to Whisper STT to bias toward English without forcing it, preventing false Korean/other language detection in mixed-language voice sessions (#1910)
+
 ## [0.62.2] - 2026-04-08
 
 ### Fixed
