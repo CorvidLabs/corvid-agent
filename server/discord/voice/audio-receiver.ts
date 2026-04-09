@@ -16,7 +16,65 @@ import { transcribe } from '../../voice/stt';
 const log = createLogger('AudioReceiver');
 
 /** Minimum audio duration (ms) to bother transcribing. */
-const MIN_AUDIO_DURATION_MS = 500;
+const MIN_AUDIO_DURATION_MS = 800;
+
+/**
+ * Minimum RMS energy threshold for audio to be worth transcribing.
+ * PCM s16le range is -32768..32767; typical speech RMS is 1000-8000+.
+ * Below this threshold the audio is near-silence and Whisper will hallucinate.
+ */
+const MIN_RMS_ENERGY = 200;
+
+/**
+ * Common Whisper hallucination phrases produced from short/silent audio.
+ * These are checked case-insensitively against the transcription result.
+ * If the entire transcription matches one of these, it's discarded.
+ */
+const WHISPER_HALLUCINATIONS = new Set([
+  'thank you for watching',
+  'thanks for watching',
+  'thank you for listening',
+  'thanks for listening',
+  'this is a conversation in english',
+  'the conversation is in english',
+  'this is in english',
+  'subtitle',
+  'subtitles',
+  'subtítulos',
+  'sous-titres',
+  'you',
+  'bye',
+  'bye bye',
+  'bye-bye',
+  'goodbye',
+  'thank you',
+  'thanks',
+  'the end',
+  'silence',
+  'mhm',
+  'hmm',
+  'uh',
+  'um',
+  'oh',
+  'ah',
+  'okay',
+  'so',
+  'yeah',
+  'yes',
+  'no',
+  'right',
+  'like',
+  'subscribe',
+  'like and subscribe',
+  'please subscribe',
+  'see you next time',
+  'see you in the next video',
+  'transcribed by',
+  'translated by',
+  'copyright',
+  '...',
+  '…',
+]);
 
 /** Maximum audio duration (ms) — flush buffer if someone talks too long. */
 const MAX_AUDIO_DURATION_MS = 60_000;
@@ -138,10 +196,18 @@ export class AudioReceiver extends EventEmitter {
         return;
       }
 
-      log.info('Audio stream ended, transcribing', { userId, durationMs: Math.round(durationMs) });
-
       // Convert PCM to WAV and transcribe
       const pcm = Buffer.concat(pcmChunks);
+
+      // Check audio energy — skip near-silence to avoid Whisper hallucinations
+      const rms = computeRms(pcm);
+      if (rms < MIN_RMS_ENERGY) {
+        log.debug('Audio energy too low, skipping transcription', { userId, rms: Math.round(rms), durationMs });
+        return;
+      }
+
+      log.info('Audio stream ended, transcribing', { userId, durationMs: Math.round(durationMs), rms: Math.round(rms) });
+
       const wav = pcmToWav(pcm, SAMPLE_RATE, CHANNELS);
 
       this.transcribeAudio(userId, wav, durationMs).catch((err) => {
@@ -162,10 +228,20 @@ export class AudioReceiver extends EventEmitter {
 
   private async transcribeAudio(userId: string, wav: Buffer, durationMs: number): Promise<void> {
     try {
-      const result = await transcribe({ audio: wav, format: 'wav', prompt: 'This is a conversation in English.' });
+      // Use a natural conversational prompt that Whisper won't echo back.
+      // Avoid phrases like "This is in English" — Whisper hallucinates those on short clips.
+      const result = await transcribe({ audio: wav, format: 'wav', prompt: 'Discord voice chat between friends discussing software projects.' });
 
-      if (!result.text.trim()) {
+      const trimmed = result.text.trim();
+      if (!trimmed) {
         log.debug('Empty transcription', { userId });
+        return;
+      }
+
+      // Filter known Whisper hallucination phrases
+      const normalized = trimmed.toLowerCase().replace(/[.!?,;:\s]+$/g, '').trim();
+      if (WHISPER_HALLUCINATIONS.has(normalized)) {
+        log.debug('Filtered Whisper hallucination', { userId, text: trimmed });
         return;
       }
 
@@ -226,4 +302,21 @@ function pcmToWav(pcm: Buffer, sampleRate: number, channels: number): Buffer {
   header.writeUInt32LE(dataSize, 40);
 
   return Buffer.concat([header, pcm]);
+}
+
+/**
+ * Compute RMS (root mean square) energy of PCM s16le audio.
+ * Returns a value roughly in 0-32768 range; typical speech is 1000-8000+.
+ */
+function computeRms(pcm: Buffer): number {
+  const samples = pcm.length / BYTES_PER_SAMPLE;
+  if (samples === 0) return 0;
+
+  let sumSquares = 0;
+  for (let i = 0; i < pcm.length; i += BYTES_PER_SAMPLE) {
+    const sample = pcm.readInt16LE(i);
+    sumSquares += sample * sample;
+  }
+
+  return Math.sqrt(sumSquares / samples);
 }
