@@ -45,7 +45,7 @@ mock.module('../algochat/config', () => ({
   _resetConfigCache: () => {},
 }));
 
-import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
+import { saveMemory, updateMemoryStatus, updateMemoryTxid } from '../db/agent-memories';
 import { grantCredits } from '../db/credits';
 import { getSchedule } from '../db/schedules';
 import { buildDirectTools } from '../mcp/direct-tools';
@@ -1077,6 +1077,7 @@ describe('handleRecallMemory', () => {
   test('recall by key shows full txid when confirmed', async () => {
     const mem = saveMemory(db, { agentId, key: 'full-txid-key', content: 'txid-content' });
     updateMemoryTxid(db, mem.id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+    updateMemoryStatus(db, mem.id, 'confirmed');
     const ctx = createMockContext();
     const result = await handleRecallMemory(ctx, { key: 'full-txid-key' });
     const text = (result.content[0] as { text: string }).text;
@@ -1139,6 +1140,7 @@ describe('handleRecallMemory', () => {
   test('search results include txid when confirmed', async () => {
     const mem = saveMemory(db, { agentId, key: 'search-txid', content: 'searchable content' });
     updateMemoryTxid(db, mem.id, 'FULLTXIDINSEARCH');
+    updateMemoryStatus(db, mem.id, 'confirmed');
     const ctx = createMockContext();
     const result = await handleRecallMemory(ctx, { query: 'searchable' });
     const text = (result.content[0] as { text: string }).text;
