@@ -926,9 +926,25 @@ function watchSessionsForAutoAdvance(
         advance();
     }, WATCHER_TIMEOUT_MS);
 
+    // Heartbeat: periodically re-check isRunning for pending sessions to catch
+    // exits missed by event subscription (e.g. process killed, crash without event)
+    const HEARTBEAT_MS = 30 * 1000;
+    const heartbeatTimer = setInterval(() => {
+        if (settled || pending.size === 0) return;
+        for (const sessionId of pending) {
+            if (!processManager.isRunning(sessionId)) {
+                pending.delete(sessionId);
+                const roleLabel = role === 'member' ? 'Member' : 'Reviewer';
+                emitLog(db, launchId, 'info', `${roleLabel} session detected dead via heartbeat`, `${pending.size} remaining`);
+            }
+        }
+        checkAllDone();
+    }, HEARTBEAT_MS);
+
     const cleanup = (): void => {
         settled = true;
         clearTimeout(watcherTimer);
+        clearInterval(heartbeatTimer);
         for (const [sid, cb] of callbacks) {
             processManager.unsubscribe(sid, cb);
         }
