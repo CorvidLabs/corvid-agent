@@ -142,31 +142,32 @@ export class VoiceConnectionManager {
   }
 
   /**
-   * Toggle the bot's deafened state on Discord.
+   * Set the bot's deafened state on Discord.
    *
    * When deafened, the bot icon shows as deafened to all users in the channel
    * and STT listening is stopped. When undeafened, listening resumes if a
    * transcription channel was previously set.
    */
-  toggleDeafen(guildId: string): boolean {
+  setDeafen(guildId: string, deaf: boolean): boolean {
     const connection = getVoiceConnection(guildId);
     const info = this.connections.get(guildId);
     if (!connection || !info) return false;
 
-    const newDeaf = !info.selfDeaf;
-    info.selfDeaf = newDeaf;
+    if (info.selfDeaf === deaf) return true; // already in desired state
+
+    info.selfDeaf = deaf;
 
     connection.rejoin({
       ...connection.joinConfig,
-      selfDeaf: newDeaf,
+      selfDeaf: deaf,
     });
 
-    if (newDeaf) {
+    if (deaf) {
       // Stop STT when deafened
       this.stopListening(guildId);
     }
 
-    log.info('Toggled voice deafen', { guildId, selfDeaf: newDeaf });
+    log.info('Set voice deafen', { guildId, selfDeaf: deaf });
     return true;
   }
 

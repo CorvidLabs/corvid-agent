@@ -115,6 +115,11 @@ async function handleVoiceListen(
     return;
   }
 
+  // Undeafen if currently deafened
+  if (voiceManager.isDeafened(guildId)) {
+    voiceManager.setDeafen(guildId, false);
+  }
+
   if (voiceManager.isListening(guildId)) {
     await respondEphemeral(interaction, 'Already listening and transcribing.');
     return;
@@ -149,18 +154,18 @@ async function handleVoiceDeafen(
     return;
   }
 
-  const toggled = voiceManager.toggleDeafen(guildId);
-  if (!toggled) {
-    await respondEphemeral(interaction, 'Failed to toggle deafen state.');
+  if (voiceManager.isDeafened(guildId)) {
+    await respondEphemeral(interaction, 'Already deafened. Use `/voice listen` to undeafen and start listening.');
     return;
   }
 
-  const isDeaf = voiceManager.isDeafened(guildId);
-  if (isDeaf) {
-    await respondToInteraction(interaction, 'Deafened — not listening. Use `/voice deafen` again to undeafen.');
-  } else {
-    await respondToInteraction(interaction, 'Undeafened — listening again.');
+  const deafened = voiceManager.setDeafen(guildId, true);
+  if (!deafened) {
+    await respondEphemeral(interaction, 'Failed to deafen.');
+    return;
   }
+
+  await respondToInteraction(interaction, 'Deafened — not listening. Use `/voice listen` to undeafen.');
 }
 
 async function handleVoiceStatus(
