@@ -384,13 +384,15 @@ export class VoiceConnectionManager {
     // Track connection lifecycle
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
       log.warn('Voice connection disconnected', { guildId, channelId });
+      // Always stop the old receiver — its subscriptions are on the stale connection
+      this.stopListening(guildId);
       try {
         // Try to reconnect — discord.js/voice handles most reconnection automatically
         await Promise.race([
           entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
           entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
         ]);
-        // Reconnecting...
+        log.info('Voice reconnecting, receiver stopped — use /voice listen to resume', { guildId });
       } catch {
         // Failed to reconnect — clean up
         log.warn('Voice reconnection failed, destroying connection', { guildId, channelId });
@@ -401,6 +403,7 @@ export class VoiceConnectionManager {
 
     connection.on(VoiceConnectionStatus.Destroyed, () => {
       log.info('Voice connection destroyed', { guildId, channelId });
+      this.stopListening(guildId);
       this.connections.delete(guildId);
     });
 
