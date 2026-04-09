@@ -8,6 +8,10 @@ files:
   - server/process/session-config-resolver.ts
   - server/process/session-resilience-manager.ts
   - server/process/session-timer-manager.ts
+  - server/process/resume-prompt-builder.ts
+  - server/process/provider-routing.ts
+  - server/process/session-exit-handler.ts
+  - server/process/event-handler.ts
 db_tables:
   - sessions
   - session_messages
@@ -63,6 +67,58 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `resolveSessionPrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve persona and skill prompts for a session |
 | `resolveToolPermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve merged tool permissions from agent and project skill bundles |
 | `resolveSessionConfig` | `(db, agent, agentId, projectId)` | `ResolvedSessionConfig` | Resolve complete session config (prompts + tools + MCP servers) |
+
+### Exported Functions (from provider-routing.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolveProviderRouting` | `(opts: { providerType, agentModel, hasCursorBinary, hasClaudeAccess, hasOllamaProvider, ollamaDefaultModel? })` | `RoutingDecision` | Pure function to determine provider routing decision based on agent config and system state |
+| `resolveDirectToolAllowList` | `(toolAllowList?, mcpToolAllowList?)` | `string[] \| undefined` | Map SDK tool permissions to direct-process tool allow list |
+
+### Exported Types (from provider-routing.ts)
+
+| Type | Description |
+|------|-------------|
+| `RoutingDecision` | Result of a provider routing decision: provider, reason, fallback flag, effectiveModel |
+
+### Exported Functions (from resume-prompt-builder.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `buildResumePrompt` | `(db, session, sessionMeta?, newPrompt?)` | `string` | Build resume prompt from session history, observations, and context |
+
+### Exported Functions (from event-handler.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleSessionEvent` | `(deps: EventHandlerDeps, sessionId, event)` | `void` | Process SDK/direct-process events: persist messages, broadcast activity, handle cost/credits |
+| `applyCostUpdate` | `(deps, sessionId, event)` | `void` | Apply cost update from a stream event |
+| `persistDirectSessionMetrics` | `(db, sessionId, metrics)` | `void` | Persist metrics from a direct-process session |
+| `broadcastActivityStatus` | `(deps, sessionId, status)` | `void` | Broadcast activity status to WebSocket subscribers |
+
+### Exported Types (from event-handler.ts)
+
+| Type | Description |
+|------|-------------|
+| `EventHandlerDeps` | Dependencies needed by the event handler (db, eventBus, broadcast, etc.) |
+| `SessionMetaForEvents` | Session metadata needed for event processing |
+
+### Exported Functions (from session-exit-handler.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleSessionExit` | `(deps: ExitHandlerDeps, sessionId, code, errorMessage?)` | `void` | Process session exit: save summary, cleanup worktree, manage auto-restart |
+| `saveSessionSummaryToMemory` | `(db, sessionId)` | `void` | Save session summary to agent memory |
+| `saveContextSummaryObservation` | `(db, session, summary)` | `void` | Save context summary as an observation for session continuity |
+| `persistConversationSummary` | `(db, sessionId)` | `void` | Persist conversation summary to session record |
+| `cleanupChatWorktree` | `(deps, sessionId)` | `void` | Clean up worktree for a chat session |
+
+### Exported Types (from session-exit-handler.ts)
+
+| Type | Description |
+|------|-------------|
+| `ExitHandlerDeps` | Dependencies needed by the exit handler (db, eventBus, resilience, etc.) |
+| `SessionMetaForExit` | Session metadata needed for exit processing |
 
 ### Exported Constants (server/process/session-resilience-manager.ts)
 
@@ -302,3 +358,4 @@ Internal constants (not env-configurable):
 | 2026-03-13 | corvid-agent | Added session-resilience-manager.ts (SessionResilienceManager: API outage handling, crash restart, orphan pruning) and session-timer-manager.ts (SessionTimerManager: stable timers, inactivity timeouts, fallback checker) |
 | 2026-03-30 | corvid-agent | Context resets now save conversation summaries as memory observations (#1753) |
 | 2026-04-09 | corvid-agent | Added OLLAMA_USE_CLAUDE_PROXY routing, relevant observations loaded on session resume (#1779), zero-turn circuit breaker (3 consecutive zero-turn completions blocks resume) |
+| 2026-04-09 | corvid-agent | Added extracted sub-modules: provider-routing.ts, resume-prompt-builder.ts, event-handler.ts, session-exit-handler.ts (#1940) |
