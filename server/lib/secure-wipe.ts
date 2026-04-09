@@ -17,12 +17,12 @@
  * @param buf - The buffer to wipe. No-op if null or undefined.
  */
 export function wipeBuffer(buf: Uint8Array | ArrayBuffer | null | undefined): void {
-    if (!buf) return;
-    const view = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
-    // First overwrite with random bytes to defeat dead-store elimination by optimizers,
-    // then zero-fill for clean state.
-    crypto.getRandomValues(view);
-    view.fill(0);
+  if (!buf) return;
+  const view = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
+  // First overwrite with random bytes to defeat dead-store elimination by optimizers,
+  // then zero-fill for clean state.
+  crypto.getRandomValues(view);
+  view.fill(0);
 }
 
 /**
@@ -31,9 +31,9 @@ export function wipeBuffer(buf: Uint8Array | ArrayBuffer | null | undefined): vo
  * @param bufs - The buffers to wipe. Null/undefined entries are skipped.
  */
 export function wipeBuffers(...bufs: Array<Uint8Array | ArrayBuffer | null | undefined>): void {
-    for (const buf of bufs) {
-        wipeBuffer(buf);
-    }
+  for (const buf of bufs) {
+    wipeBuffer(buf);
+  }
 }
 
 /**
@@ -44,13 +44,10 @@ export function wipeBuffers(...bufs: Array<Uint8Array | ArrayBuffer | null | und
  * @param operation - The async function to execute with the buffer.
  * @returns The result of `operation`.
  */
-export async function withSecureBuffer<T>(
-    buf: Uint8Array,
-    operation: (buf: Uint8Array) => Promise<T>,
-): Promise<T> {
-    try {
-        return await operation(buf);
-    } finally {
-        wipeBuffer(buf);
-    }
+export async function withSecureBuffer<T>(buf: Uint8Array, operation: (buf: Uint8Array) => Promise<T>): Promise<T> {
+  try {
+    return await operation(buf);
+  } finally {
+    wipeBuffer(buf);
+  }
 }

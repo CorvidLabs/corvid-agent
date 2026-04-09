@@ -25,7 +25,6 @@ const log = createLogger('VoiceSession');
 /** Max length of text to send to TTS (longer gets truncated). */
 const MAX_TTS_LENGTH = 4000;
 
-
 /** How long to wait after the last content event before considering the response complete (ms). */
 const RESPONSE_DEBOUNCE_MS = 1500;
 
@@ -93,9 +92,7 @@ export class VoiceSessionRouter {
     // Resolve Discord ID to display name so the agent knows who's speaking
     // without relying on Whisper's (often garbled) name recognition
     const contact = findContactByPlatformId(this.db, 'default', 'discord', userId);
-    const speakerLabel = contact?.displayName
-      ? `${contact.displayName} (<@${userId}>)`
-      : `<@${userId}>`;
+    const speakerLabel = contact?.displayName ? `${contact.displayName} (<@${userId}>)` : `<@${userId}>`;
     const voicePrefix = `[Voice from ${speakerLabel}${channelSuffix}]`;
 
     // Queue transcription if we're currently speaking (process after TTS finishes)
@@ -151,9 +148,7 @@ export class VoiceSessionRouter {
     if (buffered.length === 0) return;
 
     // Combine all buffered transcriptions into a single message
-    const combinedMessage = buffered
-      .map((t) => `${t.voicePrefix}: ${t.text}`)
-      .join('\n');
+    const combinedMessage = buffered.map((t) => `${t.voicePrefix}: ${t.text}`).join('\n');
 
     log.info('Flushing transcription buffer → agent', {
       guildId,
@@ -236,7 +231,7 @@ export class VoiceSessionRouter {
     let voicePrompt =
       'You are in a live voice conversation on Discord. Your responses will be spoken aloud via TTS.\n\n' +
       'SPEAKER IDENTIFICATION:\n' +
-      '- Each voice message includes the speaker\'s Discord ID in the prefix: [Voice from <@DISCORD_ID>]\n' +
+      "- Each voice message includes the speaker's Discord ID in the prefix: [Voice from <@DISCORD_ID>]\n" +
       '- ALWAYS use this ID to identify who is speaking. Never guess based on voice or context.\n' +
       '- When referring to someone by name in the text channel, use the proper Discord mention format: <@DISCORD_ID>\n' +
       '- If you are unsure who someone is, use corvid_lookup_contact with their Discord ID to resolve their name.\n\n' +

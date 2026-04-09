@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 090: Add response_feedback table for user feedback on agent responses.
@@ -8,7 +8,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS response_feedback (
             id              TEXT PRIMARY KEY,
             agent_id        TEXT NOT NULL,
@@ -22,10 +22,10 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_response_feedback_agent ON response_feedback(agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_response_feedback_created ON response_feedback(created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_response_feedback_agent ON response_feedback(agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_response_feedback_created ON response_feedback(created_at)`);
 }
 
 export function down(db: Database): void {
-    db.exec(`DROP TABLE IF EXISTS response_feedback`);
+  db.exec(`DROP TABLE IF EXISTS response_feedback`);
 }

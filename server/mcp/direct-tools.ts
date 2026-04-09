@@ -6,932 +6,1108 @@
  * the same handlers from tool-handlers.ts.
  */
 
-import type { McpToolContext } from './tool-handlers';
-import {
-    handleSendMessage,
-    handleSaveMemory,
-    handlePromoteMemory,
-    handleRecallMemory,
-    handleDeleteMemory,
-    handleReadOnChainMemories,
-    handleSyncOnChainMemories,
-    handleListAgents,
-    handleExtendTimeout,
-    handleCheckCredits,
-    handleGrantCredits,
-    handleCreditConfig,
-    handleCreateWorkTask,
-    handleCheckWorkStatus,
-    handleListWorkTasks,
-    handleManageSchedule,
-    handleManageWorkflow,
-    handleWebSearch,
-    handleDeepResearch,
-    handleGitHubStarRepo,
-    handleGitHubUnstarRepo,
-    handleGitHubForkRepo,
-    handleGitHubListPrs,
-    handleGitHubCreatePr,
-    handleGitHubReviewPr,
-    handleGitHubCreateIssue,
-    handleGitHubListIssues,
-    handleGitHubRepoInfo,
-    handleGitHubGetPrDiff,
-    handleGitHubCommentOnPr,
-    handleGitHubFollowUser,
-    handleCodeSymbols,
-    handleFindReferences,
-    handleFlockDirectory,
-    handleListProjects,
-    handleCurrentProject,
-} from './tool-handlers';
-import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
-import { handleLibraryWrite, handleLibraryRead, handleLibraryListOnChain, handleLibraryDelete } from './tool-handlers/library';
-import { handleRestartServer } from './tool-handlers/server-ops';
-import { isToolBlockedForScheduler } from './scheduler-tool-gating';
-import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
-import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
 import type { LlmToolDefinition } from '../providers/types';
+import { buildCodingTools, type CodingToolContext } from './coding-tools';
+import { isToolBlockedForScheduler } from './scheduler-tool-gating';
+import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
+import type { McpToolContext } from './tool-handlers';
+import {
+  handleCheckCredits,
+  handleCheckWorkStatus,
+  handleCodeSymbols,
+  handleCreateWorkTask,
+  handleCreditConfig,
+  handleCurrentProject,
+  handleDeepResearch,
+  handleDeleteMemory,
+  handleExtendTimeout,
+  handleFindReferences,
+  handleFlockDirectory,
+  handleGitHubCommentOnPr,
+  handleGitHubCreateIssue,
+  handleGitHubCreatePr,
+  handleGitHubFollowUser,
+  handleGitHubForkRepo,
+  handleGitHubGetPrDiff,
+  handleGitHubListIssues,
+  handleGitHubListPrs,
+  handleGitHubRepoInfo,
+  handleGitHubReviewPr,
+  handleGitHubStarRepo,
+  handleGitHubUnstarRepo,
+  handleGrantCredits,
+  handleListAgents,
+  handleListProjects,
+  handleListWorkTasks,
+  handleManageSchedule,
+  handleManageWorkflow,
+  handlePromoteMemory,
+  handleReadOnChainMemories,
+  handleRecallMemory,
+  handleSaveMemory,
+  handleSendMessage,
+  handleSyncOnChainMemories,
+  handleWebSearch,
+} from './tool-handlers';
+import {
+  handleLibraryDelete,
+  handleLibraryListOnChain,
+  handleLibraryRead,
+  handleLibraryWrite,
+} from './tool-handlers/library';
+import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
+import { handleRestartServer } from './tool-handlers/server-ops';
 
 export interface DirectToolDefinition {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>; // JSON Schema
-    handler: (args: Record<string, unknown>) => Promise<{ text: string; isError?: boolean }>;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>; // JSON Schema
+  handler: (args: Record<string, unknown>) => Promise<{ text: string; isError?: boolean }>;
 }
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
 const DEFAULT_ALLOWED_TOOLS = new Set([
-    'corvid_send_message',
-    'corvid_save_memory',
-    'corvid_promote_memory',
-    'corvid_recall_memory',
-    'corvid_delete_memory',
-    'corvid_read_on_chain_memories',
-    'corvid_sync_on_chain_memories',
-    'corvid_library_write',
-    'corvid_library_read',
-    'corvid_library_list',
-    'corvid_library_delete',
-    'corvid_list_agents',
-    'corvid_extend_timeout',
-    'corvid_restart_server',
-    'corvid_check_credits',
-    'corvid_list_projects',
-    'corvid_current_project',
-    'corvid_create_work_task',
-    'corvid_check_work_status',
-    'corvid_list_work_tasks',
-    'corvid_manage_schedule',
-    'corvid_manage_workflow',
-    'corvid_web_search',
-    'corvid_deep_research',
-    'corvid_github_star_repo',
-    'corvid_github_fork_repo',
-    'corvid_github_list_prs',
-    'corvid_github_create_pr',
-    'corvid_github_review_pr',
-    'corvid_github_create_issue',
-    'corvid_github_list_issues',
-    'corvid_github_repo_info',
-    'corvid_github_unstar_repo',
-    'corvid_github_get_pr_diff',
-    'corvid_github_comment_on_pr',
-    'corvid_github_follow_user',
-    'read_file',
-    'write_file',
-    'edit_file',
-    'run_command',
-    'list_files',
-    'search_files',
-    'corvid_code_symbols',
-    'corvid_find_references',
-    'corvid_repo_blocklist',
-    'corvid_flock_directory',
+  'corvid_send_message',
+  'corvid_save_memory',
+  'corvid_promote_memory',
+  'corvid_recall_memory',
+  'corvid_delete_memory',
+  'corvid_read_on_chain_memories',
+  'corvid_sync_on_chain_memories',
+  'corvid_library_write',
+  'corvid_library_read',
+  'corvid_library_list',
+  'corvid_library_delete',
+  'corvid_list_agents',
+  'corvid_extend_timeout',
+  'corvid_restart_server',
+  'corvid_check_credits',
+  'corvid_list_projects',
+  'corvid_current_project',
+  'corvid_create_work_task',
+  'corvid_check_work_status',
+  'corvid_list_work_tasks',
+  'corvid_manage_schedule',
+  'corvid_manage_workflow',
+  'corvid_web_search',
+  'corvid_deep_research',
+  'corvid_github_star_repo',
+  'corvid_github_fork_repo',
+  'corvid_github_list_prs',
+  'corvid_github_create_pr',
+  'corvid_github_review_pr',
+  'corvid_github_create_issue',
+  'corvid_github_list_issues',
+  'corvid_github_repo_info',
+  'corvid_github_unstar_repo',
+  'corvid_github_get_pr_diff',
+  'corvid_github_comment_on_pr',
+  'corvid_github_follow_user',
+  'read_file',
+  'write_file',
+  'edit_file',
+  'run_command',
+  'list_files',
+  'search_files',
+  'corvid_code_symbols',
+  'corvid_find_references',
+  'corvid_repo_blocklist',
+  'corvid_flock_directory',
 ]);
 
 // Scheduler tool gating is now handled by scheduler-tool-gating.ts (tiered by action type).
 
 /** Validate that required fields exist and are non-empty strings/numbers in the args object. */
 function validateRequired(
-    toolName: string,
-    args: Record<string, unknown>,
-    fields: string[],
+  toolName: string,
+  args: Record<string, unknown>,
+  fields: string[],
 ): { text: string; isError: true } | null {
-    const missing: string[] = [];
-    for (const field of fields) {
-        const val = args[field];
-        if (val === undefined || val === null || val === '') {
-            missing.push(field);
-        }
+  const missing: string[] = [];
+  for (const field of fields) {
+    const val = args[field];
+    if (val === undefined || val === null || val === '') {
+      missing.push(field);
     }
-    if (missing.length > 0) {
-        return {
-            text: `Missing required argument(s) for ${toolName}: ${missing.join(', ')}`,
-            isError: true,
-        };
-    }
-    return null;
+  }
+  if (missing.length > 0) {
+    return {
+      text: `Missing required argument(s) for ${toolName}: ${missing.join(', ')}`,
+      isError: true,
+    };
+  }
+  return null;
 }
 
 /** Convert a CallToolResult to our simple { text, isError } format. */
-function unwrapResult(result: { content: Array<{ type: string; text?: string }>; isError?: boolean }): { text: string; isError?: boolean } {
-    const text = result.content
-        .filter((c) => c.type === 'text' && c.text)
-        .map((c) => c.text)
-        .join('');
-    return { text, isError: result.isError };
+function unwrapResult(result: { content: Array<{ type: string; text?: string }>; isError?: boolean }): {
+  text: string;
+  isError?: boolean;
+} {
+  const text = result.content
+    .filter((c) => c.type === 'text' && c.text)
+    .map((c) => c.text)
+    .join('');
+  return { text, isError: result.isError };
 }
 
 export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingToolContext): DirectToolDefinition[] {
-    const tools: DirectToolDefinition[] = [];
+  const tools: DirectToolDefinition[] = [];
 
-    // MCP-based tools require a valid McpToolContext
-    if (ctx) {
+  // MCP-based tools require a valid McpToolContext
+  if (ctx) {
     tools.push(
-        {
-            name: 'corvid_send_message',
-            description: 'Send a message to another agent and wait for their response. Use corvid_list_agents first to discover available agents.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    to_agent: { type: 'string', description: 'Agent name or ID to message' },
-                    message: { type: 'string', description: 'The message to send' },
-                    thread: { type: 'string', description: 'Thread ID to continue a conversation. Omit to start new.' },
-                },
-                required: ['to_agent', 'message'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_send_message', args, ['to_agent', 'message']);
-                if (err) return err;
-                return unwrapResult(await handleSendMessage(ctx, args as { to_agent: string; message: string; thread?: string }));
-            },
+      {
+        name: 'corvid_send_message',
+        description:
+          'Send a message to another agent and wait for their response. Use corvid_list_agents first to discover available agents.',
+        parameters: {
+          type: 'object',
+          properties: {
+            to_agent: { type: 'string', description: 'Agent name or ID to message' },
+            message: { type: 'string', description: 'The message to send' },
+            thread: { type: 'string', description: 'Thread ID to continue a conversation. Omit to start new.' },
+          },
+          required: ['to_agent', 'message'],
         },
-        {
-            name: 'corvid_save_memory',
-            description: 'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache for fast recall.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'A short descriptive key for this memory' },
-                    content: { type: 'string', description: 'The content to remember' },
-                },
-                required: ['key', 'content'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_save_memory', args, ['key', 'content']);
-                if (err) return err;
-                return unwrapResult(await handleSaveMemory(ctx, args as { key: string; content: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_send_message', args, ['to_agent', 'message']);
+          if (err) return err;
+          return unwrapResult(
+            await handleSendMessage(ctx, args as { to_agent: string; message: string; thread?: string }),
+          );
         },
-        {
-            name: 'corvid_recall_memory',
-            description: 'Recall memories from short-term cache (SQLite) with long-term storage status. Key for exact lookup, query for search, or neither to list recent.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Exact key to look up' },
-                    query: { type: 'string', description: 'Search term to find across keys and content' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleRecallMemory(ctx, args as { key?: string; query?: string })),
+      },
+      {
+        name: 'corvid_save_memory',
+        description:
+          'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache for fast recall.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'A short descriptive key for this memory' },
+            content: { type: 'string', description: 'The content to remember' },
+          },
+          required: ['key', 'content'],
         },
-        {
-            name: 'corvid_read_on_chain_memories',
-            description: 'Read memories directly from on-chain storage (Algorand blockchain). Browse permanent long-term memories. Useful when local cache may be stale or empty.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    search: { type: 'string', description: 'Optional search term to filter by key or content' },
-                    limit: { type: 'number', description: 'Max memories to return (default: 50)' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleReadOnChainMemories(ctx, args as { search?: string; limit?: number })),
+        handler: async (args) => {
+          const err = validateRequired('corvid_save_memory', args, ['key', 'content']);
+          if (err) return err;
+          return unwrapResult(await handleSaveMemory(ctx, args as { key: string; content: string }));
         },
-        {
-            name: 'corvid_sync_on_chain_memories',
-            description: 'Sync memories from on-chain storage back to local SQLite cache. Recovers memories after database reset.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    limit: { type: 'number', description: 'Max on-chain memories to scan (default: 200)' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleSyncOnChainMemories(ctx, args as { limit?: number })),
+      },
+      {
+        name: 'corvid_recall_memory',
+        description:
+          'Recall memories from short-term cache (SQLite) with long-term storage status. Key for exact lookup, query for search, or neither to list recent.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Exact key to look up' },
+            query: { type: 'string', description: 'Search term to find across keys and content' },
+          },
         },
-        {
-            name: 'corvid_delete_memory',
-            description: 'Delete (forget) a long-term ARC-69 memory. Only works for ASA memories on localnet. Soft delete (default) archives; hard delete destroys the ASA.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Memory key to delete' },
-                    mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
-                },
-                required: ['key'],
-            },
-            handler: async (args) => unwrapResult(await handleDeleteMemory(ctx, args as { key: string; mode?: string })),
+        handler: async (args) => unwrapResult(await handleRecallMemory(ctx, args as { key?: string; query?: string })),
+      },
+      {
+        name: 'corvid_read_on_chain_memories',
+        description:
+          'Read memories directly from on-chain storage (Algorand blockchain). Browse permanent long-term memories. Useful when local cache may be stale or empty.',
+        parameters: {
+          type: 'object',
+          properties: {
+            search: { type: 'string', description: 'Optional search term to filter by key or content' },
+            limit: { type: 'number', description: 'Max memories to return (default: 50)' },
+          },
         },
-        {
-            name: 'corvid_promote_memory',
-            description: 'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). Use after corvid_save_memory to make a memory permanent.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Memory key to promote to long-term on-chain storage' },
-                },
-                required: ['key'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_promote_memory', args, ['key']);
-                if (err) return err;
-                return unwrapResult(await handlePromoteMemory(ctx, args as { key: string }));
-            },
+        handler: async (args) =>
+          unwrapResult(await handleReadOnChainMemories(ctx, args as { search?: string; limit?: number })),
+      },
+      {
+        name: 'corvid_sync_on_chain_memories',
+        description:
+          'Sync memories from on-chain storage back to local SQLite cache. Recovers memories after database reset.',
+        parameters: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number', description: 'Max on-chain memories to scan (default: 200)' },
+          },
         },
-        // ── Shared Library (CRVLIB) ──────────────────────────────────────
-        {
-            name: 'corvid_library_write',
-            description: 'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents. Large content is auto-split into a multi-page book.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Unique key for this entry. For auto-split books, pages are keyed as {key}/page-1, etc.' },
-                    content: { type: 'string', description: 'Content to publish. No size limit — large content auto-splits into linked pages.' },
-                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Entry category (default: reference)' },
-                    tags: { type: 'array', items: { type: 'string' }, description: 'Tags for discovery' },
-                },
-                required: ['key', 'content'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_library_write', args, ['key', 'content']);
-                if (err) return err;
-                return unwrapResult(await handleLibraryWrite(ctx, args as { key: string; content: string; category?: string; tags?: string[] }));
-            },
+        handler: async (args) => unwrapResult(await handleSyncOnChainMemories(ctx, args as { limit?: number })),
+      },
+      {
+        name: 'corvid_delete_memory',
+        description:
+          'Delete (forget) a long-term ARC-69 memory. Only works for ASA memories on localnet. Soft delete (default) archives; hard delete destroys the ASA.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Memory key to delete' },
+            mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
+          },
+          required: ['key'],
         },
-        {
-            name: 'corvid_library_read',
-            description: 'Read shared library entries by key, query, category, or tag.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Exact key to look up' },
-                    query: { type: 'string', description: 'Search term to filter entries' },
-                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Filter by category' },
-                    tag: { type: 'string', description: 'Filter by tag' },
-                    limit: { type: 'number', description: 'Max entries (default: 20)' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleLibraryRead(ctx, args as { key?: string; query?: string; category?: string; tag?: string; limit?: number })),
+        handler: async (args) => unwrapResult(await handleDeleteMemory(ctx, args as { key: string; mode?: string })),
+      },
+      {
+        name: 'corvid_promote_memory',
+        description:
+          'Promote a short-term (SQLite) memory to long-term on-chain storage (ARC-69 ASA). Use after corvid_save_memory to make a memory permanent.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Memory key to promote to long-term on-chain storage' },
+          },
+          required: ['key'],
         },
-        {
-            name: 'corvid_library_list',
-            description: 'List all shared library entries directly from on-chain CRVLIB ASAs.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    category: { type: 'string', enum: ['guide', 'reference', 'decision', 'standard', 'runbook'], description: 'Filter by category' },
-                    tag: { type: 'string', description: 'Filter by tag' },
-                    limit: { type: 'number', description: 'Max entries (default: 50)' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleLibraryListOnChain(ctx, args as { category?: string; tag?: string; limit?: number })),
+        handler: async (args) => {
+          const err = validateRequired('corvid_promote_memory', args, ['key']);
+          if (err) return err;
+          return unwrapResult(await handlePromoteMemory(ctx, args as { key: string }));
         },
-        {
-            name: 'corvid_library_delete',
-            description: 'Delete a shared library entry. Soft (default) archives; hard destroys ASA.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Library entry key to delete' },
-                    mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
-                },
-                required: ['key'],
+      },
+      // ── Shared Library (CRVLIB) ──────────────────────────────────────
+      {
+        name: 'corvid_library_write',
+        description:
+          'Publish or update a shared library entry (CRVLIB). Plaintext, readable by all agents. Large content is auto-split into a multi-page book.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: {
+              type: 'string',
+              description: 'Unique key for this entry. For auto-split books, pages are keyed as {key}/page-1, etc.',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_library_delete', args, ['key']);
-                if (err) return err;
-                return unwrapResult(await handleLibraryDelete(ctx, args as { key: string; mode?: string }));
+            content: {
+              type: 'string',
+              description: 'Content to publish. No size limit — large content auto-splits into linked pages.',
             },
+            category: {
+              type: 'string',
+              enum: ['guide', 'reference', 'decision', 'standard', 'runbook'],
+              description: 'Entry category (default: reference)',
+            },
+            tags: { type: 'array', items: { type: 'string' }, description: 'Tags for discovery' },
+          },
+          required: ['key', 'content'],
         },
-        {
-            name: 'corvid_list_agents',
-            description: 'List all available agents you can communicate with.',
-            parameters: { type: 'object', properties: {} },
-            handler: async () => unwrapResult(await handleListAgents(ctx)),
+        handler: async (args) => {
+          const err = validateRequired('corvid_library_write', args, ['key', 'content']);
+          if (err) return err;
+          return unwrapResult(
+            await handleLibraryWrite(ctx, args as { key: string; content: string; category?: string; tags?: string[] }),
+          );
         },
-        {
-            name: 'corvid_extend_timeout',
-            description: 'Request more time for your current session. Maximum extension is 120 minutes.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    minutes: { type: 'number', description: 'Number of additional minutes to request (1-120)' },
-                },
-                required: ['minutes'],
+      },
+      {
+        name: 'corvid_library_read',
+        description: 'Read shared library entries by key, query, category, or tag.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Exact key to look up' },
+            query: { type: 'string', description: 'Search term to filter entries' },
+            category: {
+              type: 'string',
+              enum: ['guide', 'reference', 'decision', 'standard', 'runbook'],
+              description: 'Filter by category',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_extend_timeout', args, ['minutes']);
-                if (err) return err;
-                return unwrapResult(await handleExtendTimeout(ctx, args as { minutes: number }));
-            },
+            tag: { type: 'string', description: 'Filter by tag' },
+            limit: { type: 'number', description: 'Max entries (default: 20)' },
+          },
         },
-        {
-            name: 'corvid_restart_server',
-            description: 'Restart the corvid-agent server. Idempotent — if the server was already restarted in this session, returns a confirmation instead of restarting again.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    reason: { type: 'string', description: 'Brief reason for the restart (e.g. "apply env var changes")' },
-                },
+        handler: async (args) =>
+          unwrapResult(
+            await handleLibraryRead(
+              ctx,
+              args as { key?: string; query?: string; category?: string; tag?: string; limit?: number },
+            ),
+          ),
+      },
+      {
+        name: 'corvid_library_list',
+        description: 'List all shared library entries directly from on-chain CRVLIB ASAs.',
+        parameters: {
+          type: 'object',
+          properties: {
+            category: {
+              type: 'string',
+              enum: ['guide', 'reference', 'decision', 'standard', 'runbook'],
+              description: 'Filter by category',
             },
-            handler: async (args) => unwrapResult(await handleRestartServer(ctx, args as { reason?: string })),
+            tag: { type: 'string', description: 'Filter by tag' },
+            limit: { type: 'number', description: 'Max entries (default: 50)' },
+          },
         },
-        {
-            name: 'corvid_check_credits',
-            description: 'Check the credit balance for a wallet address.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    wallet_address: { type: 'string', description: 'Wallet address to check. Omit to see your own.' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleCheckCredits(ctx, args as { wallet_address?: string })),
+        handler: async (args) =>
+          unwrapResult(
+            await handleLibraryListOnChain(ctx, args as { category?: string; tag?: string; limit?: number }),
+          ),
+      },
+      {
+        name: 'corvid_library_delete',
+        description: 'Delete a shared library entry. Soft (default) archives; hard destroys ASA.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Library entry key to delete' },
+            mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
+          },
+          required: ['key'],
         },
-        {
-            name: 'corvid_grant_credits',
-            description: 'Grant free credits to a wallet address. Maximum 1,000,000 per grant.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    wallet_address: { type: 'string', description: 'Wallet address to grant credits to' },
-                    amount: { type: 'number', description: 'Number of credits to grant' },
-                    reason: { type: 'string', description: 'Reason for the grant' },
-                },
-                required: ['wallet_address', 'amount'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_grant_credits', args, ['wallet_address', 'amount']);
-                if (err) return err;
-                return unwrapResult(await handleGrantCredits(ctx, args as { wallet_address: string; amount: number; reason?: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_library_delete', args, ['key']);
+          if (err) return err;
+          return unwrapResult(await handleLibraryDelete(ctx, args as { key: string; mode?: string }));
         },
-        {
-            name: 'corvid_credit_config',
-            description: 'View or update credit system configuration.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    key: { type: 'string', description: 'Config key to update' },
-                    value: { type: 'string', description: 'New value for the config key' },
-                },
-            },
-            handler: async (args) => unwrapResult(await handleCreditConfig(ctx, args as { key?: string; value?: string })),
+      },
+      {
+        name: 'corvid_list_agents',
+        description: 'List all available agents you can communicate with.',
+        parameters: { type: 'object', properties: {} },
+        handler: async () => unwrapResult(await handleListAgents(ctx)),
+      },
+      {
+        name: 'corvid_extend_timeout',
+        description: 'Request more time for your current session. Maximum extension is 120 minutes.',
+        parameters: {
+          type: 'object',
+          properties: {
+            minutes: { type: 'number', description: 'Number of additional minutes to request (1-120)' },
+          },
+          required: ['minutes'],
         },
+        handler: async (args) => {
+          const err = validateRequired('corvid_extend_timeout', args, ['minutes']);
+          if (err) return err;
+          return unwrapResult(await handleExtendTimeout(ctx, args as { minutes: number }));
+        },
+      },
+      {
+        name: 'corvid_restart_server',
+        description:
+          'Restart the corvid-agent server. Idempotent — if the server was already restarted in this session, returns a confirmation instead of restarting again.',
+        parameters: {
+          type: 'object',
+          properties: {
+            reason: { type: 'string', description: 'Brief reason for the restart (e.g. "apply env var changes")' },
+          },
+        },
+        handler: async (args) => unwrapResult(await handleRestartServer(ctx, args as { reason?: string })),
+      },
+      {
+        name: 'corvid_check_credits',
+        description: 'Check the credit balance for a wallet address.',
+        parameters: {
+          type: 'object',
+          properties: {
+            wallet_address: { type: 'string', description: 'Wallet address to check. Omit to see your own.' },
+          },
+        },
+        handler: async (args) => unwrapResult(await handleCheckCredits(ctx, args as { wallet_address?: string })),
+      },
+      {
+        name: 'corvid_grant_credits',
+        description: 'Grant free credits to a wallet address. Maximum 1,000,000 per grant.',
+        parameters: {
+          type: 'object',
+          properties: {
+            wallet_address: { type: 'string', description: 'Wallet address to grant credits to' },
+            amount: { type: 'number', description: 'Number of credits to grant' },
+            reason: { type: 'string', description: 'Reason for the grant' },
+          },
+          required: ['wallet_address', 'amount'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_grant_credits', args, ['wallet_address', 'amount']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGrantCredits(ctx, args as { wallet_address: string; amount: number; reason?: string }),
+          );
+        },
+      },
+      {
+        name: 'corvid_credit_config',
+        description: 'View or update credit system configuration.',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Config key to update' },
+            value: { type: 'string', description: 'New value for the config key' },
+          },
+        },
+        handler: async (args) => unwrapResult(await handleCreditConfig(ctx, args as { key?: string; value?: string })),
+      },
     );
 
     // Project discovery tools
     tools.push(
-        {
-            name: 'corvid_list_projects',
-            description: 'List all available projects with their IDs, names, and working directories.',
-            parameters: { type: 'object', properties: {} },
-            handler: async () => unwrapResult(await handleListProjects(ctx)),
-        },
-        {
-            name: 'corvid_current_project',
-            description: 'Show the current agent\'s default project.',
-            parameters: { type: 'object', properties: {} },
-            handler: async () => unwrapResult(await handleCurrentProject(ctx)),
-        },
+      {
+        name: 'corvid_list_projects',
+        description: 'List all available projects with their IDs, names, and working directories.',
+        parameters: { type: 'object', properties: {} },
+        handler: async () => unwrapResult(await handleListProjects(ctx)),
+      },
+      {
+        name: 'corvid_current_project',
+        description: "Show the current agent's default project.",
+        parameters: { type: 'object', properties: {} },
+        handler: async () => unwrapResult(await handleCurrentProject(ctx)),
+      },
     );
 
     // Conditionally add work task tools
     if (ctx.workTaskService) {
-        tools.push({
-            name: 'corvid_create_work_task',
-            description: 'Create a work task that spawns a new agent session on a dedicated branch. Set model_tier to control cost. Use corvid_list_projects to discover available projects first.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    description: { type: 'string', description: 'A clear description of the work to be done' },
-                    project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
-                    project_name: { type: 'string', description: 'Project name (alternative to project_id). Use corvid_list_projects to discover names.' },
-                    model_tier: { type: 'string', description: 'Model tier: "light" (Haiku), "standard" (Sonnet), "heavy" (Opus). Omit for auto-select.' },
-                    agent_id: { type: 'string', description: 'Agent ID to execute and be credited for this task. Defaults to the calling agent.' },
-                },
-                required: ['description'],
+      tools.push({
+        name: 'corvid_create_work_task',
+        description:
+          'Create a work task that spawns a new agent session on a dedicated branch. Set model_tier to control cost. Use corvid_list_projects to discover available projects first.',
+        parameters: {
+          type: 'object',
+          properties: {
+            description: { type: 'string', description: 'A clear description of the work to be done' },
+            project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
+            project_name: {
+              type: 'string',
+              description: 'Project name (alternative to project_id). Use corvid_list_projects to discover names.',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_create_work_task', args, ['description']);
-                if (err) return err;
-                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string; model_tier?: string; agent_id?: string }));
+            model_tier: {
+              type: 'string',
+              description: 'Model tier: "light" (Haiku), "standard" (Sonnet), "heavy" (Opus). Omit for auto-select.',
             },
-        });
-        tools.push({
-            name: 'corvid_check_work_status',
-            description: 'Check the status of a work task by ID.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    task_id: { type: 'string', description: 'The work task ID to check' },
-                },
-                required: ['task_id'],
+            agent_id: {
+              type: 'string',
+              description: 'Agent ID to execute and be credited for this task. Defaults to the calling agent.',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_check_work_status', args, ['task_id']);
-                if (err) return err;
-                return unwrapResult(await handleCheckWorkStatus(ctx, args as { task_id: string }));
+          },
+          required: ['description'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_create_work_task', args, ['description']);
+          if (err) return err;
+          return unwrapResult(
+            await handleCreateWorkTask(
+              ctx,
+              args as {
+                description: string;
+                project_id?: string;
+                project_name?: string;
+                model_tier?: string;
+                agent_id?: string;
+              },
+            ),
+          );
+        },
+      });
+      tools.push({
+        name: 'corvid_check_work_status',
+        description: 'Check the status of a work task by ID.',
+        parameters: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'The work task ID to check' },
+          },
+          required: ['task_id'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_check_work_status', args, ['task_id']);
+          if (err) return err;
+          return unwrapResult(await handleCheckWorkStatus(ctx, args as { task_id: string }));
+        },
+      });
+      tools.push({
+        name: 'corvid_list_work_tasks',
+        description: 'List work tasks for this agent. Optionally filter by status.',
+        parameters: {
+          type: 'object',
+          properties: {
+            status: {
+              type: 'string',
+              description: 'Filter by status: pending, branching, running, validating, completed, failed',
             },
-        });
-        tools.push({
-            name: 'corvid_list_work_tasks',
-            description: 'List work tasks for this agent. Optionally filter by status.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    status: { type: 'string', description: 'Filter by status: pending, branching, running, validating, completed, failed' },
-                    limit: { type: 'number', description: 'Max number of tasks to return (default 20, max 50)' },
-                },
-            },
-            handler: async (args) => {
-                return unwrapResult(await handleListWorkTasks(ctx, args as { status?: string; limit?: number }));
-            },
-        });
+            limit: { type: 'number', description: 'Max number of tasks to return (default 20, max 50)' },
+          },
+        },
+        handler: async (args) => {
+          return unwrapResult(await handleListWorkTasks(ctx, args as { status?: string; limit?: number }));
+        },
+      });
     }
 
     tools.push({
-        name: 'corvid_manage_schedule',
-        description: 'Manage automated schedules for all agents. Use action="list" without agent_id to see all schedules, or pass agent_id to filter. Use "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
-        parameters: {
-            type: 'object',
-            properties: {
-                action: { type: 'string', enum: ['list', 'create', 'update', 'get', 'pause', 'resume', 'history'], description: 'What to do' },
-                name: { type: 'string', description: 'Schedule name (for create/update)' },
-                description: { type: 'string', description: 'Schedule description (for create/update)' },
-                cron_expression: { type: 'string', description: 'Cron expression (for create/update)' },
-                interval_minutes: { type: 'number', description: 'Run every N minutes (for create/update)' },
-                schedule_actions: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            type: { type: 'string' },
-                            repos: { type: 'array', items: { type: 'string' } },
-                            description: { type: 'string' },
-                            project_id: { type: 'string' },
-                            to_agent_id: { type: 'string' },
-                            message: { type: 'string' },
-                            prompt: { type: 'string' },
-                        },
-                        required: ['type'],
-                    },
-                    description: 'Actions to perform (for create/update)',
-                },
-                approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve (for create/update)' },
-                max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
-                agent_id: { type: 'string', description: 'Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.' },
-                schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
-                output_destinations: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            type: { type: 'string', description: 'discord_channel, algochat_agent, or algochat_address' },
-                            target: { type: 'string', description: 'Discord channel ID, agent ID, or Algorand address' },
-                            format: { type: 'string', description: 'summary, full, or on_error_only' },
-                        },
-                        required: ['type', 'target'],
-                    },
-                    description: 'Where to deliver results after execution (for create/update)',
-                },
+      name: 'corvid_manage_schedule',
+      description:
+        'Manage automated schedules for all agents. Use action="list" without agent_id to see all schedules, or pass agent_id to filter. Use "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['list', 'create', 'update', 'get', 'pause', 'resume', 'history'],
+            description: 'What to do',
+          },
+          name: { type: 'string', description: 'Schedule name (for create/update)' },
+          description: { type: 'string', description: 'Schedule description (for create/update)' },
+          cron_expression: { type: 'string', description: 'Cron expression (for create/update)' },
+          interval_minutes: { type: 'number', description: 'Run every N minutes (for create/update)' },
+          schedule_actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                repos: { type: 'array', items: { type: 'string' } },
+                description: { type: 'string' },
+                project_id: { type: 'string' },
+                to_agent_id: { type: 'string' },
+                message: { type: 'string' },
+                prompt: { type: 'string' },
+              },
+              required: ['type'],
             },
-            required: ['action'],
+            description: 'Actions to perform (for create/update)',
+          },
+          approval_policy: {
+            type: 'string',
+            description: 'auto, owner_approve, or council_approve (for create/update)',
+          },
+          max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
+          agent_id: {
+            type: 'string',
+            description:
+              'Agent ID — filter by agent (for list), or assign schedule to agent (for create/update). Omit on list to see all schedules.',
+          },
+          schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
+          output_destinations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', description: 'discord_channel, algochat_agent, or algochat_address' },
+                target: { type: 'string', description: 'Discord channel ID, agent ID, or Algorand address' },
+                format: { type: 'string', description: 'summary, full, or on_error_only' },
+              },
+              required: ['type', 'target'],
+            },
+            description: 'Where to deliver results after execution (for create/update)',
+          },
         },
-        handler: async (args) => {
-            const err = validateRequired('corvid_manage_schedule', args, ['action']);
-            if (err) return err;
-            return unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1]));
-        },
+        required: ['action'],
+      },
+      handler: async (args) => {
+        const err = validateRequired('corvid_manage_schedule', args, ['action']);
+        if (err) return err;
+        return unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1]));
+      },
     });
 
     tools.push({
-        name: 'corvid_manage_workflow',
-        description: 'Manage graph-based workflows for multi-step agent orchestration. Actions: list, create, get, activate, pause, trigger, runs, run_status.',
-        parameters: {
-            type: 'object',
-            properties: {
-                action: { type: 'string', enum: ['list', 'create', 'get', 'activate', 'pause', 'trigger', 'runs', 'run_status'], description: 'What to do' },
-                workflow_id: { type: 'string', description: 'Workflow ID' },
-                run_id: { type: 'string', description: 'Run ID (for run_status)' },
-                name: { type: 'string', description: 'Workflow name (for create)' },
-                description: { type: 'string', description: 'Workflow description' },
-                nodes: { type: 'array', items: { type: 'object' }, description: 'Workflow nodes (for create)' },
-                edges: { type: 'array', items: { type: 'object' }, description: 'Workflow edges (for create)' },
-                default_project_id: { type: 'string', description: 'Default project ID' },
-                max_concurrency: { type: 'number', description: 'Max concurrent nodes' },
-                input: { type: 'object', description: 'Input data for trigger' },
-            },
-            required: ['action'],
+      name: 'corvid_manage_workflow',
+      description:
+        'Manage graph-based workflows for multi-step agent orchestration. Actions: list, create, get, activate, pause, trigger, runs, run_status.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['list', 'create', 'get', 'activate', 'pause', 'trigger', 'runs', 'run_status'],
+            description: 'What to do',
+          },
+          workflow_id: { type: 'string', description: 'Workflow ID' },
+          run_id: { type: 'string', description: 'Run ID (for run_status)' },
+          name: { type: 'string', description: 'Workflow name (for create)' },
+          description: { type: 'string', description: 'Workflow description' },
+          nodes: { type: 'array', items: { type: 'object' }, description: 'Workflow nodes (for create)' },
+          edges: { type: 'array', items: { type: 'object' }, description: 'Workflow edges (for create)' },
+          default_project_id: { type: 'string', description: 'Default project ID' },
+          max_concurrency: { type: 'number', description: 'Max concurrent nodes' },
+          input: { type: 'object', description: 'Input data for trigger' },
         },
-        handler: async (args) => {
-            const err = validateRequired('corvid_manage_workflow', args, ['action']);
-            if (err) return err;
-            return unwrapResult(await handleManageWorkflow(ctx, args as Parameters<typeof handleManageWorkflow>[1]));
-        },
+        required: ['action'],
+      },
+      handler: async (args) => {
+        const err = validateRequired('corvid_manage_workflow', args, ['action']);
+        if (err) return err;
+        return unwrapResult(await handleManageWorkflow(ctx, args as Parameters<typeof handleManageWorkflow>[1]));
+      },
     });
 
     tools.push(
-        {
-            name: 'corvid_web_search',
-            description: 'Search the web for current information using Brave Search. Returns titles, URLs, and descriptions.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    query: { type: 'string', description: 'The search query' },
-                    count: { type: 'number', description: 'Number of results to return (1-20, default 5)' },
-                    freshness: { type: 'string', enum: ['pd', 'pw', 'pm', 'py'], description: 'Freshness filter: pd (past day), pw (past week), pm (past month), py (past year)' },
-                },
-                required: ['query'],
+      {
+        name: 'corvid_web_search',
+        description:
+          'Search the web for current information using Brave Search. Returns titles, URLs, and descriptions.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'The search query' },
+            count: { type: 'number', description: 'Number of results to return (1-20, default 5)' },
+            freshness: {
+              type: 'string',
+              enum: ['pd', 'pw', 'pm', 'py'],
+              description: 'Freshness filter: pd (past day), pw (past week), pm (past month), py (past year)',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_web_search', args, ['query']);
-                if (err) return err;
-                return unwrapResult(await handleWebSearch(ctx, args as { query: string; count?: number; freshness?: string }));
-            },
+          },
+          required: ['query'],
         },
-        {
-            name: 'corvid_deep_research',
-            description: 'Research a topic in depth by running multiple web searches from different angles. Returns deduplicated, organized results.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    topic: { type: 'string', description: 'The main topic to research' },
-                    sub_questions: { type: 'array', items: { type: 'string' }, description: 'Custom sub-questions to search. If omitted, auto-generates angles.' },
-                },
-                required: ['topic'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_deep_research', args, ['topic']);
-                if (err) return err;
-                return unwrapResult(await handleDeepResearch(ctx, args as { topic: string; sub_questions?: string[] }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_web_search', args, ['query']);
+          if (err) return err;
+          return unwrapResult(
+            await handleWebSearch(ctx, args as { query: string; count?: number; freshness?: string }),
+          );
         },
+      },
+      {
+        name: 'corvid_deep_research',
+        description:
+          'Research a topic in depth by running multiple web searches from different angles. Returns deduplicated, organized results.',
+        parameters: {
+          type: 'object',
+          properties: {
+            topic: { type: 'string', description: 'The main topic to research' },
+            sub_questions: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Custom sub-questions to search. If omitted, auto-generates angles.',
+            },
+          },
+          required: ['topic'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_deep_research', args, ['topic']);
+          if (err) return err;
+          return unwrapResult(await handleDeepResearch(ctx, args as { topic: string; sub_questions?: string[] }));
+        },
+      },
     );
 
     // ─── GitHub tools ────────────────────────────────────────────────────
     tools.push(
-        {
-            name: 'corvid_github_star_repo',
-            description: 'Star a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_star_repo', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubStarRepo(ctx, args as { repo: string }));
-            },
+      {
+        name: 'corvid_github_star_repo',
+        description: 'Star a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
+          },
+          required: ['repo'],
         },
-        {
-            name: 'corvid_github_fork_repo',
-            description: 'Fork a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    org: { type: 'string', description: 'Organization to fork into. Omit to fork to personal account.' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_fork_repo', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubForkRepo(ctx, args as { repo: string; org?: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_star_repo', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubStarRepo(ctx, args as { repo: string }));
         },
-        {
-            name: 'corvid_github_list_prs',
-            description: 'List open pull requests for a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    limit: { type: 'number', description: 'Maximum number of PRs to return (default 10)' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_list_prs', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubListPrs(ctx, args as { repo: string; limit?: number }));
-            },
+      },
+      {
+        name: 'corvid_github_fork_repo',
+        description: 'Fork a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            org: { type: 'string', description: 'Organization to fork into. Omit to fork to personal account.' },
+          },
+          required: ['repo'],
         },
-        {
-            name: 'corvid_github_create_pr',
-            description: 'Create a pull request on a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    title: { type: 'string', description: 'PR title' },
-                    body: { type: 'string', description: 'PR description/body' },
-                    head: { type: 'string', description: 'Source branch name' },
-                    base: { type: 'string', description: 'Target branch name (default "main")' },
-                },
-                required: ['repo', 'title', 'body', 'head'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_create_pr', args, ['repo', 'title', 'body', 'head']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubCreatePr(ctx, args as { repo: string; title: string; body: string; head: string; base?: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_fork_repo', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubForkRepo(ctx, args as { repo: string; org?: string }));
         },
-        {
-            name: 'corvid_github_review_pr',
-            description: 'Submit a review on a pull request.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    pr_number: { type: 'number', description: 'Pull request number' },
-                    event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'], description: 'Review action' },
-                    body: { type: 'string', description: 'Review comment body' },
-                },
-                required: ['repo', 'pr_number', 'event', 'body'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_review_pr', args, ['repo', 'pr_number', 'event', 'body']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubReviewPr(ctx, args as { repo: string; pr_number: number; event: string; body: string }));
-            },
+      },
+      {
+        name: 'corvid_github_list_prs',
+        description: 'List open pull requests for a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            limit: { type: 'number', description: 'Maximum number of PRs to return (default 10)' },
+          },
+          required: ['repo'],
         },
-        {
-            name: 'corvid_github_create_issue',
-            description: 'Create a new issue on a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    title: { type: 'string', description: 'Issue title' },
-                    body: { type: 'string', description: 'Issue description/body' },
-                    labels: { type: 'array', items: { type: 'string' }, description: 'Labels to apply' },
-                },
-                required: ['repo', 'title', 'body'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_create_issue', args, ['repo', 'title', 'body']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubCreateIssue(ctx, args as { repo: string; title: string; body: string; labels?: string[] }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_list_prs', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubListPrs(ctx, args as { repo: string; limit?: number }));
         },
-        {
-            name: 'corvid_github_list_issues',
-            description: 'List issues for a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    state: { type: 'string', enum: ['open', 'closed', 'all'], description: 'Filter by state (default "open")' },
-                    limit: { type: 'number', description: 'Maximum number of issues (default 30)' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_list_issues', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubListIssues(ctx, args as { repo: string; state?: string; limit?: number }));
-            },
+      },
+      {
+        name: 'corvid_github_create_pr',
+        description: 'Create a pull request on a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            title: { type: 'string', description: 'PR title' },
+            body: { type: 'string', description: 'PR description/body' },
+            head: { type: 'string', description: 'Source branch name' },
+            base: { type: 'string', description: 'Target branch name (default "main")' },
+          },
+          required: ['repo', 'title', 'body', 'head'],
         },
-        {
-            name: 'corvid_github_repo_info',
-            description: 'Get information about a GitHub repository (name, description, stars, forks, etc).',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_repo_info', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubRepoInfo(ctx, args as { repo: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_create_pr', args, ['repo', 'title', 'body', 'head']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGitHubCreatePr(
+              ctx,
+              args as { repo: string; title: string; body: string; head: string; base?: string },
+            ),
+          );
         },
-        {
-            name: 'corvid_github_unstar_repo',
-            description: 'Remove a star from a GitHub repository.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
-                },
-                required: ['repo'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_unstar_repo', args, ['repo']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubUnstarRepo(ctx, args as { repo: string }));
-            },
+      },
+      {
+        name: 'corvid_github_review_pr',
+        description: 'Submit a review on a pull request.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            pr_number: { type: 'number', description: 'Pull request number' },
+            event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'], description: 'Review action' },
+            body: { type: 'string', description: 'Review comment body' },
+          },
+          required: ['repo', 'pr_number', 'event', 'body'],
         },
-        {
-            name: 'corvid_github_get_pr_diff',
-            description: 'Get the full diff/patch for a pull request. Useful for reviewing code changes.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    pr_number: { type: 'number', description: 'Pull request number' },
-                },
-                required: ['repo', 'pr_number'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_get_pr_diff', args, ['repo', 'pr_number']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubGetPrDiff(ctx, args as { repo: string; pr_number: number }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_review_pr', args, ['repo', 'pr_number', 'event', 'body']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGitHubReviewPr(ctx, args as { repo: string; pr_number: number; event: string; body: string }),
+          );
         },
-        {
-            name: 'corvid_github_comment_on_pr',
-            description: 'Add a comment to a pull request.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    repo: { type: 'string', description: 'Repository in owner/name format' },
-                    pr_number: { type: 'number', description: 'Pull request number' },
-                    body: { type: 'string', description: 'Comment body (supports markdown)' },
-                },
-                required: ['repo', 'pr_number', 'body'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_comment_on_pr', args, ['repo', 'pr_number', 'body']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubCommentOnPr(ctx, args as { repo: string; pr_number: number; body: string }));
-            },
+      },
+      {
+        name: 'corvid_github_create_issue',
+        description: 'Create a new issue on a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            title: { type: 'string', description: 'Issue title' },
+            body: { type: 'string', description: 'Issue description/body' },
+            labels: { type: 'array', items: { type: 'string' }, description: 'Labels to apply' },
+          },
+          required: ['repo', 'title', 'body'],
         },
-        {
-            name: 'corvid_github_follow_user',
-            description: 'Follow a GitHub user.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    username: { type: 'string', description: 'GitHub username to follow' },
-                },
-                required: ['username'],
-            },
-            handler: async (args) => {
-                const err = validateRequired('corvid_github_follow_user', args, ['username']);
-                if (err) return err;
-                return unwrapResult(await handleGitHubFollowUser(ctx, args as { username: string }));
-            },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_create_issue', args, ['repo', 'title', 'body']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGitHubCreateIssue(
+              ctx,
+              args as { repo: string; title: string; body: string; labels?: string[] },
+            ),
+          );
         },
+      },
+      {
+        name: 'corvid_github_list_issues',
+        description: 'List issues for a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            state: { type: 'string', enum: ['open', 'closed', 'all'], description: 'Filter by state (default "open")' },
+            limit: { type: 'number', description: 'Maximum number of issues (default 30)' },
+          },
+          required: ['repo'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_list_issues', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGitHubListIssues(ctx, args as { repo: string; state?: string; limit?: number }),
+          );
+        },
+      },
+      {
+        name: 'corvid_github_repo_info',
+        description: 'Get information about a GitHub repository (name, description, stars, forks, etc).',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+          },
+          required: ['repo'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_repo_info', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubRepoInfo(ctx, args as { repo: string }));
+        },
+      },
+      {
+        name: 'corvid_github_unstar_repo',
+        description: 'Remove a star from a GitHub repository.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
+          },
+          required: ['repo'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_unstar_repo', args, ['repo']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubUnstarRepo(ctx, args as { repo: string }));
+        },
+      },
+      {
+        name: 'corvid_github_get_pr_diff',
+        description: 'Get the full diff/patch for a pull request. Useful for reviewing code changes.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            pr_number: { type: 'number', description: 'Pull request number' },
+          },
+          required: ['repo', 'pr_number'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_get_pr_diff', args, ['repo', 'pr_number']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubGetPrDiff(ctx, args as { repo: string; pr_number: number }));
+        },
+      },
+      {
+        name: 'corvid_github_comment_on_pr',
+        description: 'Add a comment to a pull request.',
+        parameters: {
+          type: 'object',
+          properties: {
+            repo: { type: 'string', description: 'Repository in owner/name format' },
+            pr_number: { type: 'number', description: 'Pull request number' },
+            body: { type: 'string', description: 'Comment body (supports markdown)' },
+          },
+          required: ['repo', 'pr_number', 'body'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_comment_on_pr', args, ['repo', 'pr_number', 'body']);
+          if (err) return err;
+          return unwrapResult(
+            await handleGitHubCommentOnPr(ctx, args as { repo: string; pr_number: number; body: string }),
+          );
+        },
+      },
+      {
+        name: 'corvid_github_follow_user',
+        description: 'Follow a GitHub user.',
+        parameters: {
+          type: 'object',
+          properties: {
+            username: { type: 'string', description: 'GitHub username to follow' },
+          },
+          required: ['username'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_github_follow_user', args, ['username']);
+          if (err) return err;
+          return unwrapResult(await handleGitHubFollowUser(ctx, args as { username: string }));
+        },
+      },
     );
 
     // ─── AST / Code navigation tools ─────────────────────────────────────
     if (ctx.astParserService) {
-        tools.push(
-            {
-                name: 'corvid_code_symbols',
-                description: 'Search for code symbols (functions, classes, interfaces, types, etc.) in a project using AST parsing. Returns symbol names, kinds, line ranges, and export status.',
-                parameters: {
-                    type: 'object',
-                    properties: {
-                        query: { type: 'string', description: 'Symbol name or partial name to search for' },
-                        project_dir: { type: 'string', description: 'Project directory to search. Omit to use agent default project.' },
-                        kinds: { type: 'array', items: { type: 'string', enum: ['function', 'class', 'interface', 'type_alias', 'enum', 'import', 'export', 'variable', 'method'] }, description: 'Filter by symbol kind(s)' },
-                        limit: { type: 'number', description: 'Maximum results to return (default 50)' },
-                    },
-                    required: ['query'],
+      tools.push(
+        {
+          name: 'corvid_code_symbols',
+          description:
+            'Search for code symbols (functions, classes, interfaces, types, etc.) in a project using AST parsing. Returns symbol names, kinds, line ranges, and export status.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Symbol name or partial name to search for' },
+              project_dir: {
+                type: 'string',
+                description: 'Project directory to search. Omit to use agent default project.',
+              },
+              kinds: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: [
+                    'function',
+                    'class',
+                    'interface',
+                    'type_alias',
+                    'enum',
+                    'import',
+                    'export',
+                    'variable',
+                    'method',
+                  ],
                 },
-                handler: async (args) => {
-                    const err = validateRequired('corvid_code_symbols', args, ['query']);
-                    if (err) return err;
-                    return unwrapResult(await handleCodeSymbols(ctx, args as { query: string; project_dir?: string; kinds?: string[]; limit?: number }));
-                },
+                description: 'Filter by symbol kind(s)',
+              },
+              limit: { type: 'number', description: 'Maximum results to return (default 50)' },
             },
-            {
-                name: 'corvid_find_references',
-                description: 'Find all references to a symbol across the project. Combines AST-based definition lookup with text search. Returns definition locations and file:line references.',
-                parameters: {
-                    type: 'object',
-                    properties: {
-                        symbol_name: { type: 'string', description: 'Exact symbol name to find references for' },
-                        project_dir: { type: 'string', description: 'Project directory to search. Omit to use agent default project.' },
-                        limit: { type: 'number', description: 'Maximum reference lines to return (default 50)' },
-                    },
-                    required: ['symbol_name'],
-                },
-                handler: async (args) => {
-                    const err = validateRequired('corvid_find_references', args, ['symbol_name']);
-                    if (err) return err;
-                    return unwrapResult(await handleFindReferences(ctx, args as { symbol_name: string; project_dir?: string; limit?: number }));
-                },
+            required: ['query'],
+          },
+          handler: async (args) => {
+            const err = validateRequired('corvid_code_symbols', args, ['query']);
+            if (err) return err;
+            return unwrapResult(
+              await handleCodeSymbols(
+                ctx,
+                args as { query: string; project_dir?: string; kinds?: string[]; limit?: number },
+              ),
+            );
+          },
+        },
+        {
+          name: 'corvid_find_references',
+          description:
+            'Find all references to a symbol across the project. Combines AST-based definition lookup with text search. Returns definition locations and file:line references.',
+          parameters: {
+            type: 'object',
+            properties: {
+              symbol_name: { type: 'string', description: 'Exact symbol name to find references for' },
+              project_dir: {
+                type: 'string',
+                description: 'Project directory to search. Omit to use agent default project.',
+              },
+              limit: { type: 'number', description: 'Maximum reference lines to return (default 50)' },
             },
-        );
+            required: ['symbol_name'],
+          },
+          handler: async (args) => {
+            const err = validateRequired('corvid_find_references', args, ['symbol_name']);
+            if (err) return err;
+            return unwrapResult(
+              await handleFindReferences(ctx, args as { symbol_name: string; project_dir?: string; limit?: number }),
+            );
+          },
+        },
+      );
 
-        // ─── Repo Blocklist ──────────────────────────────────────────────
-        tools.push({
-            name: 'corvid_repo_blocklist',
-            description: 'Manage the repo blocklist — repos the agent should not contribute to. Use action="list" to view, "add" to block, "remove" to unblock, "check" to test.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    action: { type: 'string', enum: ['list', 'add', 'remove', 'check'], description: 'What to do' },
-                    repo: { type: 'string', description: 'Repository in owner/name format, or owner/* for org wildcard' },
-                    reason: { type: 'string', description: 'Why this repo is blocked (for add)' },
-                    source: { type: 'string', enum: ['manual', 'pr_rejection', 'daily_review'], description: 'Block source (default: manual)' },
-                },
-                required: ['action'],
+      // ─── Repo Blocklist ──────────────────────────────────────────────
+      tools.push({
+        name: 'corvid_repo_blocklist',
+        description:
+          'Manage the repo blocklist — repos the agent should not contribute to. Use action="list" to view, "add" to block, "remove" to unblock, "check" to test.',
+        parameters: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['list', 'add', 'remove', 'check'], description: 'What to do' },
+            repo: { type: 'string', description: 'Repository in owner/name format, or owner/* for org wildcard' },
+            reason: { type: 'string', description: 'Why this repo is blocked (for add)' },
+            source: {
+              type: 'string',
+              enum: ['manual', 'pr_rejection', 'daily_review'],
+              description: 'Block source (default: manual)',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_repo_blocklist', args, ['action']);
-                if (err) return err;
-                return unwrapResult(await handleManageRepoBlocklist(ctx, args as Parameters<typeof handleManageRepoBlocklist>[1]));
-            },
-        });
+          },
+          required: ['action'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_repo_blocklist', args, ['action']);
+          if (err) return err;
+          return unwrapResult(
+            await handleManageRepoBlocklist(ctx, args as Parameters<typeof handleManageRepoBlocklist>[1]),
+          );
+        },
+      });
 
-        // ─── Flock Directory ────────────────────────────────────────────
-        tools.push({
-            name: 'corvid_flock_directory',
-            description: 'Manage the Flock Directory — on-chain agent registry for discovery and reputation. Actions: register, deregister, heartbeat, lookup, search, list, stats, compute_reputation.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    action: { type: 'string', enum: ['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats', 'compute_reputation'], description: 'Operation to perform' },
-                    agent_id: { type: 'string', description: 'Agent ID (for deregister, heartbeat, lookup, compute_reputation)' },
-                    address: { type: 'string', description: 'Algorand address (for register, lookup)' },
-                    name: { type: 'string', description: 'Agent name (for register)' },
-                    description: { type: 'string', description: 'Agent description (for register)' },
-                    instance_url: { type: 'string', description: 'Agent instance URL (for register)' },
-                    capabilities: { type: 'string', description: 'Comma-separated capabilities (for register)' },
-                    query: { type: 'string', description: 'Search query (for search)' },
-                    capability: { type: 'string', description: 'Filter by capability (for search)' },
-                    min_reputation: { type: 'number', description: 'Minimum reputation score (for search)' },
-                    sort_by: { type: 'string', enum: ['reputation', 'name', 'uptime', 'registered', 'attestations'], description: 'Sort field (for search, default: reputation)' },
-                    sort_order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order (for search, default: desc)' },
-                    limit: { type: 'number', description: 'Max results (default 20)' },
-                },
-                required: ['action'],
+      // ─── Flock Directory ────────────────────────────────────────────
+      tools.push({
+        name: 'corvid_flock_directory',
+        description:
+          'Manage the Flock Directory — on-chain agent registry for discovery and reputation. Actions: register, deregister, heartbeat, lookup, search, list, stats, compute_reputation.',
+        parameters: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: ['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats', 'compute_reputation'],
+              description: 'Operation to perform',
             },
-            handler: async (args) => {
-                const err = validateRequired('corvid_flock_directory', args, ['action']);
-                if (err) return err;
-                return unwrapResult(await handleFlockDirectory(ctx, args as Parameters<typeof handleFlockDirectory>[1]));
+            agent_id: {
+              type: 'string',
+              description: 'Agent ID (for deregister, heartbeat, lookup, compute_reputation)',
             },
-        });
+            address: { type: 'string', description: 'Algorand address (for register, lookup)' },
+            name: { type: 'string', description: 'Agent name (for register)' },
+            description: { type: 'string', description: 'Agent description (for register)' },
+            instance_url: { type: 'string', description: 'Agent instance URL (for register)' },
+            capabilities: { type: 'string', description: 'Comma-separated capabilities (for register)' },
+            query: { type: 'string', description: 'Search query (for search)' },
+            capability: { type: 'string', description: 'Filter by capability (for search)' },
+            min_reputation: { type: 'number', description: 'Minimum reputation score (for search)' },
+            sort_by: {
+              type: 'string',
+              enum: ['reputation', 'name', 'uptime', 'registered', 'attestations'],
+              description: 'Sort field (for search, default: reputation)',
+            },
+            sort_order: {
+              type: 'string',
+              enum: ['asc', 'desc'],
+              description: 'Sort order (for search, default: desc)',
+            },
+            limit: { type: 'number', description: 'Max results (default 20)' },
+          },
+          required: ['action'],
+        },
+        handler: async (args) => {
+          const err = validateRequired('corvid_flock_directory', args, ['action']);
+          if (err) return err;
+          return unwrapResult(await handleFlockDirectory(ctx, args as Parameters<typeof handleFlockDirectory>[1]));
+        },
+      });
     }
-    } // end if (ctx)
+  } // end if (ctx)
 
-    // Merge coding tools when a coding context is provided
-    if (codingCtx) {
-        tools.push(...buildCodingTools(codingCtx));
+  // Merge coding tools when a coding context is provided
+  if (codingCtx) {
+    tools.push(...buildCodingTools(codingCtx));
+  }
+
+  // Permission filtering — apply resolved tool permissions (agent base + skill bundles
+  // + project bundles) or fall back to the agent's explicit mcp_tool_permissions.
+  // For non-web sessions without explicit permissions, fall back to DEFAULT_ALLOWED_TOOLS.
+  // This is critical for small Ollama models that cannot handle 10+ tool definitions.
+  let filtered = tools;
+
+  if (ctx) {
+    // Prefer pre-resolved permissions (includes skill bundle merging)
+    const permissions =
+      ctx.resolvedToolPermissions !== undefined
+        ? ctx.resolvedToolPermissions
+        : (getAgent(ctx.db, ctx.agentId)?.mcpToolPermissions ?? null);
+    if (permissions) {
+      // Agent has explicit or resolved tool permissions — always apply
+      const allowedSet = new Set(permissions);
+      filtered = filtered.filter((t) => allowedSet.has(t.name));
+    } else if (ctx.sessionSource !== 'web') {
+      // Non-web sessions without explicit permissions get the default set
+      const allowedSet = DEFAULT_ALLOWED_TOOLS;
+      filtered = filtered.filter((t) => allowedSet.has(t.name));
     }
 
-    // Permission filtering — apply resolved tool permissions (agent base + skill bundles
-    // + project bundles) or fall back to the agent's explicit mcp_tool_permissions.
-    // For non-web sessions without explicit permissions, fall back to DEFAULT_ALLOWED_TOOLS.
-    // This is critical for small Ollama models that cannot handle 10+ tool definitions.
-    let filtered = tools;
-
-    if (ctx) {
-        // Prefer pre-resolved permissions (includes skill bundle merging)
-        const permissions = ctx.resolvedToolPermissions !== undefined
-            ? ctx.resolvedToolPermissions
-            : getAgent(ctx.db, ctx.agentId)?.mcpToolPermissions ?? null;
-        if (permissions) {
-            // Agent has explicit or resolved tool permissions — always apply
-            const allowedSet = new Set(permissions);
-            filtered = filtered.filter((t) => allowedSet.has(t.name));
-        } else if (ctx.sessionSource !== 'web') {
-            // Non-web sessions without explicit permissions get the default set
-            const allowedSet = DEFAULT_ALLOWED_TOOLS;
-            filtered = filtered.filter((t) => allowedSet.has(t.name));
-        }
-
-        if (ctx.schedulerMode) {
-            filtered = filtered.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
-        }
-
-        // Tool guardrails: hide expensive networking tools from sessions that don't need them (#1054).
-        const toolAccessConfig: ToolAccessConfig = ctx.toolAccessConfig ?? {
-            policy: resolveToolAccessPolicy(ctx.sessionSource),
-        };
-        filtered = filterToolsByGuardrail(filtered, toolAccessConfig);
+    if (ctx.schedulerMode) {
+      filtered = filtered.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
     }
 
-    return filtered;
+    // Tool guardrails: hide expensive networking tools from sessions that don't need them (#1054).
+    const toolAccessConfig: ToolAccessConfig = ctx.toolAccessConfig ?? {
+      policy: resolveToolAccessPolicy(ctx.sessionSource),
+    };
+    filtered = filterToolsByGuardrail(filtered, toolAccessConfig);
+  }
+
+  return filtered;
 }
 
 /** Extract just the LlmToolDefinition (for sending to the provider) from DirectToolDefinitions. */
 export function toProviderTools(tools: DirectToolDefinition[]): LlmToolDefinition[] {
-    return tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters,
-    }));
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    parameters: t.parameters,
+  }));
 }

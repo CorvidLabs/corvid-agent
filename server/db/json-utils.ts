@@ -8,14 +8,14 @@ const log = createLogger('JsonUtils');
  * are visible in logs without crashing the server.
  */
 export function safeJsonParse<T>(json: string, defaultValue: T, context?: string): T {
-    try {
-        return JSON.parse(json) as T;
-    } catch (err) {
-        log.warn('JSON parse failed, using default', {
-            context: context ?? 'unknown',
-            error: err instanceof Error ? err.message : String(err),
-            inputPreview: json.length > 100 ? json.slice(0, 100) + '...' : json,
-        });
-        return defaultValue;
-    }
+  try {
+    return JSON.parse(json) as T;
+  } catch (err) {
+    log.warn('JSON parse failed, using default', {
+      context: context ?? 'unknown',
+      error: err instanceof Error ? err.message : String(err),
+      inputPreview: json.length > 100 ? `${json.slice(0, 100)}...` : json,
+    });
+    return defaultValue;
+  }
 }

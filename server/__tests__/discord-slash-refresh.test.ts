@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { runMigrations } from '../db/schema';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { createAgent } from '../db/agents';
+import { runMigrations } from '../db/schema';
 import { DiscordBridge } from '../discord/bridge';
-import type { DiscordBridgeConfig } from '../discord/types';
 import { _setRestClientForTesting } from '../discord/rest-client';
+import type { DiscordBridgeConfig } from '../discord/types';
 
 /**
  * Tests for the DiscordBridge.updateSlashCommands() debounce behaviour.

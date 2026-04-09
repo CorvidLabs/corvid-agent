@@ -10,7 +10,7 @@
  * so dedup state is never lost on crash.
  */
 
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 import { createLogger } from './logger';
 
 const log = createLogger('dedup');
@@ -20,19 +20,19 @@ const log = createLogger('dedup');
 // ---------------------------------------------------------------------------
 
 export interface DedupNamespaceConfig {
-    /** Maximum number of entries before LRU eviction. Default: 1000 */
-    maxSize?: number;
-    /** Time-to-live per entry in milliseconds. Default: 5 minutes */
-    ttlMs?: number;
-    /** Persist entries to SQLite for crash recovery. Default: false */
-    persist?: boolean;
+  /** Maximum number of entries before LRU eviction. Default: 1000 */
+  maxSize?: number;
+  /** Time-to-live per entry in milliseconds. Default: 5 minutes */
+  ttlMs?: number;
+  /** Persist entries to SQLite for crash recovery. Default: false */
+  persist?: boolean;
 }
 
 export interface DedupMetrics {
-    size: number;
-    hits: number;
-    misses: number;
-    evictions: number;
+  size: number;
+  hits: number;
+  misses: number;
+  evictions: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,106 +40,106 @@ export interface DedupMetrics {
 // ---------------------------------------------------------------------------
 
 class DedupCache {
-    private readonly maxSize: number;
-    private readonly ttlMs: number;
-    private readonly map = new Map<string, number>(); // key -> expiresAt
-    private _hits = 0;
-    private _misses = 0;
-    private _evictions = 0;
+  private readonly maxSize: number;
+  private readonly ttlMs: number;
+  private readonly map = new Map<string, number>(); // key -> expiresAt
+  private _hits = 0;
+  private _misses = 0;
+  private _evictions = 0;
 
-    constructor(maxSize: number, ttlMs: number) {
-        this.maxSize = maxSize;
-        this.ttlMs = ttlMs;
+  constructor(maxSize: number, ttlMs: number) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+  }
+
+  /** Returns true if the key has been seen and has not expired. */
+  has(key: string): boolean {
+    const expiresAt = this.map.get(key);
+    if (expiresAt === undefined) {
+      this._misses++;
+      return false;
     }
+    if (Date.now() > expiresAt) {
+      this.map.delete(key);
+      this._misses++;
+      return false;
+    }
+    // Promote to most-recently-used
+    this.map.delete(key);
+    this.map.set(key, expiresAt);
+    this._hits++;
+    return true;
+  }
 
-    /** Returns true if the key has been seen and has not expired. */
-    has(key: string): boolean {
-        const expiresAt = this.map.get(key);
-        if (expiresAt === undefined) {
-            this._misses++;
-            return false;
-        }
-        if (Date.now() > expiresAt) {
-            this.map.delete(key);
-            this._misses++;
-            return false;
-        }
-        // Promote to most-recently-used
+  /** Mark a key as seen. Returns true if it was already present (duplicate). */
+  add(key: string): boolean {
+    const existing = this.has(key);
+    // Delete + re-insert to move to end
+    this.map.delete(key);
+    // Evict LRU if at capacity
+    if (this.map.size >= this.maxSize) {
+      const oldest = this.map.keys().next().value;
+      if (oldest !== undefined) {
+        this.map.delete(oldest);
+        this._evictions++;
+      }
+    }
+    const expiresAt = Date.now() + this.ttlMs;
+    this.map.set(key, expiresAt);
+    return existing;
+  }
+
+  /** Get the expiration timestamp for a key (for write-through persistence). */
+  getExpiresAt(key: string): number | undefined {
+    return this.map.get(key);
+  }
+
+  /** Remove a specific key. */
+  delete(key: string): boolean {
+    return this.map.delete(key);
+  }
+
+  /** Clear all entries. */
+  clear(): void {
+    this.map.clear();
+  }
+
+  /** Number of entries (including potentially expired). */
+  get size(): number {
+    return this.map.size;
+  }
+
+  /** Remove expired entries. Returns count of removed items. */
+  prune(): number {
+    const now = Date.now();
+    let count = 0;
+    for (const [key, expiresAt] of this.map) {
+      if (now > expiresAt) {
         this.map.delete(key);
-        this.map.set(key, expiresAt);
-        this._hits++;
-        return true;
+        count++;
+      }
     }
+    return count;
+  }
 
-    /** Mark a key as seen. Returns true if it was already present (duplicate). */
-    add(key: string): boolean {
-        const existing = this.has(key);
-        // Delete + re-insert to move to end
-        this.map.delete(key);
-        // Evict LRU if at capacity
-        if (this.map.size >= this.maxSize) {
-            const oldest = this.map.keys().next().value;
-            if (oldest !== undefined) {
-                this.map.delete(oldest);
-                this._evictions++;
-            }
-        }
-        const expiresAt = Date.now() + this.ttlMs;
-        this.map.set(key, expiresAt);
-        return existing;
+  /** Return all non-expired keys (for persistence snapshots). */
+  keys(): string[] {
+    const now = Date.now();
+    const result: string[] = [];
+    for (const [key, expiresAt] of this.map) {
+      if (now <= expiresAt) result.push(key);
     }
+    return result;
+  }
 
-    /** Get the expiration timestamp for a key (for write-through persistence). */
-    getExpiresAt(key: string): number | undefined {
-        return this.map.get(key);
-    }
-
-    /** Remove a specific key. */
-    delete(key: string): boolean {
-        return this.map.delete(key);
-    }
-
-    /** Clear all entries. */
-    clear(): void {
-        this.map.clear();
-    }
-
-    /** Number of entries (including potentially expired). */
-    get size(): number {
-        return this.map.size;
-    }
-
-    /** Remove expired entries. Returns count of removed items. */
-    prune(): number {
-        const now = Date.now();
-        let count = 0;
-        for (const [key, expiresAt] of this.map) {
-            if (now > expiresAt) {
-                this.map.delete(key);
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /** Return all non-expired keys (for persistence snapshots). */
-    keys(): string[] {
-        const now = Date.now();
-        const result: string[] = [];
-        for (const [key, expiresAt] of this.map) {
-            if (now <= expiresAt) result.push(key);
-        }
-        return result;
-    }
-
-    get metrics(): DedupMetrics {
-        return {
-            size: this.map.size,
-            hits: this._hits,
-            misses: this._misses,
-            evictions: this._evictions,
-        };
-    }
+  get metrics(): DedupMetrics {
+    return {
+      size: this.map.size,
+      hits: this._hits,
+      misses: this._misses,
+      evictions: this._evictions,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -152,269 +152,274 @@ const PRUNE_INTERVAL_MS = 60_000; // prune expired entries every 60s
 const PERSIST_INTERVAL_MS = 30_000; // flush dirty namespaces to DB every 30s
 
 export class DedupService {
-    private static instance: DedupService | null = null;
+  private static instance: DedupService | null = null;
 
-    private namespaces = new Map<string, { cache: DedupCache; config: Required<DedupNamespaceConfig>; dirty: boolean }>();
-    private db: Database | null = null;
-    private pruneTimer: ReturnType<typeof setInterval> | null = null;
-    private persistTimer: ReturnType<typeof setInterval> | null = null;
+  private namespaces = new Map<string, { cache: DedupCache; config: Required<DedupNamespaceConfig>; dirty: boolean }>();
+  private db: Database | null = null;
+  private pruneTimer: ReturnType<typeof setInterval> | null = null;
+  private persistTimer: ReturnType<typeof setInterval> | null = null;
 
-    constructor(db?: Database) {
-        this.db = db ?? null;
-        if (this.db) {
-            this.ensureTable();
-        }
+  constructor(db?: Database) {
+    this.db = db ?? null;
+    if (this.db) {
+      this.ensureTable();
     }
+  }
 
-    /**
-     * Initialize the global singleton. Call once at server startup.
-     * Subsequent calls to `DedupService.global()` return this instance.
-     */
-    static init(db?: Database): DedupService {
-        if (!DedupService.instance) {
-            DedupService.instance = new DedupService(db);
-        }
-        return DedupService.instance;
+  /**
+   * Initialize the global singleton. Call once at server startup.
+   * Subsequent calls to `DedupService.global()` return this instance.
+   */
+  static init(db?: Database): DedupService {
+    if (!DedupService.instance) {
+      DedupService.instance = new DedupService(db);
     }
+    return DedupService.instance;
+  }
 
-    /**
-     * Get the global singleton. Falls back to a no-persistence instance
-     * if `init()` has not been called (e.g. in tests).
-     */
-    static global(): DedupService {
-        if (!DedupService.instance) {
-            DedupService.instance = new DedupService();
-        }
-        return DedupService.instance;
+  /**
+   * Get the global singleton. Falls back to a no-persistence instance
+   * if `init()` has not been called (e.g. in tests).
+   */
+  static global(): DedupService {
+    if (!DedupService.instance) {
+      DedupService.instance = new DedupService();
     }
+    return DedupService.instance;
+  }
 
-    /**
-     * Reset the global singleton (for testing only).
-     */
-    static resetGlobal(): void {
-        if (DedupService.instance) {
-            DedupService.instance.stop();
-            DedupService.instance = null;
-        }
+  /**
+   * Reset the global singleton (for testing only).
+   */
+  static resetGlobal(): void {
+    if (DedupService.instance) {
+      DedupService.instance.stop();
+      DedupService.instance = null;
     }
+  }
 
-    /**
-     * Start background pruning and persistence timers.
-     * Call this once after constructing the service.
-     */
-    start(): void {
-        if (this.pruneTimer) return;
-        this.pruneTimer = setInterval(() => this.pruneAll(), PRUNE_INTERVAL_MS);
-        if (this.db) {
-            this.persistTimer = setInterval(() => this.persistAll(), PERSIST_INTERVAL_MS);
-        }
+  /**
+   * Start background pruning and persistence timers.
+   * Call this once after constructing the service.
+   */
+  start(): void {
+    if (this.pruneTimer) return;
+    this.pruneTimer = setInterval(() => this.pruneAll(), PRUNE_INTERVAL_MS);
+    if (this.db) {
+      this.persistTimer = setInterval(() => this.persistAll(), PERSIST_INTERVAL_MS);
     }
+  }
 
-    /**
-     * Stop background timers and flush any dirty state.
-     */
-    stop(): void {
-        if (this.pruneTimer) {
-            clearInterval(this.pruneTimer);
-            this.pruneTimer = null;
-        }
-        if (this.persistTimer) {
-            clearInterval(this.persistTimer);
-            this.persistTimer = null;
-        }
-        // Final flush
-        if (this.db) {
-            this.persistAll();
-        }
+  /**
+   * Stop background timers and flush any dirty state.
+   */
+  stop(): void {
+    if (this.pruneTimer) {
+      clearInterval(this.pruneTimer);
+      this.pruneTimer = null;
     }
-
-    /**
-     * Register a dedup namespace with its configuration.
-     * If the namespace uses persistence, restores keys from SQLite.
-     */
-    register(namespace: string, config: DedupNamespaceConfig = {}): void {
-        if (this.namespaces.has(namespace)) return;
-
-        const resolved: Required<DedupNamespaceConfig> = {
-            maxSize: config.maxSize ?? DEFAULT_MAX_SIZE,
-            ttlMs: config.ttlMs ?? DEFAULT_TTL_MS,
-            persist: config.persist ?? false,
-        };
-
-        const cache = new DedupCache(resolved.maxSize, resolved.ttlMs);
-        this.namespaces.set(namespace, { cache, config: resolved, dirty: false });
-
-        // Restore from DB if persistence is enabled
-        if (resolved.persist && this.db) {
-            this.restoreNamespace(namespace, cache);
-        }
+    if (this.persistTimer) {
+      clearInterval(this.persistTimer);
+      this.persistTimer = null;
     }
-
-    /**
-     * Check if a key has been seen in the given namespace.
-     * Auto-registers the namespace with defaults if not already registered.
-     *
-     * For persistent namespaces, falls back to SQLite on cache miss (read-through).
-     */
-    has(namespace: string, key: string): boolean {
-        const ns = this.getOrRegister(namespace);
-        const inCache = ns.cache.has(key);
-        if (inCache) return true;
-
-        // Read-through: check SQLite for persistent namespaces on cache miss
-        if (ns.config.persist && this.db) {
-            const found = this.readThrough(namespace, key);
-            if (found) {
-                ns.cache.add(key);
-                return true;
-            }
-        }
-        return false;
+    // Final flush
+    if (this.db) {
+      this.persistAll();
     }
+  }
 
-    /**
-     * Mark a key as seen. Returns true if it was already present (duplicate).
-     * This is the primary dedup API — equivalent to "check-and-set".
-     *
-     * For persistent namespaces, writes through to SQLite immediately.
-     */
-    isDuplicate(namespace: string, key: string): boolean {
-        const ns = this.getOrRegister(namespace);
+  /**
+   * Register a dedup namespace with its configuration.
+   * If the namespace uses persistence, restores keys from SQLite.
+   */
+  register(namespace: string, config: DedupNamespaceConfig = {}): void {
+    if (this.namespaces.has(namespace)) return;
 
-        // For persistent namespaces, check SQLite on cache miss before declaring "new"
-        let wasDuplicate = ns.cache.add(key);
-        if (!wasDuplicate && ns.config.persist && this.db) {
-            wasDuplicate = this.readThrough(namespace, key);
-        }
+    const resolved: Required<DedupNamespaceConfig> = {
+      maxSize: config.maxSize ?? DEFAULT_MAX_SIZE,
+      ttlMs: config.ttlMs ?? DEFAULT_TTL_MS,
+      persist: config.persist ?? false,
+    };
 
-        if (!wasDuplicate) {
-            ns.dirty = true;
-            // Write-through: persist immediately for durable dedup
-            if (ns.config.persist && this.db) {
-                this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
-            }
-        }
-        return wasDuplicate;
+    const cache = new DedupCache(resolved.maxSize, resolved.ttlMs);
+    this.namespaces.set(namespace, { cache, config: resolved, dirty: false });
+
+    // Restore from DB if persistence is enabled
+    if (resolved.persist && this.db) {
+      this.restoreNamespace(namespace, cache);
     }
+  }
 
-    /**
-     * Mark a key as seen without checking for duplicates.
-     *
-     * For persistent namespaces, writes through to SQLite immediately.
-     */
-    markSeen(namespace: string, key: string): void {
-        const ns = this.getOrRegister(namespace);
+  /**
+   * Check if a key has been seen in the given namespace.
+   * Auto-registers the namespace with defaults if not already registered.
+   *
+   * For persistent namespaces, falls back to SQLite on cache miss (read-through).
+   */
+  has(namespace: string, key: string): boolean {
+    const ns = this.getOrRegister(namespace);
+    const inCache = ns.cache.has(key);
+    if (inCache) return true;
+
+    // Read-through: check SQLite for persistent namespaces on cache miss
+    if (ns.config.persist && this.db) {
+      const found = this.readThrough(namespace, key);
+      if (found) {
         ns.cache.add(key);
-        ns.dirty = true;
+        return true;
+      }
+    }
+    return false;
+  }
 
-        // Write-through for persistent namespaces
-        if (ns.config.persist && this.db) {
-            this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
-        }
+  /**
+   * Mark a key as seen. Returns true if it was already present (duplicate).
+   * This is the primary dedup API — equivalent to "check-and-set".
+   *
+   * For persistent namespaces, writes through to SQLite immediately.
+   */
+  isDuplicate(namespace: string, key: string): boolean {
+    const ns = this.getOrRegister(namespace);
+
+    // For persistent namespaces, check SQLite on cache miss before declaring "new"
+    let wasDuplicate = ns.cache.add(key);
+    if (!wasDuplicate && ns.config.persist && this.db) {
+      wasDuplicate = this.readThrough(namespace, key);
     }
 
-    /**
-     * Remove a key from the namespace.
-     */
-    delete(namespace: string, key: string): boolean {
-        const ns = this.namespaces.get(namespace);
-        if (!ns) return false;
-        const deleted = ns.cache.delete(key);
-        if (deleted) ns.dirty = true;
-        return deleted;
+    if (!wasDuplicate) {
+      ns.dirty = true;
+      // Write-through: persist immediately for durable dedup
+      if (ns.config.persist && this.db) {
+        this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
+      }
     }
+    return wasDuplicate;
+  }
 
-    /**
-     * Clear all entries in a namespace.
-     */
-    clear(namespace: string): void {
-        const ns = this.namespaces.get(namespace);
-        if (!ns) return;
-        ns.cache.clear();
-        ns.dirty = true;
+  /**
+   * Mark a key as seen without checking for duplicates.
+   *
+   * For persistent namespaces, writes through to SQLite immediately.
+   */
+  markSeen(namespace: string, key: string): void {
+    const ns = this.getOrRegister(namespace);
+    ns.cache.add(key);
+    ns.dirty = true;
+
+    // Write-through for persistent namespaces
+    if (ns.config.persist && this.db) {
+      this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
     }
+  }
 
-    /**
-     * Get metrics for a namespace.
-     */
-    metrics(namespace: string): DedupMetrics | null {
-        const ns = this.namespaces.get(namespace);
-        if (!ns) return null;
-        return ns.cache.metrics;
+  /**
+   * Remove a key from the namespace.
+   */
+  delete(namespace: string, key: string): boolean {
+    const ns = this.namespaces.get(namespace);
+    if (!ns) return false;
+    const deleted = ns.cache.delete(key);
+    if (deleted) ns.dirty = true;
+    return deleted;
+  }
+
+  /**
+   * Clear all entries in a namespace.
+   */
+  clear(namespace: string): void {
+    const ns = this.namespaces.get(namespace);
+    if (!ns) return;
+    ns.cache.clear();
+    ns.dirty = true;
+  }
+
+  /**
+   * Get metrics for a namespace.
+   */
+  metrics(namespace: string): DedupMetrics | null {
+    const ns = this.namespaces.get(namespace);
+    if (!ns) return null;
+    return ns.cache.metrics;
+  }
+
+  /**
+   * Get metrics for all namespaces.
+   */
+  allMetrics(): Record<string, DedupMetrics> {
+    const result: Record<string, DedupMetrics> = {};
+    for (const [name, ns] of this.namespaces) {
+      result[name] = ns.cache.metrics;
     }
+    return result;
+  }
 
-    /**
-     * Get metrics for all namespaces.
-     */
-    allMetrics(): Record<string, DedupMetrics> {
-        const result: Record<string, DedupMetrics> = {};
-        for (const [name, ns] of this.namespaces) {
-            result[name] = ns.cache.metrics;
-        }
-        return result;
+  // -----------------------------------------------------------------------
+  // Private helpers
+  // -----------------------------------------------------------------------
+
+  /**
+   * Write-through: immediately persist a key to SQLite.
+   */
+  private writeThrough(namespace: string, key: string, expiresAt: number): void {
+    if (!this.db) return;
+    try {
+      this.db.run(`INSERT OR REPLACE INTO dedup_state (namespace, key, expires_at) VALUES (?, ?, ?)`, [
+        namespace,
+        key,
+        expiresAt,
+      ]);
+    } catch (err) {
+      log.error('Write-through failed', { namespace, error: String(err) });
     }
+  }
 
-    // -----------------------------------------------------------------------
-    // Private helpers
-    // -----------------------------------------------------------------------
-
-    /**
-     * Write-through: immediately persist a key to SQLite.
-     */
-    private writeThrough(namespace: string, key: string, expiresAt: number): void {
-        if (!this.db) return;
-        try {
-            this.db.run(
-                `INSERT OR REPLACE INTO dedup_state (namespace, key, expires_at) VALUES (?, ?, ?)`,
-                [namespace, key, expiresAt],
-            );
-        } catch (err) {
-            log.error('Write-through failed', { namespace, error: String(err) });
-        }
+  /**
+   * Read-through: check SQLite for a key not found in the cache.
+   */
+  private readThrough(namespace: string, key: string): boolean {
+    if (!this.db) return false;
+    try {
+      const row = this.db
+        .query(`SELECT 1 FROM dedup_state WHERE namespace = ? AND key = ? AND expires_at > ?`)
+        .get(namespace, key, Date.now());
+      return row !== null;
+    } catch (err) {
+      log.error('Read-through failed', { namespace, error: String(err) });
+      return false;
     }
+  }
 
-    /**
-     * Read-through: check SQLite for a key not found in the cache.
-     */
-    private readThrough(namespace: string, key: string): boolean {
-        if (!this.db) return false;
-        try {
-            const row = this.db.query(
-                `SELECT 1 FROM dedup_state WHERE namespace = ? AND key = ? AND expires_at > ?`
-            ).get(namespace, key, Date.now());
-            return row !== null;
-        } catch (err) {
-            log.error('Read-through failed', { namespace, error: String(err) });
-            return false;
-        }
+  private getOrRegister(namespace: string): {
+    cache: DedupCache;
+    config: Required<DedupNamespaceConfig>;
+    dirty: boolean;
+  } {
+    let ns = this.namespaces.get(namespace);
+    if (!ns) {
+      this.register(namespace);
+      ns = this.namespaces.get(namespace)!;
     }
+    return ns;
+  }
 
-    private getOrRegister(namespace: string): { cache: DedupCache; config: Required<DedupNamespaceConfig>; dirty: boolean } {
-        let ns = this.namespaces.get(namespace);
-        if (!ns) {
-            this.register(namespace);
-            ns = this.namespaces.get(namespace)!;
-        }
-        return ns;
+  private pruneAll(): void {
+    for (const [, ns] of this.namespaces) {
+      ns.cache.prune();
     }
-
-    private pruneAll(): void {
-        for (const [, ns] of this.namespaces) {
-            ns.cache.prune();
-        }
-        // Also prune expired rows from SQLite
-        if (this.db) {
-            try {
-                this.db.run(`DELETE FROM dedup_state WHERE expires_at < ?`, [Date.now()]);
-            } catch (err) {
-                log.error('Failed to prune expired dedup rows', { error: String(err) });
-            }
-        }
+    // Also prune expired rows from SQLite
+    if (this.db) {
+      try {
+        this.db.run(`DELETE FROM dedup_state WHERE expires_at < ?`, [Date.now()]);
+      } catch (err) {
+        log.error('Failed to prune expired dedup rows', { error: String(err) });
+      }
     }
+  }
 
-    private ensureTable(): void {
-        if (!this.db) return;
-        this.db.run(`
+  private ensureTable(): void {
+    if (!this.db) return;
+    this.db.run(`
             CREATE TABLE IF NOT EXISTS dedup_state (
                 namespace TEXT NOT NULL,
                 key       TEXT NOT NULL,
@@ -422,48 +427,46 @@ export class DedupService {
                 PRIMARY KEY (namespace, key)
             )
         `);
-        // Clean up expired rows on startup
-        this.db.run(`DELETE FROM dedup_state WHERE expires_at < ?`, [Date.now()]);
-    }
+    // Clean up expired rows on startup
+    this.db.run(`DELETE FROM dedup_state WHERE expires_at < ?`, [Date.now()]);
+  }
 
-    private restoreNamespace(namespace: string, cache: DedupCache): void {
-        if (!this.db) return;
-        try {
-            const rows = this.db.query(
-                `SELECT key FROM dedup_state WHERE namespace = ? AND expires_at > ?`
-            ).all(namespace, Date.now()) as { key: string }[];
-            for (const row of rows) {
-                cache.add(row.key);
-            }
-            if (rows.length > 0) {
-                log.info('Restored dedup state from DB', { namespace, count: rows.length });
-            }
-        } catch (err) {
-            log.error('Failed to restore dedup state', { namespace, error: String(err) });
-        }
+  private restoreNamespace(namespace: string, cache: DedupCache): void {
+    if (!this.db) return;
+    try {
+      const rows = this.db
+        .query(`SELECT key FROM dedup_state WHERE namespace = ? AND expires_at > ?`)
+        .all(namespace, Date.now()) as { key: string }[];
+      for (const row of rows) {
+        cache.add(row.key);
+      }
+      if (rows.length > 0) {
+        log.info('Restored dedup state from DB', { namespace, count: rows.length });
+      }
+    } catch (err) {
+      log.error('Failed to restore dedup state', { namespace, error: String(err) });
     }
+  }
 
-    private persistAll(): void {
-        if (!this.db) return;
-        for (const [namespace, ns] of this.namespaces) {
-            if (!ns.config.persist || !ns.dirty) continue;
-            try {
-                // Delete old keys for this namespace, then insert current ones
-                this.db.run(`DELETE FROM dedup_state WHERE namespace = ?`, [namespace]);
-                const keys = ns.cache.keys();
-                if (keys.length > 0) {
-                    const insert = this.db.prepare(
-                        `INSERT INTO dedup_state (namespace, key, expires_at) VALUES (?, ?, ?)`
-                    );
-                    const expiresAt = Date.now() + ns.config.ttlMs;
-                    for (const key of keys) {
-                        insert.run(namespace, key, expiresAt);
-                    }
-                }
-                ns.dirty = false;
-            } catch (err) {
-                log.error('Failed to persist dedup state', { namespace, error: String(err) });
-            }
+  private persistAll(): void {
+    if (!this.db) return;
+    for (const [namespace, ns] of this.namespaces) {
+      if (!ns.config.persist || !ns.dirty) continue;
+      try {
+        // Delete old keys for this namespace, then insert current ones
+        this.db.run(`DELETE FROM dedup_state WHERE namespace = ?`, [namespace]);
+        const keys = ns.cache.keys();
+        if (keys.length > 0) {
+          const insert = this.db.prepare(`INSERT INTO dedup_state (namespace, key, expires_at) VALUES (?, ?, ?)`);
+          const expiresAt = Date.now() + ns.config.ttlMs;
+          for (const key of keys) {
+            insert.run(namespace, key, expiresAt);
+          }
         }
+        ns.dirty = false;
+      } catch (err) {
+        log.error('Failed to persist dedup state', { namespace, error: String(err) });
+      }
     }
+  }
 }

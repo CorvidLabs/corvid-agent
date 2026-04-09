@@ -1,1 +1,733 @@
-import{a as W}from"./chunk-OFKXBWQC.js";import{a as A}from"./chunk-CSQXEU3M.js";import{a as H}from"./chunk-FGNIWOFY.js";import{e as F,f as N}from"./chunk-GH246MXO.js";import{b as R}from"./chunk-D6WCRQHB.js";import"./chunk-GEI46CGR.js";import{$b as O,Bb as s,Kb as L,Lb as z,Mb as x,Na as r,Ob as l,Pb as u,Qb as g,Rb as E,T as S,Y as b,Z as f,_a as I,ac as $,bc as T,cc as V,fc as B,ib as m,ja as _,jb as p,lb as k,mb as M,nb as P,ob as C,pb as a,q as h,qb as o,rb as y,vb as w,zb as v}from"./chunk-LF4EWAJA.js";var U=(n,e)=>e.model,j=(n,e)=>e.name,q=(n,e)=>e.id;function K(n,e){if(n&1&&(a(0,"span"),l(1,"Ollama running at "),a(2,"code"),l(3),o(),l(4),o()),n&2){let t=s();r(3),u(t.ollamaHost()),r(),E(" \u2014 ",t.installedModels().length," model",t.installedModels().length===1?"":"s"," installed")}}function G(n,e){n&1&&(a(0,"span"),l(1,"Ollama not reachable. Start it with "),a(2,"code"),l(3,"ollama serve"),o()())}function Y(n,e){if(n&1&&(a(0,"div",24),l(1),O(2,"slice"),o()),n&2){let t=s(2).$implicit;r(),g("Layer: ",V(2,1,t.currentLayer,0,20),"...")}}function J(n,e){if(n&1&&(a(0,"div",21),y(1,"div",22),o(),a(2,"div",23)(3,"span"),l(4),o(),a(5,"span"),l(6),O(7,"number"),o()(),m(8,Y,3,5,"div",24)),n&2){let t=s().$implicit,i=s(2);r(),z("width",t.progress,"%"),r(3),E("",i.formatBytes(t.downloadedBytes)," / ",i.formatBytes(t.totalBytes)),r(2),g("",T(7,6,t.progress,"1.0-0"),"%"),r(2),p(t.currentLayer?8:-1)}}function X(n,e){n&1&&(a(0,"div",21),y(1,"div",25),o(),a(2,"div",23)(3,"span"),l(4,"Download complete"),o()())}function Z(n,e){if(n&1&&(a(0,"div",20),l(1),o()),n&2){let t=s().$implicit;r(),u(t.error)}}function ee(n,e){if(n&1&&(a(0,"div",16)(1,"div",17)(2,"span",18),l(3),o(),a(4,"span",19),l(5),o()(),m(6,J,9,9)(7,X,5,0)(8,Z,2,1,"div",20),o()),n&2){let t=e.$implicit;r(3),u(t.model),r(),x("pull-card__status--error",t.status==="error"),r(),g(" ",t.status," "),r(),p(t.status==="pulling"?6:t.status==="completed"?7:t.error?8:-1)}}function te(n,e){if(n&1&&(a(0,"section",7)(1,"h3",11),l(2,"Downloading"),o(),a(3,"div",15),M(4,ee,9,5,"div",16,U),o()()),n&2){let t=s();r(4),P(t.activePulls())}}function ne(n,e){n&1&&y(0,"app-skeleton",26),n&2&&C("count",4)}function ie(n,e){n&1&&(a(0,"div",27)(1,"p"),l(2,"No models installed yet."),o(),a(3,"p",29),l(4,"Switch to the "),a(5,"strong"),l(6,"Library"),o(),l(7," tab to download one."),o()())}function oe(n,e){n&1&&(a(0,"span",33),l(1,"Loaded"),o())}function ae(n,e){n&1&&(a(0,"span",36),l(1,"Tools"),o())}function re(n,e){n&1&&(a(0,"span",37),l(1,"Vision"),o())}function le(n,e){if(n&1&&(a(0,"span",35),l(1),o()),n&2){let t=s(4);r(),g("",t.formatContextWindow(e)," ctx")}}function de(n,e){if(n&1){let t=w();a(0,"div",30)(1,"div",31)(2,"h4",32),l(3),o(),m(4,oe,2,0,"span",33),o(),a(5,"div",34)(6,"span",35),l(7),o(),a(8,"span",35),l(9),o(),m(10,ae,2,0,"span",36),m(11,re,2,0,"span",37),m(12,le,2,1,"span",35),o(),a(13,"div",38)(14,"button",39),v("click",function(){let d=b(t).$implicit,c=s(3);return f(c.deleteModel(d.name))}),l(15),o()()()}if(n&2){let t,i=e.$implicit,d=s(3);r(3),u(i.name),r(),p(i.loaded?4:-1),r(3),u(i.sizeHuman),r(2),u(i.family),r(),p(i.capabilities!=null&&i.capabilities.supportsTools?10:-1),r(),p(i.capabilities!=null&&i.capabilities.supportsVision?11:-1),r(),p((t=i.capabilities==null?null:i.capabilities.contextWindow)?12:-1,t),r(2),C("disabled",d.deletingModel()===i.name),r(),g(" ",d.deletingModel()===i.name?"Deleting...":"Delete"," ")}}function se(n,e){if(n&1&&(a(0,"div",28),M(1,de,16,9,"div",30,j),o()),n&2){let t=s(2);r(),P(t.installedModels())}}function ce(n,e){if(n&1&&m(0,ne,1,1,"app-skeleton",26)(1,ie,8,0,"div",27)(2,se,3,0,"div",28),n&2){let t=s();p(t.loading()?0:t.installedModels().length===0?1:2)}}function me(n,e){if(n&1){let t=w();a(0,"button",44),v("click",function(){let d=b(t).$implicit,c=s(2);return f(c.filterCategory(d))}),l(1),o()}if(n&2){let t=e.$implicit,i=s(2);x("filter-chip--active",i.libraryCategory()===t),r(),g(" ",t," ")}}function pe(n,e){n&1&&y(0,"app-skeleton",26),n&2&&C("count",6)}function _e(n,e){n&1&&(a(0,"p",29),l(1,"No models found."),o())}function ue(n,e){if(n&1&&(a(0,"span",48),l(1),o()),n&2){let t=e.$implicit;r(),u(t)}}function ge(n,e){n&1&&(a(0,"span",49),l(1,"Installed"),o())}function be(n,e){n&1&&(a(0,"span",50),l(1,"Downloading..."),o())}function fe(n,e){if(n&1){let t=w();a(0,"button",52),v("click",function(){b(t);let d=s().$implicit,c=s(3);return f(c.pullModel(d.pullCommand))}),l(1," Download "),o()}if(n&2){let t=s(4);C("disabled",!t.ollamaAvailable())}}function ve(n,e){if(n&1&&(a(0,"div",30)(1,"div",31)(2,"h4",32),l(3),o(),a(4,"span",46),l(5),o()(),a(6,"p",47),l(7),o(),a(8,"div",34),M(9,ue,2,1,"span",48,k),o(),a(11,"div",38),m(12,ge,2,0,"span",49)(13,be,2,0,"span",50)(14,fe,2,1,"button",51),o()()),n&2){let t=e.$implicit,i=s(3);x("model-card--installed",t.installed),r(3),u(t.name),r(2),u(t.parameterSize),r(2),u(t.description),r(2),P(t.capabilities),r(3),p(t.installed?12:i.isPulling(t.pullCommand)?13:14)}}function Ce(n,e){if(n&1&&(a(0,"div",28),M(1,ve,15,6,"div",45,j),o()),n&2){let t=s(2);r(),P(t.libraryModels())}}function xe(n,e){if(n&1){let t=w();a(0,"div",40)(1,"input",41),v("input",function(d){b(t);let c=s();return f(c.onSearchInput(d))}),o(),a(2,"div",42),M(3,me,2,3,"button",43,k),o()(),m(5,pe,1,1,"app-skeleton",26)(6,_e,2,0,"p",29)(7,Ce,3,0,"div",28)}if(n&2){let t=s();r(),C("value",t.libraryQuery()),r(2),P(t.libraryCategories()),r(2),p(t.loadingLibrary()?5:t.libraryModels().length===0?6:7)}}function ye(n,e){n&1&&y(0,"app-skeleton",26),n&2&&C("count",6)}function he(n,e){n&1&&(a(0,"p",29),l(1," No OpenRouter models available. Set "),a(2,"code"),l(3,"OPENROUTER_API_KEY"),o(),l(4," to enable. "),o())}function Me(n,e){if(n&1&&(a(0,"div",30)(1,"div",31)(2,"span",32),l(3),o()(),a(4,"div",53)(5,"span",54),l(6),O(7,"number"),o(),a(8,"span",54),l(9," Price: "),a(10,"span"),l(11,"$"),o(),l(12),O(13,"number"),a(14,"span"),l(15,"$"),o(),l(16),O(17,"number"),o()(),a(18,"div",55),l(19),o()()),n&2){let t=e.$implicit;r(3),u(t.name),r(3),g("Context: ",$(7,5,t.contextLength)," tokens"),r(6),g("",T(13,7,t.pricing.promptPerMillion,"1.2-2"),"/"),r(4),g("",T(17,10,t.pricing.completionPerMillion,"1.2-2")," /M "),r(3),u(t.id)}}function Pe(n,e){if(n&1&&(a(0,"div",28),M(1,Me,20,13,"div",30,q),o()),n&2){let t=s(2);r(),P(t.openrouterModels())}}function we(n,e){if(n&1&&m(0,ye,1,1,"app-skeleton",26)(1,he,5,0,"p",29)(2,Pe,3,0,"div",28),n&2){let t=s();p(t.loadingOpenRouter()?0:t.openrouterModels().length===0?1:2)}}var Q=class n{api=S(R);ws=S(W);notifications=S(A);loading=_(!1);ollamaAvailable=_(!1);ollamaHost=_("http://localhost:11434");installedModels=_([]);activePulls=_([]);deletingModel=_(null);activeTab=_("installed");loadingLibrary=_(!1);libraryModels=_([]);libraryCategories=_(["all","recommended","coding","small","large","vision"]);libraryCategory=_("all");libraryQuery=_("");pullingSet=B(()=>new Set(this.activePulls().filter(e=>e.status==="pulling").map(e=>e.model)));loadingOpenRouter=_(!1);openrouterModels=_([]);wsUnsub=null;searchDebounce=null;ngOnInit(){this.refresh(),this.ws.subscribeOllama(),this.wsUnsub=this.ws.onMessage(e=>{e.type==="ollama_pull_progress"&&this.handlePullProgress(e)})}ngOnDestroy(){this.ws.unsubscribeOllama(),this.wsUnsub?.(),this.searchDebounce&&clearTimeout(this.searchDebounce)}async refresh(){this.loading.set(!0);try{let[e,t]=await Promise.all([h(this.api.get("/ollama/status")).catch(()=>null),h(this.api.get("/ollama/models")).catch(()=>null)]);e?(this.ollamaAvailable.set(e.available),this.ollamaHost.set(e.host),this.activePulls.set(e.pullStatuses??[])):this.ollamaAvailable.set(!1),t&&this.installedModels.set(t.models)}finally{this.loading.set(!1)}}async pullModel(e){if(e.trim())try{await h(this.api.post("/ollama/models/pull",{model:e.trim()})),this.notifications.success(`Started downloading ${e}`),this.activePulls.update(t=>t.some(i=>i.model===e)?t:[...t,{model:e.trim(),status:"pulling",progress:0,downloadedBytes:0,totalBytes:0,currentLayer:""}])}catch(t){let i=t instanceof Error?t.message:"Pull request failed";this.notifications.error(i)}}async deleteModel(e){if(confirm(`Delete model "${e}"? This cannot be undone.`)){this.deletingModel.set(e);try{await h(this.api.deleteWithBody("/ollama/models",{model:e})),this.notifications.success(`Deleted ${e}`),this.installedModels.update(t=>t.filter(i=>i.name!==e))}catch(t){let i=t instanceof Error?t.message:"Delete failed";this.notifications.error(i)}finally{this.deletingModel.set(null)}}}switchToLibrary(){this.activeTab.set("library"),this.libraryModels().length===0&&this.loadLibrary()}switchToOpenRouter(){this.activeTab.set("openrouter"),this.openrouterModels().length===0&&this.loadOpenRouterModels()}async loadOpenRouterModels(){this.loadingOpenRouter.set(!0);try{let e=await h(this.api.get("/openrouter/models"));this.openrouterModels.set(e.models??[])}catch{}finally{this.loadingOpenRouter.set(!1)}}async loadLibrary(){this.loadingLibrary.set(!0);try{let e=new URLSearchParams;this.libraryCategory()!=="all"&&e.set("category",this.libraryCategory()),this.libraryQuery()&&e.set("q",this.libraryQuery());let t=e.toString(),i=`/ollama/library${t?"?"+t:""}`,d=await h(this.api.get(i));this.libraryModels.set(d.models),d.categories?.length&&this.libraryCategories.set(d.categories)}catch{this.notifications.error("Failed to load model library")}finally{this.loadingLibrary.set(!1)}}filterCategory(e){this.libraryCategory.set(e),this.loadLibrary()}onSearchInput(e){let t=e.target.value;this.libraryQuery.set(t),this.searchDebounce&&clearTimeout(this.searchDebounce),this.searchDebounce=setTimeout(()=>this.loadLibrary(),300)}isPulling(e){return this.pullingSet().has(e)}formatBytes(e){if(!e||e===0)return"0 B";let t=["B","KB","MB","GB"],i=0,d=e;for(;d>=1024&&i<t.length-1;)d/=1024,i++;return`${d.toFixed(i===0?0:1)} ${t[i]}`}formatContextWindow(e){return e>=1e3?`${Math.round(e/1e3)}k`:`${e}`}handlePullProgress(e){let t={model:e.model,status:e.status,progress:e.progress,downloadedBytes:e.downloadedBytes,totalBytes:e.totalBytes,currentLayer:e.currentLayer,error:e.error};this.activePulls.update(i=>{let d=i.findIndex(c=>c.model===e.model);if(d>=0){let c=[...i];return c[d]=t,c}return[...i,t]}),e.status==="completed"?(this.notifications.success(`Model ${e.model} downloaded successfully`),setTimeout(()=>this.refresh(),1500)):e.status==="error"&&this.notifications.error(`Failed to download ${e.model}: ${e.error||"unknown error"}`)}static \u0275fac=function(t){return new(t||n)};static \u0275cmp=I({type:n,selectors:[["app-models"]],decls:30,vars:19,consts:[["customModelInput",""],[1,"page"],[1,"page__header"],[1,"header__actions"],[1,"btn","btn--secondary",3,"click","disabled"],[1,"status-banner"],[1,"status-dot"],[1,"section"],[1,"tabs"],[1,"tab",3,"click"],[1,"section","manual-pull"],[1,"section__title"],[1,"manual-pull__form"],["type","text","placeholder","e.g. qwen3:8b, llama3.1:70b",1,"search-input"],[1,"btn","btn--primary",3,"click","disabled"],[1,"pull-list"],[1,"pull-card"],[1,"pull-card__header"],[1,"pull-card__model"],[1,"pull-card__status"],[1,"pull-card__error"],[1,"progress-bar"],[1,"progress-bar__fill"],[1,"pull-card__detail"],[1,"pull-card__layer"],[1,"progress-bar__fill","progress-bar__fill--done",2,"width","100%"],["variant","card",3,"count"],[1,"empty-state"],[1,"model-grid"],[1,"hint"],[1,"model-card"],[1,"model-card__header"],[1,"model-card__name"],[1,"badge","badge--running"],[1,"model-card__info"],[1,"model-card__meta"],[1,"badge","badge--tools"],[1,"badge","badge--vision"],[1,"model-card__actions"],[1,"btn","btn--danger","btn--sm",3,"click","disabled"],[1,"library-controls"],["type","text","placeholder","Search models...",1,"search-input",3,"input","value"],[1,"category-filters"],[1,"filter-chip",3,"filter-chip--active"],[1,"filter-chip",3,"click"],[1,"model-card",3,"model-card--installed"],[1,"badge","badge--size"],[1,"model-card__desc"],[1,"badge","badge--cap"],[1,"installed-label"],[1,"pulling-label"],[1,"btn","btn--primary","btn--sm",3,"disabled"],[1,"btn","btn--primary","btn--sm",3,"click","disabled"],[1,"model-card__details"],[1,"detail"],[1,"model-card__id"]],template:function(t,i){if(t&1){let d=w();a(0,"div",1)(1,"div",2)(2,"h2"),l(3,"Models"),o(),a(4,"div",3)(5,"button",4),v("click",function(){return b(d),f(i.refresh())}),l(6," Refresh "),o()()(),a(7,"div",5),y(8,"span",6),m(9,K,5,3,"span")(10,G,4,0,"span"),o(),m(11,te,6,0,"section",7),a(12,"div",8)(13,"button",9),v("click",function(){return b(d),f(i.activeTab.set("installed"))}),l(14),o(),a(15,"button",9),v("click",function(){return b(d),f(i.switchToLibrary())}),l(16," Library "),o(),a(17,"button",9),v("click",function(){return b(d),f(i.switchToOpenRouter())}),l(18),o()(),m(19,ce,3,1),m(20,xe,8,2),m(21,we,3,1),a(22,"section",10)(23,"h3",11),l(24,"Pull Custom Model"),o(),a(25,"div",12),y(26,"input",13,0),a(28,"button",14),v("click",function(){b(d);let D=L(27);return i.pullModel(D.value),f(D.value="")}),l(29," Pull "),o()()()()}t&2&&(r(5),C("disabled",i.loading()),r(2),x("status-banner--offline",!i.ollamaAvailable()),r(),x("status-dot--online",i.ollamaAvailable()),r(),p(i.ollamaAvailable()?9:10),r(2),p(i.activePulls().length>0?11:-1),r(2),x("tab--active",i.activeTab()==="installed"),r(),g(" Installed (",i.installedModels().length,") "),r(),x("tab--active",i.activeTab()==="library"),r(2),x("tab--active",i.activeTab()==="openrouter"),r(),g(" OpenRouter (",i.openrouterModels().length,") "),r(),p(i.activeTab()==="installed"?19:-1),r(),p(i.activeTab()==="library"?20:-1),r(),p(i.activeTab()==="openrouter"?21:-1),r(7),C("disabled",!i.ollamaAvailable()))},dependencies:[H,F,N],styles:[".page[_ngcontent-%COMP%]{padding:1.5rem;max-width:960px}.page__header[_ngcontent-%COMP%]{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}.header__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem}.status-banner[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-radius:var(--radius-lg);background:var(--bg-surface);border:1px solid var(--border);font-size:.8rem;color:var(--text-secondary);margin-bottom:1.25rem}.status-banner--offline[_ngcontent-%COMP%]{border-color:#ff50504d}.status-banner[_ngcontent-%COMP%]   code[_ngcontent-%COMP%]{background:var(--bg-raised);padding:1px 6px;border-radius:var(--radius-sm);font-size:.75rem}.status-dot[_ngcontent-%COMP%]{width:8px;height:8px;border-radius:50%;background:#ff5050;flex-shrink:0}.status-dot--online[_ngcontent-%COMP%]{background:#00e676;box-shadow:0 0 6px #00e67666}.tabs[_ngcontent-%COMP%]{display:flex;gap:0;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}.tab[_ngcontent-%COMP%]{padding:.6rem 1.25rem;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:color .15s,border-color .15s}.tab[_ngcontent-%COMP%]:hover{color:var(--text-primary)}.tab--active[_ngcontent-%COMP%]{color:var(--accent-cyan);border-bottom-color:var(--accent-cyan)}.section[_ngcontent-%COMP%]{margin-bottom:1.5rem}.section__title[_ngcontent-%COMP%]{font-size:.8rem;font-weight:600;color:var(--accent-magenta);text-transform:uppercase;letter-spacing:.05em;margin:0 0 .75rem}.model-grid[_ngcontent-%COMP%]{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem}.model-card[_ngcontent-%COMP%]{padding:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color .2s}.model-card[_ngcontent-%COMP%]:hover{border-color:var(--accent-cyan)}.model-card--installed[_ngcontent-%COMP%]{opacity:.7}.model-card__header[_ngcontent-%COMP%]{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.model-card__name[_ngcontent-%COMP%]{margin:0;font-size:.9rem;color:var(--text-primary);font-weight:600}.model-card__desc[_ngcontent-%COMP%]{margin:0 0 .5rem;font-size:.78rem;color:var(--text-secondary);line-height:1.4}.model-card__info[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.75rem}.model-card__meta[_ngcontent-%COMP%]{font-size:.72rem;color:var(--text-tertiary);background:var(--bg-raised);padding:2px 8px;border-radius:var(--radius-sm)}.model-card__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem;align-items:center}.pull-list[_ngcontent-%COMP%]{display:flex;flex-direction:column;gap:.5rem}.pull-card[_ngcontent-%COMP%]{padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--accent-cyan);border-radius:var(--radius-lg);box-shadow:0 0 8px #00e5ff0d}.pull-card__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}.pull-card__model[_ngcontent-%COMP%]{font-weight:600;font-size:.85rem;color:var(--text-primary)}.pull-card__status[_ngcontent-%COMP%]{font-size:.72rem;text-transform:uppercase;color:var(--accent-cyan);font-weight:600;letter-spacing:.05em}.pull-card__status--error[_ngcontent-%COMP%]{color:#ff5050}.pull-card__detail[_ngcontent-%COMP%]{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-tertiary);margin-top:.35rem}.pull-card__layer[_ngcontent-%COMP%]{font-size:.68rem;color:var(--text-tertiary);margin-top:.25rem;font-family:monospace}.pull-card__error[_ngcontent-%COMP%]{font-size:.78rem;color:#ff5050;margin-top:.35rem}.progress-bar[_ngcontent-%COMP%]{height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden}.progress-bar__fill[_ngcontent-%COMP%]{height:100%;background:var(--accent-cyan);border-radius:3px;transition:width .3s ease;box-shadow:0 0 6px #00e5ff4d}.progress-bar__fill--done[_ngcontent-%COMP%]{background:#00e676;box-shadow:0 0 6px #00e6764d}.badge[_ngcontent-%COMP%]{font-size:.62rem;padding:1px 6px;border-radius:var(--radius-sm);font-weight:600;border:1px solid;letter-spacing:.05em;text-transform:uppercase}.badge--running[_ngcontent-%COMP%]{background:#00e6761a;color:#00e676;border-color:#00e6764d}.badge--tools[_ngcontent-%COMP%]{background:var(--accent-cyan-dim);color:var(--accent-cyan);border-color:#00e5ff4d}.badge--vision[_ngcontent-%COMP%]{background:#ffaa001a;color:#fa0;border-color:#ffaa004d}.badge--size[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--text-secondary);border-color:var(--border)}.badge--cap[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--text-secondary);border-color:var(--border);font-size:.62rem}.library-controls[_ngcontent-%COMP%]{margin-bottom:1rem;display:flex;flex-direction:column;gap:.75rem}.search-input[_ngcontent-%COMP%]{padding:.5rem .75rem;border:1px solid var(--border-bright);border-radius:var(--radius);font-size:.85rem;font-family:inherit;background:var(--bg-input);color:var(--text-primary);width:100%}.search-input[_ngcontent-%COMP%]:focus{outline:none;border-color:var(--accent-cyan);box-shadow:var(--glow-cyan)}.category-filters[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem}.filter-chip[_ngcontent-%COMP%]{padding:.3rem .75rem;border-radius:999px;font-size:.72rem;font-weight:600;border:1px solid var(--border-bright);background:transparent;color:var(--text-secondary);cursor:pointer;font-family:inherit;text-transform:capitalize;transition:background .15s,border-color .15s,color .15s}.filter-chip[_ngcontent-%COMP%]:hover{border-color:var(--accent-cyan);color:var(--text-primary)}.filter-chip--active[_ngcontent-%COMP%]{background:var(--accent-cyan-dim);border-color:var(--accent-cyan);color:var(--accent-cyan)}.installed-label[_ngcontent-%COMP%]{font-size:.72rem;color:#00e676;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.pulling-label[_ngcontent-%COMP%]{font-size:.72rem;color:var(--accent-cyan);font-weight:600;text-transform:uppercase;letter-spacing:.05em}.manual-pull[_ngcontent-%COMP%]{margin-top:1.5rem}.manual-pull__form[_ngcontent-%COMP%]{display:flex;gap:.5rem}.manual-pull__form[_ngcontent-%COMP%]   .search-input[_ngcontent-%COMP%]{flex:1}.btn[_ngcontent-%COMP%]{padding:.5rem 1rem;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:background .15s,box-shadow .15s}.btn--primary[_ngcontent-%COMP%]{background:transparent;color:var(--accent-cyan);border-color:var(--accent-cyan)}.btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.btn--primary[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--secondary[_ngcontent-%COMP%]{background:transparent;color:var(--text-secondary);border-color:var(--border-bright)}.btn--secondary[_ngcontent-%COMP%]:hover{background:var(--bg-hover)}.btn--secondary[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--danger[_ngcontent-%COMP%]{background:transparent;color:#ff5050;border-color:#ff505066}.btn--danger[_ngcontent-%COMP%]:hover{background:#ff505014;box-shadow:0 0 8px #ff505026}.btn--danger[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--sm[_ngcontent-%COMP%]{padding:.3rem .6rem;font-size:.7rem}.hint[_ngcontent-%COMP%]{color:var(--text-tertiary);font-size:.82rem}.empty-state[_ngcontent-%COMP%]{text-align:center;padding:2rem 1rem;color:var(--text-secondary)}.empty-state[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%]{color:var(--accent-cyan)}"],changeDetection:0})};export{Q as ModelsComponent};
+import { a as A } from './chunk-CSQXEU3M.js';
+import { b as R } from './chunk-D6WCRQHB.js';
+import { a as H } from './chunk-FGNIWOFY.js';
+import { e as F, f as N } from './chunk-GH246MXO.js';
+import { a as W } from './chunk-OFKXBWQC.js';
+import './chunk-GEI46CGR.js';
+import {
+  ja as _,
+  ac as $,
+  pb as a,
+  fc as B,
+  Y as b,
+  ob as C,
+  Rb as E,
+  Z as f,
+  Qb as g,
+  q as h,
+  _a as I,
+  lb as k,
+  Kb as L,
+  Ob as l,
+  mb as M,
+  ib as m,
+  $b as O,
+  qb as o,
+  nb as P,
+  jb as p,
+  Na as r,
+  T as S,
+  Bb as s,
+  bc as T,
+  Pb as u,
+  cc as V,
+  zb as v,
+  vb as w,
+  Mb as x,
+  rb as y,
+  Lb as z,
+} from './chunk-LF4EWAJA.js';
+
+var U = (_n, e) => e.model,
+  j = (_n, e) => e.name,
+  q = (_n, e) => e.id;
+function K(n, _e) {
+  if ((n & 1 && (a(0, 'span'), l(1, 'Ollama running at '), a(2, 'code'), l(3), o(), l(4), o()), n & 2)) {
+    const t = s();
+    r(3),
+      u(t.ollamaHost()),
+      r(),
+      E(' \u2014 ', t.installedModels().length, ' model', t.installedModels().length === 1 ? '' : 's', ' installed');
+  }
+}
+function G(n, _e) {
+  n & 1 && (a(0, 'span'), l(1, 'Ollama not reachable. Start it with '), a(2, 'code'), l(3, 'ollama serve'), o()());
+}
+function Y(n, _e) {
+  if ((n & 1 && (a(0, 'div', 24), l(1), O(2, 'slice'), o()), n & 2)) {
+    const t = s(2).$implicit;
+    r(), g('Layer: ', V(2, 1, t.currentLayer, 0, 20), '...');
+  }
+}
+function J(n, _e) {
+  if (
+    (n & 1 &&
+      (a(0, 'div', 21),
+      y(1, 'div', 22),
+      o(),
+      a(2, 'div', 23)(3, 'span'),
+      l(4),
+      o(),
+      a(5, 'span'),
+      l(6),
+      O(7, 'number'),
+      o()(),
+      m(8, Y, 3, 5, 'div', 24)),
+    n & 2)
+  ) {
+    const t = s().$implicit,
+      i = s(2);
+    r(),
+      z('width', t.progress, '%'),
+      r(3),
+      E('', i.formatBytes(t.downloadedBytes), ' / ', i.formatBytes(t.totalBytes)),
+      r(2),
+      g('', T(7, 6, t.progress, '1.0-0'), '%'),
+      r(2),
+      p(t.currentLayer ? 8 : -1);
+  }
+}
+function X(n, _e) {
+  n & 1 && (a(0, 'div', 21), y(1, 'div', 25), o(), a(2, 'div', 23)(3, 'span'), l(4, 'Download complete'), o()());
+}
+function Z(n, _e) {
+  if ((n & 1 && (a(0, 'div', 20), l(1), o()), n & 2)) {
+    const t = s().$implicit;
+    r(), u(t.error);
+  }
+}
+function ee(n, e) {
+  if (
+    (n & 1 &&
+      (a(0, 'div', 16)(1, 'div', 17)(2, 'span', 18),
+      l(3),
+      o(),
+      a(4, 'span', 19),
+      l(5),
+      o()(),
+      m(6, J, 9, 9)(7, X, 5, 0)(8, Z, 2, 1, 'div', 20),
+      o()),
+    n & 2)
+  ) {
+    const t = e.$implicit;
+    r(3),
+      u(t.model),
+      r(),
+      x('pull-card__status--error', t.status === 'error'),
+      r(),
+      g(' ', t.status, ' '),
+      r(),
+      p(t.status === 'pulling' ? 6 : t.status === 'completed' ? 7 : t.error ? 8 : -1);
+  }
+}
+function te(n, _e) {
+  if (
+    (n & 1 &&
+      (a(0, 'section', 7)(1, 'h3', 11), l(2, 'Downloading'), o(), a(3, 'div', 15), M(4, ee, 9, 5, 'div', 16, U), o()()),
+    n & 2)
+  ) {
+    const t = s();
+    r(4), P(t.activePulls());
+  }
+}
+function ne(n, _e) {
+  n & 1 && y(0, 'app-skeleton', 26), n & 2 && C('count', 4);
+}
+function ie(n, _e) {
+  n & 1 &&
+    (a(0, 'div', 27)(1, 'p'),
+    l(2, 'No models installed yet.'),
+    o(),
+    a(3, 'p', 29),
+    l(4, 'Switch to the '),
+    a(5, 'strong'),
+    l(6, 'Library'),
+    o(),
+    l(7, ' tab to download one.'),
+    o()());
+}
+function oe(n, _e) {
+  n & 1 && (a(0, 'span', 33), l(1, 'Loaded'), o());
+}
+function ae(n, _e) {
+  n & 1 && (a(0, 'span', 36), l(1, 'Tools'), o());
+}
+function re(n, _e) {
+  n & 1 && (a(0, 'span', 37), l(1, 'Vision'), o());
+}
+function le(n, e) {
+  if ((n & 1 && (a(0, 'span', 35), l(1), o()), n & 2)) {
+    const t = s(4);
+    r(), g('', t.formatContextWindow(e), ' ctx');
+  }
+}
+function de(n, e) {
+  if (n & 1) {
+    const t = w();
+    a(0, 'div', 30)(1, 'div', 31)(2, 'h4', 32),
+      l(3),
+      o(),
+      m(4, oe, 2, 0, 'span', 33),
+      o(),
+      a(5, 'div', 34)(6, 'span', 35),
+      l(7),
+      o(),
+      a(8, 'span', 35),
+      l(9),
+      o(),
+      m(10, ae, 2, 0, 'span', 36),
+      m(11, re, 2, 0, 'span', 37),
+      m(12, le, 2, 1, 'span', 35),
+      o(),
+      a(13, 'div', 38)(14, 'button', 39),
+      v('click', () => {
+        const d = b(t).$implicit,
+          c = s(3);
+        return f(c.deleteModel(d.name));
+      }),
+      l(15),
+      o()()();
+  }
+  if (n & 2) {
+    let t,
+      i = e.$implicit,
+      d = s(3);
+    r(3),
+      u(i.name),
+      r(),
+      p(i.loaded ? 4 : -1),
+      r(3),
+      u(i.sizeHuman),
+      r(2),
+      u(i.family),
+      r(),
+      p(i.capabilities?.supportsTools ? 10 : -1),
+      r(),
+      p(i.capabilities?.supportsVision ? 11 : -1),
+      r(),
+      p((t = i.capabilities == null ? null : i.capabilities.contextWindow) ? 12 : -1, t),
+      r(2),
+      C('disabled', d.deletingModel() === i.name),
+      r(),
+      g(' ', d.deletingModel() === i.name ? 'Deleting...' : 'Delete', ' ');
+  }
+}
+function se(n, _e) {
+  if ((n & 1 && (a(0, 'div', 28), M(1, de, 16, 9, 'div', 30, j), o()), n & 2)) {
+    const t = s(2);
+    r(), P(t.installedModels());
+  }
+}
+function ce(n, _e) {
+  if ((n & 1 && m(0, ne, 1, 1, 'app-skeleton', 26)(1, ie, 8, 0, 'div', 27)(2, se, 3, 0, 'div', 28), n & 2)) {
+    const t = s();
+    p(t.loading() ? 0 : t.installedModels().length === 0 ? 1 : 2);
+  }
+}
+function me(n, e) {
+  if (n & 1) {
+    const t = w();
+    a(0, 'button', 44),
+      v('click', () => {
+        const d = b(t).$implicit,
+          c = s(2);
+        return f(c.filterCategory(d));
+      }),
+      l(1),
+      o();
+  }
+  if (n & 2) {
+    const t = e.$implicit,
+      i = s(2);
+    x('filter-chip--active', i.libraryCategory() === t), r(), g(' ', t, ' ');
+  }
+}
+function pe(n, _e) {
+  n & 1 && y(0, 'app-skeleton', 26), n & 2 && C('count', 6);
+}
+function _e(n, _e) {
+  n & 1 && (a(0, 'p', 29), l(1, 'No models found.'), o());
+}
+function ue(n, e) {
+  if ((n & 1 && (a(0, 'span', 48), l(1), o()), n & 2)) {
+    const t = e.$implicit;
+    r(), u(t);
+  }
+}
+function ge(n, _e) {
+  n & 1 && (a(0, 'span', 49), l(1, 'Installed'), o());
+}
+function be(n, _e) {
+  n & 1 && (a(0, 'span', 50), l(1, 'Downloading...'), o());
+}
+function fe(n, _e) {
+  if (n & 1) {
+    const t = w();
+    a(0, 'button', 52),
+      v('click', () => {
+        b(t);
+        const d = s().$implicit,
+          c = s(3);
+        return f(c.pullModel(d.pullCommand));
+      }),
+      l(1, ' Download '),
+      o();
+  }
+  if (n & 2) {
+    const t = s(4);
+    C('disabled', !t.ollamaAvailable());
+  }
+}
+function ve(n, e) {
+  if (
+    (n & 1 &&
+      (a(0, 'div', 30)(1, 'div', 31)(2, 'h4', 32),
+      l(3),
+      o(),
+      a(4, 'span', 46),
+      l(5),
+      o()(),
+      a(6, 'p', 47),
+      l(7),
+      o(),
+      a(8, 'div', 34),
+      M(9, ue, 2, 1, 'span', 48, k),
+      o(),
+      a(11, 'div', 38),
+      m(12, ge, 2, 0, 'span', 49)(13, be, 2, 0, 'span', 50)(14, fe, 2, 1, 'button', 51),
+      o()()),
+    n & 2)
+  ) {
+    const t = e.$implicit,
+      i = s(3);
+    x('model-card--installed', t.installed),
+      r(3),
+      u(t.name),
+      r(2),
+      u(t.parameterSize),
+      r(2),
+      u(t.description),
+      r(2),
+      P(t.capabilities),
+      r(3),
+      p(t.installed ? 12 : i.isPulling(t.pullCommand) ? 13 : 14);
+  }
+}
+function Ce(n, _e) {
+  if ((n & 1 && (a(0, 'div', 28), M(1, ve, 15, 6, 'div', 45, j), o()), n & 2)) {
+    const t = s(2);
+    r(), P(t.libraryModels());
+  }
+}
+function xe(n, _e) {
+  if (n & 1) {
+    const t = w();
+    a(0, 'div', 40)(1, 'input', 41),
+      v('input', (d) => {
+        b(t);
+        const c = s();
+        return f(c.onSearchInput(d));
+      }),
+      o(),
+      a(2, 'div', 42),
+      M(3, me, 2, 3, 'button', 43, k),
+      o()(),
+      m(5, pe, 1, 1, 'app-skeleton', 26)(6, _e, 2, 0, 'p', 29)(7, Ce, 3, 0, 'div', 28);
+  }
+  if (n & 2) {
+    const t = s();
+    r(),
+      C('value', t.libraryQuery()),
+      r(2),
+      P(t.libraryCategories()),
+      r(2),
+      p(t.loadingLibrary() ? 5 : t.libraryModels().length === 0 ? 6 : 7);
+  }
+}
+function ye(n, _e) {
+  n & 1 && y(0, 'app-skeleton', 26), n & 2 && C('count', 6);
+}
+function he(n, _e) {
+  n & 1 &&
+    (a(0, 'p', 29),
+    l(1, ' No OpenRouter models available. Set '),
+    a(2, 'code'),
+    l(3, 'OPENROUTER_API_KEY'),
+    o(),
+    l(4, ' to enable. '),
+    o());
+}
+function Me(n, e) {
+  if (
+    (n & 1 &&
+      (a(0, 'div', 30)(1, 'div', 31)(2, 'span', 32),
+      l(3),
+      o()(),
+      a(4, 'div', 53)(5, 'span', 54),
+      l(6),
+      O(7, 'number'),
+      o(),
+      a(8, 'span', 54),
+      l(9, ' Price: '),
+      a(10, 'span'),
+      l(11, '$'),
+      o(),
+      l(12),
+      O(13, 'number'),
+      a(14, 'span'),
+      l(15, '$'),
+      o(),
+      l(16),
+      O(17, 'number'),
+      o()(),
+      a(18, 'div', 55),
+      l(19),
+      o()()),
+    n & 2)
+  ) {
+    const t = e.$implicit;
+    r(3),
+      u(t.name),
+      r(3),
+      g('Context: ', $(7, 5, t.contextLength), ' tokens'),
+      r(6),
+      g('', T(13, 7, t.pricing.promptPerMillion, '1.2-2'), '/'),
+      r(4),
+      g('', T(17, 10, t.pricing.completionPerMillion, '1.2-2'), ' /M '),
+      r(3),
+      u(t.id);
+  }
+}
+function Pe(n, _e) {
+  if ((n & 1 && (a(0, 'div', 28), M(1, Me, 20, 13, 'div', 30, q), o()), n & 2)) {
+    const t = s(2);
+    r(), P(t.openrouterModels());
+  }
+}
+function we(n, _e) {
+  if ((n & 1 && m(0, ye, 1, 1, 'app-skeleton', 26)(1, he, 5, 0, 'p', 29)(2, Pe, 3, 0, 'div', 28), n & 2)) {
+    const t = s();
+    p(t.loadingOpenRouter() ? 0 : t.openrouterModels().length === 0 ? 1 : 2);
+  }
+}
+var Q = class n {
+  api = S(R);
+  ws = S(W);
+  notifications = S(A);
+  loading = _(!1);
+  ollamaAvailable = _(!1);
+  ollamaHost = _('http://localhost:11434');
+  installedModels = _([]);
+  activePulls = _([]);
+  deletingModel = _(null);
+  activeTab = _('installed');
+  loadingLibrary = _(!1);
+  libraryModels = _([]);
+  libraryCategories = _(['all', 'recommended', 'coding', 'small', 'large', 'vision']);
+  libraryCategory = _('all');
+  libraryQuery = _('');
+  pullingSet = B(
+    () =>
+      new Set(
+        this.activePulls()
+          .filter((e) => e.status === 'pulling')
+          .map((e) => e.model),
+      ),
+  );
+  loadingOpenRouter = _(!1);
+  openrouterModels = _([]);
+  wsUnsub = null;
+  searchDebounce = null;
+  ngOnInit() {
+    this.refresh(),
+      this.ws.subscribeOllama(),
+      (this.wsUnsub = this.ws.onMessage((e) => {
+        e.type === 'ollama_pull_progress' && this.handlePullProgress(e);
+      }));
+  }
+  ngOnDestroy() {
+    this.ws.unsubscribeOllama(), this.wsUnsub?.(), this.searchDebounce && clearTimeout(this.searchDebounce);
+  }
+  async refresh() {
+    this.loading.set(!0);
+    try {
+      const [e, t] = await Promise.all([
+        h(this.api.get('/ollama/status')).catch(() => null),
+        h(this.api.get('/ollama/models')).catch(() => null),
+      ]);
+      e
+        ? (this.ollamaAvailable.set(e.available),
+          this.ollamaHost.set(e.host),
+          this.activePulls.set(e.pullStatuses ?? []))
+        : this.ollamaAvailable.set(!1),
+        t && this.installedModels.set(t.models);
+    } finally {
+      this.loading.set(!1);
+    }
+  }
+  async pullModel(e) {
+    if (e.trim())
+      try {
+        await h(this.api.post('/ollama/models/pull', { model: e.trim() })),
+          this.notifications.success(`Started downloading ${e}`),
+          this.activePulls.update((t) =>
+            t.some((i) => i.model === e)
+              ? t
+              : [
+                  ...t,
+                  {
+                    model: e.trim(),
+                    status: 'pulling',
+                    progress: 0,
+                    downloadedBytes: 0,
+                    totalBytes: 0,
+                    currentLayer: '',
+                  },
+                ],
+          );
+      } catch (t) {
+        const i = t instanceof Error ? t.message : 'Pull request failed';
+        this.notifications.error(i);
+      }
+  }
+  async deleteModel(e) {
+    if (confirm(`Delete model "${e}"? This cannot be undone.`)) {
+      this.deletingModel.set(e);
+      try {
+        await h(this.api.deleteWithBody('/ollama/models', { model: e })),
+          this.notifications.success(`Deleted ${e}`),
+          this.installedModels.update((t) => t.filter((i) => i.name !== e));
+      } catch (t) {
+        const i = t instanceof Error ? t.message : 'Delete failed';
+        this.notifications.error(i);
+      } finally {
+        this.deletingModel.set(null);
+      }
+    }
+  }
+  switchToLibrary() {
+    this.activeTab.set('library'), this.libraryModels().length === 0 && this.loadLibrary();
+  }
+  switchToOpenRouter() {
+    this.activeTab.set('openrouter'), this.openrouterModels().length === 0 && this.loadOpenRouterModels();
+  }
+  async loadOpenRouterModels() {
+    this.loadingOpenRouter.set(!0);
+    try {
+      const e = await h(this.api.get('/openrouter/models'));
+      this.openrouterModels.set(e.models ?? []);
+    } catch {
+    } finally {
+      this.loadingOpenRouter.set(!1);
+    }
+  }
+  async loadLibrary() {
+    this.loadingLibrary.set(!0);
+    try {
+      const e = new URLSearchParams();
+      this.libraryCategory() !== 'all' && e.set('category', this.libraryCategory()),
+        this.libraryQuery() && e.set('q', this.libraryQuery());
+      const t = e.toString(),
+        i = `/ollama/library${t ? `?${t}` : ''}`,
+        d = await h(this.api.get(i));
+      this.libraryModels.set(d.models), d.categories?.length && this.libraryCategories.set(d.categories);
+    } catch {
+      this.notifications.error('Failed to load model library');
+    } finally {
+      this.loadingLibrary.set(!1);
+    }
+  }
+  filterCategory(e) {
+    this.libraryCategory.set(e), this.loadLibrary();
+  }
+  onSearchInput(e) {
+    const t = e.target.value;
+    this.libraryQuery.set(t),
+      this.searchDebounce && clearTimeout(this.searchDebounce),
+      (this.searchDebounce = setTimeout(() => this.loadLibrary(), 300));
+  }
+  isPulling(e) {
+    return this.pullingSet().has(e);
+  }
+  formatBytes(e) {
+    if (!e || e === 0) return '0 B';
+    let t = ['B', 'KB', 'MB', 'GB'],
+      i = 0,
+      d = e;
+    for (; d >= 1024 && i < t.length - 1; ) (d /= 1024), i++;
+    return `${d.toFixed(i === 0 ? 0 : 1)} ${t[i]}`;
+  }
+  formatContextWindow(e) {
+    return e >= 1e3 ? `${Math.round(e / 1e3)}k` : `${e}`;
+  }
+  handlePullProgress(e) {
+    const t = {
+      model: e.model,
+      status: e.status,
+      progress: e.progress,
+      downloadedBytes: e.downloadedBytes,
+      totalBytes: e.totalBytes,
+      currentLayer: e.currentLayer,
+      error: e.error,
+    };
+    this.activePulls.update((i) => {
+      const d = i.findIndex((c) => c.model === e.model);
+      if (d >= 0) {
+        const c = [...i];
+        return (c[d] = t), c;
+      }
+      return [...i, t];
+    }),
+      e.status === 'completed'
+        ? (this.notifications.success(`Model ${e.model} downloaded successfully`),
+          setTimeout(() => this.refresh(), 1500))
+        : e.status === 'error' &&
+          this.notifications.error(`Failed to download ${e.model}: ${e.error || 'unknown error'}`);
+  }
+  static \u0275fac = (t) => new (t || n)();
+  static \u0275cmp = I({
+    type: n,
+    selectors: [['app-models']],
+    decls: 30,
+    vars: 19,
+    consts: [
+      ['customModelInput', ''],
+      [1, 'page'],
+      [1, 'page__header'],
+      [1, 'header__actions'],
+      [1, 'btn', 'btn--secondary', 3, 'click', 'disabled'],
+      [1, 'status-banner'],
+      [1, 'status-dot'],
+      [1, 'section'],
+      [1, 'tabs'],
+      [1, 'tab', 3, 'click'],
+      [1, 'section', 'manual-pull'],
+      [1, 'section__title'],
+      [1, 'manual-pull__form'],
+      ['type', 'text', 'placeholder', 'e.g. qwen3:8b, llama3.1:70b', 1, 'search-input'],
+      [1, 'btn', 'btn--primary', 3, 'click', 'disabled'],
+      [1, 'pull-list'],
+      [1, 'pull-card'],
+      [1, 'pull-card__header'],
+      [1, 'pull-card__model'],
+      [1, 'pull-card__status'],
+      [1, 'pull-card__error'],
+      [1, 'progress-bar'],
+      [1, 'progress-bar__fill'],
+      [1, 'pull-card__detail'],
+      [1, 'pull-card__layer'],
+      [1, 'progress-bar__fill', 'progress-bar__fill--done', 2, 'width', '100%'],
+      ['variant', 'card', 3, 'count'],
+      [1, 'empty-state'],
+      [1, 'model-grid'],
+      [1, 'hint'],
+      [1, 'model-card'],
+      [1, 'model-card__header'],
+      [1, 'model-card__name'],
+      [1, 'badge', 'badge--running'],
+      [1, 'model-card__info'],
+      [1, 'model-card__meta'],
+      [1, 'badge', 'badge--tools'],
+      [1, 'badge', 'badge--vision'],
+      [1, 'model-card__actions'],
+      [1, 'btn', 'btn--danger', 'btn--sm', 3, 'click', 'disabled'],
+      [1, 'library-controls'],
+      ['type', 'text', 'placeholder', 'Search models...', 1, 'search-input', 3, 'input', 'value'],
+      [1, 'category-filters'],
+      [1, 'filter-chip', 3, 'filter-chip--active'],
+      [1, 'filter-chip', 3, 'click'],
+      [1, 'model-card', 3, 'model-card--installed'],
+      [1, 'badge', 'badge--size'],
+      [1, 'model-card__desc'],
+      [1, 'badge', 'badge--cap'],
+      [1, 'installed-label'],
+      [1, 'pulling-label'],
+      [1, 'btn', 'btn--primary', 'btn--sm', 3, 'disabled'],
+      [1, 'btn', 'btn--primary', 'btn--sm', 3, 'click', 'disabled'],
+      [1, 'model-card__details'],
+      [1, 'detail'],
+      [1, 'model-card__id'],
+    ],
+    template: (t, i) => {
+      if (t & 1) {
+        const d = w();
+        a(0, 'div', 1)(1, 'div', 2)(2, 'h2'),
+          l(3, 'Models'),
+          o(),
+          a(4, 'div', 3)(5, 'button', 4),
+          v('click', () => (b(d), f(i.refresh()))),
+          l(6, ' Refresh '),
+          o()()(),
+          a(7, 'div', 5),
+          y(8, 'span', 6),
+          m(9, K, 5, 3, 'span')(10, G, 4, 0, 'span'),
+          o(),
+          m(11, te, 6, 0, 'section', 7),
+          a(12, 'div', 8)(13, 'button', 9),
+          v('click', () => (b(d), f(i.activeTab.set('installed')))),
+          l(14),
+          o(),
+          a(15, 'button', 9),
+          v('click', () => (b(d), f(i.switchToLibrary()))),
+          l(16, ' Library '),
+          o(),
+          a(17, 'button', 9),
+          v('click', () => (b(d), f(i.switchToOpenRouter()))),
+          l(18),
+          o()(),
+          m(19, ce, 3, 1),
+          m(20, xe, 8, 2),
+          m(21, we, 3, 1),
+          a(22, 'section', 10)(23, 'h3', 11),
+          l(24, 'Pull Custom Model'),
+          o(),
+          a(25, 'div', 12),
+          y(26, 'input', 13, 0),
+          a(28, 'button', 14),
+          v('click', () => {
+            b(d);
+            const D = L(27);
+            return i.pullModel(D.value), f((D.value = ''));
+          }),
+          l(29, ' Pull '),
+          o()()()();
+      }
+      t & 2 &&
+        (r(5),
+        C('disabled', i.loading()),
+        r(2),
+        x('status-banner--offline', !i.ollamaAvailable()),
+        r(),
+        x('status-dot--online', i.ollamaAvailable()),
+        r(),
+        p(i.ollamaAvailable() ? 9 : 10),
+        r(2),
+        p(i.activePulls().length > 0 ? 11 : -1),
+        r(2),
+        x('tab--active', i.activeTab() === 'installed'),
+        r(),
+        g(' Installed (', i.installedModels().length, ') '),
+        r(),
+        x('tab--active', i.activeTab() === 'library'),
+        r(2),
+        x('tab--active', i.activeTab() === 'openrouter'),
+        r(),
+        g(' OpenRouter (', i.openrouterModels().length, ') '),
+        r(),
+        p(i.activeTab() === 'installed' ? 19 : -1),
+        r(),
+        p(i.activeTab() === 'library' ? 20 : -1),
+        r(),
+        p(i.activeTab() === 'openrouter' ? 21 : -1),
+        r(7),
+        C('disabled', !i.ollamaAvailable()));
+    },
+    dependencies: [H, F, N],
+    styles: [
+      '.page[_ngcontent-%COMP%]{padding:1.5rem;max-width:960px}.page__header[_ngcontent-%COMP%]{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}.header__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem}.status-banner[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-radius:var(--radius-lg);background:var(--bg-surface);border:1px solid var(--border);font-size:.8rem;color:var(--text-secondary);margin-bottom:1.25rem}.status-banner--offline[_ngcontent-%COMP%]{border-color:#ff50504d}.status-banner[_ngcontent-%COMP%]   code[_ngcontent-%COMP%]{background:var(--bg-raised);padding:1px 6px;border-radius:var(--radius-sm);font-size:.75rem}.status-dot[_ngcontent-%COMP%]{width:8px;height:8px;border-radius:50%;background:#ff5050;flex-shrink:0}.status-dot--online[_ngcontent-%COMP%]{background:#00e676;box-shadow:0 0 6px #00e67666}.tabs[_ngcontent-%COMP%]{display:flex;gap:0;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}.tab[_ngcontent-%COMP%]{padding:.6rem 1.25rem;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:color .15s,border-color .15s}.tab[_ngcontent-%COMP%]:hover{color:var(--text-primary)}.tab--active[_ngcontent-%COMP%]{color:var(--accent-cyan);border-bottom-color:var(--accent-cyan)}.section[_ngcontent-%COMP%]{margin-bottom:1.5rem}.section__title[_ngcontent-%COMP%]{font-size:.8rem;font-weight:600;color:var(--accent-magenta);text-transform:uppercase;letter-spacing:.05em;margin:0 0 .75rem}.model-grid[_ngcontent-%COMP%]{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem}.model-card[_ngcontent-%COMP%]{padding:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color .2s}.model-card[_ngcontent-%COMP%]:hover{border-color:var(--accent-cyan)}.model-card--installed[_ngcontent-%COMP%]{opacity:.7}.model-card__header[_ngcontent-%COMP%]{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}.model-card__name[_ngcontent-%COMP%]{margin:0;font-size:.9rem;color:var(--text-primary);font-weight:600}.model-card__desc[_ngcontent-%COMP%]{margin:0 0 .5rem;font-size:.78rem;color:var(--text-secondary);line-height:1.4}.model-card__info[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.75rem}.model-card__meta[_ngcontent-%COMP%]{font-size:.72rem;color:var(--text-tertiary);background:var(--bg-raised);padding:2px 8px;border-radius:var(--radius-sm)}.model-card__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem;align-items:center}.pull-list[_ngcontent-%COMP%]{display:flex;flex-direction:column;gap:.5rem}.pull-card[_ngcontent-%COMP%]{padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--accent-cyan);border-radius:var(--radius-lg);box-shadow:0 0 8px #00e5ff0d}.pull-card__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}.pull-card__model[_ngcontent-%COMP%]{font-weight:600;font-size:.85rem;color:var(--text-primary)}.pull-card__status[_ngcontent-%COMP%]{font-size:.72rem;text-transform:uppercase;color:var(--accent-cyan);font-weight:600;letter-spacing:.05em}.pull-card__status--error[_ngcontent-%COMP%]{color:#ff5050}.pull-card__detail[_ngcontent-%COMP%]{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-tertiary);margin-top:.35rem}.pull-card__layer[_ngcontent-%COMP%]{font-size:.68rem;color:var(--text-tertiary);margin-top:.25rem;font-family:monospace}.pull-card__error[_ngcontent-%COMP%]{font-size:.78rem;color:#ff5050;margin-top:.35rem}.progress-bar[_ngcontent-%COMP%]{height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden}.progress-bar__fill[_ngcontent-%COMP%]{height:100%;background:var(--accent-cyan);border-radius:3px;transition:width .3s ease;box-shadow:0 0 6px #00e5ff4d}.progress-bar__fill--done[_ngcontent-%COMP%]{background:#00e676;box-shadow:0 0 6px #00e6764d}.badge[_ngcontent-%COMP%]{font-size:.62rem;padding:1px 6px;border-radius:var(--radius-sm);font-weight:600;border:1px solid;letter-spacing:.05em;text-transform:uppercase}.badge--running[_ngcontent-%COMP%]{background:#00e6761a;color:#00e676;border-color:#00e6764d}.badge--tools[_ngcontent-%COMP%]{background:var(--accent-cyan-dim);color:var(--accent-cyan);border-color:#00e5ff4d}.badge--vision[_ngcontent-%COMP%]{background:#ffaa001a;color:#fa0;border-color:#ffaa004d}.badge--size[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--text-secondary);border-color:var(--border)}.badge--cap[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--text-secondary);border-color:var(--border);font-size:.62rem}.library-controls[_ngcontent-%COMP%]{margin-bottom:1rem;display:flex;flex-direction:column;gap:.75rem}.search-input[_ngcontent-%COMP%]{padding:.5rem .75rem;border:1px solid var(--border-bright);border-radius:var(--radius);font-size:.85rem;font-family:inherit;background:var(--bg-input);color:var(--text-primary);width:100%}.search-input[_ngcontent-%COMP%]:focus{outline:none;border-color:var(--accent-cyan);box-shadow:var(--glow-cyan)}.category-filters[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem}.filter-chip[_ngcontent-%COMP%]{padding:.3rem .75rem;border-radius:999px;font-size:.72rem;font-weight:600;border:1px solid var(--border-bright);background:transparent;color:var(--text-secondary);cursor:pointer;font-family:inherit;text-transform:capitalize;transition:background .15s,border-color .15s,color .15s}.filter-chip[_ngcontent-%COMP%]:hover{border-color:var(--accent-cyan);color:var(--text-primary)}.filter-chip--active[_ngcontent-%COMP%]{background:var(--accent-cyan-dim);border-color:var(--accent-cyan);color:var(--accent-cyan)}.installed-label[_ngcontent-%COMP%]{font-size:.72rem;color:#00e676;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.pulling-label[_ngcontent-%COMP%]{font-size:.72rem;color:var(--accent-cyan);font-weight:600;text-transform:uppercase;letter-spacing:.05em}.manual-pull[_ngcontent-%COMP%]{margin-top:1.5rem}.manual-pull__form[_ngcontent-%COMP%]{display:flex;gap:.5rem}.manual-pull__form[_ngcontent-%COMP%]   .search-input[_ngcontent-%COMP%]{flex:1}.btn[_ngcontent-%COMP%]{padding:.5rem 1rem;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:background .15s,box-shadow .15s}.btn--primary[_ngcontent-%COMP%]{background:transparent;color:var(--accent-cyan);border-color:var(--accent-cyan)}.btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.btn--primary[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--secondary[_ngcontent-%COMP%]{background:transparent;color:var(--text-secondary);border-color:var(--border-bright)}.btn--secondary[_ngcontent-%COMP%]:hover{background:var(--bg-hover)}.btn--secondary[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--danger[_ngcontent-%COMP%]{background:transparent;color:#ff5050;border-color:#ff505066}.btn--danger[_ngcontent-%COMP%]:hover{background:#ff505014;box-shadow:0 0 8px #ff505026}.btn--danger[_ngcontent-%COMP%]:disabled{opacity:.3;cursor:not-allowed}.btn--sm[_ngcontent-%COMP%]{padding:.3rem .6rem;font-size:.7rem}.hint[_ngcontent-%COMP%]{color:var(--text-tertiary);font-size:.82rem}.empty-state[_ngcontent-%COMP%]{text-align:center;padding:2rem 1rem;color:var(--text-secondary)}.empty-state[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%]{color:var(--accent-cyan)}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { Q as ModelsComponent };

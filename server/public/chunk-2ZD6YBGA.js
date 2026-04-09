@@ -1,1 +1,595 @@
-import{a as V}from"./chunk-CZZRTCER.js";import{a as U}from"./chunk-CSQXEU3M.js";import{a as B,b as $,c as R,d as L,e as G,g as q,h as z,i as H,j as W,k as J,l as K,m as Q,p as X,q as Y,s as Z}from"./chunk-AF4UDQOX.js";import{a as D}from"./chunk-ZEJIPHXJ.js";import"./chunk-ZSTU6MUH.js";import{g as j}from"./chunk-G7DVZDMF.js";import"./chunk-GH246MXO.js";import{b as O}from"./chunk-D6WCRQHB.js";import"./chunk-GEI46CGR.js";import{Bb as v,Ka as k,Mb as I,Na as d,Ob as n,Pb as b,Qb as M,T as c,Y as S,Z as E,_a as N,hb as P,ib as C,ic as T,ja as _,jb as y,lb as w,mb as f,nb as g,ob as p,pb as o,q as x,qb as t,rb as m,vb as A,zb as u}from"./chunk-LF4EWAJA.js";var te=(a,i)=>i.type,oe=(a,i)=>i.id;function ne(a,i){a&1&&(o(0,"span",5),n(1,"Agent name is required."),t())}function ie(a,i){if(a&1&&(o(0,"option",11),n(1),t()),a&2){let e=i.$implicit;p("value",e.type),d(),b(e.name)}}function re(a,i){if(a&1&&(o(0,"option",11),n(1),t()),a&2){let e=i.$implicit;p("value",e),d(),b(e)}}function ae(a,i){a&1&&(o(0,"span",14),n(1,"Loading models..."),t())}function le(a,i){if(a&1){let e=A();o(0,"button",54),u("click",function(){let l,s=S(e).$implicit,h=v();return E((l=h.form.get("displayIcon"))==null?null:l.setValue(s))}),n(1),t()}if(a&2){let e,r,l=i.$implicit,s=v();I("icon-picker__option--active",((e=s.form.get("displayIcon"))==null?null:e.value)===l),P("aria-label","Select "+l+" as agent icon")("aria-pressed",((r=s.form.get("displayIcon"))==null?null:r.value)===l),d(),M(" ",l," ")}}function de(a,i){if(a&1){let e=A();o(0,"div",44)(1,"img",55),u("error",function(l){S(e);let s=v();return E(s.onAvatarError(l))}),t()()}if(a&2){let e,r=v();d(),p("src",(e=r.form.get("avatarUrl"))==null?null:e.value,k)}}function me(a,i){if(a&1&&(o(0,"option",50),n(1),t()),a&2){let e=i.$implicit;p("ngValue",e.id),d(),b(e.name)}}var ee=class a{fb=c(Y);agentService=c(V);projectService=c(D);apiService=c(O);router=c(j);notify=c(U);id=T(void 0);saving=_(!1);projects=_([]);providers=_([]);models=_([]);loadingModels=_(!1);form=this.fb.nonNullable.group({name:["",R.required],description:[""],provider:[""],model:[""],permissionMode:["default"],systemPrompt:[""],appendPrompt:[""],allowedTools:[""],disallowedTools:[""],maxBudgetUsd:[null],algochatEnabled:[!1],algochatAuto:[!1],defaultProjectId:[null],displayColor:[null],displayIcon:[null],avatarUrl:[null]});commonEmoji=["\u{1F916}","\u{1F47E}","\u{1F680}","\u2699\uFE0F","\u{1F9E0}","\u26A1","\u{1F525}","\u{1F4A1}","\u{1F3AF}","\u{1F6E1}\uFE0F","\u{1F50D}","\u{1F4BB}","\u{1F310}","\u2728","\u{1F9EA}","\u{1F426}"];async ngOnInit(){await this.projectService.loadProjects(),this.projects.set(this.projectService.projects());try{let e=await x(this.apiService.get("/providers"));this.providers.set(e)}catch{}let i=this.id();if(i){let e=await this.agentService.getAgent(i);this.form.patchValue({name:e.name,description:e.description,provider:e.provider??"",model:e.model,permissionMode:e.permissionMode,systemPrompt:e.systemPrompt,appendPrompt:e.appendPrompt,allowedTools:e.allowedTools,disallowedTools:e.disallowedTools,maxBudgetUsd:e.maxBudgetUsd,algochatEnabled:e.algochatEnabled,algochatAuto:e.algochatAuto,defaultProjectId:e.defaultProjectId,displayColor:e.displayColor,displayIcon:e.displayIcon,avatarUrl:e.avatarUrl}),await this.loadModelsForProvider(e.provider??"")}else await this.loadModelsForProvider("")}async onProviderChange(){let i=this.form.get("provider")?.value??"";this.form.get("model")?.setValue(""),await this.loadModelsForProvider(i)}async loadModelsForProvider(i){if(!i){let e=this.providers(),r=e.find(l=>l.type==="anthropic")??e[0];this.models.set(r?.models??[]);return}this.loadingModels.set(!0);try{let e=await x(this.apiService.get(`/providers/${i}/models`));this.models.set(e.models)}catch{let e=this.providers().find(r=>r.type===i);this.models.set(e?.models??[])}finally{this.loadingModels.set(!1)}}async onSubmit(){if(!this.form.invalid){this.saving.set(!0);try{let i=this.form.getRawValue(),e=this.id();if(e)await this.agentService.updateAgent(e,i),this.notify.success("Agent updated"),this.router.navigate(["/agents",e]);else{let r=await this.agentService.createAgent(i);this.notify.success(`Agent '${i.name}' created successfully`),this.router.navigate(["/agents",r.id])}}catch(i){this.notify.error("Failed to save agent",String(i))}finally{this.saving.set(!1)}}}onCancel(){this.router.navigate(["/agents"])}clearColor(){this.form.get("displayColor")?.setValue(null)}onAvatarError(i){i.target.style.display="none"}static \u0275fac=function(e){return new(e||a)};static \u0275cmp=N({type:a,selectors:[["app-agent-form"]],inputs:{id:[1,"id"]},decls:107,vars:10,consts:[[1,"page"],[1,"form",3,"ngSubmit","formGroup"],[1,"form__field"],["for","name",1,"form__label"],["id","name","formControlName","name",1,"form__input"],["id","name-error","role","alert",1,"form__error"],["for","description",1,"form__label"],["id","description","formControlName","description","rows","3",1,"form__input","form__textarea"],["for","provider",1,"form__label"],["id","provider","formControlName","provider",1,"form__input",3,"change"],["value",""],[3,"value"],["for","model",1,"form__label"],["id","model","formControlName","model",1,"form__input"],[1,"form__hint"],["for","permissionMode",1,"form__label"],["id","permissionMode","formControlName","permissionMode",1,"form__input"],["value","default"],["value","plan"],["value","auto-edit"],["value","full-auto"],["for","systemPrompt",1,"form__label"],["id","systemPrompt","formControlName","systemPrompt","rows","8","placeholder","Custom system instructions...",1,"form__input","form__textarea"],["for","appendPrompt",1,"form__label"],["id","appendPrompt","formControlName","appendPrompt","rows","6","placeholder","Appended to the system prompt...",1,"form__input","form__textarea"],["for","allowedTools",1,"form__label"],["id","allowedTools","formControlName","allowedTools","placeholder","Read, Write, Bash, ...",1,"form__input"],["for","disallowedTools",1,"form__label"],["id","disallowedTools","formControlName","disallowedTools",1,"form__input"],["for","maxBudgetUsd",1,"form__label"],["id","maxBudgetUsd","formControlName","maxBudgetUsd","type","number","step","0.01","placeholder","Leave empty for unlimited",1,"form__input"],[1,"form__fieldset"],[1,"form__legend"],["for","displayColor",1,"form__label"],[1,"color-picker"],["id","displayColor","formControlName","displayColor","type","color",1,"color-picker__input",3,"value"],["formControlName","displayColor","placeholder","#00e5ff","maxlength","7","aria-label","Hex color value",1,"form__input","color-picker__hex"],["type","button","aria-label","Reset to auto-generated color",1,"btn","btn--secondary","btn--sm",3,"click"],["for","displayIcon",1,"form__label"],[1,"icon-picker"],["type","button",1,"icon-picker__option",3,"icon-picker__option--active"],["id","displayIcon","formControlName","displayIcon","placeholder","Custom...","maxlength","32","aria-label","Custom icon or emoji",1,"form__input","icon-picker__custom"],["for","avatarUrl",1,"form__label"],["id","avatarUrl","formControlName","avatarUrl","placeholder","https://example.com/avatar.png","type","url",1,"form__input"],[1,"avatar-preview"],[1,"form__checkbox"],["type","checkbox","formControlName","algochatEnabled"],["type","checkbox","formControlName","algochatAuto"],["for","defaultProjectId",1,"form__label"],["id","defaultProjectId","formControlName","defaultProjectId",1,"form__input"],[3,"ngValue"],[1,"form__actions"],["type","submit",1,"btn","btn--primary",3,"disabled"],["type","button",1,"btn","btn--secondary",3,"click"],["type","button",1,"icon-picker__option",3,"click"],["alt","Avatar preview",1,"avatar-preview__img",3,"error","src"]],template:function(e,r){if(e&1&&(o(0,"div",0)(1,"h2"),n(2),t(),o(3,"form",1),u("ngSubmit",function(){return r.onSubmit()}),o(4,"div",2)(5,"label",3),n(6,"Name"),t(),m(7,"input",4),C(8,ne,2,0,"span",5),t(),o(9,"div",2)(10,"label",6),n(11,"Description"),t(),m(12,"textarea",7),t(),o(13,"div",2)(14,"label",8),n(15,"Provider"),t(),o(16,"select",9),u("change",function(){return r.onProviderChange()}),o(17,"option",10),n(18,"Default (Anthropic)"),t(),f(19,ie,2,2,"option",11,te),t()(),o(21,"div",2)(22,"label",12),n(23,"Model"),t(),o(24,"select",13)(25,"option",10),n(26,"Default"),t(),f(27,re,2,2,"option",11,w),t(),C(29,ae,2,0,"span",14),t(),o(30,"div",2)(31,"label",15),n(32,"Permission Mode"),t(),o(33,"select",16)(34,"option",17),n(35,"Default"),t(),o(36,"option",18),n(37,"Plan"),t(),o(38,"option",19),n(39,"Auto Edit"),t(),o(40,"option",20),n(41,"Full Auto"),t()()(),o(42,"div",2)(43,"label",21),n(44,"System Prompt"),t(),m(45,"textarea",22),t(),o(46,"div",2)(47,"label",23),n(48,"Append Prompt"),t(),m(49,"textarea",24),t(),o(50,"div",2)(51,"label",25),n(52,"Allowed Tools (comma-separated)"),t(),m(53,"input",26),t(),o(54,"div",2)(55,"label",27),n(56,"Disallowed Tools (comma-separated)"),t(),m(57,"input",28),t(),o(58,"div",2)(59,"label",29),n(60,"Max Budget (USD)"),t(),m(61,"input",30),t(),o(62,"fieldset",31)(63,"legend",32),n(64,"Appearance"),t(),o(65,"div",2)(66,"label",33),n(67,"Accent Color"),t(),o(68,"div",34),m(69,"input",35)(70,"input",36),o(71,"button",37),u("click",function(){return r.clearColor()}),n(72,"Reset"),t()()(),o(73,"div",2)(74,"label",38),n(75,"Icon / Emoji"),t(),o(76,"div",39),f(77,le,2,5,"button",40,w),m(79,"input",41),t()(),o(80,"div",2)(81,"label",42),n(82,"Avatar URL"),t(),m(83,"input",43),C(84,de,2,1,"div",44),t()(),o(85,"fieldset",31)(86,"legend",32),n(87,"AlgoChat"),t(),o(88,"label",45),m(89,"input",46),n(90," Enable AlgoChat for this agent "),t(),o(91,"label",45),m(92,"input",47),n(93," Auto-respond to incoming messages "),t()(),o(94,"div",2)(95,"label",48),n(96,"Default Project"),t(),o(97,"select",49)(98,"option",50),n(99,"None (use global default)"),t(),f(100,me,2,2,"option",50,oe),t()(),o(102,"div",51)(103,"button",52),n(104),t(),o(105,"button",53),u("click",function(){return r.onCancel()}),n(106,"Cancel"),t()()()()),e&2){let l,s,h,F;d(2),b(r.id()?"Edit Agent":"New Agent"),d(),p("formGroup",r.form),d(4),P("aria-describedby",(l=r.form.get("name"))!=null&&l.invalid&&((l=r.form.get("name"))!=null&&l.touched)?"name-error":null),d(),y((s=r.form.get("name"))!=null&&s.hasError("required")&&((s=r.form.get("name"))!=null&&s.touched)?8:-1),d(11),g(r.providers()),d(8),g(r.models()),d(2),y(r.loadingModels()?29:-1),d(40),p("value",((h=r.form.get("displayColor"))==null?null:h.value)||"#00e5ff"),d(8),g(r.commonEmoji),d(7),y((F=r.form.get("avatarUrl"))!=null&&F.value?84:-1),d(14),p("ngValue",null),d(2),g(r.projects()),d(3),p("disabled",r.form.invalid||r.saving()),d(),M(" ",r.saving()?"Saving...":"Save"," ")}},dependencies:[Z,q,K,Q,$,z,B,J,L,G,X,W,H],styles:[".page[_ngcontent-%COMP%]{padding:1.5rem;max-width:640px}.page[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0 0 1.5rem;color:var(--text-primary)}.form__textarea[_ngcontent-%COMP%]{min-height:5em;line-height:1.5}.form__hint[_ngcontent-%COMP%]{font-style:italic}.form__fieldset[_ngcontent-%COMP%]{background:var(--bg-surface)}.form__legend[_ngcontent-%COMP%]{color:var(--accent-magenta)}.form__checkbox[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%]{accent-color:var(--accent-cyan)}.color-picker[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.5rem}.color-picker__input[_ngcontent-%COMP%]{width:44px;height:44px;padding:2px;border:1px solid var(--border-bright);border-radius:var(--radius);background:var(--bg-input);cursor:pointer}.color-picker__input[_ngcontent-%COMP%]::-webkit-color-swatch-wrapper{padding:2px}.color-picker__input[_ngcontent-%COMP%]::-webkit-color-swatch{border-radius:3px;border:none}.color-picker__hex[_ngcontent-%COMP%]{width:100px;font-family:Courier New,monospace}.icon-picker[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}.icon-picker__option[_ngcontent-%COMP%]{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);cursor:pointer;transition:all .15s}.icon-picker__option[_ngcontent-%COMP%]:hover{border-color:var(--border-bright);background:var(--bg-hover)}.icon-picker__option--active[_ngcontent-%COMP%]{border-color:var(--accent-cyan);background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.icon-picker__option[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:2px}.icon-picker__custom[_ngcontent-%COMP%]{width:100px}.avatar-preview[_ngcontent-%COMP%]{margin-top:.5rem}.avatar-preview__img[_ngcontent-%COMP%]{width:64px;height:64px;border-radius:var(--radius);border:1px solid var(--border-bright);object-fit:cover}"],changeDetection:0})};export{ee as AgentFormComponent};
+import {
+  b as $,
+  a as B,
+  e as G,
+  i as H,
+  k as J,
+  l as K,
+  d as L,
+  m as Q,
+  g as q,
+  c as R,
+  j as W,
+  p as X,
+  q as Y,
+  s as Z,
+  h as z,
+} from './chunk-AF4UDQOX.js';
+import { a as U } from './chunk-CSQXEU3M.js';
+import { a as V } from './chunk-CZZRTCER.js';
+import { a as D } from './chunk-ZEJIPHXJ.js';
+import './chunk-ZSTU6MUH.js';
+import { g as j } from './chunk-G7DVZDMF.js';
+import './chunk-GH246MXO.js';
+import { b as O } from './chunk-D6WCRQHB.js';
+import './chunk-GEI46CGR.js';
+import {
+  ja as _,
+  vb as A,
+  Pb as b,
+  ib as C,
+  T as c,
+  Na as d,
+  Z as E,
+  mb as f,
+  nb as g,
+  Mb as I,
+  Ka as k,
+  Qb as M,
+  rb as m,
+  _a as N,
+  Ob as n,
+  pb as o,
+  hb as P,
+  ob as p,
+  Y as S,
+  ic as T,
+  qb as t,
+  zb as u,
+  Bb as v,
+  lb as w,
+  q as x,
+  jb as y,
+} from './chunk-LF4EWAJA.js';
+
+var te = (_a, i) => i.type,
+  oe = (_a, i) => i.id;
+function ne(a, _i) {
+  a & 1 && (o(0, 'span', 5), n(1, 'Agent name is required.'), t());
+}
+function ie(a, i) {
+  if ((a & 1 && (o(0, 'option', 11), n(1), t()), a & 2)) {
+    const e = i.$implicit;
+    p('value', e.type), d(), b(e.name);
+  }
+}
+function re(a, i) {
+  if ((a & 1 && (o(0, 'option', 11), n(1), t()), a & 2)) {
+    const e = i.$implicit;
+    p('value', e), d(), b(e);
+  }
+}
+function ae(a, _i) {
+  a & 1 && (o(0, 'span', 14), n(1, 'Loading models...'), t());
+}
+function le(a, i) {
+  if (a & 1) {
+    const e = A();
+    o(0, 'button', 54),
+      u('click', () => {
+        let l,
+          s = S(e).$implicit,
+          h = v();
+        return E((l = h.form.get('displayIcon')) == null ? null : l.setValue(s));
+      }),
+      n(1),
+      t();
+  }
+  if (a & 2) {
+    let e,
+      r,
+      l = i.$implicit,
+      s = v();
+    I('icon-picker__option--active', ((e = s.form.get('displayIcon')) == null ? null : e.value) === l),
+      P('aria-label', `Select ${l} as agent icon`)(
+        'aria-pressed',
+        ((r = s.form.get('displayIcon')) == null ? null : r.value) === l,
+      ),
+      d(),
+      M(' ', l, ' ');
+  }
+}
+function de(a, _i) {
+  if (a & 1) {
+    const e = A();
+    o(0, 'div', 44)(1, 'img', 55),
+      u('error', (l) => {
+        S(e);
+        const s = v();
+        return E(s.onAvatarError(l));
+      }),
+      t()();
+  }
+  if (a & 2) {
+    let e,
+      r = v();
+    d(), p('src', (e = r.form.get('avatarUrl')) == null ? null : e.value, k);
+  }
+}
+function me(a, i) {
+  if ((a & 1 && (o(0, 'option', 50), n(1), t()), a & 2)) {
+    const e = i.$implicit;
+    p('ngValue', e.id), d(), b(e.name);
+  }
+}
+var ee = class a {
+  fb = c(Y);
+  agentService = c(V);
+  projectService = c(D);
+  apiService = c(O);
+  router = c(j);
+  notify = c(U);
+  id = T(void 0);
+  saving = _(!1);
+  projects = _([]);
+  providers = _([]);
+  models = _([]);
+  loadingModels = _(!1);
+  form = this.fb.nonNullable.group({
+    name: ['', R.required],
+    description: [''],
+    provider: [''],
+    model: [''],
+    permissionMode: ['default'],
+    systemPrompt: [''],
+    appendPrompt: [''],
+    allowedTools: [''],
+    disallowedTools: [''],
+    maxBudgetUsd: [null],
+    algochatEnabled: [!1],
+    algochatAuto: [!1],
+    defaultProjectId: [null],
+    displayColor: [null],
+    displayIcon: [null],
+    avatarUrl: [null],
+  });
+  commonEmoji = [
+    '\u{1F916}',
+    '\u{1F47E}',
+    '\u{1F680}',
+    '\u2699\uFE0F',
+    '\u{1F9E0}',
+    '\u26A1',
+    '\u{1F525}',
+    '\u{1F4A1}',
+    '\u{1F3AF}',
+    '\u{1F6E1}\uFE0F',
+    '\u{1F50D}',
+    '\u{1F4BB}',
+    '\u{1F310}',
+    '\u2728',
+    '\u{1F9EA}',
+    '\u{1F426}',
+  ];
+  async ngOnInit() {
+    await this.projectService.loadProjects(), this.projects.set(this.projectService.projects());
+    try {
+      const e = await x(this.apiService.get('/providers'));
+      this.providers.set(e);
+    } catch {}
+    const i = this.id();
+    if (i) {
+      const e = await this.agentService.getAgent(i);
+      this.form.patchValue({
+        name: e.name,
+        description: e.description,
+        provider: e.provider ?? '',
+        model: e.model,
+        permissionMode: e.permissionMode,
+        systemPrompt: e.systemPrompt,
+        appendPrompt: e.appendPrompt,
+        allowedTools: e.allowedTools,
+        disallowedTools: e.disallowedTools,
+        maxBudgetUsd: e.maxBudgetUsd,
+        algochatEnabled: e.algochatEnabled,
+        algochatAuto: e.algochatAuto,
+        defaultProjectId: e.defaultProjectId,
+        displayColor: e.displayColor,
+        displayIcon: e.displayIcon,
+        avatarUrl: e.avatarUrl,
+      }),
+        await this.loadModelsForProvider(e.provider ?? '');
+    } else await this.loadModelsForProvider('');
+  }
+  async onProviderChange() {
+    const i = this.form.get('provider')?.value ?? '';
+    this.form.get('model')?.setValue(''), await this.loadModelsForProvider(i);
+  }
+  async loadModelsForProvider(i) {
+    if (!i) {
+      const e = this.providers(),
+        r = e.find((l) => l.type === 'anthropic') ?? e[0];
+      this.models.set(r?.models ?? []);
+      return;
+    }
+    this.loadingModels.set(!0);
+    try {
+      const e = await x(this.apiService.get(`/providers/${i}/models`));
+      this.models.set(e.models);
+    } catch {
+      const e = this.providers().find((r) => r.type === i);
+      this.models.set(e?.models ?? []);
+    } finally {
+      this.loadingModels.set(!1);
+    }
+  }
+  async onSubmit() {
+    if (!this.form.invalid) {
+      this.saving.set(!0);
+      try {
+        const i = this.form.getRawValue(),
+          e = this.id();
+        if (e)
+          await this.agentService.updateAgent(e, i),
+            this.notify.success('Agent updated'),
+            this.router.navigate(['/agents', e]);
+        else {
+          const r = await this.agentService.createAgent(i);
+          this.notify.success(`Agent '${i.name}' created successfully`), this.router.navigate(['/agents', r.id]);
+        }
+      } catch (i) {
+        this.notify.error('Failed to save agent', String(i));
+      } finally {
+        this.saving.set(!1);
+      }
+    }
+  }
+  onCancel() {
+    this.router.navigate(['/agents']);
+  }
+  clearColor() {
+    this.form.get('displayColor')?.setValue(null);
+  }
+  onAvatarError(i) {
+    i.target.style.display = 'none';
+  }
+  static \u0275fac = (e) => new (e || a)();
+  static \u0275cmp = N({
+    type: a,
+    selectors: [['app-agent-form']],
+    inputs: { id: [1, 'id'] },
+    decls: 107,
+    vars: 10,
+    consts: [
+      [1, 'page'],
+      [1, 'form', 3, 'ngSubmit', 'formGroup'],
+      [1, 'form__field'],
+      ['for', 'name', 1, 'form__label'],
+      ['id', 'name', 'formControlName', 'name', 1, 'form__input'],
+      ['id', 'name-error', 'role', 'alert', 1, 'form__error'],
+      ['for', 'description', 1, 'form__label'],
+      ['id', 'description', 'formControlName', 'description', 'rows', '3', 1, 'form__input', 'form__textarea'],
+      ['for', 'provider', 1, 'form__label'],
+      ['id', 'provider', 'formControlName', 'provider', 1, 'form__input', 3, 'change'],
+      ['value', ''],
+      [3, 'value'],
+      ['for', 'model', 1, 'form__label'],
+      ['id', 'model', 'formControlName', 'model', 1, 'form__input'],
+      [1, 'form__hint'],
+      ['for', 'permissionMode', 1, 'form__label'],
+      ['id', 'permissionMode', 'formControlName', 'permissionMode', 1, 'form__input'],
+      ['value', 'default'],
+      ['value', 'plan'],
+      ['value', 'auto-edit'],
+      ['value', 'full-auto'],
+      ['for', 'systemPrompt', 1, 'form__label'],
+      [
+        'id',
+        'systemPrompt',
+        'formControlName',
+        'systemPrompt',
+        'rows',
+        '8',
+        'placeholder',
+        'Custom system instructions...',
+        1,
+        'form__input',
+        'form__textarea',
+      ],
+      ['for', 'appendPrompt', 1, 'form__label'],
+      [
+        'id',
+        'appendPrompt',
+        'formControlName',
+        'appendPrompt',
+        'rows',
+        '6',
+        'placeholder',
+        'Appended to the system prompt...',
+        1,
+        'form__input',
+        'form__textarea',
+      ],
+      ['for', 'allowedTools', 1, 'form__label'],
+      [
+        'id',
+        'allowedTools',
+        'formControlName',
+        'allowedTools',
+        'placeholder',
+        'Read, Write, Bash, ...',
+        1,
+        'form__input',
+      ],
+      ['for', 'disallowedTools', 1, 'form__label'],
+      ['id', 'disallowedTools', 'formControlName', 'disallowedTools', 1, 'form__input'],
+      ['for', 'maxBudgetUsd', 1, 'form__label'],
+      [
+        'id',
+        'maxBudgetUsd',
+        'formControlName',
+        'maxBudgetUsd',
+        'type',
+        'number',
+        'step',
+        '0.01',
+        'placeholder',
+        'Leave empty for unlimited',
+        1,
+        'form__input',
+      ],
+      [1, 'form__fieldset'],
+      [1, 'form__legend'],
+      ['for', 'displayColor', 1, 'form__label'],
+      [1, 'color-picker'],
+      ['id', 'displayColor', 'formControlName', 'displayColor', 'type', 'color', 1, 'color-picker__input', 3, 'value'],
+      [
+        'formControlName',
+        'displayColor',
+        'placeholder',
+        '#00e5ff',
+        'maxlength',
+        '7',
+        'aria-label',
+        'Hex color value',
+        1,
+        'form__input',
+        'color-picker__hex',
+      ],
+      [
+        'type',
+        'button',
+        'aria-label',
+        'Reset to auto-generated color',
+        1,
+        'btn',
+        'btn--secondary',
+        'btn--sm',
+        3,
+        'click',
+      ],
+      ['for', 'displayIcon', 1, 'form__label'],
+      [1, 'icon-picker'],
+      ['type', 'button', 1, 'icon-picker__option', 3, 'icon-picker__option--active'],
+      [
+        'id',
+        'displayIcon',
+        'formControlName',
+        'displayIcon',
+        'placeholder',
+        'Custom...',
+        'maxlength',
+        '32',
+        'aria-label',
+        'Custom icon or emoji',
+        1,
+        'form__input',
+        'icon-picker__custom',
+      ],
+      ['for', 'avatarUrl', 1, 'form__label'],
+      [
+        'id',
+        'avatarUrl',
+        'formControlName',
+        'avatarUrl',
+        'placeholder',
+        'https://example.com/avatar.png',
+        'type',
+        'url',
+        1,
+        'form__input',
+      ],
+      [1, 'avatar-preview'],
+      [1, 'form__checkbox'],
+      ['type', 'checkbox', 'formControlName', 'algochatEnabled'],
+      ['type', 'checkbox', 'formControlName', 'algochatAuto'],
+      ['for', 'defaultProjectId', 1, 'form__label'],
+      ['id', 'defaultProjectId', 'formControlName', 'defaultProjectId', 1, 'form__input'],
+      [3, 'ngValue'],
+      [1, 'form__actions'],
+      ['type', 'submit', 1, 'btn', 'btn--primary', 3, 'disabled'],
+      ['type', 'button', 1, 'btn', 'btn--secondary', 3, 'click'],
+      ['type', 'button', 1, 'icon-picker__option', 3, 'click'],
+      ['alt', 'Avatar preview', 1, 'avatar-preview__img', 3, 'error', 'src'],
+    ],
+    template: (e, r) => {
+      if (
+        (e & 1 &&
+          (o(0, 'div', 0)(1, 'h2'),
+          n(2),
+          t(),
+          o(3, 'form', 1),
+          u('ngSubmit', () => r.onSubmit()),
+          o(4, 'div', 2)(5, 'label', 3),
+          n(6, 'Name'),
+          t(),
+          m(7, 'input', 4),
+          C(8, ne, 2, 0, 'span', 5),
+          t(),
+          o(9, 'div', 2)(10, 'label', 6),
+          n(11, 'Description'),
+          t(),
+          m(12, 'textarea', 7),
+          t(),
+          o(13, 'div', 2)(14, 'label', 8),
+          n(15, 'Provider'),
+          t(),
+          o(16, 'select', 9),
+          u('change', () => r.onProviderChange()),
+          o(17, 'option', 10),
+          n(18, 'Default (Anthropic)'),
+          t(),
+          f(19, ie, 2, 2, 'option', 11, te),
+          t()(),
+          o(21, 'div', 2)(22, 'label', 12),
+          n(23, 'Model'),
+          t(),
+          o(24, 'select', 13)(25, 'option', 10),
+          n(26, 'Default'),
+          t(),
+          f(27, re, 2, 2, 'option', 11, w),
+          t(),
+          C(29, ae, 2, 0, 'span', 14),
+          t(),
+          o(30, 'div', 2)(31, 'label', 15),
+          n(32, 'Permission Mode'),
+          t(),
+          o(33, 'select', 16)(34, 'option', 17),
+          n(35, 'Default'),
+          t(),
+          o(36, 'option', 18),
+          n(37, 'Plan'),
+          t(),
+          o(38, 'option', 19),
+          n(39, 'Auto Edit'),
+          t(),
+          o(40, 'option', 20),
+          n(41, 'Full Auto'),
+          t()()(),
+          o(42, 'div', 2)(43, 'label', 21),
+          n(44, 'System Prompt'),
+          t(),
+          m(45, 'textarea', 22),
+          t(),
+          o(46, 'div', 2)(47, 'label', 23),
+          n(48, 'Append Prompt'),
+          t(),
+          m(49, 'textarea', 24),
+          t(),
+          o(50, 'div', 2)(51, 'label', 25),
+          n(52, 'Allowed Tools (comma-separated)'),
+          t(),
+          m(53, 'input', 26),
+          t(),
+          o(54, 'div', 2)(55, 'label', 27),
+          n(56, 'Disallowed Tools (comma-separated)'),
+          t(),
+          m(57, 'input', 28),
+          t(),
+          o(58, 'div', 2)(59, 'label', 29),
+          n(60, 'Max Budget (USD)'),
+          t(),
+          m(61, 'input', 30),
+          t(),
+          o(62, 'fieldset', 31)(63, 'legend', 32),
+          n(64, 'Appearance'),
+          t(),
+          o(65, 'div', 2)(66, 'label', 33),
+          n(67, 'Accent Color'),
+          t(),
+          o(68, 'div', 34),
+          m(69, 'input', 35)(70, 'input', 36),
+          o(71, 'button', 37),
+          u('click', () => r.clearColor()),
+          n(72, 'Reset'),
+          t()()(),
+          o(73, 'div', 2)(74, 'label', 38),
+          n(75, 'Icon / Emoji'),
+          t(),
+          o(76, 'div', 39),
+          f(77, le, 2, 5, 'button', 40, w),
+          m(79, 'input', 41),
+          t()(),
+          o(80, 'div', 2)(81, 'label', 42),
+          n(82, 'Avatar URL'),
+          t(),
+          m(83, 'input', 43),
+          C(84, de, 2, 1, 'div', 44),
+          t()(),
+          o(85, 'fieldset', 31)(86, 'legend', 32),
+          n(87, 'AlgoChat'),
+          t(),
+          o(88, 'label', 45),
+          m(89, 'input', 46),
+          n(90, ' Enable AlgoChat for this agent '),
+          t(),
+          o(91, 'label', 45),
+          m(92, 'input', 47),
+          n(93, ' Auto-respond to incoming messages '),
+          t()(),
+          o(94, 'div', 2)(95, 'label', 48),
+          n(96, 'Default Project'),
+          t(),
+          o(97, 'select', 49)(98, 'option', 50),
+          n(99, 'None (use global default)'),
+          t(),
+          f(100, me, 2, 2, 'option', 50, oe),
+          t()(),
+          o(102, 'div', 51)(103, 'button', 52),
+          n(104),
+          t(),
+          o(105, 'button', 53),
+          u('click', () => r.onCancel()),
+          n(106, 'Cancel'),
+          t()()()()),
+        e & 2)
+      ) {
+        let l, s, h, F;
+        d(2),
+          b(r.id() ? 'Edit Agent' : 'New Agent'),
+          d(),
+          p('formGroup', r.form),
+          d(4),
+          P(
+            'aria-describedby',
+            (l = r.form.get('name')) != null && l.invalid && (l = r.form.get('name')) != null && l.touched
+              ? 'name-error'
+              : null,
+          ),
+          d(),
+          y(
+            (s = r.form.get('name')) != null && s.hasError('required') && (s = r.form.get('name')) != null && s.touched
+              ? 8
+              : -1,
+          ),
+          d(11),
+          g(r.providers()),
+          d(8),
+          g(r.models()),
+          d(2),
+          y(r.loadingModels() ? 29 : -1),
+          d(40),
+          p('value', ((h = r.form.get('displayColor')) == null ? null : h.value) || '#00e5ff'),
+          d(8),
+          g(r.commonEmoji),
+          d(7),
+          y((F = r.form.get('avatarUrl')) != null && F.value ? 84 : -1),
+          d(14),
+          p('ngValue', null),
+          d(2),
+          g(r.projects()),
+          d(3),
+          p('disabled', r.form.invalid || r.saving()),
+          d(),
+          M(' ', r.saving() ? 'Saving...' : 'Save', ' ');
+      }
+    },
+    dependencies: [Z, q, K, Q, $, z, B, J, L, G, X, W, H],
+    styles: [
+      '.page[_ngcontent-%COMP%]{padding:1.5rem;max-width:640px}.page[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0 0 1.5rem;color:var(--text-primary)}.form__textarea[_ngcontent-%COMP%]{min-height:5em;line-height:1.5}.form__hint[_ngcontent-%COMP%]{font-style:italic}.form__fieldset[_ngcontent-%COMP%]{background:var(--bg-surface)}.form__legend[_ngcontent-%COMP%]{color:var(--accent-magenta)}.form__checkbox[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%]{accent-color:var(--accent-cyan)}.color-picker[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.5rem}.color-picker__input[_ngcontent-%COMP%]{width:44px;height:44px;padding:2px;border:1px solid var(--border-bright);border-radius:var(--radius);background:var(--bg-input);cursor:pointer}.color-picker__input[_ngcontent-%COMP%]::-webkit-color-swatch-wrapper{padding:2px}.color-picker__input[_ngcontent-%COMP%]::-webkit-color-swatch{border-radius:3px;border:none}.color-picker__hex[_ngcontent-%COMP%]{width:100px;font-family:Courier New,monospace}.icon-picker[_ngcontent-%COMP%]{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}.icon-picker__option[_ngcontent-%COMP%]{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);cursor:pointer;transition:all .15s}.icon-picker__option[_ngcontent-%COMP%]:hover{border-color:var(--border-bright);background:var(--bg-hover)}.icon-picker__option--active[_ngcontent-%COMP%]{border-color:var(--accent-cyan);background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.icon-picker__option[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:2px}.icon-picker__custom[_ngcontent-%COMP%]{width:100px}.avatar-preview[_ngcontent-%COMP%]{margin-top:.5rem}.avatar-preview__img[_ngcontent-%COMP%]{width:64px;height:64px;border-radius:var(--radius);border:1px solid var(--border-bright);object-fit:cover}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { ee as AgentFormComponent };

@@ -1,7 +1,7 @@
 /** Authentication, tenants, permissions, and allowlists. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS api_keys (
+  `CREATE TABLE IF NOT EXISTS api_keys (
         key_hash     TEXT PRIMARY KEY,
         tenant_id    TEXT NOT NULL,
         label        TEXT DEFAULT 'default',
@@ -10,13 +10,13 @@ export const tables: string[] = [
         created_at   TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS github_allowlist (
+  `CREATE TABLE IF NOT EXISTS github_allowlist (
         username   TEXT PRIMARY KEY,
         label      TEXT DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS permission_checks (
+  `CREATE TABLE IF NOT EXISTS permission_checks (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id   TEXT NOT NULL,
         tool_name  TEXT NOT NULL,
@@ -30,7 +30,7 @@ export const tables: string[] = [
         checked_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS permission_grants (
+  `CREATE TABLE IF NOT EXISTS permission_grants (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id   TEXT NOT NULL,
         action     TEXT NOT NULL,
@@ -44,7 +44,7 @@ export const tables: string[] = [
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS tenant_members (
+  `CREATE TABLE IF NOT EXISTS tenant_members (
         tenant_id  TEXT NOT NULL,
         key_hash   TEXT NOT NULL,
         role       TEXT NOT NULL DEFAULT 'viewer',
@@ -54,9 +54,9 @@ export const tables: string[] = [
         PRIMARY KEY (tenant_id, key_hash)
     )`,
 
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_members_email ON tenant_members(tenant_id, email) WHERE email IS NOT NULL`,
 
-    `CREATE TABLE IF NOT EXISTS tenants (
+  `CREATE TABLE IF NOT EXISTS tenants (
         id                      TEXT PRIMARY KEY,
         name                    TEXT NOT NULL,
         slug                    TEXT UNIQUE NOT NULL,
@@ -73,11 +73,11 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_agent ON permission_checks(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_action ON permission_grants(action)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_agent ON permission_grants(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_perm_grants_tenant ON permission_grants(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_agent ON permission_checks(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_action ON permission_grants(action)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_agent ON permission_grants(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_perm_grants_tenant ON permission_grants(tenant_id)`,
 ];

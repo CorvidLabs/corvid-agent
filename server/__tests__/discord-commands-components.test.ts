@@ -19,11 +19,9 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
 import { handleComponentInteraction } from '../discord/command-handlers/component-handlers';
-import { type InteractionContext, handleInteraction } from '../discord/commands';
+import { handleInteraction, type InteractionContext } from '../discord/commands';
 import type { DiscordBridgeConfig } from '../discord/types';
-import {
-  makeMockComponentInteraction,
-} from './helpers/mock-discord-interaction';
+import { makeMockComponentInteraction } from './helpers/mock-discord-interaction';
 
 let db: Database;
 const originalFetch = globalThis.fetch;

@@ -22,11 +22,9 @@ import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
 import { createBundle } from '../db/skill-bundles';
 import { clearAutocompleteCache, handleAutocomplete } from '../discord/command-handlers/autocomplete-handler';
-import { type InteractionContext, handleInteraction } from '../discord/commands';
+import { handleInteraction, type InteractionContext } from '../discord/commands';
 import type { DiscordBridgeConfig } from '../discord/types';
-import {
-  makeMockAutocompleteInteraction,
-} from './helpers/mock-discord-interaction';
+import { makeMockAutocompleteInteraction } from './helpers/mock-discord-interaction';
 
 let db: Database;
 const originalFetch = globalThis.fetch;

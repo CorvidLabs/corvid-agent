@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 088: Add missing display customization columns.
@@ -10,22 +10,22 @@ import { Database } from 'bun:sqlite';
  */
 
 function columnExists(db: Database, table: string, column: string): boolean {
-    const cols = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-    return cols.some((c) => c.name === column);
+  const cols = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return cols.some((c) => c.name === column);
 }
 
 export function up(db: Database): void {
-    if (!columnExists(db, 'agents', 'display_color')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN display_color TEXT DEFAULT NULL`);
-    }
-    if (!columnExists(db, 'agents', 'display_icon')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN display_icon TEXT DEFAULT NULL`);
-    }
-    if (!columnExists(db, 'agents', 'avatar_url')) {
-        db.exec(`ALTER TABLE agents ADD COLUMN avatar_url TEXT DEFAULT NULL`);
-    }
+  if (!columnExists(db, 'agents', 'display_color')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN display_color TEXT DEFAULT NULL`);
+  }
+  if (!columnExists(db, 'agents', 'display_icon')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN display_icon TEXT DEFAULT NULL`);
+  }
+  if (!columnExists(db, 'agents', 'avatar_url')) {
+    db.exec(`ALTER TABLE agents ADD COLUMN avatar_url TEXT DEFAULT NULL`);
+  }
 }
 
 export function down(_db: Database): void {
-    // Columns are nullable — safe to leave in place
+  // Columns are nullable — safe to leave in place
 }

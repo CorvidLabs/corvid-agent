@@ -1,17 +1,17 @@
-import type { ProcessManager } from '../../process/manager';
-import type { EventCallback } from '../../process/interfaces';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
-import { extractContentText } from '../../process/types';
 import { createLogger } from '../../lib/logger';
+import type { EventCallback } from '../../process/interfaces';
+import type { ProcessManager } from '../../process/manager';
+import { extractContentText } from '../../process/types';
 import {
+  agentColor,
+  buildAgentAuthor,
+  buildFooterText,
+  collapseCodeBlocks,
+  hexColorToInt,
   sendEmbed,
   sendReplyEmbed,
   sendTypingIndicator,
-  agentColor,
-  hexColorToInt,
-  collapseCodeBlocks,
-  buildFooterText,
-  buildAgentAuthor,
 } from '../embeds';
 import { visibleEmbedParts } from './utils';
 

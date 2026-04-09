@@ -8,20 +8,20 @@
  *
  * Test naming follows: [<provider-config>] buddy: <scenario>
  */
-import { describe, it, expect, afterEach, mock } from 'bun:test';
-import { FallbackManager } from '../providers/fallback';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { BuddyService } from '../buddy/service';
+import { FallbackManager } from '../providers/fallback';
 import type { LlmCompletionParams } from '../providers/types';
 import {
-    createProviderAgent,
-    createMockRegistry,
-    makeParams,
-    makeResult,
-    makeChain,
-    mockProviderResponse,
-    mockProviderFailure,
-    assertProviderUsed,
-    assertProviderNotUsed,
+  assertProviderNotUsed,
+  assertProviderUsed,
+  createMockRegistry,
+  createProviderAgent,
+  makeChain,
+  makeParams,
+  makeResult,
+  mockProviderFailure,
+  mockProviderResponse,
 } from './helpers/provider-matrix';
 
 // ─── isApproval wrapper ───────────────────────────────────────────────────────
@@ -29,351 +29,325 @@ import {
 // BuddyService.isApproval is private; access via bracket notation.
 const buddyService = new BuddyService({ db: {} as any, processManager: {} as any });
 function isApproval(text: string): boolean {
-    return (buddyService as any).isApproval(text);
+  return (buddyService as any).isApproval(text);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('buddy mixed-provider smoke tests', () => {
-    afterEach(() => {
-        mock.restore();
+  afterEach(() => {
+    mock.restore();
+  });
+
+  // ── [ollama] Ollama-only Buddy flow ──────────────────────────────────────
+
+  describe('[ollama] buddy: Ollama-only provider flow', () => {
+    it('primary Ollama provider completes successfully', async () => {
+      const ollamaPrimary = createProviderAgent(
+        'ollama',
+        'qwen3:14b',
+        mockProviderResponse('Here is the implementation.', 'qwen3:14b'),
+      );
+      const registry = createMockRegistry([ollamaPrimary]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
+      const result = await manager.completeWithFallback(makeParams(), chain);
+
+      expect(result.content).toBe('Here is the implementation.');
+      expect(result.usedProvider).toBe('ollama');
+      expect(result.usedModel).toBe('qwen3:14b');
+      assertProviderUsed(ollamaPrimary);
     });
 
-    // ── [ollama] Ollama-only Buddy flow ──────────────────────────────────────
+    it('buddy Ollama provider completes review', async () => {
+      const ollamaBuddy = createProviderAgent('ollama', 'llama3.1:8b', mockProviderResponse('LGTM.', 'llama3.1:8b'));
+      const registry = createMockRegistry([ollamaBuddy]);
+      const manager = new FallbackManager(registry);
 
-    describe('[ollama] buddy: Ollama-only provider flow', () => {
-        it('primary Ollama provider completes successfully', async () => {
-            const ollamaPrimary = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderResponse('Here is the implementation.', 'qwen3:14b'),
-            );
-            const registry = createMockRegistry([ollamaPrimary]);
-            const manager = new FallbackManager(registry);
+      const chain = makeChain({ provider: 'ollama', model: 'llama3.1:8b' });
+      const result = await manager.completeWithFallback(
+        makeParams({ messages: [{ role: 'user', content: 'Review this: const x = 1;' }] }),
+        chain,
+      );
 
-            const chain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
-            const result = await manager.completeWithFallback(makeParams(), chain);
-
-            expect(result.content).toBe('Here is the implementation.');
-            expect(result.usedProvider).toBe('ollama');
-            expect(result.usedModel).toBe('qwen3:14b');
-            assertProviderUsed(ollamaPrimary);
-        });
-
-        it('buddy Ollama provider completes review', async () => {
-            const ollamaBuddy = createProviderAgent(
-                'ollama',
-                'llama3.1:8b',
-                mockProviderResponse('LGTM.', 'llama3.1:8b'),
-            );
-            const registry = createMockRegistry([ollamaBuddy]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'ollama', model: 'llama3.1:8b' });
-            const result = await manager.completeWithFallback(
-                makeParams({ messages: [{ role: 'user', content: 'Review this: const x = 1;' }] }),
-                chain,
-            );
-
-            expect(result.content).toBe('LGTM.');
-            expect(result.usedProvider).toBe('ollama');
-            assertProviderUsed(ollamaBuddy);
-        });
-
-        it('approval detection works on Ollama-sourced review output', () => {
-            // Ollama produces a clean approval — isApproval should detect it
-            expect(isApproval('LGTM')).toBe(true);
-            expect(isApproval('Looks good to me!')).toBe(true);
-            expect(isApproval('Ship it!')).toBe(true);
-        });
-
-        it('approval detection correctly rejects Ollama feedback with caveats', () => {
-            // Ollama sometimes adds qualifiers — these must not be treated as approval
-            expect(isApproval('LGTM, however the error handling needs work.')).toBe(false);
-            expect(isApproval('Approved with reservations about the null check.')).toBe(false);
-        });
+      expect(result.content).toBe('LGTM.');
+      expect(result.usedProvider).toBe('ollama');
+      assertProviderUsed(ollamaBuddy);
     });
 
-    // ── [cursor] Cursor-only Buddy flow ──────────────────────────────────────
-
-    describe('[cursor] buddy: Cursor-only provider flow', () => {
-        it('primary Cursor provider completes successfully', async () => {
-            const cursorPrimary = createProviderAgent(
-                'cursor',
-                'cursor-fast',
-                mockProviderResponse('Implementation complete.', 'cursor-fast'),
-            );
-            const registry = createMockRegistry([cursorPrimary]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
-            const result = await manager.completeWithFallback(makeParams(), chain);
-
-            expect(result.content).toBe('Implementation complete.');
-            expect(result.usedProvider).toBe('cursor');
-            assertProviderUsed(cursorPrimary);
-        });
-
-        it('buddy Cursor provider completes review and approval is detected', async () => {
-            const cursorBuddy = createProviderAgent(
-                'cursor',
-                'cursor-fast',
-                mockProviderResponse('Approved.', 'cursor-fast'),
-            );
-            const registry = createMockRegistry([cursorBuddy]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
-            const result = await manager.completeWithFallback(
-                makeParams({ messages: [{ role: 'user', content: 'Review this PR' }] }),
-                chain,
-            );
-
-            expect(result.usedProvider).toBe('cursor');
-            expect(isApproval(result.content)).toBe(true);
-        });
-
-        it('no provider errors surface for a valid Cursor completion', async () => {
-            const cursorProvider = createProviderAgent(
-                'cursor',
-                'cursor-fast',
-                mockProviderResponse('No issues.', 'cursor-fast'),
-            );
-            const registry = createMockRegistry([cursorProvider]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
-            await expect(manager.completeWithFallback(makeParams(), chain)).resolves.toBeDefined();
-        });
+    it('approval detection works on Ollama-sourced review output', () => {
+      // Ollama produces a clean approval — isApproval should detect it
+      expect(isApproval('LGTM')).toBe(true);
+      expect(isApproval('Looks good to me!')).toBe(true);
+      expect(isApproval('Ship it!')).toBe(true);
     });
 
-    // ── [mixed:ollama+anthropic] Cross-provider buddy flow ───────────────────
+    it('approval detection correctly rejects Ollama feedback with caveats', () => {
+      // Ollama sometimes adds qualifiers — these must not be treated as approval
+      expect(isApproval('LGTM, however the error handling needs work.')).toBe(false);
+      expect(isApproval('Approved with reservations about the null check.')).toBe(false);
+    });
+  });
 
-    describe('[mixed:ollama+anthropic] buddy: cross-provider review handoff', () => {
-        it('primary Ollama produces work, Anthropic reviews — both succeed', async () => {
-            const ollamaPrimary = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderResponse('Here is the code change.', 'qwen3:14b'),
-            );
-            const anthropicBuddy = createProviderAgent(
-                'anthropic',
-                'claude-sonnet-4-6',
-                mockProviderResponse('LGTM', 'claude-sonnet-4-6'),
-            );
-            const registry = createMockRegistry([ollamaPrimary, anthropicBuddy]);
-            const manager = new FallbackManager(registry);
+  // ── [cursor] Cursor-only Buddy flow ──────────────────────────────────────
 
-            // Round 1: lead agent (Ollama) does the work
-            const leadChain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
-            const leadResult = await manager.completeWithFallback(makeParams(), leadChain);
-            expect(leadResult.usedProvider).toBe('ollama');
-            assertProviderUsed(ollamaPrimary);
+  describe('[cursor] buddy: Cursor-only provider flow', () => {
+    it('primary Cursor provider completes successfully', async () => {
+      const cursorPrimary = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('Implementation complete.', 'cursor-fast'),
+      );
+      const registry = createMockRegistry([cursorPrimary]);
+      const manager = new FallbackManager(registry);
 
-            // Round 2: buddy agent (Anthropic) reviews
-            const buddyChain = makeChain({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
-            const reviewResult = await manager.completeWithFallback(
-                makeParams({ messages: [{ role: 'user', content: leadResult.content }] }),
-                buddyChain,
-            );
-            expect(reviewResult.usedProvider).toBe('anthropic');
-            assertProviderUsed(anthropicBuddy);
+      const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
+      const result = await manager.completeWithFallback(makeParams(), chain);
 
-            // Approval detection works on Anthropic review output
-            expect(isApproval(reviewResult.content)).toBe(true);
-        });
-
-        it('providers are isolated — Ollama primary does NOT call Anthropic', async () => {
-            const ollamaPrimary = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderResponse('Done.', 'qwen3:14b'),
-            );
-            const anthropicBuddy = createProviderAgent(
-                'anthropic',
-                'claude-sonnet-4-6',
-                mockProviderResponse('LGTM', 'claude-sonnet-4-6'),
-            );
-            const registry = createMockRegistry([ollamaPrimary, anthropicBuddy]);
-            const manager = new FallbackManager(registry);
-
-            // Only run the lead chain — Anthropic should NOT be called
-            const leadChain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
-            await manager.completeWithFallback(makeParams(), leadChain);
-
-            assertProviderUsed(ollamaPrimary);
-            assertProviderNotUsed(anthropicBuddy);
-        });
-
-        it('synthesis does not collapse when providers differ', async () => {
-            const ollamaLeadOutput = 'Refactored the session manager to use a pool.';
-            const anthropicReviewOutput = 'Code review complete. LGTM.';
-
-            // Both providers succeed independently
-            expect(ollamaLeadOutput.length).toBeGreaterThan(0);
-            expect(anthropicReviewOutput.length).toBeGreaterThan(0);
-
-            // isApproval works on Anthropic review regardless of lead's provider
-            expect(isApproval(anthropicReviewOutput)).toBe(true);
-
-            // Non-approval feedback from buddy should NOT be collapsed
-            const nonApproval = 'The pool size should be configurable.';
-            expect(isApproval(nonApproval)).toBe(false);
-        });
+      expect(result.content).toBe('Implementation complete.');
+      expect(result.usedProvider).toBe('cursor');
+      assertProviderUsed(cursorPrimary);
     });
 
-    // ── [degraded:ollama-offline] Provider fallback during buddy review ───────
+    it('buddy Cursor provider completes review and approval is detected', async () => {
+      const cursorBuddy = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('Approved.', 'cursor-fast'),
+      );
+      const registry = createMockRegistry([cursorBuddy]);
+      const manager = new FallbackManager(registry);
 
-    describe('[degraded:ollama-offline] buddy: fallback when buddy provider fails', () => {
-        it('FallbackManager routes to next provider when Ollama returns error', async () => {
-            const ollamaFailing = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderFailure(new Error('ECONNREFUSED: Ollama not reachable')),
-            );
-            const anthropicFallback = createProviderAgent(
-                'anthropic',
-                'claude-haiku-4-5-20251001',
-                mockProviderResponse('Review complete. Approved.', 'claude-haiku-4-5-20251001'),
-            );
-            const registry = createMockRegistry([ollamaFailing, anthropicFallback]);
-            const manager = new FallbackManager(registry);
+      const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
+      const result = await manager.completeWithFallback(
+        makeParams({ messages: [{ role: 'user', content: 'Review this PR' }] }),
+        chain,
+      );
 
-            // Chain: try Ollama first, fall back to Anthropic
-            const chain = makeChain(
-                { provider: 'ollama', model: 'qwen3:14b' },
-                { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-            );
-
-            const result = await manager.completeWithFallback(makeParams(), chain);
-
-            // Fallback to Anthropic should have happened
-            expect(result.usedProvider).toBe('anthropic');
-            expect(result.content).toBe('Review complete. Approved.');
-            assertProviderUsed(ollamaFailing);
-            assertProviderUsed(anthropicFallback);
-        });
-
-        it('review still completes via fallback — approval detection is unaffected', async () => {
-            const ollamaFailing = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderFailure('connection refused'),
-            );
-            const cursorFallback = createProviderAgent(
-                'cursor',
-                'cursor-fast',
-                mockProviderResponse('LGTM. Ship it!', 'cursor-fast'),
-            );
-            const registry = createMockRegistry([ollamaFailing, cursorFallback]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain(
-                { provider: 'ollama', model: 'qwen3:14b' },
-                { provider: 'cursor', model: 'cursor-fast' },
-            );
-
-            const result = await manager.completeWithFallback(makeParams(), chain);
-            expect(result.usedProvider).toBe('cursor');
-
-            // Approval detection still works on the fallback provider's output
-            expect(isApproval(result.content)).toBe(true);
-        });
-
-        it('throws ExternalServiceError when ALL providers fail', async () => {
-            const ollamaFailing = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderFailure('ECONNREFUSED'),
-            );
-            const anthropicFailing = createProviderAgent(
-                'anthropic',
-                'claude-haiku-4-5-20251001',
-                mockProviderFailure('503 Service Unavailable'),
-            );
-            const registry = createMockRegistry([ollamaFailing, anthropicFailing]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain(
-                { provider: 'ollama', model: 'qwen3:14b' },
-                { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-            );
-
-            await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow(
-                'All providers in fallback chain failed',
-            );
-        });
-
-        it('Ollama marked unhealthy after repeated ECONNREFUSED failures', async () => {
-            const ollamaFailing = createProviderAgent(
-                'ollama',
-                'qwen3:14b',
-                mockProviderFailure('ECONNREFUSED'),
-            );
-            const registry = createMockRegistry([ollamaFailing]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
-
-            // Three consecutive failures are needed to trip the cooldown threshold
-            for (let i = 0; i < 3; i++) {
-                await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
-            }
-
-            // Provider should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
-            expect(manager.isProviderAvailable('ollama')).toBe(false);
-        });
-
-        it('Cursor marked unhealthy after 3 consecutive ECONNREFUSED failures', async () => {
-            const cursorFailing = createProviderAgent(
-                'cursor',
-                'auto',
-                mockProviderFailure('ECONNREFUSED: cursor-agent not reachable'),
-            );
-            const registry = createMockRegistry([cursorFailing]);
-            const manager = new FallbackManager(registry);
-
-            const chain = makeChain({ provider: 'cursor', model: 'auto' });
-
-            // Three consecutive transient failures trip the cooldown threshold
-            for (let i = 0; i < 3; i++) {
-                await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
-            }
-
-            // Cursor should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
-            expect(manager.isProviderAvailable('cursor')).toBe(false);
-        });
-
-        it('Cursor fallback chain: auto fails, composer-2-fast succeeds', async () => {
-            // The registry resolves providers by type, not model. A single cursor
-            // provider handles both chain entries — use a model-aware mock to
-            // simulate auto failing while composer-2-fast succeeds.
-            const completeCalls: string[] = [];
-            const modelAwareComplete = mock((params: LlmCompletionParams) => {
-                completeCalls.push(params.model);
-                if (params.model === 'auto') {
-                    return Promise.reject(new Error('timeout'));
-                }
-                return Promise.resolve(makeResult('Fallback complete.', params.model));
-            });
-            const cursorProvider = createProviderAgent('cursor', 'auto', modelAwareComplete);
-            const registry = createMockRegistry([cursorProvider]);
-            const manager = new FallbackManager(registry);
-
-            // DEFAULT_FALLBACK_CHAINS['cursor'] shape: auto → composer-2-fast
-            const chain = makeChain(
-                { provider: 'cursor', model: 'auto' },
-                { provider: 'cursor', model: 'composer-2-fast' },
-            );
-
-            const result = await manager.completeWithFallback(makeParams(), chain);
-
-            expect(result.usedProvider).toBe('cursor');
-            expect(result.usedModel).toBe('composer-2-fast');
-            expect(result.content).toBe('Fallback complete.');
-            // Both models were attempted
-            expect(completeCalls).toContain('auto');
-            expect(completeCalls).toContain('composer-2-fast');
-        });
+      expect(result.usedProvider).toBe('cursor');
+      expect(isApproval(result.content)).toBe(true);
     });
+
+    it('no provider errors surface for a valid Cursor completion', async () => {
+      const cursorProvider = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('No issues.', 'cursor-fast'),
+      );
+      const registry = createMockRegistry([cursorProvider]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain({ provider: 'cursor', model: 'cursor-fast' });
+      await expect(manager.completeWithFallback(makeParams(), chain)).resolves.toBeDefined();
+    });
+  });
+
+  // ── [mixed:ollama+anthropic] Cross-provider buddy flow ───────────────────
+
+  describe('[mixed:ollama+anthropic] buddy: cross-provider review handoff', () => {
+    it('primary Ollama produces work, Anthropic reviews — both succeed', async () => {
+      const ollamaPrimary = createProviderAgent(
+        'ollama',
+        'qwen3:14b',
+        mockProviderResponse('Here is the code change.', 'qwen3:14b'),
+      );
+      const anthropicBuddy = createProviderAgent(
+        'anthropic',
+        'claude-sonnet-4-6',
+        mockProviderResponse('LGTM', 'claude-sonnet-4-6'),
+      );
+      const registry = createMockRegistry([ollamaPrimary, anthropicBuddy]);
+      const manager = new FallbackManager(registry);
+
+      // Round 1: lead agent (Ollama) does the work
+      const leadChain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
+      const leadResult = await manager.completeWithFallback(makeParams(), leadChain);
+      expect(leadResult.usedProvider).toBe('ollama');
+      assertProviderUsed(ollamaPrimary);
+
+      // Round 2: buddy agent (Anthropic) reviews
+      const buddyChain = makeChain({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
+      const reviewResult = await manager.completeWithFallback(
+        makeParams({ messages: [{ role: 'user', content: leadResult.content }] }),
+        buddyChain,
+      );
+      expect(reviewResult.usedProvider).toBe('anthropic');
+      assertProviderUsed(anthropicBuddy);
+
+      // Approval detection works on Anthropic review output
+      expect(isApproval(reviewResult.content)).toBe(true);
+    });
+
+    it('providers are isolated — Ollama primary does NOT call Anthropic', async () => {
+      const ollamaPrimary = createProviderAgent('ollama', 'qwen3:14b', mockProviderResponse('Done.', 'qwen3:14b'));
+      const anthropicBuddy = createProviderAgent(
+        'anthropic',
+        'claude-sonnet-4-6',
+        mockProviderResponse('LGTM', 'claude-sonnet-4-6'),
+      );
+      const registry = createMockRegistry([ollamaPrimary, anthropicBuddy]);
+      const manager = new FallbackManager(registry);
+
+      // Only run the lead chain — Anthropic should NOT be called
+      const leadChain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
+      await manager.completeWithFallback(makeParams(), leadChain);
+
+      assertProviderUsed(ollamaPrimary);
+      assertProviderNotUsed(anthropicBuddy);
+    });
+
+    it('synthesis does not collapse when providers differ', async () => {
+      const ollamaLeadOutput = 'Refactored the session manager to use a pool.';
+      const anthropicReviewOutput = 'Code review complete. LGTM.';
+
+      // Both providers succeed independently
+      expect(ollamaLeadOutput.length).toBeGreaterThan(0);
+      expect(anthropicReviewOutput.length).toBeGreaterThan(0);
+
+      // isApproval works on Anthropic review regardless of lead's provider
+      expect(isApproval(anthropicReviewOutput)).toBe(true);
+
+      // Non-approval feedback from buddy should NOT be collapsed
+      const nonApproval = 'The pool size should be configurable.';
+      expect(isApproval(nonApproval)).toBe(false);
+    });
+  });
+
+  // ── [degraded:ollama-offline] Provider fallback during buddy review ───────
+
+  describe('[degraded:ollama-offline] buddy: fallback when buddy provider fails', () => {
+    it('FallbackManager routes to next provider when Ollama returns error', async () => {
+      const ollamaFailing = createProviderAgent(
+        'ollama',
+        'qwen3:14b',
+        mockProviderFailure(new Error('ECONNREFUSED: Ollama not reachable')),
+      );
+      const anthropicFallback = createProviderAgent(
+        'anthropic',
+        'claude-haiku-4-5-20251001',
+        mockProviderResponse('Review complete. Approved.', 'claude-haiku-4-5-20251001'),
+      );
+      const registry = createMockRegistry([ollamaFailing, anthropicFallback]);
+      const manager = new FallbackManager(registry);
+
+      // Chain: try Ollama first, fall back to Anthropic
+      const chain = makeChain(
+        { provider: 'ollama', model: 'qwen3:14b' },
+        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+      );
+
+      const result = await manager.completeWithFallback(makeParams(), chain);
+
+      // Fallback to Anthropic should have happened
+      expect(result.usedProvider).toBe('anthropic');
+      expect(result.content).toBe('Review complete. Approved.');
+      assertProviderUsed(ollamaFailing);
+      assertProviderUsed(anthropicFallback);
+    });
+
+    it('review still completes via fallback — approval detection is unaffected', async () => {
+      const ollamaFailing = createProviderAgent('ollama', 'qwen3:14b', mockProviderFailure('connection refused'));
+      const cursorFallback = createProviderAgent(
+        'cursor',
+        'cursor-fast',
+        mockProviderResponse('LGTM. Ship it!', 'cursor-fast'),
+      );
+      const registry = createMockRegistry([ollamaFailing, cursorFallback]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain({ provider: 'ollama', model: 'qwen3:14b' }, { provider: 'cursor', model: 'cursor-fast' });
+
+      const result = await manager.completeWithFallback(makeParams(), chain);
+      expect(result.usedProvider).toBe('cursor');
+
+      // Approval detection still works on the fallback provider's output
+      expect(isApproval(result.content)).toBe(true);
+    });
+
+    it('throws ExternalServiceError when ALL providers fail', async () => {
+      const ollamaFailing = createProviderAgent('ollama', 'qwen3:14b', mockProviderFailure('ECONNREFUSED'));
+      const anthropicFailing = createProviderAgent(
+        'anthropic',
+        'claude-haiku-4-5-20251001',
+        mockProviderFailure('503 Service Unavailable'),
+      );
+      const registry = createMockRegistry([ollamaFailing, anthropicFailing]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain(
+        { provider: 'ollama', model: 'qwen3:14b' },
+        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+      );
+
+      await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow(
+        'All providers in fallback chain failed',
+      );
+    });
+
+    it('Ollama marked unhealthy after repeated ECONNREFUSED failures', async () => {
+      const ollamaFailing = createProviderAgent('ollama', 'qwen3:14b', mockProviderFailure('ECONNREFUSED'));
+      const registry = createMockRegistry([ollamaFailing]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain({ provider: 'ollama', model: 'qwen3:14b' });
+
+      // Three consecutive failures are needed to trip the cooldown threshold
+      for (let i = 0; i < 3; i++) {
+        await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
+      }
+
+      // Provider should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
+      expect(manager.isProviderAvailable('ollama')).toBe(false);
+    });
+
+    it('Cursor marked unhealthy after 3 consecutive ECONNREFUSED failures', async () => {
+      const cursorFailing = createProviderAgent(
+        'cursor',
+        'auto',
+        mockProviderFailure('ECONNREFUSED: cursor-agent not reachable'),
+      );
+      const registry = createMockRegistry([cursorFailing]);
+      const manager = new FallbackManager(registry);
+
+      const chain = makeChain({ provider: 'cursor', model: 'auto' });
+
+      // Three consecutive transient failures trip the cooldown threshold
+      for (let i = 0; i < 3; i++) {
+        await expect(manager.completeWithFallback(makeParams(), chain)).rejects.toThrow();
+      }
+
+      // Cursor should now be in cooldown after MAX_CONSECUTIVE_FAILURES=3
+      expect(manager.isProviderAvailable('cursor')).toBe(false);
+    });
+
+    it('Cursor fallback chain: auto fails, composer-2-fast succeeds', async () => {
+      // The registry resolves providers by type, not model. A single cursor
+      // provider handles both chain entries — use a model-aware mock to
+      // simulate auto failing while composer-2-fast succeeds.
+      const completeCalls: string[] = [];
+      const modelAwareComplete = mock((params: LlmCompletionParams) => {
+        completeCalls.push(params.model);
+        if (params.model === 'auto') {
+          return Promise.reject(new Error('timeout'));
+        }
+        return Promise.resolve(makeResult('Fallback complete.', params.model));
+      });
+      const cursorProvider = createProviderAgent('cursor', 'auto', modelAwareComplete);
+      const registry = createMockRegistry([cursorProvider]);
+      const manager = new FallbackManager(registry);
+
+      // DEFAULT_FALLBACK_CHAINS['cursor'] shape: auto → composer-2-fast
+      const chain = makeChain({ provider: 'cursor', model: 'auto' }, { provider: 'cursor', model: 'composer-2-fast' });
+
+      const result = await manager.completeWithFallback(makeParams(), chain);
+
+      expect(result.usedProvider).toBe('cursor');
+      expect(result.usedModel).toBe('composer-2-fast');
+      expect(result.content).toBe('Fallback complete.');
+      // Both models were attempted
+      expect(completeCalls).toContain('auto');
+      expect(completeCalls).toContain('composer-2-fast');
+    });
+  });
 });

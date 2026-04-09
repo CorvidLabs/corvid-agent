@@ -16,6 +16,7 @@
 
 import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { getEncryptionPassphrase } from './crypto';
+
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const SALT_LENGTH = 16;
@@ -28,7 +29,7 @@ const DIGEST = 'sha256';
 export const ENCRYPTED_PREFIX = 'enc:';
 
 function deriveKey(passphrase: string, salt: Buffer): Buffer {
-    return pbkdf2Sync(passphrase, salt, ITERATIONS, KEY_LENGTH, DIGEST);
+  return pbkdf2Sync(passphrase, salt, ITERATIONS, KEY_LENGTH, DIGEST);
 }
 
 /**
@@ -36,21 +37,21 @@ function deriveKey(passphrase: string, salt: Buffer): Buffer {
  * Returns a prefixed base64 string: "enc:<base64(salt + iv + authTag + ciphertext)>"
  */
 export function encryptEnvVars(jsonStr: string): string {
-    // Skip encryption for empty objects — no secrets to protect
-    if (jsonStr === '{}') return jsonStr;
+  // Skip encryption for empty objects — no secrets to protect
+  if (jsonStr === '{}') return jsonStr;
 
-    const passphrase = getEncryptionPassphrase();
-    const salt = randomBytes(SALT_LENGTH);
-    const key = deriveKey(passphrase, salt);
-    const iv = randomBytes(IV_LENGTH);
+  const passphrase = getEncryptionPassphrase();
+  const salt = randomBytes(SALT_LENGTH);
+  const key = deriveKey(passphrase, salt);
+  const iv = randomBytes(IV_LENGTH);
 
-    const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
-    const encrypted = Buffer.concat([cipher.update(jsonStr, 'utf8'), cipher.final()]);
-    const authTag = cipher.getAuthTag();
+  const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
+  const encrypted = Buffer.concat([cipher.update(jsonStr, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
 
-    // Format: salt(16) + iv(12) + authTag(16) + ciphertext
-    const combined = Buffer.concat([salt, iv, authTag, encrypted]);
-    return ENCRYPTED_PREFIX + combined.toString('base64');
+  // Format: salt(16) + iv(12) + authTag(16) + ciphertext
+  const combined = Buffer.concat([salt, iv, authTag, encrypted]);
+  return ENCRYPTED_PREFIX + combined.toString('base64');
 }
 
 /**
@@ -58,30 +59,30 @@ export function encryptEnvVars(jsonStr: string): string {
  * Handles both encrypted ("enc:...") and legacy plaintext JSON.
  */
 export function decryptEnvVars(stored: string): string {
-    // Legacy plaintext JSON — pass through
-    if (!stored.startsWith(ENCRYPTED_PREFIX)) {
-        return stored;
-    }
+  // Legacy plaintext JSON — pass through
+  if (!stored.startsWith(ENCRYPTED_PREFIX)) {
+    return stored;
+  }
 
-    const passphrase = getEncryptionPassphrase();
-    const combined = Buffer.from(stored.slice(ENCRYPTED_PREFIX.length), 'base64');
+  const passphrase = getEncryptionPassphrase();
+  const combined = Buffer.from(stored.slice(ENCRYPTED_PREFIX.length), 'base64');
 
-    const salt = combined.subarray(0, SALT_LENGTH);
-    const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-    const authTag = combined.subarray(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
-    const ciphertext = combined.subarray(SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
+  const salt = combined.subarray(0, SALT_LENGTH);
+  const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const authTag = combined.subarray(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = combined.subarray(SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
 
-    const key = deriveKey(passphrase, salt);
-    const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
-    decipher.setAuthTag(authTag);
+  const key = deriveKey(passphrase, salt);
+  const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
+  decipher.setAuthTag(authTag);
 
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    return decrypted.toString('utf8');
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return decrypted.toString('utf8');
 }
 
 /**
  * Check whether a stored value is already encrypted.
  */
 export function isEncrypted(stored: string): boolean {
-    return stored.startsWith(ENCRYPTED_PREFIX);
+  return stored.startsWith(ENCRYPTED_PREFIX);
 }

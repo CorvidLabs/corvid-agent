@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 084: Model exam persistence tables.
@@ -8,7 +8,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS model_exam_runs (
             id                TEXT PRIMARY KEY,
             model             TEXT NOT NULL,
@@ -21,7 +21,7 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS model_exam_results (
             id          TEXT PRIMARY KEY,
             run_id      TEXT NOT NULL REFERENCES model_exam_runs(id),
@@ -35,17 +35,17 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_runs_model ON model_exam_runs(model)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_runs_created ON model_exam_runs(created_at)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_results_run ON model_exam_results(run_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_results_category ON model_exam_results(category)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_runs_model ON model_exam_runs(model)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_runs_created ON model_exam_runs(created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_results_run ON model_exam_results(run_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_model_exam_results_category ON model_exam_results(category)`);
 }
 
 export function down(db: Database): void {
-    db.exec('DROP INDEX IF EXISTS idx_model_exam_results_category');
-    db.exec('DROP INDEX IF EXISTS idx_model_exam_results_run');
-    db.exec('DROP INDEX IF EXISTS idx_model_exam_runs_created');
-    db.exec('DROP INDEX IF EXISTS idx_model_exam_runs_model');
-    db.exec('DROP TABLE IF EXISTS model_exam_results');
-    db.exec('DROP TABLE IF EXISTS model_exam_runs');
+  db.exec('DROP INDEX IF EXISTS idx_model_exam_results_category');
+  db.exec('DROP INDEX IF EXISTS idx_model_exam_results_run');
+  db.exec('DROP INDEX IF EXISTS idx_model_exam_runs_created');
+  db.exec('DROP INDEX IF EXISTS idx_model_exam_runs_model');
+  db.exec('DROP TABLE IF EXISTS model_exam_results');
+  db.exec('DROP TABLE IF EXISTS model_exam_runs');
 }

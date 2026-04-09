@@ -4,20 +4,21 @@
  * When a primary model fails, automatically tries the next model in the
  * fallback chain. Tracks provider health for routing decisions.
  */
-import type { LlmCompletionParams, LlmCompletionResult, LlmProviderType } from './types';
-import type { LlmProviderRegistry } from './registry';
-import { createLogger } from '../lib/logger';
+
 import { ExternalServiceError } from '../lib/errors';
+import { createLogger } from '../lib/logger';
+import type { LlmProviderRegistry } from './registry';
+import type { LlmCompletionParams, LlmCompletionResult, LlmProviderType } from './types';
 
 const log = createLogger('ProviderFallback');
 
 interface ProviderHealth {
-    provider: LlmProviderType;
-    healthy: boolean;
-    lastFailure: number | null;
-    consecutiveFailures: number;
-    /** Cooldown period in ms before retrying a failed provider */
-    cooldownMs: number;
+  provider: LlmProviderType;
+  healthy: boolean;
+  lastFailure: number | null;
+  consecutiveFailures: number;
+  /** Cooldown period in ms before retrying a failed provider */
+  cooldownMs: number;
 }
 
 const DEFAULT_COOLDOWN_MS = 60_000; // 1 minute cooldown after failure
@@ -31,8 +32,8 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 export const OLLAMA_DEFAULT_LOCAL_MODEL = process.env.OLLAMA_DEFAULT_MODEL ?? 'qwen3:14b';
 
 export interface FallbackChain {
-    /** Ordered list of [provider, model] pairs to try */
-    chain: Array<{ provider: LlmProviderType; model: string }>;
+  /** Ordered list of [provider, model] pairs to try */
+  chain: Array<{ provider: LlmProviderType; model: string }>;
 }
 
 /**
@@ -49,215 +50,211 @@ export interface FallbackChain {
  *   - Fallback = task queue (TaskQueueService), NOT model degradation.
  */
 export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
-    /** High-capability chain: council sessions, architecture decisions. Anthropic-only. */
-    'high-capability': {
-        chain: [
-            { provider: 'anthropic', model: 'claude-opus-4-6' },
-            { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-        ],
-    },
-    /** Balanced chain: work tasks, code generation, specialist agents. Anthropic-only. */
-    'balanced': {
-        chain: [
-            { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-            { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-        ],
-    },
-    /** Cost-optimized chain: routing, triage, lightweight classification. Anthropic-only. */
-    'cost-optimized': {
-        chain: [
-            { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-        ],
-    },
-    /**
-     * Local chain: only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
-     * Not on production dispatch path.
-     */
-    'local': {
-        chain: [
-            { provider: 'ollama', model: OLLAMA_DEFAULT_LOCAL_MODEL },
-        ],
-    },
-    /**
-     * Cursor chain: cursor-agent CLI models.
-     * Only used when Cursor is the designated provider.
-     * Falls back from auto-routed to composer-2-fast for lighter tasks.
-     */
-    'cursor': {
-        chain: [
-            { provider: 'cursor', model: 'auto' },
-            { provider: 'cursor', model: 'composer-2-fast' },
-        ],
-    },
-    /**
-     * Cloud chain: Ollama cloud relay models.
-     * Only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
-     * Not on production dispatch path.
-     */
-    'cloud': {
-        chain: [
-            { provider: 'ollama', model: 'qwen3.5:cloud' },
-            { provider: 'ollama', model: 'deepseek-v3.2:cloud' },
-            { provider: 'ollama', model: 'qwen3-coder-next:cloud' },
-            { provider: 'ollama', model: 'minimax-m2.5:cloud' },
-            { provider: 'ollama', model: 'kimi-k2.5:cloud' },
-            { provider: 'ollama', model: 'glm-5:cloud' },
-            { provider: 'ollama', model: 'nemotron-3-super:cloud' },
-            { provider: 'ollama', model: 'gemini-3-flash-preview:cloud' },
-            // devstral-small-2:cloud not yet available on Ollama cloud
-        ],
-    },
+  /** High-capability chain: council sessions, architecture decisions. Anthropic-only. */
+  'high-capability': {
+    chain: [
+      { provider: 'anthropic', model: 'claude-opus-4-6' },
+      { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+    ],
+  },
+  /** Balanced chain: work tasks, code generation, specialist agents. Anthropic-only. */
+  balanced: {
+    chain: [
+      { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+      { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+    ],
+  },
+  /** Cost-optimized chain: routing, triage, lightweight classification. Anthropic-only. */
+  'cost-optimized': {
+    chain: [{ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }],
+  },
+  /**
+   * Local chain: only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
+   * Not on production dispatch path.
+   */
+  local: {
+    chain: [{ provider: 'ollama', model: OLLAMA_DEFAULT_LOCAL_MODEL }],
+  },
+  /**
+   * Cursor chain: cursor-agent CLI models.
+   * Only used when Cursor is the designated provider.
+   * Falls back from auto-routed to composer-2-fast for lighter tasks.
+   */
+  cursor: {
+    chain: [
+      { provider: 'cursor', model: 'auto' },
+      { provider: 'cursor', model: 'composer-2-fast' },
+    ],
+  },
+  /**
+   * Cloud chain: Ollama cloud relay models.
+   * Only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
+   * Not on production dispatch path.
+   */
+  cloud: {
+    chain: [
+      { provider: 'ollama', model: 'qwen3.5:cloud' },
+      { provider: 'ollama', model: 'deepseek-v3.2:cloud' },
+      { provider: 'ollama', model: 'qwen3-coder-next:cloud' },
+      { provider: 'ollama', model: 'minimax-m2.5:cloud' },
+      { provider: 'ollama', model: 'kimi-k2.5:cloud' },
+      { provider: 'ollama', model: 'glm-5:cloud' },
+      { provider: 'ollama', model: 'nemotron-3-super:cloud' },
+      { provider: 'ollama', model: 'gemini-3-flash-preview:cloud' },
+      // devstral-small-2:cloud not yet available on Ollama cloud
+    ],
+  },
 };
 
 export class FallbackManager {
-    private registry: LlmProviderRegistry;
-    private health: Map<LlmProviderType, ProviderHealth> = new Map();
+  private registry: LlmProviderRegistry;
+  private health: Map<LlmProviderType, ProviderHealth> = new Map();
 
-    constructor(registry: LlmProviderRegistry) {
-        this.registry = registry;
-    }
+  constructor(registry: LlmProviderRegistry) {
+    this.registry = registry;
+  }
 
-    /**
-     * Execute a completion with fallback support.
-     * Tries each model in the chain until one succeeds.
-     */
-    async completeWithFallback(
-        params: LlmCompletionParams,
-        chain: FallbackChain,
-    ): Promise<LlmCompletionResult & { usedProvider: LlmProviderType; usedModel: string }> {
-        const errors: string[] = [];
+  /**
+   * Execute a completion with fallback support.
+   * Tries each model in the chain until one succeeds.
+   */
+  async completeWithFallback(
+    params: LlmCompletionParams,
+    chain: FallbackChain,
+  ): Promise<LlmCompletionResult & { usedProvider: LlmProviderType; usedModel: string }> {
+    const errors: string[] = [];
 
-        for (const entry of chain.chain) {
-            // Skip unhealthy providers in cooldown
-            if (!this.isProviderAvailable(entry.provider)) {
-                log.debug('Skipping provider in cooldown', { provider: entry.provider });
-                continue;
-            }
+    for (const entry of chain.chain) {
+      // Skip unhealthy providers in cooldown
+      if (!this.isProviderAvailable(entry.provider)) {
+        log.debug('Skipping provider in cooldown', { provider: entry.provider });
+        continue;
+      }
 
-            const provider = this.registry.get(entry.provider);
-            if (!provider) continue;
+      const provider = this.registry.get(entry.provider);
+      if (!provider) continue;
 
-            try {
-                const result = await provider.complete({
-                    ...params,
-                    model: entry.model,
-                });
+      try {
+        const result = await provider.complete({
+          ...params,
+          model: entry.model,
+        });
 
-                // Mark provider as healthy on success
-                this.markHealthy(entry.provider);
+        // Mark provider as healthy on success
+        this.markHealthy(entry.provider);
 
-                return {
-                    ...result,
-                    usedProvider: entry.provider,
-                    usedModel: entry.model,
-                };
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                errors.push(`${entry.provider}/${entry.model}: ${message}`);
+        return {
+          ...result,
+          usedProvider: entry.provider,
+          usedModel: entry.model,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`${entry.provider}/${entry.model}: ${message}`);
 
-                // Check if this is a rate limit or transient error
-                if (this.isTransientError(message)) {
-                    this.markFailure(entry.provider);
-                    log.warn('Provider failed (transient), trying next', {
-                        provider: entry.provider,
-                        model: entry.model,
-                        error: message,
-                    });
-                } else {
-                    // Non-transient errors (auth, invalid model, etc.) — still try next
-                    log.warn('Provider failed (non-transient)', {
-                        provider: entry.provider,
-                        model: entry.model,
-                        error: message,
-                    });
-                }
-            }
-        }
-
-        throw new ExternalServiceError('LLM', `All providers in fallback chain failed:\n${errors.join('\n')}`);
-    }
-
-    /**
-     * Check if a provider is available (not in cooldown).
-     */
-    isProviderAvailable(provider: LlmProviderType): boolean {
-        const health = this.health.get(provider);
-        if (!health) return true; // No health record = healthy
-
-        if (health.healthy) return true;
-
-        // Check cooldown
-        if (health.lastFailure) {
-            const elapsed = Date.now() - health.lastFailure;
-            if (elapsed > health.cooldownMs) {
-                // Cooldown expired — give it another chance
-                health.healthy = true;
-                health.consecutiveFailures = 0;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get health status for all known providers.
-     */
-    getHealthStatus(): ProviderHealth[] {
-        return Array.from(this.health.values());
-    }
-
-    /**
-     * Reset health status for all providers.
-     */
-    resetHealth(): void {
-        this.health.clear();
-    }
-
-    // ─── Private ─────────────────────────────────────────────────────────────
-
-    private markHealthy(provider: LlmProviderType): void {
-        const existing = this.health.get(provider);
-        if (existing) {
-            existing.healthy = true;
-            existing.consecutiveFailures = 0;
-        }
-    }
-
-    private markFailure(provider: LlmProviderType): void {
-        const existing = this.health.get(provider);
-        if (existing) {
-            existing.consecutiveFailures++;
-            existing.lastFailure = Date.now();
-            if (existing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                existing.healthy = false;
-                // Exponential backoff: 1min, 2min, 4min...
-                existing.cooldownMs = DEFAULT_COOLDOWN_MS * Math.pow(2, existing.consecutiveFailures - MAX_CONSECUTIVE_FAILURES);
-            }
+        // Check if this is a rate limit or transient error
+        if (this.isTransientError(message)) {
+          this.markFailure(entry.provider);
+          log.warn('Provider failed (transient), trying next', {
+            provider: entry.provider,
+            model: entry.model,
+            error: message,
+          });
         } else {
-            this.health.set(provider, {
-                provider,
-                healthy: true,
-                lastFailure: Date.now(),
-                consecutiveFailures: 1,
-                cooldownMs: DEFAULT_COOLDOWN_MS,
-            });
+          // Non-transient errors (auth, invalid model, etc.) — still try next
+          log.warn('Provider failed (non-transient)', {
+            provider: entry.provider,
+            model: entry.model,
+            error: message,
+          });
         }
+      }
     }
 
-    private isTransientError(message: string): boolean {
-        const lower = message.toLowerCase();
-        return (
-            lower.includes('rate limit') ||
-            lower.includes('429') ||
-            lower.includes('503') ||
-            lower.includes('502') ||
-            lower.includes('timeout') ||
-            lower.includes('econnrefused') ||
-            lower.includes('fetch failed') ||
-            lower.includes('overloaded') ||
-            // Ollama HTTP 500: internal server error — transient, model may recover
-            lower.includes('(500)')
-        );
+    throw new ExternalServiceError('LLM', `All providers in fallback chain failed:\n${errors.join('\n')}`);
+  }
+
+  /**
+   * Check if a provider is available (not in cooldown).
+   */
+  isProviderAvailable(provider: LlmProviderType): boolean {
+    const health = this.health.get(provider);
+    if (!health) return true; // No health record = healthy
+
+    if (health.healthy) return true;
+
+    // Check cooldown
+    if (health.lastFailure) {
+      const elapsed = Date.now() - health.lastFailure;
+      if (elapsed > health.cooldownMs) {
+        // Cooldown expired — give it another chance
+        health.healthy = true;
+        health.consecutiveFailures = 0;
+        return true;
+      }
     }
+
+    return false;
+  }
+
+  /**
+   * Get health status for all known providers.
+   */
+  getHealthStatus(): ProviderHealth[] {
+    return Array.from(this.health.values());
+  }
+
+  /**
+   * Reset health status for all providers.
+   */
+  resetHealth(): void {
+    this.health.clear();
+  }
+
+  // ─── Private ─────────────────────────────────────────────────────────────
+
+  private markHealthy(provider: LlmProviderType): void {
+    const existing = this.health.get(provider);
+    if (existing) {
+      existing.healthy = true;
+      existing.consecutiveFailures = 0;
+    }
+  }
+
+  private markFailure(provider: LlmProviderType): void {
+    const existing = this.health.get(provider);
+    if (existing) {
+      existing.consecutiveFailures++;
+      existing.lastFailure = Date.now();
+      if (existing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        existing.healthy = false;
+        // Exponential backoff: 1min, 2min, 4min...
+        existing.cooldownMs = DEFAULT_COOLDOWN_MS * 2 ** (existing.consecutiveFailures - MAX_CONSECUTIVE_FAILURES);
+      }
+    } else {
+      this.health.set(provider, {
+        provider,
+        healthy: true,
+        lastFailure: Date.now(),
+        consecutiveFailures: 1,
+        cooldownMs: DEFAULT_COOLDOWN_MS,
+      });
+    }
+  }
+
+  private isTransientError(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      lower.includes('rate limit') ||
+      lower.includes('429') ||
+      lower.includes('503') ||
+      lower.includes('502') ||
+      lower.includes('timeout') ||
+      lower.includes('econnrefused') ||
+      lower.includes('fetch failed') ||
+      lower.includes('overloaded') ||
+      // Ollama HTTP 500: internal server error — transient, model may recover
+      lower.includes('(500)')
+    );
+  }
 }

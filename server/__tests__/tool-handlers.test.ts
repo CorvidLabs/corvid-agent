@@ -1144,7 +1144,6 @@ describe('handleRecallMemory', () => {
     const text = (result.content[0] as { text: string }).text;
     expect(text).toContain('FULLTXIDINSEARCH');
   });
-
 });
 
 // ─── handleSaveMemory (short-term default) ──────────────────────────────────

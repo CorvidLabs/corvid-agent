@@ -5,26 +5,216 @@
  * DO NOT MODIFY IT BY HAND.
  * requires: @algorandfoundation/algokit-utils: ^7
  */
-import { type AlgorandClient } from '@algorandfoundation/algokit-utils/types/algorand-client'
-import { ABIReturn, AppReturn, SendAppTransactionResult } from '@algorandfoundation/algokit-utils/types/app'
-import { Arc56Contract, getArc56ReturnValue, getABIStructFromABITuple } from '@algorandfoundation/algokit-utils/types/app-arc56'
+import type { AlgorandClient } from '@algorandfoundation/algokit-utils/types/algorand-client';
+import type { ABIReturn } from '@algorandfoundation/algokit-utils/types/app';
+import {
+  type Arc56Contract,
+  getABIStructFromABITuple,
+  getArc56ReturnValue,
+} from '@algorandfoundation/algokit-utils/types/app-arc56';
 import {
   AppClient as _AppClient,
-  AppClientMethodCallParams,
-  AppClientParams,
-  AppClientBareCallParams,
-  CallOnComplete,
-  AppClientCompilationParams,
-  ResolveAppClientByCreatorAndName,
-  ResolveAppClientByNetwork,
-  CloneAppClientParams,
-} from '@algorandfoundation/algokit-utils/types/app-client'
-import { AppFactory as _AppFactory, AppFactoryAppClientParams, AppFactoryResolveAppClientByCreatorAndNameParams, AppFactoryDeployParams, AppFactoryParams, CreateSchema } from '@algorandfoundation/algokit-utils/types/app-factory'
-import { TransactionComposer, AppCallMethodCall, AppMethodCallTransactionArgument, SimulateOptions, RawSimulateOptions, SkipSignaturesSimulateOptions } from '@algorandfoundation/algokit-utils/types/composer'
-import { SendParams, SendSingleTransactionResult, SendAtomicTransactionComposerResults } from '@algorandfoundation/algokit-utils/types/transaction'
-import { Address, encodeAddress, modelsv2, OnApplicationComplete, Transaction, TransactionSigner } from 'algosdk'
+  type AppClientBareCallParams,
+  type AppClientCompilationParams,
+  type AppClientMethodCallParams,
+  type AppClientParams,
+  type CallOnComplete,
+  type CloneAppClientParams,
+  type ResolveAppClientByCreatorAndName,
+  type ResolveAppClientByNetwork,
+} from '@algorandfoundation/algokit-utils/types/app-client';
+import {
+  AppFactory as _AppFactory,
+  type AppFactoryAppClientParams,
+  type AppFactoryDeployParams,
+  type AppFactoryParams,
+  type AppFactoryResolveAppClientByCreatorAndNameParams,
+  type CreateSchema,
+} from '@algorandfoundation/algokit-utils/types/app-factory';
+import type {
+  AppMethodCallTransactionArgument,
+  RawSimulateOptions,
+  SimulateOptions,
+  SkipSignaturesSimulateOptions,
+  TransactionComposer,
+} from '@algorandfoundation/algokit-utils/types/composer';
+import type {
+  SendAtomicTransactionComposerResults,
+  SendParams,
+} from '@algorandfoundation/algokit-utils/types/transaction';
+import type { modelsv2, OnApplicationComplete, Transaction, TransactionSigner } from 'algosdk';
 
-export const APP_SPEC: Arc56Contract = {"name":"FlockDirectory","desc":"","methods":[{"name":"createApplication","args":[],"returns":{"type":"void"},"actions":{"create":["NoOp"],"call":[]}},{"name":"registerAgent","args":[{"name":"name","type":"string"},{"name":"endpoint","type":"string"},{"name":"metadata","type":"string"},{"name":"payment","type":"pay"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"updateAgent","args":[{"name":"name","type":"string"},{"name":"endpoint","type":"string"},{"name":"metadata","type":"string"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"heartbeat","args":[],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"deregister","args":[],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"createChallenge","args":[{"name":"challengeId","type":"string"},{"name":"category","type":"string"},{"name":"description","type":"string"},{"name":"maxScore","type":"uint64"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"deactivateChallenge","args":[{"name":"challengeId","type":"string"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"recordTestResult","args":[{"name":"agentAddress","type":"address"},{"name":"challengeId","type":"string"},{"name":"score","type":"uint64"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"getAgentTier","args":[{"name":"agentAddress","type":"address"}],"returns":{"type":"uint64"},"actions":{"create":[],"call":["NoOp"]}},{"name":"getAgentScore","args":[{"name":"agentAddress","type":"address"}],"returns":{"type":"uint64"},"actions":{"create":[],"call":["NoOp"]}},{"name":"getAgentTestCount","args":[{"name":"agentAddress","type":"address"}],"returns":{"type":"uint64"},"actions":{"create":[],"call":["NoOp"]}},{"name":"getAgentInfo","args":[{"name":"agentAddress","type":"address"}],"returns":{"type":"(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)","struct":"AgentRecord"},"actions":{"create":[],"call":["NoOp"]}},{"name":"getChallengeInfo","args":[{"name":"challengeId","type":"string"}],"returns":{"type":"(string,string,uint64,uint64)","struct":"Challenge"},"actions":{"create":[],"call":["NoOp"]}},{"name":"updateMinStake","args":[{"name":"newMinStake","type":"uint64"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"transferAdmin","args":[{"name":"newAdmin","type":"address"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"setRegistrationOpen","args":[{"name":"open","type":"uint64"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}},{"name":"adminRemoveAgent","args":[{"name":"agentAddress","type":"address"}],"returns":{"type":"void"},"actions":{"create":[],"call":["NoOp"]}}],"arcs":[4,56],"structs":{"AgentRecord":[{"name":"name","type":"string"},{"name":"endpoint","type":"string"},{"name":"metadata","type":"string"},{"name":"tier","type":"uint64"},{"name":"totalScore","type":"uint64"},{"name":"totalMaxScore","type":"uint64"},{"name":"testCount","type":"uint64"},{"name":"lastHeartbeatRound","type":"uint64"},{"name":"registrationRound","type":"uint64"},{"name":"stake","type":"uint64"}],"TestResult":[{"name":"score","type":"uint64"},{"name":"maxScore","type":"uint64"},{"name":"category","type":"string"},{"name":"round","type":"uint64"}],"Challenge":[{"name":"category","type":"string"},{"name":"description","type":"string"},{"name":"maxScore","type":"uint64"},{"name":"active","type":"uint64"}]},"state":{"schema":{"global":{"bytes":1,"ints":4},"local":{"bytes":0,"ints":0}},"keys":{"global":{"agentCount":{"key":"YWdlbnRfY291bnQ=","keyType":"AVMBytes","valueType":"uint64"},"minStake":{"key":"bWluX3N0YWtl","keyType":"AVMBytes","valueType":"uint64"},"admin":{"key":"YWRtaW4=","keyType":"AVMBytes","valueType":"address"},"challengeCount":{"key":"Y2hhbF9jb3VudA==","keyType":"AVMBytes","valueType":"uint64"},"registrationOpen":{"key":"cmVnX29wZW4=","keyType":"AVMBytes","valueType":"uint64"}},"local":{},"box":{}},"maps":{"global":{},"local":{},"box":{"agents":{"keyType":"address","valueType":"AgentRecord","prefix":"YQ=="},"testResults":{"keyType":"(address,string)","valueType":"TestResult","prefix":"dA=="},"challenges":{"keyType":"string","valueType":"Challenge","prefix":"Yw=="}}}},"bareActions":{"create":[],"call":[]},"byteCode":{"approval":"CiAKAQACIASAAoAEA0BkJg0AAWEFYWRtaW4BYwthZ2VudF9jb3VudAQVH3x1CAAAAAAAAAAAAgA+CmNoYWxfY291bnQJbWluX3N0YWtlCHJlZ19vcGVuCAAAAAAAAAABAgAUMRgUgQYLMRkIjQwIJQAAAAAAAAAAAAAIFwAAAAAAAAAAAAAAiAACIkOKAAAqMQBnJwQjZycJgcCEPWcnCCNnJwoiZ4kxFiIJSTgQIhJENhoDVwIANhoCVwIANhoBVwIAiAACIkOKBAAnCmQiEkSL/DgIJwlkD0SL/DgHMgoSRIv/FSMNSUEAB4v/FSEIDhBEi/4VIw1JQQAHi/4VIQUOEESL/RUhBg5EKTEAUL1MSBREKTEAUEm8SCgoJweL/0kVFlcGAkxQiAgSi/5JFRZXBgJMUIgIBYv9SRUWVwYCTFCIB/gnC4gH5icGiAfhJwaIB9wnBogH1zIGFogH0TIGFogHy4v8OAgWiAfDSFC/JwRJZCIIZ4k2GgNXAgA2GgJXAgA2GgFXAgCIAAIiQ4oDACiL/xUjDUlBAAeL/xUhCA4QRIv+FSMNSUEAB4v+FSEFDhBEi/0VIQYORCkxAFC9TEhEKTEAUL5EjAApMQBQSbxIKCgnB4v/SRUWVwYCTFCIB1mL/kkVFlcGAkxQiAdMi/1JFRZXBgJMUIgHP4sANf80/1cGCBcWiAckiwA1/zT/Vw4IFxaIBxaLADX/NP9XFggXFogHCIsANf80/1ceCBcWiAb6iwA1/zT/VyYIFxaIBuyLADX/NP9XLggXFogG3osANf80/1c2CBcWiAbQSFC/iYgAAiJDigAAKCkxAFC9TEhEKTEAUL5EjAApMQBQSbxIKCgnB4sANf8jNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgGkYsANf8kNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgGbYsANf8hBDT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIBkiLADX/NP9XBggXFogGLYsANf80/1cOCBcWiAYfiwA1/zT/VxYIFxaIBhGLADX/NP9XHggXFogGAzIGFogF/YsANf80/1cuCBcWiAXviwA1/zT/VzYIFxaIBeFIUL+JiAACIkOKAAAoSSkxAFC9TEhEKTEAUL5EjACLADX/NP9XNggXjAEpMQBQvCcESWQiCWexIrIQMQCyB4sBsggjsgGziTYaBBc2GgNXAgA2GgJXAgA2GgFXAgCIAAIiQ4oEADEAKmQSRIv/FSMNSUEABov/FSUOEESL/hUjDUlBAAaL/hUlDhBEK4v/SRUWVwYCTFBQvUxIFEQri/9JFRZXBgJMUFBJvEgoKCcMi/5JFRZXBgJMUIgFMov9SRUWVwYCTFCIBSWL/BaIBRInC4gFDUhQvycISWQiCGeJNhoBVwIAiAACIkOKAQAoMQAqZBJEK4v/SRUWVwYCTFBQvUxIRCuL/0kVFlcGAkxQUL5EjAAri/9JFRZXBgJMUFBJvEgoKCcMiwA1/yM0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiASjiwA1/yQ0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiAR/iwA1/zT/VwQIFxaIBGQnBogEX0hQv4k2GgMXNhoCVwIANhoBSRUlEkSIAAIiQ4oDAChHBTEAKmQSRCuL/kkVFlcGAkxQUL1MSEQri/5JFRZXBgJMUFC+RIwAiwA1/zT/VwwIFyISRIv9iwA1/zT/VwQIFw5EKYv/UL1MSESAAXQoKIACACKL/4gD54v+SRUWVwYCTFCIA+dIUFBJvEgoKIACABqL/RaIA8iLADX/NP9XBAgXFogDuosANf8jNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgDozIGFogDkEhQvymL/1C+RIwBiwE1/zT/Vw4IF4v9CIwCiwE1/zT/VxYIF4sANf80/1cECBcIjAOLATX/NP9XHggXIgiMBIsEiwOLAogCaYwFKYv/UEm8SCgoJweLATX/IzT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIAySLATX/JDT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIAwCLATX/IQQ0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiALbiwUWiALIiwIWiALCiwMWiAK8iwQWiAK2iwE1/zT/VyYIFxaIAqiLATX/NP9XLggXFogCmosBNf80/1c2CBcWiAKMSFC/iScFNhoBSRUlEkSIAAUWULAiQ4oBASmL/1C9TEhEKYv/UL5ENf80/1cGCBeJJwU2GgFJFSUSRIgABRZQsCJDigEBKCmL/1C9TEhEKYv/UIwAiwC+RDX/NP9XFggXIxJBAAQjQgAciwC+RDX/NP9XDggXIQkLiwC+RDX/NP9XFggXCowAiScFNhoBSRUlEkSIAAUWULAiQ4oBASmL/1C9TEhEKYv/UL5ENf80/1ceCBeJJwU2GgFJFSUSRIgABFCwIkOKAQEpi/9QvUxIRCmL/1C+RIknBTYaAVcCAIgABFCwIkOKAQEri/9JFRZXBgJMUFC9TEhEK4v/SRUWVwYCTFBQvkSJNhoBF4gAAiJDigEAMQAqZBJEJwmL/2eJNhoBSRUlEkSIAAIiQ4oBADEAKmQSRCqL/2eJNhoBF4gAAiJDigEAMQAqZBJEi/8jEklAAAWL/yISEUQnCov/Z4k2GgFJFSUSRIgAAiJDigEAKDEAKmQSRCmL/1C9TEhEKYv/UL5EjAApi/9QvCcESWQiCWexIrIQi/+yB4sANf80/1c2CBeyCCOyAbOJigMBKIv9IxJBAAQiQgA5i/8hCQuL/gqMAIv9gQUPSUEABosAgVAPEEEABSEEQgAYi/0hBw9JQQAGiwCBPA8QQQAFIQdCAAEkjACJgAS4RHs2NhoAjgH33QCABJUC1MKABOFsV2eABEiTQ12ABIFh1NiABKyR6wGABE41mDGABLhmItKABP/CKeGABMe1GU2ABL/aQN6ABBZwOOyABKV6U0aABIwLYYmABH7hucyABIBX3kuABOQNWGg2GgCOEPd3+En5Nfok+mf6//um/Xn9pf39/in+TP59/pX+sP7WAIoEA4v8i/9Qi/2L/omKBAOL/Iv+UIz8i/9JFYv+FwgWVwYCjP6L/UxQjP2L/Iv9i/6J","clear":"Cg=="},"networks":{}} as unknown as Arc56Contract
+export const APP_SPEC: Arc56Contract = {
+  name: 'FlockDirectory',
+  desc: '',
+  methods: [
+    { name: 'createApplication', args: [], returns: { type: 'void' }, actions: { create: ['NoOp'], call: [] } },
+    {
+      name: 'registerAgent',
+      args: [
+        { name: 'name', type: 'string' },
+        { name: 'endpoint', type: 'string' },
+        { name: 'metadata', type: 'string' },
+        { name: 'payment', type: 'pay' },
+      ],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'updateAgent',
+      args: [
+        { name: 'name', type: 'string' },
+        { name: 'endpoint', type: 'string' },
+        { name: 'metadata', type: 'string' },
+      ],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    { name: 'heartbeat', args: [], returns: { type: 'void' }, actions: { create: [], call: ['NoOp'] } },
+    { name: 'deregister', args: [], returns: { type: 'void' }, actions: { create: [], call: ['NoOp'] } },
+    {
+      name: 'createChallenge',
+      args: [
+        { name: 'challengeId', type: 'string' },
+        { name: 'category', type: 'string' },
+        { name: 'description', type: 'string' },
+        { name: 'maxScore', type: 'uint64' },
+      ],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'deactivateChallenge',
+      args: [{ name: 'challengeId', type: 'string' }],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'recordTestResult',
+      args: [
+        { name: 'agentAddress', type: 'address' },
+        { name: 'challengeId', type: 'string' },
+        { name: 'score', type: 'uint64' },
+      ],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'getAgentTier',
+      args: [{ name: 'agentAddress', type: 'address' }],
+      returns: { type: 'uint64' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'getAgentScore',
+      args: [{ name: 'agentAddress', type: 'address' }],
+      returns: { type: 'uint64' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'getAgentTestCount',
+      args: [{ name: 'agentAddress', type: 'address' }],
+      returns: { type: 'uint64' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'getAgentInfo',
+      args: [{ name: 'agentAddress', type: 'address' }],
+      returns: {
+        type: '(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)',
+        struct: 'AgentRecord',
+      },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'getChallengeInfo',
+      args: [{ name: 'challengeId', type: 'string' }],
+      returns: { type: '(string,string,uint64,uint64)', struct: 'Challenge' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'updateMinStake',
+      args: [{ name: 'newMinStake', type: 'uint64' }],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'transferAdmin',
+      args: [{ name: 'newAdmin', type: 'address' }],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'setRegistrationOpen',
+      args: [{ name: 'open', type: 'uint64' }],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+    {
+      name: 'adminRemoveAgent',
+      args: [{ name: 'agentAddress', type: 'address' }],
+      returns: { type: 'void' },
+      actions: { create: [], call: ['NoOp'] },
+    },
+  ],
+  arcs: [4, 56],
+  structs: {
+    AgentRecord: [
+      { name: 'name', type: 'string' },
+      { name: 'endpoint', type: 'string' },
+      { name: 'metadata', type: 'string' },
+      { name: 'tier', type: 'uint64' },
+      { name: 'totalScore', type: 'uint64' },
+      { name: 'totalMaxScore', type: 'uint64' },
+      { name: 'testCount', type: 'uint64' },
+      { name: 'lastHeartbeatRound', type: 'uint64' },
+      { name: 'registrationRound', type: 'uint64' },
+      { name: 'stake', type: 'uint64' },
+    ],
+    TestResult: [
+      { name: 'score', type: 'uint64' },
+      { name: 'maxScore', type: 'uint64' },
+      { name: 'category', type: 'string' },
+      { name: 'round', type: 'uint64' },
+    ],
+    Challenge: [
+      { name: 'category', type: 'string' },
+      { name: 'description', type: 'string' },
+      { name: 'maxScore', type: 'uint64' },
+      { name: 'active', type: 'uint64' },
+    ],
+  },
+  state: {
+    schema: { global: { bytes: 1, ints: 4 }, local: { bytes: 0, ints: 0 } },
+    keys: {
+      global: {
+        agentCount: { key: 'YWdlbnRfY291bnQ=', keyType: 'AVMBytes', valueType: 'uint64' },
+        minStake: { key: 'bWluX3N0YWtl', keyType: 'AVMBytes', valueType: 'uint64' },
+        admin: { key: 'YWRtaW4=', keyType: 'AVMBytes', valueType: 'address' },
+        challengeCount: { key: 'Y2hhbF9jb3VudA==', keyType: 'AVMBytes', valueType: 'uint64' },
+        registrationOpen: { key: 'cmVnX29wZW4=', keyType: 'AVMBytes', valueType: 'uint64' },
+      },
+      local: {},
+      box: {},
+    },
+    maps: {
+      global: {},
+      local: {},
+      box: {
+        agents: { keyType: 'address', valueType: 'AgentRecord', prefix: 'YQ==' },
+        testResults: { keyType: '(address,string)', valueType: 'TestResult', prefix: 'dA==' },
+        challenges: { keyType: 'string', valueType: 'Challenge', prefix: 'Yw==' },
+      },
+    },
+  },
+  bareActions: { create: [], call: [] },
+  byteCode: {
+    approval:
+      'CiAKAQACIASAAoAEA0BkJg0AAWEFYWRtaW4BYwthZ2VudF9jb3VudAQVH3x1CAAAAAAAAAAAAgA+CmNoYWxfY291bnQJbWluX3N0YWtlCHJlZ19vcGVuCAAAAAAAAAABAgAUMRgUgQYLMRkIjQwIJQAAAAAAAAAAAAAIFwAAAAAAAAAAAAAAiAACIkOKAAAqMQBnJwQjZycJgcCEPWcnCCNnJwoiZ4kxFiIJSTgQIhJENhoDVwIANhoCVwIANhoBVwIAiAACIkOKBAAnCmQiEkSL/DgIJwlkD0SL/DgHMgoSRIv/FSMNSUEAB4v/FSEIDhBEi/4VIw1JQQAHi/4VIQUOEESL/RUhBg5EKTEAUL1MSBREKTEAUEm8SCgoJweL/0kVFlcGAkxQiAgSi/5JFRZXBgJMUIgIBYv9SRUWVwYCTFCIB/gnC4gH5icGiAfhJwaIB9wnBogH1zIGFogH0TIGFogHy4v8OAgWiAfDSFC/JwRJZCIIZ4k2GgNXAgA2GgJXAgA2GgFXAgCIAAIiQ4oDACiL/xUjDUlBAAeL/xUhCA4QRIv+FSMNSUEAB4v+FSEFDhBEi/0VIQYORCkxAFC9TEhEKTEAUL5EjAApMQBQSbxIKCgnB4v/SRUWVwYCTFCIB1mL/kkVFlcGAkxQiAdMi/1JFRZXBgJMUIgHP4sANf80/1cGCBcWiAckiwA1/zT/Vw4IFxaIBxaLADX/NP9XFggXFogHCIsANf80/1ceCBcWiAb6iwA1/zT/VyYIFxaIBuyLADX/NP9XLggXFogG3osANf80/1c2CBcWiAbQSFC/iYgAAiJDigAAKCkxAFC9TEhEKTEAUL5EjAApMQBQSbxIKCgnB4sANf8jNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgGkYsANf8kNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgGbYsANf8hBDT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIBkiLADX/NP9XBggXFogGLYsANf80/1cOCBcWiAYfiwA1/zT/VxYIFxaIBhGLADX/NP9XHggXFogGAzIGFogF/YsANf80/1cuCBcWiAXviwA1/zT/VzYIFxaIBeFIUL+JiAACIkOKAAAoSSkxAFC9TEhEKTEAUL5EjACLADX/NP9XNggXjAEpMQBQvCcESWQiCWexIrIQMQCyB4sBsggjsgGziTYaBBc2GgNXAgA2GgJXAgA2GgFXAgCIAAIiQ4oEADEAKmQSRIv/FSMNSUEABov/FSUOEESL/hUjDUlBAAaL/hUlDhBEK4v/SRUWVwYCTFBQvUxIFEQri/9JFRZXBgJMUFBJvEgoKCcMi/5JFRZXBgJMUIgFMov9SRUWVwYCTFCIBSWL/BaIBRInC4gFDUhQvycISWQiCGeJNhoBVwIAiAACIkOKAQAoMQAqZBJEK4v/SRUWVwYCTFBQvUxIRCuL/0kVFlcGAkxQUL5EjAAri/9JFRZXBgJMUFBJvEgoKCcMiwA1/yM0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiASjiwA1/yQ0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiAR/iwA1/zT/VwQIFxaIBGQnBogEX0hQv4k2GgMXNhoCVwIANhoBSRUlEkSIAAIiQ4oDAChHBTEAKmQSRCuL/kkVFlcGAkxQUL1MSEQri/5JFRZXBgJMUFC+RIwAiwA1/zT/VwwIFyISRIv9iwA1/zT/VwQIFw5EKYv/UL1MSESAAXQoKIACACKL/4gD54v+SRUWVwYCTFCIA+dIUFBJvEgoKIACABqL/RaIA8iLADX/NP9XBAgXFogDuosANf8jNP80/08CWUk0/0xZIgskCFhXAgBJFRZXBgJMUIgDozIGFogDkEhQvymL/1C+RIwBiwE1/zT/Vw4IF4v9CIwCiwE1/zT/VxYIF4sANf80/1cECBcIjAOLATX/NP9XHggXIgiMBIsEiwOLAogCaYwFKYv/UEm8SCgoJweLATX/IzT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIAySLATX/JDT/NP9PAllJNP9MWSILJAhYVwIASRUWVwYCTFCIAwCLATX/IQQ0/zT/TwJZSTT/TFkiCyQIWFcCAEkVFlcGAkxQiALbiwUWiALIiwIWiALCiwMWiAK8iwQWiAK2iwE1/zT/VyYIFxaIAqiLATX/NP9XLggXFogCmosBNf80/1c2CBcWiAKMSFC/iScFNhoBSRUlEkSIAAUWULAiQ4oBASmL/1C9TEhEKYv/UL5ENf80/1cGCBeJJwU2GgFJFSUSRIgABRZQsCJDigEBKCmL/1C9TEhEKYv/UIwAiwC+RDX/NP9XFggXIxJBAAQjQgAciwC+RDX/NP9XDggXIQkLiwC+RDX/NP9XFggXCowAiScFNhoBSRUlEkSIAAUWULAiQ4oBASmL/1C9TEhEKYv/UL5ENf80/1ceCBeJJwU2GgFJFSUSRIgABFCwIkOKAQEpi/9QvUxIRCmL/1C+RIknBTYaAVcCAIgABFCwIkOKAQEri/9JFRZXBgJMUFC9TEhEK4v/SRUWVwYCTFBQvkSJNhoBF4gAAiJDigEAMQAqZBJEJwmL/2eJNhoBSRUlEkSIAAIiQ4oBADEAKmQSRCqL/2eJNhoBF4gAAiJDigEAMQAqZBJEi/8jEklAAAWL/yISEUQnCov/Z4k2GgFJFSUSRIgAAiJDigEAKDEAKmQSRCmL/1C9TEhEKYv/UL5EjAApi/9QvCcESWQiCWexIrIQi/+yB4sANf80/1c2CBeyCCOyAbOJigMBKIv9IxJBAAQiQgA5i/8hCQuL/gqMAIv9gQUPSUEABosAgVAPEEEABSEEQgAYi/0hBw9JQQAGiwCBPA8QQQAFIQdCAAEkjACJgAS4RHs2NhoAjgH33QCABJUC1MKABOFsV2eABEiTQ12ABIFh1NiABKyR6wGABE41mDGABLhmItKABP/CKeGABMe1GU2ABL/aQN6ABBZwOOyABKV6U0aABIwLYYmABH7hucyABIBX3kuABOQNWGg2GgCOEPd3+En5Nfok+mf6//um/Xn9pf39/in+TP59/pX+sP7WAIoEA4v8i/9Qi/2L/omKBAOL/Iv+UIz8i/9JFYv+FwgWVwYCjP6L/UxQjP2L/Iv9i/6J',
+    clear: 'Cg==',
+  },
+  networks: {},
+} as unknown as Arc56Contract;
 
 /**
  * A state record containing binary data
@@ -33,22 +223,22 @@ export interface BinaryState {
   /**
    * Gets the state value as a Uint8Array
    */
-  asByteArray(): Uint8Array | undefined
+  asByteArray(): Uint8Array | undefined;
   /**
    * Gets the state value as a string
    */
-  asString(): string | undefined
+  asString(): string | undefined;
 }
 
 class BinaryStateValue implements BinaryState {
   constructor(private value: Uint8Array | undefined) {}
 
   asByteArray(): Uint8Array | undefined {
-    return this.value
+    return this.value;
   }
 
   asString(): string | undefined {
-    return this.value !== undefined ? Buffer.from(this.value).toString('utf-8') : undefined
+    return this.value !== undefined ? Buffer.from(this.value).toString('utf-8') : undefined;
   }
 }
 
@@ -60,60 +250,58 @@ export type Expand<T> = T extends (...args: infer A) => infer R
   ? (...args: Expand<A>) => Expand<R>
   : T extends infer O
     ? { [K in keyof O]: O[K] }
-    : never
-
+    : never;
 
 // Type definitions for ARC-56 structs
 
 export type AgentRecord = {
-  name: string,
-  endpoint: string,
-  metadata: string,
-  tier: bigint,
-  totalScore: bigint,
-  totalMaxScore: bigint,
-  testCount: bigint,
-  lastHeartbeatRound: bigint,
-  registrationRound: bigint,
-  stake: bigint
-}
-
+  name: string;
+  endpoint: string;
+  metadata: string;
+  tier: bigint;
+  totalScore: bigint;
+  totalMaxScore: bigint;
+  testCount: bigint;
+  lastHeartbeatRound: bigint;
+  registrationRound: bigint;
+  stake: bigint;
+};
 
 /**
  * Converts the ABI tuple representation of a AgentRecord to the struct representation
  */
-export function AgentRecordFromTuple(abiTuple: [string, string, string, bigint, bigint, bigint, bigint, bigint, bigint, bigint]) {
-  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.AgentRecord, APP_SPEC.structs) as AgentRecord
+export function AgentRecordFromTuple(
+  abiTuple: [string, string, string, bigint, bigint, bigint, bigint, bigint, bigint, bigint],
+) {
+  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.AgentRecord, APP_SPEC.structs) as AgentRecord;
 }
 
 export type TestResult = {
-  score: bigint,
-  maxScore: bigint,
-  category: string,
-  round: bigint
-}
-
+  score: bigint;
+  maxScore: bigint;
+  category: string;
+  round: bigint;
+};
 
 /**
  * Converts the ABI tuple representation of a TestResult to the struct representation
  */
 export function TestResultFromTuple(abiTuple: [bigint, bigint, string, bigint]) {
-  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.TestResult, APP_SPEC.structs) as TestResult
+  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.TestResult, APP_SPEC.structs) as TestResult;
 }
 
 export type Challenge = {
-  category: string,
-  description: string,
-  maxScore: bigint,
-  active: bigint
-}
-
+  category: string;
+  description: string;
+  maxScore: bigint;
+  active: bigint;
+};
 
 /**
  * Converts the ABI tuple representation of a Challenge to the struct representation
  */
 export function ChallengeFromTuple(abiTuple: [string, string, bigint, bigint]) {
-  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.Challenge, APP_SPEC.structs) as Challenge
+  return getABIStructFromABITuple(abiTuple, APP_SPEC.structs.Challenge, APP_SPEC.structs) as Challenge;
 }
 
 /**
@@ -124,108 +312,120 @@ export type FlockDirectoryArgs = {
    * The object representation of the arguments for each method
    */
   obj: {
-    'createApplication()void': Record<string, never>
+    'createApplication()void': Record<string, never>;
     'registerAgent(string,string,string,pay)void': {
-      name: string
-      endpoint: string
-      metadata: string
-      payment: AppMethodCallTransactionArgument
-    }
+      name: string;
+      endpoint: string;
+      metadata: string;
+      payment: AppMethodCallTransactionArgument;
+    };
     'updateAgent(string,string,string)void': {
-      name: string
-      endpoint: string
-      metadata: string
-    }
-    'heartbeat()void': Record<string, never>
-    'deregister()void': Record<string, never>
+      name: string;
+      endpoint: string;
+      metadata: string;
+    };
+    'heartbeat()void': Record<string, never>;
+    'deregister()void': Record<string, never>;
     'createChallenge(string,string,string,uint64)void': {
-      challengeId: string
-      category: string
-      description: string
-      maxScore: bigint | number
-    }
+      challengeId: string;
+      category: string;
+      description: string;
+      maxScore: bigint | number;
+    };
     'deactivateChallenge(string)void': {
-      challengeId: string
-    }
+      challengeId: string;
+    };
     'recordTestResult(address,string,uint64)void': {
-      agentAddress: string
-      challengeId: string
-      score: bigint | number
-    }
+      agentAddress: string;
+      challengeId: string;
+      score: bigint | number;
+    };
     'getAgentTier(address)uint64': {
-      agentAddress: string
-    }
+      agentAddress: string;
+    };
     'getAgentScore(address)uint64': {
-      agentAddress: string
-    }
+      agentAddress: string;
+    };
     'getAgentTestCount(address)uint64': {
-      agentAddress: string
-    }
+      agentAddress: string;
+    };
     'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)': {
-      agentAddress: string
-    }
+      agentAddress: string;
+    };
     'getChallengeInfo(string)(string,string,uint64,uint64)': {
-      challengeId: string
-    }
+      challengeId: string;
+    };
     'updateMinStake(uint64)void': {
-      newMinStake: bigint | number
-    }
+      newMinStake: bigint | number;
+    };
     'transferAdmin(address)void': {
-      newAdmin: string
-    }
+      newAdmin: string;
+    };
     'setRegistrationOpen(uint64)void': {
-      open: bigint | number
-    }
+      open: bigint | number;
+    };
     'adminRemoveAgent(address)void': {
-      agentAddress: string
-    }
-  }
+      agentAddress: string;
+    };
+  };
   /**
    * The tuple representation of the arguments for each method
    */
   tuple: {
-    'createApplication()void': []
-    'registerAgent(string,string,string,pay)void': [name: string, endpoint: string, metadata: string, payment: AppMethodCallTransactionArgument]
-    'updateAgent(string,string,string)void': [name: string, endpoint: string, metadata: string]
-    'heartbeat()void': []
-    'deregister()void': []
-    'createChallenge(string,string,string,uint64)void': [challengeId: string, category: string, description: string, maxScore: bigint | number]
-    'deactivateChallenge(string)void': [challengeId: string]
-    'recordTestResult(address,string,uint64)void': [agentAddress: string, challengeId: string, score: bigint | number]
-    'getAgentTier(address)uint64': [agentAddress: string]
-    'getAgentScore(address)uint64': [agentAddress: string]
-    'getAgentTestCount(address)uint64': [agentAddress: string]
-    'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)': [agentAddress: string]
-    'getChallengeInfo(string)(string,string,uint64,uint64)': [challengeId: string]
-    'updateMinStake(uint64)void': [newMinStake: bigint | number]
-    'transferAdmin(address)void': [newAdmin: string]
-    'setRegistrationOpen(uint64)void': [open: bigint | number]
-    'adminRemoveAgent(address)void': [agentAddress: string]
-  }
-}
+    'createApplication()void': [];
+    'registerAgent(string,string,string,pay)void': [
+      name: string,
+      endpoint: string,
+      metadata: string,
+      payment: AppMethodCallTransactionArgument,
+    ];
+    'updateAgent(string,string,string)void': [name: string, endpoint: string, metadata: string];
+    'heartbeat()void': [];
+    'deregister()void': [];
+    'createChallenge(string,string,string,uint64)void': [
+      challengeId: string,
+      category: string,
+      description: string,
+      maxScore: bigint | number,
+    ];
+    'deactivateChallenge(string)void': [challengeId: string];
+    'recordTestResult(address,string,uint64)void': [agentAddress: string, challengeId: string, score: bigint | number];
+    'getAgentTier(address)uint64': [agentAddress: string];
+    'getAgentScore(address)uint64': [agentAddress: string];
+    'getAgentTestCount(address)uint64': [agentAddress: string];
+    'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)': [
+      agentAddress: string,
+    ];
+    'getChallengeInfo(string)(string,string,uint64,uint64)': [challengeId: string];
+    'updateMinStake(uint64)void': [newMinStake: bigint | number];
+    'transferAdmin(address)void': [newAdmin: string];
+    'setRegistrationOpen(uint64)void': [open: bigint | number];
+    'adminRemoveAgent(address)void': [agentAddress: string];
+  };
+};
 
 /**
  * The return type for each method
  */
 export type FlockDirectoryReturns = {
-  'createApplication()void': void
-  'registerAgent(string,string,string,pay)void': void
-  'updateAgent(string,string,string)void': void
-  'heartbeat()void': void
-  'deregister()void': void
-  'createChallenge(string,string,string,uint64)void': void
-  'deactivateChallenge(string)void': void
-  'recordTestResult(address,string,uint64)void': void
-  'getAgentTier(address)uint64': bigint
-  'getAgentScore(address)uint64': bigint
-  'getAgentTestCount(address)uint64': bigint
-  'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)': AgentRecord
-  'getChallengeInfo(string)(string,string,uint64,uint64)': Challenge
-  'updateMinStake(uint64)void': void
-  'transferAdmin(address)void': void
-  'setRegistrationOpen(uint64)void': void
-  'adminRemoveAgent(address)void': void
-}
+  'createApplication()void': undefined;
+  'registerAgent(string,string,string,pay)void': undefined;
+  'updateAgent(string,string,string)void': undefined;
+  'heartbeat()void': undefined;
+  'deregister()void': undefined;
+  'createChallenge(string,string,string,uint64)void': undefined;
+  'deactivateChallenge(string)void': undefined;
+  'recordTestResult(address,string,uint64)void': undefined;
+  'getAgentTier(address)uint64': bigint;
+  'getAgentScore(address)uint64': bigint;
+  'getAgentTestCount(address)uint64': bigint;
+  'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)': AgentRecord;
+  'getChallengeInfo(string)(string,string,uint64,uint64)': Challenge;
+  'updateMinStake(uint64)void': undefined;
+  'transferAdmin(address)void': undefined;
+  'setRegistrationOpen(uint64)void': undefined;
+  'adminRemoveAgent(address)void': undefined;
+};
 
 /**
  * Defines the types of available calls and state of the FlockDirectory smart contract.
@@ -234,171 +434,237 @@ export type FlockDirectoryTypes = {
   /**
    * Maps method signatures / names to their argument and return types.
    */
-  methods:
-    & Record<'createApplication()void' | 'createApplication', {
-      argsObj: FlockDirectoryArgs['obj']['createApplication()void']
-      argsTuple: FlockDirectoryArgs['tuple']['createApplication()void']
-      returns: FlockDirectoryReturns['createApplication()void']
-    }>
-    & Record<'registerAgent(string,string,string,pay)void' | 'registerAgent', {
-      argsObj: FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
-      argsTuple: FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
-      returns: FlockDirectoryReturns['registerAgent(string,string,string,pay)void']
-    }>
-    & Record<'updateAgent(string,string,string)void' | 'updateAgent', {
-      argsObj: FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
-      argsTuple: FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
-      returns: FlockDirectoryReturns['updateAgent(string,string,string)void']
-    }>
-    & Record<'heartbeat()void' | 'heartbeat', {
-      argsObj: FlockDirectoryArgs['obj']['heartbeat()void']
-      argsTuple: FlockDirectoryArgs['tuple']['heartbeat()void']
-      returns: FlockDirectoryReturns['heartbeat()void']
-    }>
-    & Record<'deregister()void' | 'deregister', {
-      argsObj: FlockDirectoryArgs['obj']['deregister()void']
-      argsTuple: FlockDirectoryArgs['tuple']['deregister()void']
-      returns: FlockDirectoryReturns['deregister()void']
-    }>
-    & Record<'createChallenge(string,string,string,uint64)void' | 'createChallenge', {
-      argsObj: FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
-      argsTuple: FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
-      returns: FlockDirectoryReturns['createChallenge(string,string,string,uint64)void']
-    }>
-    & Record<'deactivateChallenge(string)void' | 'deactivateChallenge', {
-      argsObj: FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
-      argsTuple: FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
-      returns: FlockDirectoryReturns['deactivateChallenge(string)void']
-    }>
-    & Record<'recordTestResult(address,string,uint64)void' | 'recordTestResult', {
-      argsObj: FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
-      argsTuple: FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
-      returns: FlockDirectoryReturns['recordTestResult(address,string,uint64)void']
-    }>
-    & Record<'getAgentTier(address)uint64' | 'getAgentTier', {
-      argsObj: FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
-      argsTuple: FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
-      returns: FlockDirectoryReturns['getAgentTier(address)uint64']
-    }>
-    & Record<'getAgentScore(address)uint64' | 'getAgentScore', {
-      argsObj: FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
-      argsTuple: FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
-      returns: FlockDirectoryReturns['getAgentScore(address)uint64']
-    }>
-    & Record<'getAgentTestCount(address)uint64' | 'getAgentTestCount', {
-      argsObj: FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
-      argsTuple: FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
-      returns: FlockDirectoryReturns['getAgentTestCount(address)uint64']
-    }>
-    & Record<'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)' | 'getAgentInfo', {
-      argsObj: FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
-      argsTuple: FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
-      returns: FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
-    }>
-    & Record<'getChallengeInfo(string)(string,string,uint64,uint64)' | 'getChallengeInfo', {
-      argsObj: FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
-      argsTuple: FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
-      returns: FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)']
-    }>
-    & Record<'updateMinStake(uint64)void' | 'updateMinStake', {
-      argsObj: FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
-      argsTuple: FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
-      returns: FlockDirectoryReturns['updateMinStake(uint64)void']
-    }>
-    & Record<'transferAdmin(address)void' | 'transferAdmin', {
-      argsObj: FlockDirectoryArgs['obj']['transferAdmin(address)void']
-      argsTuple: FlockDirectoryArgs['tuple']['transferAdmin(address)void']
-      returns: FlockDirectoryReturns['transferAdmin(address)void']
-    }>
-    & Record<'setRegistrationOpen(uint64)void' | 'setRegistrationOpen', {
-      argsObj: FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
-      argsTuple: FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
-      returns: FlockDirectoryReturns['setRegistrationOpen(uint64)void']
-    }>
-    & Record<'adminRemoveAgent(address)void' | 'adminRemoveAgent', {
-      argsObj: FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
-      argsTuple: FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
-      returns: FlockDirectoryReturns['adminRemoveAgent(address)void']
-    }>
+  methods: Record<
+    'createApplication()void' | 'createApplication',
+    {
+      argsObj: FlockDirectoryArgs['obj']['createApplication()void'];
+      argsTuple: FlockDirectoryArgs['tuple']['createApplication()void'];
+      returns: FlockDirectoryReturns['createApplication()void'];
+    }
+  > &
+    Record<
+      'registerAgent(string,string,string,pay)void' | 'registerAgent',
+      {
+        argsObj: FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void'];
+        returns: FlockDirectoryReturns['registerAgent(string,string,string,pay)void'];
+      }
+    > &
+    Record<
+      'updateAgent(string,string,string)void' | 'updateAgent',
+      {
+        argsObj: FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void'];
+        returns: FlockDirectoryReturns['updateAgent(string,string,string)void'];
+      }
+    > &
+    Record<
+      'heartbeat()void' | 'heartbeat',
+      {
+        argsObj: FlockDirectoryArgs['obj']['heartbeat()void'];
+        argsTuple: FlockDirectoryArgs['tuple']['heartbeat()void'];
+        returns: FlockDirectoryReturns['heartbeat()void'];
+      }
+    > &
+    Record<
+      'deregister()void' | 'deregister',
+      {
+        argsObj: FlockDirectoryArgs['obj']['deregister()void'];
+        argsTuple: FlockDirectoryArgs['tuple']['deregister()void'];
+        returns: FlockDirectoryReturns['deregister()void'];
+      }
+    > &
+    Record<
+      'createChallenge(string,string,string,uint64)void' | 'createChallenge',
+      {
+        argsObj: FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void'];
+        returns: FlockDirectoryReturns['createChallenge(string,string,string,uint64)void'];
+      }
+    > &
+    Record<
+      'deactivateChallenge(string)void' | 'deactivateChallenge',
+      {
+        argsObj: FlockDirectoryArgs['obj']['deactivateChallenge(string)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['deactivateChallenge(string)void'];
+        returns: FlockDirectoryReturns['deactivateChallenge(string)void'];
+      }
+    > &
+    Record<
+      'recordTestResult(address,string,uint64)void' | 'recordTestResult',
+      {
+        argsObj: FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void'];
+        returns: FlockDirectoryReturns['recordTestResult(address,string,uint64)void'];
+      }
+    > &
+    Record<
+      'getAgentTier(address)uint64' | 'getAgentTier',
+      {
+        argsObj: FlockDirectoryArgs['obj']['getAgentTier(address)uint64'];
+        argsTuple: FlockDirectoryArgs['tuple']['getAgentTier(address)uint64'];
+        returns: FlockDirectoryReturns['getAgentTier(address)uint64'];
+      }
+    > &
+    Record<
+      'getAgentScore(address)uint64' | 'getAgentScore',
+      {
+        argsObj: FlockDirectoryArgs['obj']['getAgentScore(address)uint64'];
+        argsTuple: FlockDirectoryArgs['tuple']['getAgentScore(address)uint64'];
+        returns: FlockDirectoryReturns['getAgentScore(address)uint64'];
+      }
+    > &
+    Record<
+      'getAgentTestCount(address)uint64' | 'getAgentTestCount',
+      {
+        argsObj: FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'];
+        argsTuple: FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64'];
+        returns: FlockDirectoryReturns['getAgentTestCount(address)uint64'];
+      }
+    > &
+    Record<
+      'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)' | 'getAgentInfo',
+      {
+        argsObj: FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'];
+        argsTuple: FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'];
+        returns: FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'];
+      }
+    > &
+    Record<
+      'getChallengeInfo(string)(string,string,uint64,uint64)' | 'getChallengeInfo',
+      {
+        argsObj: FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'];
+        argsTuple: FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)'];
+        returns: FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)'];
+      }
+    > &
+    Record<
+      'updateMinStake(uint64)void' | 'updateMinStake',
+      {
+        argsObj: FlockDirectoryArgs['obj']['updateMinStake(uint64)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['updateMinStake(uint64)void'];
+        returns: FlockDirectoryReturns['updateMinStake(uint64)void'];
+      }
+    > &
+    Record<
+      'transferAdmin(address)void' | 'transferAdmin',
+      {
+        argsObj: FlockDirectoryArgs['obj']['transferAdmin(address)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['transferAdmin(address)void'];
+        returns: FlockDirectoryReturns['transferAdmin(address)void'];
+      }
+    > &
+    Record<
+      'setRegistrationOpen(uint64)void' | 'setRegistrationOpen',
+      {
+        argsObj: FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void'];
+        returns: FlockDirectoryReturns['setRegistrationOpen(uint64)void'];
+      }
+    > &
+    Record<
+      'adminRemoveAgent(address)void' | 'adminRemoveAgent',
+      {
+        argsObj: FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'];
+        argsTuple: FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void'];
+        returns: FlockDirectoryReturns['adminRemoveAgent(address)void'];
+      }
+    >;
   /**
    * Defines the shape of the state of the application.
    */
   state: {
     global: {
       keys: {
-        agentCount: bigint
-        minStake: bigint
-        admin: string
-        challengeCount: bigint
-        registrationOpen: bigint
-      }
-      maps: {}
-    }
+        agentCount: bigint;
+        minStake: bigint;
+        admin: string;
+        challengeCount: bigint;
+        registrationOpen: bigint;
+      };
+      maps: {};
+    };
     box: {
-      keys: {}
+      keys: {};
       maps: {
-        agents: Map<string, AgentRecord>
-        testResults: Map<[string, string], TestResult>
-        challenges: Map<string, Challenge>
-      }
-    }
-  }
-}
+        agents: Map<string, AgentRecord>;
+        testResults: Map<[string, string], TestResult>;
+        challenges: Map<string, Challenge>;
+      };
+    };
+  };
+};
 
 /**
  * Defines the possible abi call signatures.
  */
-export type FlockDirectorySignatures = keyof FlockDirectoryTypes['methods']
+export type FlockDirectorySignatures = keyof FlockDirectoryTypes['methods'];
 /**
  * Defines the possible abi call signatures for methods that return a non-void value.
  */
-export type FlockDirectoryNonVoidMethodSignatures = keyof FlockDirectoryTypes['methods'] extends infer T ? T extends keyof FlockDirectoryTypes['methods'] ? MethodReturn<T> extends void ? never : T  : never : never
+export type FlockDirectoryNonVoidMethodSignatures = keyof FlockDirectoryTypes['methods'] extends infer T
+  ? T extends keyof FlockDirectoryTypes['methods']
+    ? MethodReturn<T> extends void
+      ? never
+      : T
+    : never
+  : never;
 /**
  * Defines an object containing all relevant parameters for a single call to the contract.
  */
 export type CallParams<TArgs> = Expand<
-  Omit<AppClientMethodCallParams, 'method' | 'args' | 'onComplete'> &
-    {
-      /** The args for the ABI method call, either as an ordered array or an object */
-      args: Expand<TArgs>
-    }
->
+  Omit<AppClientMethodCallParams, 'method' | 'args' | 'onComplete'> & {
+    /** The args for the ABI method call, either as an ordered array or an object */
+    args: Expand<TArgs>;
+  }
+>;
 /**
  * Maps a method signature from the FlockDirectory smart contract to the method's arguments in either tuple or struct form
  */
-export type MethodArgs<TSignature extends FlockDirectorySignatures> = FlockDirectoryTypes['methods'][TSignature]['argsObj' | 'argsTuple']
+export type MethodArgs<TSignature extends FlockDirectorySignatures> = FlockDirectoryTypes['methods'][TSignature][
+  | 'argsObj'
+  | 'argsTuple'];
 /**
  * Maps a method signature from the FlockDirectory smart contract to the method's return type
  */
-export type MethodReturn<TSignature extends FlockDirectorySignatures> = FlockDirectoryTypes['methods'][TSignature]['returns']
+export type MethodReturn<TSignature extends FlockDirectorySignatures> =
+  FlockDirectoryTypes['methods'][TSignature]['returns'];
 
 /**
  * Defines the shape of the keyed global state of the application.
  */
-export type GlobalKeysState = FlockDirectoryTypes['state']['global']['keys']
+export type GlobalKeysState = FlockDirectoryTypes['state']['global']['keys'];
 
 /**
  * Defines the shape of the keyed box state of the application.
  */
-export type BoxKeysState = FlockDirectoryTypes['state']['box']['keys']
-
+export type BoxKeysState = FlockDirectoryTypes['state']['box']['keys'];
 
 /**
  * Defines supported create method params for this smart contract
  */
 export type FlockDirectoryCreateCallParams =
-  | Expand<CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & {method: 'createApplication'} & {onComplete?: OnApplicationComplete.NoOpOC} & CreateSchema>
-  | Expand<CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & {method: 'createApplication()void'} & {onComplete?: OnApplicationComplete.NoOpOC} & CreateSchema>
+  | Expand<
+      CallParams<
+        FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+      > & { method: 'createApplication' } & { onComplete?: OnApplicationComplete.NoOpOC } & CreateSchema
+    >
+  | Expand<
+      CallParams<
+        FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+      > & { method: 'createApplication()void' } & { onComplete?: OnApplicationComplete.NoOpOC } & CreateSchema
+    >;
 /**
  * Defines arguments required for the deploy method.
  */
-export type FlockDirectoryDeployParams = Expand<Omit<AppFactoryDeployParams, 'createParams' | 'updateParams' | 'deleteParams'> & {
-  /**
-   * Create transaction parameters to use if a create needs to be issued as part of deployment; use `method` to define ABI call (if available) or leave out for a bare call (if available)
-   */
-  createParams?: FlockDirectoryCreateCallParams
-}>
-
+export type FlockDirectoryDeployParams = Expand<
+  Omit<AppFactoryDeployParams, 'createParams' | 'updateParams' | 'deleteParams'> & {
+    /**
+     * Create transaction parameters to use if a create needs to be issued as part of deployment; use `method` to define ABI call (if available) or leave out for a bare call (if available)
+     */
+    createParams?: FlockDirectoryCreateCallParams;
+  }
+>;
 
 /**
  * Exposes methods for constructing `AppClient` params objects for ABI calls to the FlockDirectory smart contract
@@ -409,13 +675,13 @@ export abstract class FlockDirectoryParamsFactory {
    */
   static get create() {
     return {
-      _resolveByMethod<TParams extends FlockDirectoryCreateCallParams & {method: string}>(params: TParams) {
-        switch(params.method) {
+      _resolveByMethod<TParams extends FlockDirectoryCreateCallParams & { method: string }>(params: TParams) {
+        switch (params.method) {
           case 'createApplication':
           case 'createApplication()void':
-            return FlockDirectoryParamsFactory.create.createApplication(params)
+            return FlockDirectoryParamsFactory.create.createApplication(params);
         }
-        throw new Error(`Unknown ' + verb + ' method`)
+        throw new Error(`Unknown ' + verb + ' method`);
       },
 
       /**
@@ -424,14 +690,19 @@ export abstract class FlockDirectoryParamsFactory {
        * @param params Parameters for the call
        * @returns An `AppClientMethodCallParams` object for the call
        */
-      createApplication(params: CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & AppClientCompilationParams & {onComplete?: OnApplicationComplete.NoOpOC}): AppClientMethodCallParams & AppClientCompilationParams & {onComplete?: OnApplicationComplete.NoOpOC} {
+      createApplication(
+        params: CallParams<
+          FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+        > &
+          AppClientCompilationParams & { onComplete?: OnApplicationComplete.NoOpOC },
+      ): AppClientMethodCallParams & AppClientCompilationParams & { onComplete?: OnApplicationComplete.NoOpOC } {
         return {
           ...params,
           method: 'createApplication()void' as const,
           args: Array.isArray(params.args) ? params.args : [],
-        }
+        };
       },
-    }
+    };
   }
 
   /**
@@ -440,12 +711,20 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static registerAgent(params: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static registerAgent(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+      | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'registerAgent(string,string,string,pay)void' as const,
-      args: Array.isArray(params.args) ? params.args : [params.args.name, params.args.endpoint, params.args.metadata, params.args.payment],
-    }
+      args: Array.isArray(params.args)
+        ? params.args
+        : [params.args.name, params.args.endpoint, params.args.metadata, params.args.payment],
+    };
   }
   /**
    * Constructs a no op call for the updateAgent(string,string,string)void ABI method
@@ -453,12 +732,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static updateAgent(params: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static updateAgent(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+      | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'updateAgent(string,string,string)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.name, params.args.endpoint, params.args.metadata],
-    }
+    };
   }
   /**
    * Constructs a no op call for the heartbeat()void ABI method
@@ -466,12 +751,15 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static heartbeat(params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static heartbeat(
+    params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'heartbeat()void' as const,
       args: Array.isArray(params.args) ? params.args : [],
-    }
+    };
   }
   /**
    * Constructs a no op call for the deregister()void ABI method
@@ -479,12 +767,17 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static deregister(params: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static deregister(
+    params: CallParams<
+      FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'deregister()void' as const,
       args: Array.isArray(params.args) ? params.args : [],
-    }
+    };
   }
   /**
    * Constructs a no op call for the createChallenge(string,string,string,uint64)void ABI method
@@ -492,12 +785,20 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static createChallenge(params: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static createChallenge(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+      | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'createChallenge(string,string,string,uint64)void' as const,
-      args: Array.isArray(params.args) ? params.args : [params.args.challengeId, params.args.category, params.args.description, params.args.maxScore],
-    }
+      args: Array.isArray(params.args)
+        ? params.args
+        : [params.args.challengeId, params.args.category, params.args.description, params.args.maxScore],
+    };
   }
   /**
    * Constructs a no op call for the deactivateChallenge(string)void ABI method
@@ -505,12 +806,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static deactivateChallenge(params: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static deactivateChallenge(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+      | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'deactivateChallenge(string)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.challengeId],
-    }
+    };
   }
   /**
    * Constructs a no op call for the recordTestResult(address,string,uint64)void ABI method
@@ -518,12 +825,20 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static recordTestResult(params: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static recordTestResult(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+      | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'recordTestResult(address,string,uint64)void' as const,
-      args: Array.isArray(params.args) ? params.args : [params.args.agentAddress, params.args.challengeId, params.args.score],
-    }
+      args: Array.isArray(params.args)
+        ? params.args
+        : [params.args.agentAddress, params.args.challengeId, params.args.score],
+    };
   }
   /**
    * Constructs a no op call for the getAgentTier(address)uint64 ABI method
@@ -531,12 +846,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static getAgentTier(params: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static getAgentTier(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'getAgentTier(address)uint64' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.agentAddress],
-    }
+    };
   }
   /**
    * Constructs a no op call for the getAgentScore(address)uint64 ABI method
@@ -544,12 +865,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static getAgentScore(params: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static getAgentScore(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'getAgentScore(address)uint64' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.agentAddress],
-    }
+    };
   }
   /**
    * Constructs a no op call for the getAgentTestCount(address)uint64 ABI method
@@ -557,12 +884,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static getAgentTestCount(params: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static getAgentTestCount(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'getAgentTestCount(address)uint64' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.agentAddress],
-    }
+    };
   }
   /**
    * Constructs a no op call for the getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64) ABI method
@@ -570,12 +903,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static getAgentInfo(params: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static getAgentInfo(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+      | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.agentAddress],
-    }
+    };
   }
   /**
    * Constructs a no op call for the getChallengeInfo(string)(string,string,uint64,uint64) ABI method
@@ -583,12 +922,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static getChallengeInfo(params: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static getChallengeInfo(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+      | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'getChallengeInfo(string)(string,string,uint64,uint64)' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.challengeId],
-    }
+    };
   }
   /**
    * Constructs a no op call for the updateMinStake(uint64)void ABI method
@@ -596,12 +941,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static updateMinStake(params: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static updateMinStake(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+      | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'updateMinStake(uint64)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.newMinStake],
-    }
+    };
   }
   /**
    * Constructs a no op call for the transferAdmin(address)void ABI method
@@ -609,12 +960,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static transferAdmin(params: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static transferAdmin(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+      | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'transferAdmin(address)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.newAdmin],
-    }
+    };
   }
   /**
    * Constructs a no op call for the setRegistrationOpen(uint64)void ABI method
@@ -622,12 +979,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static setRegistrationOpen(params: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static setRegistrationOpen(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+      | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'setRegistrationOpen(uint64)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.open],
-    }
+    };
   }
   /**
    * Constructs a no op call for the adminRemoveAgent(address)void ABI method
@@ -635,12 +998,18 @@ export abstract class FlockDirectoryParamsFactory {
    * @param params Parameters for the call
    * @returns An `AppClientMethodCallParams` object for the call
    */
-  static adminRemoveAgent(params: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']> & CallOnComplete): AppClientMethodCallParams & CallOnComplete {
+  static adminRemoveAgent(
+    params: CallParams<
+      | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+      | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+    > &
+      CallOnComplete,
+  ): AppClientMethodCallParams & CallOnComplete {
     return {
       ...params,
       method: 'adminRemoveAgent(address)void' as const,
       args: Array.isArray(params.args) ? params.args : [params.args.agentAddress],
-    }
+    };
   }
 }
 
@@ -651,7 +1020,7 @@ export class FlockDirectoryFactory {
   /**
    * The underlying `AppFactory` for when you want to have more flexibility
    */
-  public readonly appFactory: _AppFactory
+  public readonly appFactory: _AppFactory;
 
   /**
    * Creates a new instance of `FlockDirectoryFactory`
@@ -662,24 +1031,24 @@ export class FlockDirectoryFactory {
     this.appFactory = new _AppFactory({
       ...params,
       appSpec: APP_SPEC,
-    })
+    });
   }
-  
+
   /** The name of the app (from the ARC-32 / ARC-56 app spec or override). */
   public get appName() {
-    return this.appFactory.appName
+    return this.appFactory.appName;
   }
-  
+
   /** The ARC-56 app spec being used */
   get appSpec() {
-    return APP_SPEC
+    return APP_SPEC;
   }
-  
+
   /** A reference to the underlying `AlgorandClient` this app factory is using. */
   public get algorand(): AlgorandClient {
-    return this.appFactory.algorand
+    return this.appFactory.algorand;
   }
-  
+
   /**
    * Returns a new `AppClient` client for an app instance of the given ID.
    *
@@ -689,9 +1058,9 @@ export class FlockDirectoryFactory {
    * @returns The `AppClient`
    */
   public getAppClientById(params: AppFactoryAppClientParams) {
-    return new FlockDirectoryClient(this.appFactory.getAppClientById(params))
+    return new FlockDirectoryClient(this.appFactory.getAppClientById(params));
   }
-  
+
   /**
    * Returns a new `AppClient` client, resolving the app by creator address and name
    * using AlgoKit app deployment semantics (i.e. looking for the app creation transaction note).
@@ -701,10 +1070,8 @@ export class FlockDirectoryFactory {
    * @param params The parameters to create the app client
    * @returns The `AppClient`
    */
-  public async getAppClientByCreatorAndName(
-    params: AppFactoryResolveAppClientByCreatorAndNameParams,
-  ) {
-    return new FlockDirectoryClient(await this.appFactory.getAppClientByCreatorAndName(params))
+  public async getAppClientByCreatorAndName(params: AppFactoryResolveAppClientByCreatorAndNameParams) {
+    return new FlockDirectoryClient(await this.appFactory.getAppClientByCreatorAndName(params));
   }
 
   /**
@@ -716,9 +1083,13 @@ export class FlockDirectoryFactory {
   public async deploy(params: FlockDirectoryDeployParams = {}) {
     const result = await this.appFactory.deploy({
       ...params,
-      createParams: params.createParams?.method ? FlockDirectoryParamsFactory.create._resolveByMethod(params.createParams) : params.createParams ? params.createParams as (FlockDirectoryCreateCallParams & { args: Uint8Array[] }) : undefined,
-    })
-    return { result: result.result, appClient: new FlockDirectoryClient(result.appClient) }
+      createParams: params.createParams?.method
+        ? FlockDirectoryParamsFactory.create._resolveByMethod(params.createParams)
+        : params.createParams
+          ? (params.createParams as FlockDirectoryCreateCallParams & { args: Uint8Array[] })
+          : undefined,
+    });
+    return { result: result.result, appClient: new FlockDirectoryClient(result.appClient) };
   }
 
   /**
@@ -735,12 +1106,17 @@ export class FlockDirectoryFactory {
        * @param params The params for the smart contract call
        * @returns The create params
        */
-      createApplication: (params: CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & AppClientCompilationParams & CreateSchema & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-        return this.appFactory.params.create(FlockDirectoryParamsFactory.create.createApplication(params))
+      createApplication: (
+        params: CallParams<
+          FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+        > &
+          AppClientCompilationParams &
+          CreateSchema & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+      ) => {
+        return this.appFactory.params.create(FlockDirectoryParamsFactory.create.createApplication(params));
       },
     },
-
-  }
+  };
 
   /**
    * Create transactions for the current app
@@ -756,12 +1132,17 @@ export class FlockDirectoryFactory {
        * @param params The params for the smart contract call
        * @returns The create transaction
        */
-      createApplication: (params: CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & AppClientCompilationParams & CreateSchema & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-        return this.appFactory.createTransaction.create(FlockDirectoryParamsFactory.create.createApplication(params))
+      createApplication: (
+        params: CallParams<
+          FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+        > &
+          AppClientCompilationParams &
+          CreateSchema & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+      ) => {
+        return this.appFactory.createTransaction.create(FlockDirectoryParamsFactory.create.createApplication(params));
       },
     },
-
-  }
+  };
 
   /**
    * Send calls to the current app
@@ -777,14 +1158,25 @@ export class FlockDirectoryFactory {
        * @param params The params for the smart contract call
        * @returns The create result
        */
-      createApplication: async (params: CallParams<FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']> & AppClientCompilationParams & CreateSchema & SendParams & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-        const result = await this.appFactory.send.create(FlockDirectoryParamsFactory.create.createApplication(params))
-        return { result: { ...result.result, return: result.result.return as unknown as (undefined | FlockDirectoryReturns['createApplication()void']) }, appClient: new FlockDirectoryClient(result.appClient) }
+      createApplication: async (
+        params: CallParams<
+          FlockDirectoryArgs['obj']['createApplication()void'] | FlockDirectoryArgs['tuple']['createApplication()void']
+        > &
+          AppClientCompilationParams &
+          CreateSchema &
+          SendParams & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+      ) => {
+        const result = await this.appFactory.send.create(FlockDirectoryParamsFactory.create.createApplication(params));
+        return {
+          result: {
+            ...result.result,
+            return: result.result.return as unknown as undefined | FlockDirectoryReturns['createApplication()void'],
+          },
+          appClient: new FlockDirectoryClient(result.appClient),
+        };
       },
     },
-
-  }
-
+  };
 }
 /**
  * A client to make calls to the FlockDirectory smart contract
@@ -793,33 +1185,45 @@ export class FlockDirectoryClient {
   /**
    * The underlying `AppClient` for when you want to have more flexibility
    */
-  public readonly appClient: _AppClient
+  public readonly appClient: _AppClient;
 
   /**
    * Creates a new instance of `FlockDirectoryClient`
    *
    * @param appClient An `AppClient` instance which has been created with the FlockDirectory app spec
    */
-  constructor(appClient: _AppClient)
+  constructor(appClient: _AppClient);
   /**
    * Creates a new instance of `FlockDirectoryClient`
    *
    * @param params The parameters to initialise the app client with
    */
-  constructor(params: Omit<AppClientParams, 'appSpec'>)
+  constructor(params: Omit<AppClientParams, 'appSpec'>);
   constructor(appClientOrParams: _AppClient | Omit<AppClientParams, 'appSpec'>) {
-    this.appClient = appClientOrParams instanceof _AppClient ? appClientOrParams : new _AppClient({
-      ...appClientOrParams,
-      appSpec: APP_SPEC,
-    })
+    this.appClient =
+      appClientOrParams instanceof _AppClient
+        ? appClientOrParams
+        : new _AppClient({
+            ...appClientOrParams,
+            appSpec: APP_SPEC,
+          });
   }
 
   /**
    * Checks for decode errors on the given return value and maps the return value to the return type for the given method
    * @returns The typed return value or undefined if there was no value
    */
-  decodeReturnValue<TSignature extends FlockDirectoryNonVoidMethodSignatures>(method: TSignature, returnValue: ABIReturn | undefined) {
-    return returnValue !== undefined ? getArc56ReturnValue<MethodReturn<TSignature>>(returnValue, this.appClient.getABIMethod(method), APP_SPEC.structs) : undefined
+  decodeReturnValue<TSignature extends FlockDirectoryNonVoidMethodSignatures>(
+    method: TSignature,
+    returnValue: ABIReturn | undefined,
+  ) {
+    return returnValue !== undefined
+      ? getArc56ReturnValue<MethodReturn<TSignature>>(
+          returnValue,
+          this.appClient.getABIMethod(method),
+          APP_SPEC.structs,
+        )
+      : undefined;
   }
 
   /**
@@ -827,10 +1231,12 @@ export class FlockDirectoryClient {
    * using AlgoKit app deployment semantics (i.e. looking for the app creation transaction note).
    * @param params The parameters to create the app client
    */
-  public static async fromCreatorAndName(params: Omit<ResolveAppClientByCreatorAndName, 'appSpec'>): Promise<FlockDirectoryClient> {
-    return new FlockDirectoryClient(await _AppClient.fromCreatorAndName({...params, appSpec: APP_SPEC}))
+  public static async fromCreatorAndName(
+    params: Omit<ResolveAppClientByCreatorAndName, 'appSpec'>,
+  ): Promise<FlockDirectoryClient> {
+    return new FlockDirectoryClient(await _AppClient.fromCreatorAndName({ ...params, appSpec: APP_SPEC }));
   }
-  
+
   /**
    * Returns an `FlockDirectoryClient` instance for the current network based on
    * pre-determined network-specific app IDs specified in the ARC-56 app spec.
@@ -838,35 +1244,33 @@ export class FlockDirectoryClient {
    * If no IDs are in the app spec or the network isn't recognised, an error is thrown.
    * @param params The parameters to create the app client
    */
-  static async fromNetwork(
-    params: Omit<ResolveAppClientByNetwork, 'appSpec'>
-  ): Promise<FlockDirectoryClient> {
-    return new FlockDirectoryClient(await _AppClient.fromNetwork({...params, appSpec: APP_SPEC}))
+  static async fromNetwork(params: Omit<ResolveAppClientByNetwork, 'appSpec'>): Promise<FlockDirectoryClient> {
+    return new FlockDirectoryClient(await _AppClient.fromNetwork({ ...params, appSpec: APP_SPEC }));
   }
-  
+
   /** The ID of the app instance this client is linked to. */
   public get appId() {
-    return this.appClient.appId
+    return this.appClient.appId;
   }
-  
+
   /** The app address of the app instance this client is linked to. */
   public get appAddress() {
-    return this.appClient.appAddress
+    return this.appClient.appAddress;
   }
-  
+
   /** The name of the app. */
   public get appName() {
-    return this.appClient.appName
+    return this.appClient.appName;
   }
-  
+
   /** The ARC-56 app spec being used */
   public get appSpec() {
-    return this.appClient.appSpec
+    return this.appClient.appSpec;
   }
-  
+
   /** A reference to the underlying `AlgorandClient` this app client is using. */
   public get algorand(): AlgorandClient {
-    return this.appClient.algorand
+    return this.appClient.algorand;
   }
 
   /**
@@ -880,7 +1284,7 @@ export class FlockDirectoryClient {
      * @returns The clearState result
      */
     clearState: (params?: Expand<AppClientBareCallParams>) => {
-      return this.appClient.params.bare.clearState(params)
+      return this.appClient.params.bare.clearState(params);
     },
 
     /**
@@ -889,8 +1293,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    registerAgent: (params: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.registerAgent(params))
+    registerAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+        | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.registerAgent(params));
     },
 
     /**
@@ -899,8 +1308,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    updateAgent: (params: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.updateAgent(params))
+    updateAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+        | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.updateAgent(params));
     },
 
     /**
@@ -909,8 +1323,12 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    heartbeat: (params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.heartbeat(params))
+    heartbeat: (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.heartbeat(params));
     },
 
     /**
@@ -919,8 +1337,12 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    deregister: (params: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']> & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.deregister(params))
+    deregister: (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.deregister(params));
     },
 
     /**
@@ -929,8 +1351,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    createChallenge: (params: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.createChallenge(params))
+    createChallenge: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.createChallenge(params));
     },
 
     /**
@@ -939,8 +1366,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    deactivateChallenge: (params: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.deactivateChallenge(params))
+    deactivateChallenge: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+        | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.deactivateChallenge(params));
     },
 
     /**
@@ -949,8 +1381,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    recordTestResult: (params: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.recordTestResult(params))
+    recordTestResult: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.recordTestResult(params));
     },
 
     /**
@@ -959,8 +1396,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    getAgentTier: (params: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentTier(params))
+    getAgentTier: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentTier(params));
     },
 
     /**
@@ -969,8 +1411,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    getAgentScore: (params: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentScore(params))
+    getAgentScore: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentScore(params));
     },
 
     /**
@@ -979,8 +1426,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    getAgentTestCount: (params: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentTestCount(params))
+    getAgentTestCount: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentTestCount(params));
     },
 
     /**
@@ -989,8 +1441,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    getAgentInfo: (params: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentInfo(params))
+    getAgentInfo: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.getAgentInfo(params));
     },
 
     /**
@@ -999,8 +1456,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    getChallengeInfo: (params: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.getChallengeInfo(params))
+    getChallengeInfo: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.getChallengeInfo(params));
     },
 
     /**
@@ -1009,8 +1471,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    updateMinStake: (params: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.updateMinStake(params))
+    updateMinStake: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+        | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.updateMinStake(params));
     },
 
     /**
@@ -1019,8 +1486,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    transferAdmin: (params: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.transferAdmin(params))
+    transferAdmin: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+        | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.transferAdmin(params));
     },
 
     /**
@@ -1029,8 +1501,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    setRegistrationOpen: (params: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.setRegistrationOpen(params))
+    setRegistrationOpen: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+        | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.setRegistrationOpen(params));
     },
 
     /**
@@ -1039,11 +1516,15 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call params
      */
-    adminRemoveAgent: (params: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.params.call(FlockDirectoryParamsFactory.adminRemoveAgent(params))
+    adminRemoveAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+        | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.params.call(FlockDirectoryParamsFactory.adminRemoveAgent(params));
     },
-
-  }
+  };
 
   /**
    * Create transactions for the current app
@@ -1056,7 +1537,7 @@ export class FlockDirectoryClient {
      * @returns The clearState result
      */
     clearState: (params?: Expand<AppClientBareCallParams>) => {
-      return this.appClient.createTransaction.bare.clearState(params)
+      return this.appClient.createTransaction.bare.clearState(params);
     },
 
     /**
@@ -1065,8 +1546,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    registerAgent: (params: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.registerAgent(params))
+    registerAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+        | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.registerAgent(params));
     },
 
     /**
@@ -1075,8 +1561,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    updateAgent: (params: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.updateAgent(params))
+    updateAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+        | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.updateAgent(params));
     },
 
     /**
@@ -1085,8 +1576,12 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    heartbeat: (params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.heartbeat(params))
+    heartbeat: (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.heartbeat(params));
     },
 
     /**
@@ -1095,8 +1590,12 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    deregister: (params: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']> & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.deregister(params))
+    deregister: (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.deregister(params));
     },
 
     /**
@@ -1105,8 +1604,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    createChallenge: (params: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.createChallenge(params))
+    createChallenge: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.createChallenge(params));
     },
 
     /**
@@ -1115,8 +1619,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    deactivateChallenge: (params: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.deactivateChallenge(params))
+    deactivateChallenge: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+        | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.deactivateChallenge(params));
     },
 
     /**
@@ -1125,8 +1634,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    recordTestResult: (params: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.recordTestResult(params))
+    recordTestResult: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.recordTestResult(params));
     },
 
     /**
@@ -1135,8 +1649,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    getAgentTier: (params: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentTier(params))
+    getAgentTier: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentTier(params));
     },
 
     /**
@@ -1145,8 +1664,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    getAgentScore: (params: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentScore(params))
+    getAgentScore: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentScore(params));
     },
 
     /**
@@ -1155,8 +1679,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    getAgentTestCount: (params: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentTestCount(params))
+    getAgentTestCount: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentTestCount(params));
     },
 
     /**
@@ -1165,8 +1694,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    getAgentInfo: (params: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentInfo(params))
+    getAgentInfo: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getAgentInfo(params));
     },
 
     /**
@@ -1175,8 +1709,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    getChallengeInfo: (params: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getChallengeInfo(params))
+    getChallengeInfo: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.getChallengeInfo(params));
     },
 
     /**
@@ -1185,8 +1724,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    updateMinStake: (params: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.updateMinStake(params))
+    updateMinStake: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+        | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.updateMinStake(params));
     },
 
     /**
@@ -1195,8 +1739,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    transferAdmin: (params: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.transferAdmin(params))
+    transferAdmin: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+        | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.transferAdmin(params));
     },
 
     /**
@@ -1205,8 +1754,13 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    setRegistrationOpen: (params: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.setRegistrationOpen(params))
+    setRegistrationOpen: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+        | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.setRegistrationOpen(params));
     },
 
     /**
@@ -1215,11 +1769,15 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call transaction
      */
-    adminRemoveAgent: (params: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.adminRemoveAgent(params))
+    adminRemoveAgent: (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+        | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+      > & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      return this.appClient.createTransaction.call(FlockDirectoryParamsFactory.adminRemoveAgent(params));
     },
-
-  }
+  };
 
   /**
    * Send calls to the current app
@@ -1232,7 +1790,7 @@ export class FlockDirectoryClient {
      * @returns The clearState result
      */
     clearState: (params?: Expand<AppClientBareCallParams & SendParams>) => {
-      return this.appClient.send.bare.clearState(params)
+      return this.appClient.send.bare.clearState(params);
     },
 
     /**
@@ -1241,9 +1799,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    registerAgent: async (params: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.registerAgent(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['registerAgent(string,string,string,pay)void'])}
+    registerAgent: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+        | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.registerAgent(params));
+      return {
+        ...result,
+        return: result.return as unknown as
+          | undefined
+          | FlockDirectoryReturns['registerAgent(string,string,string,pay)void'],
+      };
     },
 
     /**
@@ -1252,9 +1821,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    updateAgent: async (params: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.updateAgent(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['updateAgent(string,string,string)void'])}
+    updateAgent: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+        | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.updateAgent(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['updateAgent(string,string,string)void'],
+      };
     },
 
     /**
@@ -1263,9 +1841,14 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    heartbeat: async (params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.heartbeat(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['heartbeat()void'])}
+    heartbeat: async (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.heartbeat(params));
+      return { ...result, return: result.return as unknown as undefined | FlockDirectoryReturns['heartbeat()void'] };
     },
 
     /**
@@ -1274,9 +1857,14 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    deregister: async (params: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC} = {args: []}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.deregister(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['deregister()void'])}
+    deregister: async (
+      params: CallParams<
+        FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC } = { args: [] },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.deregister(params));
+      return { ...result, return: result.return as unknown as undefined | FlockDirectoryReturns['deregister()void'] };
     },
 
     /**
@@ -1285,9 +1873,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    createChallenge: async (params: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.createChallenge(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['createChallenge(string,string,string,uint64)void'])}
+    createChallenge: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.createChallenge(params));
+      return {
+        ...result,
+        return: result.return as unknown as
+          | undefined
+          | FlockDirectoryReturns['createChallenge(string,string,string,uint64)void'],
+      };
     },
 
     /**
@@ -1296,9 +1895,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    deactivateChallenge: async (params: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.deactivateChallenge(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['deactivateChallenge(string)void'])}
+    deactivateChallenge: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+        | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.deactivateChallenge(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['deactivateChallenge(string)void'],
+      };
     },
 
     /**
@@ -1307,9 +1915,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    recordTestResult: async (params: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.recordTestResult(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['recordTestResult(address,string,uint64)void'])}
+    recordTestResult: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+        | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.recordTestResult(params));
+      return {
+        ...result,
+        return: result.return as unknown as
+          | undefined
+          | FlockDirectoryReturns['recordTestResult(address,string,uint64)void'],
+      };
     },
 
     /**
@@ -1318,9 +1937,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    getAgentTier: async (params: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentTier(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['getAgentTier(address)uint64'])}
+    getAgentTier: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentTier(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['getAgentTier(address)uint64'],
+      };
     },
 
     /**
@@ -1329,9 +1957,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    getAgentScore: async (params: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentScore(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['getAgentScore(address)uint64'])}
+    getAgentScore: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentScore(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['getAgentScore(address)uint64'],
+      };
     },
 
     /**
@@ -1340,9 +1977,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    getAgentTestCount: async (params: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentTestCount(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['getAgentTestCount(address)uint64'])}
+    getAgentTestCount: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+        | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentTestCount(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['getAgentTestCount(address)uint64'],
+      };
     },
 
     /**
@@ -1351,9 +1997,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    getAgentInfo: async (params: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentInfo(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'])}
+    getAgentInfo: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getAgentInfo(params));
+      return {
+        ...result,
+        return: result.return as unknown as
+          | undefined
+          | FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'],
+      };
     },
 
     /**
@@ -1362,9 +2019,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    getChallengeInfo: async (params: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getChallengeInfo(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)'])}
+    getChallengeInfo: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+        | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.getChallengeInfo(params));
+      return {
+        ...result,
+        return: result.return as unknown as
+          | undefined
+          | FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)'],
+      };
     },
 
     /**
@@ -1373,9 +2041,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    updateMinStake: async (params: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.updateMinStake(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['updateMinStake(uint64)void'])}
+    updateMinStake: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+        | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.updateMinStake(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['updateMinStake(uint64)void'],
+      };
     },
 
     /**
@@ -1384,9 +2061,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    transferAdmin: async (params: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.transferAdmin(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['transferAdmin(address)void'])}
+    transferAdmin: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+        | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.transferAdmin(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['transferAdmin(address)void'],
+      };
     },
 
     /**
@@ -1395,9 +2081,18 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    setRegistrationOpen: async (params: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.setRegistrationOpen(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['setRegistrationOpen(uint64)void'])}
+    setRegistrationOpen: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+        | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.setRegistrationOpen(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['setRegistrationOpen(uint64)void'],
+      };
     },
 
     /**
@@ -1406,12 +2101,20 @@ export class FlockDirectoryClient {
      * @param params The params for the smart contract call
      * @returns The call result
      */
-    adminRemoveAgent: async (params: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']> & SendParams & {onComplete?: OnApplicationComplete.NoOpOC}) => {
-      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.adminRemoveAgent(params))
-      return {...result, return: result.return as unknown as (undefined | FlockDirectoryReturns['adminRemoveAgent(address)void'])}
+    adminRemoveAgent: async (
+      params: CallParams<
+        | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+        | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+      > &
+        SendParams & { onComplete?: OnApplicationComplete.NoOpOC },
+    ) => {
+      const result = await this.appClient.send.call(FlockDirectoryParamsFactory.adminRemoveAgent(params));
+      return {
+        ...result,
+        return: result.return as unknown as undefined | FlockDirectoryReturns['adminRemoveAgent(address)void'],
+      };
     },
-
-  }
+  };
 
   /**
    * Clone this app client with different params
@@ -1420,7 +2123,7 @@ export class FlockDirectoryClient {
    * @returns A new app client with the altered params
    */
   public clone(params: CloneAppClientParams) {
-    return new FlockDirectoryClient(this.appClient.clone(params))
+    return new FlockDirectoryClient(this.appClient.clone(params));
   }
 
   /**
@@ -1435,35 +2138,45 @@ export class FlockDirectoryClient {
        * Get all current keyed values from global state
        */
       getAll: async (): Promise<Partial<Expand<GlobalKeysState>>> => {
-        const result = await this.appClient.state.global.getAll()
+        const result = await this.appClient.state.global.getAll();
         return {
           agentCount: result.agentCount,
           minStake: result.minStake,
           admin: result.admin,
           challengeCount: result.challengeCount,
           registrationOpen: result.registrationOpen,
-        }
+        };
       },
       /**
        * Get the current value of the agentCount key in global state
        */
-      agentCount: async (): Promise<bigint | undefined> => { return (await this.appClient.state.global.getValue("agentCount")) as bigint | undefined },
+      agentCount: async (): Promise<bigint | undefined> => {
+        return (await this.appClient.state.global.getValue('agentCount')) as bigint | undefined;
+      },
       /**
        * Get the current value of the minStake key in global state
        */
-      minStake: async (): Promise<bigint | undefined> => { return (await this.appClient.state.global.getValue("minStake")) as bigint | undefined },
+      minStake: async (): Promise<bigint | undefined> => {
+        return (await this.appClient.state.global.getValue('minStake')) as bigint | undefined;
+      },
       /**
        * Get the current value of the admin key in global state
        */
-      admin: async (): Promise<string | undefined> => { return (await this.appClient.state.global.getValue("admin")) as string | undefined },
+      admin: async (): Promise<string | undefined> => {
+        return (await this.appClient.state.global.getValue('admin')) as string | undefined;
+      },
       /**
        * Get the current value of the challengeCount key in global state
        */
-      challengeCount: async (): Promise<bigint | undefined> => { return (await this.appClient.state.global.getValue("challengeCount")) as bigint | undefined },
+      challengeCount: async (): Promise<bigint | undefined> => {
+        return (await this.appClient.state.global.getValue('challengeCount')) as bigint | undefined;
+      },
       /**
        * Get the current value of the registrationOpen key in global state
        */
-      registrationOpen: async (): Promise<bigint | undefined> => { return (await this.appClient.state.global.getValue("registrationOpen")) as bigint | undefined },
+      registrationOpen: async (): Promise<bigint | undefined> => {
+        return (await this.appClient.state.global.getValue('registrationOpen')) as bigint | undefined;
+      },
     },
     /**
      * Methods to access box state for the current FlockDirectory app
@@ -1473,9 +2186,8 @@ export class FlockDirectoryClient {
        * Get all current keyed values from box state
        */
       getAll: async (): Promise<Partial<Expand<BoxKeysState>>> => {
-        const result = await this.appClient.state.box.getAll()
-        return {
-        }
+        const _result = await this.appClient.state.box.getAll();
+        return {};
       },
       /**
        * Get values from the agents map in box state
@@ -1484,11 +2196,15 @@ export class FlockDirectoryClient {
         /**
          * Get all current values of the agents map in box state
          */
-        getMap: async (): Promise<Map<string, AgentRecord>> => { return (await this.appClient.state.box.getMap("agents")) as Map<string, AgentRecord> },
+        getMap: async (): Promise<Map<string, AgentRecord>> => {
+          return (await this.appClient.state.box.getMap('agents')) as Map<string, AgentRecord>;
+        },
         /**
          * Get a current value of the agents map by key from box state
          */
-        value: async (key: string): Promise<AgentRecord | undefined> => { return await this.appClient.state.box.getMapValue("agents", key) as AgentRecord | undefined },
+        value: async (key: string): Promise<AgentRecord | undefined> => {
+          return (await this.appClient.state.box.getMapValue('agents', key)) as AgentRecord | undefined;
+        },
       },
       /**
        * Get values from the testResults map in box state
@@ -1497,11 +2213,15 @@ export class FlockDirectoryClient {
         /**
          * Get all current values of the testResults map in box state
          */
-        getMap: async (): Promise<Map<[string, string], TestResult>> => { return (await this.appClient.state.box.getMap("testResults")) as Map<[string, string], TestResult> },
+        getMap: async (): Promise<Map<[string, string], TestResult>> => {
+          return (await this.appClient.state.box.getMap('testResults')) as Map<[string, string], TestResult>;
+        },
         /**
          * Get a current value of the testResults map by key from box state
          */
-        value: async (key: [string, string]): Promise<TestResult | undefined> => { return await this.appClient.state.box.getMapValue("testResults", key) as TestResult | undefined },
+        value: async (key: [string, string]): Promise<TestResult | undefined> => {
+          return (await this.appClient.state.box.getMapValue('testResults', key)) as TestResult | undefined;
+        },
       },
       /**
        * Get values from the challenges map in box state
@@ -1510,181 +2230,304 @@ export class FlockDirectoryClient {
         /**
          * Get all current values of the challenges map in box state
          */
-        getMap: async (): Promise<Map<string, Challenge>> => { return (await this.appClient.state.box.getMap("challenges")) as Map<string, Challenge> },
+        getMap: async (): Promise<Map<string, Challenge>> => {
+          return (await this.appClient.state.box.getMap('challenges')) as Map<string, Challenge>;
+        },
         /**
          * Get a current value of the challenges map by key from box state
          */
-        value: async (key: string): Promise<Challenge | undefined> => { return await this.appClient.state.box.getMapValue("challenges", key) as Challenge | undefined },
+        value: async (key: string): Promise<Challenge | undefined> => {
+          return (await this.appClient.state.box.getMapValue('challenges', key)) as Challenge | undefined;
+        },
       },
     },
-  }
+  };
 
   public newGroup(): FlockDirectoryComposer {
-    const client = this
-    const composer = this.algorand.newGroup()
-    let promiseChain:Promise<unknown> = Promise.resolve()
-    const resultMappers: Array<undefined | ((x: ABIReturn | undefined) => any)> = []
+    const client = this;
+    const composer = this.algorand.newGroup();
+    let promiseChain: Promise<unknown> = Promise.resolve();
+    const resultMappers: Array<undefined | ((x: ABIReturn | undefined) => any)> = [];
     return {
       /**
        * Add a registerAgent(string,string,string,pay)void method call against the FlockDirectory contract
        */
-      registerAgent(params: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.registerAgent(params)))
-        resultMappers.push(undefined)
-        return this
+      registerAgent(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+          | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.registerAgent(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a updateAgent(string,string,string)void method call against the FlockDirectory contract
        */
-      updateAgent(params: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.updateAgent(params)))
-        resultMappers.push(undefined)
-        return this
+      updateAgent(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+          | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.updateAgent(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a heartbeat()void method call against the FlockDirectory contract
        */
-      heartbeat(params: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.heartbeat(params)))
-        resultMappers.push(undefined)
-        return this
+      heartbeat(
+        params: CallParams<
+          FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.heartbeat(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a deregister()void method call against the FlockDirectory contract
        */
-      deregister(params: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.deregister(params)))
-        resultMappers.push(undefined)
-        return this
+      deregister(
+        params: CallParams<
+          FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.deregister(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a createChallenge(string,string,string,uint64)void method call against the FlockDirectory contract
        */
-      createChallenge(params: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.createChallenge(params)))
-        resultMappers.push(undefined)
-        return this
+      createChallenge(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+          | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.createChallenge(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a deactivateChallenge(string)void method call against the FlockDirectory contract
        */
-      deactivateChallenge(params: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.deactivateChallenge(params)))
-        resultMappers.push(undefined)
-        return this
+      deactivateChallenge(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+          | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.deactivateChallenge(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a recordTestResult(address,string,uint64)void method call against the FlockDirectory contract
        */
-      recordTestResult(params: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.recordTestResult(params)))
-        resultMappers.push(undefined)
-        return this
+      recordTestResult(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+          | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.recordTestResult(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a getAgentTier(address)uint64 method call against the FlockDirectory contract
        */
-      getAgentTier(params: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.getAgentTier(params)))
-        resultMappers.push((v) => client.decodeReturnValue('getAgentTier(address)uint64', v))
-        return this
+      getAgentTier(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+          | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.getAgentTier(params)),
+        );
+        resultMappers.push((v) => client.decodeReturnValue('getAgentTier(address)uint64', v));
+        return this;
       },
       /**
        * Add a getAgentScore(address)uint64 method call against the FlockDirectory contract
        */
-      getAgentScore(params: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.getAgentScore(params)))
-        resultMappers.push((v) => client.decodeReturnValue('getAgentScore(address)uint64', v))
-        return this
+      getAgentScore(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+          | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.getAgentScore(params)),
+        );
+        resultMappers.push((v) => client.decodeReturnValue('getAgentScore(address)uint64', v));
+        return this;
       },
       /**
        * Add a getAgentTestCount(address)uint64 method call against the FlockDirectory contract
        */
-      getAgentTestCount(params: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.getAgentTestCount(params)))
-        resultMappers.push((v) => client.decodeReturnValue('getAgentTestCount(address)uint64', v))
-        return this
+      getAgentTestCount(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+          | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.getAgentTestCount(params)),
+        );
+        resultMappers.push((v) => client.decodeReturnValue('getAgentTestCount(address)uint64', v));
+        return this;
       },
       /**
        * Add a getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64) method call against the FlockDirectory contract
        */
-      getAgentInfo(params: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.getAgentInfo(params)))
-        resultMappers.push((v) => client.decodeReturnValue('getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)', v))
-        return this
+      getAgentInfo(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+          | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.getAgentInfo(params)),
+        );
+        resultMappers.push((v) =>
+          client.decodeReturnValue(
+            'getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)',
+            v,
+          ),
+        );
+        return this;
       },
       /**
        * Add a getChallengeInfo(string)(string,string,uint64,uint64) method call against the FlockDirectory contract
        */
-      getChallengeInfo(params: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.getChallengeInfo(params)))
-        resultMappers.push((v) => client.decodeReturnValue('getChallengeInfo(string)(string,string,uint64,uint64)', v))
-        return this
+      getChallengeInfo(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+          | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.getChallengeInfo(params)),
+        );
+        resultMappers.push((v) => client.decodeReturnValue('getChallengeInfo(string)(string,string,uint64,uint64)', v));
+        return this;
       },
       /**
        * Add a updateMinStake(uint64)void method call against the FlockDirectory contract
        */
-      updateMinStake(params: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.updateMinStake(params)))
-        resultMappers.push(undefined)
-        return this
+      updateMinStake(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+          | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.updateMinStake(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a transferAdmin(address)void method call against the FlockDirectory contract
        */
-      transferAdmin(params: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.transferAdmin(params)))
-        resultMappers.push(undefined)
-        return this
+      transferAdmin(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+          | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.transferAdmin(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a setRegistrationOpen(uint64)void method call against the FlockDirectory contract
        */
-      setRegistrationOpen(params: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.setRegistrationOpen(params)))
-        resultMappers.push(undefined)
-        return this
+      setRegistrationOpen(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+          | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.setRegistrationOpen(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a adminRemoveAgent(address)void method call against the FlockDirectory contract
        */
-      adminRemoveAgent(params: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']> & {onComplete?: OnApplicationComplete.NoOpOC}) {
-        promiseChain = promiseChain.then(async () => composer.addAppCallMethodCall(await client.params.adminRemoveAgent(params)))
-        resultMappers.push(undefined)
-        return this
+      adminRemoveAgent(
+        params: CallParams<
+          | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+          | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+        > & { onComplete?: OnApplicationComplete.NoOpOC },
+      ) {
+        promiseChain = promiseChain.then(async () =>
+          composer.addAppCallMethodCall(await client.params.adminRemoveAgent(params)),
+        );
+        resultMappers.push(undefined);
+        return this;
       },
       /**
        * Add a clear state call to the FlockDirectory contract
        */
       clearState(params: AppClientBareCallParams) {
-        promiseChain = promiseChain.then(() => composer.addAppCall(client.params.clearState(params)))
-        return this
+        promiseChain = promiseChain.then(() => composer.addAppCall(client.params.clearState(params)));
+        return this;
       },
       addTransaction(txn: Transaction, signer?: TransactionSigner) {
-        promiseChain = promiseChain.then(() => composer.addTransaction(txn, signer))
-        return this
+        promiseChain = promiseChain.then(() => composer.addTransaction(txn, signer));
+        return this;
       },
       async composer() {
-        await promiseChain
-        return composer
+        await promiseChain;
+        return composer;
       },
       async simulate(options?: SimulateOptions) {
-        await promiseChain
-        const result = await (!options ? composer.simulate() : composer.simulate(options))
+        await promiseChain;
+        const result = await (!options ? composer.simulate() : composer.simulate(options));
         return {
           ...result,
-          returns: result.returns?.map((val, i) => resultMappers[i] !== undefined ? resultMappers[i]!(val) : val.returnValue)
-        }
+          returns: result.returns?.map((val, i) =>
+            resultMappers[i] !== undefined ? resultMappers[i]!(val) : val.returnValue,
+          ),
+        };
       },
       async send(params?: SendParams) {
-        await promiseChain
-        const result = await composer.send(params)
+        await promiseChain;
+        const result = await composer.send(params);
         return {
           ...result,
-          returns: result.returns?.map((val, i) => resultMappers[i] !== undefined ? resultMappers[i]!(val) : val.returnValue)
-        }
-      }
-    } as unknown as FlockDirectoryComposer
+          returns: result.returns?.map((val, i) =>
+            resultMappers[i] !== undefined ? resultMappers[i]!(val) : val.returnValue,
+          ),
+        };
+      },
+    } as unknown as FlockDirectoryComposer;
   }
 }
 export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
@@ -1695,7 +2538,14 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  registerAgent(params?: CallParams<FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void'] | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['registerAgent(string,string,string,pay)void'] | undefined]>
+  registerAgent(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['registerAgent(string,string,string,pay)void']
+      | FlockDirectoryArgs['tuple']['registerAgent(string,string,string,pay)void']
+    >,
+  ): FlockDirectoryComposer<
+    [...TReturns, FlockDirectoryReturns['registerAgent(string,string,string,pay)void'] | undefined]
+  >;
 
   /**
    * Calls the updateAgent(string,string,string)void ABI method.
@@ -1704,7 +2554,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  updateAgent(params?: CallParams<FlockDirectoryArgs['obj']['updateAgent(string,string,string)void'] | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['updateAgent(string,string,string)void'] | undefined]>
+  updateAgent(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['updateAgent(string,string,string)void']
+      | FlockDirectoryArgs['tuple']['updateAgent(string,string,string)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['updateAgent(string,string,string)void'] | undefined]>;
 
   /**
    * Calls the heartbeat()void ABI method.
@@ -1713,7 +2568,9 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  heartbeat(params?: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['heartbeat()void'] | undefined]>
+  heartbeat(
+    params?: CallParams<FlockDirectoryArgs['obj']['heartbeat()void'] | FlockDirectoryArgs['tuple']['heartbeat()void']>,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['heartbeat()void'] | undefined]>;
 
   /**
    * Calls the deregister()void ABI method.
@@ -1722,7 +2579,11 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  deregister(params?: CallParams<FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['deregister()void'] | undefined]>
+  deregister(
+    params?: CallParams<
+      FlockDirectoryArgs['obj']['deregister()void'] | FlockDirectoryArgs['tuple']['deregister()void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['deregister()void'] | undefined]>;
 
   /**
    * Calls the createChallenge(string,string,string,uint64)void ABI method.
@@ -1731,7 +2592,14 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  createChallenge(params?: CallParams<FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void'] | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['createChallenge(string,string,string,uint64)void'] | undefined]>
+  createChallenge(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['createChallenge(string,string,string,uint64)void']
+      | FlockDirectoryArgs['tuple']['createChallenge(string,string,string,uint64)void']
+    >,
+  ): FlockDirectoryComposer<
+    [...TReturns, FlockDirectoryReturns['createChallenge(string,string,string,uint64)void'] | undefined]
+  >;
 
   /**
    * Calls the deactivateChallenge(string)void ABI method.
@@ -1740,7 +2608,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  deactivateChallenge(params?: CallParams<FlockDirectoryArgs['obj']['deactivateChallenge(string)void'] | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['deactivateChallenge(string)void'] | undefined]>
+  deactivateChallenge(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['deactivateChallenge(string)void']
+      | FlockDirectoryArgs['tuple']['deactivateChallenge(string)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['deactivateChallenge(string)void'] | undefined]>;
 
   /**
    * Calls the recordTestResult(address,string,uint64)void ABI method.
@@ -1749,7 +2622,14 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  recordTestResult(params?: CallParams<FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void'] | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['recordTestResult(address,string,uint64)void'] | undefined]>
+  recordTestResult(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['recordTestResult(address,string,uint64)void']
+      | FlockDirectoryArgs['tuple']['recordTestResult(address,string,uint64)void']
+    >,
+  ): FlockDirectoryComposer<
+    [...TReturns, FlockDirectoryReturns['recordTestResult(address,string,uint64)void'] | undefined]
+  >;
 
   /**
    * Calls the getAgentTier(address)uint64 ABI method.
@@ -1758,7 +2638,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  getAgentTier(params?: CallParams<FlockDirectoryArgs['obj']['getAgentTier(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentTier(address)uint64'] | undefined]>
+  getAgentTier(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentTier(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentTier(address)uint64']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentTier(address)uint64'] | undefined]>;
 
   /**
    * Calls the getAgentScore(address)uint64 ABI method.
@@ -1767,7 +2652,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  getAgentScore(params?: CallParams<FlockDirectoryArgs['obj']['getAgentScore(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentScore(address)uint64'] | undefined]>
+  getAgentScore(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentScore(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentScore(address)uint64']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentScore(address)uint64'] | undefined]>;
 
   /**
    * Calls the getAgentTestCount(address)uint64 ABI method.
@@ -1776,7 +2666,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  getAgentTestCount(params?: CallParams<FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64'] | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentTestCount(address)uint64'] | undefined]>
+  getAgentTestCount(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentTestCount(address)uint64']
+      | FlockDirectoryArgs['tuple']['getAgentTestCount(address)uint64']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentTestCount(address)uint64'] | undefined]>;
 
   /**
    * Calls the getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64) ABI method.
@@ -1785,7 +2680,20 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  getAgentInfo(params?: CallParams<FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)'] | undefined]>
+  getAgentInfo(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+      | FlockDirectoryArgs['tuple']['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+    >,
+  ): FlockDirectoryComposer<
+    [
+      ...TReturns,
+      (
+        | FlockDirectoryReturns['getAgentInfo(address)(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)']
+        | undefined
+      ),
+    ]
+  >;
 
   /**
    * Calls the getChallengeInfo(string)(string,string,uint64,uint64) ABI method.
@@ -1794,7 +2702,14 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  getChallengeInfo(params?: CallParams<FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)'] | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)'] | undefined]>
+  getChallengeInfo(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['getChallengeInfo(string)(string,string,uint64,uint64)']
+      | FlockDirectoryArgs['tuple']['getChallengeInfo(string)(string,string,uint64,uint64)']
+    >,
+  ): FlockDirectoryComposer<
+    [...TReturns, FlockDirectoryReturns['getChallengeInfo(string)(string,string,uint64,uint64)'] | undefined]
+  >;
 
   /**
    * Calls the updateMinStake(uint64)void ABI method.
@@ -1803,7 +2718,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  updateMinStake(params?: CallParams<FlockDirectoryArgs['obj']['updateMinStake(uint64)void'] | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['updateMinStake(uint64)void'] | undefined]>
+  updateMinStake(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['updateMinStake(uint64)void']
+      | FlockDirectoryArgs['tuple']['updateMinStake(uint64)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['updateMinStake(uint64)void'] | undefined]>;
 
   /**
    * Calls the transferAdmin(address)void ABI method.
@@ -1812,7 +2732,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  transferAdmin(params?: CallParams<FlockDirectoryArgs['obj']['transferAdmin(address)void'] | FlockDirectoryArgs['tuple']['transferAdmin(address)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['transferAdmin(address)void'] | undefined]>
+  transferAdmin(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['transferAdmin(address)void']
+      | FlockDirectoryArgs['tuple']['transferAdmin(address)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['transferAdmin(address)void'] | undefined]>;
 
   /**
    * Calls the setRegistrationOpen(uint64)void ABI method.
@@ -1821,7 +2746,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  setRegistrationOpen(params?: CallParams<FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void'] | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['setRegistrationOpen(uint64)void'] | undefined]>
+  setRegistrationOpen(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['setRegistrationOpen(uint64)void']
+      | FlockDirectoryArgs['tuple']['setRegistrationOpen(uint64)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['setRegistrationOpen(uint64)void'] | undefined]>;
 
   /**
    * Calls the adminRemoveAgent(address)void ABI method.
@@ -1830,7 +2760,12 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  adminRemoveAgent(params?: CallParams<FlockDirectoryArgs['obj']['adminRemoveAgent(address)void'] | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']>): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['adminRemoveAgent(address)void'] | undefined]>
+  adminRemoveAgent(
+    params?: CallParams<
+      | FlockDirectoryArgs['obj']['adminRemoveAgent(address)void']
+      | FlockDirectoryArgs['tuple']['adminRemoveAgent(address)void']
+    >,
+  ): FlockDirectoryComposer<[...TReturns, FlockDirectoryReturns['adminRemoveAgent(address)void'] | undefined]>;
 
   /**
    * Makes a clear_state call to an existing instance of the FlockDirectory smart contract.
@@ -1838,7 +2773,7 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param args The arguments for the bare call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  clearState(params?: AppClientBareCallParams): FlockDirectoryComposer<[...TReturns, undefined]>
+  clearState(params?: AppClientBareCallParams): FlockDirectoryComposer<[...TReturns, undefined]>;
 
   /**
    * Adds a transaction to the composer
@@ -1846,23 +2781,28 @@ export type FlockDirectoryComposer<TReturns extends [...any[]] = []> = {
    * @param txn A transaction to add to the transaction group
    * @param signer The optional signer to use when signing this transaction.
    */
-  addTransaction(txn: Transaction, signer?: TransactionSigner): FlockDirectoryComposer<TReturns>
+  addTransaction(txn: Transaction, signer?: TransactionSigner): FlockDirectoryComposer<TReturns>;
   /**
    * Returns the underlying AtomicTransactionComposer instance
    */
-  composer(): Promise<TransactionComposer>
+  composer(): Promise<TransactionComposer>;
   /**
    * Simulates the transaction group and returns the result
    */
-  simulate(): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>
-  simulate(options: SkipSignaturesSimulateOptions): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>
-  simulate(options: RawSimulateOptions): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>
+  simulate(): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>;
+  simulate(
+    options: SkipSignaturesSimulateOptions,
+  ): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>;
+  simulate(
+    options: RawSimulateOptions,
+  ): Promise<FlockDirectoryComposerResults<TReturns> & { simulateResponse: modelsv2.SimulateResponse }>;
   /**
    * Sends the transaction group to the network and returns the results
    */
-  send(params?: SendParams): Promise<FlockDirectoryComposerResults<TReturns>>
-}
-export type FlockDirectoryComposerResults<TReturns extends [...any[]]> = Expand<SendAtomicTransactionComposerResults & {
-  returns: TReturns
-}>
-
+  send(params?: SendParams): Promise<FlockDirectoryComposerResults<TReturns>>;
+};
+export type FlockDirectoryComposerResults<TReturns extends [...any[]]> = Expand<
+  SendAtomicTransactionComposerResults & {
+    returns: TReturns;
+  }
+>;

@@ -371,7 +371,11 @@ export class AudioReceiver extends EventEmitter {
         return;
       }
 
-      log.info('Audio stream ended, transcribing', { userId, durationMs: Math.round(durationMs), rms: Math.round(rms) });
+      log.info('Audio stream ended, transcribing', {
+        userId,
+        durationMs: Math.round(durationMs),
+        rms: Math.round(rms),
+      });
 
       const wav = pcmToWav(pcm, SAMPLE_RATE, CHANNELS);
 
@@ -395,7 +399,11 @@ export class AudioReceiver extends EventEmitter {
     try {
       // Use a natural conversational prompt that Whisper won't echo back.
       // Avoid phrases like "This is in English" — Whisper hallucinates those on short clips.
-      const result = await transcribe({ audio: wav, format: 'wav', prompt: 'Discord voice chat between friends discussing software projects.' });
+      const result = await transcribe({
+        audio: wav,
+        format: 'wav',
+        prompt: 'Discord voice chat between friends discussing software projects.',
+      });
 
       const trimmed = result.text.trim();
       if (!trimmed) {
@@ -404,7 +412,10 @@ export class AudioReceiver extends EventEmitter {
       }
 
       // Filter known Whisper hallucination phrases
-      const normalized = trimmed.toLowerCase().replace(/[.!?,;:\s]+$/g, '').trim();
+      const normalized = trimmed
+        .toLowerCase()
+        .replace(/[.!?,;:\s]+$/g, '')
+        .trim();
       if (WHISPER_HALLUCINATIONS.has(normalized)) {
         log.debug('Filtered Whisper hallucination', { userId, text: trimmed });
         return;
