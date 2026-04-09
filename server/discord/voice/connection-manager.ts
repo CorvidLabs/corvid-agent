@@ -448,6 +448,10 @@ export class VoiceConnectionManager {
       this.players.set(guildId, player);
     }
 
+    // Remember if we were listening — rejoin() disrupts the receiver
+    const wasListening = this.isListening(guildId);
+    const info = this.connections.get(guildId);
+
     // Unmute for playback
     connection.rejoin({
       ...connection.joinConfig,
@@ -465,6 +469,21 @@ export class VoiceConnectionManager {
     }
 
     log.info('TTS playback complete', { guildId, durationMs: result.durationMs });
+
+    // rejoin() cycles the connection through Signalling → Connecting → Ready,
+    // which rebuilds the networking layer and kills the AudioReceiver's
+    // speaking event subscriptions. Restart listening with a fresh receiver.
+    if (wasListening) {
+      try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
+      } catch {
+        log.warn('Connection did not return to Ready after speak — listening not restarted', { guildId });
+        return;
+      }
+      this.stopListening(guildId);
+      this.startListening(guildId, info?.transcriptionChannelId);
+      log.info('Restarted listening after TTS playback', { guildId });
+    }
   }
 
   /** Stop current TTS playback in a guild. */
