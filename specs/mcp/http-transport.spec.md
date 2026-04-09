@@ -21,7 +21,7 @@ Exposes corvid-agent MCP tools over Streamable HTTP at the `/mcp` endpoint. This
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleMcpHttpRequest` | `req: Request, baseUrl: string` | `Promise<Response>` | Routes an incoming HTTP request to the appropriate MCP transport. Creates new sessions for POST/GET, routes existing sessions by `mcp-session-id` header, returns 405 for unsupported methods. Internally creates an `McpServer` with 17 corvid tools (health, agents, sessions, messaging, memory, work tasks, projects) that proxy to the local REST API. |
+| `handleMcpHttpRequest` | `req: Request, baseUrl: string` | `Promise<Response>` | Routes an incoming HTTP request to the appropriate MCP transport. Creates new sessions for POST/GET, routes existing sessions by `mcp-session-id` header, returns 405 for unsupported methods. Internally creates an `McpServer` with 24 corvid tools (health, agents, sessions, messaging, memory, observations, work tasks, projects) that proxy to the local REST API. |
 
 ## Invariants
 
@@ -89,8 +89,40 @@ Exposes corvid-agent MCP tools over Streamable HTTP at the `/mcp` endpoint. This
 |--------|-------------|
 | `server/index` | `handleMcpHttpRequest` -- mounted at `/mcp` route in the main Bun server |
 
+## MCP Tools Exposed
+
+The MCP server exposes 24 tools that proxy to the local REST API:
+
+| Tool | Category | Description |
+|------|----------|-------------|
+| `corvid_health` | Health | Check server health status |
+| `corvid_list_agents` | Agents | List all registered agents |
+| `corvid_get_agent` | Agents | Get agent details by ID |
+| `corvid_create_session` | Sessions | Create a new agent session |
+| `corvid_list_sessions` | Sessions | List sessions with optional status filter |
+| `corvid_get_session` | Sessions | Get session details by ID |
+| `corvid_stop_session` | Sessions | Stop a running session |
+| `corvid_send_message` | Messaging | Send a message to another agent |
+| `corvid_save_memory` | Memory | Save to short-term SQLite storage |
+| `corvid_recall_memory` | Memory | Recall memories by key/query |
+| `corvid_read_on_chain_memories` | Memory | Read from Algorand blockchain |
+| `corvid_sync_on_chain_memories` | Memory | Sync on-chain to local cache |
+| `corvid_delete_memory` | Memory | Delete an ARC-69 memory |
+| `corvid_promote_memory` | Memory | Promote short-term to on-chain |
+| `corvid_record_observation` | Observations | Record a short-term observation |
+| `corvid_list_observations` | Observations | List/search observations |
+| `corvid_boost_observation` | Observations | Boost observation relevance |
+| `corvid_dismiss_observation` | Observations | Dismiss an observation |
+| `corvid_observation_stats` | Observations | Get observation statistics |
+| `corvid_create_work_task` | Work Tasks | Create a work task on a branch |
+| `corvid_list_work_tasks` | Work Tasks | List work tasks with optional filter |
+| `corvid_get_work_task` | Work Tasks | Get work task details by ID |
+| `corvid_list_projects` | Projects | List all configured projects |
+| `corvid_get_project` | Projects | Get project details by ID |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-19 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Updated tool count from 17 to 24: added corvid_promote_memory, corvid_delete_memory, corvid_record_observation, corvid_list_observations, corvid_boost_observation, corvid_dismiss_observation, corvid_observation_stats. Added corvid_save_memory description updated to short-term SQLite |

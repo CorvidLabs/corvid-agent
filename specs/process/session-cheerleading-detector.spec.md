@@ -6,7 +6,7 @@ files:
   - server/process/session-cheerleading-detector.ts
 db_tables: []
 depends_on:
-  - specs/lib/session-analysis.spec.md
+  - specs/lib/session/session-analysis.spec.md
   - specs/process/process-manager.spec.md
 ---
 

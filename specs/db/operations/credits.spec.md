@@ -9,7 +9,7 @@ db_tables:
   - credit_transactions
   - credit_config
 depends_on:
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 ---
 
 # Credits System

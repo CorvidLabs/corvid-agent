@@ -25,7 +25,7 @@ Provides an immutable, append-only audit log for security and compliance. All si
 ### Exported Types
 | Type | Description |
 |------|-------------|
-| `AuditAction` | Union of 28 string literals representing all auditable actions (e.g., `'credit_grant'`, `'credit_deduction'`, `'schedule_create'`, `'agent_message_send'`, `'auth_login'`, `'auth_failed'`, etc.) |
+| `AuditAction` | Union of 55 string literals representing all auditable actions (e.g., `'credit_grant'`, `'credit_deduction'`, `'schedule_create'`, `'agent_message_send'`, `'auth_login'`, `'auth_failed'`, `'permission_grant'`, `'permission_revoke'`, `'key_access_decrypt'`, `'contact_create'`, `'discord_permission_denied'`, `'agent_conversation_mode_change'`, etc.) |
 | `AuditEntry` | `{ id: number; timestamp: string; action: AuditAction; actor: string; resourceType: string; resourceId: string \| null; detail: string \| null; traceId: string \| null; ipAddress: string \| null }` |
 | `AuditQueryOptions` | `{ action?: string; actor?: string; resourceType?: string; startDate?: string; endDate?: string; offset?: number; limit?: number }` |
 
@@ -84,14 +84,24 @@ Provides an immutable, append-only audit log for security and compliance. All si
 | `server/routes/settings.ts` | `recordAudit` for config change events |
 | `server/routes/webhooks.ts` | `recordAudit` for webhook register/delete events |
 | `server/routes/tenants.ts` | `recordAudit` for tenant and member events |
+| `server/routes/contacts.ts` | `recordAudit` for contact CRUD events |
 | `server/scheduler/service.ts` | `recordAudit` for schedule execution events |
+| `server/scheduler/orchestration.ts` | `recordAudit` for orchestration events |
+| `server/scheduler/pipeline.ts` | `recordAudit` for pipeline execution events |
 | `server/work/service.ts` | `recordAudit` for work task events |
+| `server/work/session-lifecycle.ts` | `recordAudit` for work session lifecycle events |
 | `server/algochat/message-router.ts` | `recordAudit` for message and injection-blocked events |
 | `server/algochat/agent-messenger.ts` | `recordAudit` for agent message send events |
+| `server/algochat/agent-wallet.ts` | `recordAudit` for agent wallet events |
 | `server/algochat/psk.ts` | `recordAudit` for PSK rotation and drift alerts |
 | `server/lib/key-rotation.ts` | `recordAudit` for key rotation events |
+| `server/lib/injection-guard.ts` | `recordAudit` for injection-blocked events |
+| `server/permissions/broker.ts` | `recordAudit` for permission grant/revoke events |
+| `server/middleware/auth.ts` | `recordAudit` for authentication events |
 | `server/marketplace/escrow.ts` | `recordAudit` for escrow transaction events |
-| `server/discord/bridge.ts` | `recordAudit` for Discord bridge events |
+| `server/marketplace/subscriptions.ts` | `recordAudit` for subscription events |
+| `server/discord/message-handler.ts` | `recordAudit` for Discord message handling events |
+| `server/discord/admin-commands.ts` | `recordAudit` for Discord admin command events |
 | `server/telegram/bridge.ts` | `recordAudit` for Telegram bridge events |
 
 ## Database Tables
@@ -119,3 +129,4 @@ Provides an immutable, append-only audit log for security and compliance. All si
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Updated AuditAction count from 28 to 55 (added permission, key_access, contact, link, discord, subscription, and conversation actions). Updated Consumed By with 11 new consumer modules. |

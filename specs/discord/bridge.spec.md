@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 22
+version: 24
 status: active
 files:
   - server/discord/bridge.ts
@@ -27,14 +27,19 @@ files:
   - server/discord/thread-lifecycle.ts
   - server/discord/thread-session-map.ts
   - server/discord/thread-session-manager.ts
-  - server/discord/command-handlers/message-commands.ts
+  - server/discord/rest-client.ts
+  - server/discord/guild-api.ts
+  - server/discord/voice/connection-manager.ts
+  - server/discord/voice/voice-session.ts
+  - server/discord/voice/audio-player.ts
+  - server/discord/voice/audio-receiver.ts
 db_tables:
   - sessions
   - session_messages
   - discord_config
 depends_on:
   - specs/process/process-manager.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/councils/councils.spec.md
   - specs/lib/worktree.spec.md
 ---
@@ -62,6 +67,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `processManager` | `ProcessManager` | For starting sessions and subscribing to events |
 | `config` | `DiscordBridgeConfig` | Bot token, channel ID, allowed user IDs, app ID, etc. |
 | `workTaskService?` | `WorkTaskService` | Optional work task service for `work_intake` mode |
+| `buddyService?` | `BuddyService` | Optional buddy review service for code review sessions |
 
 #### DiscordBridge Methods
 
@@ -397,6 +403,32 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `recoverActiveMentionSessions` | Restores recent mention sessions from DB into the in-memory map on startup |
 | `recoverActiveThreadSessions` | Restores recent thread sessions from DB into in-memory maps on startup |
 
+### Exported Classes (from voice/connection-manager.ts)
+
+| Class | Description |
+|-------|-------------|
+| `VoiceConnectionManager` | Manages voice channel connections using discord.js `@discordjs/voice`. Handles join/leave, audio receiving (STT via Whisper), and audio playback (TTS via OpenAI tts-1). Emits transcription events |
+
+### Exported Classes (from voice/voice-session.ts)
+
+| Class | Description |
+|-------|-------------|
+| `VoiceSessionRouter` | Routes voice transcriptions through agent sessions for a conversational STT → agent → TTS loop. Manages per-user voice sessions |
+
+### Exported Classes (from guild-api.ts)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `GuildCache` | Interface | Cached guild info: `{ info, roles, channels }` |
+| `loadGuildCache` | Function | Load guild data from DB cache |
+| `syncGuildData` | Function | Sync guild data from Discord API to DB |
+
+### Exported Functions (from rest-client.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `initializeRestClient` | `(botToken: string)` | `void` | Initialize the discord.js REST client for API calls |
+
 ## Invariants
 
 ### Gateway & Connection
@@ -469,6 +501,16 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 40. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 41. **`/admin` command**: Admin-only configuration management with subcommand groups. All changes persist to `discord_config` DB table and hot-reload within 30s. Subcommands: `channels add/remove/list` (manage monitored channels via #channel mentions), `users add/remove/list` (manage allowed users via @user mentions), `roles set/remove/list` (manage role→permission mappings via @role mentions with level dropdown), `mode` (set bridge mode), `public` (toggle public mode), `show` (display full config summary). Every mutation is audit-logged. Responses use rich embeds with clear confirmation/status
 42. **Autocomplete deadline guard**: The gateway stamps `receivedAt = Date.now()` on every `INTERACTION_CREATE` payload. In `handleAutocomplete`, if `Date.now() - receivedAt >= 2500ms` before posting the callback, the response is silently skipped. Discord rejects autocomplete responses arriving after its 3-second window with "Unknown interaction" (404); a skipped response is silent on the user side and avoids false-positive error logs. If `receivedAt` is absent (e.g. tests injecting interactions without the field), the guard is skipped
+
+### Voice Support
+
+43. **Voice connection management**: `VoiceConnectionManager` handles joining/leaving Discord voice channels using `@discordjs/voice`. The discord.js `Client` and DB are wired on gateway READY
+44. **STT transcription**: Audio from voice channels is captured by `AudioReceiver`, sent to OpenAI Whisper for speech-to-text. Transcriptions are emitted via the `onTranscription` callback
+45. **Voice conversation loop**: `VoiceSessionRouter` routes transcriptions through agent sessions (STT → agent prompt → TTS response playback). Per-user voice sessions maintain context across turns
+46. **TTS playback**: Agent responses are synthesized via OpenAI tts-1 and played back through the voice channel via `AudioPlayer`
+47. **Voice transcription text posting**: Voice transcriptions are posted to the text channel for visibility, showing speaker mention and duration
+48. **Guild data sync**: Guild roles, channels, and info are cached in DB and synced from Discord API every 5 minutes via `syncGuildData`
+49. **Global event auto-subscription**: A `subscribeAll` callback on `ProcessManager` watches for `assistant` events from Discord sessions without thread subscriptions and auto-subscribes them
 
 ## Behavioral Examples
 
@@ -667,3 +709,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-04-04 | corvid-agent | v20 (Phase 3 Part 1): Migrated slash command registration from raw JSON objects to `SlashCommandBuilder` from `@discordjs/builders`. Replaced `discordFetch` PUT call with `DiscordRestClient.putCommands()`. Added `putCommands(appId, guildId, commands)` method to `DiscordRestClient`. All 18 commands re-expressed as type-safe builder chains: options use explicit type methods (`addStringOption`, `addIntegerOption`, `addBooleanOption`, `addUserOption`, `addChannelOption`, `addRoleOption`), permissions use `PermissionFlagsBits.Administrator` instead of hardcoded `'8'`. Test updated to mock `DiscordRestClient` via `_setRestClientForTesting`. Part of #1793 |
 | 2026-04-04 | corvid-agent | v21: Declarative permission middleware — `COMMAND_HANDLERS` map entries now declare `minPermission`. Dispatcher enforces it before calling handlers. Per-handler redundant permission checks removed. Closes #1581 |
 | 2026-04-04 | corvid-agent | v22: Autocomplete deadline guard — `handleAutocomplete` skips stale responses (≥2500ms elapsed since `receivedAt`) to avoid Discord "Unknown interaction" 404 errors. Added invariant #42. Refs #1800 |
+| 2026-04-09 | corvid-agent | v23: Voice support — `VoiceConnectionManager` for join/leave voice channels, `AudioReceiver` for STT via Whisper, `AudioPlayer` for TTS via OpenAI tts-1, `VoiceSessionRouter` for conversational STT → agent → TTS loop. Added `rest-client.ts` (discord.js REST adapter), `guild-api.ts` (guild data sync every 5 min). BuddyService constructor parameter. Global event auto-subscription for resumed Discord sessions. Voice files: `voice/connection-manager.ts`, `voice/voice-session.ts`, `voice/audio-player.ts`, `voice/audio-receiver.ts`. Added invariants #43-49 |

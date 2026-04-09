@@ -10,7 +10,7 @@ db_tables:
   - credit_ledger
   - credit_transactions
 depends_on:
-  - specs/db/credits.spec.md
+  - specs/db/operations/credits.spec.md
   - specs/marketplace/service.spec.md
 ---
 

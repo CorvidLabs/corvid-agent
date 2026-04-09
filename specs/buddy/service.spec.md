@@ -6,7 +6,7 @@ files:
   - server/buddy/service.ts
 db_tables: []
 depends_on:
-  - specs/db/buddy.spec.md
+  - specs/db/sessions/buddy.spec.md
 ---
 
 # Buddy Service

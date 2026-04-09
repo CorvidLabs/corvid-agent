@@ -7,7 +7,7 @@ files:
 db_tables:
   - mcp_server_configs
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/tenant/tenant.spec.md
 ---
 

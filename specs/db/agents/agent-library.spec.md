@@ -7,7 +7,7 @@ files:
 db_tables:
   - agent_library
 depends_on:
-  - specs/db/agents.spec.md
+  - specs/db/agents/agents.spec.md
 ---
 
 # Agent Library DB

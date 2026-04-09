@@ -6,7 +6,7 @@ files:
   - server/work/session-lifecycle.ts
 depends_on:
   - specs/work/work-task-service.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 ---
 
 # Session Lifecycle

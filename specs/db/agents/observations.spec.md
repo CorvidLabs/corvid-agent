@@ -8,7 +8,7 @@ db_tables:
   - memory_observations
   - memory_observations_fts
 depends_on:
-  - specs/db/agents.spec.md
+  - specs/db/agents/agents.spec.md
 ---
 
 # Observations DB

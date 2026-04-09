@@ -11,7 +11,7 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/work/work-task-service.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 ---
 
 # Workflow Service

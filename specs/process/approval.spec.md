@@ -10,8 +10,8 @@ db_tables:
   - escalation_queue
   - owner_questions
 depends_on:
-  - specs/db/escalation-queue.spec.md
-  - specs/lib/infra.spec.md
+  - specs/db/sessions/escalation-queue.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Approval

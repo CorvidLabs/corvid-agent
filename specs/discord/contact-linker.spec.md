@@ -5,7 +5,7 @@ status: draft
 files:
   - server/discord/contact-linker.ts
 depends_on:
-  - specs/db/contacts.spec.md
+  - specs/db/agents/contacts.spec.md
 ---
 
 # Discord Contact Linker

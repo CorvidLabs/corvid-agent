@@ -9,7 +9,7 @@ db_tables:
   - sessions
 depends_on:
   - specs/polling/mention-polling-db.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/process/process-manager.spec.md
 ---
 

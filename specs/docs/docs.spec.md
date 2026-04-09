@@ -9,7 +9,7 @@ files:
   - server/docs/route-registry.ts
 db_tables: []
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Docs

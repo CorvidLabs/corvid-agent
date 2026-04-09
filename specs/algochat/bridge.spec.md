@@ -15,7 +15,7 @@ db_tables:
   - psk_contacts
 depends_on:
   - specs/process/process-manager.spec.md
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 tracks: [1458]
 ---
 

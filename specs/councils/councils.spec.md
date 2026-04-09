@@ -11,7 +11,7 @@ depends_on:
   - specs/db/connection.spec.md
   - specs/process/process-manager.spec.md
   - specs/algochat/bridge.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
   - specs/providers/provider-system.spec.md
   - specs/observability/observability.spec.md
 ---

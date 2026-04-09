@@ -6,7 +6,7 @@ files:
   - server/routes/buddy.ts
 db_tables: []
 depends_on:
-  - specs/db/buddy.spec.md
+  - specs/db/sessions/buddy.spec.md
   - specs/middleware/auth.spec.md
 ---
 

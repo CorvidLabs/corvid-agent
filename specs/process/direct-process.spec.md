@@ -1,6 +1,6 @@
 ---
 module: direct-process
-version: 2
+version: 3
 status: active
 files:
   - server/process/direct-process.ts
@@ -15,9 +15,11 @@ depends_on:
 
 ## Purpose
 
-Direct execution engine for non-SDK providers (e.g., Ollama). Implements the same `SdkProcess` interface so the ProcessManager and WebSocket clients are unaware of the difference between SDK and direct mode. Manages the full agentic loop: slot acquisition, tool execution, context management, repeat detection, hallucination detection, nudging, and summary epilogue.
+Direct execution engine for non-SDK providers (e.g., Ollama). Implements the same `SdkProcess` interface so the ProcessManager and WebSocket clients are unaware of the difference between SDK and direct mode. Manages the full agentic loop: slot acquisition, tool execution, context management, repeat detection, repetition tracking, response quality tracking, hallucination detection, nudging, idle-wait multi-turn conversation, and summary epilogue.
 
 Emits `message_stop` at the end of each model iteration (tool-chain step or text-only branch) so downstream logic that mirrors the Claude SDK stream (for example work-queue chain-continuation stall detection) receives the same turn boundaries as the Anthropic SDK path.
+
+After completing a turn, the process enters an idle-wait state instead of exiting, allowing follow-up user messages within a 5-minute idle timeout window. Queued messages during processing are handled in order.
 
 ## Public API
 
@@ -25,7 +27,7 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 
 | Type | Description |
 |------|-------------|
-| `DirectProcessOptions` | Full configuration: session, project, agent, prompt, provider, callbacks, MCP context, persona/skill prompts, model override, external MCP configs, tool allow list |
+| `DirectProcessOptions` | Full configuration: session, project, agent, prompt, provider, callbacks, MCP context, persona/skill prompts, model override, external MCP configs, tool allow list, conversationOnly flag |
 | `ToolDef` | Minimal tool definition shape: name, description, parameters |
 | `SessionMetricsState` | Input state captured from the main loop for building session metrics: model, tier, iteration, toolCallCount, maxChainDepth, nudge/drift counts, stallType, terminationReason, loopDurationMs, needsSummary |
 | `BuildEscalationInput` | Input interface for `buildEscalationInfo`: `terminationReason`, `model`, `tier`, `originalPrompt`, `toolCallLog`, optional `qualityMetrics` |
@@ -38,10 +40,10 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 | `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
 | `buildSessionMetrics` | `(state: SessionMetricsState)` | `DirectProcessMetrics` | Build a DirectProcessMetrics object from loop state variables. Pure function — derives `stallDetected` from `terminationReason` and maps field names |
 | `trackToolCall` | `(log: string[], toolName: string, outcome: 'ok' \| 'error' \| 'exception')` | `void` | Append a tool-call entry to the log, capped at 20 entries |
-| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, stall_repetitive_loop, stall_quality_exhausted, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
+| `buildEscalationInfo` | `(input: BuildEscalationInput)` | `EscalationInfo \| null` | Build escalation metadata for sessions that terminated abnormally (stall_repeat, stall_same_tool, stall_repetitive_loop, stall_quality_exhausted, stall_repetitive, max_iterations, or low_quality). Returns null for normal/abort/error terminations. Truncates prompt to 2000 chars, caps completedSteps at 20 |
 | `buildResultEvent` | `(base: {...}, escalationInput: BuildEscalationInput)` | `ClaudeStreamEvent` | Build a result event with optional escalation metadata attached. Used for both success and error result events |
-| `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
-| `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Re-exported from `context-management.ts` |
+| `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?, sessionWorkDir?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get tools with reasoning instructions. Includes cloud-model compact prompts, tier-based scoping instructions, and worktree isolation context |
+| `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean, model?: string` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Re-exported from `context-management.ts` |
 | `determineWarningLevel` | `usagePercent: number` | `{level, message} \| null` | Re-exported from `context-management.ts` |
 | `compressToolResults` | `(messages: ConversationMessage[], maxAge: number, maxChars: number)` | `number` | Re-exported from `context-management.ts` |
 | `summarizeConversation` | `(messages: Array<{role, content}>)` | `string` | Re-exported from `context-management.ts` |
@@ -50,19 +52,28 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 ## Invariants
 
 1. **Slot acquired before loop, released in finally**: The inference slot is acquired before the agentic loop begins and released in a `finally` block, guaranteeing release even on abort or error
-2. **Max 25 tool iterations**: The agentic loop runs at most `MAX_TOOL_ITERATIONS` (25) turns. If exceeded, sets `needsSummary = true`
+2. **Tier-based tool iteration limit**: The agentic loop runs at most `tierConfig.maxToolIterations` turns (tier-dependent, not hardcoded). If exceeded, sets `needsSummary = true`
 3. **Repeat detection (same tool+args 3x)**: If the same tool call (normalized: sorted keys, trimmed whitespace) repeats 3 times consecutively, the loop breaks with `needsSummary = true`
 4. **Same tool name detection (5x)**: If the same tool name is called 5 times consecutively (even with different args), the loop breaks
 5. **Context trim at >40 messages or >70% budget**: `trimMessages()` triggers when message count exceeds 40 or estimated tokens exceed 70% of context window. Keeps first message (original prompt) and most recent messages
 6. **Tool result capped at 30% context**: `calculateMaxToolResultChars()` limits any single tool result to 30% of context window, scaling down further under budget pressure. Minimum 1,000 chars
-7. **Max 2 initial nudges / 2 mid-chain nudges**: Standard nudges (promisedAction, tooShort, wroteButDidntAct, askedInsteadOfActing) limited to 2. Mid-chain nudges (hallucinated tool results) also limited to 2
-8. **Hallucination detection**: If model generates `[Tool Result]`, `<<tool_output>>`, or `<</tool_output>>` in its output after tools have been called, the content is stripped and a mid-chain nudge is injected
-9. **Summary epilogue on abnormal break**: When the loop breaks due to repeat detection, same-tool detection, or max iterations, a final tools-disabled inference call produces a summary
-10. **Council sessions get no tools**: Deliberation sessions (member, discusser, reviewer) disable all tools and get reasoning-only system prompts
+7. **Tier-based nudge limits**: Standard nudges and mid-chain nudges use `tierConfig.maxNudges` and `tierConfig.maxMidChainNudges` respectively (tier-dependent, not hardcoded)
+8. **Hallucination detection**: If model generates `[Tool Result]`, `«tool_output»`, or `«/tool_output»` in its output after tools have been called, the content is stripped and a mid-chain nudge is injected
+9. **Summary epilogue on abnormal break**: When the loop breaks due to repeat detection, same-tool detection, repetition, or max iterations, a final tools-disabled inference call produces a summary
+10. **Council sessions get tools with reasoning prompt**: Deliberation sessions (member, discusser, reviewer) receive tools and a reasoning-focused system prompt encouraging evidence-based analysis
 11. **Token estimation**: Uses content-aware estimation: ~0.33 tokens/char for code-heavy content, ~0.25 tokens/char for prose
 12. **Smart trimming with summaries**: When trimming messages, discarded tool results are replaced with one-line summaries instead of being dropped entirely
 13. **Context usage events emitted per turn**: After each `trimMessages()` call, a `context_usage` event is emitted with estimated tokens, context window size, usage percent, message count, and whether trimming occurred
 14. **Context warning events at thresholds**: `context_warning` events are emitted when usage crosses 50% (info), 70% (warning), or 85% (critical). Each level is emitted only once (no re-emission until a higher level is crossed)
+15. **Repetition tracking**: `RepetitionTracker` monitors text responses for rephrasing; triggers nudge or break (`stall_repetitive` termination) when responses repeat without progress
+16. **Response quality tracking**: `ResponseQualityTracker` detects low-quality "cheerleading" responses; injects quality nudges up to `MAX_QUALITY_NUDGES` (tier-dependent: 1 for high, 2 otherwise)
+17. **Repetitive tool call detection**: `RepetitiveToolCallDetector` identifies identical tool call loops; injects loop nudges up to `MAX_LOOP_NUDGES` (2) before breaking
+18. **Idle-wait multi-turn**: After completing a turn, the process waits up to 5 minutes (`IDLE_TIMEOUT_MS`) for the next user message instead of exiting. Queued messages during processing are handled sequentially
+19. **Conversation-only mode**: When `conversationOnly` is true, all tools are disabled for untrusted users
+20. **Context overflow recovery**: If provider returns a context overflow error (`isContextOverflowError`), messages are aggressively trimmed and the turn is retried
+21. **Cloud-model compact prompts**: Cloud-proxied models (`OllamaProvider.isCloudModel`) receive compact system prompt sections to minimize token usage within server-side timeouts
+22. **Tier-based scoping**: Non-high-tier agents receive task focus guidelines; limited-tier agents get additional critical constraints (max tool calls, max PRs/issues per session)
+23. **Worktree isolation**: Sessions with a `sessionWorkDir` receive worktree isolation instructions in the system prompt
 
 ## Behavioral Examples
 
@@ -87,12 +98,12 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 - **Then** the hallucinated content is NOT added to messages
 - **And** a nudge message instructs the model to call tools properly
 
-### Scenario: Council deliberation (no tools)
+### Scenario: Council deliberation (tools with reasoning prompt)
 
 - **Given** a session with `councilRole = 'member'`
 - **When** `startDirectProcess` is called
-- **Then** `directTools` is empty
-- **And** the system prompt uses reasoning-only instructions
+- **Then** `directTools` are available (tools enabled for full capability testing)
+- **And** the system prompt uses reasoning-focused instructions encouraging evidence-based analysis with tool use
 
 ### Scenario: Context usage events emitted each turn
 
@@ -122,6 +133,8 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 | Unknown tool name | Error text `Unknown tool: <name>` added to messages |
 | Permission denied | Denied text added to messages, loop continues |
 | External MCP connection failure | Logged, process continues without external tools |
+| Context overflow error from provider | Messages aggressively trimmed, turn retried |
+| Idle timeout (5 min no messages) | Session exits cleanly with code 0 |
 
 ## Dependencies
 
@@ -130,14 +143,21 @@ Emits `message_stop` at the end of each model iteration (tool-chain step or text
 | Module | What is used |
 |--------|-------------|
 | `server/providers/types.ts` | `LlmProvider`, `LlmToolCall` |
-| `server/providers/ollama/tool-prompt-templates.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `detectModelFamily` |
+| `server/providers/ollama/provider.ts` | `OllamaProvider` (for `isCloudModel` check) |
+| `server/providers/ollama/tool-prompt-templates.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getCompactToolInstructionPrompt`, `getCompactResponseRoutingPrompt`, `getCompactCodingToolPrompt`, `getCodebaseContextPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
 | `server/mcp/direct-tools.ts` | `buildDirectTools`, `toProviderTools`, `DirectToolDefinition` |
 | `server/mcp/coding-tools.ts` | `CodingToolContext`, `buildSafeEnvForCoding` |
 | `server/mcp/external-client.ts` | `ExternalMcpClientManager` |
 | `server/process/approval-manager.ts` | `ApprovalManager` |
 | `server/process/approval-types.ts` | `ApprovalRequest`, `ApprovalRequestWire`, `formatToolDescription` |
-| `server/process/types.ts` | `ClaudeStreamEvent` |
+| `server/process/context-management.ts` | `calculateMaxToolResultChars`, `compressToolResults`, `computeContextUsage`, `determineWarningLevel`, `getContextBudget`, `isContextOverflowError`, `summarizeConversation`, `trimMessages`, `truncateCouncilContext`, `truncateOldToolResults` |
+| `server/process/types.ts` | `ClaudeStreamEvent`, `DirectProcessMetrics`, `EscalationInfo` |
 | `server/lib/logger.ts` | `createLogger` |
+| `server/lib/agent-input-sanitizer.ts` | `sanitizeAgentInput` for external content sanitization |
+| `server/lib/agent-session-limits.ts` | `AgentSessionLimiter` for tier-based session limits |
+| `server/lib/agent-tiers.ts` | `AgentTierConfig`, `getAgentTierConfig` for tier-based configuration |
+| `server/lib/response-quality.ts` | `RepetitionTracker`, `RepetitiveToolCallDetector`, `ResponseQualityTracker`, `scoreResponseQuality`, `countVacuousToolCalls`, `buildLoopNudge`, `buildQualityNudge`, `buildRepetitionNudge` |
+| `server/work/chain-continuation.ts` | `escalateTier`, `inferModelTier` for escalation metadata |
 
 ### Consumed By
 
@@ -156,13 +176,14 @@ Internal constants:
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `MAX_TOOL_ITERATIONS` | `25` | Maximum agentic loop iterations |
-| `MAX_MESSAGES` | `40` | Message count trim trigger |
-| `KEEP_RECENT` | `30` | Messages to keep after count-based trim |
+| `MAX_TOOL_ITERATIONS` | `tierConfig.maxToolIterations` | Maximum agentic loop iterations (tier-dependent) |
 | `MAX_REPEATS` | `2` | Break after same call repeated 3x (0-indexed) |
 | `MAX_SAME_TOOL` | `4` | Break after same tool name 5x (0-indexed) |
-| `MAX_NUDGES` | `2` | Max initial nudge attempts |
-| `MAX_MID_CHAIN_NUDGES` | `2` | Max hallucination nudge attempts |
+| `MAX_NUDGES` | `tierConfig.maxNudges` | Max initial nudge attempts (tier-dependent) |
+| `MAX_MID_CHAIN_NUDGES` | `tierConfig.maxMidChainNudges` | Max hallucination nudge attempts (tier-dependent) |
+| `MAX_QUALITY_NUDGES` | `1` (high) / `2` (other) | Max quality-correction nudges (tier-dependent) |
+| `MAX_LOOP_NUDGES` | `2` | Max repetitive loop nudges |
+| `IDLE_TIMEOUT_MS` | `300000` (5 min) | Idle timeout before session exits between turns |
 | `nextPseudoPid` | `800000` | Starting pseudo-PID counter |
 
 ## Change Log
@@ -171,3 +192,4 @@ Internal constants:
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-03-25 | corvid-agent | Add escalation handling for `stall_repetitive_loop` and `stall_quality_exhausted` termination reasons |
+| 2026-04-09 | corvid-agent | Update for tier-based limits, idle-wait multi-turn, repetition/quality tracking, council tools, cloud compact prompts, worktree isolation, conversationOnly mode, context overflow recovery, stall_repetitive termination, updated dependencies |

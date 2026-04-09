@@ -11,7 +11,7 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/notifications/service.spec.md
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Usage

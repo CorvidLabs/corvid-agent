@@ -9,7 +9,7 @@ db_tables:
   - agent_conversation_blocklist
   - agent_conversation_rate_limits
 depends_on:
-  - specs/db/agents.spec.md
+  - specs/db/agents/agents.spec.md
 ---
 
 # Conversation Access DB

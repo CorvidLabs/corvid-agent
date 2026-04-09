@@ -8,7 +8,7 @@ files:
 db_tables:
   - session_metrics
 depends_on:
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
 ---
 
 # Session Metrics DB

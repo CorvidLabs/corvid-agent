@@ -6,9 +6,9 @@ files:
   - server/process/ollama-stall-escalator.ts
 db_tables: []
 depends_on:
-  - specs/lib/session-analysis.spec.md
-  - specs/db/sessions.spec.md
-  - specs/db/agents.spec.md
+  - specs/lib/session/session-analysis.spec.md
+  - specs/db/sessions/sessions.spec.md
+  - specs/db/agents/agents.spec.md
   - specs/work/work-task-service.spec.md
 ---
 

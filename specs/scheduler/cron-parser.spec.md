@@ -8,7 +8,7 @@ files:
   - server/scheduler/system-state.ts
 db_tables: []
 depends_on:
-  - specs/lib/infra.spec.md
+  - specs/lib/infra/infra.spec.md
 ---
 
 # Cron Parser & Scheduler Primitives
@@ -67,6 +67,34 @@ Provides cron expression parsing with preset aliases, next-date computation, hum
 | `evaluate` | (none) | `Promise<SystemStateResult>` | Evaluates all system state signals (CI, server, P0, disk) with 60s cache TTL |
 | `invalidateCache` | (none) | `void` | Forces the next `evaluate()` call to re-check all signals |
 
+### Action Category Mappings
+
+The `ACTION_CATEGORY_MAP` maps all `ScheduleActionType` values to categories:
+
+| Action Type | Category |
+|-------------|----------|
+| `work_task` | `feature_work` |
+| `github_suggest` | `feature_work` |
+| `fork_repo` | `feature_work` |
+| `custom` | `feature_work` |
+| `review_prs` | `review` |
+| `daily_review` | `review` |
+| `codebase_review` | `maintenance` |
+| `dependency_audit` | `maintenance` |
+| `improvement_loop` | `maintenance` |
+| `memory_maintenance` | `maintenance` |
+| `marketplace_billing` | `maintenance` |
+| `flock_testing` | `maintenance` |
+| `council_launch` | `communication` |
+| `send_message` | `communication` |
+| `reputation_attestation` | `lightweight` |
+| `outcome_analysis` | `lightweight` |
+| `status_checkin` | `lightweight` |
+| `star_repo` | `lightweight` |
+| `flock_reputation_refresh` | `lightweight` |
+| `discord_post` | `lightweight` |
+| `github_comment_monitor` | `lightweight` |
+
 ## Invariants
 1. Cron expressions must have exactly 5 fields (minute, hour, day-of-month, month, day-of-week); otherwise `ValidationError` is thrown.
 2. Supported preset aliases: `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, `@annually`.
@@ -80,9 +108,9 @@ Provides cron expression parsing with preset aliases, next-date computation, hum
 10. If skip and boost both apply to an action, skip takes precedence.
 11. CI checks query the GitHub Actions API for the latest completed run on the `main` branch.
 12. P0 issue checks search for open issues matching configured labels (`priority:p0`, `critical`, `P0`).
-13. Disk pressure checks use `df -P .` and compare usage against the threshold (default 90%).
+13. Disk pressure checks use `df -P .` (via `Bun.spawn`) and compare usage against the threshold (default 90%).
 14. All system state sub-checks (CI, server, P0, disk) run in parallel via `Promise.all` and silently return null on failure.
-15. Default config targets `CorvidLabs/corvid-agent` repo.
+15. Default config reads owner/repo from `GITHUB_OWNER`/`GITHUB_REPO` environment variables (empty string fallback).
 
 ## Behavioral Examples
 
@@ -123,6 +151,7 @@ Provides cron expression parsing with preset aliases, next-date computation, hum
 | `df` command fails | Returns null; disk pressure not flagged |
 | Health check callback not set | Server health check returns null |
 | `GH_TOKEN` not set | CI and P0 checks return null (skipped) |
+| `GITHUB_OWNER` / `GITHUB_REPO` not set | Default config uses empty strings; GitHub API calls will fail gracefully |
 
 ## Dependencies
 
@@ -132,7 +161,7 @@ Provides cron expression parsing with preset aliases, next-date computation, hum
 |--------|-------------|
 | `server/lib/errors` | `ValidationError` for invalid cron expressions |
 | `server/lib/logger` | `createLogger` for structured logging |
-| `shared/types` | `ScheduleActionType` for action categorization |
+| `shared/types/schedules` | `ScheduleActionType` for action categorization |
 | `bun:sqlite` | `Database` type (constructor parameter for SystemStateDetector) |
 | GitHub Actions API | CI status check (`/repos/{owner}/{repo}/actions/runs`) |
 | GitHub Search API | P0 issue search (`/search/issues`) |
@@ -149,3 +178,4 @@ Provides cron expression parsing with preset aliases, next-date computation, hum
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-04-09 | corvid-agent | Update action category mappings (add marketplace_billing, flock_testing, flock_reputation_refresh, discord_post, github_comment_monitor); update default config to use GITHUB_OWNER/GITHUB_REPO env vars; note Bun.spawn for disk check |

@@ -8,7 +8,7 @@ db_tables:
   - agent_variants
   - agent_variant_assignments
 depends_on:
-  - specs/db/personas.spec.md
+  - specs/db/agents/personas.spec.md
 ---
 
 # Variants DB

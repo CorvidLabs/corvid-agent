@@ -11,13 +11,13 @@ depends_on:
   - specs/process/process-manager.spec.md
   - specs/work/work-task-service.spec.md
   - specs/scheduler/scheduler-service.spec.md
-  - specs/db/webhooks.spec.md
-  - specs/db/agents.spec.md
-  - specs/db/sessions.spec.md
-  - specs/db/schedules.spec.md
-  - specs/db/github-allowlist.spec.md
-  - specs/lib/infra.spec.md
-  - specs/lib/security.spec.md
+  - specs/db/operations/webhooks.spec.md
+  - specs/db/agents/agents.spec.md
+  - specs/db/sessions/sessions.spec.md
+  - specs/db/operations/schedules.spec.md
+  - specs/db/platform/github-allowlist.spec.md
+  - specs/lib/infra/infra.spec.md
+  - specs/lib/security/security.spec.md
   - specs/observability/observability.spec.md
 ---
 

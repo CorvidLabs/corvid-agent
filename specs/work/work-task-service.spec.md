@@ -14,7 +14,7 @@ files:
 db_tables:
   - work_tasks
 depends_on:
-  - specs/db/sessions.spec.md
+  - specs/db/sessions/sessions.spec.md
   - specs/process/process-manager.spec.md
 ---
 
