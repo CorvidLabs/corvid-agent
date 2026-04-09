@@ -7,6 +7,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { SessionSource } from '../../../shared/types';
+import { findContactByPlatformId } from '../../db/contacts';
 import { listProjects } from '../../db/projects';
 import { createSession, getSession } from '../../db/sessions';
 import { createLogger } from '../../lib/logger';
@@ -24,11 +25,16 @@ const log = createLogger('VoiceSession');
 /** Max length of text to send to TTS (longer gets truncated). */
 const MAX_TTS_LENGTH = 4000;
 
-/** Quick acknowledgment phrases — played immediately after transcription while the agent thinks. */
-const ACK_PHRASES = ['Got it.', 'On it.', 'Okay.', 'Sure.', 'One sec.', 'Checking.', 'Let me see.', 'Looking into it.'];
 
 /** How long to wait after the last content event before considering the response complete (ms). */
-const RESPONSE_DEBOUNCE_MS = 800;
+const RESPONSE_DEBOUNCE_MS = 1500;
+
+/**
+ * How long to wait after the last transcription before sending the batch to the agent (ms).
+ * This lets multiple speakers (or continued speech) accumulate into a single prompt,
+ * avoiding interrupting people mid-conversation.
+ */
+const TRANSCRIPTION_BUFFER_MS = 2000;
 
 /** Per-guild voice session state. */
 interface GuildVoiceSession {
@@ -44,8 +50,10 @@ interface GuildVoiceSession {
   callback: EventCallback;
   /** Queued transcriptions received while TTS was playing. */
   pendingTranscriptions: { userId: string; text: string }[];
-  /** Round-robin index for acknowledgment phrases. */
-  ackIndex: number;
+  /** Buffered transcriptions waiting to be sent as a batch. */
+  transcriptionBuffer: { userId: string; text: string; voicePrefix: string }[];
+  /** Timer for flushing the transcription buffer. */
+  transcriptionBufferTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -70,7 +78,8 @@ export class VoiceSessionRouter {
 
   /**
    * Handle a transcription from a voice channel user.
-   * Routes through the agent and plays back the response via TTS.
+   * Buffers transcriptions for TRANSCRIPTION_BUFFER_MS before sending to the agent,
+   * so multiple speakers (or continued speech) get combined into one prompt.
    */
   async handleTranscription(result: TranscriptionResult): Promise<void> {
     const { guildId, userId, text } = result;
@@ -81,7 +90,13 @@ export class VoiceSessionRouter {
     const connectionInfo = this.voiceManager.getConnection(guildId);
     const textChannelId = connectionInfo?.transcriptionChannelId;
     const channelSuffix = textChannelId ? ` in channel ${textChannelId}` : '';
-    const voicePrefix = `[Voice from <@${userId}>${channelSuffix}]`;
+    // Resolve Discord ID to display name so the agent knows who's speaking
+    // without relying on Whisper's (often garbled) name recognition
+    const contact = findContactByPlatformId(this.db, 'default', 'discord', userId);
+    const speakerLabel = contact?.displayName
+      ? `${contact.displayName} (<@${userId}>)`
+      : `<@${userId}>`;
+    const voicePrefix = `[Voice from ${speakerLabel}${channelSuffix}]`;
 
     // Queue transcription if we're currently speaking (process after TTS finishes)
     if (this.voiceManager.isSpeaking(guildId)) {
@@ -97,51 +112,75 @@ export class VoiceSessionRouter {
       return;
     }
 
-    // Skip if already responding to a previous transcription
+    // If already responding, add to the transcription buffer (will flush after current response)
     const existing = this.sessions.get(guildId);
     if (existing?.responding) {
       log.debug('Queuing transcription — still responding to previous', { guildId, userId });
-      // Send to existing session anyway — it queues
       this.processManager.sendMessage(existing.sessionId, `${voicePrefix}: ${text}`);
       return;
     }
 
-    log.info('Voice transcription → agent', { guildId, userId, textLength: text.length });
-
+    // Buffer the transcription — wait for more before sending to agent
     const session = await this.ensureSession(guildId);
     if (!session) {
       log.warn('No voice session available — cannot route transcription', { guildId });
       return;
     }
 
+    session.transcriptionBuffer.push({ userId, text, voicePrefix });
+    log.debug('Buffered transcription', {
+      guildId,
+      userId,
+      bufferSize: session.transcriptionBuffer.length,
+    });
+
+    // Reset the buffer timer — wait for more transcriptions
+    if (session.transcriptionBufferTimer) clearTimeout(session.transcriptionBufferTimer);
+    session.transcriptionBufferTimer = setTimeout(() => {
+      this.flushTranscriptionBuffer(guildId);
+    }, TRANSCRIPTION_BUFFER_MS);
+  }
+
+  /** Flush all buffered transcriptions as a single combined message to the agent. */
+  private flushTranscriptionBuffer(guildId: string): void {
+    const session = this.sessions.get(guildId);
+    if (!session) return;
+
+    session.transcriptionBufferTimer = null;
+    const buffered = session.transcriptionBuffer.splice(0);
+    if (buffered.length === 0) return;
+
+    // Combine all buffered transcriptions into a single message
+    const combinedMessage = buffered
+      .map((t) => `${t.voicePrefix}: ${t.text}`)
+      .join('\n');
+
+    log.info('Flushing transcription buffer → agent', {
+      guildId,
+      messageCount: buffered.length,
+      textLength: combinedMessage.length,
+    });
+
     session.responding = true;
     session.responseBuffer = '';
 
-    // Play a quick acknowledgment so the user knows we heard them
-    const ack = ACK_PHRASES[session.ackIndex % ACK_PHRASES.length];
-    session.ackIndex++;
-    this.voiceManager.speak(guildId, ack).catch((err) => {
-      log.error('Ack TTS failed', { guildId, error: String(err) });
-    });
-    // Don't await — send to agent in parallel so the LLM starts thinking immediately
-
-    const sent = this.processManager.sendMessage(session.sessionId, `${voicePrefix}: ${text}`);
+    const sent = this.processManager.sendMessage(session.sessionId, combinedMessage);
     if (!sent) {
       // Session may have stopped — try resuming
       const dbSession = getSession(this.db, session.sessionId);
       if (dbSession) {
-        // Re-subscribe: cleanupSessionState removes all subscribers when process exits
         this.processManager.subscribe(session.sessionId, session.callback);
-        this.processManager.resumeProcess(dbSession, `${voicePrefix}: ${text}`);
+        this.processManager.resumeProcess(dbSession, combinedMessage);
       } else {
         // Session is gone — create a new one
         log.info('Voice session expired, creating new one', { guildId });
         this.sessions.delete(guildId);
-        const newSession = await this.ensureSession(guildId);
-        if (newSession) {
-          newSession.responding = true;
-          this.processManager.sendMessage(newSession.sessionId, `${voicePrefix}: ${text}`);
-        }
+        this.ensureSession(guildId).then((newSession) => {
+          if (newSession) {
+            newSession.responding = true;
+            this.processManager.sendMessage(newSession.sessionId, combinedMessage);
+          }
+        });
       }
     }
   }
@@ -248,7 +287,8 @@ export class VoiceSessionRouter {
       debounceTimer: null,
       callback: (_sid, event) => this.handleSessionEvent(guildId, event),
       pendingTranscriptions: [],
-      ackIndex: 0,
+      transcriptionBuffer: [],
+      transcriptionBufferTimer: null,
     };
 
     this.processManager.subscribe(session.id, voiceSession.callback);
@@ -315,6 +355,9 @@ export class VoiceSessionRouter {
 
     if (!text) return;
 
+    // Resolve Discord mentions (<@123456>) to display names before TTS cleanup
+    text = this.resolveMentionsForTts(text);
+
     // Extract rich content (URLs, code blocks) before cleaning for TTS
     const richContent = extractRichContent(text);
 
@@ -375,12 +418,24 @@ export class VoiceSessionRouter {
     }
   }
 
+  /**
+   * Replace Discord mention tags (<@123456>) with the contact's display name
+   * so TTS says "Leif" instead of "someone".
+   */
+  private resolveMentionsForTts(text: string): string {
+    return text.replace(/<@!?(\d+)>/g, (_match, discordId: string) => {
+      const contact = findContactByPlatformId(this.db, 'default', 'discord', discordId);
+      return contact?.displayName ?? 'someone';
+    });
+  }
+
   /** Clean up a guild's voice session (called on /voice leave). */
   cleanup(guildId: string): void {
     const session = this.sessions.get(guildId);
     if (!session) return;
 
     if (session.debounceTimer) clearTimeout(session.debounceTimer);
+    if (session.transcriptionBufferTimer) clearTimeout(session.transcriptionBufferTimer);
     this.processManager.unsubscribe(session.sessionId, session.callback);
     this.sessions.delete(guildId);
     log.info('Cleaned up voice session', { guildId, sessionId: session.sessionId });

@@ -69,7 +69,7 @@ export class VoiceConnectionManager {
   private transcriptionHandler: TranscriptionHandler | null = null;
 
   /** Default voice preset for TTS. */
-  private defaultVoice: VoicePreset = 'onyx';
+  private defaultVoice: VoicePreset = (process.env.CORVID_VOICE as VoicePreset) || 'nova';
 
   setClient(client: Client): void {
     this.client = client;
