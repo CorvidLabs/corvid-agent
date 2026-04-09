@@ -105,6 +105,9 @@ export function handleApprovalIfNeeded(
     return true;
 }
 
+/** Action types that handle their own contention (e.g. via queuing). */
+const SELF_CONTENTION_ACTIONS: ScheduleActionType[] = ['work_task'];
+
 export function handleRepoLocking(
     db: Database,
     schedule: AgentSchedule,
@@ -112,6 +115,10 @@ export function handleRepoLocking(
     action: ScheduleAction,
     emit: EmitFn,
 ): boolean {
+    // Work tasks handle contention via WorkTaskService queuing — skip repo locking
+    // so they can queue behind active tasks instead of being cancelled outright.
+    if (SELF_CONTENTION_ACTIONS.includes(action.type)) return false;
+
     const repos = resolveActionRepos(action);
     if (repos.length === 0) return false;
 
