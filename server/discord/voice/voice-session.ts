@@ -7,6 +7,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { SessionSource } from '../../../shared/types';
+import { findContactByPlatformId } from '../../db/contacts';
 import { listProjects } from '../../db/projects';
 import { createSession, getSession } from '../../db/sessions';
 import { createLogger } from '../../lib/logger';
@@ -26,6 +27,14 @@ const MAX_TTS_LENGTH = 4000;
 
 /** Quick acknowledgment phrases — played immediately after transcription while the agent thinks. */
 const ACK_PHRASES = ['Got it.', 'On it.', 'Okay.', 'Sure.', 'One sec.', 'Checking.', 'Let me see.', 'Looking into it.'];
+
+/**
+ * Minimum word count to trigger an acknowledgment before responding.
+ * Short conversational messages (greetings, yes/no, quick questions) don't need
+ * an ack — the real response arrives fast enough. Longer task-like messages benefit
+ * from an ack so the user knows they were heard while the agent works.
+ */
+const ACK_WORD_THRESHOLD = 6;
 
 /** How long to wait after the last content event before considering the response complete (ms). */
 const RESPONSE_DEBOUNCE_MS = 800;
@@ -117,13 +126,17 @@ export class VoiceSessionRouter {
     session.responding = true;
     session.responseBuffer = '';
 
-    // Play a quick acknowledgment so the user knows we heard them
-    const ack = ACK_PHRASES[session.ackIndex % ACK_PHRASES.length];
-    session.ackIndex++;
-    this.voiceManager.speak(guildId, ack).catch((err) => {
-      log.error('Ack TTS failed', { guildId, error: String(err) });
-    });
-    // Don't await — send to agent in parallel so the LLM starts thinking immediately
+    // Only play ack for longer task-like messages — short conversational exchanges
+    // (greetings, yes/no, quick questions) get the real response fast enough
+    const wordCount = text.trim().split(/\s+/).length;
+    if (wordCount >= ACK_WORD_THRESHOLD) {
+      const ack = ACK_PHRASES[session.ackIndex % ACK_PHRASES.length];
+      session.ackIndex++;
+      this.voiceManager.speak(guildId, ack).catch((err) => {
+        log.error('Ack TTS failed', { guildId, error: String(err) });
+      });
+      // Don't await — send to agent in parallel so the LLM starts thinking immediately
+    }
 
     const sent = this.processManager.sendMessage(session.sessionId, `${voicePrefix}: ${text}`);
     if (!sent) {
@@ -315,6 +328,9 @@ export class VoiceSessionRouter {
 
     if (!text) return;
 
+    // Resolve Discord mentions (<@123456>) to display names before TTS cleanup
+    text = this.resolveMentionsForTts(text);
+
     // Extract rich content (URLs, code blocks) before cleaning for TTS
     const richContent = extractRichContent(text);
 
@@ -373,6 +389,17 @@ export class VoiceSessionRouter {
     for (const { userId, text } of pending) {
       this.handleTranscription({ guildId, userId, text, channelId, durationMs: 0 });
     }
+  }
+
+  /**
+   * Replace Discord mention tags (<@123456>) with the contact's display name
+   * so TTS says "Leif" instead of "someone".
+   */
+  private resolveMentionsForTts(text: string): string {
+    return text.replace(/<@!?(\d+)>/g, (_match, discordId: string) => {
+      const contact = findContactByPlatformId(this.db, 'default', 'discord', discordId);
+      return contact?.displayName ?? 'someone';
+    });
   }
 
   /** Clean up a guild's voice session (called on /voice leave). */
