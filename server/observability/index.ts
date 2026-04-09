@@ -6,22 +6,22 @@
  * - Metrics: always collected in-memory, exposed via /metrics endpoint
  */
 
-export { initTracing, getTracer, parseTraceparent, generateTraceId, generateSpanId, buildTraceparent } from './tracing';
+export { createEventContext, type EventContext, type EventSource, runWithEventContext } from './event-context';
 export {
-    renderMetrics,
-    httpRequestsTotal,
-    httpRequestDuration,
-    sessionDuration,
-    dbQueryDuration,
-    agentMessagesTotal,
-    creditsConsumedTotal,
-    activeSessions,
+  activeSessions,
+  agentMessagesTotal,
+  creditsConsumedTotal,
+  dbQueryDuration,
+  httpRequestDuration,
+  httpRequestsTotal,
+  renderMetrics,
+  sessionDuration,
 } from './metrics';
-export { traceContext, getTraceId, runWithTraceId } from './trace-context';
-export { type EventContext, type EventSource, createEventContext, runWithEventContext } from './event-context';
+export { getTraceId, runWithTraceId, traceContext } from './trace-context';
+export { buildTraceparent, generateSpanId, generateTraceId, getTracer, initTracing, parseTraceparent } from './tracing';
 
-import { initTracing } from './tracing';
 import { createLogger } from '../lib/logger';
+import { initTracing } from './tracing';
 
 const log = createLogger('Observability');
 
@@ -30,15 +30,15 @@ const log = createLogger('Observability');
  * Safe to call at startup — failures are logged but never crash the server.
  */
 export async function initObservability(): Promise<void> {
-    try {
-        await initTracing();
-        log.info('Observability initialized', {
-            tracing: !!process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-            metrics: true,
-        });
-    } catch (err) {
-        log.warn('Observability init failed (non-fatal)', {
-            error: err instanceof Error ? err.message : String(err),
-        });
-    }
+  try {
+    await initTracing();
+    log.info('Observability initialized', {
+      tracing: !!process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      metrics: true,
+    });
+  } catch (err) {
+    log.warn('Observability init failed (non-fatal)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

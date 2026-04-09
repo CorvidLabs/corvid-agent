@@ -5,55 +5,66 @@
  * clients are unaware of the difference between SDK and direct mode.
  */
 
-import type { Session, Agent, Project, McpServerConfig } from '../../shared/types';
-import type { ClaudeStreamEvent, DirectProcessMetrics, EscalationInfo } from './types';
+import type { Agent, McpServerConfig, Project, Session } from '../../shared/types';
+import { sanitizeAgentInput } from '../lib/agent-input-sanitizer';
+import { AgentSessionLimiter } from '../lib/agent-session-limits';
+import { type AgentTierConfig, getAgentTierConfig } from '../lib/agent-tiers';
+import { createLogger } from '../lib/logger';
+import {
+  buildLoopNudge,
+  buildQualityNudge,
+  buildRepetitionNudge,
+  countVacuousToolCalls,
+  RepetitionTracker,
+  RepetitiveToolCallDetector,
+  type ResponseQualityMetrics,
+  ResponseQualityTracker,
+  scoreResponseQuality,
+  type ToolCallQualityInput,
+} from '../lib/response-quality';
+import { buildSafeEnvForCoding, type CodingToolContext } from '../mcp/coding-tools';
+import { buildDirectTools, type DirectToolDefinition, toProviderTools } from '../mcp/direct-tools';
+import { ExternalMcpClientManager } from '../mcp/external-client';
+import type { McpToolContext } from '../mcp/tool-handlers';
+import { OllamaProvider } from '../providers/ollama/provider';
+import {
+  detectModelFamily,
+  getCodebaseContextPrompt,
+  getCodingToolPrompt,
+  getCompactCodingToolPrompt,
+  getCompactResponseRoutingPrompt,
+  getCompactToolInstructionPrompt,
+  getMessagingSafetyPrompt,
+  getResponseRoutingPrompt,
+  getToolInstructionPrompt,
+  getWorktreeIsolationPrompt,
+} from '../providers/ollama/tool-prompt-templates';
+import type { LlmProvider, LlmToolCall } from '../providers/types';
+import { escalateTier, inferModelTier } from '../work/chain-continuation';
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
-import type { SdkProcess } from './sdk-process';
-import type { LlmProvider, LlmToolCall } from '../providers/types';
-import type { McpToolContext } from '../mcp/tool-handlers';
-import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
-import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getCompactToolInstructionPrompt, getResponseRoutingPrompt, getCompactResponseRoutingPrompt, getCodingToolPrompt, getCompactCodingToolPrompt, getCodebaseContextPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
-import { OllamaProvider } from '../providers/ollama/provider';
-import { ExternalMcpClientManager } from '../mcp/external-client';
-import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
-import { escalateTier, inferModelTier } from '../work/chain-continuation';
-import { AgentSessionLimiter } from '../lib/agent-session-limits';
-import { sanitizeAgentInput } from '../lib/agent-input-sanitizer';
-import { createLogger } from '../lib/logger';
 import {
-    scoreResponseQuality,
-    countVacuousToolCalls,
-    ResponseQualityTracker,
-    RepetitiveToolCallDetector,
-    RepetitionTracker,
-    buildQualityNudge,
-    buildLoopNudge,
-    buildRepetitionNudge,
-    type ResponseQualityMetrics,
-    type ToolCallQualityInput,
-} from '../lib/response-quality';
-import {
-    getContextBudget,
-    calculateMaxToolResultChars,
-    truncateCouncilContext,
-    compressToolResults,
-    summarizeConversation,
-    truncateOldToolResults,
-    trimMessages,
-    computeContextUsage,
-    determineWarningLevel,
-    isContextOverflowError,
+  calculateMaxToolResultChars,
+  compressToolResults,
+  computeContextUsage,
+  determineWarningLevel,
+  getContextBudget,
+  isContextOverflowError,
+  summarizeConversation,
+  trimMessages,
+  truncateCouncilContext,
+  truncateOldToolResults,
 } from './context-management';
+import type { SdkProcess } from './sdk-process';
+import type { ClaudeStreamEvent, DirectProcessMetrics, EscalationInfo } from './types';
 
 export {
-    compressToolResults,
-    summarizeConversation,
-    truncateOldToolResults,
-    computeContextUsage,
-    determineWarningLevel,
+  compressToolResults,
+  computeContextUsage,
+  determineWarningLevel,
+  summarizeConversation,
+  truncateOldToolResults,
 };
 
 const log = createLogger('DirectProcess');
@@ -61,1005 +72,1087 @@ const log = createLogger('DirectProcess');
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface DirectProcessOptions {
-    session: Session;
-    project: Project;
-    agent: Agent | null;
-    prompt: string;
-    provider: LlmProvider;
-    approvalManager: ApprovalManager;
-    onEvent: (event: ClaudeStreamEvent) => void;
-    onExit: (code: number | null, errorMessage?: string) => void;
-    onApprovalRequest: (request: ApprovalRequestWire) => void;
-    mcpToolContext: McpToolContext | null;
-    /** Called to reset the session timeout when the agent is still active. */
-    extendTimeout?: (additionalMs: number) => void;
-    /** Persona system prompt section (from personas + agent_persona_assignments tables) */
-    personaPrompt?: string;
-    /** Skill bundle prompt additions (from assigned skill_bundles) */
-    skillPrompt?: string;
-    /** Override the agent/provider default model (e.g. COUNCIL_MODEL for chairman). */
-    modelOverride?: string;
-    /** External MCP server configs to connect to. */
-    externalMcpConfigs?: McpServerConfig[];
-    /** If set, only these tool names are available (all others filtered out). */
-    toolAllowList?: string[];
-    /** When true, disable ALL tools — pure conversation mode for untrusted users. */
-    conversationOnly?: boolean;
+  session: Session;
+  project: Project;
+  agent: Agent | null;
+  prompt: string;
+  provider: LlmProvider;
+  approvalManager: ApprovalManager;
+  onEvent: (event: ClaudeStreamEvent) => void;
+  onExit: (code: number | null, errorMessage?: string) => void;
+  onApprovalRequest: (request: ApprovalRequestWire) => void;
+  mcpToolContext: McpToolContext | null;
+  /** Called to reset the session timeout when the agent is still active. */
+  extendTimeout?: (additionalMs: number) => void;
+  /** Persona system prompt section (from personas + agent_persona_assignments tables) */
+  personaPrompt?: string;
+  /** Skill bundle prompt additions (from assigned skill_bundles) */
+  skillPrompt?: string;
+  /** Override the agent/provider default model (e.g. COUNCIL_MODEL for chairman). */
+  modelOverride?: string;
+  /** External MCP server configs to connect to. */
+  externalMcpConfigs?: McpServerConfig[];
+  /** If set, only these tool names are available (all others filtered out). */
+  toolAllowList?: string[];
+  /** When true, disable ALL tools — pure conversation mode for untrusted users. */
+  conversationOnly?: boolean;
 }
 
 let nextPseudoPid = 800_000;
 
 export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
-    const {
-        session,
-        project,
+  const {
+    session,
+    project,
+    agent,
+    prompt,
+    provider,
+    approvalManager,
+    onEvent,
+    onExit,
+    onApprovalRequest,
+    mcpToolContext,
+    extendTimeout,
+    personaPrompt,
+    skillPrompt,
+    modelOverride,
+    externalMcpConfigs,
+  } = options;
+
+  const pseudoPid = nextPseudoPid++;
+  let aborted = false;
+  let toolsDisabled = false;
+  const abortController = new AbortController();
+
+  // Message queue for follow-up user messages
+  const pendingMessages: string[] = [];
+  let processing = false;
+
+  // Idle-wait state: instead of exiting after each turn, wait for the next message
+  let idleResolver: ((msg: string | null) => void) | null = null;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Council deliberation sessions get tools so they can demonstrate
+  // full capabilities (tool use, memory, code reading, etc.)
+  const isDeliberationSession =
+    session.councilRole === 'member' || session.councilRole === 'discusser' || session.councilRole === 'reviewer';
+
+  // Build coding context (always available — file/command tools don't need MCP)
+  const codingCtx: CodingToolContext = {
+    workingDir: project.workingDir,
+    env: buildSafeEnvForCoding(),
+  };
+
+  // External MCP client manager for third-party MCP servers
+  const externalMcpManager = new ExternalMcpClientManager();
+
+  // Build tools — council deliberation sessions now get tools for full capability testing
+  let directTools = options.conversationOnly ? [] : buildDirectTools(mcpToolContext, codingCtx);
+  // Filter to allowlist if specified (e.g. poll sessions only need run_command)
+  if (options.toolAllowList && options.toolAllowList.length > 0) {
+    const allowed = new Set(options.toolAllowList);
+    directTools = directTools.filter((t) => allowed.has(t.name));
+  }
+  const toolMap = new Map<string, DirectToolDefinition>();
+  for (const t of directTools) {
+    toolMap.set(t.name, t);
+  }
+
+  const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
+
+  // Provider options for CLI-based providers (cursor-agent, etc.)
+  const providerOptions: Record<string, unknown> = {
+    sessionId: session.id,
+    agent,
+    project,
+  };
+
+  // Tier-based limits for this agent's model
+  const tierConfig = getAgentTierConfig(model);
+  const sessionLimiter = new AgentSessionLimiter(session.id, model);
+  log.info(`Agent tier: ${tierConfig.tier} for model ${model}`, {
+    maxIterations: tierConfig.maxToolIterations,
+    maxNudges: tierConfig.maxNudges,
+    sessionId: session.id,
+  });
+
+  // Connect external MCP servers and merge their tools before starting the loop
+  const initPromise = (async () => {
+    if (externalMcpConfigs && externalMcpConfigs.length > 0) {
+      await externalMcpManager.connectAll(externalMcpConfigs);
+      const externalTools = externalMcpManager.getAllTools();
+      for (const t of externalTools) {
+        directTools.push(t);
+        toolMap.set(t.name, t);
+      }
+      if (externalTools.length > 0) {
+        log.info(`Added ${externalTools.length} external MCP tools for session ${session.id}`);
+      }
+    }
+  })();
+
+  // Build system prompt (with tool instructions if tools are available) — deferred until external tools are loaded
+  let systemPrompt = '';
+
+  // Conversation history for the current session
+  const messages: Array<{
+    role: 'user' | 'assistant' | 'tool';
+    content: string;
+    toolCallId?: string;
+    toolCalls?: LlmToolCall[];
+  }> = [];
+
+  // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
+  const effectivePrompt = prependRoutingContext(prompt, session.source, tierConfig);
+
+  // Wait for external MCP initialization, then build system prompt and start loop
+  initPromise
+    .then(() => {
+      const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
+      systemPrompt = buildSystemPrompt(
         agent,
-        prompt,
-        provider,
-        approvalManager,
-        onEvent,
-        onExit,
-        onApprovalRequest,
-        mcpToolContext,
-        extendTimeout,
+        project,
+        model,
+        toolDefs,
+        !toolsDisabled && directTools.length > 0,
+        isDeliberationSession,
         personaPrompt,
         skillPrompt,
-        modelOverride,
-        externalMcpConfigs,
-    } = options;
-
-    const pseudoPid = nextPseudoPid++;
-    let aborted = false;
-    let toolsDisabled = false;
-    const abortController = new AbortController();
-
-    // Message queue for follow-up user messages
-    const pendingMessages: string[] = [];
-    let processing = false;
-
-    // Idle-wait state: instead of exiting after each turn, wait for the next message
-    let idleResolver: ((msg: string | null) => void) | null = null;
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // Council deliberation sessions get tools so they can demonstrate
-    // full capabilities (tool use, memory, code reading, etc.)
-    const isDeliberationSession = session.councilRole === 'member'
-        || session.councilRole === 'discusser'
-        || session.councilRole === 'reviewer';
-
-    // Build coding context (always available — file/command tools don't need MCP)
-    const codingCtx: CodingToolContext = {
-        workingDir: project.workingDir,
-        env: buildSafeEnvForCoding(),
-    };
-
-    // External MCP client manager for third-party MCP servers
-    const externalMcpManager = new ExternalMcpClientManager();
-
-    // Build tools — council deliberation sessions now get tools for full capability testing
-    let directTools = options.conversationOnly ? [] : buildDirectTools(mcpToolContext, codingCtx);
-    // Filter to allowlist if specified (e.g. poll sessions only need run_command)
-    if (options.toolAllowList && options.toolAllowList.length > 0) {
-        const allowed = new Set(options.toolAllowList);
-        directTools = directTools.filter(t => allowed.has(t.name));
-    }
-    const toolMap = new Map<string, DirectToolDefinition>();
-    for (const t of directTools) {
-        toolMap.set(t.name, t);
-    }
-
-    const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
-
-    // Provider options for CLI-based providers (cursor-agent, etc.)
-    const providerOptions: Record<string, unknown> = {
-        sessionId: session.id,
-        agent,
-        project,
-    };
-
-    // Tier-based limits for this agent's model
-    const tierConfig = getAgentTierConfig(model);
-    const sessionLimiter = new AgentSessionLimiter(session.id, model);
-    log.info(`Agent tier: ${tierConfig.tier} for model ${model}`, {
-        maxIterations: tierConfig.maxToolIterations,
-        maxNudges: tierConfig.maxNudges,
-        sessionId: session.id,
+        tierConfig,
+        session.workDir,
+      );
+      return runLoop(effectivePrompt);
+    })
+    .catch((err) => {
+      if (aborted) return;
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
+      onEvent({
+        type: 'error',
+        error: { message: errorMsg, type: 'direct_process_error' },
+      } as ClaudeStreamEvent);
+      onExit(1, errorMsg);
     });
 
-    // Connect external MCP servers and merge their tools before starting the loop
-    const initPromise = (async () => {
-        if (externalMcpConfigs && externalMcpConfigs.length > 0) {
-            await externalMcpManager.connectAll(externalMcpConfigs);
-            const externalTools = externalMcpManager.getAllTools();
-            for (const t of externalTools) {
-                directTools.push(t);
-                toolMap.set(t.name, t);
-            }
-            if (externalTools.length > 0) {
-                log.info(`Added ${externalTools.length} external MCP tools for session ${session.id}`);
-            }
+  /* c8 ignore next 4 -- wiring inside integration-level process loop */
+  let lastUserMessage = '';
+  async function runLoop(userMessage: string): Promise<void> {
+    lastUserMessage = userMessage;
+    processing = true;
+    messages.push({ role: 'user', content: userMessage });
+
+    // Council synthesis prompts can be very long — truncate if needed
+    if (session.councilRole === 'chairman') {
+      truncateCouncilContext(messages, systemPrompt, model);
+    }
+
+    // Signal that the agent is working
+    onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+
+    // Extend session timeout on activity (debounced to once per minute)
+    let lastExtend = 0;
+    const EXTEND_DEBOUNCE_MS = 60_000;
+    const TIMEOUT_EXTENSION_MS = 30 * 60 * 1000; // 30 minutes
+
+    const extendTimeoutIfNeeded = () => {
+      if (extendTimeout) {
+        const now = Date.now();
+        if (now - lastExtend > EXTEND_DEBOUNCE_MS) {
+          extendTimeout(TIMEOUT_EXTENSION_MS);
+          lastExtend = now;
         }
-    })();
+      }
+    };
 
-    // Build system prompt (with tool instructions if tools are available) — deferred until external tools are loaded
-    let systemPrompt = '';
+    // Acquire inference slot BEFORE the agentic loop so this agent runs all
+    // its turns to completion without yielding. This keeps the model loaded
+    // in Ollama's memory (preserves KV cache) and avoids context-switching.
+    const onSlotStatus = (status: string) => {
+      if (status) {
+        onEvent({
+          type: 'queue_status',
+          statusMessage: status,
+        } as ClaudeStreamEvent);
+      } else {
+        onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+      }
+    };
 
-    // Conversation history for the current session
-    const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string; toolCalls?: LlmToolCall[] }> = [];
+    // Heartbeat while waiting for slot (so UI doesn't look frozen)
+    const slotHeartbeat = setInterval(() => {
+      extendTimeoutIfNeeded();
+      onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+    }, 10_000);
 
-    // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
-    const effectivePrompt = prependRoutingContext(prompt, session.source, tierConfig);
+    let slotAcquired = false;
+    if (provider.acquireSlot) {
+      slotAcquired = await provider.acquireSlot(model, abortController.signal, onSlotStatus);
+    }
+    clearInterval(slotHeartbeat);
 
-    // Wait for external MCP initialization, then build system prompt and start loop
-    initPromise.then(() => {
-        const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt, tierConfig, session.workDir);
-        return runLoop(effectivePrompt);
-    }).catch((err) => {
+    if (aborted) {
+      if (slotAcquired) provider.releaseSlot?.(model);
+      return;
+    }
+
+    let iteration = 0;
+    let lastToolCallKey = '';
+    let lastToolNames = '';
+    let repeatCount = 0;
+    let sameToolNameCount = 0;
+    let nudgeCount = 0;
+    let midChainNudgeCount = 0;
+    let toolsEverCalled = false;
+    let needsSummary = false; // Set true when loop breaks abnormally (repeat/max-iter)
+    const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
+    const MAX_SAME_TOOL = 4; // Break if same tool name called 5 times (even with different args)
+    // Tier-based nudge limits: weaker models get more nudges (they need more guidance)
+    const MAX_NUDGES = tierConfig.maxNudges;
+    const MAX_MID_CHAIN_NUDGES = tierConfig.maxMidChainNudges;
+    const MAX_TOOL_ITERATIONS = tierConfig.maxToolIterations;
+    let explorationToolCalls = 0; // Track how many list_files/search_files calls
+    let totalExplorationDrifts = 0; // Cumulative exploration drift triggers
+    let toolCallCount = 0; // Total tool calls across all iterations
+    let currentChainDepth = 0; // Current unbroken tool-call sequence
+    let maxChainDepth = 0; // Longest unbroken tool-call sequence
+    let terminationReason: DirectProcessMetrics['terminationReason'] = 'normal';
+    let stallType: string | null = null;
+    const qualityTracker = new ResponseQualityTracker();
+    const loopDetector = new RepetitiveToolCallDetector();
+    const repetitionTracker = new RepetitionTracker();
+    const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
+    const MAX_LOOP_NUDGES = 2;
+    /* c8 ignore next -- integration-level process loop */
+    const toolCallLog: string[] = []; // Brief log of tool calls for escalation
+    const loopStartTime = Date.now();
+
+    // ── Context usage tracking ──────────────────────────────────
+    let lastWarningLevel: string | null = null;
+    let hasTrimmed = false;
+
+    function emitContextUsage(msgs: Array<{ role: string; content: string }>, sysPrompt: string): void {
+      const usage = computeContextUsage(msgs, sysPrompt, hasTrimmed, model);
+
+      onEvent({
+        type: 'context_usage',
+        session_id: session.id,
+        ...usage,
+      } as ClaudeStreamEvent);
+
+      // Emit warnings at thresholds (only when crossing a new level)
+      const warning = determineWarningLevel(usage.usagePercent);
+
+      if (warning && warning.level !== lastWarningLevel) {
+        lastWarningLevel = warning.level;
+        onEvent({
+          type: 'context_warning',
+          session_id: session.id,
+          level: warning.level,
+          usagePercent: usage.usagePercent,
+          message: warning.message,
+        } as ClaudeStreamEvent);
+      }
+    }
+
+    /** End-of-turn marker aligned with Claude SDK streams (work-queue stall detection). */
+    function emitModelTurnEnd(): void {
+      onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
+    }
+
+    try {
+      while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
+        iteration++;
+
+        const providerTools = !toolsDisabled && directTools.length > 0 ? toProviderTools(directTools) : undefined;
+
+        const activityCallback = () => {
+          onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+          extendTimeoutIfNeeded();
+        };
+
+        // Heartbeat while waiting for inference
+        const heartbeat = setInterval(activityCallback, 10_000);
+
+        let result;
+        try {
+          const countBefore = messages.length;
+          trimMessages(messages, systemPrompt, model);
+          if (messages.length < countBefore) hasTrimmed = true;
+          // Post-trim pass: truncate old tool results for additional savings
+          truncateOldToolResults(messages, 3, 500);
+          emitContextUsage(messages, systemPrompt);
+          result = await provider.complete({
+            model,
+            systemPrompt,
+            messages,
+            tools: providerTools,
+            signal: abortController.signal,
+            onActivity: activityCallback,
+            onStream: (text) =>
+              onEvent({
+                type: 'content_block_delta',
+                delta: { text },
+              } as ClaudeStreamEvent),
+            providerOptions,
+          });
+        } catch (err) {
+          clearInterval(heartbeat);
+          // Tool fallback: if the model doesn't support tools, retry without them
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          if (isContextOverflowError(errorMsg)) {
+            log.warn(
+              `Context overflow for session ${session.id} (model: ${model}) — applying emergency compression and retrying`,
+            );
+            const projectContext = project ? { name: project.name, workingDir: project.workingDir } : undefined;
+            const summary = summarizeConversation(messages, projectContext);
+            const keepLast = Math.min(4, messages.length);
+            const recent = messages.slice(-keepLast);
+            messages.length = 0;
+            messages.push({ role: 'user', content: summary });
+            messages.push(...recent);
+            hasTrimmed = true;
+
+            onEvent({
+              type: 'context_warning',
+              session_id: session.id,
+              level: 'critical',
+              usagePercent: 100,
+              message:
+                'Context limit reached — conversation history was compressed to continue. Some earlier details may be summarized.',
+            } as ClaudeStreamEvent);
+
+            emitContextUsage(messages, systemPrompt);
+            result = await provider.complete({
+              model,
+              systemPrompt,
+              messages,
+              tools: !toolsDisabled && directTools.length > 0 ? toProviderTools(directTools) : undefined,
+              signal: abortController.signal,
+              onActivity: activityCallback,
+              onStream: (text) =>
+                onEvent({
+                  type: 'content_block_delta',
+                  delta: { text },
+                } as ClaudeStreamEvent),
+              providerOptions,
+            });
+          } else if (!toolsDisabled && providerTools && isToolUnsupportedError(errorMsg)) {
+            log.warn(`Model ${model} does not support tools — disabling for this session`);
+            toolsDisabled = true;
+            // Retry without tools
+            const countBefore2 = messages.length;
+            trimMessages(messages, systemPrompt, model);
+            if (messages.length < countBefore2) hasTrimmed = true;
+            // Post-trim pass: truncate old tool results
+            truncateOldToolResults(messages, 3, 500);
+            emitContextUsage(messages, systemPrompt);
+            result = await provider.complete({
+              model,
+              systemPrompt,
+              messages,
+              signal: abortController.signal,
+              onActivity: activityCallback,
+              onStream: (text) =>
+                onEvent({
+                  type: 'content_block_delta',
+                  delta: { text },
+                } as ClaudeStreamEvent),
+              providerOptions,
+            });
+          } else {
+            throw err;
+          }
+        } finally {
+          clearInterval(heartbeat);
+        }
+
+        if (aborted) return;
+
+        // Emit assistant response
+        if (result.content) {
+          onEvent({
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: result.content }],
+            },
+          } as ClaudeStreamEvent);
+        }
+
+        // Emit performance metrics (tok/s) if available
+        if (result.performance && result.performance.tokensPerSecond > 0) {
+          onEvent({
+            type: 'performance',
+            model: result.model,
+            tokensPerSecond: result.performance.tokensPerSecond,
+            outputTokens: result.usage?.outputTokens ?? 0,
+            evalDurationMs: result.performance.evalDurationMs,
+          } as ClaudeStreamEvent);
+        }
+
+        // Handle tool calls
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          toolsEverCalled = true;
+          toolCallCount += result.toolCalls.length;
+          currentChainDepth++;
+          if (currentChainDepth > maxChainDepth) {
+            maxChainDepth = currentChainDepth;
+          }
+          // Detect repeated tool calls — uses normalized comparison to catch
+          // near-identical loops (same tool, args differ only in whitespace/order)
+          const callKey = normalizeToolCallKey(result.toolCalls);
+          if (callKey === lastToolCallKey) {
+            repeatCount++;
+            if (repeatCount >= MAX_REPEATS) {
+              log.warn(`Breaking tool loop: same call repeated ${repeatCount + 1} times`, {
+                calls: callKey.slice(0, 200),
+              });
+              messages.push({ role: 'assistant', content: result.content || '' });
+              needsSummary = true;
+              terminationReason = 'stall_repeat';
+              stallType = 'repeat';
+              emitModelTurnEnd();
+              break;
+            }
+          } else {
+            lastToolCallKey = callKey;
+            repeatCount = 0;
+          }
+
+          // Also detect same tool name called repeatedly with different args
+          // (e.g., model keeps re-calling save_memory with slightly different content)
+          const toolNames = result.toolCalls.map((tc) => tc.name).join('|');
+          if (toolNames === lastToolNames) {
+            sameToolNameCount++;
+            if (sameToolNameCount >= MAX_SAME_TOOL) {
+              log.warn(`Breaking tool loop: same tool name repeated ${sameToolNameCount + 1} times with varying args`, {
+                tools: toolNames,
+              });
+              messages.push({ role: 'assistant', content: result.content || '' });
+              needsSummary = true;
+              terminationReason = 'stall_same_tool';
+              stallType = 'same_tool';
+              emitModelTurnEnd();
+              break;
+            }
+          } else {
+            lastToolNames = toolNames;
+            sameToolNameCount = 0;
+          }
+
+          // Add assistant message with tool call indication (include toolCalls so
+          // providers can reconstruct the full assistant turn for the next API call)
+          messages.push({ role: 'assistant', content: result.content || '', toolCalls: result.toolCalls });
+
+          for (const toolCall of result.toolCalls) {
+            if (aborted) return;
+
+            // Emit structured tool_use event so CLI/dashboard can display it
+            onEvent({
+              type: 'content_block_start',
+              content_block: {
+                type: 'tool_use',
+                name: toolCall.name,
+                input: toolCall.arguments,
+              },
+            } as ClaudeStreamEvent);
+
+            const toolDef = toolMap.get(toolCall.name);
+            if (!toolDef) {
+              const errorText = `Unknown tool: ${toolCall.name}`;
+              messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
+              emitToolStatus(toolCall.name, errorText, true);
+              continue;
+            }
+
+            // Session rate limiting (tier-based)
+            const rateLimitError = sessionLimiter.checkAndIncrement(toolCall.name);
+            if (rateLimitError) {
+              messages.push({ role: 'tool', content: rateLimitError, toolCallId: toolCall.id });
+              emitToolStatus(toolCall.name, rateLimitError, true);
+              continue;
+            }
+
+            // Permission check via approval flow
+            const permitted = await checkToolPermission(toolCall, session, agent, approvalManager, onApprovalRequest);
+            if (aborted) return;
+
+            if (!permitted) {
+              const deniedText = `Permission denied for tool: ${toolCall.name}`;
+              messages.push({ role: 'tool', content: deniedText, toolCallId: toolCall.id });
+              emitToolStatus(toolCall.name, deniedText, true);
+              continue;
+            }
+
+            // Execute tool
+            emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
+            try {
+              const toolResult = await toolDef.handler(toolCall.arguments);
+              const maxChars = calculateMaxToolResultChars(messages, systemPrompt, model);
+              let resultText = toolResult.text;
+              if (resultText.length > maxChars) {
+                log.warn(`Truncated tool result for ${toolCall.name}`, {
+                  original: resultText.length,
+                  maxChars,
+                  contextBudget: getContextBudget(model),
+                });
+                // For structured data (JSON), try to keep head + tail
+                if (resultText.startsWith('{') || resultText.startsWith('[')) {
+                  const headSize = Math.floor(maxChars * 0.7);
+                  const tailSize = Math.floor(maxChars * 0.2);
+                  resultText =
+                    resultText.slice(0, headSize) +
+                    `\n\n[... ${toolResult.text.length - headSize - tailSize} chars omitted ...]\n\n` +
+                    resultText.slice(-tailSize);
+                } else {
+                  resultText =
+                    resultText.slice(0, maxChars) +
+                    `\n\n[... truncated, ${toolResult.text.length - maxChars} chars omitted]`;
+                }
+              }
+              // Strip lone surrogates that would produce invalid JSON
+              // (e.g. from binary output or malformed UTF-16 in tool results)
+              resultText = resultText.replace(/[\uD800-\uDFFF]/g, '\uFFFD');
+              messages.push({
+                role: 'tool',
+                content: resultText,
+                toolCallId: toolCall.id,
+              });
+              emitToolStatus(
+                toolCall.name,
+                toolResult.isError ? `Error: ${toolResult.text.slice(0, 200)}` : `Done`,
+                false,
+              );
+              trackToolCall(toolCallLog, toolCall.name, toolResult.isError ? 'error' : 'ok');
+            } catch (err) {
+              const errorText = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
+              messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
+              emitToolStatus(toolCall.name, errorText, true);
+              trackToolCall(toolCallLog, toolCall.name, 'exception');
+            }
+          }
+
+          // Exploration drift detection: if the agent is calling exploration
+          // tools excessively, inject a focus reminder
+          const explorationTools = new Set(['list_files', 'search_files']);
+          const driftCalls = result.toolCalls.filter((tc) => explorationTools.has(tc.name));
+          explorationToolCalls += driftCalls.length;
+          const MAX_EXPLORATION_DRIFTS = 3; // Cap cumulative drift triggers
+          if (explorationToolCalls >= 5 && tierConfig.tier !== 'high') {
+            totalExplorationDrifts++;
+            if (totalExplorationDrifts > MAX_EXPLORATION_DRIFTS) {
+              log.warn('Exploration drift limit exceeded — terminating', {
+                totalDrifts: totalExplorationDrifts,
+                tier: tierConfig.tier,
+                sessionId: session.id,
+              });
+              stallType = 'exploration_drift';
+              terminationReason = 'stall_exploration';
+              emitModelTurnEnd();
+              break;
+            }
+            log.info('Exploration drift detected — injecting focus reminder', {
+              explorationCalls: explorationToolCalls,
+              driftCount: totalExplorationDrifts,
+              tier: tierConfig.tier,
+              sessionId: session.id,
+            });
+            messages.push({
+              role: 'user',
+              content:
+                'FOCUS: You have been exploring many directories. Stop browsing and focus on the specific task. ' +
+                'Only read files that are directly relevant to completing the task. ' +
+                'If you have enough information, proceed to take action now.' +
+                (totalExplorationDrifts >= 2
+                  ? ' WARNING: This is your last chance to focus before the session is terminated.'
+                  : ''),
+            });
+            explorationToolCalls = 0; // Reset so we don't spam
+          }
+
+          // Vacuous tool call detection: flag semantically empty tool calls
+          const toolCallInputs = result.toolCalls.map(
+            (tc: LlmToolCall): ToolCallQualityInput => ({
+              name: tc.name,
+              arguments: tc.arguments as Record<string, unknown>,
+            }),
+          );
+          const vacuousCount = countVacuousToolCalls(toolCallInputs);
+          if (vacuousCount > 0) {
+            qualityTracker.recordVacuousToolCalls(vacuousCount);
+            log.info('Vacuous tool calls detected', {
+              count: vacuousCount,
+              tools: result.toolCalls.map((tc: LlmToolCall) => tc.name).join(', '),
+              sessionId: session.id,
+            });
+          }
+
+          // Repetitive tool call loop detection
+          const isLoop = loopDetector.recordToolCalls(toolCallInputs);
+          if (isLoop && loopDetector.totalLoopsDetected <= MAX_LOOP_NUDGES) {
+            const repeatedTool = result.toolCalls[result.toolCalls.length - 1]?.name ?? 'unknown';
+            log.warn('Repetitive tool call loop detected', {
+              tool: repeatedTool,
+              totalLoops: loopDetector.totalLoopsDetected,
+              sessionId: session.id,
+            });
+            messages.push({ role: 'user', content: buildLoopNudge(repeatedTool) });
+            loopDetector.reset(); // Give the model a chance to recover
+          } else if (isLoop && loopDetector.totalLoopsDetected > MAX_LOOP_NUDGES) {
+            // Loop nudges exhausted — terminate the loop
+            log.warn('Repetitive loop nudges exhausted — breaking tool loop', {
+              totalLoops: loopDetector.totalLoopsDetected,
+              sessionId: session.id,
+            });
+            stallType = 'repetitive_loop';
+            terminationReason = 'stall_repetitive_loop';
+            emitModelTurnEnd();
+            break;
+          }
+
+          // Score text quality alongside tool calls
+          const toolResponseQuality = scoreResponseQuality(result.content || '', true);
+          const needsToolQualityNudge = qualityTracker.recordResponse(toolResponseQuality);
+          if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES) {
+            qualityTracker.incrementNudgeCount();
+            log.info('Low-quality response detected during tool chain', {
+              score: toolResponseQuality.score,
+              signals: toolResponseQuality.signals,
+              sessionId: session.id,
+            });
+            messages.push({ role: 'user', content: buildQualityNudge() });
+          } else if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount >= MAX_QUALITY_NUDGES) {
+            // Quality nudges exhausted — mark for escalation
+            qualityTracker.markNudgesExhausted();
+            log.warn('Quality nudges exhausted without improvement', {
+              totalLowQuality: qualityTracker.getMetrics().totalLowQualityResponses,
+              sessionId: session.id,
+            });
+            stallType = 'quality_nudges_exhausted';
+            terminationReason = 'stall_quality_exhausted';
+            emitModelTurnEnd();
+            break;
+          }
+
+          // Continue loop to let the model process tool results
+          emitModelTurnEnd();
+          continue;
+        }
+
+        // No tool calls — reset chain depth counter
+        currentChainDepth = 0;
+
+        // No tool calls — check if the model stopped prematurely
+        const responseText = (result.content || '').trim();
+
+        // Detect hallucinated tool results: if the model generated tool output
+        // markers in its text, it's imitating the tool result format instead of making
+        // actual tool calls. Strip the hallucination and nudge it to call tools properly.
+        const hasHallucinatedResult =
+          responseText.includes('[Tool Result]') ||
+          responseText.includes('«tool_output»') ||
+          responseText.includes('«/tool_output»');
+        if (toolsEverCalled && hasHallucinatedResult && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
+          midChainNudgeCount++;
+          log.warn(
+            `Detected hallucinated tool result in model output (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`,
+            {
+              preview: responseText.slice(0, 300),
+            },
+          );
+          // Strip the hallucinated content — don't add it to messages
+          // Instead, nudge the model to make a real tool call
+          messages.push({
+            role: 'user',
+            content:
+              'STOP. You just wrote fake tool results instead of calling a tool. ' +
+              'You must NOT write tool output tags or results yourself — only the system provides those. ' +
+              'Call the next tool now by outputting ONLY the JSON array: ' +
+              '[{"name": "tool_name", "arguments": {...}}]',
+          });
+          emitModelTurnEnd();
+          continue;
+        }
+
+        // Quality scoring for text-only responses
+        const textQuality = scoreResponseQuality(responseText, false);
+        const needsTextQualityNudge = qualityTracker.recordResponse(textQuality);
+
+        // Repetition detection: check if this response rephrases recent ones
+        const repetitionAction = repetitionTracker.recordResponse(responseText);
+
+        messages.push({ role: 'assistant', content: responseText });
+
+        // Repetition loop — higher priority than quality nudge because
+        // repetitive loops are a harder failure mode to escape
+        if (repetitionAction === 'break') {
+          log.warn('Repetitive response loop detected — breaking', {
+            ...repetitionTracker.getMetrics(),
+            sessionId: session.id,
+          });
+          needsSummary = true;
+          terminationReason = 'stall_repetitive';
+          stallType = 'repetitive';
+          break;
+        }
+        if (repetitionAction === 'nudge' && iteration < MAX_TOOL_ITERATIONS - 1) {
+          log.info('Repetitive response detected — injecting repetition nudge', {
+            ...repetitionTracker.getMetrics(),
+            sessionId: session.id,
+          });
+          messages.push({ role: 'user', content: buildRepetitionNudge() });
+          continue;
+        }
+
+        // Cheerleading detection: if consecutive low-quality text responses,
+        // inject a corrective nudge before the standard nudge system
+        if (
+          needsTextQualityNudge &&
+          qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES &&
+          iteration < MAX_TOOL_ITERATIONS - 1
+        ) {
+          qualityTracker.incrementNudgeCount();
+          log.info('Cheerleading detected — injecting quality nudge', {
+            score: textQuality.score,
+            signals: textQuality.signals,
+            consecutiveNudge: qualityTracker.getMetrics().qualityNudgeCount,
+            sessionId: session.id,
+          });
+          messages.push({ role: 'user', content: buildQualityNudge() });
+          emitModelTurnEnd();
+          continue;
+        }
+
+        // Skip nudging if we've already nudged too many times or tools are disabled
+        if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
+          emitModelTurnEnd();
+          break;
+        }
+
+        // After tools have been called, check if the model tried to call a tool
+        // but used a format the parser couldn't extract. If the text mentions a
+        // known tool name, treat it as a failed tool call and nudge instead of exiting.
+        if (toolsEverCalled) {
+          const mentionedTool = directTools.find((t) => responseText.includes(t.name));
+          if (mentionedTool && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
+            midChainNudgeCount++;
+            log.warn(
+              `Detected failed tool call attempt in text (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`,
+              {
+                mentionedTool: mentionedTool.name,
+                preview: responseText.slice(0, 300),
+              },
+            );
+            messages.push({
+              role: 'user',
+              content:
+                `Your response mentioned "${mentionedTool.name}" but was not formatted as a tool call. ` +
+                'To call a tool, output ONLY a JSON array like this:\n' +
+                `[{"name": "${mentionedTool.name}", "arguments": {...}}]\n` +
+                'Do NOT wrap it in XML tags, markdown, or explanation text. Just the raw JSON array.',
+            });
+            emitModelTurnEnd();
+            continue;
+          }
+          emitModelTurnEnd();
+          break;
+        }
+
+        // Detect incomplete responses that need a nudge to use tools.
+        // Only nudge if the model has never successfully called a tool yet.
+        // Once it has used tools, a text-only response means it's genuinely done.
+        const nudgeReason = detectNudgeReason(responseText, iteration, directTools);
+
+        if (nudgeReason && iteration < MAX_TOOL_ITERATIONS - 1) {
+          nudgeCount++;
+          log.info(
+            `Nudging model to continue (iteration=${iteration}, reason=${nudgeReason}, nudge=${nudgeCount}/${MAX_NUDGES})`,
+          );
+          const nudge = buildNudgeMessage(nudgeReason, directTools);
+          messages.push({ role: 'user', content: nudge });
+          emitModelTurnEnd();
+          continue;
+        }
+
+        emitModelTurnEnd();
+        break;
+      }
+
+      // Max iterations reached — also needs a summary epilogue
+      if (iteration >= MAX_TOOL_ITERATIONS && toolsEverCalled) {
+        needsSummary = true;
+        if (terminationReason === 'normal') {
+          terminationReason = 'max_iterations';
+        }
+      }
+
+      // Final summary epilogue: when the tool loop broke abnormally (repeat
+      // detection, same-tool detection, or max iterations), the model never
+      // got a chance to produce a coherent text conclusion. Run one last
+      // inference call with tools disabled so it can summarize its work.
+      if (needsSummary && toolsEverCalled && !aborted) {
+        log.info('Running final summary call (tools disabled)', { sessionId: session.id, iteration });
+        messages.push({
+          role: 'user',
+          content: 'Summarize what you accomplished. Be concise — state the key actions taken and their results.',
+        });
+        try {
+          const countBeforeSummary = messages.length;
+          trimMessages(messages, systemPrompt);
+          if (messages.length < countBeforeSummary) hasTrimmed = true;
+          emitContextUsage(messages, systemPrompt);
+          const summaryResult = await provider.complete({
+            model,
+            systemPrompt,
+            messages,
+            // No tools — force a text-only response
+            signal: abortController.signal,
+            onStream: (text) =>
+              onEvent({
+                type: 'content_block_delta',
+                delta: { text },
+              } as ClaudeStreamEvent),
+          });
+          if (summaryResult.content && !aborted) {
+            messages.push({ role: 'assistant', content: summaryResult.content });
+            onEvent({
+              type: 'assistant',
+              message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: summaryResult.content }],
+              },
+            } as ClaudeStreamEvent);
+            emitModelTurnEnd();
+          }
+        } catch (err) {
+          log.warn('Final summary call failed', {
+            sessionId: session.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    } catch (err) {
+      terminationReason = 'error';
+      const loopDurationMs = Date.now() - loopStartTime;
+      const sessionMetrics = buildSessionMetrics({
+        model,
+        tier: tierConfig.tier,
+        iteration,
+        toolCallCount,
+        maxChainDepth,
+        nudgeCount,
+        midChainNudgeCount,
+        totalExplorationDrifts,
+        stallType,
+        terminationReason,
+        loopDurationMs,
+        needsSummary,
+        qualityMetrics: qualityTracker.getMetrics(),
+      });
+      onEvent(
+        buildResultEvent(
+          {
+            subtype: 'error',
+            durationMs: loopDurationMs,
+            numTurns: iteration,
+            sessionId: session.id,
+            metrics: sessionMetrics,
+          },
+          {
+            terminationReason,
+            model,
+            tier: tierConfig.tier,
+            originalPrompt: lastUserMessage,
+            toolCallLog,
+            qualityMetrics: qualityTracker.getMetrics(),
+          },
+        ),
+      );
+      throw err;
+    } finally {
+      // Release the slot so the next agent can run
+      if (slotAcquired) provider.releaseSlot?.(model);
+    }
+
+    if (aborted) {
+      const loopDurationMs = Date.now() - loopStartTime;
+      const sessionMetrics = buildSessionMetrics({
+        model,
+        tier: tierConfig.tier,
+        iteration,
+        toolCallCount,
+        maxChainDepth,
+        nudgeCount,
+        midChainNudgeCount,
+        totalExplorationDrifts,
+        stallType,
+        terminationReason: 'abort',
+        loopDurationMs,
+        needsSummary,
+        qualityMetrics: qualityTracker.getMetrics(),
+      });
+      onEvent({
+        type: 'result',
+        subtype: 'abort',
+        total_cost_usd: 0,
+        duration_ms: loopDurationMs,
+        num_turns: iteration,
+        session_id: session.id,
+        metrics: sessionMetrics,
+      } as ClaudeStreamEvent);
+      return;
+    }
+
+    // Signal that the agent is done thinking
+    onEvent({ type: 'thinking', thinking: false } as ClaudeStreamEvent);
+
+    // Build session metrics
+    const loopDurationMs = Date.now() - loopStartTime;
+    const sessionMetrics = buildSessionMetrics({
+      model,
+      tier: tierConfig.tier,
+      iteration,
+      toolCallCount,
+      maxChainDepth,
+      nudgeCount,
+      midChainNudgeCount,
+      totalExplorationDrifts,
+      stallType,
+      terminationReason,
+      loopDurationMs,
+      needsSummary,
+      qualityMetrics: qualityTracker.getMetrics(),
+    });
+
+    // Emit result event with metrics (and escalation metadata for abnormal terminations)
+    onEvent(
+      buildResultEvent(
+        {
+          subtype: 'success',
+          durationMs: loopDurationMs,
+          numTurns: iteration,
+          sessionId: session.id,
+          metrics: sessionMetrics,
+        },
+        {
+          terminationReason,
+          model,
+          tier: tierConfig.tier,
+          originalPrompt: lastUserMessage,
+          toolCallLog,
+          qualityMetrics: qualityTracker.getMetrics(),
+        },
+      ),
+    );
+
+    processing = false;
+
+    // Check for queued messages or wait for the next one
+    if (aborted) {
+      onExit(0);
+      return;
+    }
+
+    const next = pendingMessages.length > 0 ? pendingMessages.shift()! : await waitForNextMessage();
+
+    if (next === null) {
+      // Idle timeout or abort — exit cleanly
+      onExit(0);
+      return;
+    }
+
+    runLoop(next).catch((err) => {
+      if (aborted) return;
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
+      onEvent({
+        type: 'error',
+        error: { message: errorMsg, type: 'direct_process_error' },
+      } as ClaudeStreamEvent);
+      onExit(1, errorMsg);
+    });
+  }
+
+  /** Wait for the next user message or idle timeout. Returns null on timeout/abort. */
+  function waitForNextMessage(): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      idleResolver = resolve;
+      idleTimer = setTimeout(() => {
+        idleResolver = null;
+        idleTimer = null;
+        log.info(`Session ${session.id} idle timeout after ${IDLE_TIMEOUT_MS / 1000}s`);
+        resolve(null);
+      }, IDLE_TIMEOUT_MS);
+    });
+  }
+
+  function emitToolStatus(toolName: string, message: string, _isError: boolean): void {
+    onEvent({
+      type: 'tool_status',
+      statusMessage: `[${toolName}] ${message}`,
+    });
+  }
+
+  function sendMessage(
+    content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[],
+  ): boolean {
+    // Direct process (Ollama) doesn't support multimodal — extract text only
+    const textContent =
+      typeof content === 'string'
+        ? content
+        : content
+            .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+            .map((b) => b.text)
+            .join('\n') || '[image attachment(s)]';
+    if (aborted) return false;
+    if (processing) {
+      pendingMessages.push(textContent);
+    } else if (idleResolver) {
+      // Waiting for next message — resolve the idle promise
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      const resolve = idleResolver;
+      idleResolver = null;
+      resolve(textContent);
+    } else {
+      runLoop(textContent).catch((err) => {
         if (aborted) return;
         const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
         onEvent({
-            type: 'error',
-            error: { message: errorMsg, type: 'direct_process_error' },
+          type: 'error',
+          error: { message: errorMsg, type: 'direct_process_error' },
         } as ClaudeStreamEvent);
         onExit(1, errorMsg);
+      });
+    }
+    return true;
+  }
+
+  function kill(): void {
+    aborted = true;
+    abortController.abort();
+    // Clear idle wait so the process exits immediately
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    if (idleResolver) {
+      idleResolver(null);
+      idleResolver = null;
+    }
+    approvalManager.cancelSession(session.id);
+    // Clean up external MCP server connections
+    externalMcpManager.disconnectAll().catch((err: unknown) => {
+      log.warn(`Error cleaning up external MCP connections for session ${session.id}`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
+  }
 
-    /* c8 ignore next 4 -- wiring inside integration-level process loop */
-    let lastUserMessage = '';
-    async function runLoop(userMessage: string): Promise<void> {
-        lastUserMessage = userMessage;
-        processing = true;
-        messages.push({ role: 'user', content: userMessage });
-
-        // Council synthesis prompts can be very long — truncate if needed
-        if (session.councilRole === 'chairman') {
-            truncateCouncilContext(messages, systemPrompt, model);
-        }
-
-        // Signal that the agent is working
-        onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
-
-        // Extend session timeout on activity (debounced to once per minute)
-        let lastExtend = 0;
-        const EXTEND_DEBOUNCE_MS = 60_000;
-        const TIMEOUT_EXTENSION_MS = 30 * 60 * 1000; // 30 minutes
-
-        const extendTimeoutIfNeeded = () => {
-            if (extendTimeout) {
-                const now = Date.now();
-                if (now - lastExtend > EXTEND_DEBOUNCE_MS) {
-                    extendTimeout(TIMEOUT_EXTENSION_MS);
-                    lastExtend = now;
-                }
-            }
-        };
-
-        // Acquire inference slot BEFORE the agentic loop so this agent runs all
-        // its turns to completion without yielding. This keeps the model loaded
-        // in Ollama's memory (preserves KV cache) and avoids context-switching.
-        const onSlotStatus = (status: string) => {
-            if (status) {
-                onEvent({
-                    type: 'queue_status',
-                    statusMessage: status,
-                } as ClaudeStreamEvent);
-            } else {
-                onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
-            }
-        };
-
-        // Heartbeat while waiting for slot (so UI doesn't look frozen)
-        const slotHeartbeat = setInterval(() => {
-            extendTimeoutIfNeeded();
-            onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
-        }, 10_000);
-
-        let slotAcquired = false;
-        if (provider.acquireSlot) {
-            slotAcquired = await provider.acquireSlot(model, abortController.signal, onSlotStatus);
-        }
-        clearInterval(slotHeartbeat);
-
-        if (aborted) {
-            if (slotAcquired) provider.releaseSlot?.(model);
-            return;
-        }
-
-        let iteration = 0;
-        let lastToolCallKey = '';
-        let lastToolNames = '';
-        let repeatCount = 0;
-        let sameToolNameCount = 0;
-        let nudgeCount = 0;
-        let midChainNudgeCount = 0;
-        let toolsEverCalled = false;
-        let needsSummary = false; // Set true when loop breaks abnormally (repeat/max-iter)
-        const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
-        const MAX_SAME_TOOL = 4; // Break if same tool name called 5 times (even with different args)
-        // Tier-based nudge limits: weaker models get more nudges (they need more guidance)
-        const MAX_NUDGES = tierConfig.maxNudges;
-        const MAX_MID_CHAIN_NUDGES = tierConfig.maxMidChainNudges;
-        const MAX_TOOL_ITERATIONS = tierConfig.maxToolIterations;
-        let explorationToolCalls = 0; // Track how many list_files/search_files calls
-        let totalExplorationDrifts = 0; // Cumulative exploration drift triggers
-        let toolCallCount = 0; // Total tool calls across all iterations
-        let currentChainDepth = 0; // Current unbroken tool-call sequence
-        let maxChainDepth = 0; // Longest unbroken tool-call sequence
-        let terminationReason: DirectProcessMetrics['terminationReason'] = 'normal';
-        let stallType: string | null = null;
-        const qualityTracker = new ResponseQualityTracker();
-        const loopDetector = new RepetitiveToolCallDetector();
-        const repetitionTracker = new RepetitionTracker();
-        const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
-        const MAX_LOOP_NUDGES = 2;
-        /* c8 ignore next -- integration-level process loop */
-        const toolCallLog: string[] = []; // Brief log of tool calls for escalation
-        const loopStartTime = Date.now();
-
-        // ── Context usage tracking ──────────────────────────────────
-        let lastWarningLevel: string | null = null;
-        let hasTrimmed = false;
-
-        function emitContextUsage(
-            msgs: Array<{ role: string; content: string }>,
-            sysPrompt: string,
-        ): void {
-            const usage = computeContextUsage(msgs, sysPrompt, hasTrimmed, model);
-
-            onEvent({
-                type: 'context_usage',
-                session_id: session.id,
-                ...usage,
-            } as ClaudeStreamEvent);
-
-            // Emit warnings at thresholds (only when crossing a new level)
-            const warning = determineWarningLevel(usage.usagePercent);
-
-            if (warning && warning.level !== lastWarningLevel) {
-                lastWarningLevel = warning.level;
-                onEvent({
-                    type: 'context_warning',
-                    session_id: session.id,
-                    level: warning.level,
-                    usagePercent: usage.usagePercent,
-                    message: warning.message,
-                } as ClaudeStreamEvent);
-            }
-        }
-
-        /** End-of-turn marker aligned with Claude SDK streams (work-queue stall detection). */
-        function emitModelTurnEnd(): void {
-            onEvent({ type: 'message_stop' } as ClaudeStreamEvent);
-        }
-
-        try {
-
-        while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
-            iteration++;
-
-            const providerTools = (!toolsDisabled && directTools.length > 0)
-                ? toProviderTools(directTools)
-                : undefined;
-
-            const activityCallback = () => {
-                onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
-                extendTimeoutIfNeeded();
-            };
-
-            // Heartbeat while waiting for inference
-            const heartbeat = setInterval(activityCallback, 10_000);
-
-            let result;
-            try {
-                const countBefore = messages.length;
-                trimMessages(messages, systemPrompt, model);
-                if (messages.length < countBefore) hasTrimmed = true;
-                // Post-trim pass: truncate old tool results for additional savings
-                truncateOldToolResults(messages, 3, 500);
-                emitContextUsage(messages, systemPrompt);
-                result = await provider.complete({
-                    model,
-                    systemPrompt,
-                    messages,
-                    tools: providerTools,
-                    signal: abortController.signal,
-                    onActivity: activityCallback,
-                    onStream: (text) => onEvent({
-                        type: 'content_block_delta',
-                        delta: { text },
-                    } as ClaudeStreamEvent),
-                    providerOptions,
-                });
-            } catch (err) {
-                clearInterval(heartbeat);
-                // Tool fallback: if the model doesn't support tools, retry without them
-                const errorMsg = err instanceof Error ? err.message : String(err);
-                if (isContextOverflowError(errorMsg)) {
-                    log.warn(`Context overflow for session ${session.id} (model: ${model}) — applying emergency compression and retrying`);
-                    const projectContext = project ? { name: project.name, workingDir: project.workingDir } : undefined;
-                    const summary = summarizeConversation(messages, projectContext);
-                    const keepLast = Math.min(4, messages.length);
-                    const recent = messages.slice(-keepLast);
-                    messages.length = 0;
-                    messages.push({ role: 'user', content: summary });
-                    messages.push(...recent);
-                    hasTrimmed = true;
-
-                    onEvent({
-                        type: 'context_warning',
-                        session_id: session.id,
-                        level: 'critical',
-                        usagePercent: 100,
-                        message: 'Context limit reached — conversation history was compressed to continue. Some earlier details may be summarized.',
-                    } as ClaudeStreamEvent);
-
-                    emitContextUsage(messages, systemPrompt);
-                    result = await provider.complete({
-                        model,
-                        systemPrompt,
-                        messages,
-                        tools: (!toolsDisabled && directTools.length > 0) ? toProviderTools(directTools) : undefined,
-                        signal: abortController.signal,
-                        onActivity: activityCallback,
-                        onStream: (text) => onEvent({
-                            type: 'content_block_delta',
-                            delta: { text },
-                        } as ClaudeStreamEvent),
-                        providerOptions,
-                    });
-                } else if (!toolsDisabled && providerTools && isToolUnsupportedError(errorMsg)) {
-                    log.warn(`Model ${model} does not support tools — disabling for this session`);
-                    toolsDisabled = true;
-                    // Retry without tools
-                    const countBefore2 = messages.length;
-                    trimMessages(messages, systemPrompt, model);
-                    if (messages.length < countBefore2) hasTrimmed = true;
-                    // Post-trim pass: truncate old tool results
-                    truncateOldToolResults(messages, 3, 500);
-                    emitContextUsage(messages, systemPrompt);
-                    result = await provider.complete({
-                        model,
-                        systemPrompt,
-                        messages,
-                        signal: abortController.signal,
-                        onActivity: activityCallback,
-                        onStream: (text) => onEvent({
-                            type: 'content_block_delta',
-                            delta: { text },
-                        } as ClaudeStreamEvent),
-                        providerOptions,
-                    });
-                } else {
-                    throw err;
-                }
-            } finally {
-                clearInterval(heartbeat);
-            }
-
-            if (aborted) return;
-
-            // Emit assistant response
-            if (result.content) {
-                onEvent({
-                    type: 'assistant',
-                    message: {
-                        role: 'assistant',
-                        content: [{ type: 'text', text: result.content }],
-                    },
-                } as ClaudeStreamEvent);
-            }
-
-            // Emit performance metrics (tok/s) if available
-            if (result.performance && result.performance.tokensPerSecond > 0) {
-                onEvent({
-                    type: 'performance',
-                    model: result.model,
-                    tokensPerSecond: result.performance.tokensPerSecond,
-                    outputTokens: result.usage?.outputTokens ?? 0,
-                    evalDurationMs: result.performance.evalDurationMs,
-                } as ClaudeStreamEvent);
-            }
-
-            // Handle tool calls
-            if (result.toolCalls && result.toolCalls.length > 0) {
-                toolsEverCalled = true;
-                toolCallCount += result.toolCalls.length;
-                currentChainDepth++;
-                if (currentChainDepth > maxChainDepth) {
-                    maxChainDepth = currentChainDepth;
-                }
-                // Detect repeated tool calls — uses normalized comparison to catch
-                // near-identical loops (same tool, args differ only in whitespace/order)
-                const callKey = normalizeToolCallKey(result.toolCalls);
-                if (callKey === lastToolCallKey) {
-                    repeatCount++;
-                    if (repeatCount >= MAX_REPEATS) {
-                        log.warn(`Breaking tool loop: same call repeated ${repeatCount + 1} times`, { calls: callKey.slice(0, 200) });
-                        messages.push({ role: 'assistant', content: result.content || '' });
-                        needsSummary = true;
-                        terminationReason = 'stall_repeat';
-                        stallType = 'repeat';
-                        emitModelTurnEnd();
-                        break;
-                    }
-                } else {
-                    lastToolCallKey = callKey;
-                    repeatCount = 0;
-                }
-
-                // Also detect same tool name called repeatedly with different args
-                // (e.g., model keeps re-calling save_memory with slightly different content)
-                const toolNames = result.toolCalls.map(tc => tc.name).join('|');
-                if (toolNames === lastToolNames) {
-                    sameToolNameCount++;
-                    if (sameToolNameCount >= MAX_SAME_TOOL) {
-                        log.warn(`Breaking tool loop: same tool name repeated ${sameToolNameCount + 1} times with varying args`, { tools: toolNames });
-                        messages.push({ role: 'assistant', content: result.content || '' });
-                        needsSummary = true;
-                        terminationReason = 'stall_same_tool';
-                        stallType = 'same_tool';
-                        emitModelTurnEnd();
-                        break;
-                    }
-                } else {
-                    lastToolNames = toolNames;
-                    sameToolNameCount = 0;
-                }
-
-                // Add assistant message with tool call indication (include toolCalls so
-                // providers can reconstruct the full assistant turn for the next API call)
-                messages.push({ role: 'assistant', content: result.content || '', toolCalls: result.toolCalls });
-
-                for (const toolCall of result.toolCalls) {
-                    if (aborted) return;
-
-                    // Emit structured tool_use event so CLI/dashboard can display it
-                    onEvent({
-                        type: 'content_block_start',
-                        content_block: {
-                            type: 'tool_use',
-                            name: toolCall.name,
-                            input: toolCall.arguments,
-                        },
-                    } as ClaudeStreamEvent);
-
-                    const toolDef = toolMap.get(toolCall.name);
-                    if (!toolDef) {
-                        const errorText = `Unknown tool: ${toolCall.name}`;
-                        messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
-                        emitToolStatus(toolCall.name, errorText, true);
-                        continue;
-                    }
-
-                    // Session rate limiting (tier-based)
-                    const rateLimitError = sessionLimiter.checkAndIncrement(toolCall.name);
-                    if (rateLimitError) {
-                        messages.push({ role: 'tool', content: rateLimitError, toolCallId: toolCall.id });
-                        emitToolStatus(toolCall.name, rateLimitError, true);
-                        continue;
-                    }
-
-                    // Permission check via approval flow
-                    const permitted = await checkToolPermission(
-                        toolCall, session, agent, approvalManager, onApprovalRequest,
-                    );
-                    if (aborted) return;
-
-                    if (!permitted) {
-                        const deniedText = `Permission denied for tool: ${toolCall.name}`;
-                        messages.push({ role: 'tool', content: deniedText, toolCallId: toolCall.id });
-                        emitToolStatus(toolCall.name, deniedText, true);
-                        continue;
-                    }
-
-                    // Execute tool
-                    emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
-                    try {
-                        const toolResult = await toolDef.handler(toolCall.arguments);
-                        const maxChars = calculateMaxToolResultChars(messages, systemPrompt, model);
-                        let resultText = toolResult.text;
-                        if (resultText.length > maxChars) {
-                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, maxChars, contextBudget: getContextBudget(model) });
-                            // For structured data (JSON), try to keep head + tail
-                            if (resultText.startsWith('{') || resultText.startsWith('[')) {
-                                const headSize = Math.floor(maxChars * 0.7);
-                                const tailSize = Math.floor(maxChars * 0.2);
-                                resultText = resultText.slice(0, headSize)
-                                    + `\n\n[... ${toolResult.text.length - headSize - tailSize} chars omitted ...]\n\n`
-                                    + resultText.slice(-tailSize);
-                            } else {
-                                resultText = resultText.slice(0, maxChars) + `\n\n[... truncated, ${toolResult.text.length - maxChars} chars omitted]`;
-                            }
-                        }
-                        // Strip lone surrogates that would produce invalid JSON
-                        // (e.g. from binary output or malformed UTF-16 in tool results)
-                        resultText = resultText.replace(/[\uD800-\uDFFF]/g, '\uFFFD');
-                        messages.push({
-                            role: 'tool',
-                            content: resultText,
-                            toolCallId: toolCall.id,
-                        });
-                        emitToolStatus(toolCall.name, toolResult.isError ? `Error: ${toolResult.text.slice(0, 200)}` : `Done`, false);
-                        trackToolCall(toolCallLog, toolCall.name, toolResult.isError ? 'error' : 'ok');
-                    } catch (err) {
-                        const errorText = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
-                        messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
-                        emitToolStatus(toolCall.name, errorText, true);
-                        trackToolCall(toolCallLog, toolCall.name, 'exception');
-                    }
-                }
-
-                // Exploration drift detection: if the agent is calling exploration
-                // tools excessively, inject a focus reminder
-                const explorationTools = new Set(['list_files', 'search_files']);
-                const driftCalls = result.toolCalls.filter(tc => explorationTools.has(tc.name));
-                explorationToolCalls += driftCalls.length;
-                const MAX_EXPLORATION_DRIFTS = 3; // Cap cumulative drift triggers
-                if (explorationToolCalls >= 5 && tierConfig.tier !== 'high') {
-                    totalExplorationDrifts++;
-                    if (totalExplorationDrifts > MAX_EXPLORATION_DRIFTS) {
-                        log.warn('Exploration drift limit exceeded — terminating', {
-                            totalDrifts: totalExplorationDrifts,
-                            tier: tierConfig.tier,
-                            sessionId: session.id,
-                        });
-                        stallType = 'exploration_drift';
-                        terminationReason = 'stall_exploration';
-                        emitModelTurnEnd();
-                        break;
-                    }
-                    log.info('Exploration drift detected — injecting focus reminder', {
-                        explorationCalls: explorationToolCalls,
-                        driftCount: totalExplorationDrifts,
-                        tier: tierConfig.tier,
-                        sessionId: session.id,
-                    });
-                    messages.push({
-                        role: 'user',
-                        content: 'FOCUS: You have been exploring many directories. Stop browsing and focus on the specific task. '
-                            + 'Only read files that are directly relevant to completing the task. '
-                            + 'If you have enough information, proceed to take action now.'
-                            + (totalExplorationDrifts >= 2 ? ' WARNING: This is your last chance to focus before the session is terminated.' : ''),
-                    });
-                    explorationToolCalls = 0; // Reset so we don't spam
-                }
-
-                // Vacuous tool call detection: flag semantically empty tool calls
-                const toolCallInputs = result.toolCalls.map((tc: LlmToolCall): ToolCallQualityInput => ({
-                    name: tc.name,
-                    arguments: tc.arguments as Record<string, unknown>,
-                }));
-                const vacuousCount = countVacuousToolCalls(toolCallInputs);
-                if (vacuousCount > 0) {
-                    qualityTracker.recordVacuousToolCalls(vacuousCount);
-                    log.info('Vacuous tool calls detected', {
-                        count: vacuousCount,
-                        tools: result.toolCalls.map((tc: LlmToolCall) => tc.name).join(', '),
-                        sessionId: session.id,
-                    });
-                }
-
-                // Repetitive tool call loop detection
-                const isLoop = loopDetector.recordToolCalls(toolCallInputs);
-                if (isLoop && loopDetector.totalLoopsDetected <= MAX_LOOP_NUDGES) {
-                    const repeatedTool = result.toolCalls[result.toolCalls.length - 1]?.name ?? 'unknown';
-                    log.warn('Repetitive tool call loop detected', {
-                        tool: repeatedTool,
-                        totalLoops: loopDetector.totalLoopsDetected,
-                        sessionId: session.id,
-                    });
-                    messages.push({ role: 'user', content: buildLoopNudge(repeatedTool) });
-                    loopDetector.reset(); // Give the model a chance to recover
-                } else if (isLoop && loopDetector.totalLoopsDetected > MAX_LOOP_NUDGES) {
-                    // Loop nudges exhausted — terminate the loop
-                    log.warn('Repetitive loop nudges exhausted — breaking tool loop', {
-                        totalLoops: loopDetector.totalLoopsDetected,
-                        sessionId: session.id,
-                    });
-                    stallType = 'repetitive_loop';
-                    terminationReason = 'stall_repetitive_loop';
-                    emitModelTurnEnd();
-                    break;
-                }
-
-                // Score text quality alongside tool calls
-                const toolResponseQuality = scoreResponseQuality(result.content || '', true);
-                const needsToolQualityNudge = qualityTracker.recordResponse(toolResponseQuality);
-                if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES) {
-                    qualityTracker.incrementNudgeCount();
-                    log.info('Low-quality response detected during tool chain', {
-                        score: toolResponseQuality.score,
-                        signals: toolResponseQuality.signals,
-                        sessionId: session.id,
-                    });
-                    messages.push({ role: 'user', content: buildQualityNudge() });
-                } else if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount >= MAX_QUALITY_NUDGES) {
-                    // Quality nudges exhausted — mark for escalation
-                    qualityTracker.markNudgesExhausted();
-                    log.warn('Quality nudges exhausted without improvement', {
-                        totalLowQuality: qualityTracker.getMetrics().totalLowQualityResponses,
-                        sessionId: session.id,
-                    });
-                    stallType = 'quality_nudges_exhausted';
-                    terminationReason = 'stall_quality_exhausted';
-                    emitModelTurnEnd();
-                    break;
-                }
-
-                // Continue loop to let the model process tool results
-                emitModelTurnEnd();
-                continue;
-            }
-
-            // No tool calls — reset chain depth counter
-            currentChainDepth = 0;
-
-            // No tool calls — check if the model stopped prematurely
-            const responseText = (result.content || '').trim();
-
-            // Detect hallucinated tool results: if the model generated tool output
-            // markers in its text, it's imitating the tool result format instead of making
-            // actual tool calls. Strip the hallucination and nudge it to call tools properly.
-            const hasHallucinatedResult = responseText.includes('[Tool Result]')
-                || responseText.includes('«tool_output»')
-                || responseText.includes('«/tool_output»');
-            if (toolsEverCalled && hasHallucinatedResult && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
-                midChainNudgeCount++;
-                log.warn(`Detected hallucinated tool result in model output (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`, {
-                    preview: responseText.slice(0, 300),
-                });
-                // Strip the hallucinated content — don't add it to messages
-                // Instead, nudge the model to make a real tool call
-                messages.push({
-                    role: 'user',
-                    content: 'STOP. You just wrote fake tool results instead of calling a tool. '
-                        + 'You must NOT write tool output tags or results yourself — only the system provides those. '
-                        + 'Call the next tool now by outputting ONLY the JSON array: '
-                        + '[{"name": "tool_name", "arguments": {...}}]',
-                });
-                emitModelTurnEnd();
-                continue;
-            }
-
-            // Quality scoring for text-only responses
-            const textQuality = scoreResponseQuality(responseText, false);
-            const needsTextQualityNudge = qualityTracker.recordResponse(textQuality);
-
-            // Repetition detection: check if this response rephrases recent ones
-            const repetitionAction = repetitionTracker.recordResponse(responseText);
-
-            messages.push({ role: 'assistant', content: responseText });
-
-            // Repetition loop — higher priority than quality nudge because
-            // repetitive loops are a harder failure mode to escape
-            if (repetitionAction === 'break') {
-                log.warn('Repetitive response loop detected — breaking', {
-                    ...repetitionTracker.getMetrics(),
-                    sessionId: session.id,
-                });
-                needsSummary = true;
-                terminationReason = 'stall_repetitive';
-                stallType = 'repetitive';
-                break;
-            }
-            if (repetitionAction === 'nudge' && iteration < MAX_TOOL_ITERATIONS - 1) {
-                log.info('Repetitive response detected — injecting repetition nudge', {
-                    ...repetitionTracker.getMetrics(),
-                    sessionId: session.id,
-                });
-                messages.push({ role: 'user', content: buildRepetitionNudge() });
-                continue;
-            }
-
-            // Cheerleading detection: if consecutive low-quality text responses,
-            // inject a corrective nudge before the standard nudge system
-            if (needsTextQualityNudge
-                && qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES
-                && iteration < MAX_TOOL_ITERATIONS - 1) {
-                qualityTracker.incrementNudgeCount();
-                log.info('Cheerleading detected — injecting quality nudge', {
-                    score: textQuality.score,
-                    signals: textQuality.signals,
-                    consecutiveNudge: qualityTracker.getMetrics().qualityNudgeCount,
-                    sessionId: session.id,
-                });
-                messages.push({ role: 'user', content: buildQualityNudge() });
-                emitModelTurnEnd();
-                continue;
-            }
-
-            // Skip nudging if we've already nudged too many times or tools are disabled
-            if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
-                emitModelTurnEnd();
-                break;
-            }
-
-            // After tools have been called, check if the model tried to call a tool
-            // but used a format the parser couldn't extract. If the text mentions a
-            // known tool name, treat it as a failed tool call and nudge instead of exiting.
-            if (toolsEverCalled) {
-                const mentionedTool = directTools.find(t => responseText.includes(t.name));
-                if (mentionedTool && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
-                    midChainNudgeCount++;
-                    log.warn(`Detected failed tool call attempt in text (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`, {
-                        mentionedTool: mentionedTool.name,
-                        preview: responseText.slice(0, 300),
-                    });
-                    messages.push({
-                        role: 'user',
-                        content: `Your response mentioned "${mentionedTool.name}" but was not formatted as a tool call. `
-                            + 'To call a tool, output ONLY a JSON array like this:\n'
-                            + `[{"name": "${mentionedTool.name}", "arguments": {...}}]\n`
-                            + 'Do NOT wrap it in XML tags, markdown, or explanation text. Just the raw JSON array.',
-                    });
-                    emitModelTurnEnd();
-                    continue;
-                }
-                emitModelTurnEnd();
-                break;
-            }
-
-            // Detect incomplete responses that need a nudge to use tools.
-            // Only nudge if the model has never successfully called a tool yet.
-            // Once it has used tools, a text-only response means it's genuinely done.
-            const nudgeReason = detectNudgeReason(responseText, iteration, directTools);
-
-            if (nudgeReason && iteration < MAX_TOOL_ITERATIONS - 1) {
-                nudgeCount++;
-                log.info(`Nudging model to continue (iteration=${iteration}, reason=${nudgeReason}, nudge=${nudgeCount}/${MAX_NUDGES})`);
-                const nudge = buildNudgeMessage(nudgeReason, directTools);
-                messages.push({ role: 'user', content: nudge });
-                emitModelTurnEnd();
-                continue;
-            }
-
-            emitModelTurnEnd();
-            break;
-        }
-
-        // Max iterations reached — also needs a summary epilogue
-        if (iteration >= MAX_TOOL_ITERATIONS && toolsEverCalled) {
-            needsSummary = true;
-            if (terminationReason === 'normal') {
-                terminationReason = 'max_iterations';
-            }
-        }
-
-        // Final summary epilogue: when the tool loop broke abnormally (repeat
-        // detection, same-tool detection, or max iterations), the model never
-        // got a chance to produce a coherent text conclusion. Run one last
-        // inference call with tools disabled so it can summarize its work.
-        if (needsSummary && toolsEverCalled && !aborted) {
-            log.info('Running final summary call (tools disabled)', { sessionId: session.id, iteration });
-            messages.push({
-                role: 'user',
-                content: 'Summarize what you accomplished. Be concise — state the key actions taken and their results.',
-            });
-            try {
-                const countBeforeSummary = messages.length;
-                trimMessages(messages, systemPrompt);
-                if (messages.length < countBeforeSummary) hasTrimmed = true;
-                emitContextUsage(messages, systemPrompt);
-                const summaryResult = await provider.complete({
-                    model,
-                    systemPrompt,
-                    messages,
-                    // No tools — force a text-only response
-                    signal: abortController.signal,
-                    onStream: (text) => onEvent({
-                        type: 'content_block_delta',
-                        delta: { text },
-                    } as ClaudeStreamEvent),
-                });
-                if (summaryResult.content && !aborted) {
-                    messages.push({ role: 'assistant', content: summaryResult.content });
-                    onEvent({
-                        type: 'assistant',
-                        message: {
-                            role: 'assistant',
-                            content: [{ type: 'text', text: summaryResult.content }],
-                        },
-                    } as ClaudeStreamEvent);
-                    emitModelTurnEnd();
-                }
-            } catch (err) {
-                log.warn('Final summary call failed', {
-                    sessionId: session.id,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
-
-        } catch (err) {
-            terminationReason = 'error';
-            const loopDurationMs = Date.now() - loopStartTime;
-            const sessionMetrics = buildSessionMetrics({
-                model,
-                tier: tierConfig.tier,
-                iteration,
-                toolCallCount,
-                maxChainDepth,
-                nudgeCount,
-                midChainNudgeCount,
-                totalExplorationDrifts,
-                stallType,
-                terminationReason,
-                loopDurationMs,
-                needsSummary,
-                qualityMetrics: qualityTracker.getMetrics(),
-            });
-            onEvent(buildResultEvent(
-                { subtype: 'error', durationMs: loopDurationMs, numTurns: iteration, sessionId: session.id, metrics: sessionMetrics },
-                { terminationReason, model, tier: tierConfig.tier, originalPrompt: lastUserMessage, toolCallLog, qualityMetrics: qualityTracker.getMetrics() },
-            ));
-            throw err;
-        } finally {
-            // Release the slot so the next agent can run
-            if (slotAcquired) provider.releaseSlot?.(model);
-        }
-
-        if (aborted) {
-            const loopDurationMs = Date.now() - loopStartTime;
-            const sessionMetrics = buildSessionMetrics({
-                model,
-                tier: tierConfig.tier,
-                iteration,
-                toolCallCount,
-                maxChainDepth,
-                nudgeCount,
-                midChainNudgeCount,
-                totalExplorationDrifts,
-                stallType,
-                terminationReason: 'abort',
-                loopDurationMs,
-                needsSummary,
-                qualityMetrics: qualityTracker.getMetrics(),
-            });
-            onEvent({
-                type: 'result',
-                subtype: 'abort',
-                total_cost_usd: 0,
-                duration_ms: loopDurationMs,
-                num_turns: iteration,
-                session_id: session.id,
-                metrics: sessionMetrics,
-            } as ClaudeStreamEvent);
-            return;
-        }
-
-        // Signal that the agent is done thinking
-        onEvent({ type: 'thinking', thinking: false } as ClaudeStreamEvent);
-
-        // Build session metrics
-        const loopDurationMs = Date.now() - loopStartTime;
-        const sessionMetrics = buildSessionMetrics({
-            model,
-            tier: tierConfig.tier,
-            iteration,
-            toolCallCount,
-            maxChainDepth,
-            nudgeCount,
-            midChainNudgeCount,
-            totalExplorationDrifts,
-            stallType,
-            terminationReason,
-            loopDurationMs,
-            needsSummary,
-            qualityMetrics: qualityTracker.getMetrics(),
-        });
-
-        // Emit result event with metrics (and escalation metadata for abnormal terminations)
-        onEvent(buildResultEvent(
-            { subtype: 'success', durationMs: loopDurationMs, numTurns: iteration, sessionId: session.id, metrics: sessionMetrics },
-            { terminationReason, model, tier: tierConfig.tier, originalPrompt: lastUserMessage, toolCallLog, qualityMetrics: qualityTracker.getMetrics() },
-        ));
-
-        processing = false;
-
-        // Check for queued messages or wait for the next one
-        if (aborted) {
-            onExit(0);
-            return;
-        }
-
-        const next = pendingMessages.length > 0
-            ? pendingMessages.shift()!
-            : await waitForNextMessage();
-
-        if (next === null) {
-            // Idle timeout or abort — exit cleanly
-            onExit(0);
-            return;
-        }
-
-        runLoop(next).catch((err) => {
-            if (aborted) return;
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
-            onEvent({
-                type: 'error',
-                error: { message: errorMsg, type: 'direct_process_error' },
-            } as ClaudeStreamEvent);
-            onExit(1, errorMsg);
-        });
-    }
-
-    /** Wait for the next user message or idle timeout. Returns null on timeout/abort. */
-    function waitForNextMessage(): Promise<string | null> {
-        return new Promise<string | null>((resolve) => {
-            idleResolver = resolve;
-            idleTimer = setTimeout(() => {
-                idleResolver = null;
-                idleTimer = null;
-                log.info(`Session ${session.id} idle timeout after ${IDLE_TIMEOUT_MS / 1000}s`);
-                resolve(null);
-            }, IDLE_TIMEOUT_MS);
-        });
-    }
-
-    function emitToolStatus(toolName: string, message: string, _isError: boolean): void {
-        onEvent({
-            type: 'tool_status',
-            statusMessage: `[${toolName}] ${message}`,
-        });
-    }
-
-    function sendMessage(content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
-        // Direct process (Ollama) doesn't support multimodal — extract text only
-        const textContent = typeof content === 'string'
-            ? content
-            : content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('\n') || '[image attachment(s)]';
-        if (aborted) return false;
-        if (processing) {
-            pendingMessages.push(textContent);
-        } else if (idleResolver) {
-            // Waiting for next message — resolve the idle promise
-            if (idleTimer) {
-                clearTimeout(idleTimer);
-                idleTimer = null;
-            }
-            const resolve = idleResolver;
-            idleResolver = null;
-            resolve(textContent);
-        } else {
-            runLoop(textContent).catch((err) => {
-                if (aborted) return;
-                const errorMsg = err instanceof Error ? err.message : String(err);
-                log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
-                onEvent({
-                    type: 'error',
-                    error: { message: errorMsg, type: 'direct_process_error' },
-                } as ClaudeStreamEvent);
-                onExit(1, errorMsg);
-            });
-        }
-        return true;
-    }
-
-    function kill(): void {
-        aborted = true;
-        abortController.abort();
-        // Clear idle wait so the process exits immediately
-        if (idleTimer) {
-            clearTimeout(idleTimer);
-            idleTimer = null;
-        }
-        if (idleResolver) {
-            idleResolver(null);
-            idleResolver = null;
-        }
-        approvalManager.cancelSession(session.id);
-        // Clean up external MCP server connections
-        externalMcpManager.disconnectAll().catch((err: unknown) => {
-            log.warn(`Error cleaning up external MCP connections for session ${session.id}`, {
-                error: err instanceof Error ? err.message : String(err),
-            });
-        });
-    }
-
-    return { pid: pseudoPid, sendMessage, kill };
+  return { pid: pseudoPid, sendMessage, kill };
 }
 
 // ── Nudge system ──────────────────────────────────────────────────────────
@@ -1070,35 +1163,37 @@ type NudgeReason = 'promisedAction' | 'tooShort' | 'wroteButDidntAct' | 'askedIn
  * Detect if the model's response indicates it should have called a tool but didn't.
  * Returns the reason string or null if no nudge is needed.
  */
-function detectNudgeReason(
-    responseText: string,
-    iteration: number,
-    tools: DirectToolDefinition[],
-): NudgeReason | null {
-    if (!responseText || tools.length === 0) return null;
+function detectNudgeReason(responseText: string, iteration: number, tools: DirectToolDefinition[]): NudgeReason | null {
+  if (!responseText || tools.length === 0) return null;
 
-    // (a) Model promised future action without doing it
-    // More targeted regex — avoid matching genuine explanations
-    const promisedAction = /\b(i('ll| will) (now |proceed to )?(review|check|analyze|look|fetch|investigate|read|search|run|execute)|let me (start|begin|check|review|look|examine|read)|working on (it|this|that)|one moment|getting (the|that|this))\b/i.test(responseText);
-    if (promisedAction && iteration <= 3) return 'promisedAction';
+  // (a) Model promised future action without doing it
+  // More targeted regex — avoid matching genuine explanations
+  const promisedAction =
+    /\b(i('ll| will) (now |proceed to )?(review|check|analyze|look|fetch|investigate|read|search|run|execute)|let me (start|begin|check|review|look|examine|read)|working on (it|this|that)|one moment|getting (the|that|this))\b/i.test(
+      responseText,
+    );
+  if (promisedAction && iteration <= 3) return 'promisedAction';
 
-    // (b) Very short early reply — model didn't engage with the task.
-    // Skip if the response is a complete sentence (ends with punctuation) — this
-    // avoids nudging models to use tools for simple conversational replies like
-    // "Yes, I'm online." which don't need tool use.
-    const isCompleteSentence = /[.!?][\s"']*$/.test(responseText.trim());
-    if (responseText.length < 100 && iteration <= 2 && !isCompleteSentence) return 'tooShort';
+  // (b) Very short early reply — model didn't engage with the task.
+  // Skip if the response is a complete sentence (ends with punctuation) — this
+  // avoids nudging models to use tools for simple conversational replies like
+  // "Yes, I'm online." which don't need tool use.
+  const isCompleteSentence = /[.!?][\s"']*$/.test(responseText.trim());
+  if (responseText.length < 100 && iteration <= 2 && !isCompleteSentence) return 'tooShort';
 
-    // (c) Model asked what to do instead of acting (Qwen3 pattern)
-    const askedInstead = /\b(would you like me to|shall i|do you want me to|what would you like|which (file|tool|command|approach)|should i)\b/i.test(responseText);
-    if (askedInstead && iteration <= 2) return 'askedInsteadOfActing';
+  // (c) Model asked what to do instead of acting (Qwen3 pattern)
+  const askedInstead =
+    /\b(would you like me to|shall i|do you want me to|what would you like|which (file|tool|command|approach)|should i)\b/i.test(
+      responseText,
+    );
+  if (askedInstead && iteration <= 2) return 'askedInsteadOfActing';
 
-    // (d) On first iteration, model wrote substantial text but never called a tool
-    // This catches cases where the model writes a PR review as text instead of
-    // actually using tools to interact with the system
-    if (iteration === 1 && responseText.length > 300) return 'wroteButDidntAct';
+  // (d) On first iteration, model wrote substantial text but never called a tool
+  // This catches cases where the model writes a PR review as text instead of
+  // actually using tools to interact with the system
+  if (iteration === 1 && responseText.length > 300) return 'wroteButDidntAct';
 
-    return null;
+  return null;
 }
 
 /**
@@ -1106,40 +1201,54 @@ function detectNudgeReason(
  * Different nudge messages for different failure modes.
  */
 function buildNudgeMessage(reason: NudgeReason, tools: DirectToolDefinition[]): string {
-    const toolNames = tools.map(t => t.name);
-    const hasRunCommand = toolNames.includes('run_command');
-    const hasReadFile = toolNames.includes('read_file');
+  const toolNames = tools.map((t) => t.name);
+  const hasRunCommand = toolNames.includes('run_command');
+  const hasReadFile = toolNames.includes('read_file');
 
-    switch (reason) {
-        case 'promisedAction':
-            return 'Do not describe what you will do — call the tool now. ' +
-                (hasReadFile ? 'For example: [{"name": "read_file", "arguments": {"path": "..."}}]' : 'Output ONLY the JSON tool call array.');
+  switch (reason) {
+    case 'promisedAction':
+      return (
+        'Do not describe what you will do — call the tool now. ' +
+        (hasReadFile
+          ? 'For example: [{"name": "read_file", "arguments": {"path": "..."}}]'
+          : 'Output ONLY the JSON tool call array.')
+      );
 
-        case 'tooShort':
-            return 'Your response was too brief. You have tools available — use them to complete the task. ' +
-                'Output a tool call as a JSON array: [{"name": "tool_name", "arguments": {...}}]';
+    case 'tooShort':
+      return (
+        'Your response was too brief. You have tools available — use them to complete the task. ' +
+        'Output a tool call as a JSON array: [{"name": "tool_name", "arguments": {...}}]'
+      );
 
-        case 'askedInsteadOfActing':
-            return 'Do not ask what to do — take action now. Use the tools available to you. ' +
-                'Start by reading relevant files or running a command. ' +
-                'Output ONLY the JSON tool call, no surrounding text.';
+    case 'askedInsteadOfActing':
+      return (
+        'Do not ask what to do — take action now. Use the tools available to you. ' +
+        'Start by reading relevant files or running a command. ' +
+        'Output ONLY the JSON tool call, no surrounding text.'
+      );
 
-        case 'wroteButDidntAct':
-            if (hasRunCommand) {
-                return 'You wrote your response as text, but you need to use tools to take action. ' +
-                    'If you need to post a comment, use run_command with gh. ' +
-                    'If you need to make changes, use the file editing tools. ' +
-                    'Output ONLY the JSON tool call array.';
-            }
-            return 'You wrote a text response, but this task requires using tools. ' +
-                'Call the appropriate tool now as a JSON array: [{"name": "tool_name", "arguments": {...}}]';
+    case 'wroteButDidntAct':
+      if (hasRunCommand) {
+        return (
+          'You wrote your response as text, but you need to use tools to take action. ' +
+          'If you need to post a comment, use run_command with gh. ' +
+          'If you need to make changes, use the file editing tools. ' +
+          'Output ONLY the JSON tool call array.'
+        );
+      }
+      return (
+        'You wrote a text response, but this task requires using tools. ' +
+        'Call the appropriate tool now as a JSON array: [{"name": "tool_name", "arguments": {...}}]'
+      );
 
-        case 'explorationDrift':
-            return 'FOCUS: You are exploring too many files and directories. ' +
-                'Stop browsing and focus on the specific task you were given. ' +
-                'Only read files that are directly needed to complete the task. ' +
-                'Take action now — do not explore further.';
-    }
+    case 'explorationDrift':
+      return (
+        'FOCUS: You are exploring too many files and directories. ' +
+        'Stop browsing and focus on the specific task you were given. ' +
+        'Only read files that are directly needed to complete the task. ' +
+        'Take action now — do not explore further.'
+      );
+  }
 }
 
 // ── Repeat detection ──────────────────────────────────────────────────────
@@ -1150,23 +1259,25 @@ function buildNudgeMessage(reason: NudgeReason, tools: DirectToolDefinition[]): 
  * Strips whitespace differences in string values.
  */
 function normalizeToolCallKey(toolCalls: LlmToolCall[]): string {
-    return toolCalls.map(tc => {
-        const normalizedArgs = normalizeArgsForComparison(tc.arguments);
-        return `${tc.name}:${normalizedArgs}`;
-    }).join('|');
+  return toolCalls
+    .map((tc) => {
+      const normalizedArgs = normalizeArgsForComparison(tc.arguments);
+      return `${tc.name}:${normalizedArgs}`;
+    })
+    .join('|');
 }
 
 /** Recursively sort object keys and normalize string values for comparison. */
 function normalizeArgsForComparison(obj: unknown): string {
-    if (obj === null || obj === undefined) return '';
-    if (typeof obj === 'string') return obj.trim().replace(/\s+/g, ' ');
-    if (typeof obj !== 'object') return String(obj);
-    if (Array.isArray(obj)) {
-        return '[' + obj.map(normalizeArgsForComparison).join(',') + ']';
-    }
-    // Sort keys for stable comparison
-    const sorted = Object.keys(obj as Record<string, unknown>).sort();
-    return '{' + sorted.map(k => `${k}:${normalizeArgsForComparison((obj as Record<string, unknown>)[k])}`).join(',') + '}';
+  if (obj === null || obj === undefined) return '';
+  if (typeof obj === 'string') return obj.trim().replace(/\s+/g, ' ');
+  if (typeof obj !== 'object') return String(obj);
+  if (Array.isArray(obj)) {
+    return `[${obj.map(normalizeArgsForComparison).join(',')}]`;
+  }
+  // Sort keys for stable comparison
+  const sorted = Object.keys(obj as Record<string, unknown>).sort();
+  return `{${sorted.map((k) => `${k}:${normalizeArgsForComparison((obj as Record<string, unknown>)[k])}`).join(',')}}`;
 }
 
 // ── Routing helpers ───────────────────────────────────────────────────────
@@ -1178,38 +1289,38 @@ function normalizeArgsForComparison(obj: unknown): string {
  */
 /** Exported for testing. */
 export function prependRoutingContext(message: string, source: string, tierConfig?: AgentTierConfig): string {
-    let sanitizedMessage = message;
+  let sanitizedMessage = message;
 
-    // Sanitize external content for non-high-tier agents
-    if (tierConfig && tierConfig.tier !== 'high') {
-        const result = sanitizeAgentInput(message, source);
-        sanitizedMessage = result.text;
-    }
+  // Sanitize external content for non-high-tier agents
+  if (tierConfig && tierConfig.tier !== 'high') {
+    const result = sanitizeAgentInput(message, source);
+    sanitizedMessage = result.text;
+  }
 
-    if (source === 'algochat' || source === 'agent') {
-        return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${sanitizedMessage}`;
-    }
-    if (source === 'discord') {
-        return `[This message came from Discord. Reply directly in this conversation — do NOT use corvid_send_message or other cross-channel tools to respond. Your text reply will be posted back to the Discord thread automatically.]\n\n${sanitizedMessage}`;
-    }
-    return sanitizedMessage;
+  if (source === 'algochat' || source === 'agent') {
+    return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${sanitizedMessage}`;
+  }
+  if (source === 'discord') {
+    return `[This message came from Discord. Reply directly in this conversation — do NOT use corvid_send_message or other cross-channel tools to respond. Your text reply will be posted back to the Discord thread automatically.]\n\n${sanitizedMessage}`;
+  }
+  return sanitizedMessage;
 }
 
 /** Input state captured from the direct-process main loop for metrics. */
 export interface SessionMetricsState {
-    model: string;
-    tier: string;
-    iteration: number;
-    toolCallCount: number;
-    maxChainDepth: number;
-    nudgeCount: number;
-    midChainNudgeCount: number;
-    totalExplorationDrifts: number;
-    stallType: string | null;
-    terminationReason: DirectProcessMetrics['terminationReason'];
-    loopDurationMs: number;
-    needsSummary: boolean;
-    qualityMetrics?: ResponseQualityMetrics;
+  model: string;
+  tier: string;
+  iteration: number;
+  toolCallCount: number;
+  maxChainDepth: number;
+  nudgeCount: number;
+  midChainNudgeCount: number;
+  totalExplorationDrifts: number;
+  stallType: string | null;
+  terminationReason: DirectProcessMetrics['terminationReason'];
+  loopDurationMs: number;
+  needsSummary: boolean;
+  qualityMetrics?: ResponseQualityMetrics;
 }
 
 /**
@@ -1218,29 +1329,30 @@ export interface SessionMetricsState {
  * tool-use loop to construct the metrics payload.
  */
 export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMetrics {
-    const stallDetected = state.terminationReason === 'stall_repeat'
-        || state.terminationReason === 'stall_same_tool'
-        || state.terminationReason === 'stall_repetitive_loop'
-        || state.terminationReason === 'stall_quality_exhausted'
-        || state.terminationReason === 'stall_repetitive';
-    return {
-        model: state.model,
-        tier: state.tier,
-        totalIterations: state.iteration,
-        toolCallCount: state.toolCallCount,
-        maxChainDepth: state.maxChainDepth,
-        nudgeCount: state.nudgeCount,
-        midChainNudgeCount: state.midChainNudgeCount,
-        explorationDriftCount: state.totalExplorationDrifts,
-        stallDetected,
-        stallType: state.stallType,
-        terminationReason: state.terminationReason,
-        durationMs: state.loopDurationMs,
-        needsSummary: state.needsSummary,
-        totalLowQualityResponses: state.qualityMetrics?.totalLowQualityResponses ?? 0,
-        totalVacuousToolCalls: state.qualityMetrics?.totalVacuousToolCalls ?? 0,
-        qualityNudgeCount: state.qualityMetrics?.qualityNudgeCount ?? 0,
-    };
+  const stallDetected =
+    state.terminationReason === 'stall_repeat' ||
+    state.terminationReason === 'stall_same_tool' ||
+    state.terminationReason === 'stall_repetitive_loop' ||
+    state.terminationReason === 'stall_quality_exhausted' ||
+    state.terminationReason === 'stall_repetitive';
+  return {
+    model: state.model,
+    tier: state.tier,
+    totalIterations: state.iteration,
+    toolCallCount: state.toolCallCount,
+    maxChainDepth: state.maxChainDepth,
+    nudgeCount: state.nudgeCount,
+    midChainNudgeCount: state.midChainNudgeCount,
+    explorationDriftCount: state.totalExplorationDrifts,
+    stallDetected,
+    stallType: state.stallType,
+    terminationReason: state.terminationReason,
+    durationMs: state.loopDurationMs,
+    needsSummary: state.needsSummary,
+    totalLowQualityResponses: state.qualityMetrics?.totalLowQualityResponses ?? 0,
+    totalVacuousToolCalls: state.qualityMetrics?.totalVacuousToolCalls ?? 0,
+    qualityNudgeCount: state.qualityMetrics?.qualityNudgeCount ?? 0,
+  };
 }
 
 // ── Escalation metadata ───────────────────────────────────────────────
@@ -1249,18 +1361,18 @@ const MAX_TOOL_CALL_LOG = 20;
 
 /** Append a tool-call entry to the log (capped at MAX_TOOL_CALL_LOG). */
 export function trackToolCall(log: string[], toolName: string, outcome: 'ok' | 'error' | 'exception'): void {
-    if (log.length < MAX_TOOL_CALL_LOG) {
-        log.push(`${toolName}: ${outcome}`);
-    }
+  if (log.length < MAX_TOOL_CALL_LOG) {
+    log.push(`${toolName}: ${outcome}`);
+  }
 }
 
 export interface BuildEscalationInput {
-    terminationReason: DirectProcessMetrics['terminationReason'];
-    model: string;
-    tier: string;
-    originalPrompt: string;
-    toolCallLog: string[];
-    qualityMetrics?: ResponseQualityMetrics;
+  terminationReason: DirectProcessMetrics['terminationReason'];
+  model: string;
+  tier: string;
+  originalPrompt: string;
+  toolCallLog: string[];
+  qualityMetrics?: ResponseQualityMetrics;
 }
 
 /**
@@ -1268,198 +1380,203 @@ export interface BuildEscalationInput {
  * Returns null if the session ended normally or was aborted.
  */
 export function buildEscalationInfo(input: BuildEscalationInput): EscalationInfo | null {
-    const escalationReasons = new Set<EscalationInfo['reason']>([
-        'stall_repeat',
-        'stall_same_tool',
-        'stall_repetitive_loop',
-        'stall_quality_exhausted',
-        'stall_repetitive',
-        'max_iterations',
-    ]);
+  const escalationReasons = new Set<EscalationInfo['reason']>([
+    'stall_repeat',
+    'stall_same_tool',
+    'stall_repetitive_loop',
+    'stall_quality_exhausted',
+    'stall_repetitive',
+    'max_iterations',
+  ]);
 
-    // Check for low-quality termination (session ended but with many low-quality responses)
-    const isLowQuality = input.qualityMetrics
-        && input.qualityMetrics.totalLowQualityResponses >= 3
-        && input.terminationReason === 'normal';
+  // Check for low-quality termination (session ended but with many low-quality responses)
+  const isLowQuality =
+    input.qualityMetrics && input.qualityMetrics.totalLowQualityResponses >= 3 && input.terminationReason === 'normal';
 
-    const reason: EscalationInfo['reason'] | null = isLowQuality
-        ? 'low_quality'
-        : escalationReasons.has(input.terminationReason as EscalationInfo['reason'])
-            ? input.terminationReason as EscalationInfo['reason']
-            : null;
+  const reason: EscalationInfo['reason'] | null = isLowQuality
+    ? 'low_quality'
+    : escalationReasons.has(input.terminationReason as EscalationInfo['reason'])
+      ? (input.terminationReason as EscalationInfo['reason'])
+      : null;
 
-    if (!reason) return null;
+  if (!reason) return null;
 
-    const currentTier = inferModelTier(input.model);
-    const nextTier = escalateTier(currentTier);
+  const currentTier = inferModelTier(input.model);
+  const nextTier = escalateTier(currentTier);
 
-    return {
-        canEscalate: nextTier !== null,
-        reason,
-        originalPrompt: input.originalPrompt.slice(0, 2000),
-        completedSteps: input.toolCallLog.slice(0, 20),
-        remainingWork: buildRemainingWorkDescription(reason),
-        currentTier: input.tier,
-        suggestedTier: nextTier,
-    };
+  return {
+    canEscalate: nextTier !== null,
+    reason,
+    originalPrompt: input.originalPrompt.slice(0, 2000),
+    completedSteps: input.toolCallLog.slice(0, 20),
+    remainingWork: buildRemainingWorkDescription(reason),
+    currentTier: input.tier,
+    suggestedTier: nextTier,
+  };
 }
 
 function buildRemainingWorkDescription(reason: EscalationInfo['reason']): string {
-    switch (reason) {
-        case 'stall_repeat':
-            return 'Model entered a repeat loop — same tool call made multiple times without progress.';
-        case 'stall_same_tool':
-            return 'Model called the same tool repeatedly with varying arguments without making progress.';
-        case 'stall_repetitive_loop':
-            return 'Model repeatedly called the same tool with identical arguments and exhausted recovery nudges.';
-        case 'stall_quality_exhausted':
-            return 'Model continued producing low-quality output after all corrective quality nudges were exhausted.';
-        case 'stall_repetitive':
-            return 'Model produced repetitive text responses — rephrasing the same content without making forward progress.';
-        case 'max_iterations':
-            return 'Model reached the maximum iteration limit before completing the task.';
-        case 'low_quality':
-            return 'Model produced multiple low-quality responses without substantive output.';
-    }
+  switch (reason) {
+    case 'stall_repeat':
+      return 'Model entered a repeat loop — same tool call made multiple times without progress.';
+    case 'stall_same_tool':
+      return 'Model called the same tool repeatedly with varying arguments without making progress.';
+    case 'stall_repetitive_loop':
+      return 'Model repeatedly called the same tool with identical arguments and exhausted recovery nudges.';
+    case 'stall_quality_exhausted':
+      return 'Model continued producing low-quality output after all corrective quality nudges were exhausted.';
+    case 'stall_repetitive':
+      return 'Model produced repetitive text responses — rephrasing the same content without making forward progress.';
+    case 'max_iterations':
+      return 'Model reached the maximum iteration limit before completing the task.';
+    case 'low_quality':
+      return 'Model produced multiple low-quality responses without substantive output.';
+  }
 }
 
 /** Build a result event, attaching escalation metadata when applicable. */
 export function buildResultEvent(
-    base: { subtype: 'success' | 'error'; durationMs: number; numTurns: number; sessionId: string; metrics: DirectProcessMetrics },
-    escalationInput: BuildEscalationInput,
+  base: {
+    subtype: 'success' | 'error';
+    durationMs: number;
+    numTurns: number;
+    sessionId: string;
+    metrics: DirectProcessMetrics;
+  },
+  escalationInput: BuildEscalationInput,
 ): ClaudeStreamEvent {
-    const escalation = buildEscalationInfo(escalationInput);
-    return {
-        type: 'result',
-        subtype: base.subtype,
-        total_cost_usd: 0,
-        duration_ms: base.durationMs,
-        num_turns: base.numTurns,
-        session_id: base.sessionId,
-        metrics: base.metrics,
-        ...(escalation && { escalation }),
-    } as ClaudeStreamEvent;
+  const escalation = buildEscalationInfo(escalationInput);
+  return {
+    type: 'result',
+    subtype: base.subtype,
+    total_cost_usd: 0,
+    duration_ms: base.durationMs,
+    num_turns: base.numTurns,
+    session_id: base.sessionId,
+    metrics: base.metrics,
+    ...(escalation && { escalation }),
+  } as ClaudeStreamEvent;
 }
 
 export interface ToolDef {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
 }
 
 export function buildSystemPrompt(
-    agent: Agent | null,
-    project: Project,
-    model: string,
-    toolDefs: ToolDef[],
-    hasTools: boolean,
-    isDeliberation = false,
-    personaPrompt?: string,
-    skillPrompt?: string,
-    agentTierConfig?: AgentTierConfig,
-    sessionWorkDir?: string | null,
+  agent: Agent | null,
+  project: Project,
+  model: string,
+  toolDefs: ToolDef[],
+  hasTools: boolean,
+  isDeliberation = false,
+  personaPrompt?: string,
+  skillPrompt?: string,
+  agentTierConfig?: AgentTierConfig,
+  sessionWorkDir?: string | null,
 ): string {
-    const parts: string[] = [];
+  const parts: string[] = [];
 
-    // Council deliberation sessions: use tools + reasoning
-    if (isDeliberation) {
-        parts.push(
-            'You are a council member participating in a structured deliberation.',
-            'Use your available tools to research, verify, and gather information before answering.',
-            'You have access to tools for reading files, running commands, saving/recalling memories, and interacting with AlgoChat.',
-            'Provide your analysis, recommendations, and trade-offs based on evidence you gather.',
-            'Be specific and opinionated. Take a clear position rather than listing generic pros and cons.',
-        );
-        if (agent?.systemPrompt) {
-            parts.push('', `Your role: ${agent.systemPrompt}`);
-        }
-        if (agent?.appendPrompt) {
-            parts.push('', agent.appendPrompt);
-        }
-        if (personaPrompt) parts.push('', personaPrompt);
-        return parts.join('\n');
-    }
-
+  // Council deliberation sessions: use tools + reasoning
+  if (isDeliberation) {
+    parts.push(
+      'You are a council member participating in a structured deliberation.',
+      'Use your available tools to research, verify, and gather information before answering.',
+      'You have access to tools for reading files, running commands, saving/recalling memories, and interacting with AlgoChat.',
+      'Provide your analysis, recommendations, and trade-offs based on evidence you gather.',
+      'Be specific and opinionated. Take a clear position rather than listing generic pros and cons.',
+    );
     if (agent?.systemPrompt) {
-        parts.push(agent.systemPrompt);
-    } else {
-        parts.push(
-            'You are a helpful AI assistant. You have access to tools that let you interact with other agents, save/recall memories, and manage tasks.',
-            `You are working in the project directory: ${project.workingDir}`,
-        );
+      parts.push('', `Your role: ${agent.systemPrompt}`);
     }
-
     if (agent?.appendPrompt) {
-        parts.push('', agent.appendPrompt);
+      parts.push('', agent.appendPrompt);
     }
-
-    // Inject model identity so agents know what model they're running.
-    // This is especially important for cloud models which skip the verbose
-    // family-specific prompts that local models receive.
-    if (model) {
-        const displayModel = OllamaProvider.isCloudModel(model)
-            ? model.replace(/:cloud$/, '').replace(/:\d+b-cloud$/, '')
-            : model;
-        parts.push('', `You are running on model: ${displayModel}.`);
-    }
-
-    // Inject persona and skill prompts
     if (personaPrompt) parts.push('', personaPrompt);
-    if (skillPrompt) parts.push('', `## Skill Instructions\n${skillPrompt}`);
-
-    // Append tool-specific instructions when tools are available.
-    // Cloud-proxied models get compact prompts to stay within tight server-side
-    // timeouts (~90s) — fewer tokens = faster processing.
-    const toolNames = toolDefs.map((t) => t.name);
-    const isCloud = OllamaProvider.isCloudModel(model);
-    if (hasTools && toolDefs.length > 0) {
-        const family = detectModelFamily(model);
-
-        if (isCloud) {
-            // Compact mode for cloud models — essential rules only
-            parts.push('', getCompactToolInstructionPrompt(family, toolNames, toolDefs));
-
-            if (toolNames.includes('corvid_send_message')) {
-                parts.push('', getCompactResponseRoutingPrompt());
-            }
-
-            if (toolNames.includes('read_file')) {
-                parts.push('', getCompactCodingToolPrompt());
-                // Skip getCodebaseContextPrompt() — it's orientation text that
-                // cloud models can infer from file reads.
-            }
-            // Messaging safety is folded into getCompactToolInstructionPrompt rule #5.
-        } else {
-            parts.push('', getToolInstructionPrompt(family, toolNames, toolDefs));
-
-            if (toolNames.includes('corvid_send_message')) {
-                parts.push('', getResponseRoutingPrompt());
-            }
-
-            if (toolNames.includes('read_file')) {
-                parts.push('', getCodingToolPrompt());
-                parts.push('', getCodebaseContextPrompt());
-            }
-
-            // Always add messaging safety instructions when tools are available.
-            // Unlike response routing (gated on corvid_send_message) or coding guidance
-            // (gated on read_file), this is unconditional — any agent with tools must not
-            // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
-            parts.push('', getMessagingSafetyPrompt());
-        }
-    }
-
-    // Add focus/scoping instructions for non-high-tier agents
-    if (agentTierConfig && agentTierConfig.tier !== 'high') {
-        parts.push('', getAgentScopingInstructions(agentTierConfig));
-    }
-
-    // Add worktree isolation context for sessions in isolated worktrees
-    if (sessionWorkDir) {
-        parts.push('', getWorktreeIsolationPrompt());
-    }
-
     return parts.join('\n');
+  }
+
+  if (agent?.systemPrompt) {
+    parts.push(agent.systemPrompt);
+  } else {
+    parts.push(
+      'You are a helpful AI assistant. You have access to tools that let you interact with other agents, save/recall memories, and manage tasks.',
+      `You are working in the project directory: ${project.workingDir}`,
+    );
+  }
+
+  if (agent?.appendPrompt) {
+    parts.push('', agent.appendPrompt);
+  }
+
+  // Inject model identity so agents know what model they're running.
+  // This is especially important for cloud models which skip the verbose
+  // family-specific prompts that local models receive.
+  if (model) {
+    const displayModel = OllamaProvider.isCloudModel(model)
+      ? model.replace(/:cloud$/, '').replace(/:\d+b-cloud$/, '')
+      : model;
+    parts.push('', `You are running on model: ${displayModel}.`);
+  }
+
+  // Inject persona and skill prompts
+  if (personaPrompt) parts.push('', personaPrompt);
+  if (skillPrompt) parts.push('', `## Skill Instructions\n${skillPrompt}`);
+
+  // Append tool-specific instructions when tools are available.
+  // Cloud-proxied models get compact prompts to stay within tight server-side
+  // timeouts (~90s) — fewer tokens = faster processing.
+  const toolNames = toolDefs.map((t) => t.name);
+  const isCloud = OllamaProvider.isCloudModel(model);
+  if (hasTools && toolDefs.length > 0) {
+    const family = detectModelFamily(model);
+
+    if (isCloud) {
+      // Compact mode for cloud models — essential rules only
+      parts.push('', getCompactToolInstructionPrompt(family, toolNames, toolDefs));
+
+      if (toolNames.includes('corvid_send_message')) {
+        parts.push('', getCompactResponseRoutingPrompt());
+      }
+
+      if (toolNames.includes('read_file')) {
+        parts.push('', getCompactCodingToolPrompt());
+        // Skip getCodebaseContextPrompt() — it's orientation text that
+        // cloud models can infer from file reads.
+      }
+      // Messaging safety is folded into getCompactToolInstructionPrompt rule #5.
+    } else {
+      parts.push('', getToolInstructionPrompt(family, toolNames, toolDefs));
+
+      if (toolNames.includes('corvid_send_message')) {
+        parts.push('', getResponseRoutingPrompt());
+      }
+
+      if (toolNames.includes('read_file')) {
+        parts.push('', getCodingToolPrompt());
+        parts.push('', getCodebaseContextPrompt());
+      }
+
+      // Always add messaging safety instructions when tools are available.
+      // Unlike response routing (gated on corvid_send_message) or coding guidance
+      // (gated on read_file), this is unconditional — any agent with tools must not
+      // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
+      parts.push('', getMessagingSafetyPrompt());
+    }
+  }
+
+  // Add focus/scoping instructions for non-high-tier agents
+  if (agentTierConfig && agentTierConfig.tier !== 'high') {
+    parts.push('', getAgentScopingInstructions(agentTierConfig));
+  }
+
+  // Add worktree isolation context for sessions in isolated worktrees
+  if (sessionWorkDir) {
+    parts.push('', getWorktreeIsolationPrompt());
+  }
+
+  return parts.join('\n');
 }
 
 /**
@@ -1467,79 +1584,79 @@ export function buildSystemPrompt(
  * These help prevent unfocused exploration and tool misuse.
  */
 function getAgentScopingInstructions(tierConfig: AgentTierConfig): string {
-    const parts = [
-        '## Task Focus Guidelines',
-        '',
-        'IMPORTANT: Stay focused on the specific task you were given.',
-        '- Do NOT explore directories or files unrelated to the task.',
-        '- Do NOT browse the entire project structure. Only read files directly relevant to completing the task.',
-        '- Before reading a file, ask yourself: "Is this file necessary for completing my specific task?"',
-        '- If the task is about a specific file or module, focus only on that area.',
-        '- Complete the task as efficiently as possible with the minimum number of tool calls.',
-    ];
+  const parts = [
+    '## Task Focus Guidelines',
+    '',
+    'IMPORTANT: Stay focused on the specific task you were given.',
+    '- Do NOT explore directories or files unrelated to the task.',
+    '- Do NOT browse the entire project structure. Only read files directly relevant to completing the task.',
+    '- Before reading a file, ask yourself: "Is this file necessary for completing my specific task?"',
+    '- If the task is about a specific file or module, focus only on that area.',
+    '- Complete the task as efficiently as possible with the minimum number of tool calls.',
+  ];
 
-    if (tierConfig.tier === 'limited') {
-        parts.push(
-            '',
-            'CRITICAL CONSTRAINTS:',
-            `- You have a maximum of ${tierConfig.maxToolIterations} tool calls. Use them wisely.`,
-            `- You may create at most ${tierConfig.maxPrsPerSession} PR(s) and ${tierConfig.maxIssuesPerSession} issue(s) per session.`,
-            '- Plan your approach before making tool calls. Do not explore randomly.',
-            '- If you are unsure what to do, state your uncertainty rather than exploring blindly.',
-        );
-    }
+  if (tierConfig.tier === 'limited') {
+    parts.push(
+      '',
+      'CRITICAL CONSTRAINTS:',
+      `- You have a maximum of ${tierConfig.maxToolIterations} tool calls. Use them wisely.`,
+      `- You may create at most ${tierConfig.maxPrsPerSession} PR(s) and ${tierConfig.maxIssuesPerSession} issue(s) per session.`,
+      '- Plan your approach before making tool calls. Do not explore randomly.',
+      '- If you are unsure what to do, state your uncertainty rather than exploring blindly.',
+    );
+  }
 
-    return parts.join('\n');
+  return parts.join('\n');
 }
 
 async function checkToolPermission(
-    toolCall: LlmToolCall,
-    session: Session,
-    agent: Agent | null,
-    approvalManager: ApprovalManager,
-    onApprovalRequest: (request: ApprovalRequestWire) => void,
+  toolCall: LlmToolCall,
+  session: Session,
+  agent: Agent | null,
+  approvalManager: ApprovalManager,
+  onApprovalRequest: (request: ApprovalRequestWire) => void,
 ): Promise<boolean> {
-    const permissionMode = agent?.permissionMode ?? 'default';
-    const BYPASS_MODES = new Set(['full-auto', 'auto-edit']);
+  const permissionMode = agent?.permissionMode ?? 'default';
+  const BYPASS_MODES = new Set(['full-auto', 'auto-edit']);
 
-    // corvid_* tools are MCP tools — auto-approve in bypass modes
-    if (BYPASS_MODES.has(permissionMode)) {
-        return true;
-    }
+  // corvid_* tools are MCP tools — auto-approve in bypass modes
+  if (BYPASS_MODES.has(permissionMode)) {
+    return true;
+  }
 
-    // For non-bypass modes, request approval
-    const requestId = crypto.randomUUID().slice(0, 8);
-    const timeoutMs = approvalManager.getDefaultTimeout(session.source);
+  // For non-bypass modes, request approval
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const timeoutMs = approvalManager.getDefaultTimeout(session.source);
 
-    const request: ApprovalRequest = {
-        id: requestId,
-        sessionId: session.id,
-        toolName: toolCall.name,
-        toolInput: toolCall.arguments,
-        description: formatToolDescription(toolCall.name, toolCall.arguments),
-        createdAt: Date.now(),
-        timeoutMs,
-        source: session.source,
-    };
+  const request: ApprovalRequest = {
+    id: requestId,
+    sessionId: session.id,
+    toolName: toolCall.name,
+    toolInput: toolCall.arguments,
+    description: formatToolDescription(toolCall.name, toolCall.arguments),
+    createdAt: Date.now(),
+    timeoutMs,
+    source: session.source,
+  };
 
-    onApprovalRequest({
-        id: request.id,
-        sessionId: request.sessionId,
-        toolName: request.toolName,
-        description: request.description,
-        createdAt: request.createdAt,
-        timeoutMs: request.timeoutMs,
-    });
+  onApprovalRequest({
+    id: request.id,
+    sessionId: request.sessionId,
+    toolName: request.toolName,
+    description: request.description,
+    createdAt: request.createdAt,
+    timeoutMs: request.timeoutMs,
+  });
 
-    const response = await approvalManager.createRequest(request);
-    return response.behavior === 'allow';
+  const response = await approvalManager.createRequest(request);
+  return response.behavior === 'allow';
 }
 
 function isToolUnsupportedError(errorMsg: string): boolean {
-    const lower = errorMsg.toLowerCase();
-    return (
-        lower.includes('does not support tools') ||
-        lower.includes('tool') && lower.includes('not supported') ||
-        lower.includes('unknown parameter') && lower.includes('tool')
-    );
+  const lower = errorMsg.toLowerCase();
+  return (
+    lower.includes('does not support tools') ||
+    (lower.includes('tool') && lower.includes('not supported')) ||
+    (lower.includes('unknown parameter') && lower.includes('tool'))
+  );
 }

@@ -17,24 +17,24 @@ const log = createLogger('SchedulerHandlers');
  * Returns null only if no projects exist at all for the tenant.
  */
 export function resolveProjectId(
-    db: Database,
-    tenantId: string,
-    agent: Agent,
-    actionProjectId?: string | null,
+  db: Database,
+  tenantId: string,
+  agent: Agent,
+  actionProjectId?: string | null,
 ): string | null {
-    if (actionProjectId) return actionProjectId;
-    if (agent.defaultProjectId) return agent.defaultProjectId;
+  if (actionProjectId) return actionProjectId;
+  if (agent.defaultProjectId) return agent.defaultProjectId;
 
-    // Fallback: pick the first available project for this tenant.
-    const projects = listProjects(db, tenantId);
-    if (projects.length > 0) {
-        log.warn('No explicit project configured for agent — falling back to first tenant project', {
-            agentId: agent.id,
-            fallbackProjectId: projects[0].id,
-            fallbackProjectName: projects[0].name,
-        });
-        return projects[0].id;
-    }
+  // Fallback: pick the first available project for this tenant.
+  const projects = listProjects(db, tenantId);
+  if (projects.length > 0) {
+    log.warn('No explicit project configured for agent — falling back to first tenant project', {
+      agentId: agent.id,
+      fallbackProjectId: projects[0].id,
+      fallbackProjectName: projects[0].name,
+    });
+    return projects[0].id;
+  }
 
-    return null;
+  return null;
 }

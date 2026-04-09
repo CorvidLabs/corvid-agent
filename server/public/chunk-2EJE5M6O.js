@@ -1,1 +1,126 @@
-import{h as C}from"./chunk-G7DVZDMF.js";import{Bb as c,Na as n,Ob as r,Pb as s,Qb as _,Y as g,Z as y,_a as u,hb as m,ib as p,jb as d,ob as x,pb as o,qb as a,vb as b,zb as f}from"./chunk-LF4EWAJA.js";function M(e,l){if(e&1&&(o(0,"a",4),r(1),a()),e&2){let t=c();x("routerLink",t.actionRoute),m("aria-label",t.actionAriaLabel||t.actionLabel),n(),_(" ",t.actionLabel," ")}}function k(e,l){if(e&1){let t=b();o(0,"button",7),f("click",function(){g(t);let h=c();return y(h.onAction())}),r(1),a()}if(e&2){let t=c();m("aria-label",t.actionAriaLabel||t.actionLabel),n(),_(" ",t.actionLabel," ")}}function P(e,l){if(e&1&&(o(0,"p",6),r(1),a()),e&2){let t=c();n(),s(t.docsHint)}}var v=class e{icon;title;description;actionLabel;actionRoute;actionAriaLabel;docsHint;actionClick;onAction(){this.actionClick?.()}static \u0275fac=function(t){return new(t||e)};static \u0275cmp=u({type:e,selectors:[["app-empty-state"]],inputs:{icon:"icon",title:"title",description:"description",actionLabel:"actionLabel",actionRoute:"actionRoute",actionAriaLabel:"actionAriaLabel",docsHint:"docsHint",actionClick:"actionClick"},decls:10,vars:6,consts:[["role","status",1,"empty-state"],["aria-hidden","true",1,"empty-state__icon"],[1,"empty-state__title"],[1,"empty-state__desc"],[1,"empty-state__action",3,"routerLink"],[1,"empty-state__action"],[1,"empty-state__docs"],[1,"empty-state__action",3,"click"]],template:function(t,i){t&1&&(o(0,"div",0)(1,"pre",1),r(2),a(),o(3,"p",2),r(4),a(),o(5,"p",3),r(6),a(),p(7,M,2,3,"a",4)(8,k,2,2,"button",5),p(9,P,2,1,"p",6),a()),t&2&&(m("aria-label",i.description),n(2),s(i.icon),n(2),s(i.title),n(2),s(i.description),n(),d(i.actionRoute?7:i.actionLabel?8:-1),n(2),d(i.docsHint?9:-1))},dependencies:[C],styles:[".empty-state[_ngcontent-%COMP%]{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem;min-height:280px;position:relative;border:1px dashed var(--border);border-radius:var(--radius-lg);background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(30,32,53,.15) 3px,rgba(30,32,53,.15) 4px);transition:border-color .3s ease}.empty-state[_ngcontent-%COMP%]:hover{border-color:var(--border-bright)}.empty-state__icon[_ngcontent-%COMP%]{margin:0 0 1.25rem;font-family:monospace;font-size:.7rem;line-height:1.4;color:var(--text-secondary);-webkit-user-select:none;user-select:none;animation:_ngcontent-%COMP%_gentleFloat 3s ease-in-out infinite}@keyframes _ngcontent-%COMP%_gentleFloat{0%,to{transform:translateY(0)}50%{transform:translateY(-6px)}}.empty-state__title[_ngcontent-%COMP%]{margin:0 0 .5rem;font-size:1rem;font-weight:700;color:var(--text-primary)}.empty-state__desc[_ngcontent-%COMP%]{margin:0 0 1.5rem;font-size:.8rem;color:var(--text-secondary);max-width:360px;line-height:1.6}.empty-state__action[_ngcontent-%COMP%]{display:inline-block;padding:.6rem 1.25rem;border:1px solid var(--accent-cyan);border-radius:var(--radius);background:transparent;color:var(--accent-cyan);font-size:.8rem;font-weight:600;font-family:inherit;text-decoration:none;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}.empty-state__action[_ngcontent-%COMP%]:hover{background:var(--accent-cyan);color:var(--bg-deep);box-shadow:var(--glow-cyan),0 0 20px var(--accent-cyan-dim);transform:translateY(-1px)}.empty-state__action[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.empty-state__action[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:2px;box-shadow:var(--glow-cyan)}.empty-state__docs[_ngcontent-%COMP%]{margin:1rem 0 0;font-size:.65rem;color:var(--text-tertiary)}@media(prefers-reduced-motion:reduce){.empty-state__icon[_ngcontent-%COMP%]{animation:none}.empty-state__action[_ngcontent-%COMP%]:hover, .empty-state__action[_ngcontent-%COMP%]:active{transform:none}}@media(max-width:767px){.empty-state[_ngcontent-%COMP%]{padding:2.5rem 1.5rem;min-height:200px}}"],changeDetection:0})};export{v as a};
+import { h as C } from './chunk-G7DVZDMF.js';
+import {
+  Qb as _,
+  qb as a,
+  vb as b,
+  Bb as c,
+  jb as d,
+  zb as f,
+  Y as g,
+  hb as m,
+  Na as n,
+  pb as o,
+  ib as p,
+  Ob as r,
+  Pb as s,
+  _a as u,
+  ob as x,
+  Z as y,
+} from './chunk-LF4EWAJA.js';
+
+function M(e, _l) {
+  if ((e & 1 && (o(0, 'a', 4), r(1), a()), e & 2)) {
+    const t = c();
+    x('routerLink', t.actionRoute),
+      m('aria-label', t.actionAriaLabel || t.actionLabel),
+      n(),
+      _(' ', t.actionLabel, ' ');
+  }
+}
+function k(e, _l) {
+  if (e & 1) {
+    const t = b();
+    o(0, 'button', 7),
+      f('click', () => {
+        g(t);
+        const h = c();
+        return y(h.onAction());
+      }),
+      r(1),
+      a();
+  }
+  if (e & 2) {
+    const t = c();
+    m('aria-label', t.actionAriaLabel || t.actionLabel), n(), _(' ', t.actionLabel, ' ');
+  }
+}
+function P(e, _l) {
+  if ((e & 1 && (o(0, 'p', 6), r(1), a()), e & 2)) {
+    const t = c();
+    n(), s(t.docsHint);
+  }
+}
+var v = class e {
+  icon;
+  title;
+  description;
+  actionLabel;
+  actionRoute;
+  actionAriaLabel;
+  docsHint;
+  actionClick;
+  onAction() {
+    this.actionClick?.();
+  }
+  static \u0275fac = (t) => new (t || e)();
+  static \u0275cmp = u({
+    type: e,
+    selectors: [['app-empty-state']],
+    inputs: {
+      icon: 'icon',
+      title: 'title',
+      description: 'description',
+      actionLabel: 'actionLabel',
+      actionRoute: 'actionRoute',
+      actionAriaLabel: 'actionAriaLabel',
+      docsHint: 'docsHint',
+      actionClick: 'actionClick',
+    },
+    decls: 10,
+    vars: 6,
+    consts: [
+      ['role', 'status', 1, 'empty-state'],
+      ['aria-hidden', 'true', 1, 'empty-state__icon'],
+      [1, 'empty-state__title'],
+      [1, 'empty-state__desc'],
+      [1, 'empty-state__action', 3, 'routerLink'],
+      [1, 'empty-state__action'],
+      [1, 'empty-state__docs'],
+      [1, 'empty-state__action', 3, 'click'],
+    ],
+    template: (t, i) => {
+      t & 1 &&
+        (o(0, 'div', 0)(1, 'pre', 1),
+        r(2),
+        a(),
+        o(3, 'p', 2),
+        r(4),
+        a(),
+        o(5, 'p', 3),
+        r(6),
+        a(),
+        p(7, M, 2, 3, 'a', 4)(8, k, 2, 2, 'button', 5),
+        p(9, P, 2, 1, 'p', 6),
+        a()),
+        t & 2 &&
+          (m('aria-label', i.description),
+          n(2),
+          s(i.icon),
+          n(2),
+          s(i.title),
+          n(2),
+          s(i.description),
+          n(),
+          d(i.actionRoute ? 7 : i.actionLabel ? 8 : -1),
+          n(2),
+          d(i.docsHint ? 9 : -1));
+    },
+    dependencies: [C],
+    styles: [
+      '.empty-state[_ngcontent-%COMP%]{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem;min-height:280px;position:relative;border:1px dashed var(--border);border-radius:var(--radius-lg);background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(30,32,53,.15) 3px,rgba(30,32,53,.15) 4px);transition:border-color .3s ease}.empty-state[_ngcontent-%COMP%]:hover{border-color:var(--border-bright)}.empty-state__icon[_ngcontent-%COMP%]{margin:0 0 1.25rem;font-family:monospace;font-size:.7rem;line-height:1.4;color:var(--text-secondary);-webkit-user-select:none;user-select:none;animation:_ngcontent-%COMP%_gentleFloat 3s ease-in-out infinite}@keyframes _ngcontent-%COMP%_gentleFloat{0%,to{transform:translateY(0)}50%{transform:translateY(-6px)}}.empty-state__title[_ngcontent-%COMP%]{margin:0 0 .5rem;font-size:1rem;font-weight:700;color:var(--text-primary)}.empty-state__desc[_ngcontent-%COMP%]{margin:0 0 1.5rem;font-size:.8rem;color:var(--text-secondary);max-width:360px;line-height:1.6}.empty-state__action[_ngcontent-%COMP%]{display:inline-block;padding:.6rem 1.25rem;border:1px solid var(--accent-cyan);border-radius:var(--radius);background:transparent;color:var(--accent-cyan);font-size:.8rem;font-weight:600;font-family:inherit;text-decoration:none;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}.empty-state__action[_ngcontent-%COMP%]:hover{background:var(--accent-cyan);color:var(--bg-deep);box-shadow:var(--glow-cyan),0 0 20px var(--accent-cyan-dim);transform:translateY(-1px)}.empty-state__action[_ngcontent-%COMP%]:active{transform:translateY(0) scale(.97)}.empty-state__action[_ngcontent-%COMP%]:focus-visible{outline:2px solid var(--accent-cyan);outline-offset:2px;box-shadow:var(--glow-cyan)}.empty-state__docs[_ngcontent-%COMP%]{margin:1rem 0 0;font-size:.65rem;color:var(--text-tertiary)}@media(prefers-reduced-motion:reduce){.empty-state__icon[_ngcontent-%COMP%]{animation:none}.empty-state__action[_ngcontent-%COMP%]:hover, .empty-state__action[_ngcontent-%COMP%]:active{transform:none}}@media(max-width:767px){.empty-state[_ngcontent-%COMP%]{padding:2.5rem 1.5rem;min-height:200px}}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { v as a };

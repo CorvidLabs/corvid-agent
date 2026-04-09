@@ -2,87 +2,87 @@ import type { Database } from 'bun:sqlite';
 import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, resolve, sep } from 'node:path';
-import { listProjects, getProject, createProject, updateProject, deleteProject } from '../db/projects';
-import { parseBodyOrThrow, ValidationError, CreateProjectSchema, UpdateProjectSchema } from '../lib/validation';
+import { createProject, deleteProject, getProject, listProjects, updateProject } from '../db/projects';
 import { createLogger } from '../lib/logger';
 import { json } from '../lib/response';
+import { CreateProjectSchema, parseBodyOrThrow, UpdateProjectSchema, ValidationError } from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 
 const log = createLogger('BrowseDirs');
 
 export function handleProjectRoutes(
-    req: Request,
-    url: URL,
-    db: Database,
-    context?: RequestContext,
+  req: Request,
+  url: URL,
+  db: Database,
+  context?: RequestContext,
 ): Response | Promise<Response> | null {
-    const path = url.pathname;
-    const method = req.method;
-    const tenantId = context?.tenantId ?? 'default';
+  const path = url.pathname;
+  const method = req.method;
+  const tenantId = context?.tenantId ?? 'default';
 
-    if (path === '/api/projects' && method === 'GET') {
-        return json(listProjects(db, tenantId));
+  if (path === '/api/projects' && method === 'GET') {
+    return json(listProjects(db, tenantId));
+  }
+
+  if (path === '/api/projects' && method === 'POST') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleCreate(req, db, tenantId);
+  }
 
-    if (path === '/api/projects' && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleCreate(req, db, tenantId);
+  const match = path.match(/^\/api\/projects\/([^/]+)$/);
+  if (!match) return null;
+
+  const id = match[1];
+
+  if (method === 'GET') {
+    const project = getProject(db, id, tenantId);
+    return project ? json(project) : json({ error: 'Not found' }, 404);
+  }
+
+  if (method === 'PUT') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    return handleUpdate(req, db, id, tenantId);
+  }
 
-    const match = path.match(/^\/api\/projects\/([^/]+)$/);
-    if (!match) return null;
-
-    const id = match[1];
-
-    if (method === 'GET') {
-        const project = getProject(db, id, tenantId);
-        return project ? json(project) : json({ error: 'Not found' }, 404);
+  if (method === 'DELETE') {
+    if (context) {
+      const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+      if (denied) return denied;
     }
+    const deleted = deleteProject(db, id, tenantId);
+    return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
+  }
 
-    if (method === 'PUT') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleUpdate(req, db, id, tenantId);
-    }
-
-    if (method === 'DELETE') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        const deleted = deleteProject(db, id, tenantId);
-        return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
-    }
-
-    return null;
+  return null;
 }
 
 async function handleCreate(req: Request, db: Database, tenantId: string = 'default'): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, CreateProjectSchema);
-        const project = createProject(db, data, tenantId);
-        return json(project, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
-    }
+  try {
+    const data = await parseBodyOrThrow(req, CreateProjectSchema);
+    const project = createProject(db, data, tenantId);
+    return json(project, 201);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }
 
 async function handleUpdate(req: Request, db: Database, id: string, tenantId: string = 'default'): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, UpdateProjectSchema);
-        const project = updateProject(db, id, data, tenantId);
-        return project ? json(project) : json({ error: 'Not found' }, 404);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        throw err;
-    }
+  try {
+    const data = await parseBodyOrThrow(req, UpdateProjectSchema);
+    const project = updateProject(db, id, data, tenantId);
+    return project ? json(project) : json({ error: 'Not found' }, 404);
+  } catch (err) {
+    if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+    throw err;
+  }
 }
 
 /**
@@ -94,31 +94,31 @@ async function handleUpdate(req: Request, db: Database, id: string, tenantId: st
  *   3. Any additional paths listed in the ALLOWED_BROWSE_ROOTS env var (comma-separated).
  */
 export function getAllowedRoots(db: Database): string[] {
-    const roots: string[] = [];
+  const roots: string[] = [];
 
-    // 1. User home directory
-    roots.push(resolve(homedir()));
+  // 1. User home directory
+  roots.push(resolve(homedir()));
 
-    // 2. Registered project working directories
-    const projects = listProjects(db);
-    for (const project of projects) {
-        if (project.workingDir) {
-            roots.push(resolve(project.workingDir));
-        }
+  // 2. Registered project working directories
+  const projects = listProjects(db);
+  for (const project of projects) {
+    if (project.workingDir) {
+      roots.push(resolve(project.workingDir));
     }
+  }
 
-    // 3. ALLOWED_BROWSE_ROOTS env var (comma-separated)
-    const envRoots = process.env.ALLOWED_BROWSE_ROOTS?.trim();
-    if (envRoots) {
-        for (const root of envRoots.split(',')) {
-            const trimmed = root.trim();
-            if (trimmed.length > 0) {
-                roots.push(resolve(trimmed));
-            }
-        }
+  // 3. ALLOWED_BROWSE_ROOTS env var (comma-separated)
+  const envRoots = process.env.ALLOWED_BROWSE_ROOTS?.trim();
+  if (envRoots) {
+    for (const root of envRoots.split(',')) {
+      const trimmed = root.trim();
+      if (trimmed.length > 0) {
+        roots.push(resolve(trimmed));
+      }
     }
+  }
 
-    return roots;
+  return roots;
 }
 
 /**
@@ -129,62 +129,62 @@ export function getAllowedRoots(db: Database): string[] {
  * (e.g. /home/user2 should NOT match allowed root /home/user).
  */
 export function isPathAllowed(dirPath: string, allowedRoots: string[]): boolean {
-    const normalized = resolve(dirPath);
+  const normalized = resolve(dirPath);
 
-    for (const root of allowedRoots) {
-        const normalizedRoot = resolve(root);
+  for (const root of allowedRoots) {
+    const normalizedRoot = resolve(root);
 
-        // Exact match
-        if (normalized === normalizedRoot) return true;
+    // Exact match
+    if (normalized === normalizedRoot) return true;
 
-        // Subdirectory: path starts with root + separator
-        // Ensure boundary check so /home/user2 doesn't match /home/user
-        const rootWithSep = normalizedRoot.endsWith(sep) ? normalizedRoot : normalizedRoot + sep;
-        if (normalized.startsWith(rootWithSep)) return true;
-    }
+    // Subdirectory: path starts with root + separator
+    // Ensure boundary check so /home/user2 doesn't match /home/user
+    const rootWithSep = normalizedRoot.endsWith(sep) ? normalizedRoot : normalizedRoot + sep;
+    if (normalized.startsWith(rootWithSep)) return true;
+  }
 
-    return false;
+  return false;
 }
 
 export async function handleBrowseDirs(_req: Request, url: URL, db: Database): Promise<Response> {
-    const rawPath = url.searchParams.get('path') || homedir();
-    const showHidden = url.searchParams.get('showHidden') === '1';
-    const dirPath = resolve(rawPath);
+  const rawPath = url.searchParams.get('path') || homedir();
+  const showHidden = url.searchParams.get('showHidden') === '1';
+  const dirPath = resolve(rawPath);
 
-    // --- Path allowlist check ---
-    const allowedRoots = getAllowedRoots(db);
-    if (!isPathAllowed(dirPath, allowedRoots)) {
-        log.warn('Blocked browse-dirs request for path outside allowlist', { path: dirPath });
-        return json({ error: 'Forbidden: path is outside allowed directories' }, 403);
+  // --- Path allowlist check ---
+  const allowedRoots = getAllowedRoots(db);
+  if (!isPathAllowed(dirPath, allowedRoots)) {
+    log.warn('Blocked browse-dirs request for path outside allowlist', { path: dirPath });
+    return json({ error: 'Forbidden: path is outside allowed directories' }, 403);
+  }
+
+  try {
+    const info = await stat(dirPath);
+    if (!info.isDirectory()) {
+      return json({ error: 'Path is not a directory' }, 400);
     }
+  } catch {
+    return json({ error: 'Path does not exist' }, 400);
+  }
 
-    try {
-        const info = await stat(dirPath);
-        if (!info.isDirectory()) {
-            return json({ error: 'Path is not a directory' }, 400);
-        }
-    } catch {
-        return json({ error: 'Path does not exist' }, 400);
-    }
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true });
+    const dirs = entries
+      .filter((e) => e.isDirectory() && (showHidden || !e.name.startsWith('.')))
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-    try {
-        const entries = await readdir(dirPath, { withFileTypes: true });
-        const dirs = entries
-            .filter((e) => e.isDirectory() && (showHidden || !e.name.startsWith('.')))
-            .map((e) => e.name)
-            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const parent = dirname(dirPath);
 
-        const parent = dirname(dirPath);
+    // Only return parent if it's also within the allowlist
+    const safeParent = parent !== dirPath && isPathAllowed(parent, allowedRoots) ? parent : null;
 
-        // Only return parent if it's also within the allowlist
-        const safeParent = parent !== dirPath && isPathAllowed(parent, allowedRoots) ? parent : null;
-
-        return json({
-            current: dirPath,
-            parent: safeParent,
-            dirs,
-        });
-    } catch {
-        return json({ error: 'Cannot read directory' }, 403);
-    }
+    return json({
+      current: dirPath,
+      parent: safeParent,
+      dirs,
+    });
+  } catch {
+    return json({ error: 'Cannot read directory' }, 403);
+  }
 }

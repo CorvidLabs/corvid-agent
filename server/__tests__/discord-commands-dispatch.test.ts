@@ -18,7 +18,7 @@ import { Database } from 'bun:sqlite';
 import { createAgent } from '../db/agents';
 import { runMigrations } from '../db/schema';
 import { clearAutocompleteCache } from '../discord/command-handlers/autocomplete-handler';
-import { type InteractionContext, handleInteraction } from '../discord/commands';
+import { handleInteraction, type InteractionContext } from '../discord/commands';
 import type { DiscordBridgeConfig } from '../discord/types';
 import {
   makeMockAutocompleteInteraction,

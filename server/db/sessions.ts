@@ -1,209 +1,220 @@
-import { Database, type SQLQueryBindings } from 'bun:sqlite';
-import { writeTransaction } from './pool';
+import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import type {
-    Session,
-    SessionMessage,
-    CreateSessionInput,
-    UpdateSessionInput,
-    AlgoChatConversation,
+  AlgoChatConversation,
+  CreateSessionInput,
+  Session,
+  SessionMessage,
+  UpdateSessionInput,
 } from '../../shared/types';
-import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { createLogger } from '../lib/logger';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { writeTransaction } from './pool';
 
 const log = createLogger('sessions');
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+
+import { validateTenantOwnership, withTenantFilter } from '../tenant/db-filter';
 
 interface SessionRow {
-    id: string;
-    project_id: string;
-    agent_id: string | null;
-    name: string;
-    status: string;
-    source: string;
-    initial_prompt: string;
-    pid: number | null;
-    total_cost_usd: number;
-    total_algo_spent: number;
-    total_turns: number;
-    council_launch_id: string | null;
-    council_role: string | null;
-    work_dir: string | null;
-    credits_consumed: number;
-    created_at: string;
-    updated_at: string;
+  id: string;
+  project_id: string;
+  agent_id: string | null;
+  name: string;
+  status: string;
+  source: string;
+  initial_prompt: string;
+  pid: number | null;
+  total_cost_usd: number;
+  total_algo_spent: number;
+  total_turns: number;
+  council_launch_id: string | null;
+  council_role: string | null;
+  work_dir: string | null;
+  credits_consumed: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface MessageRow {
-    id: number;
-    session_id: string;
-    role: string;
-    content: string;
-    cost_usd: number;
-    timestamp: string;
+  id: number;
+  session_id: string;
+  role: string;
+  content: string;
+  cost_usd: number;
+  timestamp: string;
 }
 
 interface ConversationRow {
-    id: string;
-    participant_addr: string;
-    agent_id: string | null;
-    session_id: string | null;
-    last_round: number;
-    created_at: string;
+  id: string;
+  participant_addr: string;
+  agent_id: string | null;
+  session_id: string | null;
+  last_round: number;
+  created_at: string;
 }
 
 function rowToSession(row: SessionRow): Session {
-    return {
-        id: row.id,
-        projectId: row.project_id,
-        agentId: row.agent_id,
-        name: row.name,
-        status: row.status as Session['status'],
-        source: row.source as Session['source'],
-        initialPrompt: row.initial_prompt,
-        pid: row.pid,
-        totalCostUsd: row.total_cost_usd,
-        totalAlgoSpent: row.total_algo_spent ?? 0,
-        totalTurns: row.total_turns,
-        councilLaunchId: row.council_launch_id ?? null,
-        councilRole: (row.council_role as Session['councilRole']) ?? null,
-        workDir: row.work_dir ?? null,
-        creditsConsumed: row.credits_consumed ?? 0,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-    };
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    agentId: row.agent_id,
+    name: row.name,
+    status: row.status as Session['status'],
+    source: row.source as Session['source'],
+    initialPrompt: row.initial_prompt,
+    pid: row.pid,
+    totalCostUsd: row.total_cost_usd,
+    totalAlgoSpent: row.total_algo_spent ?? 0,
+    totalTurns: row.total_turns,
+    councilLaunchId: row.council_launch_id ?? null,
+    councilRole: (row.council_role as Session['councilRole']) ?? null,
+    workDir: row.work_dir ?? null,
+    creditsConsumed: row.credits_consumed ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function rowToMessage(row: MessageRow): SessionMessage {
-    return {
-        id: row.id,
-        sessionId: row.session_id,
-        role: row.role as SessionMessage['role'],
-        content: row.content,
-        costUsd: row.cost_usd,
-        timestamp: row.timestamp,
-    };
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role as SessionMessage['role'],
+    content: row.content,
+    costUsd: row.cost_usd,
+    timestamp: row.timestamp,
+  };
 }
 
 function rowToConversation(row: ConversationRow): AlgoChatConversation {
-    return {
-        id: row.id,
-        participantAddr: row.participant_addr,
-        agentId: row.agent_id,
-        sessionId: row.session_id,
-        lastRound: row.last_round,
-        createdAt: row.created_at,
-    };
+  return {
+    id: row.id,
+    participantAddr: row.participant_addr,
+    agentId: row.agent_id,
+    sessionId: row.session_id,
+    lastRound: row.last_round,
+    createdAt: row.created_at,
+  };
 }
 
 // MARK: - Session CRUD
 
 export function listSessions(db: Database, projectId?: string, tenantId: string = DEFAULT_TENANT_ID): Session[] {
-    if (projectId) {
-        const { query, bindings } = withTenantFilter('SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC', tenantId);
-        const rows = db.query(query).all(projectId, ...bindings) as SessionRow[];
-        return rows.map(rowToSession);
-    }
-    const { query, bindings } = withTenantFilter('SELECT * FROM sessions ORDER BY updated_at DESC', tenantId);
-    const rows = db.query(query).all(...bindings) as SessionRow[];
+  if (projectId) {
+    const { query, bindings } = withTenantFilter(
+      'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC',
+      tenantId,
+    );
+    const rows = db.query(query).all(projectId, ...bindings) as SessionRow[];
     return rows.map(rowToSession);
+  }
+  const { query, bindings } = withTenantFilter('SELECT * FROM sessions ORDER BY updated_at DESC', tenantId);
+  const rows = db.query(query).all(...bindings) as SessionRow[];
+  return rows.map(rowToSession);
 }
 
 export function getSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Session | null {
-    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
-    const row = db.query('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | null;
-    return row ? rowToSession(row) : null;
+  if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
+  const row = db.query('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | null;
+  return row ? rowToSession(row) : null;
 }
 
 export function createSession(db: Database, input: CreateSessionInput, tenantId: string = DEFAULT_TENANT_ID): Session {
-    const id = crypto.randomUUID();
-    const source = input.source ?? 'web';
-    const initialStatus = source === 'agent' ? 'loading' : 'idle';
+  const id = crypto.randomUUID();
+  const source = input.source ?? 'web';
+  const initialStatus = source === 'agent' ? 'loading' : 'idle';
 
-    db.query(
-        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, status, council_launch_id, council_role, work_dir, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-        id,
-        input.projectId ?? null,
-        input.agentId ?? null,
-        input.name ?? '',
-        source,
-        input.initialPrompt ?? '',
-        initialStatus,
-        input.councilLaunchId ?? null,
-        input.councilRole ?? null,
-        input.workDir ?? null,
-        tenantId,
-    );
+  db.query(
+    `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, status, council_launch_id, council_role, work_dir, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.projectId ?? null,
+    input.agentId ?? null,
+    input.name ?? '',
+    source,
+    input.initialPrompt ?? '',
+    initialStatus,
+    input.councilLaunchId ?? null,
+    input.councilRole ?? null,
+    input.workDir ?? null,
+    tenantId,
+  );
 
-    return getSession(db, id) as Session;
+  return getSession(db, id) as Session;
 }
 
 export function listSessionsByCouncilLaunch(db: Database, launchId: string): Session[] {
-    const rows = db.query(
-        'SELECT * FROM sessions WHERE council_launch_id = ? ORDER BY created_at ASC'
-    ).all(launchId) as SessionRow[];
-    return rows.map(rowToSession);
+  const rows = db
+    .query('SELECT * FROM sessions WHERE council_launch_id = ? ORDER BY created_at ASC')
+    .all(launchId) as SessionRow[];
+  return rows.map(rowToSession);
 }
 
-export function updateSession(db: Database, id: string, input: UpdateSessionInput, tenantId: string = DEFAULT_TENANT_ID): Session | null {
-    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
-    const existing = getSession(db, id, tenantId);
-    if (!existing) return null;
+export function updateSession(
+  db: Database,
+  id: string,
+  input: UpdateSessionInput,
+  tenantId: string = DEFAULT_TENANT_ID,
+): Session | null {
+  if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
+  const existing = getSession(db, id, tenantId);
+  if (!existing) return null;
 
-    const fields: string[] = [];
-    const values: unknown[] = [];
+  const fields: string[] = [];
+  const values: unknown[] = [];
 
-    if (input.name !== undefined) {
-        fields.push('name = ?');
-        values.push(input.name);
-    }
-    if (input.status !== undefined) {
-        fields.push('status = ?');
-        values.push(input.status);
-    }
+  if (input.name !== undefined) {
+    fields.push('name = ?');
+    values.push(input.name);
+  }
+  if (input.status !== undefined) {
+    fields.push('status = ?');
+    values.push(input.status);
+  }
 
-    if (fields.length === 0) return existing;
+  if (fields.length === 0) return existing;
 
-    fields.push("updated_at = datetime('now')");
-    values.push(id);
+  fields.push("updated_at = datetime('now')");
+  values.push(id);
 
-    db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getSession(db, id, tenantId);
+  db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
+  return getSession(db, id, tenantId);
 }
 
 export function updateSessionAgent(db: Database, id: string, agentId: string): void {
-    db.query("UPDATE sessions SET agent_id = ?, updated_at = datetime('now') WHERE id = ?").run(agentId, id);
+  db.query("UPDATE sessions SET agent_id = ?, updated_at = datetime('now') WHERE id = ?").run(agentId, id);
 }
 
 export function updateSessionPid(db: Database, id: string, pid: number | null): void {
-    const result = db.query("UPDATE sessions SET pid = ?, updated_at = datetime('now') WHERE id = ?").run(pid, id);
-    if (result.changes === 0) {
-        log.warn(`updateSessionPid: 0 rows affected`, { id, pid });
-    }
+  const result = db.query("UPDATE sessions SET pid = ?, updated_at = datetime('now') WHERE id = ?").run(pid, id);
+  if (result.changes === 0) {
+    log.warn(`updateSessionPid: 0 rows affected`, { id, pid });
+  }
 }
 
 export function updateSessionStatus(db: Database, id: string, status: string): void {
-    const result = db.query("UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
-    if (result.changes === 0) {
-        log.warn(`updateSessionStatus: 0 rows affected`, { id, status });
-    }
+  const result = db.query("UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+  if (result.changes === 0) {
+    log.warn(`updateSessionStatus: 0 rows affected`, { id, status });
+  }
 }
 
 export function updateSessionCost(db: Database, id: string, costUsd: number, turns: number): void {
-    db.query(
-        "UPDATE sessions SET total_cost_usd = ?, total_turns = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(costUsd, turns, id);
+  db.query("UPDATE sessions SET total_cost_usd = ?, total_turns = ?, updated_at = datetime('now') WHERE id = ?").run(
+    costUsd,
+    turns,
+    id,
+  );
 }
 
 export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: number): void {
-    db.query(
-        "UPDATE sessions SET total_algo_spent = total_algo_spent + ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(microAlgos, id);
+  db.query(
+    "UPDATE sessions SET total_algo_spent = total_algo_spent + ?, updated_at = datetime('now') WHERE id = ?",
+  ).run(microAlgos, id);
 }
 
 export function updateSessionSummary(db: Database, id: string, summary: string): void {
-    db.query("UPDATE sessions SET conversation_summary = ?, updated_at = datetime('now') WHERE id = ?").run(summary, id);
+  db.query("UPDATE sessions SET conversation_summary = ?, updated_at = datetime('now') WHERE id = ?").run(summary, id);
 }
 
 /**
@@ -211,113 +222,109 @@ export function updateSessionSummary(db: Database, id: string, summary: string):
  * Used when creating a fresh session to carry over context from the previous one.
  */
 export function getPreviousThreadSessionSummary(db: Database, threadId: string): string | null {
-    const row = db.query(
-        `SELECT conversation_summary FROM sessions
+  const row = db
+    .query(
+      `SELECT conversation_summary FROM sessions
          WHERE name = ? AND source = 'discord' AND conversation_summary IS NOT NULL
-         ORDER BY created_at DESC LIMIT 1`
-    ).get(`Discord thread:${threadId}`) as { conversation_summary: string } | null;
-    return row?.conversation_summary ?? null;
+         ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(`Discord thread:${threadId}`) as { conversation_summary: string } | null;
+  return row?.conversation_summary ?? null;
 }
 
 export function deleteSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
-    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return false;
-    const result = writeTransaction(db, (db) => {
-        // Clean up dependent records
-        db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);
-        db.query('UPDATE algochat_conversations SET session_id = NULL WHERE session_id = ?').run(id);
-        return db.query('DELETE FROM sessions WHERE id = ?').run(id);
-    });
-    return result.changes > 0;
+  if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return false;
+  const result = writeTransaction(db, (db) => {
+    // Clean up dependent records
+    db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);
+    db.query('UPDATE algochat_conversations SET session_id = NULL WHERE session_id = ?').run(id);
+    return db.query('DELETE FROM sessions WHERE id = ?').run(id);
+  });
+  return result.changes > 0;
 }
 
 // MARK: - Session Messages
 
-export function getSessionMessages(db: Database, sessionId: string, tenantId: string = DEFAULT_TENANT_ID): SessionMessage[] {
-    if (!validateTenantOwnership(db, 'sessions', sessionId, tenantId)) return [];
-    const rows = db.query(
-        'SELECT * FROM session_messages WHERE session_id = ? ORDER BY timestamp ASC'
-    ).all(sessionId) as MessageRow[];
-    return rows.map(rowToMessage);
+export function getSessionMessages(
+  db: Database,
+  sessionId: string,
+  tenantId: string = DEFAULT_TENANT_ID,
+): SessionMessage[] {
+  if (!validateTenantOwnership(db, 'sessions', sessionId, tenantId)) return [];
+  const rows = db
+    .query('SELECT * FROM session_messages WHERE session_id = ? ORDER BY timestamp ASC')
+    .all(sessionId) as MessageRow[];
+  return rows.map(rowToMessage);
 }
 
 export function addSessionMessage(
-    db: Database,
-    sessionId: string,
-    role: string,
-    content: string,
-    costUsd: number = 0,
+  db: Database,
+  sessionId: string,
+  role: string,
+  content: string,
+  costUsd: number = 0,
 ): SessionMessage {
-    const result = db.query(
-        `INSERT INTO session_messages (session_id, role, content, cost_usd) VALUES (?, ?, ?, ?)`
-    ).run(sessionId, role, content, costUsd);
+  const result = db
+    .query(`INSERT INTO session_messages (session_id, role, content, cost_usd) VALUES (?, ?, ?, ?)`)
+    .run(sessionId, role, content, costUsd);
 
-    const row = db.query('SELECT * FROM session_messages WHERE id = ?').get(
-        result.lastInsertRowid
-    ) as MessageRow;
-    return rowToMessage(row);
+  const row = db.query('SELECT * FROM session_messages WHERE id = ?').get(result.lastInsertRowid) as MessageRow;
+  return rowToMessage(row);
 }
 
 // MARK: - AlgoChat Conversations
 
 export function listConversations(db: Database): AlgoChatConversation[] {
-    const rows = db.query(
-        'SELECT * FROM algochat_conversations ORDER BY created_at DESC'
-    ).all() as ConversationRow[];
-    return rows.map(rowToConversation);
+  const rows = db.query('SELECT * FROM algochat_conversations ORDER BY created_at DESC').all() as ConversationRow[];
+  return rows.map(rowToConversation);
 }
 
-export function getConversationByParticipant(
-    db: Database,
-    participantAddr: string,
-): AlgoChatConversation | null {
-    const row = db.query(
-        'SELECT * FROM algochat_conversations WHERE participant_addr = ?'
-    ).get(participantAddr) as ConversationRow | null;
-    return row ? rowToConversation(row) : null;
+export function getConversationByParticipant(db: Database, participantAddr: string): AlgoChatConversation | null {
+  const row = db
+    .query('SELECT * FROM algochat_conversations WHERE participant_addr = ?')
+    .get(participantAddr) as ConversationRow | null;
+  return row ? rowToConversation(row) : null;
 }
 
 export function createConversation(
-    db: Database,
-    participantAddr: string,
-    agentId: string | null,
-    sessionId: string | null,
+  db: Database,
+  participantAddr: string,
+  agentId: string | null,
+  sessionId: string | null,
 ): AlgoChatConversation {
-    const id = crypto.randomUUID();
+  const id = crypto.randomUUID();
 
-    db.query(
-        `INSERT INTO algochat_conversations (id, participant_addr, agent_id, session_id)
+  db.query(
+    `INSERT INTO algochat_conversations (id, participant_addr, agent_id, session_id)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(participant_addr) DO UPDATE SET
              agent_id = COALESCE(excluded.agent_id, agent_id),
-             session_id = COALESCE(excluded.session_id, session_id)`
-    ).run(id, participantAddr, agentId, sessionId);
+             session_id = COALESCE(excluded.session_id, session_id)`,
+  ).run(id, participantAddr, agentId, sessionId);
 
-    const row = db.query(
-        'SELECT * FROM algochat_conversations WHERE participant_addr = ?'
-    ).get(participantAddr) as ConversationRow;
-    return rowToConversation(row);
+  const row = db
+    .query('SELECT * FROM algochat_conversations WHERE participant_addr = ?')
+    .get(participantAddr) as ConversationRow;
+  return rowToConversation(row);
 }
 
-export function getConversationBySessionId(
-    db: Database,
-    sessionId: string,
-): AlgoChatConversation | null {
-    const row = db.query(
-        'SELECT * FROM algochat_conversations WHERE session_id = ?'
-    ).get(sessionId) as ConversationRow | null;
-    return row ? rowToConversation(row) : null;
+export function getConversationBySessionId(db: Database, sessionId: string): AlgoChatConversation | null {
+  const row = db
+    .query('SELECT * FROM algochat_conversations WHERE session_id = ?')
+    .get(sessionId) as ConversationRow | null;
+  return row ? rowToConversation(row) : null;
 }
 
 export function updateConversationRound(db: Database, id: string, lastRound: number): void {
-    db.query('UPDATE algochat_conversations SET last_round = ? WHERE id = ?').run(lastRound, id);
+  db.query('UPDATE algochat_conversations SET last_round = ? WHERE id = ?').run(lastRound, id);
 }
 
 export function updateConversationSession(db: Database, id: string, sessionId: string): void {
-    db.query('UPDATE algochat_conversations SET session_id = ? WHERE id = ?').run(sessionId, id);
+  db.query('UPDATE algochat_conversations SET session_id = ? WHERE id = ?').run(sessionId, id);
 }
 
 export function updateConversationAgent(db: Database, id: string, agentId: string, sessionId: string): void {
-    db.query('UPDATE algochat_conversations SET agent_id = ?, session_id = ? WHERE id = ?').run(agentId, sessionId, id);
+  db.query('UPDATE algochat_conversations SET agent_id = ?, session_id = ? WHERE id = ?').run(agentId, sessionId, id);
 }
 
 /**
@@ -327,27 +334,29 @@ export function updateConversationAgent(db: Database, id: string, agentId: strin
  * Also matches legacy short-name format `Poll: {shortName} #%` for backwards compatibility.
  */
 export function listPollingActivity(db: Database, repo: string, limit = 25): Session[] {
-    if (repo.includes('/')) {
-        const shortName = repo.split('/')[1];
-        // Match new full-repo format OR legacy short-name format
-        const rows = db.query(
-            `SELECT * FROM sessions WHERE source = 'agent' AND (name LIKE ? OR name LIKE ?) ORDER BY created_at DESC LIMIT ?`
-        ).all(`Poll: ${repo} #%`, `Poll: ${shortName} #%`, limit) as SessionRow[];
-        return rows.map(rowToSession);
-    }
-    // Org-level: match `Poll: OrgName/anyrepo #N` for all repos under the org
-    const rows = db.query(
-        `SELECT * FROM sessions WHERE source = 'agent' AND name LIKE ? ORDER BY created_at DESC LIMIT ?`
-    ).all(`Poll: ${repo}/% #%`, limit) as SessionRow[];
+  if (repo.includes('/')) {
+    const shortName = repo.split('/')[1];
+    // Match new full-repo format OR legacy short-name format
+    const rows = db
+      .query(
+        `SELECT * FROM sessions WHERE source = 'agent' AND (name LIKE ? OR name LIKE ?) ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(`Poll: ${repo} #%`, `Poll: ${shortName} #%`, limit) as SessionRow[];
     return rows.map(rowToSession);
+  }
+  // Org-level: match `Poll: OrgName/anyrepo #N` for all repos under the org
+  const rows = db
+    .query(`SELECT * FROM sessions WHERE source = 'agent' AND name LIKE ? ORDER BY created_at DESC LIMIT ?`)
+    .all(`Poll: ${repo}/% #%`, limit) as SessionRow[];
+  return rows.map(rowToSession);
 }
 
 /**
  * Look up the participant wallet address for a session (via algochat_conversations).
  */
 export function getParticipantForSession(db: Database, sessionId: string): string | null {
-    const row = db.query(
-        'SELECT participant_addr FROM algochat_conversations WHERE session_id = ?'
-    ).get(sessionId) as { participant_addr: string } | null;
-    return row?.participant_addr ?? null;
+  const row = db.query('SELECT participant_addr FROM algochat_conversations WHERE session_id = ?').get(sessionId) as {
+    participant_addr: string;
+  } | null;
+  return row?.participant_addr ?? null;
 }

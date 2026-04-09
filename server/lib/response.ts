@@ -18,10 +18,10 @@ const log = createLogger('Response');
  * @returns A `Response` with `Content-Type: application/json`.
  */
 export function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 /**
@@ -31,7 +31,7 @@ export function json(data: unknown, status: number = 200): Response {
  * @returns A 400 `Response` with `{ error: message }`.
  */
 export function badRequest(message: string): Response {
-    return json({ error: message }, 400);
+  return json({ error: message }, 400);
 }
 
 /**
@@ -41,7 +41,7 @@ export function badRequest(message: string): Response {
  * @returns A 404 `Response` with `{ error: message }`.
  */
 export function notFound(message: string): Response {
-    return json({ error: message }, 404);
+  return json({ error: message }, 404);
 }
 
 /**
@@ -51,7 +51,7 @@ export function notFound(message: string): Response {
  * @returns A 503 `Response` with `{ error: message }`.
  */
 export function unavailable(message: string): Response {
-    return json({ error: message }, 503);
+  return json({ error: message }, 503);
 }
 
 /**
@@ -62,18 +62,18 @@ export function unavailable(message: string): Response {
  * @returns A 500 `Response` with a generic error message and timestamp.
  */
 export function serverError(err: unknown): Response {
-    // Log the full error server-side for debugging — never send to client.
-    // Logging is isolated so CodeQL doesn't taint-track through the return value.
-    logInternalError(err);
-    // Always return a generic message to avoid stack trace / internal detail exposure
-    return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
+  // Log the full error server-side for debugging — never send to client.
+  // Logging is isolated so CodeQL doesn't taint-track through the return value.
+  logInternalError(err);
+  // Always return a generic message to avoid stack trace / internal detail exposure
+  return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
 }
 
 /** @internal Log error details server-side only. Separated to break taint propagation. */
 function logInternalError(err: unknown): void {
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-    log.error('Internal server error', { error: message, stack });
+  const message = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? err.stack : undefined;
+  log.error('Internal server error', { error: message, stack });
 }
 
 /**
@@ -83,7 +83,7 @@ function logInternalError(err: unknown): void {
  * @returns The error's `.message` if it's an `Error`, otherwise `String(err)`.
  */
 export function errorMessage(err: unknown): string {
-    return err instanceof Error ? err.message : String(err);
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -94,9 +94,9 @@ export function errorMessage(err: unknown): string {
  * @returns The parsed number, or `defaultValue` if parsing fails.
  */
 export function safeNumParam(value: string | null, defaultValue: number): number {
-    if (value === null) return defaultValue;
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? defaultValue : parsed;
+  if (value === null) return defaultValue;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
 /**
@@ -114,12 +114,12 @@ export function safeNumParam(value: string | null, defaultValue: number): number
  * ```
  */
 export function handleRouteError(err: unknown): Response {
-    if (isAppError(err)) {
-        const body: Record<string, unknown> = { error: err.message, code: err.code };
-        if (err instanceof RateLimitError && err.retryAfter !== undefined) {
-            body.retryAfter = err.retryAfter;
-        }
-        return json(body, err.statusCode);
+  if (isAppError(err)) {
+    const body: Record<string, unknown> = { error: err.message, code: err.code };
+    if (err instanceof RateLimitError && err.retryAfter !== undefined) {
+      body.retryAfter = err.retryAfter;
     }
-    return serverError(err);
+    return json(body, err.statusCode);
+  }
+  return serverError(err);
 }

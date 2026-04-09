@@ -5,302 +5,374 @@ import { ShutdownCoordinator } from '../lib/shutdown-coordinator';
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('ShutdownCoordinator', () => {
-    test('starts in idle phase', () => {
-        const coordinator = new ShutdownCoordinator();
-        expect(coordinator.phase).toBe('idle');
-        expect(coordinator.isShuttingDown).toBe(false);
-        expect(coordinator.result).toBeNull();
+  test('starts in idle phase', () => {
+    const coordinator = new ShutdownCoordinator();
+    expect(coordinator.phase).toBe('idle');
+    expect(coordinator.isShuttingDown).toBe(false);
+    expect(coordinator.result).toBeNull();
+  });
+
+  test('executes handlers in priority order', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const order: string[] = [];
+
+    coordinator.register({
+      name: 'last',
+      priority: 30,
+      handler: () => {
+        order.push('last');
+      },
+    });
+    coordinator.register({
+      name: 'first',
+      priority: 0,
+      handler: () => {
+        order.push('first');
+      },
+    });
+    coordinator.register({
+      name: 'middle',
+      priority: 10,
+      handler: () => {
+        order.push('middle');
+      },
     });
 
-    test('executes handlers in priority order', async () => {
-        const coordinator = new ShutdownCoordinator();
-        const order: string[] = [];
+    const result = await coordinator.shutdown();
 
-        coordinator.register({ name: 'last', priority: 30, handler: () => { order.push('last'); } });
-        coordinator.register({ name: 'first', priority: 0, handler: () => { order.push('first'); } });
-        coordinator.register({ name: 'middle', priority: 10, handler: () => { order.push('middle'); } });
+    expect(order).toEqual(['first', 'middle', 'last']);
+    expect(result.phase).toBe('completed');
+    expect(result.handlers).toHaveLength(3);
+    expect(result.handlers.every((h) => h.status === 'ok')).toBe(true);
+  });
 
-        const result = await coordinator.shutdown();
+  test('handles async handlers', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let asyncDone = false;
 
-        expect(order).toEqual(['first', 'middle', 'last']);
-        expect(result.phase).toBe('completed');
-        expect(result.handlers).toHaveLength(3);
-        expect(result.handlers.every((h) => h.status === 'ok')).toBe(true);
+    coordinator.register({
+      name: 'async-handler',
+      priority: 0,
+      handler: async () => {
+        await delay(50);
+        asyncDone = true;
+      },
     });
 
-    test('handles async handlers', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let asyncDone = false;
+    await coordinator.shutdown();
+    expect(asyncDone).toBe(true);
+  });
 
-        coordinator.register({
-            name: 'async-handler',
-            priority: 0,
-            handler: async () => {
-                await delay(50);
-                asyncDone = true;
-            },
-        });
+  test('isolates errors — one failing handler does not block others', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let secondRan = false;
 
-        await coordinator.shutdown();
-        expect(asyncDone).toBe(true);
+    coordinator.register({
+      name: 'failing',
+      priority: 0,
+      handler: () => {
+        throw new Error('boom');
+      },
+    });
+    coordinator.register({
+      name: 'succeeding',
+      priority: 10,
+      handler: () => {
+        secondRan = true;
+      },
     });
 
-    test('isolates errors — one failing handler does not block others', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let secondRan = false;
+    const result = await coordinator.shutdown();
 
-        coordinator.register({
-            name: 'failing',
-            priority: 0,
-            handler: () => { throw new Error('boom'); },
-        });
-        coordinator.register({
-            name: 'succeeding',
-            priority: 10,
-            handler: () => { secondRan = true; },
-        });
+    expect(secondRan).toBe(true);
+    expect(result.handlers[0].status).toBe('error');
+    expect(result.handlers[0].error).toBe('boom');
+    expect(result.handlers[1].status).toBe('ok');
+  });
 
-        const result = await coordinator.shutdown();
+  test('times out slow async handlers', async () => {
+    const coordinator = new ShutdownCoordinator();
 
-        expect(secondRan).toBe(true);
-        expect(result.handlers[0].status).toBe('error');
-        expect(result.handlers[0].error).toBe('boom');
-        expect(result.handlers[1].status).toBe('ok');
+    coordinator.register({
+      name: 'slow',
+      priority: 0,
+      handler: () => delay(10_000),
+      timeoutMs: 100,
+    });
+    coordinator.register({
+      name: 'fast',
+      priority: 10,
+      handler: () => {},
     });
 
-    test('times out slow async handlers', async () => {
-        const coordinator = new ShutdownCoordinator();
+    const result = await coordinator.shutdown();
 
-        coordinator.register({
-            name: 'slow',
-            priority: 0,
-            handler: () => delay(10_000),
-            timeoutMs: 100,
-        });
-        coordinator.register({
-            name: 'fast',
-            priority: 10,
-            handler: () => {},
-        });
+    expect(result.handlers[0].name).toBe('slow');
+    expect(result.handlers[0].status).toBe('timeout');
+    expect(result.handlers[1].status).toBe('ok');
+    expect(result.phase).toBe('forced');
+  });
 
-        const result = await coordinator.shutdown();
+  test('idempotent — second call returns same result', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let callCount = 0;
 
-        expect(result.handlers[0].name).toBe('slow');
-        expect(result.handlers[0].status).toBe('timeout');
-        expect(result.handlers[1].status).toBe('ok');
-        expect(result.phase).toBe('forced');
+    coordinator.register({
+      name: 'counter',
+      priority: 0,
+      handler: () => {
+        callCount++;
+      },
     });
 
-    test('idempotent — second call returns same result', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let callCount = 0;
+    const result1 = await coordinator.shutdown();
+    const result2 = await coordinator.shutdown();
 
-        coordinator.register({
-            name: 'counter',
-            priority: 0,
-            handler: () => { callCount++; },
-        });
+    expect(callCount).toBe(1);
+    expect(result1).toBe(result2);
+  });
 
-        const result1 = await coordinator.shutdown();
-        const result2 = await coordinator.shutdown();
+  test('rejects handler registration after shutdown starts', async () => {
+    const coordinator = new ShutdownCoordinator();
+    coordinator.register({ name: 'initial', priority: 0, handler: () => {} });
 
-        expect(callCount).toBe(1);
-        expect(result1).toBe(result2);
+    await coordinator.shutdown();
+
+    coordinator.register({ name: 'late', priority: 0, handler: () => {} });
+
+    const status = coordinator.getStatus();
+    expect(status.handlerCount).toBe(1);
+  });
+
+  test('registerService convenience method works', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let stopped = false;
+
+    const service = {
+      stop: () => {
+        stopped = true;
+      },
+    };
+    coordinator.registerService('TestService', service, 5);
+
+    await coordinator.shutdown();
+    expect(stopped).toBe(true);
+  });
+
+  test('registerService with async stop()', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let stopped = false;
+
+    const service = {
+      stop: async () => {
+        await delay(10);
+        stopped = true;
+      },
+    };
+    coordinator.registerService('AsyncService', service, 5);
+
+    await coordinator.shutdown();
+    expect(stopped).toBe(true);
+  });
+
+  test('grace period caps total shutdown time', async () => {
+    const coordinator = new ShutdownCoordinator(200);
+
+    for (let i = 0; i < 5; i++) {
+      coordinator.register({
+        name: `slow-${i}`,
+        priority: i,
+        handler: () => delay(500),
+        timeoutMs: 500,
+      });
+    }
+
+    const start = Date.now();
+    const result = await coordinator.shutdown();
+    const elapsed = Date.now() - start;
+
+    expect(elapsed).toBeLessThan(500);
+    const timeouts = result.handlers.filter((h) => h.status === 'timeout');
+    expect(timeouts.length).toBeGreaterThan(0);
+  });
+
+  test('getStatus returns correct state', async () => {
+    const coordinator = new ShutdownCoordinator();
+    coordinator.register({ name: 'a', priority: 0, handler: () => {} });
+    coordinator.register({ name: 'b', priority: 10, handler: () => {} });
+
+    let status = coordinator.getStatus();
+    expect(status.phase).toBe('idle');
+    expect(status.handlerCount).toBe(2);
+    expect(status.result).toBeNull();
+
+    await coordinator.shutdown();
+
+    status = coordinator.getStatus();
+    expect(status.phase).toBe('completed');
+    expect(status.result).not.toBeNull();
+    expect(status.result!.handlers).toHaveLength(2);
+  });
+
+  test('handler results include timing info', async () => {
+    const coordinator = new ShutdownCoordinator();
+
+    coordinator.register({
+      name: 'timed',
+      priority: 0,
+      handler: async () => {
+        await delay(20);
+      },
     });
 
-    test('rejects handler registration after shutdown starts', async () => {
-        const coordinator = new ShutdownCoordinator();
-        coordinator.register({ name: 'initial', priority: 0, handler: () => {} });
+    const result = await coordinator.shutdown();
 
-        await coordinator.shutdown();
+    expect(result.durationMs).toBeGreaterThanOrEqual(15);
+    expect(result.handlers[0].durationMs).toBeGreaterThanOrEqual(15);
+  });
 
-        coordinator.register({ name: 'late', priority: 0, handler: () => {} });
+  test('handles mix of sync and async handlers', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const order: string[] = [];
 
-        const status = coordinator.getStatus();
-        expect(status.handlerCount).toBe(1);
+    coordinator.register({
+      name: 'sync-1',
+      priority: 0,
+      handler: () => {
+        order.push('sync-1');
+      },
+    });
+    coordinator.register({
+      name: 'async-1',
+      priority: 5,
+      handler: async () => {
+        await delay(10);
+        order.push('async-1');
+      },
+    });
+    coordinator.register({
+      name: 'sync-2',
+      priority: 10,
+      handler: () => {
+        order.push('sync-2');
+      },
     });
 
-    test('registerService convenience method works', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let stopped = false;
+    const result = await coordinator.shutdown();
 
-        const service = { stop: () => { stopped = true; } };
-        coordinator.registerService('TestService', service, 5);
+    expect(order).toEqual(['sync-1', 'async-1', 'sync-2']);
+    expect(result.handlers.every((h) => h.status === 'ok')).toBe(true);
+  });
 
-        await coordinator.shutdown();
-        expect(stopped).toBe(true);
+  test('empty coordinator shuts down cleanly', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const result = await coordinator.shutdown();
+
+    expect(result.phase).toBe('completed');
+    expect(result.handlers).toHaveLength(0);
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test('handlers at same priority execute in registration order', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const order: string[] = [];
+
+    coordinator.register({
+      name: 'a',
+      priority: 10,
+      handler: () => {
+        order.push('a');
+      },
+    });
+    coordinator.register({
+      name: 'b',
+      priority: 10,
+      handler: () => {
+        order.push('b');
+      },
+    });
+    coordinator.register({
+      name: 'c',
+      priority: 10,
+      handler: () => {
+        order.push('c');
+      },
     });
 
-    test('registerService with async stop()', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let stopped = false;
+    await coordinator.shutdown();
 
-        const service = {
-            stop: async () => {
-                await delay(10);
-                stopped = true;
-            },
-        };
-        coordinator.registerService('AsyncService', service, 5);
+    expect(order).toEqual(['a', 'b', 'c']);
+  });
 
-        await coordinator.shutdown();
-        expect(stopped).toBe(true);
+  test('concurrent shutdown calls return the same result', async () => {
+    const coordinator = new ShutdownCoordinator();
+    let callCount = 0;
+
+    coordinator.register({
+      name: 'slow',
+      priority: 0,
+      handler: async () => {
+        await delay(50);
+        callCount++;
+      },
     });
 
-    test('grace period caps total shutdown time', async () => {
-        const coordinator = new ShutdownCoordinator(200);
+    const [r1, r2, r3] = await Promise.all([coordinator.shutdown(), coordinator.shutdown(), coordinator.shutdown()]);
 
-        for (let i = 0; i < 5; i++) {
-            coordinator.register({
-                name: `slow-${i}`,
-                priority: i,
-                handler: () => delay(500),
-                timeoutMs: 500,
-            });
-        }
+    expect(callCount).toBe(1);
+    expect(r1).toBe(r2);
+    expect(r2).toBe(r3);
+  });
 
-        const start = Date.now();
-        const result = await coordinator.shutdown();
-        const elapsed = Date.now() - start;
+  test('registerService uses default priority of 10', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const order: string[] = [];
 
-        expect(elapsed).toBeLessThan(500);
-        const timeouts = result.handlers.filter((h) => h.status === 'timeout');
-        expect(timeouts.length).toBeGreaterThan(0);
+    coordinator.register({
+      name: 'first',
+      priority: 0,
+      handler: () => {
+        order.push('first');
+      },
+    });
+    coordinator.registerService('service', {
+      stop: () => {
+        order.push('service');
+      },
     });
 
-    test('getStatus returns correct state', async () => {
-        const coordinator = new ShutdownCoordinator();
-        coordinator.register({ name: 'a', priority: 0, handler: () => {} });
-        coordinator.register({ name: 'b', priority: 10, handler: () => {} });
+    await coordinator.shutdown();
+    expect(order).toEqual(['first', 'service']);
+  });
 
-        let status = coordinator.getStatus();
-        expect(status.phase).toBe('idle');
-        expect(status.handlerCount).toBe(2);
-        expect(status.result).toBeNull();
+  test('handler with rejected promise is caught as error', async () => {
+    const coordinator = new ShutdownCoordinator();
 
-        await coordinator.shutdown();
-
-        status = coordinator.getStatus();
-        expect(status.phase).toBe('completed');
-        expect(status.result).not.toBeNull();
-        expect(status.result!.handlers).toHaveLength(2);
+    coordinator.register({
+      name: 'rejecting',
+      priority: 0,
+      handler: () => Promise.reject(new Error('async boom')),
     });
 
-    test('handler results include timing info', async () => {
-        const coordinator = new ShutdownCoordinator();
+    const result = await coordinator.shutdown();
+    expect(result.handlers[0].status).toBe('error');
+    expect(result.handlers[0].error).toBe('async boom');
+  });
 
-        coordinator.register({
-            name: 'timed',
-            priority: 0,
-            handler: async () => { await delay(20); },
-        });
+  test('default handler timeout is 5000ms', async () => {
+    const coordinator = new ShutdownCoordinator();
 
-        const result = await coordinator.shutdown();
-
-        expect(result.durationMs).toBeGreaterThanOrEqual(15);
-        expect(result.handlers[0].durationMs).toBeGreaterThanOrEqual(15);
+    coordinator.register({
+      name: 'slow-default-timeout',
+      priority: 0,
+      handler: () => delay(10_000),
     });
 
-    test('handles mix of sync and async handlers', async () => {
-        const coordinator = new ShutdownCoordinator();
-        const order: string[] = [];
+    const start = Date.now();
+    const result = await coordinator.shutdown();
+    const elapsed = Date.now() - start;
 
-        coordinator.register({ name: 'sync-1', priority: 0, handler: () => { order.push('sync-1'); } });
-        coordinator.register({
-            name: 'async-1',
-            priority: 5,
-            handler: async () => { await delay(10); order.push('async-1'); },
-        });
-        coordinator.register({ name: 'sync-2', priority: 10, handler: () => { order.push('sync-2'); } });
-
-        const result = await coordinator.shutdown();
-
-        expect(order).toEqual(['sync-1', 'async-1', 'sync-2']);
-        expect(result.handlers.every((h) => h.status === 'ok')).toBe(true);
-    });
-
-    test('empty coordinator shuts down cleanly', async () => {
-        const coordinator = new ShutdownCoordinator();
-        const result = await coordinator.shutdown();
-
-        expect(result.phase).toBe('completed');
-        expect(result.handlers).toHaveLength(0);
-        expect(result.durationMs).toBeGreaterThanOrEqual(0);
-    });
-
-    test('handlers at same priority execute in registration order', async () => {
-        const coordinator = new ShutdownCoordinator();
-        const order: string[] = [];
-
-        coordinator.register({ name: 'a', priority: 10, handler: () => { order.push('a'); } });
-        coordinator.register({ name: 'b', priority: 10, handler: () => { order.push('b'); } });
-        coordinator.register({ name: 'c', priority: 10, handler: () => { order.push('c'); } });
-
-        await coordinator.shutdown();
-
-        expect(order).toEqual(['a', 'b', 'c']);
-    });
-
-    test('concurrent shutdown calls return the same result', async () => {
-        const coordinator = new ShutdownCoordinator();
-        let callCount = 0;
-
-        coordinator.register({
-            name: 'slow',
-            priority: 0,
-            handler: async () => { await delay(50); callCount++; },
-        });
-
-        const [r1, r2, r3] = await Promise.all([
-            coordinator.shutdown(),
-            coordinator.shutdown(),
-            coordinator.shutdown(),
-        ]);
-
-        expect(callCount).toBe(1);
-        expect(r1).toBe(r2);
-        expect(r2).toBe(r3);
-    });
-
-    test('registerService uses default priority of 10', async () => {
-        const coordinator = new ShutdownCoordinator();
-        const order: string[] = [];
-
-        coordinator.register({ name: 'first', priority: 0, handler: () => { order.push('first'); } });
-        coordinator.registerService('service', { stop: () => { order.push('service'); } });
-
-        await coordinator.shutdown();
-        expect(order).toEqual(['first', 'service']);
-    });
-
-    test('handler with rejected promise is caught as error', async () => {
-        const coordinator = new ShutdownCoordinator();
-
-        coordinator.register({
-            name: 'rejecting',
-            priority: 0,
-            handler: () => Promise.reject(new Error('async boom')),
-        });
-
-        const result = await coordinator.shutdown();
-        expect(result.handlers[0].status).toBe('error');
-        expect(result.handlers[0].error).toBe('async boom');
-    });
-
-    test('default handler timeout is 5000ms', async () => {
-        const coordinator = new ShutdownCoordinator();
-
-        coordinator.register({
-            name: 'slow-default-timeout',
-            priority: 0,
-            handler: () => delay(10_000),
-        });
-
-        const start = Date.now();
-        const result = await coordinator.shutdown();
-        const elapsed = Date.now() - start;
-
-        expect(result.handlers[0].status).toBe('timeout');
-        expect(elapsed).toBeLessThan(6000);
-    }, 10_000);
+    expect(result.handlers[0].status).toBe('timeout');
+    expect(elapsed).toBeLessThan(6000);
+  }, 10_000);
 });

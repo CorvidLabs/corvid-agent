@@ -7,10 +7,10 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { createLogger } from '../../lib/logger';
 import type { Challenge, ChallengeCategory } from './challenges';
 import { ALL_CHALLENGES } from './challenges';
-import { evaluateResponse, aggregateScores, type TestSuiteResult, type ChallengeResult } from './evaluator';
-import { createLogger } from '../../lib/logger';
+import { aggregateScores, type ChallengeResult, evaluateResponse, type TestSuiteResult } from './evaluator';
 
 const log = createLogger('FlockTesting');
 
@@ -21,313 +21,325 @@ const log = createLogger('FlockTesting');
  * Implementations may use AlgoChat, HTTP, or mock transports.
  */
 export interface TestTransport {
-    /**
-     * Send a message to the agent and wait for a response.
-     * Returns the response text, or null if the agent doesn't respond within timeoutMs.
-     *
-     * @param threadId - Optional thread ID to maintain conversation context across
-     *                   multi-turn challenges. If provided, messages will be linked
-     *                   in the same thread so the agent can recall earlier turns.
-     */
-    sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null>;
+  /**
+   * Send a message to the agent and wait for a response.
+   * Returns the response text, or null if the agent doesn't respond within timeoutMs.
+   *
+   * @param threadId - Optional thread ID to maintain conversation context across
+   *                   multi-turn challenges. If provided, messages will be linked
+   *                   in the same thread so the agent can recall earlier turns.
+   */
+  sendAndWait(agentAddress: string, message: string, timeoutMs: number, threadId?: string): Promise<string | null>;
 }
 
 // ─── Test Run Configuration ───────────────────────────────────────────────────
 
 export interface TestRunConfig {
-    /** Run all challenges or a random subset. */
-    mode: 'full' | 'random';
-    /** Number of challenges for random mode (default 5). */
-    randomCount?: number;
-    /** Filter to specific categories (default: all). */
-    categories?: ChallengeCategory[];
-    /** Score decay factor per day since last test (0–1, default 0.02 = 2%/day). */
-    decayPerDay?: number;
+  /** Run all challenges or a random subset. */
+  mode: 'full' | 'random';
+  /** Number of challenges for random mode (default 5). */
+  randomCount?: number;
+  /** Filter to specific categories (default: all). */
+  categories?: ChallengeCategory[];
+  /** Score decay factor per day since last test (0–1, default 0.02 = 2%/day). */
+  decayPerDay?: number;
 }
 
 const DEFAULT_CONFIG: TestRunConfig = {
-    mode: 'full',
-    decayPerDay: 0.02,
+  mode: 'full',
+  decayPerDay: 0.02,
 };
 
 // ─── Test Runner ──────────────────────────────────────────────────────────────
 
 export class FlockTestRunner {
-    constructor(
-        private readonly db: Database,
-        private readonly transport: TestTransport,
-    ) {}
+  constructor(
+    private readonly db: Database,
+    private readonly transport: TestTransport,
+  ) {}
 
-    /**
-     * Run a test suite against a specific agent.
-     */
-    async runTest(agentId: string, agentAddress: string, config: TestRunConfig = DEFAULT_CONFIG): Promise<TestSuiteResult> {
-        const startedAt = new Date().toISOString();
-        const startMs = Date.now();
+  /**
+   * Run a test suite against a specific agent.
+   */
+  async runTest(
+    agentId: string,
+    agentAddress: string,
+    config: TestRunConfig = DEFAULT_CONFIG,
+  ): Promise<TestSuiteResult> {
+    const startedAt = new Date().toISOString();
+    const startMs = Date.now();
 
-        // Select challenges
-        const challenges = this.selectChallenges(config);
+    // Select challenges
+    const challenges = this.selectChallenges(config);
 
-        log.info('Starting agent test', {
-            agentId,
-            challengeCount: challenges.length,
-            mode: config.mode,
-            categories: config.categories ?? 'all',
-        });
+    log.info('Starting agent test', {
+      agentId,
+      challengeCount: challenges.length,
+      mode: config.mode,
+      categories: config.categories ?? 'all',
+    });
 
-        // Execute challenges sequentially (multi-turn challenges need ordering)
-        const challengeResults: ChallengeResult[] = [];
-        for (const challenge of challenges) {
-            const result = await this.executeChallenge(agentAddress, challenge);
-            challengeResults.push(result);
-        }
-
-        const completedAt = new Date().toISOString();
-        const durationMs = Date.now() - startMs;
-
-        // Aggregate scores
-        const { categoryScores, overallScore } = aggregateScores(challengeResults);
-
-        const suiteResult: TestSuiteResult = {
-            agentId,
-            overallScore,
-            categoryScores,
-            challengeResults,
-            startedAt,
-            completedAt,
-            durationMs,
-        };
-
-        // Persist to DB
-        this.persistResult(suiteResult);
-
-        log.info('Agent test completed', {
-            agentId,
-            overallScore,
-            durationMs,
-            responded: challengeResults.filter((r) => r.responded).length,
-            total: challengeResults.length,
-        });
-
-        return suiteResult;
+    // Execute challenges sequentially (multi-turn challenges need ordering)
+    const challengeResults: ChallengeResult[] = [];
+    for (const challenge of challenges) {
+      const result = await this.executeChallenge(agentAddress, challenge);
+      challengeResults.push(result);
     }
 
-    /**
-     * Get the most recent test result for an agent.
-     */
-    getLatestResult(agentId: string): TestSuiteResult | null {
-        const row = this.db.query(`
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startMs;
+
+    // Aggregate scores
+    const { categoryScores, overallScore } = aggregateScores(challengeResults);
+
+    const suiteResult: TestSuiteResult = {
+      agentId,
+      overallScore,
+      categoryScores,
+      challengeResults,
+      startedAt,
+      completedAt,
+      durationMs,
+    };
+
+    // Persist to DB
+    this.persistResult(suiteResult);
+
+    log.info('Agent test completed', {
+      agentId,
+      overallScore,
+      durationMs,
+      responded: challengeResults.filter((r) => r.responded).length,
+      total: challengeResults.length,
+    });
+
+    return suiteResult;
+  }
+
+  /**
+   * Get the most recent test result for an agent.
+   */
+  getLatestResult(agentId: string): TestSuiteResult | null {
+    const row = this.db
+      .query(`
             SELECT * FROM flock_test_results
             WHERE agent_id = ?
             ORDER BY completed_at DESC
             LIMIT 1
-        `).get(agentId) as TestResultRow | null;
+        `)
+      .get(agentId) as TestResultRow | null;
 
-        if (!row) return null;
-        return this.hydrateResult(row);
-    }
+    if (!row) return null;
+    return this.hydrateResult(row);
+  }
 
-    /**
-     * Get all test results for an agent, most recent first.
-     */
-    getResults(agentId: string, limit = 10): TestSuiteResult[] {
-        const rows = this.db.query(`
+  /**
+   * Get all test results for an agent, most recent first.
+   */
+  getResults(agentId: string, limit = 10): TestSuiteResult[] {
+    const rows = this.db
+      .query(`
             SELECT * FROM flock_test_results
             WHERE agent_id = ?
             ORDER BY completed_at DESC
             LIMIT ?
-        `).all(agentId, limit) as TestResultRow[];
+        `)
+      .all(agentId, limit) as TestResultRow[];
 
-        return rows.map((row) => this.hydrateResult(row));
-    }
+    return rows.map((row) => this.hydrateResult(row));
+  }
 
-    /**
-     * Compute the effective score for an agent, applying time-based decay.
-     * Returns 0 if the agent has never been tested.
-     */
-    getEffectiveScore(agentId: string, decayPerDay = 0.02): number {
-        const latest = this.getLatestResult(agentId);
-        if (!latest) return 0;
+  /**
+   * Compute the effective score for an agent, applying time-based decay.
+   * Returns 0 if the agent has never been tested.
+   */
+  getEffectiveScore(agentId: string, decayPerDay = 0.02): number {
+    const latest = this.getLatestResult(agentId);
+    if (!latest) return 0;
 
-        const daysSinceTest = (Date.now() - new Date(latest.completedAt).getTime()) / (1000 * 60 * 60 * 24);
-        const decayFactor = Math.max(0, 1 - decayPerDay * daysSinceTest);
-        return Math.round(latest.overallScore * decayFactor);
-    }
+    const daysSinceTest = (Date.now() - new Date(latest.completedAt).getTime()) / (1000 * 60 * 60 * 24);
+    const decayFactor = Math.max(0, 1 - decayPerDay * daysSinceTest);
+    return Math.round(latest.overallScore * decayFactor);
+  }
 
-    /**
-     * Get summary stats for all tested agents.
-     */
-    getTestStats(): { totalTests: number; testedAgents: number; avgScore: number } {
-        const total = this.db.query(
-            `SELECT COUNT(*) as cnt FROM flock_test_results`,
-        ).get() as { cnt: number };
+  /**
+   * Get summary stats for all tested agents.
+   */
+  getTestStats(): { totalTests: number; testedAgents: number; avgScore: number } {
+    const total = this.db.query(`SELECT COUNT(*) as cnt FROM flock_test_results`).get() as { cnt: number };
 
-        const agents = this.db.query(
-            `SELECT COUNT(DISTINCT agent_id) as cnt FROM flock_test_results`,
-        ).get() as { cnt: number };
+    const agents = this.db.query(`SELECT COUNT(DISTINCT agent_id) as cnt FROM flock_test_results`).get() as {
+      cnt: number;
+    };
 
-        const avg = this.db.query(
-            `SELECT AVG(overall_score) as avg_score FROM (
+    const avg = this.db
+      .query(
+        `SELECT AVG(overall_score) as avg_score FROM (
                 SELECT agent_id, overall_score,
                        ROW_NUMBER() OVER (PARTITION BY agent_id ORDER BY completed_at DESC) as rn
                 FROM flock_test_results
             ) WHERE rn = 1`,
-        ).get() as { avg_score: number | null };
+      )
+      .get() as { avg_score: number | null };
 
-        return {
-            totalTests: total.cnt,
-            testedAgents: agents.cnt,
-            avgScore: Math.round(avg.avg_score ?? 0),
-        };
+    return {
+      totalTests: total.cnt,
+      testedAgents: agents.cnt,
+      avgScore: Math.round(avg.avg_score ?? 0),
+    };
+  }
+
+  // ─── Private ──────────────────────────────────────────────────────────────
+
+  private selectChallenges(config: TestRunConfig): Challenge[] {
+    let pool = ALL_CHALLENGES;
+
+    // Filter by categories if specified
+    if (config.categories && config.categories.length > 0) {
+      pool = pool.filter((c) => config.categories!.includes(c.category));
     }
 
-    // ─── Private ──────────────────────────────────────────────────────────────
-
-    private selectChallenges(config: TestRunConfig): Challenge[] {
-        let pool = ALL_CHALLENGES;
-
-        // Filter by categories if specified
-        if (config.categories && config.categories.length > 0) {
-            pool = pool.filter((c) => config.categories!.includes(c.category));
-        }
-
-        if (config.mode === 'random') {
-            const count = config.randomCount ?? 5;
-            return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
-        }
-
-        return pool;
+    if (config.mode === 'random') {
+      const count = config.randomCount ?? 5;
+      return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
     }
 
-    private async executeChallenge(agentAddress: string, challenge: Challenge): Promise<ChallengeResult> {
-        try {
-            // For multi-turn challenges, send all messages except the last as setup.
-            // Use a shared threadId so the agent can recall earlier turns.
-            const threadId = challenge.messages.length > 1 ? crypto.randomUUID() : undefined;
-            let lastResponse: string | null = null;
-            let totalTimeMs = 0;
+    return pool;
+  }
 
-            for (let i = 0; i < challenge.messages.length; i++) {
-                const start = Date.now();
-                const response = await this.transport.sendAndWait(
-                    agentAddress,
-                    challenge.messages[i],
-                    challenge.timeoutMs,
-                    threadId,
-                );
-                const elapsed = Date.now() - start;
-                totalTimeMs += elapsed;
+  private async executeChallenge(agentAddress: string, challenge: Challenge): Promise<ChallengeResult> {
+    try {
+      // For multi-turn challenges, send all messages except the last as setup.
+      // Use a shared threadId so the agent can recall earlier turns.
+      const threadId = challenge.messages.length > 1 ? crypto.randomUUID() : undefined;
+      let lastResponse: string | null = null;
+      let totalTimeMs = 0;
 
-                if (response === null) {
-                    // Timed out on any message — fail the whole challenge
-                    return evaluateResponse(challenge, null, null);
-                }
+      for (let i = 0; i < challenge.messages.length; i++) {
+        const start = Date.now();
+        const response = await this.transport.sendAndWait(
+          agentAddress,
+          challenge.messages[i],
+          challenge.timeoutMs,
+          threadId,
+        );
+        const elapsed = Date.now() - start;
+        totalTimeMs += elapsed;
 
-                lastResponse = response;
-            }
-
-            return evaluateResponse(challenge, lastResponse, totalTimeMs);
-        } catch (err) {
-            log.warn('Challenge execution error', {
-                challengeId: challenge.id,
-                error: err instanceof Error ? err.message : String(err),
-            });
-            return evaluateResponse(challenge, null, null);
+        if (response === null) {
+          // Timed out on any message — fail the whole challenge
+          return evaluateResponse(challenge, null, null);
         }
+
+        lastResponse = response;
+      }
+
+      return evaluateResponse(challenge, lastResponse, totalTimeMs);
+    } catch (err) {
+      log.warn('Challenge execution error', {
+        challengeId: challenge.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return evaluateResponse(challenge, null, null);
     }
+  }
 
-    private persistResult(result: TestSuiteResult): void {
-        const id = crypto.randomUUID();
+  private persistResult(result: TestSuiteResult): void {
+    const id = crypto.randomUUID();
 
-        this.db.query(`
+    this.db
+      .query(`
             INSERT INTO flock_test_results
                 (id, agent_id, overall_score, category_scores, challenge_count, responded_count, duration_ms, started_at, completed_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-            id,
-            result.agentId,
-            result.overallScore,
-            JSON.stringify(result.categoryScores),
-            result.challengeResults.length,
-            result.challengeResults.filter((r) => r.responded).length,
-            result.durationMs,
-            result.startedAt,
-            result.completedAt,
-        );
+        `)
+      .run(
+        id,
+        result.agentId,
+        result.overallScore,
+        JSON.stringify(result.categoryScores),
+        result.challengeResults.length,
+        result.challengeResults.filter((r) => r.responded).length,
+        result.durationMs,
+        result.startedAt,
+        result.completedAt,
+      );
 
-        // Persist individual challenge results
-        const stmt = this.db.query(`
+    // Persist individual challenge results
+    const stmt = this.db.query(`
             INSERT INTO flock_test_challenge_results
                 (test_result_id, challenge_id, category, score, responded, response_time_ms, response, reason, weight)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        for (const cr of result.challengeResults) {
-            stmt.run(
-                id,
-                cr.challengeId,
-                cr.category,
-                cr.score,
-                cr.responded ? 1 : 0,
-                cr.responseTimeMs,
-                cr.response,
-                cr.reason,
-                cr.weight,
-            );
-        }
+    for (const cr of result.challengeResults) {
+      stmt.run(
+        id,
+        cr.challengeId,
+        cr.category,
+        cr.score,
+        cr.responded ? 1 : 0,
+        cr.responseTimeMs,
+        cr.response,
+        cr.reason,
+        cr.weight,
+      );
     }
+  }
 
-    private hydrateResult(row: TestResultRow): TestSuiteResult {
-        const challengeRows = this.db.query(`
+  private hydrateResult(row: TestResultRow): TestSuiteResult {
+    const challengeRows = this.db
+      .query(`
             SELECT * FROM flock_test_challenge_results
             WHERE test_result_id = ?
             ORDER BY ROWID
-        `).all(row.id) as ChallengeResultRow[];
+        `)
+      .all(row.id) as ChallengeResultRow[];
 
-        return {
-            agentId: row.agent_id,
-            overallScore: row.overall_score,
-            categoryScores: JSON.parse(row.category_scores),
-            challengeResults: challengeRows.map((cr) => ({
-                challengeId: cr.challenge_id,
-                category: cr.category as ChallengeCategory,
-                score: cr.score,
-                responded: cr.responded === 1,
-                responseTimeMs: cr.response_time_ms,
-                response: cr.response,
-                reason: cr.reason ?? '',
-                weight: cr.weight,
-            })),
-            startedAt: row.started_at,
-            completedAt: row.completed_at,
-            durationMs: row.duration_ms,
-        };
-    }
+    return {
+      agentId: row.agent_id,
+      overallScore: row.overall_score,
+      categoryScores: JSON.parse(row.category_scores),
+      challengeResults: challengeRows.map((cr) => ({
+        challengeId: cr.challenge_id,
+        category: cr.category as ChallengeCategory,
+        score: cr.score,
+        responded: cr.responded === 1,
+        responseTimeMs: cr.response_time_ms,
+        response: cr.response,
+        reason: cr.reason ?? '',
+        weight: cr.weight,
+      })),
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      durationMs: row.duration_ms,
+    };
+  }
 }
 
 // ─── DB Row Types ─────────────────────────────────────────────────────────────
 
 interface TestResultRow {
-    id: string;
-    agent_id: string;
-    overall_score: number;
-    category_scores: string;
-    challenge_count: number;
-    responded_count: number;
-    duration_ms: number;
-    started_at: string;
-    completed_at: string;
+  id: string;
+  agent_id: string;
+  overall_score: number;
+  category_scores: string;
+  challenge_count: number;
+  responded_count: number;
+  duration_ms: number;
+  started_at: string;
+  completed_at: string;
 }
 
 interface ChallengeResultRow {
-    id: number;
-    test_result_id: string;
-    challenge_id: string;
-    category: string;
-    score: number;
-    responded: number;
-    response_time_ms: number | null;
-    response: string | null;
-    reason: string | null;
-    weight: number;
+  id: number;
+  test_result_id: string;
+  challenge_id: string;
+  category: string;
+  score: number;
+  responded: number;
+  response_time_ms: number | null;
+  response: string | null;
+  reason: string | null;
+  weight: number;
 }

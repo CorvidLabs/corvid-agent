@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 092: Add discord_mention_sessions table.
@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS discord_mention_sessions (
             bot_message_id  TEXT PRIMARY KEY,
             session_id      TEXT NOT NULL,
@@ -19,9 +19,9 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_discord_mention_sessions_session ON discord_mention_sessions(session_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_discord_mention_sessions_session ON discord_mention_sessions(session_id)`);
 }
 
 export function down(db: Database): void {
-    db.exec(`DROP TABLE IF EXISTS discord_mention_sessions`);
+  db.exec(`DROP TABLE IF EXISTS discord_mention_sessions`);
 }

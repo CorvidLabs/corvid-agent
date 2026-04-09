@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 085: Add directory strategy fields to projects.
@@ -12,22 +12,22 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`ALTER TABLE projects ADD COLUMN git_url TEXT DEFAULT NULL`);
-    db.exec(`ALTER TABLE projects ADD COLUMN dir_strategy TEXT NOT NULL DEFAULT 'persistent'`);
-    db.exec(`ALTER TABLE projects ADD COLUMN base_clone_path TEXT DEFAULT NULL`);
+  db.exec(`ALTER TABLE projects ADD COLUMN git_url TEXT DEFAULT NULL`);
+  db.exec(`ALTER TABLE projects ADD COLUMN dir_strategy TEXT NOT NULL DEFAULT 'persistent'`);
+  db.exec(`ALTER TABLE projects ADD COLUMN base_clone_path TEXT DEFAULT NULL`);
 }
 
 export function down(db: Database): void {
-    // SQLite doesn't support DROP COLUMN before 3.35.0; recreate table if needed.
-    // For simplicity these columns are nullable/defaulted so leaving them is safe.
-    // This is a best-effort rollback.
-    db.exec(`
+  // SQLite doesn't support DROP COLUMN before 3.35.0; recreate table if needed.
+  // For simplicity these columns are nullable/defaulted so leaving them is safe.
+  // This is a best-effort rollback.
+  db.exec(`
         CREATE TABLE IF NOT EXISTS projects_backup AS SELECT
             id, name, description, working_dir, claude_md, env_vars, tenant_id, created_at, updated_at
         FROM projects
     `);
-    db.exec(`DROP TABLE IF EXISTS projects`);
-    db.exec(`
+  db.exec(`DROP TABLE IF EXISTS projects`);
+  db.exec(`
         CREATE TABLE projects (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
@@ -40,6 +40,6 @@ export function down(db: Database): void {
             updated_at  TEXT DEFAULT (datetime('now'))
         )
     `);
-    db.exec(`INSERT INTO projects SELECT * FROM projects_backup`);
-    db.exec(`DROP TABLE IF EXISTS projects_backup`);
+  db.exec(`INSERT INTO projects SELECT * FROM projects_backup`);
+  db.exec(`DROP TABLE IF EXISTS projects_backup`);
 }

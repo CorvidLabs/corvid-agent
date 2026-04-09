@@ -140,7 +140,7 @@ export function listProposals(
 
   let sql = 'SELECT * FROM governance_proposals';
   if (conditions.length > 0) {
-    sql += ' WHERE ' + conditions.join(' AND ');
+    sql += ` WHERE ${conditions.join(' AND ')}`;
   }
   sql += ' ORDER BY updated_at DESC';
 

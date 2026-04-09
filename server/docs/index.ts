@@ -1,6 +1,6 @@
-import { buildRouteRegistry } from './route-registry';
-import { generateOpenApiSpec } from './openapi-generator';
 import { getMcpToolDocs } from './mcp-tool-docs';
+import { generateOpenApiSpec } from './openapi-generator';
+import { buildRouteRegistry } from './route-registry';
 
 // ─── Cached spec ────────────────────────────────────────────────────────────
 
@@ -11,24 +11,24 @@ let cachedSpec: Record<string, unknown> | null = null;
  * Includes REST API routes and MCP tool documentation.
  */
 export function buildOpenApiSpec(version: string): Record<string, unknown> {
-    if (cachedSpec) return cachedSpec;
+  if (cachedSpec) return cachedSpec;
 
-    const routes = buildRouteRegistry();
-    const spec = generateOpenApiSpec(routes, version) as unknown as Record<string, unknown>;
+  const routes = buildRouteRegistry();
+  const spec = generateOpenApiSpec(routes, version) as unknown as Record<string, unknown>;
 
-    // Attach MCP tool documentation as a custom extension
-    const mcpTools = getMcpToolDocs();
-    (spec as Record<string, unknown>)['x-mcp-tools'] = mcpTools;
+  // Attach MCP tool documentation as a custom extension
+  const mcpTools = getMcpToolDocs();
+  (spec as Record<string, unknown>)['x-mcp-tools'] = mcpTools;
 
-    cachedSpec = spec;
-    return spec;
+  cachedSpec = spec;
+  return spec;
 }
 
 /**
  * Returns minimal HTML that loads Swagger UI from CDN.
  */
 export function getSwaggerUiHtml(specUrl: string): string {
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
     <title>corvid-agent API Docs</title>

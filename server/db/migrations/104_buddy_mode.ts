@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 104: Buddy mode — paired agent collaboration.
@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS buddy_pairings (
             id              TEXT PRIMARY KEY,
             agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -23,7 +23,7 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS buddy_sessions (
             id              TEXT PRIMARY KEY,
             work_task_id    TEXT REFERENCES work_tasks(id) ON DELETE SET NULL,
@@ -41,7 +41,7 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS buddy_messages (
             id                TEXT PRIMARY KEY,
             buddy_session_id  TEXT NOT NULL REFERENCES buddy_sessions(id) ON DELETE CASCADE,
@@ -53,17 +53,17 @@ export function up(db: Database): void {
         )
     `);
 
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_pairings_agent ON buddy_pairings(agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_pairings_buddy ON buddy_pairings(buddy_agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_lead ON buddy_sessions(lead_agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_buddy ON buddy_sessions(buddy_agent_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_work_task ON buddy_sessions(work_task_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_status ON buddy_sessions(status)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_messages_session ON buddy_messages(buddy_session_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_pairings_agent ON buddy_pairings(agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_pairings_buddy ON buddy_pairings(buddy_agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_lead ON buddy_sessions(lead_agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_buddy ON buddy_sessions(buddy_agent_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_work_task ON buddy_sessions(work_task_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_sessions_status ON buddy_sessions(status)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_buddy_messages_session ON buddy_messages(buddy_session_id)`);
 }
 
 export function down(db: Database): void {
-    db.exec('DROP TABLE IF EXISTS buddy_messages');
-    db.exec('DROP TABLE IF EXISTS buddy_sessions');
-    db.exec('DROP TABLE IF EXISTS buddy_pairings');
+  db.exec('DROP TABLE IF EXISTS buddy_messages');
+  db.exec('DROP TABLE IF EXISTS buddy_sessions');
+  db.exec('DROP TABLE IF EXISTS buddy_pairings');
 }

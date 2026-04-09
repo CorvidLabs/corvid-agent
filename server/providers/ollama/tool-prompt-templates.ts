@@ -12,41 +12,57 @@
  * 4. Response routing — when NOT to use corvid_send_message
  */
 
-import type { JsonSchemaObject } from '../types';
 import type { Project } from '../../../shared/types';
+import type { JsonSchemaObject } from '../types';
 
-export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'minimax' | 'glm' | 'kimi' | 'devstral' | 'gemini' | 'unknown';
+export type ModelFamily =
+  | 'llama'
+  | 'qwen2'
+  | 'qwen3'
+  | 'mistral'
+  | 'command-r'
+  | 'hermes'
+  | 'nemotron'
+  | 'phi'
+  | 'gemma'
+  | 'deepseek'
+  | 'minimax'
+  | 'glm'
+  | 'kimi'
+  | 'devstral'
+  | 'gemini'
+  | 'unknown';
 
 /**
  * Detect model family from a model name string.
  * Matches against known patterns in priority order.
  */
 export function detectModelFamily(modelName: string): ModelFamily {
-    const lower = modelName.toLowerCase();
+  const lower = modelName.toLowerCase();
 
-    if (lower.includes('qwen3') || lower.includes('qwen-3')) return 'qwen3';
-    if (lower.includes('qwen2') || lower.includes('qwen-2') || lower.includes('qwen')) return 'qwen2';
-    if (lower.includes('llama')) return 'llama';
-    if (lower.includes('mistral') || lower.includes('mixtral')) return 'mistral';
-    if (lower.includes('command-r') || lower.includes('command_r')) return 'command-r';
-    if (lower.includes('hermes')) return 'hermes';
-    if (lower.includes('nemotron')) return 'nemotron';
-    if (lower.includes('phi')) return 'phi';
-    if (lower.includes('gemma')) return 'gemma';
-    if (lower.includes('deepseek')) return 'deepseek';
-    if (lower.includes('minimax')) return 'minimax';
-    if (lower.includes('glm')) return 'glm';
-    if (lower.includes('kimi')) return 'kimi';
-    if (lower.includes('devstral')) return 'devstral';
-    if (lower.includes('gemini')) return 'gemini';
+  if (lower.includes('qwen3') || lower.includes('qwen-3')) return 'qwen3';
+  if (lower.includes('qwen2') || lower.includes('qwen-2') || lower.includes('qwen')) return 'qwen2';
+  if (lower.includes('llama')) return 'llama';
+  if (lower.includes('mistral') || lower.includes('mixtral')) return 'mistral';
+  if (lower.includes('command-r') || lower.includes('command_r')) return 'command-r';
+  if (lower.includes('hermes')) return 'hermes';
+  if (lower.includes('nemotron')) return 'nemotron';
+  if (lower.includes('phi')) return 'phi';
+  if (lower.includes('gemma')) return 'gemma';
+  if (lower.includes('deepseek')) return 'deepseek';
+  if (lower.includes('minimax')) return 'minimax';
+  if (lower.includes('glm')) return 'glm';
+  if (lower.includes('kimi')) return 'kimi';
+  if (lower.includes('devstral')) return 'devstral';
+  if (lower.includes('gemini')) return 'gemini';
 
-    return 'unknown';
+  return 'unknown';
 }
 
 interface ToolSchema {
-    name: string;
-    description: string;
-    parameters: JsonSchemaObject;
+  name: string;
+  description: string;
+  parameters: JsonSchemaObject;
 }
 
 /**
@@ -56,52 +72,46 @@ interface ToolSchema {
  * For text-based tool families (e.g., qwen3), includes full parameter schemas
  * so the model outputs correct argument names.
  */
-export function getToolInstructionPrompt(
-    family: ModelFamily,
-    toolNames: string[],
-    toolDefs?: ToolSchema[],
-): string {
-    const parts: string[] = [];
+export function getToolInstructionPrompt(family: ModelFamily, toolNames: string[], toolDefs?: ToolSchema[]): string {
+  const parts: string[] = [];
 
-    // Common instructions for all model families
-    parts.push(getCommonToolInstructions(toolNames));
+  // Common instructions for all model families
+  parts.push(getCommonToolInstructions(toolNames));
 
-    // For text-based tool families, include full tool schemas
-    // so the model knows exact parameter names
-    if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
-        parts.push(formatToolSchemas(toolDefs));
-    }
+  // For text-based tool families, include full tool schemas
+  // so the model knows exact parameter names
+  if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
+    parts.push(formatToolSchemas(toolDefs));
+  }
 
-    // Family-specific guidance
-    const familyPrompt = getFamilySpecificPrompt(family, toolNames);
-    if (familyPrompt) {
-        parts.push(familyPrompt);
-    }
+  // Family-specific guidance
+  const familyPrompt = getFamilySpecificPrompt(family, toolNames);
+  if (familyPrompt) {
+    parts.push(familyPrompt);
+  }
 
-    return parts.join('\n\n');
+  return parts.join('\n\n');
 }
 
 /** Families that use text-based tool calling and need full schemas in prompt. */
-const TEXT_BASED_FAMILIES = new Set<ModelFamily>([
-    'qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron',
-]);
+const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['qwen3', 'kimi', 'minimax', 'gemini', 'glm', 'devstral', 'nemotron']);
 
 /** Format tool definitions as a compact reference for the system prompt. */
 function formatToolSchemas(toolDefs: ToolSchema[]): string {
-    const lines = ['### Tool Schemas', 'Use EXACTLY these parameter names when calling tools:'];
-    for (const tool of toolDefs) {
-        const props = tool.parameters.properties ?? {};
-        const required = tool.parameters.required ?? [];
-        const params = Object.entries(props).map(([name, schema]) => {
-            const req = required.includes(name) ? ' (required)' : '';
-            return `  - ${name}: ${schema.type ?? 'string'}${req} — ${schema.description ?? ''}`;
-        });
-        lines.push(`\n**${tool.name}**: ${tool.description}`);
-        if (params.length > 0) {
-            lines.push(params.join('\n'));
-        }
+  const lines = ['### Tool Schemas', 'Use EXACTLY these parameter names when calling tools:'];
+  for (const tool of toolDefs) {
+    const props = tool.parameters.properties ?? {};
+    const required = tool.parameters.required ?? [];
+    const params = Object.entries(props).map(([name, schema]) => {
+      const req = required.includes(name) ? ' (required)' : '';
+      return `  - ${name}: ${schema.type ?? 'string'}${req} — ${schema.description ?? ''}`;
+    });
+    lines.push(`\n**${tool.name}**: ${tool.description}`);
+    if (params.length > 0) {
+      lines.push(params.join('\n'));
     }
-    return lines.join('\n');
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -110,16 +120,14 @@ function formatToolSchemas(toolDefs: ToolSchema[]): string {
  * the worked examples and verbose guidance to reduce prompt tokens.
  */
 export function getCompactToolInstructionPrompt(
-    family: ModelFamily,
-    toolNames: string[],
-    toolDefs?: ToolSchema[],
+  family: ModelFamily,
+  toolNames: string[],
+  toolDefs?: ToolSchema[],
 ): string {
-    const parts: string[] = [];
-    const toolList = toolNames.length > 0
-        ? `Available tools: ${toolNames.join(', ')}`
-        : '';
+  const parts: string[] = [];
+  const toolList = toolNames.length > 0 ? `Available tools: ${toolNames.join(', ')}` : '';
 
-    parts.push(`## Tool Usage
+  parts.push(`## Tool Usage
 ${toolList}
 
 Rules:
@@ -130,20 +138,20 @@ Rules:
 5. Only use tools from the available list — do NOT invent tool names.
 6. NEVER write scripts to send messages — only use MCP tools.`);
 
-    // Text-based families need schemas and JSON format example
-    if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
-        parts.push(formatToolSchemas(toolDefs));
-    }
+  // Text-based families need schemas and JSON format example
+  if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
+    parts.push(formatToolSchemas(toolDefs));
+  }
 
-    // Minimal format guidance for text-based families
-    if (TEXT_BASED_FAMILIES.has(family)) {
-        const exampleTool = toolNames[0] ?? 'tool_name';
-        parts.push(`To call a tool, output ONLY a JSON array:
+  // Minimal format guidance for text-based families
+  if (TEXT_BASED_FAMILIES.has(family)) {
+    const exampleTool = toolNames[0] ?? 'tool_name';
+    parts.push(`To call a tool, output ONLY a JSON array:
 [{"name": "${exampleTool}", "arguments": {"path": "server/"}}]
 No code blocks, no surrounding text.`);
-    }
+  }
 
-    return parts.join('\n\n');
+  return parts.join('\n\n');
 }
 
 /**
@@ -151,7 +159,7 @@ No code blocks, no surrounding text.`);
  * These preserve the essential rules while cutting prompt length.
  */
 export function getCompactResponseRoutingPrompt(): string {
-    return `## Response Routing
+  return `## Response Routing
 Reply with text directly — do NOT use corvid_send_message to reply to the sender.
 Do NOT use corvid_save_memory to store your reply — write it as plain text output.
 Use corvid_send_message ONLY to reach a DIFFERENT agent proactively.
@@ -160,7 +168,7 @@ Respond in first person as yourself. Do NOT narrate in third person or describe 
 }
 
 export function getCompactCodingToolPrompt(): string {
-    return `## Coding Tools
+  return `## Coding Tools
 Read files before editing. Use edit_file for targeted changes, write_file for new files. Verify changes after.`;
 }
 
@@ -169,7 +177,7 @@ Read files before editing. Use edit_file for targeted changes, write_file for ne
  * corvid_send_message vs. simply replying with text.
  */
 export function getResponseRoutingPrompt(): string {
-    return `## Response Routing
+  return `## Response Routing
 
 IMPORTANT: When someone sends you a message and you need to reply, just respond with text directly. Do NOT wrap your response in a corvid_send_message tool call back to the sender.
 
@@ -197,7 +205,7 @@ Respond in first person as yourself. Do NOT narrate in third person or describe 
  * coding tools (read_file, write_file, etc.) are available.
  */
 export function getCodingToolPrompt(): string {
-    return `## Coding Tool Guidelines
+  return `## Coding Tool Guidelines
 1. Before editing a file, always read it first with read_file.
 2. Use list_files to see directory contents and search_files to find code by keyword.
 3. Use edit_file for targeted changes (string replacement). Use write_file for new files or complete rewrites.
@@ -213,10 +221,10 @@ export function getCodingToolPrompt(): string {
  * if set, otherwise omits org-specific details.
  */
 export function getCodebaseContextPrompt(): string {
-    const owner = process.env.GITHUB_OWNER;
-    const ownerLine = owner ? `\n- **GitHub owner**: ${owner}` : '';
+  const owner = process.env.GITHUB_OWNER;
+  const ownerLine = owner ? `\n- **GitHub owner**: ${owner}` : '';
 
-    return `## Codebase Context
+  return `## Codebase Context
 
 This is a multi-agent AI platform built with TypeScript and Bun.
 
@@ -252,7 +260,7 @@ This is a multi-agent AI platform built with TypeScript and Bun.
  * append this to every tool-bearing prompt to enforce the messaging safety invariant.
  */
 export function getMessagingSafetyPrompt(): string {
-    return `## Messaging Safety
+  return `## Messaging Safety
 
 You must ONLY use your provided MCP tools to send messages or communicate through external channels. Specifically:
 
@@ -268,7 +276,7 @@ You must ONLY use your provided MCP tools to send messages or communicate throug
  * to only interact with its own branch.
  */
 export function getWorktreeIsolationPrompt(): string {
-    return `## Git Branch Isolation
+  return `## Git Branch Isolation
 
 You are running in an isolated git worktree with your own dedicated branch. To prevent cross-session contamination:
 
@@ -291,45 +299,43 @@ You are running in an isolated git worktree with your own dedicated branch. To p
  * See: https://github.com/CorvidLabs/corvid-agent/issues/1628
  */
 export function getProjectContextPrompt(project: Project): string {
-    const lines: string[] = [
-        '## Active Project Context',
-        '',
-        `You are working on project **${project.name}** in directory \`${project.workingDir}\`.`,
-    ];
+  const lines: string[] = [
+    '## Active Project Context',
+    '',
+    `You are working on project **${project.name}** in directory \`${project.workingDir}\`.`,
+  ];
 
-    if (project.gitUrl) {
-        lines.push(`Git remote: \`${project.gitUrl}\``);
+  if (project.gitUrl) {
+    lines.push(`Git remote: \`${project.gitUrl}\``);
 
-        // Extract GitHub owner/repo slug so the agent can use it directly
-        const githubMatch = project.gitUrl.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
-        if (githubMatch) {
-            lines.push(`GitHub repo: \`${githubMatch[1]}\``);
-        }
+    // Extract GitHub owner/repo slug so the agent can use it directly
+    const githubMatch = project.gitUrl.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (githubMatch) {
+      lines.push(`GitHub repo: \`${githubMatch[1]}\``);
     }
+  }
 
-    lines.push(
-        '',
-        'When performing GitHub or git operations (listing issues, PRs, merging, reviewing, etc.), always use **this project** — not corvid-agent or any other repository.',
-        'Do NOT default to a different repo because it happens to be your home project.',
-    );
+  lines.push(
+    '',
+    'When performing GitHub or git operations (listing issues, PRs, merging, reviewing, etc.), always use **this project** — not corvid-agent or any other repository.',
+    'Do NOT default to a different repo because it happens to be your home project.',
+  );
 
-    return lines.join('\n');
+  return lines.join('\n');
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────
 
 function getCommonToolInstructions(toolNames: string[]): string {
-    const toolList = toolNames.length > 0
-        ? `Available tools: ${toolNames.join(', ')}`
-        : '';
+  const toolList = toolNames.length > 0 ? `Available tools: ${toolNames.join(', ')}` : '';
 
-    // Build a worked example using actual available tools
-    const hasListFiles = toolNames.includes('list_files');
-    const hasReadFile = toolNames.includes('read_file');
-    const hasRunCommand = toolNames.includes('run_command');
-    const workedExample = buildWorkedExample(hasListFiles, hasReadFile, hasRunCommand);
+  // Build a worked example using actual available tools
+  const hasListFiles = toolNames.includes('list_files');
+  const hasReadFile = toolNames.includes('read_file');
+  const hasRunCommand = toolNames.includes('run_command');
+  const workedExample = buildWorkedExample(hasListFiles, hasReadFile, hasRunCommand);
 
-    return `## Tool Usage Instructions
+  return `## Tool Usage Instructions
 
 ${toolList}
 
@@ -357,8 +363,8 @@ The key pattern: TOOL CALL → receive result → evaluate → NEXT TOOL CALL �
  * This gives models concrete demonstrations rather than abstract rules.
  */
 function buildWorkedExample(hasListFiles: boolean, hasReadFile: boolean, hasRunCommand: boolean): string {
-    if (hasListFiles && hasReadFile) {
-        return `**Task**: "What does the server entry point do?"
+  if (hasListFiles && hasReadFile) {
+    return `**Task**: "What does the server entry point do?"
 
 **Step 1** — You call: list_files with path "server/"
 **Result** — You receive a file listing showing index.ts, routes/, db/, etc.
@@ -367,17 +373,17 @@ function buildWorkedExample(hasListFiles: boolean, hasReadFile: boolean, hasRunC
 **Step 3** — You respond with plain text: "The server entry point in server/index.ts sets up the HTTP server, registers routes, and initializes the database connection."
 
 Notice: NO narration between steps. NO "Let me read the file" or "I'll check this". Just tool call → result → next action → final answer.`;
-    }
-    if (hasRunCommand) {
-        return `**Task**: "Check if there are any TypeScript errors"
+  }
+  if (hasRunCommand) {
+    return `**Task**: "Check if there are any TypeScript errors"
 
 **Step 1** — You call: run_command with command "bun x tsc --noEmit"
 **Result** — You receive compiler output showing 2 errors in server/routes/api.ts
 **Step 2** — You respond with plain text: "There are 2 TypeScript errors in server/routes/api.ts: [describe errors]"
 
 Notice: NO narration between steps. Just tool call → result → final answer.`;
-    }
-    return `**Task**: "What tools do I have?"
+  }
+  return `**Task**: "What tools do I have?"
 
 **Step 1** — You respond with plain text listing the available tools and what they do.
 
@@ -385,14 +391,14 @@ For multi-step tasks: call a tool → receive result → evaluate → call next 
 }
 
 function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []): string | null {
-    // Build dynamic few-shot examples using actual available tools
-    const hasListFiles = toolNames.includes('list_files');
-    const hasReadFile = toolNames.includes('read_file');
-    const hasSearchFiles = toolNames.includes('search_files');
-    const exampleTool = toolNames[0] ?? 'tool_name';
+  // Build dynamic few-shot examples using actual available tools
+  const hasListFiles = toolNames.includes('list_files');
+  const hasReadFile = toolNames.includes('read_file');
+  const hasSearchFiles = toolNames.includes('search_files');
+  const exampleTool = toolNames[0] ?? 'tool_name';
 
-    // Text-based families need explicit JSON format examples
-    const textBasedExample = (toolName: string) => `
+  // Text-based families need explicit JSON format examples
+  const textBasedExample = (toolName: string) => `
 **Correct tool call format** (output ONLY this, no other text):
 [{"name": "${toolName}", "arguments": {"path": "server/"}}]
 
@@ -401,8 +407,10 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
 - Let me check the files: [{"name": "${toolName}", ...}] ← NO surrounding text
 - I'll use the ${toolName} tool to... ← NO narration, just the JSON`;
 
-    // Multi-step example for text-based families
-    const textBasedMultiStep = hasListFiles && hasReadFile ? `
+  // Multi-step example for text-based families
+  const textBasedMultiStep =
+    hasListFiles && hasReadFile
+      ? `
 **Example multi-step interaction:**
 
 Turn 1 — You output:
@@ -414,11 +422,12 @@ Turn 2 — System provides result. You see index.ts in the listing. You output:
 Turn 3 — System provides file contents. You now have enough info. You output:
 "The server entry point initializes the HTTP server and database connection."
 
-Key: Each turn is EITHER a tool call OR text. Never both.` : '';
+Key: Each turn is EITHER a tool call OR text. Never both.`
+      : '';
 
-    switch (family) {
-        case 'llama':
-            return `### Llama-specific guidance
+  switch (family) {
+    case 'llama':
+      return `### Llama-specific guidance
 - You have native tool calling support. Use the tool call format provided by the system.
 - CRITICAL: After receiving a tool result, you MUST continue working. Evaluate the result and immediately make the next tool call. Do NOT stop after one tool call.
 - Do NOT narrate what you are about to do. Do NOT describe your plan. Just make the tool call directly.
@@ -428,16 +437,16 @@ Key: Each turn is EITHER a tool call OR text. Never both.` : '';
 - If the task involves creating a PR or making changes, you must actually use the tools to do it — do not just describe what you would do.
 - Common mistake: stopping after the first tool call and summarizing. Do NOT do this — keep calling tools until the task is done.`;
 
-        case 'qwen2':
-            return `### Qwen-specific guidance
+    case 'qwen2':
+      return `### Qwen-specific guidance
 - Use the structured tool call format. Do not embed tool calls within markdown code blocks.
 - When chaining multiple operations, process each tool result and immediately proceed to the next step.
 - Do NOT narrate or explain between tool calls. Just call the next tool.
 - Provide your final answer as plain text only after all tool operations are complete.
 - Common mistake: wrapping tool calls in \`\`\`json blocks or adding explanatory text. Do NOT do this.`;
 
-        case 'qwen3':
-            return `### Qwen3 Tool Calling Format
+    case 'qwen3':
+      return `### Qwen3 Tool Calling Format
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 
 **Critical rules:**
@@ -452,30 +461,30 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'mistral':
-            return `### Mistral-specific guidance
+    case 'mistral':
+      return `### Mistral-specific guidance
 - You support function calling natively. Use the tool call mechanism directly.
 - CRITICAL: After each tool result, immediately continue to the next tool call. Do NOT stop to explain.
 - For multi-step tasks, continue making tool calls until all steps are complete.
 - Do NOT narrate your plan. Do NOT describe what you're about to do. Just call the tool.
 - Keep your final text response concise and focused on the result.`;
 
-        case 'command-r':
-            return `### Command-R specific guidance
+    case 'command-r':
+      return `### Command-R specific guidance
 - Use the provided tool definitions for function calling.
 - When multiple tool calls are needed, execute them sequentially, processing each result before proceeding.
 - Do NOT stop after one tool call if the task requires more investigation.
 - Respond with a clear, direct answer after all tool operations complete.`;
 
-        case 'hermes':
-            return `### Hermes-specific guidance
+    case 'hermes':
+      return `### Hermes-specific guidance
 - Use the tool calling format as provided. Do NOT wrap tool calls in XML or custom tags.
 - Do NOT output <tool_call> or similar XML tags — use the native function calling format.
 - Complete all steps of a multi-step task before providing your final response.
 - Common mistake: embedding tool calls in XML tags. The system handles tool routing — just output the call.`;
 
-        case 'nemotron':
-            return `### Nemotron-specific guidance
+    case 'nemotron':
+      return `### Nemotron-specific guidance
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 
 **Critical rules:**
@@ -487,8 +496,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Provide concise final responses after tool operations complete.
 ${textBasedMultiStep}`;
 
-        case 'phi':
-            return `### Phi-specific guidance
+    case 'phi':
+      return `### Phi-specific guidance
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 
 - Use the exact tool names from the available tools list. Do not invent tool names.
@@ -496,8 +505,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Do not narrate your actions. Either call a tool OR provide your final text answer.
 - Provide your final answer as plain text only after all tool operations are complete.`;
 
-        case 'gemma':
-            return `### Gemma-specific guidance
+    case 'gemma':
+      return `### Gemma-specific guidance
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 
 - Use the exact tool names from the available tools list. Do not invent tool names.
@@ -505,8 +514,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
 - Provide your final answer as plain text only after all tool operations are complete.`;
 
-        case 'deepseek':
-            return `### DeepSeek-specific guidance
+    case 'deepseek':
+      return `### DeepSeek-specific guidance
 ${textBasedExample(hasSearchFiles ? 'search_files' : exampleTool)}
 
 - Use the exact tool names from the available tools list. Do not invent tool names.
@@ -516,8 +525,8 @@ ${textBasedExample(hasSearchFiles ? 'search_files' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'minimax':
-            return `### MiniMax-specific guidance
+    case 'minimax':
+      return `### MiniMax-specific guidance
 You are MiniMax M2.5, a large cloud-hosted model with strong reasoning capabilities.
 
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
@@ -531,8 +540,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'glm':
-            return `### GLM-specific guidance
+    case 'glm':
+      return `### GLM-specific guidance
 You are GLM-5, a large cloud-hosted model from Zhipu AI.
 
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
@@ -545,8 +554,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'kimi':
-            return `### Kimi-specific guidance
+    case 'kimi':
+      return `### Kimi-specific guidance
 You are Kimi K2.5, a large cloud-hosted model from Moonshot AI with strong reasoning.
 
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
@@ -560,8 +569,8 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'devstral':
-            return `### Devstral-specific guidance
+    case 'devstral':
+      return `### Devstral-specific guidance
 You are Devstral, a coding-focused cloud model from Mistral AI optimized for software engineering.
 
 ${textBasedExample(hasReadFile ? 'read_file' : exampleTool)}
@@ -575,8 +584,8 @@ ${textBasedExample(hasReadFile ? 'read_file' : exampleTool)}
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
 
-        case 'gemini':
-            return `### Gemini-specific guidance
+    case 'gemini':
+      return `### Gemini-specific guidance
 You are a Gemini model from Google with strong multimodal and reasoning capabilities.
 
 ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
@@ -588,9 +597,7 @@ ${textBasedExample(hasListFiles ? 'list_files' : exampleTool)}
 - Call one tool at a time and wait for its result before calling the next.
 - Provide your final answer as plain text only after all tool operations are complete.
 ${textBasedMultiStep}`;
-
-        case 'unknown':
-        default:
-            return null;
-    }
+    default:
+      return null;
+  }
 }

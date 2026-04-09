@@ -12,7 +12,9 @@ let wsRetryDelay = 1000;
 function updateClock() {
   const now = new Date();
   const el = document.getElementById('clock');
-  const str = now.toLocaleTimeString('en-US', { hour12: false }) + ' ' +
+  const str =
+    now.toLocaleTimeString('en-US', { hour12: false }) +
+    ' ' +
     now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   el.textContent = str;
   el.setAttribute('datetime', now.toISOString());
@@ -24,7 +26,7 @@ updateClock();
 function normalizeTime(t) {
   if (!t) return new Date().toISOString();
   const s = String(t);
-  return s.endsWith('Z') || s.includes('+') ? s : s.replace(' ', 'T') + 'Z';
+  return s.endsWith('Z') || s.includes('+') ? s : `${s.replace(' ', 'T')}Z`;
 }
 
 function addFeedEntry(type, msg, time) {
@@ -38,7 +40,7 @@ function addFeedEntry(type, msg, time) {
 function renderFeed() {
   const feed = document.getElementById('feed');
   const sorted = feedEntries
-    .filter(e => activeFilter === 'all' || e.type === activeFilter)
+    .filter((e) => activeFilter === 'all' || e.type === activeFilter)
     .sort((a, b) => new Date(b.time) - new Date(a.time));
   feed.innerHTML = '';
   for (const entry of sorted) {
@@ -46,7 +48,12 @@ function renderFeed() {
     el.className = 'feed-entry';
     el.setAttribute('role', 'listitem');
     const t = new Date(entry.time);
-    const timeStr = t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const timeStr = t.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
     el.innerHTML =
       `<time class="feed-time" datetime="${escapeAttr(entry.time)}">${timeStr}</time>` +
       `<span class="feed-type" data-category="${escapeAttr(entry.type)}">${escapeHtml(entry.type)}</span>` +
@@ -63,11 +70,11 @@ function clearFeed() {
 }
 
 function exportFeed() {
-  const text = feedEntries.map(e => `${e.time}\t${e.type}\t${e.msg}`).join('\n');
+  const text = feedEntries.map((e) => `${e.time}\t${e.type}\t${e.msg}`).join('\n');
   const blob = new Blob([text], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `corvid-monitor-${new Date().toISOString().slice(0,16)}.log`;
+  a.download = `corvid-monitor-${new Date().toISOString().slice(0, 16)}.log`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -94,7 +101,10 @@ const filterGroup = document.querySelector('.filters[role="radiogroup"]');
 const filterRadios = Array.from(filterGroup.querySelectorAll('[role="radio"]'));
 
 function activateFilter(radio) {
-  filterRadios.forEach(r => { r.setAttribute('aria-checked', 'false'); r.tabIndex = -1; });
+  filterRadios.forEach((r) => {
+    r.setAttribute('aria-checked', 'false');
+    r.tabIndex = -1;
+  });
   radio.setAttribute('aria-checked', 'true');
   radio.tabIndex = 0;
   radio.focus();
@@ -102,10 +112,10 @@ function activateFilter(radio) {
   renderFeed();
 }
 
-filterRadios.forEach(radio => {
+filterRadios.forEach((radio) => {
   radio.addEventListener('click', () => activateFilter(radio));
   radio.addEventListener('keydown', (e) => {
-    let idx = filterRadios.indexOf(radio);
+    const idx = filterRadios.indexOf(radio);
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       activateFilter(filterRadios[(idx + 1) % filterRadios.length]);
@@ -160,8 +170,10 @@ async function pollDashboard() {
 
     document.getElementById('m-agents').textContent = data.agents?.total ?? '-';
     document.getElementById('m-active').textContent = data.sessions?.active ?? 0;
-    document.getElementById('m-sessions').textContent =
-      Object.values(data.sessions?.byStatus || {}).reduce((a, b) => a + b, 0);
+    document.getElementById('m-sessions').textContent = Object.values(data.sessions?.byStatus || {}).reduce(
+      (a, b) => a + b,
+      0,
+    );
     document.getElementById('m-tasks').textContent = data.workTasks?.total ?? '-';
 
     if (data.recentActivity) {
@@ -172,7 +184,7 @@ async function pollDashboard() {
         if (!seenAudit.has(key)) {
           seenAudit.add(key);
           const type = a.action?.includes('fail') || a.action?.includes('error') ? 'error' : 'audit';
-          addFeedEntry(type, `[${a.action}] ${a.detail || ''} (${a.actor?.slice(0,8) || 'system'})`, a.timestamp);
+          addFeedEntry(type, `[${a.action}] ${a.detail || ''} (${a.actor?.slice(0, 8) || 'system'})`, a.timestamp);
         }
       }
     }
@@ -180,7 +192,7 @@ async function pollDashboard() {
 }
 
 // ── Sessions ──────────────────────────────────────────────
-let prevSessionStatuses = {};
+const prevSessionStatuses = {};
 async function pollSessions() {
   try {
     const res = await fetch(`${API}/api/sessions`);
@@ -198,18 +210,18 @@ async function pollSessions() {
       const name = escapeHtml(s.name || s.id.slice(0, 8));
       el.innerHTML =
         `<div class="session-name">` +
-          `<span class="status-badge" data-status="${escapeAttr(s.status)}" aria-label="Status: ${escapeAttr(s.status)}">${escapeHtml(s.status)}</span> ` +
-          `${name}` +
+        `<span class="status-badge" data-status="${escapeAttr(s.status)}" aria-label="Status: ${escapeAttr(s.status)}">${escapeHtml(s.status)}</span> ` +
+        `${name}` +
         `</div>` +
         `<div class="session-meta">` +
-          `<span>${s.totalTurns || 0} turns</span>` +
-          `<span>$${(s.totalCostUsd || 0).toFixed(2)}</span>` +
-          `<span>${timeAgo(s.updatedAt)}</span>` +
+        `<span>${s.totalTurns || 0} turns</span>` +
+        `<span>$${(s.totalCostUsd || 0).toFixed(2)}</span>` +
+        `<span>${timeAgo(s.updatedAt)}</span>` +
         `</div>`;
       list.appendChild(el);
 
       if (prevSessionStatuses[s.id] && prevSessionStatuses[s.id] !== s.status) {
-        addFeedEntry('session', `${s.name || s.id.slice(0,8)}: ${prevSessionStatuses[s.id]} -> ${s.status}`);
+        addFeedEntry('session', `${s.name || s.id.slice(0, 8)}: ${prevSessionStatuses[s.id]} -> ${s.status}`);
       }
       prevSessionStatuses[s.id] = s.status;
     }
@@ -217,7 +229,7 @@ async function pollSessions() {
 }
 
 // ── Schedule Executions ───────────────────────────────────
-let seenExecs = new Set();
+const seenExecs = new Set();
 async function pollExecutions() {
   try {
     const res = await fetch(`${API}/api/schedule-executions`);
@@ -235,12 +247,12 @@ async function pollExecutions() {
       const name = escapeHtml(snap.name || e.actionType);
       el.innerHTML =
         `<div class="exec-name">` +
-          `<span class="status-badge" data-status="${escapeAttr(e.status)}" aria-label="Status: ${escapeAttr(e.status)}">${escapeHtml(e.status)}</span> ` +
-          `${name}` +
+        `<span class="status-badge" data-status="${escapeAttr(e.status)}" aria-label="Status: ${escapeAttr(e.status)}">${escapeHtml(e.status)}</span> ` +
+        `${name}` +
         `</div>` +
         `<div class="exec-meta">` +
-          `<span class="exec-cost" aria-label="Cost">$${(e.costUsd || 0).toFixed(2)}</span>` +
-          `<span>${timeAgo(e.startedAt)}</span>` +
+        `<span class="exec-cost" aria-label="Cost">$${(e.costUsd || 0).toFixed(2)}</span>` +
+        `<span>${timeAgo(e.startedAt)}</span>` +
         `</div>`;
       list.appendChild(el);
 
@@ -248,7 +260,11 @@ async function pollExecutions() {
         seenExecs.add(e.id);
         if (seenExecs.size > 1) {
           const feedType = e.status === 'failed' ? 'error' : 'schedule';
-          addFeedEntry(feedType, `[${e.actionType}] ${snap.name || e.actionType} — ${e.status} ($${(e.costUsd || 0).toFixed(2)})`, e.startedAt);
+          addFeedEntry(
+            feedType,
+            `[${e.actionType}] ${snap.name || e.actionType} — ${e.status} ($${(e.costUsd || 0).toFixed(2)})`,
+            e.startedAt,
+          );
         }
       }
     }
@@ -268,7 +284,12 @@ async function pollSchedulerHealth() {
 
 // ── WebSocket ─────────────────────────────────────────────
 function connectWS() {
-  try { ws = new WebSocket(WS_URL); } catch { scheduleReconnect(); return; }
+  try {
+    ws = new WebSocket(WS_URL);
+  } catch {
+    scheduleReconnect();
+    return;
+  }
 
   ws.onopen = () => {
     document.getElementById('ws-status').textContent = 'open';
@@ -277,7 +298,9 @@ function connectWS() {
   };
 
   ws.onmessage = (event) => {
-    try { handleWSMessage(JSON.parse(event.data)); } catch {}
+    try {
+      handleWSMessage(JSON.parse(event.data));
+    } catch {}
   };
 
   ws.onclose = () => {
@@ -291,7 +314,10 @@ function connectWS() {
 }
 
 function scheduleReconnect() {
-  setTimeout(() => { wsRetryDelay = Math.min(wsRetryDelay * 1.5, 30000); connectWS(); }, wsRetryDelay);
+  setTimeout(() => {
+    wsRetryDelay = Math.min(wsRetryDelay * 1.5, 30000);
+    connectWS();
+  }, wsRetryDelay);
 }
 
 function handleWSMessage(msg) {
@@ -303,42 +329,54 @@ function handleWSMessage(msg) {
       if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'pong' }));
       break;
     case 'session_event':
-      addFeedEntry('session', `[${msg.sessionId?.slice(0,8)}] ${msg.event?.eventType || 'event'}: ${summarizeEvent(msg.event)}`);
+      addFeedEntry(
+        'session',
+        `[${msg.sessionId?.slice(0, 8)}] ${msg.event?.eventType || 'event'}: ${summarizeEvent(msg.event)}`,
+      );
       break;
     case 'session_status':
-      addFeedEntry('session', `[${msg.sessionId?.slice(0,8)}] status -> ${msg.status}`);
+      addFeedEntry('session', `[${msg.sessionId?.slice(0, 8)}] status -> ${msg.status}`);
       break;
     case 'schedule_update':
       addFeedEntry('schedule', `Schedule updated: ${msg.schedule?.name || 'unknown'}`);
       break;
     case 'schedule_execution_update':
-      addFeedEntry('schedule', `Execution ${msg.execution?.status}: ${msg.execution?.actionType || ''} ($${(msg.execution?.costUsd || 0).toFixed(2)})`);
+      addFeedEntry(
+        'schedule',
+        `Execution ${msg.execution?.status}: ${msg.execution?.actionType || ''} ($${(msg.execution?.costUsd || 0).toFixed(2)})`,
+      );
       break;
     case 'schedule_approval_request':
-      addFeedEntry('schedule', `Approval needed: ${msg.description || msg.actionType} [${msg.executionId?.slice(0,8)}]`);
+      addFeedEntry(
+        'schedule',
+        `Approval needed: ${msg.description || msg.actionType} [${msg.executionId?.slice(0, 8)}]`,
+      );
       break;
     case 'work_task_update':
-      addFeedEntry('session', `Work task ${msg.task?.status}: ${msg.task?.description?.slice(0,60) || ''}`);
+      addFeedEntry('session', `Work task ${msg.task?.status}: ${msg.task?.description?.slice(0, 60) || ''}`);
       break;
     case 'agent_notification': {
       const lvl = msg.level === 'error' ? 'error' : 'audit';
-      addFeedEntry(lvl, `[${msg.agentId?.slice(0,8)}] ${msg.title || ''}: ${msg.message}`);
+      addFeedEntry(lvl, `[${msg.agentId?.slice(0, 8)}] ${msg.title || ''}: ${msg.message}`);
       break;
     }
     case 'agent_question':
-      addFeedEntry('audit', `Question from ${msg.question?.agentId?.slice(0,8)}: ${msg.question?.question?.slice(0,80)}`);
+      addFeedEntry(
+        'audit',
+        `Question from ${msg.question?.agentId?.slice(0, 8)}: ${msg.question?.question?.slice(0, 80)}`,
+      );
       break;
     case 'algochat_message':
-      addFeedEntry('ws', `AlgoChat ${msg.direction}: ${msg.content?.slice(0,80)}`);
+      addFeedEntry('ws', `AlgoChat ${msg.direction}: ${msg.content?.slice(0, 80)}`);
       break;
     case 'council_stage_change':
-      addFeedEntry('session', `Council ${msg.launchId?.slice(0,8)} -> ${msg.stage}`);
+      addFeedEntry('session', `Council ${msg.launchId?.slice(0, 8)} -> ${msg.stage}`);
       break;
     case 'chat_stream':
-      if (msg.done) addFeedEntry('session', `Chat stream complete for ${msg.agentId?.slice(0,8)}`);
+      if (msg.done) addFeedEntry('session', `Chat stream complete for ${msg.agentId?.slice(0, 8)}`);
       break;
     case 'chat_tool_use':
-      addFeedEntry('session', `[${msg.agentId?.slice(0,8)}] tool: ${msg.toolName}`);
+      addFeedEntry('session', `[${msg.agentId?.slice(0, 8)}] tool: ${msg.toolName}`);
       break;
     case 'error':
       addFeedEntry('error', msg.message);
@@ -360,7 +398,7 @@ function summarizeEvent(event) {
 function timeAgo(iso) {
   if (!iso) return '-';
   // Server timestamps are UTC but may lack 'Z' suffix — normalize
-  const str = String(iso).endsWith('Z') ? iso : iso.replace(' ', 'T') + 'Z';
+  const str = String(iso).endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`;
   const diff = (Date.now() - new Date(str).getTime()) / 1000;
   if (diff < 0) return 'just now';
   if (diff < 60) return `${Math.floor(diff)}s ago`;

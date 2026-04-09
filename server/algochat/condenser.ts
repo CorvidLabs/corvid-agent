@@ -3,10 +3,10 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('Condenser');
 
 export interface CondensationResult {
-    content: string;
-    wasCondensed: boolean;
-    originalBytes: number;
-    condensedBytes: number;
+  content: string;
+  wasCondensed: boolean;
+  originalBytes: number;
+  condensedBytes: number;
 }
 
 /**
@@ -17,99 +17,97 @@ export interface CondensationResult {
  * On failure or if already within limits, returns the original content.
  */
 export async function condenseMessage(
-    content: string,
-    maxBytes: number = 800,
-    messageId?: string,
+  content: string,
+  maxBytes: number = 800,
+  messageId?: string,
 ): Promise<CondensationResult> {
-    const encoder = new TextEncoder();
-    const originalBytes = encoder.encode(content).byteLength;
+  const encoder = new TextEncoder();
+  const originalBytes = encoder.encode(content).byteLength;
 
-    if (originalBytes <= maxBytes) {
-        return { content, wasCondensed: false, originalBytes, condensedBytes: originalBytes };
-    }
+  if (originalBytes <= maxBytes) {
+    return { content, wasCondensed: false, originalBytes, condensedBytes: originalBytes };
+  }
 
-    // Build a reference suffix when we have a message ID so on-chain records
-    // can point back to the full content in the database.
-    const refSuffix = messageId
-        ? ` [full: ${originalBytes}B, id:${messageId.slice(0, 8)}]`
-        : '';
-    const refSuffixBytes = encoder.encode(refSuffix).byteLength;
-    // Reserve space for the reference suffix in the condensation target
-    const condenseTarget = maxBytes - refSuffixBytes;
+  // Build a reference suffix when we have a message ID so on-chain records
+  // can point back to the full content in the database.
+  const refSuffix = messageId ? ` [full: ${originalBytes}B, id:${messageId.slice(0, 8)}]` : '';
+  const refSuffixBytes = encoder.encode(refSuffix).byteLength;
+  // Reserve space for the reference suffix in the condensation target
+  const condenseTarget = maxBytes - refSuffixBytes;
 
-    // Try all registered providers (default first, then others) before truncating
-    const { LlmProviderRegistry } = await import('../providers/registry');
-    const registry = LlmProviderRegistry.getInstance();
-    const defaultProvider = registry.getDefault();
-    const allProviders = registry.getAll();
+  // Try all registered providers (default first, then others) before truncating
+  const { LlmProviderRegistry } = await import('../providers/registry');
+  const registry = LlmProviderRegistry.getInstance();
+  const defaultProvider = registry.getDefault();
+  const allProviders = registry.getAll();
 
-    // Build ordered provider list: default first, then remaining providers
-    const providers = defaultProvider
-        ? [defaultProvider, ...allProviders.filter((p) => p.type !== defaultProvider.type)]
-        : allProviders;
+  // Build ordered provider list: default first, then remaining providers
+  const providers = defaultProvider
+    ? [defaultProvider, ...allProviders.filter((p) => p.type !== defaultProvider.type)]
+    : allProviders;
 
-    for (const provider of providers) {
-        try {
-            const result = await provider.complete({
-                model: provider.getInfo().defaultModel,
-                systemPrompt: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
-                messages: [{ role: 'user', content }],
-                maxTokens: 1024,
-            });
+  for (const provider of providers) {
+    try {
+      const result = await provider.complete({
+        model: provider.getInfo().defaultModel,
+        systemPrompt: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
+        messages: [{ role: 'user', content }],
+        maxTokens: 1024,
+      });
 
-            const condensed = result.content;
-            const condensedBytes = encoder.encode(condensed).byteLength;
+      const condensed = result.content;
+      const condensedBytes = encoder.encode(condensed).byteLength;
 
-            // If output still exceeds limit, truncate as last resort
-            if (condensedBytes > condenseTarget) {
-                const truncated = truncateToBytes(condensed, condenseTarget - 14) + '...';
-                const finalContent = `[condensed] ${truncated}${refSuffix}`;
-                const finalBytes = encoder.encode(finalContent).byteLength;
-                log.warn('Condensed output still too large, truncating', { provider: provider.type, condensedBytes, maxBytes });
-                return {
-                    content: finalContent,
-                    wasCondensed: true,
-                    originalBytes,
-                    condensedBytes: finalBytes,
-                };
-            }
+      // If output still exceeds limit, truncate as last resort
+      if (condensedBytes > condenseTarget) {
+        const truncated = `${truncateToBytes(condensed, condenseTarget - 14)}...`;
+        const finalContent = `[condensed] ${truncated}${refSuffix}`;
+        const finalBytes = encoder.encode(finalContent).byteLength;
+        log.warn('Condensed output still too large, truncating', { provider: provider.type, condensedBytes, maxBytes });
+        return {
+          content: finalContent,
+          wasCondensed: true,
+          originalBytes,
+          condensedBytes: finalBytes,
+        };
+      }
 
-            const finalContent = `[condensed] ${condensed}${refSuffix}`;
-            const finalBytes = encoder.encode(finalContent).byteLength;
-            log.info('Message condensed', { provider: provider.type, originalBytes, condensedBytes: finalBytes });
-            return {
-                content: finalContent,
-                wasCondensed: true,
-                originalBytes,
-                condensedBytes: finalBytes,
-            };
-        } catch (err) {
-            log.warn('Condensation failed with provider, trying next', {
-                provider: provider.type,
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
-    }
-
-    // All providers failed (or none registered) — fall back to truncation
-    log.error('All providers failed for condensation, truncating as fallback', {
-        providersAttempted: providers.map((p) => p.type),
-    });
-    const truncated = truncateToBytes(content, condenseTarget - 3) + '...';
-    const finalContent = truncated + refSuffix;
-    return {
+      const finalContent = `[condensed] ${condensed}${refSuffix}`;
+      const finalBytes = encoder.encode(finalContent).byteLength;
+      log.info('Message condensed', { provider: provider.type, originalBytes, condensedBytes: finalBytes });
+      return {
         content: finalContent,
         wasCondensed: true,
         originalBytes,
-        condensedBytes: encoder.encode(finalContent).byteLength,
-    };
+        condensedBytes: finalBytes,
+      };
+    } catch (err) {
+      log.warn('Condensation failed with provider, trying next', {
+        provider: provider.type,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // All providers failed (or none registered) — fall back to truncation
+  log.error('All providers failed for condensation, truncating as fallback', {
+    providersAttempted: providers.map((p) => p.type),
+  });
+  const truncated = `${truncateToBytes(content, condenseTarget - 3)}...`;
+  const finalContent = truncated + refSuffix;
+  return {
+    content: finalContent,
+    wasCondensed: true,
+    originalBytes,
+    condensedBytes: encoder.encode(finalContent).byteLength,
+  };
 }
 
 function truncateToBytes(str: string, maxBytes: number): string {
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-    const encoded = encoder.encode(str);
-    if (encoded.byteLength <= maxBytes) return str;
-    // Slice and decode, handling potential mid-codepoint truncation
-    return decoder.decode(encoded.slice(0, maxBytes));
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const encoded = encoder.encode(str);
+  if (encoded.byteLength <= maxBytes) return str;
+  // Slice and decode, handling potential mid-codepoint truncation
+  return decoder.decode(encoded.slice(0, maxBytes));
 }

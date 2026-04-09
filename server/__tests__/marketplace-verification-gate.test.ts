@@ -1,8 +1,9 @@
 /**
  * Tests for marketplace verification gate — listings require minimum tier.
  */
-import { test, expect, describe, beforeEach } from 'bun:test';
+
 import { Database } from 'bun:sqlite';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { runMigrations } from '../db/schema';
 import { MarketplaceService } from '../marketplace/service';
 import { IdentityVerification } from '../reputation/identity-verification';
@@ -12,10 +13,10 @@ import { IdentityVerification } from '../reputation/identity-verification';
 let db: Database;
 
 function setupDb(): Database {
-    const d = new Database(':memory:');
-    runMigrations(d);
+  const d = new Database(':memory:');
+  runMigrations(d);
 
-    d.exec(`
+  d.exec(`
         CREATE TABLE IF NOT EXISTS marketplace_listings (
             id TEXT PRIMARY KEY,
             agent_id TEXT NOT NULL,
@@ -36,7 +37,7 @@ function setupDb(): Database {
         )
     `);
 
-    d.exec(`
+  d.exec(`
         CREATE TABLE IF NOT EXISTS marketplace_reviews (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
@@ -48,7 +49,7 @@ function setupDb(): Database {
         )
     `);
 
-    d.exec(`
+  d.exec(`
         CREATE TABLE IF NOT EXISTS agent_identity (
             agent_id               TEXT PRIMARY KEY,
             tier                   TEXT NOT NULL DEFAULT 'UNVERIFIED',
@@ -58,140 +59,140 @@ function setupDb(): Database {
         )
     `);
 
-    return d;
+  return d;
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Marketplace Verification Gate', () => {
-    let svc: MarketplaceService;
-    let iv: IdentityVerification;
+  let svc: MarketplaceService;
+  let iv: IdentityVerification;
 
-    beforeEach(() => {
-        db = setupDb();
-        svc = new MarketplaceService(db); // Default min tier = GITHUB_VERIFIED
-        iv = new IdentityVerification(db);
+  beforeEach(() => {
+    db = setupDb();
+    svc = new MarketplaceService(db); // Default min tier = GITHUB_VERIFIED
+    iv = new IdentityVerification(db);
+  });
+
+  test('canPublish returns false for UNVERIFIED agent', () => {
+    const result = svc.canPublish('unverified-agent');
+    expect(result.allowed).toBe(false);
+    expect(result.tier).toBe('UNVERIFIED');
+    expect(result.required).toBe('GITHUB_VERIFIED');
+  });
+
+  test('canPublish returns true for GITHUB_VERIFIED agent', () => {
+    iv.setTier('verified-agent', 'GITHUB_VERIFIED');
+    const result = svc.canPublish('verified-agent');
+    expect(result.allowed).toBe(true);
+  });
+
+  test('canPublish returns true for higher tier', () => {
+    iv.setTier('established-agent', 'ESTABLISHED');
+    const result = svc.canPublish('established-agent');
+    expect(result.allowed).toBe(true);
+  });
+
+  test('UNVERIFIED agent can create draft but not publish', () => {
+    const listing = svc.createListing({
+      agentId: 'unverified-agent',
+      name: 'Test',
+      description: 'Desc',
+      category: 'coding',
+    });
+    expect(listing.status).toBe('draft');
+
+    // Try to publish — should be blocked by verification gate
+    expect(() => svc.updateListing(listing.id, { status: 'published' })).toThrow('Publishing blocked');
+
+    // Verify still in draft
+    const check = svc.getListing(listing.id);
+    expect(check!.status).toBe('draft');
+  });
+
+  test('GITHUB_VERIFIED agent can publish', () => {
+    iv.setTier('gh-agent', 'GITHUB_VERIFIED');
+
+    const listing = svc.createListing({
+      agentId: 'gh-agent',
+      name: 'Verified Code Review Agent',
+      description: 'Automated code review and analysis tool',
+      category: 'coding',
+      tags: ['code-review'],
     });
 
-    test('canPublish returns false for UNVERIFIED agent', () => {
-        const result = svc.canPublish('unverified-agent');
-        expect(result.allowed).toBe(false);
-        expect(result.tier).toBe('UNVERIFIED');
-        expect(result.required).toBe('GITHUB_VERIFIED');
+    const published = svc.updateListing(listing.id, { status: 'published' });
+    expect(published).not.toBeNull();
+    expect(published!.status).toBe('published');
+  });
+
+  test('getListingVerificationTier returns tier for listing', () => {
+    iv.setTier('gh-agent', 'GITHUB_VERIFIED');
+
+    const listing = svc.createListing({
+      agentId: 'gh-agent',
+      name: 'Test Verification Tier Agent',
+      description: 'A test agent for verification',
+      category: 'general',
+      tags: ['test'],
     });
 
-    test('canPublish returns true for GITHUB_VERIFIED agent', () => {
-        iv.setTier('verified-agent', 'GITHUB_VERIFIED');
-        const result = svc.canPublish('verified-agent');
-        expect(result.allowed).toBe(true);
+    const tier = svc.getListingVerificationTier(listing.id);
+    expect(tier).toBe('GITHUB_VERIFIED');
+  });
+
+  test('getListingVerificationTier returns null for unknown listing', () => {
+    expect(svc.getListingVerificationTier('nonexistent')).toBeNull();
+  });
+
+  test('custom min tier via constructor', () => {
+    // Allow UNVERIFIED to publish
+    const lenientSvc = new MarketplaceService(db, 'UNVERIFIED');
+    const listing = lenientSvc.createListing({
+      agentId: 'any-agent',
+      name: 'Open Listing For Everyone',
+      description: 'A general-purpose listing available to all',
+      category: 'general',
+      tags: ['open'],
     });
 
-    test('canPublish returns true for higher tier', () => {
-        iv.setTier('established-agent', 'ESTABLISHED');
-        const result = svc.canPublish('established-agent');
-        expect(result.allowed).toBe(true);
+    const published = lenientSvc.updateListing(listing.id, { status: 'published' });
+    expect(published).not.toBeNull();
+    expect(published!.status).toBe('published');
+  });
+
+  test('search with minVerificationTier filters results', () => {
+    // Create two agents: one verified, one not
+    iv.setTier('gh-agent', 'GITHUB_VERIFIED');
+
+    const l1 = svc.createListing({
+      agentId: 'gh-agent',
+      name: 'Verified Agent Listing One',
+      description: 'A verified listing for testing purposes',
+      category: 'coding',
+      tags: ['verified'],
     });
+    // Publish directly by setting verified tier
+    // Use a lenient service for setup
+    const setupSvc = new MarketplaceService(db, 'UNVERIFIED');
+    setupSvc.updateListing(l1.id, { status: 'published' });
 
-    test('UNVERIFIED agent can create draft but not publish', () => {
-        const listing = svc.createListing({
-            agentId: 'unverified-agent',
-            name: 'Test',
-            description: 'Desc',
-            category: 'coding',
-        });
-        expect(listing.status).toBe('draft');
-
-        // Try to publish — should be blocked by verification gate
-        expect(() => svc.updateListing(listing.id, { status: 'published' })).toThrow('Publishing blocked');
-
-        // Verify still in draft
-        const check = svc.getListing(listing.id);
-        expect(check!.status).toBe('draft');
+    const l2 = setupSvc.createListing({
+      agentId: 'no-verify',
+      name: 'Unverified Agent Listing',
+      description: 'An unverified listing for testing purposes',
+      category: 'coding',
+      tags: ['unverified'],
     });
+    setupSvc.updateListing(l2.id, { status: 'published' });
 
-    test('GITHUB_VERIFIED agent can publish', () => {
-        iv.setTier('gh-agent', 'GITHUB_VERIFIED');
+    // Search with tier filter
+    const filtered = svc.search({ minVerificationTier: 'GITHUB_VERIFIED' });
+    expect(filtered.total).toBe(1);
+    expect(filtered.listings[0].name).toBe('Verified Agent Listing One');
 
-        const listing = svc.createListing({
-            agentId: 'gh-agent',
-            name: 'Verified Code Review Agent',
-            description: 'Automated code review and analysis tool',
-            category: 'coding',
-            tags: ['code-review'],
-        });
-
-        const published = svc.updateListing(listing.id, { status: 'published' });
-        expect(published).not.toBeNull();
-        expect(published!.status).toBe('published');
-    });
-
-    test('getListingVerificationTier returns tier for listing', () => {
-        iv.setTier('gh-agent', 'GITHUB_VERIFIED');
-
-        const listing = svc.createListing({
-            agentId: 'gh-agent',
-            name: 'Test Verification Tier Agent',
-            description: 'A test agent for verification',
-            category: 'general',
-            tags: ['test'],
-        });
-
-        const tier = svc.getListingVerificationTier(listing.id);
-        expect(tier).toBe('GITHUB_VERIFIED');
-    });
-
-    test('getListingVerificationTier returns null for unknown listing', () => {
-        expect(svc.getListingVerificationTier('nonexistent')).toBeNull();
-    });
-
-    test('custom min tier via constructor', () => {
-        // Allow UNVERIFIED to publish
-        const lenientSvc = new MarketplaceService(db, 'UNVERIFIED');
-        const listing = lenientSvc.createListing({
-            agentId: 'any-agent',
-            name: 'Open Listing For Everyone',
-            description: 'A general-purpose listing available to all',
-            category: 'general',
-            tags: ['open'],
-        });
-
-        const published = lenientSvc.updateListing(listing.id, { status: 'published' });
-        expect(published).not.toBeNull();
-        expect(published!.status).toBe('published');
-    });
-
-    test('search with minVerificationTier filters results', () => {
-        // Create two agents: one verified, one not
-        iv.setTier('gh-agent', 'GITHUB_VERIFIED');
-
-        const l1 = svc.createListing({
-            agentId: 'gh-agent',
-            name: 'Verified Agent Listing One',
-            description: 'A verified listing for testing purposes',
-            category: 'coding',
-            tags: ['verified'],
-        });
-        // Publish directly by setting verified tier
-        // Use a lenient service for setup
-        const setupSvc = new MarketplaceService(db, 'UNVERIFIED');
-        setupSvc.updateListing(l1.id, { status: 'published' });
-
-        const l2 = setupSvc.createListing({
-            agentId: 'no-verify',
-            name: 'Unverified Agent Listing',
-            description: 'An unverified listing for testing purposes',
-            category: 'coding',
-            tags: ['unverified'],
-        });
-        setupSvc.updateListing(l2.id, { status: 'published' });
-
-        // Search with tier filter
-        const filtered = svc.search({ minVerificationTier: 'GITHUB_VERIFIED' });
-        expect(filtered.total).toBe(1);
-        expect(filtered.listings[0].name).toBe('Verified Agent Listing One');
-
-        // Search without filter returns both
-        const all = svc.search({});
-        expect(all.total).toBe(2);
-    });
+    // Search without filter returns both
+    const all = svc.search({});
+    expect(all.total).toBe(2);
+  });
 });

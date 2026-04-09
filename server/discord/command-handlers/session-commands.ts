@@ -85,7 +85,7 @@ export async function handleSessionCommand(
   }
 
   const allProjects = listProjects(ctx.db);
-  let project;
+  let project: (typeof allProjects)[number] | undefined;
   if (projectName) {
     project = allProjects.find((p) => p.name.toLowerCase() === projectName.toLowerCase());
     if (!project) {
@@ -232,7 +232,7 @@ export async function handleWorkCommand(
 
   // Resolve agent
   const allAgents = listAgents(ctx.db);
-  let workAgent;
+  let workAgent: (typeof allAgents)[number] | undefined;
   if (workAgentName) {
     // Strip model suffix like " (claude-opus-4-6)" if user typed the full display name
     const cleanWorkAgentName = workAgentName.split(' (')[0].trim();

@@ -1,9 +1,9 @@
 import type { Database } from 'bun:sqlite';
-import type { ProcessManager } from '../../process/manager';
-import type { DiscordBridgeConfig } from '../types';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
 import { createLogger } from '../../lib/logger';
-import type { ThreadSessionInfo, ThreadCallbackInfo } from '../thread-session-map';
+import type { ProcessManager } from '../../process/manager';
+import type { ThreadCallbackInfo, ThreadSessionInfo } from '../thread-session-map';
+import type { DiscordBridgeConfig } from '../types';
 import { subscribeForResponseWithEmbed } from './embed-response';
 
 const log = createLogger('DiscordThreadManager');
@@ -45,22 +45,23 @@ export function recoverActiveThreadSubscriptions(
       const threadId = row.name.replace('Discord thread:', '');
       if (!threadId || threadCallbacks.has(threadId)) continue;
 
-            if (!threadSessions.has(threadId)) {
-                const info = {
-                    sessionId: row.id,
-                    agentName: row.agent_name || 'Agent',
-                    agentModel: row.agent_model || 'unknown',
-                    ownerUserId: '',
-                    projectName: row.project_name || undefined,
-                    displayColor: row.display_color ?? undefined,
-                    displayIcon: row.display_icon ?? undefined,
-                    avatarUrl: row.avatar_url ?? undefined,
-                };
-                threadSessions.set(threadId, info);
-                // Persist to dedicated table for future fast recovery
-                const { saveThreadSession } = require('../../db/discord-thread-sessions') as typeof import('../../db/discord-thread-sessions');
-                saveThreadSession(db, threadId, info);
-            }
+      if (!threadSessions.has(threadId)) {
+        const info = {
+          sessionId: row.id,
+          agentName: row.agent_name || 'Agent',
+          agentModel: row.agent_model || 'unknown',
+          ownerUserId: '',
+          projectName: row.project_name || undefined,
+          displayColor: row.display_color ?? undefined,
+          displayIcon: row.display_icon ?? undefined,
+          avatarUrl: row.avatar_url ?? undefined,
+        };
+        threadSessions.set(threadId, info);
+        // Persist to dedicated table for future fast recovery
+        const { saveThreadSession } =
+          require('../../db/discord-thread-sessions') as typeof import('../../db/discord-thread-sessions');
+        saveThreadSession(db, threadId, info);
+      }
 
       subscribeForResponseWithEmbed(
         processManager,
@@ -129,31 +130,32 @@ export function recoverActiveMentionSessions(
  * are immediately available without lazy recovery.
  */
 export function recoverActiveThreadSessions(
-    db: Database,
-    threadSessions: Map<string, ThreadSessionInfo>,
-    threadLastActivity: Map<string, number>,
+  db: Database,
+  threadSessions: Map<string, ThreadSessionInfo>,
+  threadLastActivity: Map<string, number>,
 ): number {
-    try {
-        const { getRecentThreadSessions } = require('../../db/discord-thread-sessions') as typeof import('../../db/discord-thread-sessions');
-        const rows = getRecentThreadSessions(db, 48);
+  try {
+    const { getRecentThreadSessions } =
+      require('../../db/discord-thread-sessions') as typeof import('../../db/discord-thread-sessions');
+    const rows = getRecentThreadSessions(db, 48);
 
-        let recovered = 0;
-        for (const { threadId, info, lastActivityAt } of rows) {
-            if (!threadSessions.has(threadId)) {
-                threadSessions.set(threadId, info);
-                threadLastActivity.set(threadId, lastActivityAt);
-                recovered++;
-            }
-        }
-
-        if (recovered > 0) {
-            log.info('Recovered thread sessions from DB', { count: recovered });
-        }
-        return recovered;
-    } catch (err) {
-        log.warn('Failed to recover thread sessions', { error: err instanceof Error ? err.message : String(err) });
-        return 0;
+    let recovered = 0;
+    for (const { threadId, info, lastActivityAt } of rows) {
+      if (!threadSessions.has(threadId)) {
+        threadSessions.set(threadId, info);
+        threadLastActivity.set(threadId, lastActivityAt);
+        recovered++;
+      }
     }
+
+    if (recovered > 0) {
+      log.info('Recovered thread sessions from DB', { count: recovered });
+    }
+    return recovered;
+  } catch (err) {
+    log.warn('Failed to recover thread sessions', { error: err instanceof Error ? err.message : String(err) });
+    return 0;
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 /** Flock Directory agents, config, and automated testing. */
 
 export const tables: string[] = [
-    `CREATE TABLE IF NOT EXISTS flock_agents (
+  `CREATE TABLE IF NOT EXISTS flock_agents (
         id                     TEXT PRIMARY KEY,
         address                TEXT NOT NULL UNIQUE,
         name                   TEXT NOT NULL,
@@ -18,13 +18,13 @@ export const tables: string[] = [
         updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS flock_directory_config (
+  `CREATE TABLE IF NOT EXISTS flock_directory_config (
         key         TEXT PRIMARY KEY,
         value       TEXT NOT NULL,
         updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS flock_test_results (
+  `CREATE TABLE IF NOT EXISTS flock_test_results (
         id              TEXT PRIMARY KEY,
         agent_id        TEXT NOT NULL,
         overall_score   INTEGER NOT NULL DEFAULT 0,
@@ -37,7 +37,7 @@ export const tables: string[] = [
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 
-    `CREATE TABLE IF NOT EXISTS flock_test_challenge_results (
+  `CREATE TABLE IF NOT EXISTS flock_test_challenge_results (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
         test_result_id   TEXT NOT NULL REFERENCES flock_test_results(id) ON DELETE CASCADE,
         challenge_id     TEXT NOT NULL,
@@ -52,10 +52,10 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_address ON flock_agents(address)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_name ON flock_agents(name)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_agents_status ON flock_agents(status)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_test_results_agent ON flock_test_results(agent_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_test_results_completed ON flock_test_results(completed_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_flock_test_challenge_results_test ON flock_test_challenge_results(test_result_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_address ON flock_agents(address)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_name ON flock_agents(name)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_agents_status ON flock_agents(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_test_results_agent ON flock_test_results(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_test_results_completed ON flock_test_results(completed_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_flock_test_challenge_results_test ON flock_test_challenge_results(test_result_id)`,
 ];

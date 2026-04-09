@@ -14,8 +14,8 @@
  * @see https://github.com/CorvidLabs/corvid-agent/issues/151
  */
 
-import type { RequestContext } from './guards';
 import { createLogger } from '../lib/logger';
+import type { RequestContext } from './guards';
 
 const log = createLogger('Pipeline');
 
@@ -29,26 +29,26 @@ const log = createLogger('Pipeline');
  * and upstream middleware.
  */
 export interface MiddlewareContext {
-    /** The incoming HTTP request (immutable by convention). */
-    readonly req: Request;
-    /** Parsed URL of the request. */
-    readonly url: URL;
-    /** HTTP method shorthand. */
-    readonly method: string;
-    /** Request context populated by auth/guard middleware. */
-    requestContext: RequestContext;
-    /** The response to send back. Set by route handlers or error middleware. */
-    response: Response | null;
-    /** Arbitrary key-value state bag for middleware to share data. */
-    state: Record<string, unknown>;
-    /** Timestamp when the pipeline started processing (for timing). */
-    readonly startTime: number;
-    /**
-     * Signal that the pipeline should abort — no further downstream
-     * middleware will execute. The current middleware can still set
-     * `ctx.response` before returning.
-     */
-    aborted: boolean;
+  /** The incoming HTTP request (immutable by convention). */
+  readonly req: Request;
+  /** Parsed URL of the request. */
+  readonly url: URL;
+  /** HTTP method shorthand. */
+  readonly method: string;
+  /** Request context populated by auth/guard middleware. */
+  requestContext: RequestContext;
+  /** The response to send back. Set by route handlers or error middleware. */
+  response: Response | null;
+  /** Arbitrary key-value state bag for middleware to share data. */
+  state: Record<string, unknown>;
+  /** Timestamp when the pipeline started processing (for timing). */
+  readonly startTime: number;
+  /**
+   * Signal that the pipeline should abort — no further downstream
+   * middleware will execute. The current middleware can still set
+   * `ctx.response` before returning.
+   */
+  aborted: boolean;
 }
 
 /** A `next` function that invokes the next middleware in the chain. */
@@ -67,21 +67,21 @@ export type MiddlewareFn = (ctx: MiddlewareContext, next: NextFn) => Promise<voi
  * registration order.
  */
 export interface Middleware {
-    /** Human-readable name for logging and debugging. */
-    name: string;
-    /**
-     * Execution order. Lower values run first.
-     * Suggested ranges:
-     *   0-99:   Pre-processing (CORS, tracing, request ID)
-     *   100-199: Security (rate-limit, auth, role)
-     *   200-299: Request enrichment (body parsing, validation)
-     *   300-399: Business logic / route handling
-     *   400-499: Post-processing (response headers, compression)
-     *   500+:    Observability (logging, metrics)
-     */
-    order: number;
-    /** The middleware function. */
-    handler: MiddlewareFn;
+  /** Human-readable name for logging and debugging. */
+  name: string;
+  /**
+   * Execution order. Lower values run first.
+   * Suggested ranges:
+   *   0-99:   Pre-processing (CORS, tracing, request ID)
+   *   100-199: Security (rate-limit, auth, role)
+   *   200-299: Request enrichment (body parsing, validation)
+   *   300-399: Business logic / route handling
+   *   400-499: Post-processing (response headers, compression)
+   *   500+:    Observability (logging, metrics)
+   */
+  order: number;
+  /** The middleware function. */
+  handler: MiddlewareFn;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,21 +91,17 @@ export interface Middleware {
 /**
  * Create a fresh MiddlewareContext for an incoming request.
  */
-export function createMiddlewareContext(
-    req: Request,
-    url: URL,
-    requestContext: RequestContext,
-): MiddlewareContext {
-    return {
-        req,
-        url,
-        method: req.method,
-        requestContext,
-        response: null,
-        state: {},
-        startTime: performance.now(),
-        aborted: false,
-    };
+export function createMiddlewareContext(req: Request, url: URL, requestContext: RequestContext): MiddlewareContext {
+  return {
+    req,
+    url,
+    method: req.method,
+    requestContext,
+    response: null,
+    state: {},
+    startTime: performance.now(),
+    aborted: false,
+  };
 }
 
 /**
@@ -122,43 +118,43 @@ export function createMiddlewareContext(
  * 5. Code after `await next()` runs in reverse order (upstream phase).
  */
 export function compose(middlewares: Middleware[]): (ctx: MiddlewareContext) => Promise<void> {
-    // Sort by order (stable sort — preserves registration order for equal `order` values)
-    const sorted = [...middlewares].sort((a, b) => a.order - b.order);
+  // Sort by order (stable sort — preserves registration order for equal `order` values)
+  const sorted = [...middlewares].sort((a, b) => a.order - b.order);
 
-    return function pipeline(ctx: MiddlewareContext): Promise<void> {
-        let index = -1;
+  return function pipeline(ctx: MiddlewareContext): Promise<void> {
+    let index = -1;
 
-        function dispatch(i: number): Promise<void> {
-            // Guard against calling next() multiple times from the same middleware
-            if (i <= index) {
-                return Promise.reject(new Error('next() called multiple times'));
-            }
-            index = i;
+    function dispatch(i: number): Promise<void> {
+      // Guard against calling next() multiple times from the same middleware
+      if (i <= index) {
+        return Promise.reject(new Error('next() called multiple times'));
+      }
+      index = i;
 
-            // If the pipeline was aborted by a previous middleware, stop
-            if (ctx.aborted) {
-                return Promise.resolve();
-            }
+      // If the pipeline was aborted by a previous middleware, stop
+      if (ctx.aborted) {
+        return Promise.resolve();
+      }
 
-            const entry = sorted[i];
-            if (!entry) {
-                // End of chain — all middleware have been invoked
-                return Promise.resolve();
-            }
+      const entry = sorted[i];
+      if (!entry) {
+        // End of chain — all middleware have been invoked
+        return Promise.resolve();
+      }
 
-            try {
-                return entry.handler(ctx, () => {
-                    // If the middleware set aborted, don't proceed
-                    if (ctx.aborted) return Promise.resolve();
-                    return dispatch(i + 1);
-                });
-            } catch (err) {
-                return Promise.reject(err);
-            }
-        }
+      try {
+        return entry.handler(ctx, () => {
+          // If the middleware set aborted, don't proceed
+          if (ctx.aborted) return Promise.resolve();
+          return dispatch(i + 1);
+        });
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
 
-        return dispatch(0);
-    };
+    return dispatch(0);
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -180,51 +176,51 @@ export function compose(middlewares: Middleware[]): (ctx: MiddlewareContext) => 
  * ```
  */
 export class MiddlewarePipeline {
-    private middlewares: Middleware[] = [];
-    private compiled: ((ctx: MiddlewareContext) => Promise<void>) | null = null;
+  private middlewares: Middleware[] = [];
+  private compiled: ((ctx: MiddlewareContext) => Promise<void>) | null = null;
 
-    /** Register a middleware. Invalidates the compiled pipeline. */
-    use(middleware: Middleware): this {
-        this.middlewares.push(middleware);
-        this.compiled = null; // Force recompile on next execute
-        return this;
+  /** Register a middleware. Invalidates the compiled pipeline. */
+  use(middleware: Middleware): this {
+    this.middlewares.push(middleware);
+    this.compiled = null; // Force recompile on next execute
+    return this;
+  }
+
+  /** Remove a middleware by name. */
+  remove(name: string): this {
+    this.middlewares = this.middlewares.filter((m) => m.name !== name);
+    this.compiled = null;
+    return this;
+  }
+
+  /** Get all registered middleware (sorted by order). */
+  getMiddlewares(): ReadonlyArray<Readonly<Middleware>> {
+    return [...this.middlewares].sort((a, b) => a.order - b.order);
+  }
+
+  /**
+   * Execute the pipeline with the given context.
+   * Returns the context after all middleware have run.
+   */
+  async execute(ctx: MiddlewareContext): Promise<MiddlewareContext> {
+    if (!this.compiled) {
+      this.compiled = compose(this.middlewares);
     }
 
-    /** Remove a middleware by name. */
-    remove(name: string): this {
-        this.middlewares = this.middlewares.filter((m) => m.name !== name);
-        this.compiled = null;
-        return this;
+    try {
+      await this.compiled(ctx);
+    } catch (err) {
+      // If no middleware caught the error and set a response, log and set 500
+      if (!ctx.response) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('Unhandled pipeline error', { error: message });
+        ctx.response = new Response(
+          JSON.stringify({ error: 'Internal server error', timestamp: new Date().toISOString() }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
-    /** Get all registered middleware (sorted by order). */
-    getMiddlewares(): ReadonlyArray<Readonly<Middleware>> {
-        return [...this.middlewares].sort((a, b) => a.order - b.order);
-    }
-
-    /**
-     * Execute the pipeline with the given context.
-     * Returns the context after all middleware have run.
-     */
-    async execute(ctx: MiddlewareContext): Promise<MiddlewareContext> {
-        if (!this.compiled) {
-            this.compiled = compose(this.middlewares);
-        }
-
-        try {
-            await this.compiled(ctx);
-        } catch (err) {
-            // If no middleware caught the error and set a response, log and set 500
-            if (!ctx.response) {
-                const message = err instanceof Error ? err.message : String(err);
-                log.error('Unhandled pipeline error', { error: message });
-                ctx.response = new Response(
-                    JSON.stringify({ error: 'Internal server error', timestamp: new Date().toISOString() }),
-                    { status: 500, headers: { 'Content-Type': 'application/json' } },
-                );
-            }
-        }
-
-        return ctx;
-    }
+    return ctx;
+  }
 }

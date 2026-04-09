@@ -1,1 +1,334 @@
-import{a as K}from"./chunk-N4BOLOM7.js";import{a as R}from"./chunk-CZZRTCER.js";import{b as k,c as v,d as D,e as O,g as T,h as P,i as G,j as z,k as L,l as $,m as q,n as H,o as j,q as B,s as J}from"./chunk-AF4UDQOX.js";import"./chunk-ZSTU6MUH.js";import{e as F,g as V}from"./chunk-G7DVZDMF.js";import"./chunk-GH246MXO.js";import"./chunk-D6WCRQHB.js";import"./chunk-GEI46CGR.js";import{Bb as _,Na as l,Ob as a,Pb as M,Qb as A,Rb as N,T as c,Y as u,Z as p,_a as E,hb as w,ib as S,ja as m,jb as b,mb as x,nb as y,ob as g,pb as i,qb as n,rb as h,vb as I,zb as f}from"./chunk-LF4EWAJA.js";var Q=(s,t)=>t.id;function W(s,t){s&1&&(i(0,"span",6),a(1,"Council name is required."),n())}function X(s,t){if(s&1){let o=I();i(0,"label",12)(1,"input",27),f("change",function(r){let d=u(o).$implicit,C=_();return p(C.toggleAgent(d.id,r))}),n(),a(2),i(3,"span",28),a(4),n()()}if(s&2){let o=t.$implicit,e=_();l(),g("checked",e.selectedAgentIds().has(o.id)),l(),A(" ",o.name," "),l(2),N("",o.model||"default"," / ",o.permissionMode)}}function Y(s,t){s&1&&(i(0,"p",11),a(1,"No agents available. Create agents first."),n())}function Z(s,t){if(s&1&&(i(0,"option",23),a(1),n()),s&2){let o=t.$implicit,e=_();g("value",o.id)("selected",o.id===e.chairmanId()),l(),M(o.name)}}var U=class s{fb=c(B);councilService=c(K);agentService=c(R);router=c(V);route=c(F);editId=m(void 0);saving=m(!1);allAgents=m([]);selectedAgentIds=m(new Set);chairmanId=m("");form=this.fb.nonNullable.group({name:["",v.required],description:[""],discussionRounds:[2,[v.min(0),v.max(10)]],onChainMode:["full"]});get selectedAgentsList(){return()=>this.allAgents().filter(t=>this.selectedAgentIds().has(t.id))}async ngOnInit(){let t=this.route.snapshot.paramMap.get("id");t&&this.editId.set(t),await this.agentService.loadAgents(),this.allAgents.set(this.agentService.agents());let o=this.editId();if(o){let e=await this.councilService.getCouncil(o);this.form.patchValue({name:e.name,description:e.description,discussionRounds:e.discussionRounds??2,onChainMode:e.onChainMode??"full"}),this.selectedAgentIds.set(new Set(e.agentIds)),this.chairmanId.set(e.chairmanAgentId??"")}}toggleAgent(t,o){let e=o.target.checked,r=new Set(this.selectedAgentIds());e?r.add(t):(r.delete(t),this.chairmanId()===t&&this.chairmanId.set("")),this.selectedAgentIds.set(r)}onChairmanChange(t){this.chairmanId.set(t.target.value)}async onSubmit(){if(!(this.form.invalid||this.selectedAgentIds().size===0)){this.saving.set(!0);try{let t=this.form.getRawValue(),o=[...this.selectedAgentIds()],e=this.chairmanId()||void 0,r=this.editId();if(r)await this.councilService.updateCouncil(r,{name:t.name,description:t.description,discussionRounds:t.discussionRounds,onChainMode:t.onChainMode,agentIds:o,chairmanAgentId:e??null}),this.router.navigate(["/sessions/councils",r]);else{let d=await this.councilService.createCouncil({name:t.name,description:t.description,discussionRounds:t.discussionRounds,onChainMode:t.onChainMode,agentIds:o,chairmanAgentId:e});this.router.navigate(["/sessions/councils",d.id])}}finally{this.saving.set(!1)}}}onCancel(){this.router.navigate(["/sessions/councils"])}static \u0275fac=function(o){return new(o||s)};static \u0275cmp=E({type:s,selectors:[["app-council-form"]],decls:55,vars:7,consts:[["chairmanSelect",""],[1,"page"],[1,"form",3,"ngSubmit","formGroup"],[1,"form__field"],["for","name",1,"form__label"],["id","name","formControlName","name",1,"form__input"],["id","name-error","role","alert",1,"form__error"],["for","description",1,"form__label"],["id","description","formControlName","description","rows","2",1,"form__input","form__textarea"],[1,"form__fieldset"],[1,"form__legend"],[1,"form__hint"],[1,"form__checkbox"],["for","discussionRounds",1,"form__label"],["id","discussionRounds","type","number","formControlName","discussionRounds","min","0","max","10",1,"form__input"],["for","onChainMode",1,"form__label"],["id","onChainMode","formControlName","onChainMode",1,"form__input"],["value","off"],["value","attestation"],["value","full"],["for","chairman",1,"form__label"],["id","chairman",1,"form__input",3,"change"],["value",""],[3,"value","selected"],[1,"form__actions"],["type","submit",1,"btn","btn--primary",3,"disabled"],["type","button",1,"btn","btn--secondary",3,"click"],["type","checkbox",3,"change","checked"],[1,"agent-meta"]],template:function(o,e){if(o&1){let r=I();i(0,"div",1)(1,"h2"),a(2),n(),i(3,"form",2),f("ngSubmit",function(){return u(r),p(e.onSubmit())}),i(4,"div",3)(5,"label",4),a(6,"Name"),n(),h(7,"input",5),S(8,W,2,0,"span",6),n(),i(9,"div",3)(10,"label",7),a(11,"Description"),n(),h(12,"textarea",8),n(),i(13,"fieldset",9)(14,"legend",10),a(15,"Members"),n(),i(16,"p",11),a(17,"Select agents to include in this council."),n(),x(18,X,5,4,"label",12,Q),S(20,Y,2,0,"p",11),n(),i(21,"div",3)(22,"label",13),a(23,"Discussion Rounds"),n(),h(24,"input",14),i(25,"p",11),a(26,"Number of agent-to-agent discussion rounds between responding and reviewing. Set to 0 to skip."),n()(),i(27,"div",3)(28,"label",15),a(29,"Governance Tier"),n(),i(30,"select",16)(31,"option",17),a(32,"Off"),n(),i(33,"option",18),a(34,"Attestation"),n(),i(35,"option",19),a(36,"Full"),n()(),i(37,"p",11),a(38,"Controls on-chain recording: off (local only), attestation (hash on-chain), or full (all data on-chain)."),n()(),i(39,"div",3)(40,"label",20),a(41,"Chairman (optional)"),n(),i(42,"select",21,0),f("change",function(C){return u(r),p(e.onChairmanChange(C))}),i(44,"option",22),a(45,"None"),n(),x(46,Z,2,3,"option",23,Q),n(),i(48,"p",11),a(49,"The chairman produces the final synthesized answer."),n()(),i(50,"div",24)(51,"button",25),a(52),n(),i(53,"button",26),f("click",function(){return u(r),p(e.onCancel())}),a(54,"Cancel"),n()()()()}if(o&2){let r,d;l(2),M(e.editId()?"Edit Council":"New Council"),l(),g("formGroup",e.form),l(4),w("aria-describedby",(r=e.form.get("name"))!=null&&r.invalid&&((r=e.form.get("name"))!=null&&r.touched)?"name-error":null),l(),b((d=e.form.get("name"))!=null&&d.hasError("required")&&((d=e.form.get("name"))!=null&&d.touched)?8:-1),l(10),y(e.allAgents()),l(2),b(e.allAgents().length===0?20:-1),l(26),y(e.selectedAgentsList()),l(5),g("disabled",e.form.invalid||e.selectedAgentIds().size===0||e.saving()),l(),A(" ",e.saving()?"Saving...":"Save"," ")}},dependencies:[J,T,$,q,k,P,L,D,O,j,H,z,G],styles:[".page[_ngcontent-%COMP%]{padding:1.5rem;max-width:640px}.page[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0 0 1.5rem;color:var(--text-primary)}.form__fieldset[_ngcontent-%COMP%]{background:var(--bg-surface)}.form__legend[_ngcontent-%COMP%]{color:var(--accent-magenta)}.form__checkbox[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%]{accent-color:var(--accent-cyan)}.agent-meta[_ngcontent-%COMP%]{font-size:var(--text-xs);color:var(--text-tertiary);margin-left:.25rem}"],changeDetection:0})};export{U as CouncilFormComponent};
+import {
+  l as $,
+  q as B,
+  d as D,
+  i as G,
+  n as H,
+  s as J,
+  o as j,
+  b as k,
+  k as L,
+  e as O,
+  h as P,
+  m as q,
+  g as T,
+  c as v,
+  j as z,
+} from './chunk-AF4UDQOX.js';
+import { a as R } from './chunk-CZZRTCER.js';
+import { a as K } from './chunk-N4BOLOM7.js';
+import './chunk-ZSTU6MUH.js';
+import { e as F, g as V } from './chunk-G7DVZDMF.js';
+import './chunk-GH246MXO.js';
+import './chunk-D6WCRQHB.js';
+import './chunk-GEI46CGR.js';
+import {
+  Bb as _,
+  Qb as A,
+  Ob as a,
+  jb as b,
+  T as c,
+  _a as E,
+  zb as f,
+  ob as g,
+  rb as h,
+  vb as I,
+  pb as i,
+  Na as l,
+  Pb as M,
+  ja as m,
+  Rb as N,
+  qb as n,
+  Z as p,
+  ib as S,
+  Y as u,
+  hb as w,
+  mb as x,
+  nb as y,
+} from './chunk-LF4EWAJA.js';
+
+var Q = (_s, t) => t.id;
+function W(s, _t) {
+  s & 1 && (i(0, 'span', 6), a(1, 'Council name is required.'), n());
+}
+function X(s, t) {
+  if (s & 1) {
+    const o = I();
+    i(0, 'label', 12)(1, 'input', 27),
+      f('change', (r) => {
+        const d = u(o).$implicit,
+          C = _();
+        return p(C.toggleAgent(d.id, r));
+      }),
+      n(),
+      a(2),
+      i(3, 'span', 28),
+      a(4),
+      n()();
+  }
+  if (s & 2) {
+    const o = t.$implicit,
+      e = _();
+    l(),
+      g('checked', e.selectedAgentIds().has(o.id)),
+      l(),
+      A(' ', o.name, ' '),
+      l(2),
+      N('', o.model || 'default', ' / ', o.permissionMode);
+  }
+}
+function Y(s, _t) {
+  s & 1 && (i(0, 'p', 11), a(1, 'No agents available. Create agents first.'), n());
+}
+function Z(s, t) {
+  if ((s & 1 && (i(0, 'option', 23), a(1), n()), s & 2)) {
+    const o = t.$implicit,
+      e = _();
+    g('value', o.id)('selected', o.id === e.chairmanId()), l(), M(o.name);
+  }
+}
+var U = class s {
+  fb = c(B);
+  councilService = c(K);
+  agentService = c(R);
+  router = c(V);
+  route = c(F);
+  editId = m(void 0);
+  saving = m(!1);
+  allAgents = m([]);
+  selectedAgentIds = m(new Set());
+  chairmanId = m('');
+  form = this.fb.nonNullable.group({
+    name: ['', v.required],
+    description: [''],
+    discussionRounds: [2, [v.min(0), v.max(10)]],
+    onChainMode: ['full'],
+  });
+  get selectedAgentsList() {
+    return () => this.allAgents().filter((t) => this.selectedAgentIds().has(t.id));
+  }
+  async ngOnInit() {
+    const t = this.route.snapshot.paramMap.get('id');
+    t && this.editId.set(t), await this.agentService.loadAgents(), this.allAgents.set(this.agentService.agents());
+    const o = this.editId();
+    if (o) {
+      const e = await this.councilService.getCouncil(o);
+      this.form.patchValue({
+        name: e.name,
+        description: e.description,
+        discussionRounds: e.discussionRounds ?? 2,
+        onChainMode: e.onChainMode ?? 'full',
+      }),
+        this.selectedAgentIds.set(new Set(e.agentIds)),
+        this.chairmanId.set(e.chairmanAgentId ?? '');
+    }
+  }
+  toggleAgent(t, o) {
+    const e = o.target.checked,
+      r = new Set(this.selectedAgentIds());
+    e ? r.add(t) : (r.delete(t), this.chairmanId() === t && this.chairmanId.set('')), this.selectedAgentIds.set(r);
+  }
+  onChairmanChange(t) {
+    this.chairmanId.set(t.target.value);
+  }
+  async onSubmit() {
+    if (!(this.form.invalid || this.selectedAgentIds().size === 0)) {
+      this.saving.set(!0);
+      try {
+        const t = this.form.getRawValue(),
+          o = [...this.selectedAgentIds()],
+          e = this.chairmanId() || void 0,
+          r = this.editId();
+        if (r)
+          await this.councilService.updateCouncil(r, {
+            name: t.name,
+            description: t.description,
+            discussionRounds: t.discussionRounds,
+            onChainMode: t.onChainMode,
+            agentIds: o,
+            chairmanAgentId: e ?? null,
+          }),
+            this.router.navigate(['/sessions/councils', r]);
+        else {
+          const d = await this.councilService.createCouncil({
+            name: t.name,
+            description: t.description,
+            discussionRounds: t.discussionRounds,
+            onChainMode: t.onChainMode,
+            agentIds: o,
+            chairmanAgentId: e,
+          });
+          this.router.navigate(['/sessions/councils', d.id]);
+        }
+      } finally {
+        this.saving.set(!1);
+      }
+    }
+  }
+  onCancel() {
+    this.router.navigate(['/sessions/councils']);
+  }
+  static \u0275fac = (o) => new (o || s)();
+  static \u0275cmp = E({
+    type: s,
+    selectors: [['app-council-form']],
+    decls: 55,
+    vars: 7,
+    consts: [
+      ['chairmanSelect', ''],
+      [1, 'page'],
+      [1, 'form', 3, 'ngSubmit', 'formGroup'],
+      [1, 'form__field'],
+      ['for', 'name', 1, 'form__label'],
+      ['id', 'name', 'formControlName', 'name', 1, 'form__input'],
+      ['id', 'name-error', 'role', 'alert', 1, 'form__error'],
+      ['for', 'description', 1, 'form__label'],
+      ['id', 'description', 'formControlName', 'description', 'rows', '2', 1, 'form__input', 'form__textarea'],
+      [1, 'form__fieldset'],
+      [1, 'form__legend'],
+      [1, 'form__hint'],
+      [1, 'form__checkbox'],
+      ['for', 'discussionRounds', 1, 'form__label'],
+      [
+        'id',
+        'discussionRounds',
+        'type',
+        'number',
+        'formControlName',
+        'discussionRounds',
+        'min',
+        '0',
+        'max',
+        '10',
+        1,
+        'form__input',
+      ],
+      ['for', 'onChainMode', 1, 'form__label'],
+      ['id', 'onChainMode', 'formControlName', 'onChainMode', 1, 'form__input'],
+      ['value', 'off'],
+      ['value', 'attestation'],
+      ['value', 'full'],
+      ['for', 'chairman', 1, 'form__label'],
+      ['id', 'chairman', 1, 'form__input', 3, 'change'],
+      ['value', ''],
+      [3, 'value', 'selected'],
+      [1, 'form__actions'],
+      ['type', 'submit', 1, 'btn', 'btn--primary', 3, 'disabled'],
+      ['type', 'button', 1, 'btn', 'btn--secondary', 3, 'click'],
+      ['type', 'checkbox', 3, 'change', 'checked'],
+      [1, 'agent-meta'],
+    ],
+    template: (o, e) => {
+      if (o & 1) {
+        const r = I();
+        i(0, 'div', 1)(1, 'h2'),
+          a(2),
+          n(),
+          i(3, 'form', 2),
+          f('ngSubmit', () => (u(r), p(e.onSubmit()))),
+          i(4, 'div', 3)(5, 'label', 4),
+          a(6, 'Name'),
+          n(),
+          h(7, 'input', 5),
+          S(8, W, 2, 0, 'span', 6),
+          n(),
+          i(9, 'div', 3)(10, 'label', 7),
+          a(11, 'Description'),
+          n(),
+          h(12, 'textarea', 8),
+          n(),
+          i(13, 'fieldset', 9)(14, 'legend', 10),
+          a(15, 'Members'),
+          n(),
+          i(16, 'p', 11),
+          a(17, 'Select agents to include in this council.'),
+          n(),
+          x(18, X, 5, 4, 'label', 12, Q),
+          S(20, Y, 2, 0, 'p', 11),
+          n(),
+          i(21, 'div', 3)(22, 'label', 13),
+          a(23, 'Discussion Rounds'),
+          n(),
+          h(24, 'input', 14),
+          i(25, 'p', 11),
+          a(26, 'Number of agent-to-agent discussion rounds between responding and reviewing. Set to 0 to skip.'),
+          n()(),
+          i(27, 'div', 3)(28, 'label', 15),
+          a(29, 'Governance Tier'),
+          n(),
+          i(30, 'select', 16)(31, 'option', 17),
+          a(32, 'Off'),
+          n(),
+          i(33, 'option', 18),
+          a(34, 'Attestation'),
+          n(),
+          i(35, 'option', 19),
+          a(36, 'Full'),
+          n()(),
+          i(37, 'p', 11),
+          a(
+            38,
+            'Controls on-chain recording: off (local only), attestation (hash on-chain), or full (all data on-chain).',
+          ),
+          n()(),
+          i(39, 'div', 3)(40, 'label', 20),
+          a(41, 'Chairman (optional)'),
+          n(),
+          i(42, 'select', 21, 0),
+          f('change', (C) => (u(r), p(e.onChairmanChange(C)))),
+          i(44, 'option', 22),
+          a(45, 'None'),
+          n(),
+          x(46, Z, 2, 3, 'option', 23, Q),
+          n(),
+          i(48, 'p', 11),
+          a(49, 'The chairman produces the final synthesized answer.'),
+          n()(),
+          i(50, 'div', 24)(51, 'button', 25),
+          a(52),
+          n(),
+          i(53, 'button', 26),
+          f('click', () => (u(r), p(e.onCancel()))),
+          a(54, 'Cancel'),
+          n()()()();
+      }
+      if (o & 2) {
+        let r, d;
+        l(2),
+          M(e.editId() ? 'Edit Council' : 'New Council'),
+          l(),
+          g('formGroup', e.form),
+          l(4),
+          w(
+            'aria-describedby',
+            (r = e.form.get('name')) != null && r.invalid && (r = e.form.get('name')) != null && r.touched
+              ? 'name-error'
+              : null,
+          ),
+          l(),
+          b(
+            (d = e.form.get('name')) != null && d.hasError('required') && (d = e.form.get('name')) != null && d.touched
+              ? 8
+              : -1,
+          ),
+          l(10),
+          y(e.allAgents()),
+          l(2),
+          b(e.allAgents().length === 0 ? 20 : -1),
+          l(26),
+          y(e.selectedAgentsList()),
+          l(5),
+          g('disabled', e.form.invalid || e.selectedAgentIds().size === 0 || e.saving()),
+          l(),
+          A(' ', e.saving() ? 'Saving...' : 'Save', ' ');
+      }
+    },
+    dependencies: [J, T, $, q, k, P, L, D, O, j, H, z, G],
+    styles: [
+      '.page[_ngcontent-%COMP%]{padding:1.5rem;max-width:640px}.page[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0 0 1.5rem;color:var(--text-primary)}.form__fieldset[_ngcontent-%COMP%]{background:var(--bg-surface)}.form__legend[_ngcontent-%COMP%]{color:var(--accent-magenta)}.form__checkbox[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%]{accent-color:var(--accent-cyan)}.agent-meta[_ngcontent-%COMP%]{font-size:var(--text-xs);color:var(--text-tertiary);margin-left:.25rem}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { U as CouncilFormComponent };

@@ -9,44 +9,44 @@
  *   try { ... } finally { cleanup(); }
  */
 
-import { _setRestClientForTesting } from '../../discord/rest-client';
 import type { DiscordRestClient } from '../../discord/rest-client';
+import { _setRestClientForTesting } from '../../discord/rest-client';
 
 export function mockDiscordRest(): { fetchBodies: unknown[]; cleanup: () => void } {
-    const fetchBodies: unknown[] = [];
+  const fetchBodies: unknown[] = [];
 
-    const mock: Partial<DiscordRestClient> = {
-        respondToInteraction: async (_id: string, _token: string, data: unknown) => {
-            fetchBodies.push(data);
-            return {} as never;
-        },
-        deferInteraction: async () => {},
-        editDeferredResponse: async (_appId: string, _token: string, data: unknown) => {
-            fetchBodies.push(data);
-            return {} as never;
-        },
-        sendMessage: async (_channelId: string, data: unknown) => {
-            fetchBodies.push(data);
-            return { id: 'mock-msg-1' } as never;
-        },
-        editMessage: async (_channelId: string, _messageId: string, data: unknown) => {
-            fetchBodies.push(data);
-            return { id: 'mock-msg-1' } as never;
-        },
-        deleteMessage: async () => {},
-        addReaction: async () => {},
-        removeReaction: async () => {},
-        sendTypingIndicator: async () => {},
-        sendMessageWithFiles: async (_channelId: string, data: unknown) => {
-            fetchBodies.push(data);
-            return { id: 'mock-msg-1' } as never;
-        },
-    };
+  const mock: Partial<DiscordRestClient> = {
+    respondToInteraction: async (_id: string, _token: string, data: unknown) => {
+      fetchBodies.push(data);
+      return {} as never;
+    },
+    deferInteraction: async () => {},
+    editDeferredResponse: async (_appId: string, _token: string, data: unknown) => {
+      fetchBodies.push(data);
+      return {} as never;
+    },
+    sendMessage: async (_channelId: string, data: unknown) => {
+      fetchBodies.push(data);
+      return { id: 'mock-msg-1' } as never;
+    },
+    editMessage: async (_channelId: string, _messageId: string, data: unknown) => {
+      fetchBodies.push(data);
+      return { id: 'mock-msg-1' } as never;
+    },
+    deleteMessage: async () => {},
+    addReaction: async () => {},
+    removeReaction: async () => {},
+    sendTypingIndicator: async () => {},
+    sendMessageWithFiles: async (_channelId: string, data: unknown) => {
+      fetchBodies.push(data);
+      return { id: 'mock-msg-1' } as never;
+    },
+  };
 
-    _setRestClientForTesting(mock as DiscordRestClient);
+  _setRestClientForTesting(mock as DiscordRestClient);
 
-    return {
-        fetchBodies,
-        cleanup: () => _setRestClientForTesting(null),
-    };
+  return {
+    fetchBodies,
+    cleanup: () => _setRestClientForTesting(null),
+  };
 }

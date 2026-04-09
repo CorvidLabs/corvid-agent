@@ -13,31 +13,31 @@ const log = createLogger('GitHubSearcher');
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface DetectedMention {
-    /** Unique identifier (e.g. comment ID or issue number + timestamp) */
-    id: string;
-    /** Event type */
-    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request' | 'assignment';
-    /** The comment/issue body containing the @mention */
-    body: string;
-    /** GitHub username of the author */
-    sender: string;
-    /** Issue/PR number */
-    number: number;
-    /** Issue/PR title */
-    title: string;
-    /** Direct URL to the comment/issue */
-    htmlUrl: string;
-    /** When the comment/issue was created */
-    createdAt: string;
-    /** Whether this is on a PR (vs an issue) */
-    isPullRequest: boolean;
+  /** Unique identifier (e.g. comment ID or issue number + timestamp) */
+  id: string;
+  /** Event type */
+  type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request' | 'assignment';
+  /** The comment/issue body containing the @mention */
+  body: string;
+  /** GitHub username of the author */
+  sender: string;
+  /** Issue/PR number */
+  number: number;
+  /** Issue/PR title */
+  title: string;
+  /** Direct URL to the comment/issue */
+  htmlUrl: string;
+  /** When the comment/issue was created */
+  createdAt: string;
+  /** Whether this is on a PR (vs an issue) */
+  isPullRequest: boolean;
 }
 
 /** Result of running a `gh` CLI command. */
 export interface GhResult {
-    ok: boolean;
-    stdout: string;
-    stderr: string;
+  ok: boolean;
+  stdout: string;
+  stderr: string;
 }
 
 /** Function that executes a `gh` CLI command. Injected for testability. */
@@ -52,568 +52,600 @@ export type IsAllowedFn = (sender: string) => boolean;
 // ─── GitHubSearcher ─────────────────────────────────────────────────────────
 
 export class GitHubSearcher {
-    /**
-     * Per-cycle cache for global authored PR review results.
-     * Prevents redundant API calls when multiple configs share the same username.
-     * Call clearGlobalReviewCache() at the start of each poll cycle.
-     */
-    private globalReviewCache = new Map<string, DetectedMention[]>();
+  /**
+   * Per-cycle cache for global authored PR review results.
+   * Prevents redundant API calls when multiple configs share the same username.
+   * Call clearGlobalReviewCache() at the start of each poll cycle.
+   */
+  private globalReviewCache = new Map<string, DetectedMention[]>();
 
-    clearGlobalReviewCache(): void {
-        this.globalReviewCache.clear();
+  clearGlobalReviewCache(): void {
+    this.globalReviewCache.clear();
+  }
+
+  constructor(private readonly runGh: RunGhFn) {}
+
+  // ─── Orchestrator ───────────────────────────────────────────────────────
+
+  /**
+   * Fetch all recent mentions for a polling config.
+   * Orchestrates the individual search methods and applies allowlist filtering.
+   */
+  async fetchMentions(config: MentionPollingConfig, isAllowed: IsAllowedFn): Promise<DetectedMention[]> {
+    const mentions: DetectedMention[] = [];
+
+    // GitHub search `updated:` only supports date precision (no time), so we
+    // subtract 1 day from lastPollAt to avoid missing mentions near midnight.
+    // Duplicate prevention is handled by the processedIds set, not the date filter.
+    const lastPollDate = config.lastPollAt
+      ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : `${config.lastPollAt}Z`)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const paddedDate = new Date(lastPollDate.getTime() - 24 * 60 * 60 * 1000);
+    const sinceDate = paddedDate.toISOString();
+
+    if (shouldPollEventType(config, 'issue_comment')) {
+      const commentMentions = await this.searchIssueMentions(config.repo, config.mentionUsername, sinceDate);
+      mentions.push(...commentMentions);
     }
 
-    constructor(private readonly runGh: RunGhFn) {}
+    if (shouldPollEventType(config, 'issues')) {
+      const issueMentions = await this.searchNewIssueMentions(config.repo, config.mentionUsername, sinceDate);
+      mentions.push(...issueMentions);
+    }
 
-    // ─── Orchestrator ───────────────────────────────────────────────────────
+    const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
+    mentions.push(...assignedIssues);
 
-    /**
-     * Fetch all recent mentions for a polling config.
-     * Orchestrates the individual search methods and applies allowlist filtering.
-     */
-    async fetchMentions(
-        config: MentionPollingConfig,
-        isAllowed: IsAllowedFn,
-    ): Promise<DetectedMention[]> {
-        const mentions: DetectedMention[] = [];
+    if (shouldPollEventType(config, 'pull_request_review_comment')) {
+      // Global search: find review comments on ALL agent-authored PRs,
+      // not just within the config's repo scope. This catches feedback on
+      // external/cross-org PRs (e.g. PRs on repos outside CorvidLabs).
+      const cacheKey = `${config.mentionUsername}:${sinceDate.split('T')[0]}`;
+      let prReviewMentions = this.globalReviewCache.get(cacheKey);
+      if (!prReviewMentions) {
+        prReviewMentions = await this.searchGlobalAuthoredPRReviews(config.mentionUsername, sinceDate);
+        this.globalReviewCache.set(cacheKey, prReviewMentions);
+      }
+      mentions.push(...prReviewMentions);
+    }
 
-        // GitHub search `updated:` only supports date precision (no time), so we
-        // subtract 1 day from lastPollAt to avoid missing mentions near midnight.
-        // Duplicate prevention is handled by the processedIds set, not the date filter.
-        const lastPollDate = config.lastPollAt
-            ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : config.lastPollAt + 'Z')
-            : new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const paddedDate = new Date(lastPollDate.getTime() - 24 * 60 * 60 * 1000);
-        const sinceDate = paddedDate.toISOString();
+    if (shouldPollEventType(config, 'pull_request')) {
+      const prMentions = await this.searchPullRequestMentions(config.repo, config.mentionUsername, sinceDate);
+      mentions.push(...prMentions);
+    }
 
-        if (shouldPollEventType(config, 'issue_comment')) {
-            const commentMentions = await this.searchIssueMentions(config.repo, config.mentionUsername, sinceDate);
-            mentions.push(...commentMentions);
-        }
+    // Sort by creation time descending (newest first)
+    mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        if (shouldPollEventType(config, 'issues')) {
-            const issueMentions = await this.searchNewIssueMentions(config.repo, config.mentionUsername, sinceDate);
-            mentions.push(...issueMentions);
-        }
-
-        const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
-        mentions.push(...assignedIssues);
-
-        if (shouldPollEventType(config, 'pull_request_review_comment')) {
-            // Global search: find review comments on ALL agent-authored PRs,
-            // not just within the config's repo scope. This catches feedback on
-            // external/cross-org PRs (e.g. PRs on repos outside CorvidLabs).
-            const cacheKey = `${config.mentionUsername}:${sinceDate.split('T')[0]}`;
-            let prReviewMentions = this.globalReviewCache.get(cacheKey);
-            if (!prReviewMentions) {
-                prReviewMentions = await this.searchGlobalAuthoredPRReviews(
-                    config.mentionUsername, sinceDate,
-                );
-                this.globalReviewCache.set(cacheKey, prReviewMentions);
-            }
-            mentions.push(...prReviewMentions);
-        }
-
-        if (shouldPollEventType(config, 'pull_request')) {
-            const prMentions = await this.searchPullRequestMentions(
-                config.repo, config.mentionUsername, sinceDate,
-            );
-            mentions.push(...prMentions);
-        }
-
-        // Sort by creation time descending (newest first)
-        mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        // Global allowlist filter (empty = open mode).
-        // Assignment-type mentions bypass the allowlist — the assignment itself
-        // is authorization (someone with repo write access explicitly assigned us).
-        const globalFiltered = mentions.filter(m => {
-            if (m.type === 'assignment') return true;
-            const allowed = isAllowed(m.sender);
-            if (!allowed) {
-                log.debug('Filtered mention — sender not in allowlist', {
-                    sender: m.sender, type: m.type, number: m.number, id: m.id,
-                });
-            }
-            return allowed;
+    // Global allowlist filter (empty = open mode).
+    // Assignment-type mentions bypass the allowlist — the assignment itself
+    // is authorization (someone with repo write access explicitly assigned us).
+    const globalFiltered = mentions.filter((m) => {
+      if (m.type === 'assignment') return true;
+      const allowed = isAllowed(m.sender);
+      if (!allowed) {
+        log.debug('Filtered mention — sender not in allowlist', {
+          sender: m.sender,
+          type: m.type,
+          number: m.number,
+          id: m.id,
         });
+      }
+      return allowed;
+    });
 
-        // Per-config allowed users filter (further restricts global list).
-        // Assignments still bypass this filter.
-        if (config.allowedUsers.length > 0) {
-            const allowed = new Set(config.allowedUsers.map(u => u.toLowerCase()));
-            return globalFiltered.filter(m => {
-                if (m.type === 'assignment') return true;
-                return allowed.has(m.sender.toLowerCase());
-            });
-        }
-
-        return globalFiltered;
+    // Per-config allowed users filter (further restricts global list).
+    // Assignments still bypass this filter.
+    if (config.allowedUsers.length > 0) {
+      const allowed = new Set(config.allowedUsers.map((u) => u.toLowerCase()));
+      return globalFiltered.filter((m) => {
+        if (m.type === 'assignment') return true;
+        return allowed.has(m.sender.toLowerCase());
+      });
     }
 
-    // ─── Search Methods ─────────────────────────────────────────────────────
+    return globalFiltered;
+  }
 
-    /**
-     * Search for issue/PR comments mentioning the username.
-     */
-    async searchIssueMentions(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const query = `${repoQualifier(repo)} involves:${username} updated:>=${since.split('T')[0]}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=30',
-            ]);
+  // ─── Search Methods ─────────────────────────────────────────────────────
 
-            if (!result.ok || !result.stdout.trim()) return [];
+  /**
+   * Search for issue/PR comments mentioning the username.
+   */
+  async searchIssueMentions(repo: string, username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const query = `${repoQualifier(repo)} involves:${username} updated:>=${since.split('T')[0]}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=30',
+      ]);
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            for (const item of items) {
-                const number = item.number as number;
-                const isPR = !!(item.pull_request);
-                const itemRepo = resolveFullRepo(repo, (item.html_url as string) ?? '');
-                const commentMentions = await this.fetchRecentComments(itemRepo, number, username, since, isPR, item);
-                mentions.push(...commentMentions);
-            }
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            return mentions;
-        } catch (err) {
-            log.error('Error searching issue mentions', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      for (const item of items) {
+        const number = item.number as number;
+        const isPR = !!item.pull_request;
+        const itemRepo = resolveFullRepo(repo, (item.html_url as string) ?? '');
+        const commentMentions = await this.fetchRecentComments(itemRepo, number, username, since, isPR, item);
+        mentions.push(...commentMentions);
+      }
+
+      return mentions;
+    } catch (err) {
+      log.error('Error searching issue mentions', { repo, error: err instanceof Error ? err.message : String(err) });
+      return [];
     }
+  }
 
-    /**
-     * Fetch recent comments on a specific issue/PR and find @mentions.
-     */
-    async fetchRecentComments(
-        repo: string,
-        issueNumber: number,
-        username: string,
-        since: string,
-        isPR: boolean,
-        issueData: Record<string, unknown>,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/issues/${issueNumber}/comments`,
-                '-X', 'GET',
-                '-f', `since=${since}`,
-                '-f', 'per_page=50',
-                '-f', 'sort=created',
-                '-f', 'direction=desc',
-            ]);
+  /**
+   * Fetch recent comments on a specific issue/PR and find @mentions.
+   */
+  async fetchRecentComments(
+    repo: string,
+    issueNumber: number,
+    username: string,
+    since: string,
+    isPR: boolean,
+    issueData: Record<string, unknown>,
+  ): Promise<DetectedMention[]> {
+    try {
+      const result = await this.runGh([
+        'api',
+        `repos/${repo}/issues/${issueNumber}/comments`,
+        '-X',
+        'GET',
+        '-f',
+        `since=${since}`,
+        '-f',
+        'per_page=50',
+        '-f',
+        'sort=created',
+        '-f',
+        'direction=desc',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const mentions: DetectedMention[] = [];
+      const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+      const mentions: DetectedMention[] = [];
 
-            for (const comment of comments) {
-                const body = (comment.body as string) ?? '';
-                const commentUser = (comment.user as Record<string, unknown>)?.login as string ?? '';
+      for (const comment of comments) {
+        const body = (comment.body as string) ?? '';
+        const commentUser = ((comment.user as Record<string, unknown>)?.login as string) ?? '';
 
-                if (containsMention(body, username)) {
-                    mentions.push({
-                        id: `comment-${comment.id}`,
-                        type: 'issue_comment',
-                        body,
-                        sender: commentUser,
-                        number: issueNumber,
-                        title: (issueData.title as string) ?? '',
-                        htmlUrl: (comment.html_url as string) ?? (issueData.html_url as string) ?? '',
-                        createdAt: (comment.created_at as string) ?? '',
-                        isPullRequest: isPR,
-                    });
-                }
-            }
-
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching comments', { repo, issueNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
+        if (containsMention(body, username)) {
+          mentions.push({
+            id: `comment-${comment.id}`,
+            type: 'issue_comment',
+            body,
+            sender: commentUser,
+            number: issueNumber,
+            title: (issueData.title as string) ?? '',
+            htmlUrl: (comment.html_url as string) ?? (issueData.html_url as string) ?? '',
+            createdAt: (comment.created_at as string) ?? '',
+            isPullRequest: isPR,
+          });
         }
+      }
+
+      return mentions;
+    } catch (err) {
+      log.debug('Error fetching comments', {
+        repo,
+        issueNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    /**
-     * Search for newly opened issues that mention the username in their body.
-     */
-    async searchNewIssueMentions(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${repoQualifier(repo)} involves:${username} is:issue created:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=created',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
+  /**
+   * Search for newly opened issues that mention the username in their body.
+   */
+  async searchNewIssueMentions(repo: string, username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const sinceDate = since.split('T')[0];
+      const query = `${repoQualifier(repo)} involves:${username} is:issue created:>=${sinceDate}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=created',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=20',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            for (const item of items) {
-                const body = (item.body as string) ?? '';
-                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+      for (const item of items) {
+        const body = (item.body as string) ?? '';
+        const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
 
-                if (containsMention(body, username)) {
-                    const htmlUrl = (item.html_url as string) ?? '';
-                    const itemRepo = resolveFullRepo(repo, htmlUrl);
-                    mentions.push({
-                        id: `issue-${itemRepo}-${item.number}`,
-                        type: 'issues',
-                        body,
-                        sender,
-                        number: item.number as number,
-                        title: (item.title as string) ?? '',
-                        htmlUrl,
-                        createdAt: (item.created_at as string) ?? '',
-                        isPullRequest: false,
-                    });
-                }
-            }
-
-            return mentions;
-        } catch (err) {
-            log.error('Error searching new issue mentions', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
+        if (containsMention(body, username)) {
+          const htmlUrl = (item.html_url as string) ?? '';
+          const itemRepo = resolveFullRepo(repo, htmlUrl);
+          mentions.push({
+            id: `issue-${itemRepo}-${item.number}`,
+            type: 'issues',
+            body,
+            sender,
+            number: item.number as number,
+            title: (item.title as string) ?? '',
+            htmlUrl,
+            createdAt: (item.created_at as string) ?? '',
+            isPullRequest: false,
+          });
         }
+      }
+
+      return mentions;
+    } catch (err) {
+      log.error('Error searching new issue mentions', {
+        repo,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    /**
-     * Search for issues/PRs recently assigned to the username.
-     */
-    async searchAssignedIssues(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${repoQualifier(repo)} assignee:${username} is:open updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
+  /**
+   * Search for issues/PRs recently assigned to the username.
+   */
+  async searchAssignedIssues(repo: string, username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const sinceDate = since.split('T')[0];
+      const query = `${repoQualifier(repo)} assignee:${username} is:open updated:>=${sinceDate}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=20',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            for (const item of items) {
-                const body = (item.body as string) ?? '';
-                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-                const isPR = !!(item.pull_request);
+      for (const item of items) {
+        const body = (item.body as string) ?? '';
+        const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+        const isPR = !!item.pull_request;
 
-                const htmlUrl = (item.html_url as string) ?? '';
-                const itemRepo = resolveFullRepo(repo, htmlUrl);
-                mentions.push({
-                    id: `assigned-${itemRepo}-${item.number}`,
-                    type: 'assignment',
-                    body,
-                    sender,
-                    number: item.number as number,
-                    title: (item.title as string) ?? '',
-                    htmlUrl,
-                    createdAt: (item.created_at as string) ?? '',
-                    isPullRequest: isPR,
-                });
-            }
+        const htmlUrl = (item.html_url as string) ?? '';
+        const itemRepo = resolveFullRepo(repo, htmlUrl);
+        mentions.push({
+          id: `assigned-${itemRepo}-${item.number}`,
+          type: 'assignment',
+          body,
+          sender,
+          number: item.number as number,
+          title: (item.title as string) ?? '',
+          htmlUrl,
+          createdAt: (item.created_at as string) ?? '',
+          isPullRequest: isPR,
+        });
+      }
 
-            return mentions;
-        } catch (err) {
-            log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
+      return [];
     }
+  }
 
-    /**
-     * Search for open PRs that mention, request review from, or are assigned to the user.
-     * This catches PRs (including dependabot) that need attention.
-     */
-    async searchPullRequestMentions(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            // Search for PRs that involve this user (review-requested, mentioned, assigned)
-            const query = `${repoQualifier(repo)} is:pr is:open review-requested:${username} updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
+  /**
+   * Search for open PRs that mention, request review from, or are assigned to the user.
+   * This catches PRs (including dependabot) that need attention.
+   */
+  async searchPullRequestMentions(repo: string, username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const sinceDate = since.split('T')[0];
+      // Search for PRs that involve this user (review-requested, mentioned, assigned)
+      const query = `${repoQualifier(repo)} is:pr is:open review-requested:${username} updated:>=${sinceDate}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=20',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            for (const item of items) {
-                const body = (item.body as string) ?? '';
-                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-                const htmlUrl = (item.html_url as string) ?? '';
-                const itemRepo = resolveFullRepo(repo, htmlUrl);
+      for (const item of items) {
+        const body = (item.body as string) ?? '';
+        const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+        const htmlUrl = (item.html_url as string) ?? '';
+        const itemRepo = resolveFullRepo(repo, htmlUrl);
 
-                mentions.push({
-                    id: `pr-${itemRepo}-${item.number}`,
-                    type: 'pull_request',
-                    body,
-                    sender,
-                    number: item.number as number,
-                    title: (item.title as string) ?? '',
-                    htmlUrl,
-                    createdAt: (item.created_at as string) ?? '',
-                    isPullRequest: true,
-                });
-            }
+        mentions.push({
+          id: `pr-${itemRepo}-${item.number}`,
+          type: 'pull_request',
+          body,
+          sender,
+          number: item.number as number,
+          title: (item.title as string) ?? '',
+          htmlUrl,
+          createdAt: (item.created_at as string) ?? '',
+          isPullRequest: true,
+        });
+      }
 
-            return mentions;
-        } catch (err) {
-            log.error('Error searching PR mentions', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.error('Error searching PR mentions', { repo, error: err instanceof Error ? err.message : String(err) });
+      return [];
     }
+  }
 
-    /**
-     * Search for open PRs authored by the user and fetch new reviews/review comments on each.
-     */
-    /**
-     * Search for review comments on ALL open PRs authored by the agent globally
-     * (not scoped to a specific repo). Catches feedback on external/cross-org PRs
-     * that aren't covered by repo-scoped polling configs.
-     */
-    async searchGlobalAuthoredPRReviews(
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `is:pr is:open author:${username} updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
+  /**
+   * Search for open PRs authored by the user and fetch new reviews/review comments on each.
+   */
+  /**
+   * Search for review comments on ALL open PRs authored by the agent globally
+   * (not scoped to a specific repo). Catches feedback on external/cross-org PRs
+   * that aren't covered by repo-scoped polling configs.
+   */
+  async searchGlobalAuthoredPRReviews(username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const sinceDate = since.split('T')[0];
+      const query = `is:pr is:open author:${username} updated:>=${sinceDate}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=20',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            for (const item of items) {
-                const prNumber = item.number as number;
-                const prTitle = (item.title as string) ?? '';
-                const prHtmlUrl = (item.html_url as string) ?? '';
-                const fullRepo = resolveFullRepo('', prHtmlUrl);
+      for (const item of items) {
+        const prNumber = item.number as number;
+        const prTitle = (item.title as string) ?? '';
+        const prHtmlUrl = (item.html_url as string) ?? '';
+        const fullRepo = resolveFullRepo('', prHtmlUrl);
 
-                const [reviews, reviewComments] = await Promise.all([
-                    this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                    this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                ]);
+        const [reviews, reviewComments] = await Promise.all([
+          this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+          this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+        ]);
 
-                mentions.push(...reviews, ...reviewComments);
-            }
+        mentions.push(...reviews, ...reviewComments);
+      }
 
-            return mentions;
-        } catch (err) {
-            log.error('Error searching global authored PR reviews', { error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.error('Error searching global authored PR reviews', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    async searchAuthoredPRReviews(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${repoQualifier(repo)} is:pr is:open author:${username} updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=10',
-            ]);
+  async searchAuthoredPRReviews(repo: string, username: string, since: string): Promise<DetectedMention[]> {
+    try {
+      const sinceDate = since.split('T')[0];
+      const query = `${repoQualifier(repo)} is:pr is:open author:${username} updated:>=${sinceDate}`;
+      const result = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${query}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=10',
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
+      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+      const items = parsed.items ?? [];
+      const mentions: DetectedMention[] = [];
 
-            for (const item of items) {
-                const prNumber = item.number as number;
-                const prTitle = (item.title as string) ?? '';
-                const prHtmlUrl = (item.html_url as string) ?? '';
-                const fullRepo = resolveFullRepo(repo, prHtmlUrl);
+      for (const item of items) {
+        const prNumber = item.number as number;
+        const prTitle = (item.title as string) ?? '';
+        const prHtmlUrl = (item.html_url as string) ?? '';
+        const fullRepo = resolveFullRepo(repo, prHtmlUrl);
 
-                const [reviews, reviewComments] = await Promise.all([
-                    this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                    this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                ]);
+        const [reviews, reviewComments] = await Promise.all([
+          this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+          this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+        ]);
 
-                mentions.push(...reviews, ...reviewComments);
-            }
+        mentions.push(...reviews, ...reviewComments);
+      }
 
-            return mentions;
-        } catch (err) {
-            log.error('Error searching authored PR reviews', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.error('Error searching authored PR reviews', {
+        repo,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    /**
-     * Fetch review submissions (approve/changes_requested/comment) on a specific PR.
-     */
-    async fetchPRReviews(
-        repo: string,
-        prNumber: number,
-        username: string,
-        since: string,
-        prTitle: string,
-        prHtmlUrl: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/pulls/${prNumber}/reviews`,
-                '-X', 'GET',
-            ]);
+  /**
+   * Fetch review submissions (approve/changes_requested/comment) on a specific PR.
+   */
+  async fetchPRReviews(
+    repo: string,
+    prNumber: number,
+    username: string,
+    since: string,
+    prTitle: string,
+    prHtmlUrl: string,
+  ): Promise<DetectedMention[]> {
+    try {
+      const result = await this.runGh(['api', `repos/${repo}/pulls/${prNumber}/reviews`, '-X', 'GET']);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const reviews = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const sinceTime = new Date(since).getTime();
-            const mentions: DetectedMention[] = [];
+      const reviews = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+      const sinceTime = new Date(since).getTime();
+      const mentions: DetectedMention[] = [];
 
-            for (const review of reviews) {
-                const reviewer = ((review.user as Record<string, unknown>)?.login as string) ?? '';
-                const state = (review.state as string) ?? '';
-                const body = (review.body as string) ?? '';
-                const submittedAt = (review.submitted_at as string) ?? '';
+      for (const review of reviews) {
+        const reviewer = ((review.user as Record<string, unknown>)?.login as string) ?? '';
+        const state = (review.state as string) ?? '';
+        const body = (review.body as string) ?? '';
+        const submittedAt = (review.submitted_at as string) ?? '';
 
-                // Skip self-reviews
-                if (reviewer.toLowerCase() === username.toLowerCase()) continue;
+        // Skip self-reviews
+        if (reviewer.toLowerCase() === username.toLowerCase()) continue;
 
-                // Skip reviews before the since window
-                if (submittedAt && new Date(submittedAt).getTime() < sinceTime) continue;
+        // Skip reviews before the since window
+        if (submittedAt && new Date(submittedAt).getTime() < sinceTime) continue;
 
-                // Skip dismissed reviews
-                if (state === 'DISMISSED') continue;
+        // Skip dismissed reviews
+        if (state === 'DISMISSED') continue;
 
-                // Skip empty COMMENTED reviews (phantom top-level for inline comments)
-                if (state === 'COMMENTED' && !body.trim()) continue;
+        // Skip empty COMMENTED reviews (phantom top-level for inline comments)
+        if (state === 'COMMENTED' && !body.trim()) continue;
 
-                mentions.push({
-                    id: `review-${review.id}`,
-                    type: 'pull_request_review_comment',
-                    body: body || `[${state} review with no body]`,
-                    sender: reviewer,
-                    number: prNumber,
-                    title: prTitle,
-                    htmlUrl: (review.html_url as string) ?? prHtmlUrl,
-                    createdAt: submittedAt,
-                    isPullRequest: true,
-                });
-            }
+        mentions.push({
+          id: `review-${review.id}`,
+          type: 'pull_request_review_comment',
+          body: body || `[${state} review with no body]`,
+          sender: reviewer,
+          number: prNumber,
+          title: prTitle,
+          htmlUrl: (review.html_url as string) ?? prHtmlUrl,
+          createdAt: submittedAt,
+          isPullRequest: true,
+        });
+      }
 
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching PR reviews', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.debug('Error fetching PR reviews', {
+        repo,
+        prNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    /**
-     * Fetch inline code review comments on a specific PR.
-     */
-    async fetchPRReviewComments(
-        repo: string,
-        prNumber: number,
-        username: string,
-        since: string,
-        prTitle: string,
-        prHtmlUrl: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/pulls/${prNumber}/comments`,
-                '-X', 'GET',
-                '-f', `since=${since}`,
-            ]);
+  /**
+   * Fetch inline code review comments on a specific PR.
+   */
+  async fetchPRReviewComments(
+    repo: string,
+    prNumber: number,
+    username: string,
+    since: string,
+    prTitle: string,
+    prHtmlUrl: string,
+  ): Promise<DetectedMention[]> {
+    try {
+      const result = await this.runGh([
+        'api',
+        `repos/${repo}/pulls/${prNumber}/comments`,
+        '-X',
+        'GET',
+        '-f',
+        `since=${since}`,
+      ]);
 
-            if (!result.ok || !result.stdout.trim()) return [];
+      if (!result.ok || !result.stdout.trim()) return [];
 
-            const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const mentions: DetectedMention[] = [];
+      const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+      const mentions: DetectedMention[] = [];
 
-            for (const comment of comments) {
-                const commenter = ((comment.user as Record<string, unknown>)?.login as string) ?? '';
-                const body = (comment.body as string) ?? '';
+      for (const comment of comments) {
+        const commenter = ((comment.user as Record<string, unknown>)?.login as string) ?? '';
+        const body = (comment.body as string) ?? '';
 
-                // Skip self-comments
-                if (commenter.toLowerCase() === username.toLowerCase()) continue;
+        // Skip self-comments
+        if (commenter.toLowerCase() === username.toLowerCase()) continue;
 
-                mentions.push({
-                    id: `reviewcomment-${comment.id}`,
-                    type: 'pull_request_review_comment',
-                    body,
-                    sender: commenter,
-                    number: prNumber,
-                    title: prTitle,
-                    htmlUrl: (comment.html_url as string) ?? prHtmlUrl,
-                    createdAt: (comment.created_at as string) ?? '',
-                    isPullRequest: true,
-                });
-            }
+        mentions.push({
+          id: `reviewcomment-${comment.id}`,
+          type: 'pull_request_review_comment',
+          body,
+          sender: commenter,
+          number: prNumber,
+          title: prTitle,
+          htmlUrl: (comment.html_url as string) ?? prHtmlUrl,
+          createdAt: (comment.created_at as string) ?? '',
+          isPullRequest: true,
+        });
+      }
 
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching PR review comments', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+      return mentions;
+    } catch (err) {
+      log.debug('Error fetching PR review comments', {
+        repo,
+        prNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 }
 
 // ─── Exported Helpers ───────────────────────────────────────────────────────
@@ -625,8 +657,8 @@ export class GitHubSearcher {
  * Otherwise it's an org or user — use org: which covers both.
  */
 export function repoQualifier(repo: string): string {
-    if (repo.includes('/')) return `repo:${repo}`;
-    return `org:${repo}`;
+  if (repo.includes('/')) return `repo:${repo}`;
+  return `org:${repo}`;
 }
 
 /**
@@ -634,35 +666,37 @@ export function repoQualifier(repo: string): string {
  * repo is just an org/user name (no '/').
  */
 export function resolveFullRepo(configRepo: string, htmlUrl: string): string {
-    if (configRepo.includes('/')) return configRepo;
-    try {
-        const url = new URL(htmlUrl);
-        const parts = url.pathname.split('/').filter(Boolean);
-        if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-    } catch { /* ignore */ }
-    return configRepo;
+  if (configRepo.includes('/')) return configRepo;
+  try {
+    const url = new URL(htmlUrl);
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  } catch {
+    /* ignore */
+  }
+  return configRepo;
 }
 
 /** Check whether a polling config includes a specific event type. */
 export function shouldPollEventType(config: MentionPollingConfig, type: string): boolean {
-    if (config.eventFilter.length === 0) return true;
-    return config.eventFilter.includes(type as MentionPollingConfig['eventFilter'][number]);
+  if (config.eventFilter.length === 0) return true;
+  return config.eventFilter.includes(type as MentionPollingConfig['eventFilter'][number]);
 }
 
 /** Check whether a text body contains an @mention of the given username. */
 export function containsMention(body: string, username: string): boolean {
-    const regex = new RegExp(`(?:^|\\s|[^\\w])@${escapeRegex(username)}(?:\\s|$|[^\\w])`, 'i');
-    return regex.test(body);
+  const regex = new RegExp(`(?:^|\\s|[^\\w])@${escapeRegex(username)}(?:\\s|$|[^\\w])`, 'i');
+  return regex.test(body);
 }
 
 /** Filter out mentions whose IDs are already in the processed set. */
 export function filterNewMentions(mentions: DetectedMention[], processedIds: string[]): DetectedMention[] {
-    if (processedIds.length === 0) return mentions;
-    const seen = new Set(processedIds);
-    return mentions.filter(m => !seen.has(m.id));
+  if (processedIds.length === 0) return mentions;
+  const seen = new Set(processedIds);
+  return mentions.filter((m) => !seen.has(m.id));
 }
 
 /** Escape special regex characters in a string. */
 export function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

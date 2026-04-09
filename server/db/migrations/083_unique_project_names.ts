@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 /**
  * Migration 083: Unique constraint on project names per tenant.
@@ -13,8 +13,8 @@ import { Database } from 'bun:sqlite';
  */
 
 export function up(db: Database): void {
-    // Step 1: Remove duplicates — keep the row with the latest updated_at per (tenant_id, lower(name))
-    db.exec(`
+  // Step 1: Remove duplicates — keep the row with the latest updated_at per (tenant_id, lower(name))
+  db.exec(`
         DELETE FROM projects
         WHERE id NOT IN (
             SELECT id FROM (
@@ -29,13 +29,13 @@ export function up(db: Database): void {
         )
     `);
 
-    // Step 2: Add unique index (case-insensitive name per tenant)
-    db.exec(`
+  // Step 2: Add unique index (case-insensitive name per tenant)
+  db.exec(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tenant_name
         ON projects(tenant_id, name COLLATE NOCASE)
     `);
 }
 
 export function down(db: Database): void {
-    db.exec('DROP INDEX IF EXISTS idx_projects_tenant_name');
+  db.exec('DROP INDEX IF EXISTS idx_projects_tenant_name');
 }

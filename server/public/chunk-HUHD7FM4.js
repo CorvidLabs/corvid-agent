@@ -1,1 +1,215 @@
-import{a as z}from"./chunk-J3PBVME7.js";import{a as I}from"./chunk-A4KCXO2Q.js";import"./chunk-OFKXBWQC.js";import"./chunk-CSQXEU3M.js";import{a as T}from"./chunk-355WLUEG.js";import{a as L}from"./chunk-FGNIWOFY.js";import{a as E}from"./chunk-ZEJIPHXJ.js";import"./chunk-ZSTU6MUH.js";import{e as w,g as k,h as D}from"./chunk-G7DVZDMF.js";import"./chunk-GH246MXO.js";import"./chunk-D6WCRQHB.js";import"./chunk-GEI46CGR.js";import{$b as x,Bb as l,Na as r,Ob as a,Pb as c,T as d,Y as b,Z as y,Zb as S,_a as P,_b as v,ac as f,ib as _,ja as u,jb as g,mb as h,nb as M,ob as s,pb as o,qb as i,rb as C,vb as O,zb as j}from"./chunk-LF4EWAJA.js";var N=e=>["/agents/projects",e,"edit"],A=()=>["/sessions","new"],R=e=>({projectId:e}),B=e=>["/sessions",e],V=(e,n)=>n.id;function q(e,n){if(e&1&&(o(0,"div",7)(1,"h3"),a(2,"CLAUDE.md"),i(),o(3,"pre",11),a(4),i()()),e&2){let t=l();r(4),c(t.claudeMd)}}function $(e,n){e&1&&(o(0,"p",10),a(1,"No sessions yet."),i())}function U(e,n){if(e&1&&(o(0,"div",12)(1,"a",13),a(2),i(),C(3,"app-status-badge",14),o(4,"span",15),a(5),x(6,"relativeTime"),i()()),e&2){let t=n.$implicit;r(),s("routerLink",v(6,B,t.id)),r(),c(t.name||t.id),r(),s("status",t.status),r(2),c(f(6,4,t.updatedAt))}}function W(e,n){if(e&1&&h(0,U,7,8,"div",12,V),e&2){let t=l(2);M(t.sessions())}}function G(e,n){if(e&1){let t=O();o(0,"div",0)(1,"div",1)(2,"div")(3,"h2"),a(4),i(),o(5,"p",2),a(6),i()(),o(7,"div",3)(8,"a",4),a(9,"Edit"),i(),o(10,"button",5),j("click",function(){b(t);let m=l();return y(m.onDelete())}),a(11,"Delete"),i()()(),o(12,"div",6)(13,"dl")(14,"dt"),a(15,"Working Directory"),i(),o(16,"dd")(17,"code"),a(18),i()(),o(19,"dt"),a(20,"Created"),i(),o(21,"dd"),a(22),x(23,"relativeTime"),i()()(),_(24,q,5,1,"div",7),o(25,"div",7)(26,"div",8)(27,"h3"),a(28,"Sessions"),i(),o(29,"a",9),a(30,"New Session"),i()(),_(31,$,2,0,"p",10)(32,W,2,0),i()()}if(e&2){let t=n,p=l();r(4),c(t.name),r(2),c(t.description),r(2),s("routerLink",v(11,N,t.id)),r(10),c(t.workingDir),r(4),c(f(23,9,t.createdAt)),r(2),g(t.claudeMd?24:-1),r(5),s("routerLink",S(13,A))("queryParams",v(14,R,t.id)),r(2),g(p.sessions().length===0?31:32)}}function H(e,n){e&1&&(o(0,"div",0),C(1,"app-skeleton",16)(2,"app-skeleton",17),i()),e&2&&(r(),s("count",1),r(),s("count",3))}var F=class e{route=d(w);router=d(k);projectService=d(E);sessionService=d(I);project=u(null);sessions=u([]);async ngOnInit(){let n=this.route.snapshot.paramMap.get("id");if(n){try{let t=await this.projectService.getProject(n);this.project.set(t)}catch{this.router.navigate(["/agents/projects"]);return}await this.sessionService.loadSessions(n).catch(()=>{}),this.sessions.set(this.sessionService.sessions())}}async onDelete(){let n=this.project();n&&(await this.projectService.deleteProject(n.id),this.router.navigate(["/agents/projects"]))}static \u0275fac=function(t){return new(t||e)};static \u0275cmp=P({type:e,selectors:[["app-project-detail"]],decls:2,vars:1,consts:[[1,"page"],[1,"page__header"],[1,"page__desc"],[1,"page__actions"],[1,"btn","btn--secondary",3,"routerLink"],[1,"btn","btn--danger",3,"click"],[1,"detail__info"],[1,"detail__section"],[1,"detail__section-header"],[1,"btn","btn--primary","btn--sm",3,"routerLink","queryParams"],[1,"empty"],[1,"detail__code"],[1,"session-row"],[3,"routerLink"],[3,"status"],[1,"session-row__time"],["variant","card",3,"count"],["variant","table",3,"count"]],template:function(t,p){if(t&1&&_(0,G,33,16,"div",0)(1,H,3,2,"div",0),t&2){let m;g((m=p.project())?0:1,m)}},dependencies:[D,z,L,T],styles:[".page[_ngcontent-%COMP%]{padding:1.5rem}.page__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}.page__desc[_ngcontent-%COMP%]{margin:.25rem 0 0;color:var(--text-secondary)}.page__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem}.btn[_ngcontent-%COMP%]{padding:.5rem 1rem;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid;text-decoration:none;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:background .15s,box-shadow .15s}.btn--primary[_ngcontent-%COMP%]{background:transparent;color:var(--accent-cyan);border-color:var(--accent-cyan)}.btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.btn--secondary[_ngcontent-%COMP%]{background:transparent;color:var(--text-secondary);border-color:var(--border-bright)}.btn--secondary[_ngcontent-%COMP%]:hover{background:var(--bg-hover);color:var(--text-primary)}.btn--danger[_ngcontent-%COMP%]{background:transparent;color:var(--accent-red);border-color:var(--accent-red)}.btn--danger[_ngcontent-%COMP%]:hover{background:var(--accent-red-dim)}.btn--sm[_ngcontent-%COMP%]{padding:.375rem .75rem;font-size:.75rem}.detail__info[_ngcontent-%COMP%]   dl[_ngcontent-%COMP%]{display:grid;grid-template-columns:auto 1fr;gap:.25rem 1rem}.detail__info[_ngcontent-%COMP%]   dt[_ngcontent-%COMP%]{font-weight:600;color:var(--text-secondary);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}.detail__info[_ngcontent-%COMP%]   dd[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}code[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--accent-green);padding:2px 6px;border-radius:var(--radius-sm);font-size:.8rem;border:1px solid var(--border)}.detail__section[_ngcontent-%COMP%]{margin-top:2rem}.detail__section[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%]{margin:0 0 .75rem;color:var(--text-primary)}.detail__section-header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}.detail__section-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%]{margin:0}.detail__code[_ngcontent-%COMP%]{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:.8rem;overflow-x:auto;white-space:pre-wrap;color:var(--accent-green)}.empty[_ngcontent-%COMP%]{color:var(--text-tertiary)}.session-row[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}.session-row[_ngcontent-%COMP%]   a[_ngcontent-%COMP%]{color:var(--accent-cyan);text-decoration:none}.session-row[_ngcontent-%COMP%]   a[_ngcontent-%COMP%]:hover{text-shadow:0 0 8px rgba(0,229,255,.3)}.session-row__time[_ngcontent-%COMP%]{margin-left:auto;font-size:.75rem;color:var(--text-tertiary)}"],changeDetection:0})};export{F as ProjectDetailComponent};
+import { a as I } from './chunk-A4KCXO2Q.js';
+import { a as z } from './chunk-J3PBVME7.js';
+import './chunk-OFKXBWQC.js';
+import './chunk-CSQXEU3M.js';
+import { a as T } from './chunk-355WLUEG.js';
+import { a as L } from './chunk-FGNIWOFY.js';
+import { a as E } from './chunk-ZEJIPHXJ.js';
+import './chunk-ZSTU6MUH.js';
+import { h as D, g as k, e as w } from './chunk-G7DVZDMF.js';
+import './chunk-GH246MXO.js';
+import './chunk-D6WCRQHB.js';
+import './chunk-GEI46CGR.js';
+import {
+  ib as _,
+  Ob as a,
+  Y as b,
+  rb as C,
+  Pb as c,
+  T as d,
+  ac as f,
+  jb as g,
+  mb as h,
+  qb as i,
+  zb as j,
+  Bb as l,
+  nb as M,
+  vb as O,
+  pb as o,
+  _a as P,
+  Na as r,
+  Zb as S,
+  ob as s,
+  ja as u,
+  _b as v,
+  $b as x,
+  Z as y,
+} from './chunk-LF4EWAJA.js';
+
+var N = (e) => ['/agents/projects', e, 'edit'],
+  A = () => ['/sessions', 'new'],
+  R = (e) => ({ projectId: e }),
+  B = (e) => ['/sessions', e],
+  V = (_e, n) => n.id;
+function q(e, _n) {
+  if ((e & 1 && (o(0, 'div', 7)(1, 'h3'), a(2, 'CLAUDE.md'), i(), o(3, 'pre', 11), a(4), i()()), e & 2)) {
+    const t = l();
+    r(4), c(t.claudeMd);
+  }
+}
+function $(e, _n) {
+  e & 1 && (o(0, 'p', 10), a(1, 'No sessions yet.'), i());
+}
+function U(e, n) {
+  if (
+    (e & 1 &&
+      (o(0, 'div', 12)(1, 'a', 13),
+      a(2),
+      i(),
+      C(3, 'app-status-badge', 14),
+      o(4, 'span', 15),
+      a(5),
+      x(6, 'relativeTime'),
+      i()()),
+    e & 2)
+  ) {
+    const t = n.$implicit;
+    r(),
+      s('routerLink', v(6, B, t.id)),
+      r(),
+      c(t.name || t.id),
+      r(),
+      s('status', t.status),
+      r(2),
+      c(f(6, 4, t.updatedAt));
+  }
+}
+function W(e, _n) {
+  if ((e & 1 && h(0, U, 7, 8, 'div', 12, V), e & 2)) {
+    const t = l(2);
+    M(t.sessions());
+  }
+}
+function G(e, n) {
+  if (e & 1) {
+    const t = O();
+    o(0, 'div', 0)(1, 'div', 1)(2, 'div')(3, 'h2'),
+      a(4),
+      i(),
+      o(5, 'p', 2),
+      a(6),
+      i()(),
+      o(7, 'div', 3)(8, 'a', 4),
+      a(9, 'Edit'),
+      i(),
+      o(10, 'button', 5),
+      j('click', () => {
+        b(t);
+        const m = l();
+        return y(m.onDelete());
+      }),
+      a(11, 'Delete'),
+      i()()(),
+      o(12, 'div', 6)(13, 'dl')(14, 'dt'),
+      a(15, 'Working Directory'),
+      i(),
+      o(16, 'dd')(17, 'code'),
+      a(18),
+      i()(),
+      o(19, 'dt'),
+      a(20, 'Created'),
+      i(),
+      o(21, 'dd'),
+      a(22),
+      x(23, 'relativeTime'),
+      i()()(),
+      _(24, q, 5, 1, 'div', 7),
+      o(25, 'div', 7)(26, 'div', 8)(27, 'h3'),
+      a(28, 'Sessions'),
+      i(),
+      o(29, 'a', 9),
+      a(30, 'New Session'),
+      i()(),
+      _(31, $, 2, 0, 'p', 10)(32, W, 2, 0),
+      i()();
+  }
+  if (e & 2) {
+    const t = n,
+      p = l();
+    r(4),
+      c(t.name),
+      r(2),
+      c(t.description),
+      r(2),
+      s('routerLink', v(11, N, t.id)),
+      r(10),
+      c(t.workingDir),
+      r(4),
+      c(f(23, 9, t.createdAt)),
+      r(2),
+      g(t.claudeMd ? 24 : -1),
+      r(5),
+      s('routerLink', S(13, A))('queryParams', v(14, R, t.id)),
+      r(2),
+      g(p.sessions().length === 0 ? 31 : 32);
+  }
+}
+function H(e, _n) {
+  e & 1 && (o(0, 'div', 0), C(1, 'app-skeleton', 16)(2, 'app-skeleton', 17), i()),
+    e & 2 && (r(), s('count', 1), r(), s('count', 3));
+}
+var F = class e {
+  route = d(w);
+  router = d(k);
+  projectService = d(E);
+  sessionService = d(I);
+  project = u(null);
+  sessions = u([]);
+  async ngOnInit() {
+    const n = this.route.snapshot.paramMap.get('id');
+    if (n) {
+      try {
+        const t = await this.projectService.getProject(n);
+        this.project.set(t);
+      } catch {
+        this.router.navigate(['/agents/projects']);
+        return;
+      }
+      await this.sessionService.loadSessions(n).catch(() => {}), this.sessions.set(this.sessionService.sessions());
+    }
+  }
+  async onDelete() {
+    const n = this.project();
+    n && (await this.projectService.deleteProject(n.id), this.router.navigate(['/agents/projects']));
+  }
+  static \u0275fac = (t) => new (t || e)();
+  static \u0275cmp = P({
+    type: e,
+    selectors: [['app-project-detail']],
+    decls: 2,
+    vars: 1,
+    consts: [
+      [1, 'page'],
+      [1, 'page__header'],
+      [1, 'page__desc'],
+      [1, 'page__actions'],
+      [1, 'btn', 'btn--secondary', 3, 'routerLink'],
+      [1, 'btn', 'btn--danger', 3, 'click'],
+      [1, 'detail__info'],
+      [1, 'detail__section'],
+      [1, 'detail__section-header'],
+      [1, 'btn', 'btn--primary', 'btn--sm', 3, 'routerLink', 'queryParams'],
+      [1, 'empty'],
+      [1, 'detail__code'],
+      [1, 'session-row'],
+      [3, 'routerLink'],
+      [3, 'status'],
+      [1, 'session-row__time'],
+      ['variant', 'card', 3, 'count'],
+      ['variant', 'table', 3, 'count'],
+    ],
+    template: (t, p) => {
+      if ((t & 1 && _(0, G, 33, 16, 'div', 0)(1, H, 3, 2, 'div', 0), t & 2)) {
+        let m;
+        g((m = p.project()) ? 0 : 1, m);
+      }
+    },
+    dependencies: [D, z, L, T],
+    styles: [
+      '.page[_ngcontent-%COMP%]{padding:1.5rem}.page__header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}.page__header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}.page__desc[_ngcontent-%COMP%]{margin:.25rem 0 0;color:var(--text-secondary)}.page__actions[_ngcontent-%COMP%]{display:flex;gap:.5rem}.btn[_ngcontent-%COMP%]{padding:.5rem 1rem;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid;text-decoration:none;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;transition:background .15s,box-shadow .15s}.btn--primary[_ngcontent-%COMP%]{background:transparent;color:var(--accent-cyan);border-color:var(--accent-cyan)}.btn--primary[_ngcontent-%COMP%]:hover{background:var(--accent-cyan-dim);box-shadow:var(--glow-cyan)}.btn--secondary[_ngcontent-%COMP%]{background:transparent;color:var(--text-secondary);border-color:var(--border-bright)}.btn--secondary[_ngcontent-%COMP%]:hover{background:var(--bg-hover);color:var(--text-primary)}.btn--danger[_ngcontent-%COMP%]{background:transparent;color:var(--accent-red);border-color:var(--accent-red)}.btn--danger[_ngcontent-%COMP%]:hover{background:var(--accent-red-dim)}.btn--sm[_ngcontent-%COMP%]{padding:.375rem .75rem;font-size:.75rem}.detail__info[_ngcontent-%COMP%]   dl[_ngcontent-%COMP%]{display:grid;grid-template-columns:auto 1fr;gap:.25rem 1rem}.detail__info[_ngcontent-%COMP%]   dt[_ngcontent-%COMP%]{font-weight:600;color:var(--text-secondary);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}.detail__info[_ngcontent-%COMP%]   dd[_ngcontent-%COMP%]{margin:0;color:var(--text-primary)}code[_ngcontent-%COMP%]{background:var(--bg-raised);color:var(--accent-green);padding:2px 6px;border-radius:var(--radius-sm);font-size:.8rem;border:1px solid var(--border)}.detail__section[_ngcontent-%COMP%]{margin-top:2rem}.detail__section[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%]{margin:0 0 .75rem;color:var(--text-primary)}.detail__section-header[_ngcontent-%COMP%]{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}.detail__section-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%]{margin:0}.detail__code[_ngcontent-%COMP%]{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:.8rem;overflow-x:auto;white-space:pre-wrap;color:var(--accent-green)}.empty[_ngcontent-%COMP%]{color:var(--text-tertiary)}.session-row[_ngcontent-%COMP%]{display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}.session-row[_ngcontent-%COMP%]   a[_ngcontent-%COMP%]{color:var(--accent-cyan);text-decoration:none}.session-row[_ngcontent-%COMP%]   a[_ngcontent-%COMP%]:hover{text-shadow:0 0 8px rgba(0,229,255,.3)}.session-row__time[_ngcontent-%COMP%]{margin-left:auto;font-size:.75rem;color:var(--text-tertiary)}',
+    ],
+    changeDetection: 0,
+  });
+};
+
+export { F as ProjectDetailComponent };
