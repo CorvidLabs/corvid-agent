@@ -80,7 +80,7 @@ const WHISPER_HALLUCINATIONS = new Set([
 const MAX_AUDIO_DURATION_MS = 180_000;
 
 /** Silence duration (ms) before ending a user's audio stream. */
-const SILENCE_DURATION_MS = 700;
+const SILENCE_DURATION_MS = 1200;
 
 /** Discord Opus: 48kHz, stereo, 20ms frames → 960 samples/frame. */
 const SAMPLE_RATE = 48_000;

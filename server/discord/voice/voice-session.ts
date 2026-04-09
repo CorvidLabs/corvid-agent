@@ -27,7 +27,14 @@ const MAX_TTS_LENGTH = 4000;
 
 
 /** How long to wait after the last content event before considering the response complete (ms). */
-const RESPONSE_DEBOUNCE_MS = 800;
+const RESPONSE_DEBOUNCE_MS = 1500;
+
+/**
+ * How long to wait after the last transcription before sending the batch to the agent (ms).
+ * This lets multiple speakers (or continued speech) accumulate into a single prompt,
+ * avoiding interrupting people mid-conversation.
+ */
+const TRANSCRIPTION_BUFFER_MS = 2000;
 
 /** Per-guild voice session state. */
 interface GuildVoiceSession {
@@ -43,7 +50,10 @@ interface GuildVoiceSession {
   callback: EventCallback;
   /** Queued transcriptions received while TTS was playing. */
   pendingTranscriptions: { userId: string; text: string }[];
-  /** Round-robin index for acknowledgment phrases. */
+  /** Buffered transcriptions waiting to be sent as a batch. */
+  transcriptionBuffer: { userId: string; text: string; voicePrefix: string }[];
+  /** Timer for flushing the transcription buffer. */
+  transcriptionBufferTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -68,7 +78,8 @@ export class VoiceSessionRouter {
 
   /**
    * Handle a transcription from a voice channel user.
-   * Routes through the agent and plays back the response via TTS.
+   * Buffers transcriptions for TRANSCRIPTION_BUFFER_MS before sending to the agent,
+   * so multiple speakers (or continued speech) get combined into one prompt.
    */
   async handleTranscription(result: TranscriptionResult): Promise<void> {
     const { guildId, userId, text } = result;
@@ -101,44 +112,75 @@ export class VoiceSessionRouter {
       return;
     }
 
-    // Skip if already responding to a previous transcription
+    // If already responding, add to the transcription buffer (will flush after current response)
     const existing = this.sessions.get(guildId);
     if (existing?.responding) {
       log.debug('Queuing transcription — still responding to previous', { guildId, userId });
-      // Send to existing session anyway — it queues
       this.processManager.sendMessage(existing.sessionId, `${voicePrefix}: ${text}`);
       return;
     }
 
-    log.info('Voice transcription → agent', { guildId, userId, textLength: text.length });
-
+    // Buffer the transcription — wait for more before sending to agent
     const session = await this.ensureSession(guildId);
     if (!session) {
       log.warn('No voice session available — cannot route transcription', { guildId });
       return;
     }
 
+    session.transcriptionBuffer.push({ userId, text, voicePrefix });
+    log.debug('Buffered transcription', {
+      guildId,
+      userId,
+      bufferSize: session.transcriptionBuffer.length,
+    });
+
+    // Reset the buffer timer — wait for more transcriptions
+    if (session.transcriptionBufferTimer) clearTimeout(session.transcriptionBufferTimer);
+    session.transcriptionBufferTimer = setTimeout(() => {
+      this.flushTranscriptionBuffer(guildId);
+    }, TRANSCRIPTION_BUFFER_MS);
+  }
+
+  /** Flush all buffered transcriptions as a single combined message to the agent. */
+  private flushTranscriptionBuffer(guildId: string): void {
+    const session = this.sessions.get(guildId);
+    if (!session) return;
+
+    session.transcriptionBufferTimer = null;
+    const buffered = session.transcriptionBuffer.splice(0);
+    if (buffered.length === 0) return;
+
+    // Combine all buffered transcriptions into a single message
+    const combinedMessage = buffered
+      .map((t) => `${t.voicePrefix}: ${t.text}`)
+      .join('\n');
+
+    log.info('Flushing transcription buffer → agent', {
+      guildId,
+      messageCount: buffered.length,
+      textLength: combinedMessage.length,
+    });
+
     session.responding = true;
     session.responseBuffer = '';
 
-
-    const sent = this.processManager.sendMessage(session.sessionId, `${voicePrefix}: ${text}`);
+    const sent = this.processManager.sendMessage(session.sessionId, combinedMessage);
     if (!sent) {
       // Session may have stopped — try resuming
       const dbSession = getSession(this.db, session.sessionId);
       if (dbSession) {
-        // Re-subscribe: cleanupSessionState removes all subscribers when process exits
         this.processManager.subscribe(session.sessionId, session.callback);
-        this.processManager.resumeProcess(dbSession, `${voicePrefix}: ${text}`);
+        this.processManager.resumeProcess(dbSession, combinedMessage);
       } else {
         // Session is gone — create a new one
         log.info('Voice session expired, creating new one', { guildId });
         this.sessions.delete(guildId);
-        const newSession = await this.ensureSession(guildId);
-        if (newSession) {
-          newSession.responding = true;
-          this.processManager.sendMessage(newSession.sessionId, `${voicePrefix}: ${text}`);
-        }
+        this.ensureSession(guildId).then((newSession) => {
+          if (newSession) {
+            newSession.responding = true;
+            this.processManager.sendMessage(newSession.sessionId, combinedMessage);
+          }
+        });
       }
     }
   }
@@ -245,6 +287,8 @@ export class VoiceSessionRouter {
       debounceTimer: null,
       callback: (_sid, event) => this.handleSessionEvent(guildId, event),
       pendingTranscriptions: [],
+      transcriptionBuffer: [],
+      transcriptionBufferTimer: null,
     };
 
     this.processManager.subscribe(session.id, voiceSession.callback);
@@ -391,6 +435,7 @@ export class VoiceSessionRouter {
     if (!session) return;
 
     if (session.debounceTimer) clearTimeout(session.debounceTimer);
+    if (session.transcriptionBufferTimer) clearTimeout(session.transcriptionBufferTimer);
     this.processManager.unsubscribe(session.sessionId, session.callback);
     this.sessions.delete(guildId);
     log.info('Cleaned up voice session', { guildId, sessionId: session.sessionId });
