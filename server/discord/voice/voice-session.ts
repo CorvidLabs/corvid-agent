@@ -77,6 +77,12 @@ export class VoiceSessionRouter {
 
     if (!text.trim()) return;
 
+    // Resolve text channel ID so voice messages include channel context
+    const connectionInfo = this.voiceManager.getConnection(guildId);
+    const textChannelId = connectionInfo?.transcriptionChannelId;
+    const channelSuffix = textChannelId ? ` in channel ${textChannelId}` : '';
+    const voicePrefix = `[Voice from <@${userId}>${channelSuffix}]`;
+
     // Queue transcription if we're currently speaking (process after TTS finishes)
     if (this.voiceManager.isSpeaking(guildId)) {
       const existing = this.sessions.get(guildId);
@@ -96,7 +102,7 @@ export class VoiceSessionRouter {
     if (existing?.responding) {
       log.debug('Queuing transcription — still responding to previous', { guildId, userId });
       // Send to existing session anyway — it queues
-      this.processManager.sendMessage(existing.sessionId, `[Voice from <@${userId}>]: ${text}`);
+      this.processManager.sendMessage(existing.sessionId, `${voicePrefix}: ${text}`);
       return;
     }
 
@@ -119,14 +125,14 @@ export class VoiceSessionRouter {
     });
     // Don't await — send to agent in parallel so the LLM starts thinking immediately
 
-    const sent = this.processManager.sendMessage(session.sessionId, `[Voice from <@${userId}>]: ${text}`);
+    const sent = this.processManager.sendMessage(session.sessionId, `${voicePrefix}: ${text}`);
     if (!sent) {
       // Session may have stopped — try resuming
       const dbSession = getSession(this.db, session.sessionId);
       if (dbSession) {
         // Re-subscribe: cleanupSessionState removes all subscribers when process exits
         this.processManager.subscribe(session.sessionId, session.callback);
-        this.processManager.resumeProcess(dbSession, `[Voice from <@${userId}>]: ${text}`);
+        this.processManager.resumeProcess(dbSession, `${voicePrefix}: ${text}`);
       } else {
         // Session is gone — create a new one
         log.info('Voice session expired, creating new one', { guildId });
@@ -134,7 +140,7 @@ export class VoiceSessionRouter {
         const newSession = await this.ensureSession(guildId);
         if (newSession) {
           newSession.responding = true;
-          this.processManager.sendMessage(newSession.sessionId, `[Voice from <@${userId}>]: ${text}`);
+          this.processManager.sendMessage(newSession.sessionId, `${voicePrefix}: ${text}`);
         }
       }
     }
