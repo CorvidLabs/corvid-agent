@@ -24,6 +24,7 @@ import {
   execFlockReputationRefresh,
   execFlockTesting,
   execForkRepos,
+  execGitHubCommentMonitor,
   execGithubSuggest,
   execImprovementLoop,
   execMarketplaceBilling,
@@ -120,6 +121,9 @@ async function dispatchAction(
       break;
     case 'discord_post':
       await execDiscordPost(hctx, executionId, schedule, action);
+      break;
+    case 'github_comment_monitor':
+      await execGitHubCommentMonitor(hctx, executionId, schedule, action);
       break;
     case 'custom':
       await execCustom(hctx, executionId, schedule, action);

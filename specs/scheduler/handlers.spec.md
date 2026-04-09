@@ -8,6 +8,7 @@ files:
   - server/scheduler/handlers/index.ts
   - server/scheduler/handlers/council.ts
   - server/scheduler/handlers/github.ts
+  - server/scheduler/handlers/github-comment-monitor.ts
   - server/scheduler/handlers/improvement.ts
   - server/scheduler/handlers/maintenance.ts
   - server/scheduler/handlers/review.ts
@@ -103,6 +104,12 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 |----------|-----------|---------|-------------|
 | `execDiscordPost` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Sends a message or embed to a Discord channel via the bot API. Requires `action.channelId` and `DISCORD_BOT_TOKEN`. Supports plain text (`message` only) or rich embeds (`embedTitle` + `message`). |
 
+#### github-comment-monitor.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `execGitHubCommentMonitor` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Monitors external GitHub comments on a repo. Fetches issue and PR comments since the last check (or 4h fallback), filters out team members (via `github_allowlist` DB table) and bot accounts, posts a Discord digest embed if external comments are found. Uses only 2 GitHub API calls per check. |
+
 #### maintenance.ts
 
 | Function | Parameters | Returns | Description |
@@ -135,7 +142,8 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 15. `execSendMessage` requires `toAgentId` and `message` in the action.
 16. `execCustom` requires `action.prompt` to be non-empty.
 16a. `execDiscordPost` requires `action.channelId` to be non-empty and `DISCORD_BOT_TOKEN` env var to be set. If `embedTitle` is provided, sends an embed; otherwise sends plain text. Both `message` and `embedTitle` being absent is an error.
-17. `execReviewPrs` creates a separate session per repo (not one session for all repos) and instructs the agent to skip PRs it has already reviewed (deduplication via comment check). Default `maxPrs` is 5 per repo.
+17. `execGitHubCommentMonitor` requires `GITHUB_TOKEN` env var; fails if not set. Default repo is `CorvidLabs/corvid-agent`. Team members are loaded from `github_allowlist` DB table; bot accounts (logins ending in `[bot]`) are also excluded. The `since` timestamp is stored in `action.description` for continuity between runs; defaults to 4 hours ago on first run. Discord notification requires both `DISCORD_BOT_TOKEN` and `action.channelId`; skipped silently if either is missing. Embed descriptions are capped at 4000 characters; comment body previews at 120 characters.
+18. `execReviewPrs` creates a separate session per repo (not one session for all repos) and instructs the agent to skip PRs it has already reviewed (deduplication via comment check). Default `maxPrs` is 5 per repo.
 18. Multi-tenant support: handlers that need an agent use `ctx.resolveScheduleTenantId` to resolve the tenant.
 19. `execStatusCheckin` evaluates system state via `SystemStateDetector`, resolves agent name (or first 8 chars of ID as fallback), and broadcasts via `sendOnChainToSelf` with format `[STATUS_CHECKIN] Agent: {name} | System: {states} | Schedules running: {count}`.
 
@@ -183,6 +191,18 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 - **When** `execDiscordPost` is called
 - **Then** a plain text message "Hello" is sent to channel 123
 
+### Scenario: GitHub comment monitor with external comments
+
+- **Given** an action with `type: 'github_comment_monitor'`, `repos: ['CorvidLabs/corvid-agent']`, and `channelId: '123'`
+- **When** `execGitHubCommentMonitor` is called and 2 external issue comments are found
+- **Then** a Discord embed is sent to channel 123 with title "2 External Comments on CorvidLabs/corvid-agent", and execution is marked `completed` with the comment details and updated `since` timestamp
+
+### Scenario: GitHub comment monitor with no external comments
+
+- **Given** an action targeting a repo with only team-member and bot comments since the last check
+- **When** `execGitHubCommentMonitor` is called
+- **Then** no Discord notification is sent, and execution is marked `completed` with "No external comments since ..."
+
 ### Scenario: Daily review summary
 
 - **Given** `ctx.dailyReviewService` is available and returns execution/PR/health stats
@@ -199,7 +219,9 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | Required service is null | Execution marked `failed` with service-specific message |
 | Missing required action fields | Execution marked `failed` with field-specific message |
 | No `channelId` for discord_post | Execution marked `failed` with "No channelId provided" |
-| No `DISCORD_BOT_TOKEN` env var | Execution marked `failed` with "DISCORD_BOT_TOKEN not configured" |
+| No `DISCORD_BOT_TOKEN` env var (discord_post) | Execution marked `failed` with "DISCORD_BOT_TOKEN not configured" |
+| No `GITHUB_TOKEN` env var (github_comment_monitor) | Execution marked `failed` with "GITHUB_TOKEN not configured" |
+| Invalid repo format (github_comment_monitor) | Execution marked `failed` with "Invalid repo format: ..." |
 | No message or embedTitle | Execution marked `failed` with "No message or embedTitle provided" |
 | Discord API returns non-OK | Execution marked `failed` with status code and error body |
 | Handler throws an exception | Caught internally, execution marked `failed` with error message |
@@ -228,6 +250,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `server/scheduler/system-state` | `SystemStateDetector` for status_checkin |
 | `server/flock-directory/service` | `FlockDirectoryService` for flock_testing agent listing |
 | `server/flock-directory/testing/runner` | `FlockTestRunner` for flock_testing challenge execution |
+| `server/db/github-allowlist` | `listGitHubAllowlist` for github_comment_monitor team filtering |
 
 ### Consumed By
 
@@ -244,3 +267,4 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | 2026-03-17 | corvid-agent | Added `execFlockTesting` handler for automated Flock Directory agent testing |
 | 2026-03-23 | corvid-agent | Added `execDiscordPost` handler for direct Discord channel posting |
 | 2026-03-31 | corvid-agent | Added `execFlockReputationRefresh` handler for automatic flock reputation refresh |
+| 2026-04-09 | corvid-agent | Added `execGitHubCommentMonitor` handler for external GitHub comment monitoring |

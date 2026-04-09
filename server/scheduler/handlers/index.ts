@@ -6,6 +6,7 @@ export { execCouncilLaunch, execSendMessage } from './council';
 export { execDiscordPost } from './discord-post';
 export { execFlockTesting } from './flock-testing';
 export { execForkRepos, execGithubSuggest, execReviewPrs, execStarRepos } from './github';
+export { execGitHubCommentMonitor } from './github-comment-monitor';
 export { execImprovementLoop } from './improvement';
 export {
   execCustom,

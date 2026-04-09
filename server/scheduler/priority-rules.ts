@@ -27,6 +27,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
   flock_testing: 'maintenance',
   flock_reputation_refresh: 'lightweight',
   discord_post: 'lightweight',
+  github_comment_monitor: 'lightweight',
   custom: 'feature_work',
 };
 
