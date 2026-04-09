@@ -43,9 +43,23 @@ export function saveMemory(
          VALUES (?, ?, ?, ?, 'short_term', datetime('now', ?))
          ON CONFLICT(agent_id, key) DO UPDATE SET
              content = excluded.content,
-             status = 'short_term',
-             txid = NULL,
-             expires_at = datetime('now', ?),
+             -- Preserve on-chain status: only reset to short_term if not already promoted
+             status = CASE
+                 WHEN agent_memories.status IN ('confirmed', 'pending')
+                 THEN agent_memories.status
+                 ELSE 'short_term'
+             END,
+             -- Preserve txid/asa_id for promoted memories
+             txid = CASE
+                 WHEN agent_memories.status IN ('confirmed', 'pending')
+                 THEN agent_memories.txid
+                 ELSE NULL
+             END,
+             expires_at = CASE
+                 WHEN agent_memories.status IN ('confirmed', 'pending')
+                 THEN NULL
+                 ELSE datetime('now', ?)
+             END,
              access_count = 0,
              updated_at = datetime('now')`,
   ).run(id, params.agentId, params.key, params.content, `+${ttl} days`, `+${ttl} days`);
@@ -173,7 +187,7 @@ export function listMemories(db: Database, agentId: string): AgentMemory[] {
 }
 
 export function updateMemoryTxid(db: Database, id: string, txid: string): void {
-  db.query("UPDATE agent_memories SET txid = ?, status = 'confirmed' WHERE id = ?").run(txid, id);
+  db.query("UPDATE agent_memories SET txid = ?, updated_at = datetime('now') WHERE id = ?").run(txid, id);
 }
 
 export function updateMemoryStatus(db: Database, id: string, status: MemoryStatus): void {
