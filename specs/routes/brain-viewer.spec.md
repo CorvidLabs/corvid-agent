@@ -33,6 +33,7 @@ Dashboard API endpoints for inspecting agent memory state. Provides read-only vi
 | GET | `/api/dashboard/memories/stats` | Aggregate statistics: totals by tier/status/category/agent, date range, average decay score |
 | GET | `/api/dashboard/memories/:id` | Single memory detail with tier, category, and decay score |
 | GET | `/api/dashboard/memories/sync-status` | Sync health: pending/failed counts, last sync time, running heuristic, recent errors |
+| GET | `/api/dashboard/memories/export` | Bulk export of memories as JSON or CSV download |
 
 ## Key Behaviors
 
@@ -58,6 +59,16 @@ Dashboard API endpoints for inspecting agent memory state. Provides read-only vi
 
 ### Sync Status Heuristic
 - `isRunning` is `true` if any memory was confirmed within the last 120 seconds OR there are pending memories.
+
+### Memory Export (`/export`)
+- `format` — `json` or `csv` (required, defaults to `json`; invalid values return 400)
+- `tier` — `short-term`, `long-term`, or `all` (defaults to `all`; invalid values return 400)
+- `category` — filter by category (joins `memory_categories`)
+- `agent_id` — filter by agent
+- `date_from` / `date_to` — filter by `created_at` range (ISO datetime strings)
+- JSON response includes `exportedAt`, `count`, and `entries` array; served with `Content-Disposition: attachment`
+- CSV response includes header row with columns: `key, content, tier, category, agent, created_at, updated_at, decay_score`; served with `Content-Disposition: attachment`
+- Results capped at 10,000 rows
 
 ## Invariants
 
@@ -114,3 +125,4 @@ Dashboard API endpoints for inspecting agent memory state. Provides read-only vi
 | Version | Date | Description |
 |---------|------|-------------|
 | 1 | 2026-03-18 | Initial spec — 4 read-only endpoints for memory inspection dashboard. |
+| 2 | 2026-04-10 | Add `/export` endpoint for bulk JSON/CSV download with tier/category/date filtering. |

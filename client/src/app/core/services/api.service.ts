@@ -31,4 +31,8 @@ export class ApiService {
     deleteWithBody<Result>(path: string, body: unknown): Observable<Result> {
         return this.http.delete<Result>(`${this.baseUrl}${path}`, { body });
     }
+
+    getBlob(path: string): Observable<Blob> {
+        return this.http.get(`${this.baseUrl}${path}`, { responseType: 'blob' });
+    }
 }
