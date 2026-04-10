@@ -114,11 +114,12 @@ export class MemorySyncService {
                 continue;
               }
               // syncViaArc69 returned false — ARC-69 infra unavailable (no indexer, no chat account)
-              log.warn('ARC-69 unavailable on localnet, memory stays pending', {
+              log.warn('ARC-69 unavailable on localnet, marking memory as failed for retry', {
                 key: memory.key,
                 agentId: memory.agentId,
               });
-              skipped++;
+              updateMemoryStatus(this.db, memory.id, 'failed');
+              failed++;
               continue;
             } catch (err) {
               log.warn('ARC-69 sync failed on localnet, marking failed for retry', {
@@ -140,6 +141,7 @@ export class MemorySyncService {
 
           if (txid) {
             updateMemoryTxid(this.db, memory.id, txid);
+            updateMemoryStatus(this.db, memory.id, 'confirmed');
             synced++;
           } else {
             // sendOnChainToSelf returned null — no wallet, stay pending
@@ -196,10 +198,12 @@ export class MemorySyncService {
     if (existingAsaId) {
       const { txid } = await updateMemoryAsa(ctx, existingAsaId, memory.key, memory.content);
       updateMemoryTxid(this.db, memory.id, txid);
+      updateMemoryStatus(this.db, memory.id, 'confirmed');
     } else {
       const { asaId, txid } = await createMemoryAsa(ctx, memory.key, memory.content);
       updateMemoryTxid(this.db, memory.id, txid);
       updateMemoryAsaId(this.db, memory.id, asaId);
+      updateMemoryStatus(this.db, memory.id, 'confirmed');
     }
 
     return true;

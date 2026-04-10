@@ -45,7 +45,7 @@ mock.module('../algochat/config', () => ({
   _resetConfigCache: () => {},
 }));
 
-import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
+import { recallMemory, saveMemory, updateMemoryStatus, updateMemoryTxid } from '../db/agent-memories';
 import { grantCredits } from '../db/credits';
 import { getSchedule } from '../db/schedules';
 import { buildDirectTools } from '../mcp/direct-tools';
@@ -64,6 +64,7 @@ import {
   handleRecallMemory,
   handleSaveMemory,
   handleSendMessage,
+  handleSyncOnChainMemories,
   type McpToolContext,
 } from '../mcp/tool-handlers';
 
@@ -1077,6 +1078,7 @@ describe('handleRecallMemory', () => {
   test('recall by key shows full txid when confirmed', async () => {
     const mem = saveMemory(db, { agentId, key: 'full-txid-key', content: 'txid-content' });
     updateMemoryTxid(db, mem.id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+    updateMemoryStatus(db, mem.id, 'confirmed');
     const ctx = createMockContext();
     const result = await handleRecallMemory(ctx, { key: 'full-txid-key' });
     const text = (result.content[0] as { text: string }).text;
@@ -1139,6 +1141,7 @@ describe('handleRecallMemory', () => {
   test('search results include txid when confirmed', async () => {
     const mem = saveMemory(db, { agentId, key: 'search-txid', content: 'searchable content' });
     updateMemoryTxid(db, mem.id, 'FULLTXIDINSEARCH');
+    updateMemoryStatus(db, mem.id, 'confirmed');
     const ctx = createMockContext();
     const result = await handleRecallMemory(ctx, { query: 'searchable' });
     const text = (result.content[0] as { text: string }).text;
@@ -1254,6 +1257,61 @@ describe('handlePromoteMemory', () => {
     const promTool = tools.find((t) => t.name === 'corvid_promote_memory');
     expect(promTool).toBeDefined();
     expect(promTool!.parameters.required).toContain('key');
+  });
+});
+
+// ─── handleSyncOnChainMemories ───────────────────────────────────────────────
+
+describe('handleSyncOnChainMemories', () => {
+  test('syncs plain transaction memories and marks as confirmed', async () => {
+    const ctx = createMockContext({
+      agentMessenger: {
+        readOnChainMemories: mock(() =>
+          Promise.resolve([
+            { key: 'chain-key-1', content: 'chain content 1', txid: 'TX_CHAIN_1' },
+            { key: 'chain-key-2', content: 'chain content 2', txid: 'TX_CHAIN_2' },
+          ]),
+        ),
+      } as unknown as McpToolContext['agentMessenger'],
+      agentWalletService: {} as McpToolContext['agentWalletService'],
+    });
+
+    const result = await handleSyncOnChainMemories(ctx, {});
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('restored/updated');
+
+    // Verify both memories were saved and confirmed
+    const mem1 = recallMemory(db, agentId, 'chain-key-1');
+    expect(mem1).toBeDefined();
+    expect(mem1!.status).toBe('confirmed');
+    expect(mem1!.txid).toBe('TX_CHAIN_1');
+
+    const mem2 = recallMemory(db, agentId, 'chain-key-2');
+    expect(mem2).toBeDefined();
+    expect(mem2!.status).toBe('confirmed');
+    expect(mem2!.txid).toBe('TX_CHAIN_2');
+  });
+
+  test('upgrades existing non-confirmed memory to confirmed on sync', async () => {
+    // Pre-save a memory locally (short_term, no txid)
+    saveMemory(db, { agentId, key: 'existing-sync', content: 'local content' });
+
+    const ctx = createMockContext({
+      agentMessenger: {
+        readOnChainMemories: mock(() =>
+          Promise.resolve([{ key: 'existing-sync', content: 'chain content', txid: 'TX_UPGRADE' }]),
+        ),
+      } as unknown as McpToolContext['agentMessenger'],
+      agentWalletService: {} as McpToolContext['agentWalletService'],
+    });
+
+    const result = await handleSyncOnChainMemories(ctx, {});
+    expect(result.isError).toBeFalsy();
+
+    const mem = recallMemory(db, agentId, 'existing-sync');
+    expect(mem!.status).toBe('confirmed');
+    expect(mem!.txid).toBe('TX_UPGRADE');
   });
 });
 

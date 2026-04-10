@@ -189,6 +189,7 @@ describe('MemorySyncService tick', () => {
     expect(mockEncryptMemoryContent).toHaveBeenCalledTimes(1);
     expect(messenger.sendOnChainToSelf).toHaveBeenCalledTimes(1);
     expect(mockUpdateMemoryTxid).toHaveBeenCalledWith(db, 'mem-1', 'txid-xyz');
+    expect(mockUpdateMemoryStatus).toHaveBeenCalledWith(db, 'mem-1', 'confirmed');
   });
 
   test('tick skips failed memory within backoff window', async () => {
@@ -205,6 +206,23 @@ describe('MemorySyncService tick', () => {
 
     expect(mockUpdateMemoryTxid).not.toHaveBeenCalled();
     expect(mockUpdateMemoryStatus).not.toHaveBeenCalled();
+  });
+
+  test('tick marks memory as failed when localnet ARC-69 is unavailable', async () => {
+    const messenger = makeMockMessenger();
+    const walletService = {
+      checkAndRefill: mock(async () => {}),
+      getAlgoChatService: () => ({ algodClient: {}, indexerClient: null }),
+      getAgentChatAccount: mock(async () => null),
+    } as unknown as import('../algochat/agent-wallet').AgentWalletService;
+    service.setServices(messenger, undefined, 'localnet');
+    service.setWalletService(walletService);
+    mockGetPendingMemories.mockImplementation(() => [makeMemory()]);
+
+    await service.tick();
+
+    expect(mockUpdateMemoryStatus).toHaveBeenCalledWith(db, 'mem-1', 'failed');
+    expect(mockUpdateMemoryTxid).not.toHaveBeenCalled();
   });
 
   test('tick retries failed memory outside backoff window (non-localnet)', async () => {
