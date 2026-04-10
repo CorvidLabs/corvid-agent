@@ -67,7 +67,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 116;
+const SCHEMA_VERSION = 117;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -234,6 +234,10 @@ const MIGRATIONS: Record<number, string[]> = {
     `ALTER TABLE governance_proposals ADD COLUMN voting_deadline TEXT DEFAULT NULL`,
     ...councils.tables.filter((s) => s.includes('proposal_vetoes')),
     ...councils.indexes.filter((s) => s.includes('proposal_vetoes')),
+  ],
+  117: [
+    // Durable conversation summary on thread sessions for context carry-over
+    `ALTER TABLE discord_thread_sessions ADD COLUMN last_summary TEXT DEFAULT NULL`,
   ],
 };
 
