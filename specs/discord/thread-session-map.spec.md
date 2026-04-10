@@ -43,6 +43,9 @@ Owns the in-memory state types for thread-based Discord conversations and the DB
 | `getRecentThreadSessions` | `(db: Database, maxAgeHours?: number)` | `Array<{ threadId, info, lastActivityAt }>` | Bulk-loads recent thread sessions for startup recovery (default: 48 hours). |
 | `deleteThreadSession` | `(db: Database, threadId: string)` | `void` | Deletes a thread session (e.g. on archival). |
 | `pruneOldThreadSessions` | `(db: Database, maxAgeDays?: number)` | `number` | Removes thread session entries older than the specified age (default: 14 days). Returns count of deleted rows. |
+| `updateThreadSessionSummary` | `(db: Database, threadId: string, summary: string)` | `void` | Updates the durable conversation summary on a thread session (survives session deletion). |
+| `getThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Retrieves the durable conversation summary for a thread. Returns null if none stored. |
+| `getThreadIdForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup of thread ID by session ID. Used to persist summaries on process exit. |
 
 ## Invariants
 
@@ -85,6 +88,7 @@ Owns the in-memory state types for thread-based Discord conversations and the DB
 | buddy_agent_id | TEXT | | Buddy agent ID (if buddy mode) |
 | buddy_agent_name | TEXT | | Buddy agent name |
 | buddy_max_rounds | INTEGER | | Max buddy interaction rounds |
+| last_summary | TEXT | nullable | Durable conversation summary that survives session deletion |
 | last_activity_at | TEXT | NOT NULL DEFAULT datetime('now') | Last activity timestamp |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | Creation timestamp |
 

@@ -5,6 +5,7 @@ status: active
 files:
   - server/db/discord-thread-sessions.ts
   - server/db/migrations/112_discord_thread_sessions.ts
+  - server/db/migrations/117_thread_session_summary.ts
 db_tables:
   - discord_thread_sessions
 depends_on:
@@ -29,6 +30,16 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 | `getRecentThreadSessions` | `(db: Database, maxAgeHours?: number)` | `Array<{ threadId, info, lastActivityAt }>` | Bulk-load recent thread sessions for startup recovery (default: 48 hours) |
 | `deleteThreadSession` | `(db: Database, threadId: string)` | `void` | Delete a thread session (e.g. on thread archival) |
 | `pruneOldThreadSessions` | `(db: Database, maxAgeDays?: number)` | `number` | Remove thread sessions older than specified age (default: 14 days); returns count of deleted rows |
+| `updateThreadSessionSummary` | `(db: Database, threadId: string, summary: string)` | `void` | Update the durable conversation summary on a thread session (survives session deletion) |
+| `getThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get the durable conversation summary for a thread; returns null if none stored |
+| `getThreadIdForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup of thread ID by session ID (used to persist summaries on process exit) |
+
+### Exported Migration Functions (117_thread_session_summary.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `last_summary TEXT` column to `discord_thread_sessions` for durable conversation context |
+| `down` | `(db: Database)` | `void` | Removes `last_summary` column by recreating the table without it |
 
 ### Exported Migration Functions (112_discord_thread_sessions.ts)
 
@@ -116,6 +127,7 @@ Persists Discord thread-to-session mappings in SQLite so that active conversatio
 | buddy_agent_id | TEXT | nullable | Buddy agent ID for paired sessions |
 | buddy_agent_name | TEXT | nullable | Buddy agent name |
 | buddy_max_rounds | INTEGER | nullable | Max buddy conversation rounds |
+| last_summary | TEXT | nullable | Durable conversation summary that survives session deletion |
 | last_activity_at | TEXT | NOT NULL DEFAULT datetime('now') | Last activity timestamp |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | Creation timestamp |
 
