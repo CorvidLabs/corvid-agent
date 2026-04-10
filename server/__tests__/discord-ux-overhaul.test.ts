@@ -214,6 +214,237 @@ describe('embed-response streaming edits', () => {
     }
   });
 
+  test('session_error without progress message sends new embed with Resume button', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { calls, cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        'session-err-noprog', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
+
+      // Fire error WITHOUT any prior tool_status (no progress message exists)
+      callback('session-err-noprog', {
+        type: 'session_error',
+        error: { errorType: 'context_exhausted', message: 'Context full' },
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Should send a new embed (not edit), with Resume button
+      const sendWithButtons = calls.find(
+        (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
+      );
+      expect(sendWithButtons).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('context_warning sends warning embed for critical level', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { calls, cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        'session-ctx', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx')!.callback;
+
+      callback('session-ctx', {
+        type: 'context_warning',
+        level: 'critical',
+        usagePercent: 95,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Should send a warning embed with yellow color
+      const warningEmbed = calls.find(
+        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232,
+      );
+      expect(warningEmbed).toBeDefined();
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx')?.callback;
+      if (cb) cb('session-ctx', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('session_exited cleans up and flushes buffer', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        'session-exit', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-exit')!.callback;
+
+      // Buffer some content then exit
+      callback('session-exit', { type: 'assistant', message: { content: 'partial response' } });
+      callback('session-exit', { type: 'session_exited' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Thread callback should be cleaned up
+      expect(threadCallbacks.has(THREAD_ID)).toBe(false);
+      expect(pm.unsubscribe).toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('crash detection edits progress message when one exists', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    // Make isRunning return false to trigger crash detection
+    (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => false);
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { calls, cleanup } = installSnowflakeMock();
+
+    try {
+      // Temporarily make isRunning return true for setup
+      (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => true);
+
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        'session-crash', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-crash')!.callback;
+
+      // Send tool_status to create a progress message
+      callback('session-crash', { type: 'tool_status', statusMessage: 'Building...' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Now make isRunning return false - typing interval will detect death
+      (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => false);
+
+      // Wait for typing interval to fire (8s) + some buffer
+      await new Promise((r) => setTimeout(r, 8500));
+
+      // Should have edited the progress message with crash info
+      const crashEdit = calls.find(
+        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description?.includes('ended unexpectedly'),
+      );
+      expect(crashEdit).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  }, 15000);
+
+  test('result with session stats includes duration and turns fields', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const { createSession } = await import('../db/sessions');
+    const { listAgents } = await import('../db/agents');
+    const { listProjects } = await import('../db/projects');
+    createAgent(db, { name: 'StatsAgent' });
+    createProject(db, { name: 'StatsProject', workingDir: '/tmp/stats' });
+    const agents = listAgents(db);
+    const projects = listProjects(db);
+    const session = createSession(db, {
+      projectId: projects[0].id,
+      agentId: agents[0].id,
+      name: 'Stats session',
+      initialPrompt: 'test',
+      source: 'discord',
+    });
+    // Update total_turns to exercise the turns field
+    db.run('UPDATE sessions SET total_turns = 5 WHERE id = ?', [session.id]);
+    // Insert a session_metrics row for tool_call_count
+    db.run('INSERT INTO session_metrics (session_id, tool_call_count) VALUES (?, ?)', [session.id, 12]);
+
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+
+    let resolveButtons: (call: unknown) => void;
+    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+
+    const calls: unknown[] = [];
+    const mockClient: Partial<DiscordRestClient> = {
+      respondToInteraction: async () => ({} as never),
+      deferInteraction: async () => {},
+      editDeferredResponse: async () => ({} as never),
+      sendMessage: async (_channelId, data) => {
+        const entry = { method: 'send', data };
+        calls.push(entry);
+        if ((data as any)?.components?.[0]?.components?.length > 0) {
+          resolveButtons(entry);
+        }
+        return { id: MSG_ID } as never;
+      },
+      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return { id: MSG_ID } as never; },
+      deleteMessage: async () => {},
+      addReaction: mock(async () => {}),
+      removeReaction: async () => {},
+      sendTypingIndicator: async () => {},
+      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+    };
+    _setRestClientForTesting(mockClient as DiscordRestClient);
+    const cleanup = () => _setRestClientForTesting(null);
+
+    try {
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        session.id, THREAD_ID, 'StatsAgent', 'test-model', 'StatsProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === session.id)!.callback;
+
+      // Send content then result
+      callback(session.id, { type: 'assistant', message: { content: 'Done!' } });
+      await new Promise((r) => setTimeout(r, 50));
+      callback(session.id, { type: 'result', result: 'done' });
+
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000));
+      const embedWithButtons = await Promise.race([buttonsPromise, timeout]);
+
+      expect(embedWithButtons).toBeDefined();
+      if (embedWithButtons) {
+        const embed = (embedWithButtons as any).data.embeds[0];
+        // Should have stats fields
+        const fieldNames = (embed.fields || []).map((f: any) => f.name);
+        expect(fieldNames).toContain('Duration');
+        expect(fieldNames).toContain('Turns');
+        expect(fieldNames).toContain('Tool Calls');
+      }
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  test('ack timer sends progress embed when no content arrives', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { calls, cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
+        'session-ack', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+
+      // Wait for ack timer to fire (5s) + buffer
+      await new Promise((r) => setTimeout(r, 5500));
+
+      // Should have sent an ack embed
+      const ackEmbed = calls.find(
+        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.description?.includes('working on it'),
+      );
+      expect(ackEmbed).toBeDefined();
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ack')?.callback;
+      if (cb) cb('session-ack', { type: 'result', result: '' });
+      cleanup();
+    }
+  }, 10000);
+
   test('error updates progress message when one exists', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
     const pm = createMockProcessManager();
@@ -246,6 +477,117 @@ describe('embed-response streaming edits', () => {
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-5')?.callback;
       if (cb) cb('session-5', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+});
+
+describe('adaptive-response Continue in Thread button', () => {
+  test('result event sends Continue in Thread button after flush', async () => {
+    const { subscribeForAdaptiveInlineResponse } = await import('../discord/thread-response/adaptive-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+
+    let resolveButtons: (call: unknown) => void;
+    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+
+    const calls: unknown[] = [];
+    const mockClient: Partial<DiscordRestClient> = {
+      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+      deferInteraction: async () => {},
+      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
+      sendMessage: async (_channelId, data) => {
+        const entry = { method: 'send', data };
+        calls.push(entry);
+        if ((data as any)?.components?.[0]?.components?.some((b: any) => b.custom_id?.startsWith('continue_thread'))) {
+          resolveButtons(entry);
+        }
+        return { id: MSG_ID } as never;
+      },
+      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
+      deleteMessage: async () => {},
+      addReaction: mock(async () => {}),
+      removeReaction: async () => {},
+      sendTypingIndicator: async () => {},
+      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+    };
+    _setRestClientForTesting(mockClient as DiscordRestClient);
+    const cleanup = () => _setRestClientForTesting(null);
+
+    try {
+      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
+        'session-adaptive', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
+        undefined, 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adaptive')!.callback;
+
+      // Send content then result
+      callback('session-adaptive', { type: 'assistant', message: { content: 'Response text.' } });
+      await new Promise((r) => setTimeout(r, 50));
+      callback('session-adaptive', { type: 'result', result: 'done' });
+
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
+      const embedWithButtons = await Promise.race([buttonsPromise, timeout]);
+
+      expect(embedWithButtons).toBeDefined();
+      if (embedWithButtons) {
+        const actionRow = (embedWithButtons as any).data.components[0];
+        const buttonIds = actionRow.components.map((b: any) => b.custom_id);
+        expect(buttonIds[0]).toMatch(/^continue_thread:/);
+      }
+    } finally {
+      cleanup();
+    }
+  }, 15000);
+
+  test('session_error without progress mode sends new embed', async () => {
+    const { subscribeForAdaptiveInlineResponse } = await import('../discord/thread-response/adaptive-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
+        'session-adapt-err', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
+        undefined, 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adapt-err')!.callback;
+
+      // Fire error without tool_status (no progress mode)
+      callback('session-adapt-err', {
+        type: 'session_error',
+        error: { errorType: 'credits_exhausted', message: 'No credits' },
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Should send a new embed (not edit)
+      const errorEmbed = calls.find(
+        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.title === 'Credits Exhausted',
+      );
+      expect(errorEmbed).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('session_exited cleans up in adaptive mode', async () => {
+    const { subscribeForAdaptiveInlineResponse } = await import('../discord/thread-response/adaptive-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { cleanup } = installSnowflakeMock();
+
+    try {
+      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
+        'session-adapt-exit', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
+        undefined, 'TestProject');
+
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adapt-exit')!.callback;
+
+      callback('session-adapt-exit', { type: 'session_exited' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      expect(pm.unsubscribe).toHaveBeenCalled();
+    } finally {
       cleanup();
     }
   });
