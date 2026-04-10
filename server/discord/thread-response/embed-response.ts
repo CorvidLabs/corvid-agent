@@ -12,6 +12,7 @@ import {
   buildFooterWithStats,
   collapseCodeBlocks,
   type DiscordFileAttachment,
+  editEmbed,
   hexColorToInt,
   sendEmbed,
   sendEmbedWithButtons,
@@ -67,21 +68,35 @@ export function subscribeForResponseWithEmbed(
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
   const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
 
-  // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a brief status embed
+  // Single progress message — created on first activity, edited in place for updates.
+  // Eliminates message spam: instead of N status embeds, one embed is updated.
+  let progressMessageId: string | null = null;
+
+  /** Post or upgrade the progress message. First call sends it, subsequent calls edit it. */
+  const updateProgressMessage = async (description: string, status: string, embedColor?: number) => {
+    const embed = {
+      description,
+      color: embedColor ?? 0x95a5a6,
+      author,
+      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }) },
+    };
+    if (progressMessageId) {
+      await editEmbed(delivery, botToken, threadId, progressMessageId, embed);
+    } else {
+      progressMessageId = await sendEmbed(delivery, botToken, threadId, embed);
+    }
+  };
+
+  // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a progress embed
   const ackTimer = setTimeout(() => {
     if (!receivedAnyContent && !sentErrorMessage) {
-      sendEmbed(delivery, botToken, threadId, {
-        description: 'Received — working on it...',
-        color: 0x95a5a6,
-        author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'thinking' }) },
-      }).catch((err) => {
+      updateProgressMessage('Received — working on it...', 'thinking').catch((err) => {
         log.debug('Ack embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
       });
     }
   }, ACK_DELAY_MS);
 
-  // Periodic progress for long-running operations
+  // Periodic progress for long-running operations — edits the same message
   const progressInterval = setInterval(() => {
     if (receivedAnyContent || sentErrorMessage) return;
     if (!processManager.isRunning(sessionId)) {
@@ -89,12 +104,7 @@ export function subscribeForResponseWithEmbed(
       return;
     }
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    sendEmbed(delivery, botToken, threadId, {
-      description: `Still working (${elapsed}s elapsed)...`,
-      color: 0x95a5a6,
-      author,
-      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
-    }).catch((err) => {
+    updateProgressMessage(`Still working (${elapsed}s elapsed)...`, 'working...').catch((err) => {
       log.debug('Progress embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
     });
   }, PROGRESS_INTERVAL_MS);
@@ -107,20 +117,33 @@ export function subscribeForResponseWithEmbed(
       log.warn('Process died while typing indicator active', { sessionId, threadId });
       if (!receivedAnyContent && !sentErrorMessage) {
         sentErrorMessage = true;
-        sendEmbedWithButtons(
-          delivery,
-          botToken,
-          threadId,
-          {
+        // If we have an existing progress message, update it to show the crash.
+        // Otherwise send a new embed.
+        if (progressMessageId) {
+          editEmbed(delivery, botToken, threadId, progressMessageId, {
             description: 'The agent session ended unexpectedly. Send a message to resume.',
             color: 0xff3355,
             author,
             footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
-          },
-          [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
-        ).catch((err) => {
-          log.warn('Failed to send crash embed', { threadId, error: err instanceof Error ? err.message : String(err) });
-        });
+          }).catch((err) => {
+            log.warn('Failed to update progress embed with crash', { threadId, error: err instanceof Error ? err.message : String(err) });
+          });
+        } else {
+          sendEmbedWithButtons(
+            delivery,
+            botToken,
+            threadId,
+            {
+              description: 'The agent session ended unexpectedly. Send a message to resume.',
+              color: 0xff3355,
+              author,
+              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
+            },
+            [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
+          ).catch((err) => {
+            log.warn('Failed to send crash embed', { threadId, error: err instanceof Error ? err.message : String(err) });
+          });
+        }
       }
       threadCallbacks.delete(threadId);
       return;
@@ -250,13 +273,9 @@ export function subscribeForResponseWithEmbed(
         const now = Date.now();
         if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
           lastStatusTime = now;
-          sendEmbed(delivery, botToken, threadId, {
-            description: `⏳ ${statusText}`,
-            color: 0x95a5a6,
-            author,
-            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
-          }).catch((err) => {
-            log.debug('Tool status embed failed', {
+          // Edit the progress message in place instead of posting a new embed
+          updateProgressMessage(`⏳ ${statusText}`, 'working...').catch((err) => {
+            log.debug('Tool status embed edit failed', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
             });
@@ -296,6 +315,18 @@ export function subscribeForResponseWithEmbed(
       flush();
       processManager.unsubscribe(sessionId, callback);
       threadCallbacks.delete(threadId);
+
+      // Mark the progress message as done (if it exists) before sending the completion embed
+      if (progressMessageId) {
+        editEmbed(delivery, botToken, threadId, progressMessageId, {
+          description: '✅ Done',
+          color: 0x57f287,
+          author,
+          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+        }).catch((err) => {
+          log.debug('Progress done edit failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
 
       // Gather stats and send completion embed (async, fire-and-forget)
       (async () => {
@@ -401,6 +432,22 @@ export function subscribeForResponseWithEmbed(
 
         const footerCtx = { agentName, agentModel, sessionId, projectName, status: 'done' };
         const footerStats = { filesChanged: statsFiles, turns: statsTurns, tools: statsTools, commits: statsCommits };
+
+        // Build contextual buttons based on what the session actually did
+        const buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }> = [];
+
+        // "New Session" is the primary action — actually starts a new session in this thread
+        buttons.push({ label: 'New Session', customId: 'new_session', style: ButtonStyle.SUCCESS, emoji: '🔄' });
+
+        // If a PR was created, add a contextual "View PR" button (URL button not supported
+        // via component API, so we include the PR URL in the completion description instead)
+
+        // "Create Issue" — lets the user file a GitHub issue from the conversation
+        buttons.push({ label: 'Create Issue', customId: 'create_issue', style: ButtonStyle.PRIMARY, emoji: '📋' });
+
+        // Archive is secondary
+        buttons.push({ label: 'Archive', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' });
+
         await sendEmbedWithButtons(
           delivery,
           botToken,
@@ -412,12 +459,7 @@ export function subscribeForResponseWithEmbed(
             ...(fields.length > 0 ? { fields } : {}),
             footer: { text: buildFooterWithStats(footerCtx, footerStats) },
           },
-          [
-            buildActionRow(
-              { label: 'Continue', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '💬' },
-              { label: 'Archive Thread', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' },
-            ),
-          ],
+          [buildActionRow(...buttons)],
         );
       })().catch((err) => {
         log.debug('Session complete embed failed', {
@@ -436,23 +478,36 @@ export function subscribeForResponseWithEmbed(
       const errorType = errEvent.error?.errorType || 'unknown';
 
       // Differentiated messages per error type
-      const { title, description, color } = sessionErrorEmbed(errorType, errEvent.error?.message);
+      const { title, description, color: errColor } = sessionErrorEmbed(errorType, errEvent.error?.message);
 
-      sendEmbedWithButtons(
-        delivery,
-        botToken,
-        threadId,
-        {
+      // If we have a progress message, update it to show the error; otherwise send new
+      if (progressMessageId) {
+        editEmbed(delivery, botToken, threadId, progressMessageId, {
           title,
           description,
-          color,
+          color: errColor,
           author,
           footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
-        },
-        [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
-      ).catch((err) => {
-        log.debug('Session error embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
-      });
+        }).catch((err) => {
+          log.debug('Session error embed edit failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+        });
+      } else {
+        sendEmbedWithButtons(
+          delivery,
+          botToken,
+          threadId,
+          {
+            title,
+            description,
+            color: errColor,
+            author,
+            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+          },
+          [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
+        ).catch((err) => {
+          log.debug('Session error embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
     }
 
     if (event.type === 'session_exited') {

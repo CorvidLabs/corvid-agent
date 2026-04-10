@@ -5,6 +5,7 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
   agentColor,
+  buildActionRow,
   buildAgentAuthor,
   buildFooterText,
   collapseCodeBlocks,
@@ -12,10 +13,12 @@ import {
   editEmbed,
   hexColorToInt,
   sendEmbed,
+  sendEmbedWithButtons,
   sendEmbedWithFiles,
   sendReplyEmbed,
   sendTypingIndicator,
 } from '../embeds';
+import { ButtonStyle } from '../types';
 import { visibleEmbedParts } from './utils';
 
 const log = createLogger('DiscordThreadManager');
@@ -260,6 +263,29 @@ export function subscribeForAdaptiveInlineResponse(
               });
             });
           }
+
+          // Offer "Continue in Thread" button so the user can move the conversation
+          // out of the channel and into a dedicated thread (reduces channel spam).
+          sendEmbedWithButtons(
+            delivery,
+            botToken,
+            channelId,
+            {
+              description: 'Reply to continue here, or start a thread for a longer conversation.',
+              color: 0x95a5a6,
+              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            },
+            [
+              buildActionRow(
+                { label: 'Continue in Thread', customId: `continue_thread:${sessionId}`, style: ButtonStyle.PRIMARY, emoji: '🧵' },
+              ),
+            ],
+          ).catch((err) => {
+            log.debug('Continue-in-thread embed failed', {
+              channelId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
         })
         .catch((err) => {
           log.debug('Final flush failed', { channelId, error: err instanceof Error ? err.message : String(err) });

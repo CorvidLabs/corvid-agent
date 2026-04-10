@@ -28,6 +28,7 @@ import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import { resolveDiscordContact } from './contact-linker';
 import {
+  addReaction,
   buildActionRow,
   sendDiscordMessage,
   sendEmbed,
@@ -143,6 +144,8 @@ export interface MessageHandlerContext {
   mentionSessions: Map<string, MentionSessionInfo>;
   /** Recently processed Discord message IDs — prevents duplicate handling. */
   processedMessageIds: Set<string>;
+  /** Channel → project name affinity — remembers which project was last used per channel. */
+  channelProjectAffinity: Map<string, string>;
 }
 
 /** Cooldown for permission-denial replies: only notify a user once per window. */
@@ -329,6 +332,8 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   // If this message is in a thread we're tracking, route to that thread's session
   if (isOurThread) {
     sendFirstInteractionTip(ctx, userId, channelId);
+    // React with 👀 to acknowledge receipt — gives instant visual feedback
+    addReaction(ctx.config.botToken, channelId, data.id, '👀').catch(() => {});
     sendTypingIndicator(ctx.config.botToken, channelId).catch((err) =>
       log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }),
     );
@@ -346,6 +351,8 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   }
 
   sendFirstInteractionTip(ctx, userId, channelId);
+  // React with 👀 to acknowledge the mention
+  addReaction(ctx.config.botToken, channelId, data.id, '👀').catch(() => {});
   sendTypingIndicator(ctx.config.botToken, channelId).catch((err) =>
     log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }),
   );
@@ -633,14 +640,28 @@ async function handleMentionReply(
   }
 
   const projects = listProjects(ctx.db);
-  const project = agent.defaultProjectId
-    ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
-    : projects[0];
+
+  // Channel-project affinity: prefer the project last used in this channel
+  // to prevent context bleed (e.g. talking about project A but getting project B).
+  const affinityProjectName = ctx.channelProjectAffinity.get(channelId);
+  let project = affinityProjectName
+    ? projects.find((p) => p.name.toLowerCase() === affinityProjectName.toLowerCase())
+    : undefined;
+
+  // Fall back to agent default, then first available
+  if (!project) {
+    project = agent.defaultProjectId
+      ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
+      : projects[0];
+  }
 
   if (!project) {
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No projects configured.');
     return;
   }
+
+  // Update channel-project affinity for future mentions
+  ctx.channelProjectAffinity.set(channelId, project.name);
 
   const cleanText = resolveMentions(text, mentions, ctx.botUserId);
   const hasAttachments = (attachments?.length ?? 0) > 0;
