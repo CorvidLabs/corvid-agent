@@ -399,7 +399,14 @@ export function scanGitHubContent(body: string): InjectionResult & { warning: st
 
   const seMatches = result.matches.filter((m) => m.category === 'social_engineering');
   if (seMatches.length === 0 && !result.blocked) {
-    return { ...result, warning: null };
+    const out: InjectionResult & { warning: string | null } = {
+      confidence: result.confidence,
+      blocked: result.blocked,
+      matches: result.matches,
+      scanTimeMs: result.scanTimeMs,
+      warning: null,
+    };
+    return out;
   }
 
   const lines: string[] = [];
@@ -433,7 +440,14 @@ export function scanGitHubContent(body: string): InjectionResult & { warning: st
     );
   }
 
-  return { ...result, warning: lines.length > 0 ? lines.join('\n') : null };
+  const warning = lines.length > 0 ? lines.join('\n') : null;
+  return {
+    confidence: result.confidence,
+    blocked: result.blocked,
+    matches: result.matches,
+    scanTimeMs: result.scanTimeMs,
+    warning,
+  };
 }
 
 // ─── Markdown code span detection ─────────────────────────────────────────
