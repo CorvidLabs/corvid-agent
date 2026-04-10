@@ -4,7 +4,6 @@ import type { ScheduleActionType } from '../../shared/types/schedules';
 import { saveMemory } from '../db/agent-memories';
 import { getAgent } from '../db/agents';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
-import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { boostObservation, listObservations, recordObservation } from '../db/observations';
 import { getProject } from '../db/projects';
@@ -19,6 +18,7 @@ import {
   updateSessionStatus,
   updateSessionSummary,
 } from '../db/sessions';
+import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
