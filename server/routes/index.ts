@@ -60,6 +60,7 @@ import type { WebhookService } from '../webhooks/service';
 import type { WorkTaskService } from '../work/service';
 import type { WorkflowService } from '../workflow/service';
 import { handleA2ARoutes } from './a2a';
+import { handleBlockExplorerRoutes } from './block-explorer';
 import { handleAgentRoutes } from './agents';
 import { handleAllowlistRoutes } from './allowlist';
 import { handleAnalyticsRoutes } from './analytics';
@@ -410,6 +411,10 @@ async function handleRoutes(
   // Library routes (CRVLIB — on-chain ARC-69 library entries)
   const libraryResponse = handleLibraryRoutes(req, url, db, context);
   if (libraryResponse) return libraryResponse;
+
+  // Block Explorer routes (on-chain Algorand data via indexer)
+  const explorerResponse = handleBlockExplorerRoutes(req, url, db, algochatBridge);
+  if (explorerResponse) return explorerResponse instanceof Promise ? await explorerResponse : explorerResponse;
 
   const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
   if (securityOverviewResponse) return securityOverviewResponse;
