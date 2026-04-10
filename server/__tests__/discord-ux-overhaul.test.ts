@@ -137,12 +137,17 @@ describe('embed-response streaming edits', () => {
 
       // Fire result
       callback('session-2', { type: 'result', result: 'done' });
-      await new Promise((r) => setTimeout(r, 500));
 
-      // Find the message with components (buttons)
-      const embedWithButtons = calls.find(
-        (c: any) => c.method === 'send' && c.data?.components?.length > 0,
-      ) as any;
+      // Poll for completion embed with buttons (async IIFE, may take longer on CI)
+      let embedWithButtons: any = null;
+      const deadline = Date.now() + 3000;
+      while (Date.now() < deadline) {
+        embedWithButtons = calls.find(
+          (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.length > 0,
+        );
+        if (embedWithButtons) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
 
       expect(embedWithButtons).toBeDefined();
       if (embedWithButtons) {
