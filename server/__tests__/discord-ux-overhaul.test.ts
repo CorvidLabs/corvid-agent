@@ -310,7 +310,32 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { cleanup, waitForCall } = installSnowflakeMock();
+
+    // Use a dedicated Promise to capture the Resume button send (more reliable than waitForCall)
+    let resolveResume: (call: unknown) => void;
+    const resumePromise = new Promise<unknown>((resolve) => {
+      resolveResume = resolve;
+    });
+
+    const mockClient: Partial<DiscordRestClient> = {
+      respondToInteraction: async () => ({}) as never,
+      deferInteraction: async () => {},
+      editDeferredResponse: async () => ({}) as never,
+      sendMessage: async (_channelId, data) => {
+        if ((data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume')) {
+          resolveResume({ method: 'send', data });
+        }
+        return { id: MSG_ID } as never;
+      },
+      editMessage: async () => ({ id: MSG_ID }) as never,
+      deleteMessage: async () => {},
+      addReaction: mock(async () => {}),
+      removeReaction: async () => {},
+      sendTypingIndicator: async () => {},
+      sendMessageWithFiles: async () => ({ id: MSG_ID }) as never,
+    };
+    _setRestClientForTesting(mockClient as DiscordRestClient);
+    const cleanup = () => _setRestClientForTesting(null);
 
     try {
       subscribeForResponseWithEmbed(
@@ -334,11 +359,8 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Wait for the Resume button send — uses a Promise listener instead of polling
-      const sendWithButtons = await waitForCall(
-        (c: any) =>
-          c.method === 'send' && (c.data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
-      );
+      // Wait for the Resume button send
+      const sendWithButtons = await resumePromise;
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
