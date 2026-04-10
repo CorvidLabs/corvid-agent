@@ -463,32 +463,8 @@ describe('dedup integration', () => {
     expect(dedup.has('polling:triggers', key)).toBe(true);
   });
 
-  test('ack comment dedup prevents duplicate acknowledgments across configs', () => {
-    const service = new MentionPollingService(db, mockProcessManager);
-    const dedup = (service as unknown as { dedup: import('../lib/dedup').DedupService }).dedup;
-
-    const ackKey = 'CorvidLabs/corvid-agent#42';
-    expect(dedup.has('polling:ack-comments', ackKey)).toBe(false);
-
-    dedup.markSeen('polling:ack-comments', ackKey);
-    expect(dedup.has('polling:ack-comments', ackKey)).toBe(true);
-
-    // Second check confirms dedup catches the duplicate
-    expect(dedup.has('polling:ack-comments', ackKey)).toBe(true);
-  });
-
-  test('ack dedup namespace is independent from trigger dedup', () => {
-    const service = new MentionPollingService(db, mockProcessManager);
-    const dedup = (service as unknown as { dedup: import('../lib/dedup').DedupService }).dedup;
-
-    const key = 'CorvidLabs/corvid-agent#42';
-    dedup.markSeen('polling:ack-comments', key);
-
-    // Same key in trigger namespace should NOT be marked
-    expect(dedup.has('polling:triggers', key)).toBe(false);
-    // But ack namespace should have it
-    expect(dedup.has('polling:ack-comments', key)).toBe(true);
-  });
+  // Ack comment dedup integration tests moved to polling-ack-dedup.test.ts
+  // where they test through processMention with mocked github/operations.
 });
 
 // ─── CI retry cooldown ──────────────────────────────────────────────────────
