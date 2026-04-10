@@ -73,7 +73,12 @@ export interface ExitHandlerDeps {
  * - Clean up chat worktrees
  * - Auto-restart AlgoChat sessions on crash (with exponential backoff)
  */
-export function handleSessionExit(deps: ExitHandlerDeps, sessionId: string, code: number | null, errorMessage?: string): void {
+export function handleSessionExit(
+  deps: ExitHandlerDeps,
+  sessionId: string,
+  code: number | null,
+  errorMessage?: string,
+): void {
   const meta = deps.sessionMeta.get(sessionId);
   const session = getSession(deps.db, sessionId);
   updateSessionPid(deps.db, sessionId, null);

@@ -849,9 +849,7 @@ async function handleMentionReplyResume(
 function buildPreviousThreadContext(db: Database, threadId: string, previousSessionId: string): string {
   // 1. Try to load actual messages from the previous session (richest context)
   const messages = getSessionMessages(db, previousSessionId);
-  const conversational = messages
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .slice(-20);
+  const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
     const historyLines = conversational.map((m) => {
