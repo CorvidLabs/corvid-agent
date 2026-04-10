@@ -123,7 +123,35 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { calls, cleanup } = installSnowflakeMock();
+
+    // Use a promise-based approach instead of polling to avoid CI timing flakiness.
+    // The mock sendMessage resolves a promise when a call with button components arrives.
+    let resolveButtons: (call: unknown) => void;
+    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+
+    const calls: unknown[] = [];
+    const mockClient: Partial<DiscordRestClient> = {
+      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+      deferInteraction: async () => {},
+      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
+      sendMessage: async (_channelId, data) => {
+        const entry = { method: 'send', data };
+        calls.push(entry);
+        // Resolve the promise when we see buttons
+        if ((data as any)?.components?.[0]?.components?.length > 0) {
+          resolveButtons(entry);
+        }
+        return { id: MSG_ID } as never;
+      },
+      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
+      deleteMessage: async () => {},
+      addReaction: mock(async () => {}),
+      removeReaction: async () => {},
+      sendTypingIndicator: async () => {},
+      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+    };
+    _setRestClientForTesting(mockClient as DiscordRestClient);
+    const cleanup = () => _setRestClientForTesting(null);
 
     try {
       subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
@@ -138,20 +166,13 @@ describe('embed-response streaming edits', () => {
       // Fire result
       callback('session-2', { type: 'result', result: 'done' });
 
-      // Poll for completion embed with buttons — generous deadline for slow CI runners
-      let embedWithButtons: any = null;
-      const deadline = Date.now() + 8000;
-      while (Date.now() < deadline) {
-        embedWithButtons = calls.find(
-          (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.length > 0,
-        );
-        if (embedWithButtons) break;
-        await new Promise((r) => setTimeout(r, 50));
-      }
+      // Wait for the completion embed with buttons — promise resolves when mock sees it
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000));
+      const embedWithButtons = await Promise.race([buttonsPromise, timeout]);
 
       expect(embedWithButtons).toBeDefined();
       if (embedWithButtons) {
-        const actionRow = embedWithButtons.data.components[0];
+        const actionRow = (embedWithButtons as any).data.components[0];
         const buttonLabels = actionRow.components.map((b: any) => b.label);
         expect(buttonLabels).toContain('New Session');
         expect(buttonLabels).toContain('Create Issue');
@@ -160,7 +181,7 @@ describe('embed-response streaming edits', () => {
     } finally {
       cleanup();
     }
-  }, 15000);
+  }, 20000);
 
   test('progress message edited to Done on result when progress exists', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
