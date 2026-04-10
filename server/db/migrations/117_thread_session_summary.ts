@@ -3,7 +3,11 @@ import type { Database } from 'bun:sqlite';
 export function up(db: Database): void {
   // Store conversation summary on thread session for durable context carry-over.
   // Survives session deletion — the thread mapping outlives individual sessions.
-  db.run(`ALTER TABLE discord_thread_sessions ADD COLUMN last_summary TEXT DEFAULT NULL`);
+  // Guard: column may already exist via legacy schema (schema/discord.ts).
+  const cols = db.prepare(`PRAGMA table_info(discord_thread_sessions)`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'last_summary')) {
+    db.run(`ALTER TABLE discord_thread_sessions ADD COLUMN last_summary TEXT DEFAULT NULL`);
+  }
 }
 
 export function down(db: Database): void {
