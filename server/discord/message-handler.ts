@@ -11,9 +11,14 @@ import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
-import { deleteThreadSession, saveThreadSession, updateThreadSessionActivity } from '../db/discord-thread-sessions';
+import {
+  deleteThreadSession,
+  getThreadSessionSummary,
+  saveThreadSession,
+  updateThreadSessionActivity,
+} from '../db/discord-thread-sessions';
 import { listProjects } from '../db/projects';
-import { createSession, getPreviousThreadSessionSummary, getSession } from '../db/sessions';
+import { createSession, getPreviousThreadSessionSummary, getSession, getSessionMessages } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
@@ -837,6 +842,48 @@ async function handleMentionReplyResume(
 }
 
 /**
+ * Build structured conversation context from a previous thread session.
+ * Tries three sources in order: actual messages (richest), thread summary, session summary.
+ * Call BEFORE deleting the thread session or session record.
+ */
+function buildPreviousThreadContext(db: Database, threadId: string, previousSessionId: string): string {
+  // 1. Try to load actual messages from the previous session (richest context)
+  const messages = getSessionMessages(db, previousSessionId);
+  const conversational = messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-20);
+
+  if (conversational.length > 0) {
+    const historyLines = conversational.map((m) => {
+      const role = m.role === 'user' ? 'User' : 'Assistant';
+      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+      return `[${role}]: ${text}`;
+    });
+    return [
+      '<conversation_history>',
+      'The following is the conversation history from this session. Use it for context when responding to the new message.',
+      '',
+      ...historyLines,
+      '</conversation_history>',
+    ].join('\n');
+  }
+
+  // 2. Fall back to durable thread session summary (survives session deletion)
+  const threadSummary = getThreadSessionSummary(db, threadId);
+  if (threadSummary) {
+    return `<conversation_history>\nThe following is a summary of the previous session in this thread. Use it for context when responding to the new message.\n\n[Context Summary]\n${threadSummary}\n</conversation_history>`;
+  }
+
+  // 3. Fall back to session-level conversation summary
+  const sessionSummary = getPreviousThreadSessionSummary(db, threadId);
+  if (sessionSummary) {
+    return `<conversation_history>\nThe following is a summary of the previous session in this thread. Use it for context when responding to the new message.\n\n[Context Summary]\n${sessionSummary}\n</conversation_history>`;
+  }
+
+  return '';
+}
+
+/**
  * Create a new session in a thread whose previous session expired or was deleted.
  * Reuses the original agent when possible, falls back to the default agent.
  * Returns true if the session was successfully created and the message dispatched.
@@ -856,6 +903,7 @@ async function resumeExpiredThreadSession(
   authorId?: string,
   authorUsername?: string,
   attachments?: DiscordAttachment[],
+  previousContext?: string,
 ): Promise<boolean> {
   const agents = listAgents(ctx.db);
   const agent = agents.find((a) => a.name === previousInfo.agentName) ?? resolveDefaultAgent(ctx.db, ctx.config);
@@ -915,11 +963,9 @@ async function resumeExpiredThreadSession(
   ctx.threadLastActivity.set(threadId, Date.now());
   saveThreadSession(ctx.db, threadId, threadInfo);
 
-  // Carry over context from the previous session in this thread (if any)
-  const previousSummary = getPreviousThreadSessionSummary(ctx.db, threadId);
-  const contextPrefix = previousSummary
-    ? `[Previous session context — the session was resumed, here is what was discussed before]\n${previousSummary}\n\n[New message from user]\n`
-    : '';
+  // Carry over context from the previous session in this thread.
+  // Uses pre-captured context (actual messages or durable summary) passed from the caller.
+  const contextPrefix = previousContext ? `${previousContext}\n\n` : '';
 
   // Start the process with the user's message (include attachment URLs in text so
   // the agent sees them even though startProcess only accepts strings).
@@ -943,7 +989,7 @@ async function resumeExpiredThreadSession(
   );
 
   // Brief non-blocking notification
-  const resumeDesc = previousSummary
+  const resumeDesc = previousContext
     ? `Session resumed with **${agent.name}** (previous context carried over).`
     : `Session resumed with **${agent.name}**.`;
   sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
@@ -1014,6 +1060,8 @@ async function routeToThread(
 
   const session = getSession(ctx.db, sessionId);
   if (!session) {
+    // Capture context BEFORE deleting — thread summary survives session deletion
+    const previousContext = buildPreviousThreadContext(ctx.db, threadId, sessionId);
     ctx.threadSessions.delete(threadId);
     deleteThreadSession(ctx.db, threadId);
     // Automatically resume: create a new session in the same thread
@@ -1025,6 +1073,7 @@ async function routeToThread(
       authorId,
       authorUsername,
       attachments,
+      previousContext,
     );
     if (!resumed) {
       await sendEmbedWithButtons(
@@ -1068,6 +1117,8 @@ async function routeToThread(
     // sending a false "session ended unexpectedly" crash embed.
     if (!ctx.processManager.isRunning(sessionId)) {
       log.warn('resumeProcess did not start — creating fresh session in thread', { sessionId, threadId });
+      // Capture context BEFORE deleting
+      const previousContext = buildPreviousThreadContext(ctx.db, threadId, sessionId);
       // Clear stale mapping and create a brand new session, same as expired sessions
       ctx.threadSessions.delete(threadId);
       deleteThreadSession(ctx.db, threadId);
@@ -1079,6 +1130,7 @@ async function routeToThread(
         authorId,
         authorUsername,
         attachments,
+        previousContext,
       );
       if (!resumed) {
         await sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
