@@ -4,7 +4,7 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { getBalance, grantCredits } from '../db/credits';
 import { runMigrations } from '../db/schema';
 import { GRACE_PERIOD_HOURS, SubscriptionService } from '../marketplace/subscriptions';
@@ -23,6 +23,10 @@ function setupDb(): Database {
   runMigrations(d);
   return d;
 }
+
+afterEach(() => {
+  db.close();
+});
 
 function fundSubscriber(credits: number): void {
   grantCredits(db, SUBSCRIBER, credits, 'test_setup');
