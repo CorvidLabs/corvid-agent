@@ -219,34 +219,7 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-
-    // Use a promise-based approach instead of polling to avoid CI timing flakiness.
-    let resolveResume: (call: unknown) => void;
-    const resumePromise = new Promise<unknown>((resolve) => { resolveResume = resolve; });
-
-    const calls: unknown[] = [];
-    const mockClient: Partial<DiscordRestClient> = {
-      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
-      deferInteraction: async () => {},
-      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
-      sendMessage: async (_channelId, data) => {
-        const entry = { method: 'send', data };
-        calls.push(entry);
-        // Resolve when we see a Resume button
-        if ((data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume')) {
-          resolveResume(entry);
-        }
-        return { id: MSG_ID } as never;
-      },
-      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
-      deleteMessage: async () => {},
-      addReaction: mock(async () => {}),
-      removeReaction: async () => {},
-      sendTypingIndicator: async () => {},
-      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
-    };
-    _setRestClientForTesting(mockClient as DiscordRestClient);
-    const cleanup = () => _setRestClientForTesting(null);
+    const { calls, cleanup } = installSnowflakeMock();
 
     try {
       subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
@@ -260,11 +233,15 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Wait for the Resume button send to complete (with timeout for safety)
-      const sendWithButtons = await Promise.race([
-        resumePromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Resume button not sent within 8s')), 8000)),
-      ]);
+      // Poll for the Resume button send — retry loop is more CI-reliable than a tight timeout
+      let sendWithButtons: unknown;
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        sendWithButtons = calls.find(
+          (c: any) => c.method === 'send' && (c.data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
+        );
+        if (sendWithButtons) break;
+      }
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
