@@ -47,22 +47,69 @@ function createMockProcessManager() {
 }
 
 /** Install a mock rest client that returns valid snowflake IDs */
-function installSnowflakeMock(): { calls: unknown[]; cleanup: () => void } {
+function installSnowflakeMock(): {
+  calls: unknown[];
+  cleanup: () => void;
+  waitForCall: (predicate: (c: any) => boolean, timeoutMs?: number) => Promise<unknown>;
+} {
   const calls: unknown[] = [];
+  const listeners: Array<(entry: unknown) => void> = [];
+  const pushCall = (entry: unknown) => {
+    calls.push(entry);
+    for (const fn of listeners) fn(entry);
+  };
   const mockClient: Partial<DiscordRestClient> = {
-    respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+    respondToInteraction: async (_id, _token, data) => {
+      pushCall({ method: 'respond', data });
+      return {} as never;
+    },
     deferInteraction: async () => {},
-    editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
-    sendMessage: async (_channelId, data) => { calls.push({ method: 'send', data }); return { id: MSG_ID } as never; },
-    editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return { id: MSG_ID } as never; },
+    editDeferredResponse: async (_appId, _token, data) => {
+      pushCall({ method: 'editDeferred', data });
+      return {} as never;
+    },
+    sendMessage: async (_channelId, data) => {
+      pushCall({ method: 'send', data });
+      return { id: MSG_ID } as never;
+    },
+    editMessage: async (_channelId, _messageId, data) => {
+      pushCall({ method: 'edit', data });
+      return { id: MSG_ID } as never;
+    },
     deleteMessage: async () => {},
     addReaction: mock(async () => {}),
     removeReaction: async () => {},
     sendTypingIndicator: async () => {},
-    sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+    sendMessageWithFiles: async (_channelId, data) => {
+      pushCall({ method: 'sendFiles', data });
+      return { id: MSG_ID } as never;
+    },
   };
   _setRestClientForTesting(mockClient as DiscordRestClient);
-  return { calls, cleanup: () => _setRestClientForTesting(null) };
+
+  /** Wait for a call matching the predicate (checks existing calls first, then listens for new ones). */
+  const waitForCall = (predicate: (c: any) => boolean, timeoutMs = 10_000): Promise<unknown> => {
+    const existing = calls.find(predicate);
+    if (existing) return Promise.resolve(existing);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const idx = listeners.indexOf(handler);
+        if (idx >= 0) listeners.splice(idx, 1);
+        reject(new Error(`waitForCall timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      const handler = (entry: unknown) => {
+        if (predicate(entry)) {
+          clearTimeout(timer);
+          const idx = listeners.indexOf(handler);
+          if (idx >= 0) listeners.splice(idx, 1);
+          resolve(entry);
+        }
+      };
+      listeners.push(handler);
+    });
+  };
+
+  return { calls, cleanup: () => _setRestClientForTesting(null), waitForCall };
 }
 
 let db: Database;
@@ -75,7 +122,9 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const { sessionId, callback } of pendingSubscribers) {
-    try { callback(sessionId, { type: 'result', result: '' }); } catch {}
+    try {
+      callback(sessionId, { type: 'result', result: '' });
+    } catch {}
   }
   pendingSubscribers.length = 0;
   db.close();
@@ -90,8 +139,18 @@ describe('embed-response streaming edits', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-1', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-1',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers[0].callback;
 
@@ -127,13 +186,21 @@ describe('embed-response streaming edits', () => {
     // Use a promise-based approach instead of polling to avoid CI timing flakiness.
     // The mock sendMessage resolves a promise when a call with button components arrives.
     let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+    const buttonsPromise = new Promise<unknown>((resolve) => {
+      resolveButtons = resolve;
+    });
 
     const calls: unknown[] = [];
     const mockClient: Partial<DiscordRestClient> = {
-      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+      respondToInteraction: async (_id, _token, data) => {
+        calls.push({ method: 'respond', data });
+        return {} as never;
+      },
       deferInteraction: async () => {},
-      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
+      editDeferredResponse: async (_appId, _token, data) => {
+        calls.push({ method: 'editDeferred', data });
+        return {} as never;
+      },
       sendMessage: async (_channelId, data) => {
         const entry = { method: 'send', data };
         calls.push(entry);
@@ -143,19 +210,35 @@ describe('embed-response streaming edits', () => {
         }
         return { id: MSG_ID } as never;
       },
-      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
+      editMessage: async (_channelId, _messageId, data) => {
+        calls.push({ method: 'edit', data });
+        return {} as never;
+      },
       deleteMessage: async () => {},
       addReaction: mock(async () => {}),
       removeReaction: async () => {},
       sendTypingIndicator: async () => {},
-      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+      sendMessageWithFiles: async (_channelId, data) => {
+        calls.push({ method: 'sendFiles', data });
+        return { id: MSG_ID } as never;
+      },
     };
     _setRestClientForTesting(mockClient as DiscordRestClient);
     const cleanup = () => _setRestClientForTesting(null);
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-2', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-2',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers[0].callback;
 
@@ -191,8 +274,18 @@ describe('embed-response streaming edits', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-3', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-3',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers[0].callback;
 
@@ -205,9 +298,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Should have an edit with ✅ Done
-      const doneEdit = calls.find(
-        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description === '✅ Done',
-      );
+      const doneEdit = calls.find((c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description === '✅ Done');
       expect(doneEdit).toBeDefined();
     } finally {
       cleanup();
@@ -219,11 +310,21 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { calls, cleanup } = installSnowflakeMock();
+    const { cleanup, waitForCall } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-err-noprog', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-err-noprog',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
 
@@ -233,15 +334,11 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Poll for the Resume button send — retry loop is more CI-reliable than a tight timeout
-      let sendWithButtons: unknown;
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 200));
-        sendWithButtons = calls.find(
-          (c: any) => c.method === 'send' && (c.data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
-        );
-        if (sendWithButtons) break;
-      }
+      // Wait for the Resume button send — uses a Promise listener instead of polling
+      const sendWithButtons = await waitForCall(
+        (c: any) =>
+          c.method === 'send' && (c.data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
+      );
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
@@ -256,8 +353,18 @@ describe('embed-response streaming edits', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-ctx', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-ctx',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx')!.callback;
 
@@ -269,9 +376,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Should send a warning embed with yellow color
-      const warningEmbed = calls.find(
-        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232,
-      );
+      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
       expect(warningEmbed).toBeDefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx')?.callback;
@@ -288,8 +393,18 @@ describe('embed-response streaming edits', () => {
     const { cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-exit', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-exit',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-exit')!.callback;
 
@@ -319,8 +434,18 @@ describe('embed-response streaming edits', () => {
       // Temporarily make isRunning return true for setup
       (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => true);
 
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-crash', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-crash',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-crash')!.callback;
 
@@ -370,13 +495,15 @@ describe('embed-response streaming edits', () => {
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
 
     let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+    const buttonsPromise = new Promise<unknown>((resolve) => {
+      resolveButtons = resolve;
+    });
 
     const calls: unknown[] = [];
     const mockClient: Partial<DiscordRestClient> = {
-      respondToInteraction: async () => ({} as never),
+      respondToInteraction: async () => ({}) as never,
       deferInteraction: async () => {},
-      editDeferredResponse: async () => ({} as never),
+      editDeferredResponse: async () => ({}) as never,
       sendMessage: async (_channelId, data) => {
         const entry = { method: 'send', data };
         calls.push(entry);
@@ -385,19 +512,35 @@ describe('embed-response streaming edits', () => {
         }
         return { id: MSG_ID } as never;
       },
-      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return { id: MSG_ID } as never; },
+      editMessage: async (_channelId, _messageId, data) => {
+        calls.push({ method: 'edit', data });
+        return { id: MSG_ID } as never;
+      },
       deleteMessage: async () => {},
       addReaction: mock(async () => {}),
       removeReaction: async () => {},
       sendTypingIndicator: async () => {},
-      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+      sendMessageWithFiles: async (_channelId, data) => {
+        calls.push({ method: 'sendFiles', data });
+        return { id: MSG_ID } as never;
+      },
     };
     _setRestClientForTesting(mockClient as DiscordRestClient);
     const cleanup = () => _setRestClientForTesting(null);
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        session.id, THREAD_ID, 'StatsAgent', 'test-model', 'StatsProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        session.id,
+        THREAD_ID,
+        'StatsAgent',
+        'test-model',
+        'StatsProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === session.id)!.callback;
 
@@ -431,8 +574,18 @@ describe('embed-response streaming edits', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-ack', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-ack',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       // Wait for ack timer to fire (5s) + buffer
       await new Promise((r) => setTimeout(r, 5500));
@@ -457,8 +610,18 @@ describe('embed-response streaming edits', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
-        'session-5', THREAD_ID, 'TestAgent', 'test-model', 'TestProject');
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-5',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
       const callback = pendingSubscribers[0].callback;
 
@@ -474,9 +637,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Should have an edit for the error
-      const errorEdit = calls.find(
-        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.color !== undefined,
-      );
+      const errorEdit = calls.find((c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.color !== undefined);
       expect(errorEdit).toBeDefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-5')?.callback;
@@ -493,13 +654,21 @@ describe('adaptive-response Continue in Thread button', () => {
     const delivery = new DeliveryTracker();
 
     let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => { resolveButtons = resolve; });
+    const buttonsPromise = new Promise<unknown>((resolve) => {
+      resolveButtons = resolve;
+    });
 
     const calls: unknown[] = [];
     const mockClient: Partial<DiscordRestClient> = {
-      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+      respondToInteraction: async (_id, _token, data) => {
+        calls.push({ method: 'respond', data });
+        return {} as never;
+      },
       deferInteraction: async () => {},
-      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
+      editDeferredResponse: async (_appId, _token, data) => {
+        calls.push({ method: 'editDeferred', data });
+        return {} as never;
+      },
       sendMessage: async (_channelId, data) => {
         const entry = { method: 'send', data };
         calls.push(entry);
@@ -508,20 +677,35 @@ describe('adaptive-response Continue in Thread button', () => {
         }
         return { id: MSG_ID } as never;
       },
-      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
+      editMessage: async (_channelId, _messageId, data) => {
+        calls.push({ method: 'edit', data });
+        return {} as never;
+      },
       deleteMessage: async () => {},
       addReaction: mock(async () => {}),
       removeReaction: async () => {},
       sendTypingIndicator: async () => {},
-      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+      sendMessageWithFiles: async (_channelId, data) => {
+        calls.push({ method: 'sendFiles', data });
+        return { id: MSG_ID } as never;
+      },
     };
     _setRestClientForTesting(mockClient as DiscordRestClient);
     const cleanup = () => _setRestClientForTesting(null);
 
     try {
-      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
-        'session-adaptive', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
-        undefined, 'TestProject');
+      subscribeForAdaptiveInlineResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-adaptive',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+        undefined,
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adaptive')!.callback;
 
@@ -551,9 +735,18 @@ describe('adaptive-response Continue in Thread button', () => {
     const { calls, cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
-        'session-adapt-err', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
-        undefined, 'TestProject');
+      subscribeForAdaptiveInlineResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-adapt-err',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+        undefined,
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adapt-err')!.callback;
 
@@ -581,9 +774,18 @@ describe('adaptive-response Continue in Thread button', () => {
     const { cleanup } = installSnowflakeMock();
 
     try {
-      subscribeForAdaptiveInlineResponse(pm, delivery, 'test-token',
-        'session-adapt-exit', CHANNEL_ID, MSG_ID, 'TestAgent', 'test-model',
-        undefined, 'TestProject');
+      subscribeForAdaptiveInlineResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-adapt-exit',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+        undefined,
+        'TestProject',
+      );
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-adapt-exit')!.callback;
 
@@ -685,7 +887,7 @@ describe('message-handler reactions', () => {
       });
 
       // addReaction should have been called (👀)
-      expect((mockClient.addReaction as ReturnType<typeof mock>)).toHaveBeenCalled();
+      expect(mockClient.addReaction as ReturnType<typeof mock>).toHaveBeenCalled();
     } finally {
       cleanup();
     }
