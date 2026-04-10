@@ -219,7 +219,34 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { calls, cleanup } = installSnowflakeMock();
+
+    // Use a promise-based approach instead of polling to avoid CI timing flakiness.
+    let resolveResume: (call: unknown) => void;
+    const resumePromise = new Promise<unknown>((resolve) => { resolveResume = resolve; });
+
+    const calls: unknown[] = [];
+    const mockClient: Partial<DiscordRestClient> = {
+      respondToInteraction: async (_id, _token, data) => { calls.push({ method: 'respond', data }); return {} as never; },
+      deferInteraction: async () => {},
+      editDeferredResponse: async (_appId, _token, data) => { calls.push({ method: 'editDeferred', data }); return {} as never; },
+      sendMessage: async (_channelId, data) => {
+        const entry = { method: 'send', data };
+        calls.push(entry);
+        // Resolve when we see a Resume button
+        if ((data as any)?.components?.[0]?.components?.some((b: any) => b.label === 'Resume')) {
+          resolveResume(entry);
+        }
+        return { id: MSG_ID } as never;
+      },
+      editMessage: async (_channelId, _messageId, data) => { calls.push({ method: 'edit', data }); return {} as never; },
+      deleteMessage: async () => {},
+      addReaction: mock(async () => {}),
+      removeReaction: async () => {},
+      sendTypingIndicator: async () => {},
+      sendMessageWithFiles: async (_channelId, data) => { calls.push({ method: 'sendFiles', data }); return { id: MSG_ID } as never; },
+    };
+    _setRestClientForTesting(mockClient as DiscordRestClient);
+    const cleanup = () => _setRestClientForTesting(null);
 
     try {
       subscribeForResponseWithEmbed(pm, delivery, 'test-token', db, threadCallbacks,
@@ -232,12 +259,12 @@ describe('embed-response streaming edits', () => {
         type: 'session_error',
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
-      await new Promise((r) => setTimeout(r, 200));
 
-      // Should send a new embed (not edit), with Resume button
-      const sendWithButtons = calls.find(
-        (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
-      );
+      // Wait for the Resume button send to complete (with timeout for safety)
+      const sendWithButtons = await Promise.race([
+        resumePromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Resume button not sent within 5s')), 5000)),
+      ]);
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
