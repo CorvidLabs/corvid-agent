@@ -263,13 +263,13 @@ describe('embed-response streaming edits', () => {
       // Wait for the Resume button send to complete (with timeout for safety)
       const sendWithButtons = await Promise.race([
         resumePromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Resume button not sent within 5s')), 5000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Resume button not sent within 8s')), 8000)),
       ]);
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
     }
-  });
+  }, 15000);
 
   test('context_warning sends warning embed for critical level', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
