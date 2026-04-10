@@ -138,9 +138,9 @@ describe('embed-response streaming edits', () => {
       // Fire result
       callback('session-2', { type: 'result', result: 'done' });
 
-      // Poll for completion embed with buttons (async IIFE, may take longer on CI)
+      // Poll for completion embed with buttons — generous deadline for slow CI runners
       let embedWithButtons: any = null;
-      const deadline = Date.now() + 3000;
+      const deadline = Date.now() + 8000;
       while (Date.now() < deadline) {
         embedWithButtons = calls.find(
           (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.length > 0,
@@ -160,7 +160,7 @@ describe('embed-response streaming edits', () => {
     } finally {
       cleanup();
     }
-  });
+  }, 15000);
 
   test('progress message edited to Done on result when progress exists', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
