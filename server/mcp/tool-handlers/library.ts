@@ -28,6 +28,14 @@ const log = createLogger('McpLibraryHandlers');
 const VALID_CATEGORIES: LibraryCategory[] = ['guide', 'reference', 'decision', 'standard', 'runbook'];
 
 /**
+ * Agents permitted to write to the shared library.
+ * All other callers receive an error. CorvidAgent is the default librarian.
+ */
+const LIBRARIAN_AGENT_IDS: ReadonlySet<string> = new Set([
+  '90cf34fa-1478-454c-a789-1c87cbb0d552', // CorvidAgent — default librarian
+]);
+
+/**
  * Build a LibraryContext from the MCP tool context.
  * Returns null if any required component is unavailable.
  */
@@ -152,6 +160,10 @@ export async function handleLibraryWrite(
   },
 ): Promise<CallToolResult> {
   try {
+    if (!LIBRARIAN_AGENT_IDS.has(ctx.agentId)) {
+      return errorResult('Only agents with librarian role can write to the shared library');
+    }
+
     const category = (args.category as LibraryCategory) ?? 'reference';
     if (!VALID_CATEGORIES.includes(category)) {
       return errorResult(`Invalid category "${args.category}". Valid: ${VALID_CATEGORIES.join(', ')}`);
