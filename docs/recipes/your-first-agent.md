@@ -59,8 +59,8 @@ bun run dev
 
 Expected output:
 ```
-corvid-agent v0.59.1
-✓ Database initialized (migrations: 111)
+corvid-agent v0.63.0
+✓ Database initialized (migrations: 118)
 ✓ Agent "CorvidAgent" ready
 ✓ Server listening on http://localhost:3000
 ```
