@@ -19,9 +19,15 @@
 import type { Database } from 'bun:sqlite';
 import type { BaseInteraction } from 'discord.js';
 import { getDiscordConfig } from '../db/discord-config';
-import { pruneOldThreadSessions } from '../db/discord-thread-sessions';
+import {
+  getThreadIdForSession,
+  pruneOldThreadSessions,
+  updateThreadSessionSummary,
+} from '../db/discord-thread-sessions';
+import { getSessionMessages, updateSessionSummary } from '../db/sessions';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
+import { summarizeConversation } from '../process/context-management';
 import type { EventCallback } from '../process/interfaces';
 import type { ProcessManager } from '../process/manager';
 import type { ReputationScorer } from '../reputation/scorer';
@@ -78,6 +84,11 @@ export class DiscordBridge {
   private staleCheckTimer: ReturnType<typeof setInterval> | null = null;
   /** Stale thread auto-archive after 2 hours of inactivity */
   private readonly STALE_THREAD_MS = 2 * 60 * 60 * 1000;
+
+  /** Periodic summary flush timer — persists summaries for crash recovery */
+  private summaryFlushTimer: ReturnType<typeof setInterval> | null = null;
+  /** Flush active session summaries every 5 minutes */
+  private static readonly SUMMARY_FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 
   /** Users muted from bot interactions (admin-managed). */
   private mutedUsers: Set<string> = new Set();
@@ -161,6 +172,12 @@ export class DiscordBridge {
           );
 
           this.voiceManager.onTranscription((result) => {
+            // Drop transcriptions that arrived after deafen (in-flight audio)
+            if (this.voiceManager.isDeafened(result.guildId)) {
+              log.debug('Dropping transcription — bot is deafened', { guildId: result.guildId });
+              return;
+            }
+
             // Post transcription to text channel for visibility
             const info = this.voiceManager.getConnection(result.guildId);
             const textChannelId = info?.transcriptionChannelId;
@@ -238,6 +255,28 @@ export class DiscordBridge {
       10 * 60 * 1000,
     );
 
+    // Start periodic summary flush for crash recovery (every 5 minutes)
+    this.summaryFlushTimer = setInterval(() => {
+      for (const sessionId of this.processManager.getActiveSessionIds()) {
+        try {
+          const messages = getSessionMessages(this.db, sessionId);
+          const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+          if (conversational.length === 0) continue;
+          const summary = summarizeConversation(conversational.map((m) => ({ role: m.role, content: m.content })));
+          updateSessionSummary(this.db, sessionId, summary);
+          const threadId = getThreadIdForSession(this.db, sessionId);
+          if (threadId) {
+            updateThreadSessionSummary(this.db, threadId, summary);
+          }
+        } catch (err) {
+          log.warn('Summary flush failed', {
+            sessionId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }, DiscordBridge.SUMMARY_FLUSH_INTERVAL_MS);
+
     // Start periodic config reload from DB (every 30 seconds)
     this.reloadConfigFromDb();
     this.configReloadTimer = setInterval(() => {
@@ -273,6 +312,10 @@ export class DiscordBridge {
     if (this.staleCheckTimer) {
       clearInterval(this.staleCheckTimer);
       this.staleCheckTimer = null;
+    }
+    if (this.summaryFlushTimer) {
+      clearInterval(this.summaryFlushTimer);
+      this.summaryFlushTimer = null;
     }
     if (this.configReloadTimer) {
       clearInterval(this.configReloadTimer);

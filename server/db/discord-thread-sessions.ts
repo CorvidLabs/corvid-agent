@@ -16,6 +16,7 @@ interface ThreadSessionRow {
   buddy_agent_id: string | null;
   buddy_agent_name: string | null;
   buddy_max_rounds: number | null;
+  last_summary: string | null;
   last_activity_at: string;
   created_at: string;
 }
@@ -97,6 +98,36 @@ export function getRecentThreadSessions(
  */
 export function deleteThreadSession(db: Database, threadId: string): void {
   db.query('DELETE FROM discord_thread_sessions WHERE thread_id = ?').run(threadId);
+}
+
+/**
+ * Update the conversation summary stored on a thread session.
+ * Called on process exit so context survives even if the session record is later deleted.
+ */
+export function updateThreadSessionSummary(db: Database, threadId: string, summary: string): void {
+  db.query(`UPDATE discord_thread_sessions SET last_summary = ? WHERE thread_id = ?`).run(summary, threadId);
+}
+
+/**
+ * Get the durable conversation summary from a thread session mapping.
+ * Falls back to null if the thread has no stored summary.
+ */
+export function getThreadSessionSummary(db: Database, threadId: string): string | null {
+  const row = db
+    .query(`SELECT last_summary FROM discord_thread_sessions WHERE thread_id = ?`)
+    .get(threadId) as { last_summary: string | null } | null;
+  return row?.last_summary ?? null;
+}
+
+/**
+ * Look up the thread ID for a given session ID (reverse lookup).
+ * Used to persist conversation summaries to thread sessions on process exit.
+ */
+export function getThreadIdForSession(db: Database, sessionId: string): string | null {
+  const row = db
+    .query(`SELECT thread_id FROM discord_thread_sessions WHERE session_id = ?`)
+    .get(sessionId) as { thread_id: string } | null;
+  return row?.thread_id ?? null;
 }
 
 /**

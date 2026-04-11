@@ -18,6 +18,7 @@ import {
   updateSessionStatus,
   updateSessionSummary,
 } from '../db/sessions';
+import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
@@ -1825,7 +1826,14 @@ export class ProcessManager {
 
       const summary = summarizeConversation(conversational.map((m) => ({ role: m.role, content: m.content })));
       updateSessionSummary(this.db, sessionId, summary);
-      log.debug('Persisted conversation summary to session', { sessionId });
+
+      // Also persist to the thread session mapping (durable — survives session deletion)
+      const threadId = getThreadIdForSession(this.db, sessionId);
+      if (threadId) {
+        updateThreadSessionSummary(this.db, threadId, summary);
+      }
+
+      log.debug('Persisted conversation summary to session', { sessionId, threadId: threadId ?? 'none' });
     } catch (err) {
       log.warn('Failed to persist conversation summary', {
         sessionId,

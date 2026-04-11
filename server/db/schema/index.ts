@@ -67,7 +67,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 117;
+const SCHEMA_VERSION = 118;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -242,6 +242,10 @@ const MIGRATIONS: Record<number, string[]> = {
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       updated_at TEXT DEFAULT (datetime('now'))
     )`,
+  ],
+  118: [
+    // Durable conversation summary on thread sessions for context carry-over
+    `ALTER TABLE discord_thread_sessions ADD COLUMN last_summary TEXT DEFAULT NULL`,
   ],
 };
 

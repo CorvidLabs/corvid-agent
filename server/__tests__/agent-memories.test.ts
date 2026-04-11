@@ -72,19 +72,21 @@ describe('Save and Recall', () => {
     expect(all).toHaveLength(1);
   });
 
-  test('upsert resets txid to null', () => {
+  test('upsert preserves confirmed status and txid', () => {
     const mem = saveMemory(db, { agentId, key: 'sync', content: 'original' });
     updateMemoryTxid(db, mem.id, 'TX_CONFIRMED');
+    updateMemoryStatus(db, mem.id, 'confirmed');
 
     const confirmed = recallMemory(db, agentId, 'sync');
     expect(confirmed!.txid).toBe('TX_CONFIRMED');
     expect(confirmed!.status).toBe('confirmed');
 
-    // Upsert should reset txid
+    // Upsert should preserve confirmed status and txid (no demotion)
     saveMemory(db, { agentId, key: 'sync', content: 'updated' });
     const after = recallMemory(db, agentId, 'sync');
-    expect(after!.txid).toBeNull();
-    expect(after!.status).toBe('short_term');
+    expect(after!.txid).toBe('TX_CONFIRMED');
+    expect(after!.status).toBe('confirmed');
+    expect(after!.content).toBe('updated');
   });
 });
 
@@ -258,13 +260,13 @@ describe('List Memories', () => {
 // ─── Status & Txid Updates ───────────────────────────────────────────────────
 
 describe('Status and Txid Updates', () => {
-  test('updateMemoryTxid sets txid and confirms', () => {
+  test('updateMemoryTxid sets txid without changing status', () => {
     const mem = saveMemory(db, { agentId, key: 'tx-test', content: 'data' });
     updateMemoryTxid(db, mem.id, 'TXID_ABC123');
 
     const updated = recallMemory(db, agentId, 'tx-test');
     expect(updated!.txid).toBe('TXID_ABC123');
-    expect(updated!.status).toBe('confirmed');
+    expect(updated!.status).toBe('short_term'); // txid update alone doesn't change status
   });
 
   test('updateMemoryStatus changes status', () => {
@@ -276,19 +278,21 @@ describe('Status and Txid Updates', () => {
     expect(found!.status).toBe('failed');
   });
 
-  test('status transition: short_term → confirmed → short_term (on re-save)', () => {
+  test('status transition: short_term → confirmed preserves on re-save', () => {
     const mem = saveMemory(db, { agentId, key: 'lifecycle', content: 'v1' });
     expect(mem.status).toBe('short_term');
     updateMemoryTxid(db, mem.id, 'TX1');
+    updateMemoryStatus(db, mem.id, 'confirmed');
 
     const confirmed = recallMemory(db, agentId, 'lifecycle');
     expect(confirmed!.status).toBe('confirmed');
 
-    // Re-save with new content resets to short_term (needs re-promotion)
+    // Re-save with new content preserves confirmed status (no demotion)
     saveMemory(db, { agentId, key: 'lifecycle', content: 'v2' });
     const afterUpdate = recallMemory(db, agentId, 'lifecycle');
-    expect(afterUpdate!.status).toBe('short_term');
-    expect(afterUpdate!.txid).toBeNull();
+    expect(afterUpdate!.status).toBe('confirmed');
+    expect(afterUpdate!.txid).toBe('TX1');
+    expect(afterUpdate!.content).toBe('v2');
   });
 });
 
@@ -347,8 +351,9 @@ describe('Pending Memories', () => {
     updateMemoryStatus(db, mb.id, 'pending');
     expect(countPendingMemories(db)).toBe(2);
 
-    // Confirm one
+    // Confirm one (requires explicit status update, txid alone doesn't change status)
     updateMemoryTxid(db, ma.id, 'TX1');
+    updateMemoryStatus(db, ma.id, 'confirmed');
     expect(countPendingMemories(db)).toBe(1);
   });
 

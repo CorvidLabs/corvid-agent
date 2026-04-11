@@ -137,6 +137,7 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
           if (txid) {
             try {
               updateMemoryTxid(ctx.db, memory.id, txid);
+              updateMemoryStatus(ctx.db, memory.id, 'confirmed');
             } catch {
               // DB may be closed during test teardown — safe to ignore
             }
@@ -389,6 +390,7 @@ export async function handleSyncOnChainMemories(
                 // Local row exists but doesn't know about its ASA — update it
                 updateMemoryAsaId(ctx.db, existing.id, m.asaId);
                 updateMemoryTxid(ctx.db, existing.id, m.txid);
+                updateMemoryStatus(ctx.db, existing.id, 'confirmed');
                 asaSynced++;
               } else {
                 skipped++;
@@ -402,6 +404,7 @@ export async function handleSyncOnChainMemories(
               });
               updateMemoryTxid(ctx.db, saved.id, m.txid);
               updateMemoryAsaId(ctx.db, saved.id, m.asaId);
+              updateMemoryStatus(ctx.db, saved.id, 'confirmed');
               asaSynced++;
             }
           }
@@ -423,6 +426,7 @@ export async function handleSyncOnChainMemories(
       if (existing) {
         if (existing.status !== 'confirmed' && m.txid) {
           updateMemoryTxid(ctx.db, existing.id, m.txid);
+          updateMemoryStatus(ctx.db, existing.id, 'confirmed');
           synced++;
         } else {
           skipped++;
@@ -434,6 +438,7 @@ export async function handleSyncOnChainMemories(
           content: m.content,
         });
         updateMemoryTxid(ctx.db, saved.id, m.txid);
+        updateMemoryStatus(ctx.db, saved.id, 'confirmed');
         synced++;
       }
     }

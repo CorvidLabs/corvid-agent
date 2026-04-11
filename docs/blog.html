@@ -800,6 +800,74 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: Voice Conversations, Platform Hardening, and the Sound of Agents -->
+      <article class="post post--full" id="voice-and-hardening"
+               data-tags="engineering,release,research" data-date="2026-04-10"
+               data-search="voice conversation STT TTS Whisper OpenAI ring buffer deafen speaker identification manager decomposition library permissions librarian zero lint errors security GHSA dependency pinning scheduler GitHub comment monitor discord context preservation memory upsert v0.62.3">
+        <div class="post-meta">
+          <time datetime="2026-04-10">2026-04-10</time>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-release">RELEASE</span>
+          <span class="post-tag tag-research">RESEARCH</span>
+        </div>
+        <h2><a href="#voice-and-hardening">Voice Conversations, Platform Hardening, and the Sound of Agents</a></h2>
+
+        <p><strong>TL;DR:</strong> corvid-agent v0.62.x shipped 40+ commits in three days, transforming voice from a proof-of-concept into a production conversation loop, while simultaneously hardening the platform with manager decomposition, library access control, zero lint warnings, and security dependency fixes. Agents can now talk &mdash; literally &mdash; and the codebase is cleaner than it&rsquo;s ever been.</p>
+
+        <h3>Voice: From Demo to Dialogue</h3>
+
+        <p>Voice shipped in v0.62.0 as a conversation loop: Discord voice channel &rarr; Whisper STT &rarr; agent session &rarr; OpenAI TTS &rarr; Discord playback. But a conversation loop is just plumbing. The real work happened in the 15+ follow-up commits that turned it into something you&rsquo;d actually want to use.</p>
+
+        <p><strong>The first-syllable problem.</strong> Speech recognition clips the beginning of utterances because the audio stream is already flowing when the VAD (voice activity detection) triggers. We added a <em>pre-speech ring buffer</em> that continuously captures the last 300ms of audio. When speech is detected, the buffer contents are prepended to the recording. No more &ldquo;...ello, can you hear me?&rdquo;</p>
+
+        <p><strong>Speaker identification.</strong> In a multi-user voice channel, knowing <em>who</em> is talking changes everything. The voice system now identifies speakers by their Discord user and includes that context in the agent prompt. The agent can address people by name, remember who asked what, and maintain separate conversational threads within a single channel.</p>
+
+        <p><strong>Deafen control.</strong> Sometimes you need the bot to stop listening &mdash; during a sidebar conversation, while playing music, or just because. The <code>/voice deafen</code> command explicitly toggles the listening state. When deafened, in-flight transcriptions are dropped rather than queued, so the agent doesn&rsquo;t respond to stale audio when un-deafened.</p>
+
+        <p><strong>Response calibration.</strong> Early voice responses were either too short (one-word acknowledgments) or too long (paragraph-length explanations read aloud). We tuned the voice prompt to produce <em>natural context-dependent lengths</em> &mdash; short for confirmations, longer for explanations, always conversational rather than written.</p>
+
+        <p><strong>Reliability fixes.</strong> Stale audio receivers on disconnect/reconnect, deaf-after-one-reply bugs, Whisper misdetecting English as other languages, process exit leaving orphaned listeners &mdash; all fixed. The voice system now survives connection drops, session restarts, and extended idle periods without losing state.</p>
+
+        <h3>Manager Decomposition</h3>
+
+        <p><code>manager.ts</code> was the largest file in the codebase &mdash; the session lifecycle orchestrator that handles process spawning, MCP tool registration, persona injection, and approval flows. It was 2,000+ lines and growing. PR #1940 extracted it into focused sub-modules: session creation, tool context assembly, persona loading, and process lifecycle. Each sub-module is independently testable and the main file is now a thin coordinator. The decomposition was done without changing any external API or behavior &mdash; pure structural refactor.</p>
+
+        <h3>Library Access Control</h3>
+
+        <p>The shared library (<code>CRVLIB</code>) was open-write by default &mdash; any agent could create or modify library entries. PR #1938 enforces a <em>librarian permission model</em>: only agents with the <code>librarian</code> role can write to the library. Other agents can read freely but must request a librarian to publish. This prevents knowledge base pollution from rogue or misconfigured agents while keeping the library universally readable.</p>
+
+        <h3>Zero Lint, Zero Warnings</h3>
+
+        <p>PR #1933 achieved something we&rsquo;d been chasing: <em>zero Biome lint errors and zero warnings across the entire codebase</em>. Not just suppressed &mdash; actually fixed. This was a sweep across every file, resolving unused imports, type inconsistencies, naming conventions, and dead code. Combined with the spec-sync strict mode that blocks PRs with spec violations, the codebase now has two independent automated quality gates that both pass clean.</p>
+
+        <h3>Security and Infrastructure</h3>
+
+        <ul>
+          <li><strong>CVE mitigation</strong> &mdash; Pinned <code>@anthropic-ai/sdk &ge;0.82.0</code> to address GHSA-5474-4w2j-mq4c. Security advisories in upstream dependencies are caught by Dependabot and actioned within hours.</li>
+          <li><strong>Scheduler expansion</strong> &mdash; New GitHub external comment monitor watches for comments on PRs from outside contributors and routes them to the appropriate agent for triage.</li>
+          <li><strong>Discord context preservation</strong> &mdash; Thread sessions now preserve conversation context across restarts. If the server reboots mid-conversation, the agent picks up where it left off rather than starting fresh.</li>
+          <li><strong>Memory consistency</strong> &mdash; Fixed an upsert race where confirmed memories could be accidentally demoted to unconfirmed status. Memories are now immutable once confirmed.</li>
+          <li><strong>Dependency hygiene</strong> &mdash; Five outdated packages bumped in a single audit pass.</li>
+        </ul>
+
+        <h3>By the Numbers (v0.62.0 &rarr; v0.62.3)</h3>
+
+        <ul>
+          <li><strong>40+ commits</strong> in 3 days</li>
+          <li><strong>15 voice-specific fixes and features</strong></li>
+          <li><strong>0 lint errors, 0 warnings</strong> &mdash; achieved and enforced</li>
+          <li><strong>17 stale specs updated</strong> in a single spec maintenance pass</li>
+          <li><strong>5 dependency updates</strong> audited and bumped</li>
+          <li><strong>1 CVE mitigated</strong> (SDK pinning)</li>
+        </ul>
+
+        <h3>What It Sounds Like</h3>
+
+        <p>There&rsquo;s something qualitatively different about talking to your agents versus typing at them. Voice forces brevity, demands immediate relevance, and creates a conversational rhythm that text can&rsquo;t replicate. When you ask CorvidAgent a question in a Discord voice channel and hear it answer in a natural voice two seconds later, the abstraction dissolves. It&rsquo;s not a CLI with extra steps &mdash; it&rsquo;s a colleague on a call.</p>
+
+        <p>We&rsquo;re still early. Voice doesn&rsquo;t yet support interruption (barge-in), multi-turn memory within a voice session is limited, and latency spikes when the TTS queue backs up. But the foundation is solid: ring-buffered capture, speaker-aware transcription, session-persistent context, and graceful degradation on connection loss. The next step is making it feel less like a demo and more like the default way you interact with your agents.</p>
+      </article>
+
       <!-- Post: spec-sync in Practice — Bidirectional Spec-to-Code Validation at Scale -->
       <article class="post post--full" id="spec-sync-in-practice"
                data-tags="engineering,research,release" data-date="2026-04-07"

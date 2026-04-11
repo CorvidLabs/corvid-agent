@@ -89,7 +89,7 @@
     "croner": "^10.0.1",
     "discord.js": "^14.16.0",
     "libsodium-wrappers": "^0.8.2",
-    "marked": "^17.0.5",
+    "marked": "18",
     "opusscript": "^0.1.1",
     "tree-sitter-wasms": "^0.1.13",
     "web-tree-sitter": "0.25.10",

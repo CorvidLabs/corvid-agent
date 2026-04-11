@@ -45,6 +45,7 @@ export const tables: string[] = [
         buddy_agent_id     TEXT,
         buddy_agent_name   TEXT,
         buddy_max_rounds   INTEGER,
+        last_summary       TEXT,
         last_activity_at   TEXT NOT NULL DEFAULT (datetime('now')),
         created_at         TEXT NOT NULL DEFAULT (datetime('now'))
     )`,

@@ -45,6 +45,7 @@ import { type DetectedMention, filterNewMentions, GitHubSearcher, resolveFullRep
 
 const log = createLogger('MentionPoller');
 const TRIGGER_DEDUP_NS = 'polling:triggers';
+const ACK_DEDUP_NS = 'polling:ack-comments';
 
 /** How often we check which configs are due (main loop interval). */
 const POLL_LOOP_INTERVAL_MS = 15_000; // 15 seconds
@@ -87,6 +88,8 @@ export class MentionPollingService {
     this.processManager = processManager;
     // Rate limit triggers: 60s TTL matches MIN_TRIGGER_GAP_MS, bounded at 500 entries
     this.dedup.register(TRIGGER_DEDUP_NS, { maxSize: 500, ttlMs: MIN_TRIGGER_GAP_MS });
+    // Cross-config dedup for ack comments: same repo#number only gets one "looking into this"
+    this.dedup.register(ACK_DEDUP_NS, { maxSize: 500, ttlMs: 5 * 60 * 1000 });
     this.searcher = new GitHubSearcher((args) => this.runGh(args));
 
     // Initialize sub-services
@@ -494,14 +497,23 @@ export class MentionPollingService {
       // Post an immediate acknowledgment on GitHub and subscribe
       // to session end events to guarantee a follow-up comment.
       const agentName = getAgent(this.db, config.agentId)?.name ?? 'corvid-agent';
-      const ackBody = `👋 **${agentName}** is looking into this.`;
-      addIssueComment(fullRepo, mention.number, ackBody).catch((err) => {
-        log.warn('Failed to post acknowledgment comment', {
-          repo: fullRepo,
-          number: mention.number,
-          error: err instanceof Error ? err.message : String(err),
+
+      // Skip ack when the agent is the PR/issue author (no need to announce
+      // "looking into this" on your own PR), and cross-config dedup so
+      // multiple configs polling the same mention only post one ack.
+      const ackKey = `${fullRepo}#${mention.number}`;
+      const isOwnPR = mention.sender.toLowerCase() === config.mentionUsername.toLowerCase();
+      if (!isOwnPR && !this.dedup.has(ACK_DEDUP_NS, ackKey)) {
+        this.dedup.markSeen(ACK_DEDUP_NS, ackKey);
+        const ackBody = `👋 **${agentName}** is looking into this.`;
+        addIssueComment(fullRepo, mention.number, ackBody).catch((err) => {
+          log.warn('Failed to post acknowledgment comment', {
+            repo: fullRepo,
+            number: mention.number,
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
-      });
+      }
 
       // Guarantee follow-up: when the session ends (success or failure),
       // post a completion comment. This fires even if the agent itself
