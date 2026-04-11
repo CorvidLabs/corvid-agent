@@ -13,6 +13,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import type { Project, SessionSource } from '../../../shared/types';
 import type { BuddyRoundEvent } from '../../../shared/types/buddy';
 import { listAgents } from '../../db/agents';
+import { setChannelProjectId } from '../../db/discord-channel-project';
 import { saveMentionSession } from '../../db/discord-mention-sessions';
 import { listProjects } from '../../db/projects';
 import { createSession } from '../../db/sessions';
@@ -180,6 +181,10 @@ export async function handleMessageCommand(
     await respondToInteraction(interaction, 'Could not determine channel.');
     return;
   }
+
+  // Record channel-project affinity so future @mentions in this channel
+  // inherit the same project context without needing an explicit flag.
+  setChannelProjectId(ctx.db, channelId, project.id);
 
   // Acknowledge the command immediately
   const username = interaction.member?.user?.username ?? interaction.user.username ?? userId;

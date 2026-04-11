@@ -6,13 +6,18 @@
  */
 
 import type { GuildMember, MessageComponentInteraction, RepliableInteraction } from 'discord.js';
-import { deleteThreadSession, updateThreadSessionActivity } from '../../db/discord-thread-sessions';
+import type { SessionSource } from '../../../shared/types';
+import { listAgents } from '../../db/agents';
+import { deleteThreadSession, saveThreadSession, updateThreadSessionActivity } from '../../db/discord-thread-sessions';
+import { listProjects } from '../../db/projects';
+import { createSession, getSession } from '../../db/sessions';
 import { createLogger } from '../../lib/logger';
+import { resolveAndCreateWorktree } from '../../lib/worktree';
 import type { InteractionContext } from '../commands';
 import { acknowledgeButton, assertSnowflake, respondEphemeral, respondToInteraction } from '../embeds';
 import { resolvePermissionLevel } from '../permissions';
 import type { ThreadSessionInfo } from '../thread-manager';
-import { archiveThread } from '../thread-manager';
+import { archiveThread, resolveDefaultAgent } from '../thread-manager';
 import { PermissionLevel } from '../types';
 
 // discord.js types RepliableInteraction as a union of concrete subtypes (ButtonInteraction,
@@ -91,7 +96,200 @@ export async function handleComponentInteraction(
         await respondEphemeral(ri, 'You need a higher role to create sessions.');
         return;
       }
-      await respondToInteraction(ri, 'Use `/session` to start a new conversation with an agent.');
+
+      const threadId = interaction.channelId;
+      const prevInfo = ctx.threadSessions.get(threadId);
+
+      // Stop existing session if still running
+      if (prevInfo && ctx.processManager.isRunning(prevInfo.sessionId)) {
+        ctx.processManager.stopProcess(prevInfo.sessionId);
+        const cb = ctx.threadCallbacks.get(threadId);
+        if (cb) {
+          ctx.processManager.unsubscribe(cb.sessionId, cb.callback);
+          ctx.threadCallbacks.delete(threadId);
+        }
+      }
+
+      // Resolve agent and project from previous session or defaults
+      const agent = prevInfo
+        ? listAgents(ctx.db).find((a) => a.name === prevInfo.agentName)
+        : undefined;
+      const resolvedAgent = agent ?? resolveDefaultAgent(ctx.db, ctx.config);
+      if (!resolvedAgent) {
+        await respondToInteraction(ri, 'No agents configured. Use `/session` to start manually.');
+        return;
+      }
+
+      const projects = listProjects(ctx.db);
+      const project = prevInfo?.projectName
+        ? projects.find((p) => p.name.toLowerCase() === prevInfo.projectName!.toLowerCase()) ?? projects[0]
+        : projects[0];
+      if (!project) {
+        await respondToInteraction(ri, 'No projects configured.');
+        return;
+      }
+
+      // Create worktree
+      let workDir: string | undefined;
+      if (project.workingDir || project.gitUrl) {
+        const result = await resolveAndCreateWorktree(project, resolvedAgent.name, crypto.randomUUID());
+        if (result.success) workDir = result.workDir;
+      }
+
+      const newSession = createSession(ctx.db, {
+        projectId: project.id,
+        agentId: resolvedAgent.id,
+        name: `Discord thread:${threadId}`,
+        initialPrompt: prevInfo?.topic ?? 'New session',
+        source: 'discord' as SessionSource,
+        workDir,
+      });
+
+      const threadInfo: ThreadSessionInfo = {
+        sessionId: newSession.id,
+        agentName: resolvedAgent.name,
+        agentModel: resolvedAgent.model || 'unknown',
+        ownerUserId: userId,
+        topic: prevInfo?.topic,
+        projectName: project.name,
+        displayColor: resolvedAgent.displayColor,
+        displayIcon: resolvedAgent.displayIcon,
+        avatarUrl: resolvedAgent.avatarUrl,
+        creatorPermLevel: permLevel,
+      };
+      ctx.threadSessions.set(threadId, threadInfo);
+      ctx.threadLastActivity.set(threadId, Date.now());
+      saveThreadSession(ctx.db, threadId, threadInfo);
+
+      ctx.subscribeForResponseWithEmbed(
+        newSession.id,
+        threadId,
+        resolvedAgent.name,
+        resolvedAgent.model || 'unknown',
+        project.name,
+        resolvedAgent.displayColor,
+        resolvedAgent.displayIcon,
+        resolvedAgent.avatarUrl,
+      );
+
+      ctx.processManager.startProcess(newSession, 'New session started. Ready for instructions.');
+
+      await acknowledgeButton(ri, `New session started with **${resolvedAgent.name}** on **${project.name}**.`);
+      break;
+    }
+
+    case 'continue_thread': {
+      if (permLevel < PermissionLevel.STANDARD) {
+        await respondEphemeral(ri, 'You need a higher role to create threads.');
+        return;
+      }
+
+      // Extract session ID from custom_id (format: continue_thread:sessionId)
+      const parts = customId.split(':');
+      const sourceSessionId = parts[1];
+      const sourceSession = sourceSessionId ? getSession(ctx.db, sourceSessionId) : null;
+
+      // Resolve agent
+      const ctAgent = resolveDefaultAgent(ctx.db, ctx.config);
+      if (!ctAgent) {
+        await respondToInteraction(ri, 'No agents configured.');
+        return;
+      }
+
+      const ctProjects = listProjects(ctx.db);
+      const ctProject = ctAgent.defaultProjectId
+        ? ctProjects.find((p) => p.id === ctAgent.defaultProjectId) ?? ctProjects[0]
+        : ctProjects[0];
+      if (!ctProject) {
+        await respondToInteraction(ri, 'No projects configured.');
+        return;
+      }
+
+      // Create thread from the channel
+      const sourceChannelId = interaction.channelId;
+      const threadName = `${ctAgent.name} — continued`;
+      const newThreadId = await ctx.createStandaloneThread(sourceChannelId, threadName);
+      if (!newThreadId) {
+        await respondToInteraction(ri, 'Failed to create thread. Try using `/session` instead.');
+        return;
+      }
+
+      // Create worktree
+      let ctWorkDir: string | undefined;
+      if (ctProject.workingDir || ctProject.gitUrl) {
+        const result = await resolveAndCreateWorktree(ctProject, ctAgent.name, crypto.randomUUID());
+        if (result.success) ctWorkDir = result.workDir;
+      }
+
+      const ctSession = createSession(ctx.db, {
+        projectId: ctProject.id,
+        agentId: ctAgent.id,
+        name: `Discord thread:${newThreadId}`,
+        initialPrompt: 'Continued from channel mention',
+        source: 'discord' as SessionSource,
+        workDir: ctWorkDir,
+      });
+
+      const ctThreadInfo: ThreadSessionInfo = {
+        sessionId: ctSession.id,
+        agentName: ctAgent.name,
+        agentModel: ctAgent.model || 'unknown',
+        ownerUserId: userId,
+        projectName: ctProject.name,
+        displayColor: ctAgent.displayColor,
+        displayIcon: ctAgent.displayIcon,
+        avatarUrl: ctAgent.avatarUrl,
+        creatorPermLevel: permLevel,
+      };
+      ctx.threadSessions.set(newThreadId, ctThreadInfo);
+      ctx.threadLastActivity.set(newThreadId, Date.now());
+      saveThreadSession(ctx.db, newThreadId, ctThreadInfo);
+
+      ctx.subscribeForResponseWithEmbed(
+        ctSession.id,
+        newThreadId,
+        ctAgent.name,
+        ctAgent.model || 'unknown',
+        ctProject.name,
+        ctAgent.displayColor,
+        ctAgent.displayIcon,
+        ctAgent.avatarUrl,
+      );
+
+      // Carry context from the source session if available
+      const contextMsg = sourceSession
+        ? 'Continued from a channel conversation. The user clicked "Continue in Thread" to move this conversation here. Greet them and ask how you can help.'
+        : 'New thread session started from a channel conversation. Greet the user and ask how you can help.';
+      ctx.processManager.startProcess(ctSession, contextMsg);
+
+      await acknowledgeButton(ri, `Thread created! Continue the conversation in <#${newThreadId}>.`);
+      break;
+    }
+
+    case 'create_issue': {
+      if (permLevel < PermissionLevel.STANDARD) {
+        await respondEphemeral(ri, 'You need a higher role to create issues.');
+        return;
+      }
+
+      const ciThreadId = interaction.channelId;
+      const ciInfo = ctx.threadSessions.get(ciThreadId);
+      if (!ciInfo) {
+        await respondToInteraction(ri, 'No session found in this thread. Cannot create an issue without context.');
+        return;
+      }
+
+      // Resume or send a message to the session asking it to create an issue
+      const ciSession = getSession(ctx.db, ciInfo.sessionId);
+      if (ciSession && ctx.processManager.isRunning(ciInfo.sessionId)) {
+        ctx.processManager.sendMessage(
+          ciInfo.sessionId,
+          '[System: The user clicked the "Create Issue" button. Create a GitHub issue summarizing the key findings, decisions, or work done in this conversation. Ask the user to confirm the title and description before submitting.]',
+        );
+        await acknowledgeButton(ri, 'Creating issue from conversation — check the thread for details.');
+      } else {
+        await respondToInteraction(ri, 'Session is no longer active. Send a message first to start a new session, then ask to create an issue.');
+      }
       break;
     }
 
