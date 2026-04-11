@@ -4,6 +4,7 @@ import type { ScheduleActionType } from '../../shared/types/schedules';
 import { saveMemory } from '../db/agent-memories';
 import { getAgent } from '../db/agents';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
+import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { boostObservation, listObservations, recordObservation } from '../db/observations';
 import { getProject } from '../db/projects';
@@ -18,7 +19,6 @@ import {
   updateSessionStatus,
   updateSessionSummary,
 } from '../db/sessions';
-import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
@@ -1839,6 +1839,17 @@ export class ProcessManager {
         sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  /**
+   * Flush conversation summaries for all active Discord thread sessions.
+   * Called periodically by the Discord bridge so that crash recovery
+   * has recent context even if the process never exits cleanly.
+   */
+  flushActiveSessionSummaries(): void {
+    for (const sessionId of this.processes.keys()) {
+      this.persistConversationSummary(sessionId);
     }
   }
 

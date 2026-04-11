@@ -15,12 +15,7 @@ import { addSessionMessage, getParticipantForSession, updateSessionCost, updateS
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import type { ISessionEventBus } from './interfaces';
-import type {
-  ClaudeStreamEvent,
-  ContentBlockStartEvent,
-  DirectProcessMetrics,
-  ThinkingEvent,
-} from './types';
+import type { ClaudeStreamEvent, ContentBlockStartEvent, DirectProcessMetrics, ThinkingEvent } from './types';
 import { extractContentText } from './types';
 
 const log = createLogger('EventHandler');
