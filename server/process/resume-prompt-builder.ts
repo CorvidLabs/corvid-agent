@@ -11,6 +11,7 @@ import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
 import { boostObservation, listObservations } from '../db/observations';
 import { getSessionMessages } from '../db/sessions';
+
 interface SessionMeta {
   contextSummary?: string;
 }
@@ -34,18 +35,16 @@ export function buildResumePrompt(
   const messages = getSessionMessages(db, session.id);
 
   // Check for a pending server-restart confirmation and clear it
-  const restartRow = db
-    .query('SELECT server_restart_initiated_at FROM sessions WHERE id = ?')
-    .get(session.id) as { server_restart_initiated_at: string | null } | null;
+  const restartRow = db.query('SELECT server_restart_initiated_at FROM sessions WHERE id = ?').get(session.id) as {
+    server_restart_initiated_at: string | null;
+  } | null;
   const restartInitiatedAt = restartRow?.server_restart_initiated_at ?? null;
   if (restartInitiatedAt) {
     db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
   }
 
   // Load recent active observations for this agent and increment their access count
-  const observations = session.agentId
-    ? listObservations(db, session.agentId, { status: 'active', limit: 5 })
-    : [];
+  const observations = session.agentId ? listObservations(db, session.agentId, { status: 'active', limit: 5 }) : [];
   for (const obs of observations) {
     boostObservation(db, obs.id, 0);
   }

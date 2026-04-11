@@ -211,6 +211,19 @@ export class AlgoChatBridge implements ChannelAdapter {
     this.responseFormatter.offEvent(callback);
   }
 
+  /** Expose Algorand clients for block explorer and other read-only routes. */
+  getAlgoClients(): {
+    algodClient: import('algosdk').default.Algodv2;
+    indexerClient: import('algosdk').default.Indexer | null;
+    address: string;
+  } {
+    return {
+      algodClient: this.service.algodClient,
+      indexerClient: this.service.indexerClient,
+      address: this.service.chatAccount.address,
+    };
+  }
+
   async getStatus(): Promise<AlgoChatStatus & ChannelStatus> {
     const conversations = listConversations(this.db);
     let balance = 0;

@@ -113,9 +113,9 @@ export function updateThreadSessionSummary(db: Database, threadId: string, summa
  * Falls back to null if the thread has no stored summary.
  */
 export function getThreadSessionSummary(db: Database, threadId: string): string | null {
-  const row = db
-    .query(`SELECT last_summary FROM discord_thread_sessions WHERE thread_id = ?`)
-    .get(threadId) as { last_summary: string | null } | null;
+  const row = db.query(`SELECT last_summary FROM discord_thread_sessions WHERE thread_id = ?`).get(threadId) as {
+    last_summary: string | null;
+  } | null;
   return row?.last_summary ?? null;
 }
 
@@ -124,9 +124,9 @@ export function getThreadSessionSummary(db: Database, threadId: string): string 
  * Used to persist conversation summaries to thread sessions on process exit.
  */
 export function getThreadIdForSession(db: Database, sessionId: string): string | null {
-  const row = db
-    .query(`SELECT thread_id FROM discord_thread_sessions WHERE session_id = ?`)
-    .get(sessionId) as { thread_id: string } | null;
+  const row = db.query(`SELECT thread_id FROM discord_thread_sessions WHERE session_id = ?`).get(sessionId) as {
+    thread_id: string;
+  } | null;
   return row?.thread_id ?? null;
 }
 

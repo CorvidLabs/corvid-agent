@@ -108,7 +108,10 @@ const SDK_TO_DIRECT_TOOL_MAP: Record<string, string> = {
  * mcpToolAllowList. Returns undefined if both inputs are empty/absent
  * (meaning "allow all tools").
  */
-export function resolveDirectToolAllowList(toolAllowList?: string[], mcpToolAllowList?: string[]): string[] | undefined {
+export function resolveDirectToolAllowList(
+  toolAllowList?: string[],
+  mcpToolAllowList?: string[],
+): string[] | undefined {
   const hasToolList = toolAllowList && toolAllowList.length > 0;
   const hasMcpList = mcpToolAllowList && mcpToolAllowList.length > 0;
 
