@@ -569,6 +569,8 @@ Every request passes through these stages in order:
 | PUT | `/api/settings/credits` | settings.ts | Update credit configuration |
 | POST | `/api/settings/api-key/rotate` | settings.ts | Rotate the API key |
 | GET | `/api/settings/api-key/status` | settings.ts | Get API key rotation and expiry status |
+| GET | `/api/settings/telegram` | settings.ts | Get Telegram runtime config (operator+) |
+| PUT | `/api/settings/telegram` | settings.ts | Update Telegram runtime config (owner-only) |
 
 ### Ollama
 

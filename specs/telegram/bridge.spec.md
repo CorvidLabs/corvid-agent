@@ -8,6 +8,7 @@ files:
 db_tables:
   - sessions
   - session_messages
+  - telegram_config
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/db/sessions/sessions.spec.md

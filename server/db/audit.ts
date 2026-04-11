@@ -55,6 +55,7 @@ export type AuditAction =
   | 'subscription_cancel'
   | 'discord_config_update'
   | 'discord_config_delete'
+  | 'telegram_config_update'
   | 'key_access_decrypt'
   | 'key_access_encrypt'
   | 'key_access_sign'
