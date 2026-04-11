@@ -5,7 +5,7 @@ status: active
 files:
   - server/db/discord-thread-sessions.ts
   - server/db/migrations/112_discord_thread_sessions.ts
-  - server/db/migrations/117_thread_session_summary.ts
+  - server/db/migrations/118_thread_session_summary.ts
 db_tables:
   - discord_thread_sessions
 depends_on:

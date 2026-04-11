@@ -113,7 +113,7 @@ describe('execWorkTask', () => {
     expect(mockUpdateStatus.mock.calls[0][3]?.result).toContain('queued behind active task');
   });
 
-  it('retries on ConflictError and succeeds on second attempt', async () => {
+  it('retries on transient ConflictError and succeeds on second attempt', async () => {
     const svc = {
       create: mock()
         .mockRejectedValueOnce(new ConflictError('Another task is already active on project'))
@@ -136,18 +136,45 @@ describe('execWorkTask', () => {
     expect(mockUpdateStatus.mock.calls[0][2]).toBe('completed');
   });
 
-  it('fails after exhausting all retry attempts on conflict', async () => {
+  it('marks permanent skip conflicts as completed instead of retrying', async () => {
+    const svc = {
+      create: mock().mockRejectedValueOnce(
+        new ConflictError('An active work task already addresses issue #42. Skipping.'),
+      ),
+    };
+    await execWorkTask(makeCtx(svc), 'exec-1', makeSchedule(), makeAction());
+    // Should NOT retry — permanent skip
+    expect(svc.create).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStatus).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStatus.mock.calls[0][2]).toBe('completed');
+    expect(mockUpdateStatus.mock.calls[0][3]?.result).toContain('Skipped:');
+  });
+
+  it('marks flock conflict as completed skip', async () => {
+    const svc = {
+      create: mock().mockRejectedValueOnce(
+        new ConflictError('Another agent (Jackdaw) is already working on this issue. Skipping to avoid duplicate work.'),
+      ),
+    };
+    await execWorkTask(makeCtx(svc), 'exec-1', makeSchedule(), makeAction());
+    expect(svc.create).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStatus.mock.calls[0][2]).toBe('completed');
+    expect(mockUpdateStatus.mock.calls[0][3]?.result).toContain('Skipped:');
+  });
+
+  it('fails after exhausting all retry attempts on transient conflict', async () => {
     const conflictErr = new ConflictError('Another task is already active on project');
     const svc = {
       create: mock()
         .mockRejectedValueOnce(conflictErr)
         .mockRejectedValueOnce(conflictErr)
         .mockRejectedValueOnce(conflictErr)
+        .mockRejectedValueOnce(conflictErr)
         .mockRejectedValueOnce(conflictErr),
     };
     await execWorkTask(makeCtx(svc), 'exec-1', makeSchedule(), makeAction());
-    // MAX_ATTEMPTS = 4 (RETRY_DELAYS.length + 1)
-    expect(svc.create).toHaveBeenCalledTimes(4);
+    // MAX_ATTEMPTS = 5 (RETRY_DELAYS.length + 1)
+    expect(svc.create).toHaveBeenCalledTimes(5);
     expect(mockUpdateStatus).toHaveBeenCalledTimes(1);
     expect(mockUpdateStatus.mock.calls[0][2]).toBe('failed');
   });

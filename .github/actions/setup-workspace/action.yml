@@ -5,7 +5,7 @@ inputs:
   bun-version:
     description: Bun version to install
     required: false
-    default: "1.3.8"
+    default: "1.3.10"
   install-client:
     description: Also install client dependencies
     required: false
