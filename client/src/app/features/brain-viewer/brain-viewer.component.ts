@@ -80,6 +80,34 @@ interface SyncStatus {
     recentErrors: Array<{ memoryId: string; key: string; error: string; failedAt: string }>;
 }
 
+interface DuplicatePair {
+    primaryId: string;
+    primaryKey: string;
+    duplicateId: string;
+    duplicateKey: string;
+    similarityScore: number;
+    method: 'jaccard' | 'tfidf' | 'combined';
+}
+
+interface MergeSuggestion {
+    id: string;
+    primaryId: string;
+    primaryKey: string;
+    primaryContent: string;
+    duplicateIds: string[];
+    duplicateKeys: string[];
+    maxSimilarity: number;
+    previewContent: string;
+    keyPrefix: string | null;
+}
+
+interface ConsolidationResponse {
+    suggestions: MergeSuggestion[];
+    duplicates: DuplicatePair[];
+    total: number;
+    threshold: number;
+}
+
 @Component({
     selector: 'app-brain-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -482,6 +510,126 @@ interface SyncStatus {
                                 </div>
                             }
                         </div>
+                    }
+                </div>
+
+                <!-- Consolidation -->
+                <div class="section section--consolidation">
+                    <div class="consolidation-header">
+                        <h3>Consolidation</h3>
+                        <div class="consolidation-controls">
+                            <label class="threshold-label">
+                                Threshold: {{ consolidationThreshold() }}%
+                                <input type="range" min="40" max="95" step="5"
+                                       [value]="consolidationThreshold()"
+                                       (input)="onThresholdChange($event)" />
+                            </label>
+                            <button class="btn--sm" (click)="loadConsolidation()" [disabled]="consolidationLoading()">
+                                {{ consolidationLoading() ? 'Scanning...' : 'Scan for Duplicates' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (consolidationLoading()) {
+                        <p class="loading">Scanning memories...</p>
+                    } @else if (consolidationData()) {
+                        @if (consolidationData()!.suggestions.length === 0 && consolidationData()!.duplicates.length === 0) {
+                            <p class="consolidation-empty">No duplicates or near-duplicates found at {{ consolidationData()!.threshold }}% threshold.</p>
+                        } @else {
+                            <!-- Merge Suggestions -->
+                            @if (consolidationData()!.suggestions.length > 0) {
+                                <div class="consolidation-subsection">
+                                    <h4>Merge Suggestions ({{ consolidationData()!.suggestions.length }})</h4>
+                                    @for (sug of consolidationData()!.suggestions; track sug.id) {
+                                        <div class="merge-card" [class.merge-card--expanded]="expandedMergeId() === sug.id">
+                                            <div class="merge-card__header" (click)="toggleMergeExpand(sug.id)">
+                                                <span class="merge-score">{{ (sug.maxSimilarity * 100).toFixed(0) }}%</span>
+                                                <span class="merge-primary">{{ sug.primaryKey }}</span>
+                                                <span class="merge-dupes">+ {{ sug.duplicateIds.length }} duplicate{{ sug.duplicateIds.length > 1 ? 's' : '' }}</span>
+                                                @if (sug.keyPrefix) {
+                                                    <span class="merge-prefix">prefix: {{ sug.keyPrefix }}</span>
+                                                }
+                                            </div>
+                                            @if (expandedMergeId() === sug.id) {
+                                                <div class="merge-card__detail">
+                                                    <div class="merge-diff">
+                                                        <div class="merge-diff__col">
+                                                            <span class="merge-diff__label">Primary: {{ sug.primaryKey }}</span>
+                                                            <pre class="detail-pre merge-diff__pre">{{ sug.primaryContent }}</pre>
+                                                        </div>
+                                                        <div class="merge-diff__col">
+                                                            <span class="merge-diff__label">Duplicates: {{ sug.duplicateKeys.join(', ') }}</span>
+                                                            <pre class="detail-pre merge-diff__pre merge-diff__pre--dupe">{{ sug.duplicateKeys.join('\n---\n') }}</pre>
+                                                        </div>
+                                                    </div>
+                                                    <div class="merge-preview">
+                                                        <span class="merge-diff__label">Consolidated Preview</span>
+                                                        <pre class="detail-pre merge-preview__pre">{{ sug.previewContent }}</pre>
+                                                    </div>
+                                                    <div class="merge-card__actions">
+                                                        <button class="btn--action btn--merge"
+                                                                [disabled]="mergingId() === sug.id"
+                                                                (click)="executeMerge(sug, $event)">
+                                                            {{ mergingId() === sug.id ? 'Merging...' : 'Execute Merge' }}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Duplicate Pairs -->
+                            @if (consolidationData()!.duplicates.length > 0) {
+                                <div class="consolidation-subsection">
+                                    <h4>Duplicate Pairs ({{ consolidationData()!.duplicates.length }})</h4>
+                                    @for (pair of consolidationData()!.duplicates; track pair.primaryId + pair.duplicateId) {
+                                        <div class="dup-row">
+                                            <span class="dup-score" [class.dup-score--high]="pair.similarityScore >= 0.9">{{ (pair.similarityScore * 100).toFixed(0) }}%</span>
+                                            <span class="dup-method">{{ pair.method }}</span>
+                                            <span class="dup-key">{{ pair.primaryKey }}</span>
+                                            <span class="dup-separator">≈</span>
+                                            <span class="dup-key">{{ pair.duplicateKey }}</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Bulk Archive -->
+                            <div class="consolidation-subsection">
+                                <h4>Bulk Archive</h4>
+                                <div class="archive-controls">
+                                    <div class="archive-field">
+                                        <label>Max Decay Score (0–1)</label>
+                                        <input type="number" class="archive-input" min="0" max="1" step="0.05"
+                                               placeholder="e.g. 0.3"
+                                               [value]="archiveDecayThreshold()"
+                                               (input)="onArchiveDecayChange($event)" />
+                                    </div>
+                                    <div class="archive-field">
+                                        <label>Older Than (days)</label>
+                                        <input type="number" class="archive-input" min="0" step="1"
+                                               placeholder="e.g. 30"
+                                               [value]="archiveOlderThanDays()"
+                                               (input)="onArchiveOlderThanChange($event)" />
+                                    </div>
+                                    <button class="btn--action btn--archive"
+                                            [disabled]="archiving()"
+                                            (click)="executeBulkArchive()">
+                                        {{ archiving() ? 'Archiving...' : 'Bulk Archive' }}
+                                    </button>
+                                </div>
+                                @if (archiveResult()) {
+                                    <div class="archive-result">
+                                        Archived {{ archiveResult()!.archivedCount }} memories.
+                                        @if (archiveResult()!.archivedKeys.length > 0) {
+                                            <span class="archive-keys">{{ archiveResult()!.archivedKeys.slice(0, 5).join(', ') }}{{ archiveResult()!.archivedKeys.length > 5 ? '...' : '' }}</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
                     }
                 </div>
             }
@@ -1066,11 +1214,183 @@ interface SyncStatus {
         }
         .btn--boost:hover { background: var(--accent-cyan-mid); }
 
+        /* ─── Consolidation ────── */
+        .section--consolidation { border-color: var(--accent-orange, #f59e0b); }
+        .consolidation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .consolidation-header h3 { margin: 0; }
+        .consolidation-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .threshold-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+        .threshold-label input[type=range] { width: 80px; cursor: pointer; }
+        .consolidation-empty { color: var(--text-tertiary); font-size: 0.75rem; }
+        .consolidation-subsection { margin-top: 1rem; }
+        .consolidation-subsection h4 {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin: 0 0 0.5rem;
+        }
+
+        /* Merge cards */
+        .merge-card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 4px;
+        }
+        .merge-card--expanded { border-color: var(--accent-orange, #f59e0b); }
+        .merge-card__header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: var(--space-2) var(--space-3);
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+        .merge-card__header:hover { background: var(--bg-hover); }
+        .merge-score {
+            padding: 0.15rem 0.4rem;
+            background: var(--accent-orange-dim, rgba(245,158,11,0.15));
+            color: var(--accent-orange, #f59e0b);
+            border-radius: var(--radius-sm);
+            font-size: 0.6rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .merge-primary { color: var(--text-primary); font-weight: 600; flex: 1; }
+        .merge-dupes { color: var(--text-tertiary); font-size: 0.65rem; flex-shrink: 0; }
+        .merge-prefix {
+            padding: 0.1rem 0.3rem;
+            background: var(--accent-purple-dim);
+            color: var(--accent-purple);
+            border-radius: var(--radius-sm);
+            font-size: 0.55rem;
+            flex-shrink: 0;
+        }
+        .merge-card__detail {
+            padding: var(--space-3);
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .merge-diff {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        .merge-diff__col { display: flex; flex-direction: column; gap: 0.3rem; }
+        .merge-diff__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .merge-diff__pre { max-height: 160px; }
+        .merge-diff__pre--dupe { border-color: var(--accent-red); }
+        .merge-preview { display: flex; flex-direction: column; gap: 0.3rem; }
+        .merge-preview__pre { border-color: var(--accent-green); max-height: 120px; }
+        .merge-card__actions {
+            display: flex;
+            gap: 0.5rem;
+            padding-top: var(--space-2);
+            border-top: 1px solid var(--border);
+        }
+        .btn--merge {
+            background: var(--accent-orange-dim, rgba(245,158,11,0.15));
+            border-color: var(--accent-orange, #f59e0b);
+            color: var(--accent-orange, #f59e0b);
+        }
+        .btn--merge:hover:not(:disabled) { background: rgba(245,158,11,0.3); }
+
+        /* Duplicate rows */
+        .dup-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0;
+            font-size: 0.7rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .dup-row:last-child { border-bottom: none; }
+        .dup-score {
+            padding: 0.1rem 0.35rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--accent-amber);
+            flex-shrink: 0;
+        }
+        .dup-score--high { color: var(--accent-red); border-color: var(--accent-red); }
+        .dup-method {
+            font-size: 0.55rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .dup-key { color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dup-separator { color: var(--text-tertiary); flex-shrink: 0; }
+
+        /* Bulk archive */
+        .archive-controls {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .archive-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .archive-field label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .archive-input {
+            width: 120px;
+            padding: var(--space-1) var(--space-2);
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            outline: none;
+        }
+        .archive-input:focus { border-color: var(--accent-amber); }
+        .btn--archive {
+            background: var(--accent-amber-dim);
+            border-color: var(--accent-amber);
+            color: var(--accent-amber);
+        }
+        .btn--archive:hover:not(:disabled) { background: var(--accent-amber-mid, rgba(245,158,11,0.25)); }
+        .archive-result {
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--accent-green);
+        }
+        .archive-keys { color: var(--text-tertiary); margin-left: 0.4rem; }
+
         /* ─── Responsive ────── */
         @media (max-width: 767px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
             .memory-card__header { flex-wrap: wrap; }
             .agent-table__header, .agent-table__row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: 0.6rem; }
+            .merge-diff { grid-template-columns: 1fr; }
+            .archive-controls { flex-direction: column; align-items: stretch; }
         }
     `,
 })
@@ -1093,6 +1413,17 @@ export class BrainViewerComponent implements OnInit {
     readonly obsStatusFilter = signal<string | null>('active');
     readonly expandedObsId = signal<string | null>(null);
     readonly graduatingId = signal<string | null>(null);
+
+    // Consolidation
+    readonly consolidationData = signal<ConsolidationResponse | null>(null);
+    readonly consolidationLoading = signal(false);
+    readonly consolidationThreshold = signal(70);
+    readonly expandedMergeId = signal<string | null>(null);
+    readonly mergingId = signal<string | null>(null);
+    readonly archiving = signal(false);
+    readonly archiveResult = signal<{ archivedCount: number; archivedKeys: string[] } | null>(null);
+    readonly archiveDecayThreshold = signal<number | null>(null);
+    readonly archiveOlderThanDays = signal<number | null>(null);
 
     // Filters
     readonly searchQuery = signal('');
@@ -1245,6 +1576,90 @@ export class BrainViewerComponent implements OnInit {
         } catch {
             // Non-critical
         }
+    }
+
+    // ─── Consolidation actions ───────────────────────────────────────────────
+
+    onThresholdChange(event: Event): void {
+        const val = parseInt((event.target as HTMLInputElement).value, 10);
+        if (!isNaN(val)) this.consolidationThreshold.set(val);
+    }
+
+    onArchiveDecayChange(event: Event): void {
+        const val = parseFloat((event.target as HTMLInputElement).value);
+        this.archiveDecayThreshold.set(isNaN(val) ? null : val);
+    }
+
+    onArchiveOlderThanChange(event: Event): void {
+        const val = parseInt((event.target as HTMLInputElement).value, 10);
+        this.archiveOlderThanDays.set(isNaN(val) ? null : val);
+    }
+
+    async loadConsolidation(): Promise<void> {
+        this.consolidationLoading.set(true);
+        this.consolidationData.set(null);
+        try {
+            const params = new URLSearchParams();
+            params.set('threshold', String(this.consolidationThreshold()));
+            if (this.agentFilter()) params.set('agentId', this.agentFilter()!);
+
+            const data = await firstValueFrom(
+                this.api.get<ConsolidationResponse>(`/brain/consolidation/suggestions?${params.toString()}`),
+            );
+            this.consolidationData.set(data);
+        } catch {
+            // Non-critical
+        } finally {
+            this.consolidationLoading.set(false);
+        }
+    }
+
+    async executeMerge(sug: MergeSuggestion, event: Event): Promise<void> {
+        event.stopPropagation();
+        this.mergingId.set(sug.id);
+        try {
+            await firstValueFrom(
+                this.api.post<{ success: boolean }>('/brain/consolidation/merge', {
+                    primaryId: sug.primaryId,
+                    duplicateIds: sug.duplicateIds,
+                    mergedContent: sug.previewContent,
+                }),
+            );
+            // Reload everything
+            await this.loadConsolidation();
+            await this.loadMemories();
+        } catch {
+            // Non-critical
+        } finally {
+            this.mergingId.set(null);
+        }
+    }
+
+    async executeBulkArchive(): Promise<void> {
+        this.archiving.set(true);
+        this.archiveResult.set(null);
+        try {
+            const body: Record<string, unknown> = { statuses: ['short_term'] };
+            if (this.agentFilter()) body['agentId'] = this.agentFilter();
+            if (this.archiveDecayThreshold() !== null) body['maxDecayScore'] = this.archiveDecayThreshold();
+            if (this.archiveOlderThanDays() !== null) body['olderThanDays'] = this.archiveOlderThanDays();
+
+            const result = await firstValueFrom(
+                this.api.post<{ archivedCount: number; archivedKeys: string[] }>('/brain/consolidation/archive', body),
+            );
+            this.archiveResult.set(result);
+            if (result.archivedCount > 0) {
+                await this.loadMemories();
+            }
+        } catch {
+            // Non-critical
+        } finally {
+            this.archiving.set(false);
+        }
+    }
+
+    toggleMergeExpand(id: string): void {
+        this.expandedMergeId.set(this.expandedMergeId() === id ? null : id);
     }
 
     // ─── Export ─────────────────────────────────────────────────────────────

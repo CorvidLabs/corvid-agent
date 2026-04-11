@@ -12,6 +12,7 @@
 import type { Database } from 'bun:sqlite';
 import { boostObservation, countObservations, getObservation, listObservations } from '../db/observations';
 import { badRequest, handleRouteError, json, notFound, safeNumParam } from '../lib/response';
+import { bulkArchive, executeMerge, findDuplicates, suggestMerges } from '../memory/consolidation';
 import { computeDecayMultiplier } from '../memory/decay';
 import type { MemoryGraduationService } from '../memory/graduation-service';
 import type { RequestContext } from '../middleware/guards';
@@ -87,6 +88,7 @@ function deriveStorageType(status: string, txid: string | null, asaId: number | 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
 const MEMORIES_PREFIX = '/api/dashboard/memories';
+const CONSOLIDATION_PREFIX = '/api/brain/consolidation';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
@@ -97,6 +99,15 @@ export function handleBrainViewerRoutes(
   _context?: RequestContext,
   graduationService?: MemoryGraduationService | null,
 ): Response | null | Promise<Response | null> {
+  // ─── Consolidation routes ────────────────────────────────────────────
+  if (url.pathname.startsWith(CONSOLIDATION_PREFIX)) {
+    try {
+      return handleConsolidationRoutes(req, url, db);
+    } catch (err) {
+      return handleRouteError(err);
+    }
+  }
+
   if (!url.pathname.startsWith(MEMORIES_PREFIX)) {
     return null;
   }
@@ -864,4 +875,118 @@ function safeQuery<T>(db: Database, sql: string, bindings: (string | number)[], 
   } catch {
     return null;
   }
+}
+
+// ─── Consolidation routes ───────────────────────────────────────────────────
+
+async function handleConsolidationRoutes(req: Request, url: URL, db: Database): Promise<Response | null> {
+  // GET /api/brain/consolidation/suggestions
+  if (url.pathname === `${CONSOLIDATION_PREFIX}/suggestions` && req.method === 'GET') {
+    return handleConsolidationSuggestions(url, db);
+  }
+
+  // POST /api/brain/consolidation/merge
+  if (url.pathname === `${CONSOLIDATION_PREFIX}/merge` && req.method === 'POST') {
+    return handleConsolidationMerge(req, db);
+  }
+
+  // POST /api/brain/consolidation/archive
+  if (url.pathname === `${CONSOLIDATION_PREFIX}/archive` && req.method === 'POST') {
+    return handleConsolidationArchive(req, db);
+  }
+
+  return null;
+}
+
+/** GET /api/brain/consolidation/suggestions */
+function handleConsolidationSuggestions(url: URL, db: Database): Response {
+  const agentId = url.searchParams.get('agentId') ?? undefined;
+  const threshold = safeNumParam(url.searchParams.get('threshold'), 60) / 100;
+
+  if (threshold < 0 || threshold > 1) {
+    return badRequest('threshold must be between 0 and 100 (as integer percent)');
+  }
+
+  // Also return raw duplicate pairs alongside merge suggestions
+  const suggestions = suggestMerges(db, agentId, threshold);
+  const duplicates = agentId ? findDuplicates(db, agentId, Math.max(threshold, 0.7)) : [];
+
+  return json({
+    suggestions,
+    duplicates,
+    total: suggestions.length,
+    threshold: Math.round(threshold * 100),
+  });
+}
+
+/** POST /api/brain/consolidation/merge */
+async function handleConsolidationMerge(req: Request, db: Database): Promise<Response> {
+  let body: { primaryId?: string; duplicateIds?: string[]; mergedContent?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return badRequest('Invalid JSON body');
+  }
+
+  const { primaryId, duplicateIds, mergedContent } = body;
+
+  if (!primaryId || typeof primaryId !== 'string') {
+    return badRequest('primaryId is required');
+  }
+  if (!Array.isArray(duplicateIds) || duplicateIds.length === 0) {
+    return badRequest('duplicateIds must be a non-empty array');
+  }
+  if (mergedContent !== undefined && typeof mergedContent !== 'string') {
+    return badRequest('mergedContent must be a string');
+  }
+
+  try {
+    const result = executeMerge(db, { primaryId, duplicateIds, mergedContent });
+    return json(result);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('not found')) {
+      return notFound(err.message);
+    }
+    throw err;
+  }
+}
+
+/** POST /api/brain/consolidation/archive */
+async function handleConsolidationArchive(req: Request, db: Database): Promise<Response> {
+  let body: {
+    agentId?: string;
+    maxDecayScore?: number;
+    olderThanDays?: number;
+    statuses?: string[];
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return badRequest('Invalid JSON body');
+  }
+
+  const validStatuses = ['short_term', 'pending', 'failed'];
+  if (body.statuses) {
+    const invalid = body.statuses.filter((s) => !validStatuses.includes(s));
+    if (invalid.length > 0) {
+      return badRequest(`Invalid statuses: ${invalid.join(', ')}. Valid: ${validStatuses.join(', ')}`);
+    }
+  }
+
+  if (body.maxDecayScore !== undefined && (body.maxDecayScore < 0 || body.maxDecayScore > 1)) {
+    return badRequest('maxDecayScore must be between 0.0 and 1.0');
+  }
+
+  if (body.olderThanDays !== undefined && body.olderThanDays < 0) {
+    return badRequest('olderThanDays must be non-negative');
+  }
+
+  const result = bulkArchive(db, {
+    agentId: body.agentId,
+    maxDecayScore: body.maxDecayScore,
+    olderThanDays: body.olderThanDays,
+    statuses: body.statuses as Array<'short_term' | 'pending' | 'failed'> | undefined,
+  });
+
+  return json(result);
 }
