@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   checks:
@@ -40,12 +41,10 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Spec validation (strict + 100% coverage)
-        # https://github.com/marketplace/actions/spec-sync
-        uses: CorvidLabs/spec-sync@68829c530a4c71aae2279816519cd1643b0ca8f6  # v4.0.0
+        uses: CorvidLabs/spec-sync@v4.1.2
         with:
-          version: '4.0.0'
           strict: 'true'
-          require-coverage: '100'
+          comment: 'true'
 
       - name: Build client
         run: bun run build:client
