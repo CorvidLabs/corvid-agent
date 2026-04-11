@@ -312,7 +312,7 @@ describe('embed-response streaming edits', () => {
       const pm = createMockProcessManager();
       const delivery = new DeliveryTracker();
       const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-      const { calls, cleanup } = installSnowflakeMock();
+      const { cleanup, waitForCall } = installSnowflakeMock();
 
       try {
         subscribeForResponseWithEmbed(
@@ -331,15 +331,13 @@ describe('embed-response streaming edits', () => {
         const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
 
         // Fire error WITHOUT any prior tool_status (no progress message exists).
-        // The mock sendMessage is invoked synchronously within the nested async chain,
-        // but yield a microtask to guarantee all intermediate promises settle.
         callback('session-err-noprog', {
           type: 'session_error',
           error: { errorType: 'context_exhausted', message: 'Context full' },
         });
-        await new Promise((resolve) => queueMicrotask(resolve));
 
-        const sendWithButtons = calls.find(
+        // Wait for the async sendEmbedWithButtons call to complete
+        const sendWithButtons = await waitForCall(
           (c: any) =>
             c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
         );
