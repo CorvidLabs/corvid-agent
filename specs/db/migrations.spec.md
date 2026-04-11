@@ -44,6 +44,7 @@ files:
   - server/db/migrations/114_proxy_trust_email.ts
   - server/db/migrations/115_algochat_unique_participant.ts
   - server/db/migrations/116_governance_voting_periods_and_vetoes.ts
+  - server/db/migrations/117_discord_channel_project.ts
 db_tables:
   - schema_version
 depends_on: []
