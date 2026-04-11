@@ -244,4 +244,3 @@ describe('memory leak simulation', () => {
     expect(pm.getMemoryStats().subscribers).toBe(0);
   });
 });
-

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.62.3</title>
+<title>CorvidAgent — Release Retrospective: v0.1.0 → v0.63.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -473,24 +473,24 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">60 days · 61 releases · 1200+ commits</div>
+    <div class="hero-badge">63 days · 62 releases · 1250+ commits</div>
     <h1>CorvidAgent<br>Release Retrospective</h1>
     <p>From a prototype CLI to a full autonomous AI agent platform with on-chain memory, multi-model orchestration, and cross-platform bridges.</p>
     <div class="hero-version-range">
       <span class="version">v0.1.0</span>
       <span class="arrow">→</span>
-      <span class="version">v0.61.0</span>
+      <span class="version">v0.63.0</span>
     </div>
   </section>
 
   <!-- Stats bar -->
   <section class="stats-bar">
     <div class="stat-card">
-      <div class="stat-number">61</div>
+      <div class="stat-number">62</div>
       <div class="stat-label">Releases</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number">1200+</div>
+      <div class="stat-number">1250+</div>
       <div class="stat-label">Commits</div>
     </div>
     <div class="stat-card">
@@ -585,8 +585,12 @@
         <div class="growth-label">0.60</div>
       </div>
       <div class="growth-bar-wrapper">
-        <div class="growth-bar" style="height: 157%; background: linear-gradient(180deg, var(--green), var(--accent));" title="v0.61.0: 11,000+ tests"></div>
+        <div class="growth-bar" style="height: 157%;" title="v0.61.0: 11,000+ tests"></div>
         <div class="growth-label">0.61</div>
+      </div>
+      <div class="growth-bar-wrapper">
+        <div class="growth-bar" style="height: 163%; background: linear-gradient(180deg, var(--green), var(--accent));" title="v0.63.0: 11,500+ tests"></div>
+        <div class="growth-label">0.63</div>
       </div>
     </div>
   </section>
@@ -956,9 +960,9 @@
         <div class="era-icon">&#x1F680;</div>
         <div>
           <div class="era-title">Scale — Provider Parity & Agent Observatory</div>
-          <div class="era-date">Mar 21 – Apr 8, 2026</div>
+          <div class="era-date">Mar 21 – Apr 11, 2026</div>
         </div>
-        <div class="era-versions">v0.42.0 – v0.62.3</div>
+        <div class="era-versions">v0.42.0 – v0.63.0</div>
       </div>
       <div class="era-body">
         <div class="release-card">
@@ -1002,6 +1006,23 @@
             <li><span class="tag tag-feat">feat</span> <strong>Shared agent library (CRVLIB)</strong> — ARC-69 reusable on-chain agent components</li>
             <li><span class="tag tag-test">test</span> <strong>Flock e2e: 45 tests</strong> — comprehensive e2e suite with inner transaction fee fix for AVM fee-pooling</li>
             <li><span class="tag tag-fix">fix</span> MCP tool permissions, scheduler tenant fallback, Ollama readiness probe</li>
+          </ul>
+        </div>
+        <div class="release-card" style="border-color: rgba(34,211,238,0.3); background: rgba(34,211,238,0.05);">
+          <div class="release-header">
+            <span class="release-version">v0.63.0</span>
+            <span class="release-date">Apr 11</span>
+          </div>
+          <ul class="release-highlights">
+            <li><span class="tag tag-feat">feat</span> <strong>Memory consolidation</strong> — duplicate detection service with merge UI for cleaning up redundant on-chain memories</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Block explorer API</strong> — on-chain Algorand explorer for transactions, ASAs, and accounts</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Brain viewer: memory export</strong> — export API and UI for downloading memory snapshots</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Discord UX overhaul</strong> — streaming edits, contextual buttons, thread continuity</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Library permission model</strong> — enforce librarian write permissions on shared library</li>
+            <li><span class="tag tag-feat">feat</span> <strong>Voice: speaker ID &amp; ring buffer</strong> — speaker-aware prompts, pre-speech buffer prevents first-syllable clipping</li>
+            <li><span class="tag tag-sec">sec</span> Pin Anthropic SDK &ge;0.82.0 to mitigate GHSA-5474-4w2j-mq4c</li>
+            <li><span class="tag tag-fix">fix</span> Zero lint warnings, channel-project affinity, conversation context preservation, scheduler conflict handling</li>
+            <li><span class="tag tag-chore">deps</span> spec-sync &rarr; v3.8.0, marked v18, two dependency audit passes</li>
           </ul>
         </div>
         <div class="release-card" style="border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05);">

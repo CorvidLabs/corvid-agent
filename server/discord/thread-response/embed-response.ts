@@ -126,7 +126,10 @@ export function subscribeForResponseWithEmbed(
             author,
             footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
           }).catch((err) => {
-            log.warn('Failed to update progress embed with crash', { threadId, error: err instanceof Error ? err.message : String(err) });
+            log.warn('Failed to update progress embed with crash', {
+              threadId,
+              error: err instanceof Error ? err.message : String(err),
+            });
           });
         } else {
           sendEmbedWithButtons(
@@ -141,7 +144,10 @@ export function subscribeForResponseWithEmbed(
             },
             [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
           ).catch((err) => {
-            log.warn('Failed to send crash embed', { threadId, error: err instanceof Error ? err.message : String(err) });
+            log.warn('Failed to send crash embed', {
+              threadId,
+              error: err instanceof Error ? err.message : String(err),
+            });
           });
         }
       }
@@ -489,7 +495,10 @@ export function subscribeForResponseWithEmbed(
           author,
           footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
         }).catch((err) => {
-          log.debug('Session error embed edit failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+          log.debug('Session error embed edit failed', {
+            threadId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
       } else {
         sendEmbedWithButtons(
@@ -505,7 +514,10 @@ export function subscribeForResponseWithEmbed(
           },
           [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
         ).catch((err) => {
-          log.debug('Session error embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+          log.debug('Session error embed failed', {
+            threadId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
       }
     }

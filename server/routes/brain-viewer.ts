@@ -162,7 +162,13 @@ export function handleBrainViewerRoutes(
 
     // /api/dashboard/memories/:id
     const idMatch = url.pathname.match(/^\/api\/dashboard\/memories\/([^/]+)$/);
-    if (idMatch && idMatch[1] !== 'stats' && idMatch[1] !== 'sync-status' && idMatch[1] !== 'observations' && idMatch[1] !== 'export') {
+    if (
+      idMatch &&
+      idMatch[1] !== 'stats' &&
+      idMatch[1] !== 'sync-status' &&
+      idMatch[1] !== 'observations' &&
+      idMatch[1] !== 'export'
+    ) {
       return handleMemoryDetail(idMatch[1], db);
     }
 
@@ -785,12 +791,15 @@ function handleMemoryExport(url: URL, db: Database): Response {
   }
 
   const filename = `memories-export-${new Date().toISOString().slice(0, 10)}.json`;
-  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), count: entries.length, entries }, null, 2), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+  return new Response(
+    JSON.stringify({ exportedAt: new Date().toISOString(), count: entries.length, entries }, null, 2),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
     },
-  });
+  );
 }
 
 /** Escape a value for CSV: wrap in quotes and escape internal quotes. */

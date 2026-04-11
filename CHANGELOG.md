@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.63.0] - 2026-04-11
+
+### Added
+- **Memory: consolidation service** — duplicate detection with merge UI for cleaning up redundant on-chain memories (#1949)
+- **Brain viewer: memory export** — export API and UI for downloading memory snapshots (#1948)
+- **Explorer: block explorer API** — on-chain Algorand block explorer for inspecting transactions, ASAs, and accounts (#1951)
+- **Discord: UX overhaul** — streaming message edits, contextual action buttons, thread continuity (#1959)
+- **Library: librarian permission model** — enforce write permissions on `corvid_library_write` tool (#1946, #1938)
+- **Scheduler: GitHub external comment monitor** — watch for and process external comments on GitHub PRs (#1934)
+- **Voice: pre-speech ring buffer** — prevents first-syllable clipping in voice conversations (#1925)
+- **Voice: deafen command** — `/voice deafen` toggle with explicit listen/deafen state management (#1923, #1924)
+- **Voice: speaker identification** — conversational engagement with speaker-aware voice prompts (#1921)
+
+### Fixed
+- **Discord: channel-project affinity** — fix wrong project context on @mentions (#1963)
+- **Discord: conversation context** — preserve context across thread session restarts (#1942)
+- **Polling: duplicate ack comments** — prevent duplicate acknowledgment comments across configs (#1960)
+- **Scheduler: conflict handling** — distinguish permanent vs transient conflicts in work task handler (#1945)
+- **Memory: upsert demotion** — prevent upsert from demoting confirmed memories (#1937)
+- **Voice: deaf-after-one-reply** — restart listening after TTS playback (#1928)
+- **Voice: stale audio receiver** — clean up on disconnect/reconnect (#1926, #1927)
+- **Voice: smarter acks** — resolve @mentions to names in TTS, context-dependent response lengths (#1917, #1922)
+- **Voice: transcription cleanup** — drop in-flight transcriptions when bot is deafened (#1941)
+- **Councils: heartbeat polling** — add heartbeat to `watchSessionsForAutoAdvance` (#1932)
+- **Work tasks: repo locking** — skip repo lock for scheduler actions to prevent silent triage failures (#1930)
+- **Lint: zero warnings** — achieve zero errors and zero warnings across entire codebase (#1933)
+- **API stats: endpoint counter** — correct API endpoint counter and update stats in docs (#1965)
+
+### Security
+- **Anthropic SDK pin** — pin `@anthropic-ai/sdk >=0.82.0` to mitigate GHSA-5474-4w2j-mq4c (#1919)
+
+### Refactored
+- **Process manager** — extract sub-modules for `manager.ts` decomposition (#1940)
+- **Shared types** — convert bracket notation to dot notation in ws-protocol type guard (#1939)
+
+### Maintenance
+- **spec-sync** → v3.8.0 with product requirements and task tracking (#1935, #1936, #1961)
+- **Dependencies** — two audit passes (2026-04-09, 2026-04-11), marked v17 → v18 (#1931, #1947, #1962)
+- **Specs** — add spec coverage for discord-channel-project module, update 17 stale specs (#1936, #1964)
+- **Blog** — Voice Conversations & Platform Hardening post (2026-04-10) (#1950)
+- **Cleanup** — remove Rust crates directory (#1912)
+
 ## [0.62.3] - 2026-04-08
 
 ### Fixed

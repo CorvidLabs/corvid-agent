@@ -153,7 +153,9 @@ describe('execWorkTask', () => {
   it('marks flock conflict as completed skip', async () => {
     const svc = {
       create: mock().mockRejectedValueOnce(
-        new ConflictError('Another agent (Jackdaw) is already working on this issue. Skipping to avoid duplicate work.'),
+        new ConflictError(
+          'Another agent (Jackdaw) is already working on this issue. Skipping to avoid duplicate work.',
+        ),
       ),
     };
     await execWorkTask(makeCtx(svc), 'exec-1', makeSchedule(), makeAction());

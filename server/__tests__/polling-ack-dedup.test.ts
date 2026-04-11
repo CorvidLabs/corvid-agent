@@ -103,9 +103,11 @@ describe('ack comment dedup via processMention', () => {
     });
 
     const mention = makeMention({ sender: 'external-user', number: 7001 });
-    const processMention = (service as unknown as {
-      processMention: (c: typeof config, m: DetectedMention) => Promise<boolean>;
-    }).processMention.bind(service);
+    const processMention = (
+      service as unknown as {
+        processMention: (c: typeof config, m: DetectedMention) => Promise<boolean>;
+      }
+    ).processMention.bind(service);
 
     const dedup = DedupService.global();
     const ackKey = 'CorvidLabs/corvid-agent#7001';
@@ -127,9 +129,11 @@ describe('ack comment dedup via processMention', () => {
     });
 
     const mention = makeMention({ sender: 'corvid-bot', number: 7002 });
-    const processMention = (service as unknown as {
-      processMention: (c: typeof config, m: DetectedMention) => Promise<boolean>;
-    }).processMention.bind(service);
+    const processMention = (
+      service as unknown as {
+        processMention: (c: typeof config, m: DetectedMention) => Promise<boolean>;
+      }
+    ).processMention.bind(service);
 
     const dedup = DedupService.global();
     const ackKey = 'CorvidLabs/corvid-agent#7002';
@@ -155,9 +159,11 @@ describe('ack comment dedup via processMention', () => {
       projectId,
     });
 
-    const processMention = (service as unknown as {
-      processMention: (c: typeof config1, m: DetectedMention) => Promise<boolean>;
-    }).processMention.bind(service);
+    const processMention = (
+      service as unknown as {
+        processMention: (c: typeof config1, m: DetectedMention) => Promise<boolean>;
+      }
+    ).processMention.bind(service);
 
     const dedup = DedupService.global();
     const ackKey = 'CorvidLabs/corvid-agent#7003';

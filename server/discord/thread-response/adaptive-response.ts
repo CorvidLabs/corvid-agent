@@ -276,9 +276,12 @@ export function subscribeForAdaptiveInlineResponse(
               footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             },
             [
-              buildActionRow(
-                { label: 'Continue in Thread', customId: `continue_thread:${sessionId}`, style: ButtonStyle.PRIMARY, emoji: '🧵' },
-              ),
+              buildActionRow({
+                label: 'Continue in Thread',
+                customId: `continue_thread:${sessionId}`,
+                style: ButtonStyle.PRIMARY,
+                emoji: '🧵',
+              }),
             ],
           ).catch((err) => {
             log.debug('Continue-in-thread embed failed', {
