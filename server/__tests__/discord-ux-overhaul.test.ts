@@ -343,7 +343,7 @@ describe('embed-response streaming edits', () => {
     } finally {
       cleanup();
     }
-  });
+  }, 15000);
 
   test('context_warning sends warning embed for critical level', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
@@ -428,7 +428,7 @@ describe('embed-response streaming edits', () => {
     (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => false);
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { calls, cleanup } = installSnowflakeMock();
+    const { cleanup, waitForCall } = installSnowflakeMock();
 
     try {
       // Temporarily make isRunning return true for setup
@@ -456,12 +456,10 @@ describe('embed-response streaming edits', () => {
       // Now make isRunning return false - typing interval will detect death
       (pm.isRunning as ReturnType<typeof mock>).mockImplementation(() => false);
 
-      // Wait for typing interval to fire (8s) + some buffer
-      await new Promise((r) => setTimeout(r, 8500));
-
-      // Should have edited the progress message with crash info
-      const crashEdit = calls.find(
+      // Wait for crash edit event-driven (typing interval fires at 8s, then async chain completes)
+      const crashEdit = await waitForCall(
         (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description?.includes('ended unexpectedly'),
+        12000,
       );
       expect(crashEdit).toBeDefined();
     } finally {
