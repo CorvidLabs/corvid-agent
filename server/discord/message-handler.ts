@@ -9,6 +9,7 @@ import type { Database } from 'bun:sqlite';
 import type { SessionSource } from '../../shared/types';
 import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
+import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-project';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
 import {
@@ -28,6 +29,7 @@ import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import { resolveDiscordContact } from './contact-linker';
 import {
+  addReaction,
   buildActionRow,
   sendDiscordMessage,
   sendEmbed,
@@ -329,6 +331,8 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   // If this message is in a thread we're tracking, route to that thread's session
   if (isOurThread) {
     sendFirstInteractionTip(ctx, userId, channelId);
+    // React with 👀 to acknowledge receipt — gives instant visual feedback
+    addReaction(ctx.config.botToken, channelId, data.id, '👀').catch(() => {});
     sendTypingIndicator(ctx.config.botToken, channelId).catch((err) =>
       log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }),
     );
@@ -346,6 +350,8 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   }
 
   sendFirstInteractionTip(ctx, userId, channelId);
+  // React with 👀 to acknowledge the mention
+  addReaction(ctx.config.botToken, channelId, data.id, '👀').catch(() => {});
   sendTypingIndicator(ctx.config.botToken, channelId).catch((err) =>
     log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }),
   );
@@ -633,14 +639,23 @@ async function handleMentionReply(
   }
 
   const projects = listProjects(ctx.db);
-  const project = agent.defaultProjectId
-    ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
-    : projects[0];
+
+  // Prefer the project most recently used in this channel (affinity), then fall
+  // back to the agent's default project, then the first available project.
+  const channelProjectId = getChannelProjectId(ctx.db, channelId);
+  const project =
+    (channelProjectId ? projects.find((p) => p.id === channelProjectId) : undefined) ??
+    (agent.defaultProjectId ? projects.find((p) => p.id === agent.defaultProjectId) : undefined) ??
+    projects[0];
 
   if (!project) {
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No projects configured.');
     return;
   }
+
+  // Record channel-project affinity so future @mentions in this channel
+  // default to the same project without the user needing to specify it.
+  setChannelProjectId(ctx.db, channelId, project.id);
 
   const cleanText = resolveMentions(text, mentions, ctx.botUserId);
   const hasAttachments = (attachments?.length ?? 0) > 0;
@@ -676,6 +691,10 @@ async function handleMentionReply(
     source: 'discord' as SessionSource,
     workDir,
   });
+
+  // Record channel-project affinity so future @mentions in this channel
+  // default to the same project without the user needing to specify it.
+  setChannelProjectId(ctx.db, channelId, project.id);
 
   // Advisory: warn in-channel when Ollama is used for a complex task.
   const complexityWarning = buildOllamaComplexityWarning(cleanText, agent.model, agent.provider);
@@ -849,9 +868,7 @@ async function handleMentionReplyResume(
 function buildPreviousThreadContext(db: Database, threadId: string, previousSessionId: string): string {
   // 1. Try to load actual messages from the previous session (richest context)
   const messages = getSessionMessages(db, previousSessionId);
-  const conversational = messages
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .slice(-20);
+  const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
     const historyLines = conversational.map((m) => {
