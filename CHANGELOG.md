@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.63.1] - 2026-04-11
+
+### Fixed
+- **Discord: mention session context** — add channel-based session fallback and conversation history carryover for mention sessions (#1968). Users can now reply without Discord's reply feature and still route to the correct session. When a mention session expires, new sessions inherit the previous conversation context.
+
 ## [0.63.0] - 2026-04-11
 
 ### Added
