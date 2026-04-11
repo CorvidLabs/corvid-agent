@@ -305,49 +305,47 @@ describe('embed-response streaming edits', () => {
     }
   });
 
-  test(
-    'session_error without progress message sends new embed with Resume button',
-    async () => {
-      const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
-      const pm = createMockProcessManager();
-      const delivery = new DeliveryTracker();
-      const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-      const { cleanup, waitForCall } = installSnowflakeMock();
+  test('session_error without progress message sends new embed with Resume button', async () => {
+    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+    const { calls, cleanup } = installSnowflakeMock();
 
-      try {
-        subscribeForResponseWithEmbed(
-          pm,
-          delivery,
-          'test-token',
-          db,
-          threadCallbacks,
-          'session-err-noprog',
-          THREAD_ID,
-          'TestAgent',
-          'test-model',
-          'TestProject',
-        );
+    try {
+      subscribeForResponseWithEmbed(
+        pm,
+        delivery,
+        'test-token',
+        db,
+        threadCallbacks,
+        'session-err-noprog',
+        THREAD_ID,
+        'TestAgent',
+        'test-model',
+        'TestProject',
+      );
 
-        const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
 
-        // Fire error WITHOUT any prior tool_status (no progress message exists).
-        callback('session-err-noprog', {
-          type: 'session_error',
-          error: { errorType: 'context_exhausted', message: 'Context full' },
-        });
+      // Fire error WITHOUT any prior tool_status (no progress message exists).
+      callback('session-err-noprog', {
+        type: 'session_error',
+        error: { errorType: 'context_exhausted', message: 'Context full' },
+      });
 
-        // Wait for the async sendEmbedWithButtons call to complete
-        const sendWithButtons = await waitForCall(
-          (c: any) =>
-            c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
-        );
-        expect(sendWithButtons).toBeDefined();
-      } finally {
-        cleanup();
-      }
-    },
-    15_000,
-  );
+      // Allow async sendEmbedWithButtons chain to settle (delivery tracker + retry)
+      await new Promise((r) => setTimeout(r, 1500));
+
+      const sendWithButtons = calls.find(
+        (c: any) =>
+          c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
+      );
+      expect(sendWithButtons).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
 
   test('context_warning sends warning embed for critical level', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
