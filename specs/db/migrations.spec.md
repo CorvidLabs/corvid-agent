@@ -45,6 +45,8 @@ files:
   - server/db/migrations/115_algochat_unique_participant.ts
   - server/db/migrations/116_governance_voting_periods_and_vetoes.ts
   - server/db/migrations/117_discord_channel_project.ts
+  - server/db/migrations/118_thread_session_summary.ts
+  - server/db/migrations/119_telegram_config.ts
 db_tables:
   - schema_version
 depends_on: []
