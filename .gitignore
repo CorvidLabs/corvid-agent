@@ -38,6 +38,9 @@ tmp/
 .discord-last-connect
 playwright.config.js.esm.preflight
 
+# Spec-sync derived cache (regenerated on each run; causes merge conflicts)
+.specsync/hashes.json
+
 # Scratch/prototype files
 dashboard-preview.html
 pc-upgrade-dashboard*.html
