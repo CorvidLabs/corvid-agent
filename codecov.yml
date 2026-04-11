@@ -15,6 +15,7 @@ ignore:
   - "server/discord/bridge.ts"        # Discord bridge — requires live Discord client
   - "server/discord/commands.ts"      # Slash command registration — requires Discord API
   - "server/discord/command-handlers/**"  # Command handlers — require Discord interactions
+  - "server/discord/thread-response/**"  # Thread response handlers — require live Discord threads
 
 comment:
   layout: "reach,diff,flags,files"

@@ -111,9 +111,7 @@ export async function handleComponentInteraction(
       }
 
       // Resolve agent and project from previous session or defaults
-      const agent = prevInfo
-        ? listAgents(ctx.db).find((a) => a.name === prevInfo.agentName)
-        : undefined;
+      const agent = prevInfo ? listAgents(ctx.db).find((a) => a.name === prevInfo.agentName) : undefined;
       const resolvedAgent = agent ?? resolveDefaultAgent(ctx.db, ctx.config);
       if (!resolvedAgent) {
         await respondToInteraction(ri, 'No agents configured. Use `/session` to start manually.');
@@ -122,7 +120,7 @@ export async function handleComponentInteraction(
 
       const projects = listProjects(ctx.db);
       const project = prevInfo?.projectName
-        ? projects.find((p) => p.name.toLowerCase() === prevInfo.projectName!.toLowerCase()) ?? projects[0]
+        ? (projects.find((p) => p.name.toLowerCase() === prevInfo.projectName!.toLowerCase()) ?? projects[0])
         : projects[0];
       if (!project) {
         await respondToInteraction(ri, 'No projects configured.');
@@ -198,7 +196,7 @@ export async function handleComponentInteraction(
 
       const ctProjects = listProjects(ctx.db);
       const ctProject = ctAgent.defaultProjectId
-        ? ctProjects.find((p) => p.id === ctAgent.defaultProjectId) ?? ctProjects[0]
+        ? (ctProjects.find((p) => p.id === ctAgent.defaultProjectId) ?? ctProjects[0])
         : ctProjects[0];
       if (!ctProject) {
         await respondToInteraction(ri, 'No projects configured.');
@@ -288,7 +286,10 @@ export async function handleComponentInteraction(
         );
         await acknowledgeButton(ri, 'Creating issue from conversation — check the thread for details.');
       } else {
-        await respondToInteraction(ri, 'Session is no longer active. Send a message first to start a new session, then ask to create an issue.');
+        await respondToInteraction(
+          ri,
+          'Session is no longer active. Send a message first to start a new session, then ask to create an issue.',
+        );
       }
       break;
     }
