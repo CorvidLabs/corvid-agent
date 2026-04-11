@@ -108,6 +108,47 @@ export function getRecentMentionSessions(
 }
 
 /**
+ * Look up the most recent mention session in a given channel.
+ * Used as a fallback when the user sends a message without using Discord's reply feature.
+ * Only returns sessions active within the specified time window.
+ * @param maxAgeMinutes Maximum age in minutes (default: 15)
+ */
+export function getLatestMentionSessionByChannel(
+  db: Database,
+  channelId: string,
+  maxAgeMinutes: number = 15,
+): MentionSessionInfo | null {
+  const row = db
+    .query(
+      `SELECT m.*, a.display_color, a.display_icon, a.avatar_url
+         FROM discord_mention_sessions m
+         LEFT JOIN sessions s ON s.id = m.session_id
+         LEFT JOIN agents a ON a.id = s.agent_id
+         WHERE m.channel_id = ?
+           AND COALESCE(m.last_activity_at, m.created_at) > datetime('now', '-' || ? || ' minutes')
+         ORDER BY COALESCE(m.last_activity_at, m.created_at) DESC
+         LIMIT 1`,
+    )
+    .get(channelId, maxAgeMinutes) as
+    | (MentionSessionRow & { display_color: string | null; display_icon: string | null; avatar_url: string | null })
+    | null;
+
+  if (!row) return null;
+
+  return {
+    sessionId: row.session_id,
+    agentName: row.agent_name,
+    agentModel: row.agent_model,
+    projectName: row.project_name || undefined,
+    displayColor: row.display_color ?? undefined,
+    displayIcon: row.display_icon ?? undefined,
+    avatarUrl: row.avatar_url ?? undefined,
+    channelId: row.channel_id || undefined,
+    conversationOnly: row.conversation_only === 1,
+  };
+}
+
+/**
  * Update the last_activity_at timestamp for a mention session.
  */
 export function updateMentionSessionActivity(db: Database, botMessageId: string): void {

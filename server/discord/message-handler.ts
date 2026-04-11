@@ -11,7 +11,12 @@ import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
 import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-project';
 import { updateDiscordConfig } from '../db/discord-config';
-import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
+import {
+  getLatestMentionSessionByChannel,
+  getMentionSession,
+  saveMentionSession,
+  updateMentionSessionActivity,
+} from '../db/discord-mention-sessions';
 import {
   deleteThreadSession,
   getThreadSessionSummary,
@@ -386,7 +391,35 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
       );
       return;
     }
-    // If we can't find the session in memory or DB, fall through to create new
+    // If we can't find the session by bot message ID, fall through to channel fallback below
+  }
+
+  // Channel-based fallback: if a user sends a message in a channel with a recent
+  // mention session (within 15 min), resume that session even without a reply reference.
+  // This handles the common case where users type follow-ups without using Discord's reply.
+  if (!isReplyToBot || !data.message_reference?.message_id) {
+    const channelSession = getLatestMentionSessionByChannel(ctx.db, channelId);
+    if (channelSession) {
+      log.info('Channel-based mention session fallback', {
+        channelId,
+        sessionId: channelSession.sessionId,
+        userId,
+      });
+      await handleMentionReplyResume(
+        ctx,
+        channelId,
+        userId,
+        data.id,
+        text,
+        channelSession,
+        permLevel,
+        data.mentions,
+        data.author.id,
+        data.author.username,
+        data.attachments,
+      );
+      return;
+    }
   }
 
   // In public mode, BASIC-tier users who @mention the bot should use /message
@@ -615,6 +648,7 @@ async function handleMentionReply(
   authorId?: string,
   authorUsername?: string,
   attachments?: DiscordAttachment[],
+  previousSessionId?: string,
 ): Promise<void> {
   // Dedup: check if a session already exists for this Discord message ID.
   // The in-memory dedup in handleMessage() covers most cases, but can miss
@@ -702,13 +736,20 @@ async function handleMentionReply(
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, `⚠️ ${complexityWarning}`);
   }
 
+  // Build conversation context from previous mention session (if this is a continuation)
+  let previousContext = '';
+  if (previousSessionId) {
+    previousContext = buildMentionSessionContext(ctx.db, previousSessionId);
+  }
+
   // Start the process with the text prompt (include attachment URLs so the agent
   // sees image links even though startProcess only accepts strings).
   const textWithUrls = appendAttachmentUrls(
     withAuthorContext(cleanText, authorId, authorUsername, channelId),
     attachments,
   );
-  ctx.processManager.startProcess(session, textWithUrls);
+  const promptWithContext = previousContext ? `${previousContext}\n\n${textWithUrls}` : textWithUrls;
+  ctx.processManager.startProcess(session, promptWithContext);
 
   const agentName = agent.name;
   const agentModel = agent.model || 'unknown';
@@ -783,8 +824,19 @@ async function handleMentionReplyResume(
   const session = getSession(ctx.db, sessionId);
 
   if (!session) {
-    log.info('Mention-reply session not found, creating new session', { sessionId });
-    await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
+    log.info('Mention-reply session not found, creating new session with context', { sessionId });
+    await handleMentionReply(
+      ctx,
+      channelId,
+      _userId,
+      messageId,
+      text,
+      mentions,
+      authorId,
+      authorUsername,
+      attachments,
+      sessionId,
+    );
     return;
   }
 
@@ -815,7 +867,10 @@ async function handleMentionReplyResume(
 
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
     if (!ctx.processManager.isRunning(sessionId)) {
-      log.warn('Mention resumeProcess did not start — creating new mention session', { sessionId, channelId });
+      log.warn('Mention resumeProcess did not start — creating new mention session with context', {
+        sessionId,
+        channelId,
+      });
       await handleMentionReply(
         ctx,
         channelId,
@@ -826,6 +881,7 @@ async function handleMentionReplyResume(
         authorId,
         authorUsername,
         attachments,
+        sessionId,
       );
       return;
     }
@@ -858,6 +914,31 @@ async function handleMentionReplyResume(
     displayIcon,
     avatarUrl,
   );
+}
+
+/**
+ * Build conversation context from a previous mention session.
+ * Used when a mention session ends and a new one is created as a continuation,
+ * so the new session has full context of what was discussed.
+ */
+function buildMentionSessionContext(db: Database, previousSessionId: string): string {
+  const messages = getSessionMessages(db, previousSessionId);
+  const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
+
+  if (conversational.length === 0) return '';
+
+  const historyLines = conversational.map((m) => {
+    const role = m.role === 'user' ? 'User' : 'Assistant';
+    const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+    return `[${role}]: ${text}`;
+  });
+  return [
+    '<conversation_history>',
+    'The following is the conversation history from this session. Use it for context when responding to the new message.',
+    '',
+    ...historyLines,
+    '</conversation_history>',
+  ].join('\n');
 }
 
 /**
