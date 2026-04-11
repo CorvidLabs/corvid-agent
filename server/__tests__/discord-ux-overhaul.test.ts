@@ -350,10 +350,19 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // sendEmbedWithButtons is called synchronously in the callback chain —
-      // the mock sendMessage pushes to calls before the callback returns.
-      // Allow a microtask tick for safety, then check calls.
-      await new Promise((r) => setTimeout(r, 100));
+      // sendEmbedWithButtons is called in the callback chain.
+      // Allow async chain to resolve, then check calls.
+      console.log('[DIAG] After callback, calls:', calls.length, 'methods:', calls.map((c: any) => c.method));
+      await new Promise((r) => setTimeout(r, 500));
+      console.log('[DIAG] After 500ms, calls:', calls.length, 'methods:', calls.map((c: any) => c.method));
+      if (calls.length > 0) {
+        console.log('[DIAG] First call data keys:', Object.keys(calls[0] as any));
+        const first = calls[0] as any;
+        console.log('[DIAG] First call method:', first.method);
+        if (first.data) {
+          console.log('[DIAG] First call has embeds:', !!first.data.embeds, 'components:', !!first.data.components);
+        }
+      }
 
       const sendWithButtons = calls.find(
         (c: any) =>
