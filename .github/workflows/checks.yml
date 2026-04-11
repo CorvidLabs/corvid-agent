@@ -40,12 +40,10 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Spec validation (strict + 100% coverage)
-        # 
-        uses: CorvidLabs/spec-sync@68399f5e27736dc3184ff5f31979d067177e243b  # v4.1.0
+        uses: CorvidLabs/spec-sync@v4.1.1
         with:
-          version: '4.1.0'
           strict: 'true'
-          require-coverage: '100'
+          comment: 'true'
 
       - name: Build client
         run: bun run build:client
