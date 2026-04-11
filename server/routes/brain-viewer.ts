@@ -145,6 +145,11 @@ export function handleBrainViewerRoutes(
     // GET-only routes below
     if (req.method !== 'GET') return null;
 
+    // /api/dashboard/memories/export
+    if (url.pathname === `${MEMORIES_PREFIX}/export`) {
+      return handleMemoryExport(url, db);
+    }
+
     // /api/dashboard/memories/sync-status
     if (url.pathname === `${MEMORIES_PREFIX}/sync-status`) {
       return handleSyncStatus(url, db);
@@ -157,7 +162,7 @@ export function handleBrainViewerRoutes(
 
     // /api/dashboard/memories/:id
     const idMatch = url.pathname.match(/^\/api\/dashboard\/memories\/([^/]+)$/);
-    if (idMatch && idMatch[1] !== 'stats' && idMatch[1] !== 'sync-status' && idMatch[1] !== 'observations') {
+    if (idMatch && idMatch[1] !== 'stats' && idMatch[1] !== 'sync-status' && idMatch[1] !== 'observations' && idMatch[1] !== 'export') {
       return handleMemoryDetail(idMatch[1], db);
     }
 
@@ -685,6 +690,115 @@ function formatObservationRow(row: Record<string, unknown>) {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   };
+}
+
+// ─── GET /api/dashboard/memories/export ─────────────────────────────────────
+
+const EXPORT_MAX = 10_000;
+
+function handleMemoryExport(url: URL, db: Database): Response {
+  const format = url.searchParams.get('format') ?? 'json';
+  const tier = url.searchParams.get('tier') as 'short-term' | 'long-term' | 'all' | null;
+  const category = url.searchParams.get('category') ?? undefined;
+  const agentId = url.searchParams.get('agent_id') ?? undefined;
+  const dateFrom = url.searchParams.get('date_from') ?? undefined;
+  const dateTo = url.searchParams.get('date_to') ?? undefined;
+
+  if (format !== 'json' && format !== 'csv') {
+    return badRequest('Invalid format: must be "json" or "csv"');
+  }
+
+  if (tier && !['short-term', 'long-term', 'all'].includes(tier)) {
+    return badRequest('Invalid tier: must be "short-term", "long-term", or "all"');
+  }
+
+  // Build WHERE conditions
+  const conditions: string[] = ['m.archived = 0'];
+  const bindings: (string | number)[] = [];
+
+  if (agentId) {
+    conditions.push('m.agent_id = ?');
+    bindings.push(agentId);
+  }
+
+  if (tier === 'long-term') {
+    conditions.push("m.status = 'confirmed' AND m.txid IS NOT NULL");
+  } else if (tier === 'short-term') {
+    conditions.push("(m.status != 'confirmed' OR m.txid IS NULL)");
+  }
+
+  if (dateFrom) {
+    conditions.push('m.created_at >= ?');
+    bindings.push(dateFrom);
+  }
+
+  if (dateTo) {
+    conditions.push('m.created_at <= ?');
+    bindings.push(dateTo);
+  }
+
+  const joinClause = category ? 'LEFT JOIN memory_categories mc ON mc.memory_id = m.id' : '';
+
+  if (category) {
+    conditions.push('mc.category = ?');
+    bindings.push(category);
+  }
+
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+  const rows =
+    (safeQuery<MemoryRow[]>(
+      db,
+      `SELECT m.* FROM agent_memories m ${joinClause} ${whereClause}
+         ORDER BY m.updated_at DESC LIMIT ${EXPORT_MAX}`,
+      bindings,
+      true,
+    ) as MemoryRow[]) ?? [];
+
+  const entries = enrichMemories(db, rows);
+
+  if (format === 'csv') {
+    const csvRows = [
+      'key,content,tier,category,agent,created_at,updated_at,decay_score',
+      ...entries.map((e) => {
+        const row = e as Record<string, unknown>;
+        return [
+          csvEscape(String(row.key ?? '')),
+          csvEscape(String(row.content ?? '')),
+          csvEscape(String(row.tier ?? '')),
+          csvEscape(String(row.category ?? '')),
+          csvEscape(String(row.agentId ?? '')),
+          csvEscape(String(row.createdAt ?? '')),
+          csvEscape(String(row.updatedAt ?? '')),
+          csvEscape(String((row.decayScore as number | undefined)?.toFixed(4) ?? '')),
+        ].join(',');
+      }),
+    ];
+    const csv = csvRows.join('\n');
+    const filename = `memories-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  const filename = `memories-export-${new Date().toISOString().slice(0, 10)}.json`;
+  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), count: entries.length, entries }, null, 2), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+}
+
+/** Escape a value for CSV: wrap in quotes and escape internal quotes. */
+function csvEscape(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
