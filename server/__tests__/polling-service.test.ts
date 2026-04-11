@@ -462,6 +462,9 @@ describe('dedup integration', () => {
     dedup.markSeen('polling:triggers', key);
     expect(dedup.has('polling:triggers', key)).toBe(true);
   });
+
+  // Ack comment dedup integration tests moved to polling-ack-dedup.test.ts
+  // where they test through processMention with mocked github/operations.
 });
 
 // ─── CI retry cooldown ──────────────────────────────────────────────────────

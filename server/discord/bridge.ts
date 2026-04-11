@@ -19,9 +19,15 @@
 import type { Database } from 'bun:sqlite';
 import type { BaseInteraction } from 'discord.js';
 import { getDiscordConfig } from '../db/discord-config';
-import { pruneOldThreadSessions } from '../db/discord-thread-sessions';
+import {
+  getThreadIdForSession,
+  pruneOldThreadSessions,
+  updateThreadSessionSummary,
+} from '../db/discord-thread-sessions';
+import { getSessionMessages, updateSessionSummary } from '../db/sessions';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
+import { summarizeConversation } from '../process/context-management';
 import type { EventCallback } from '../process/interfaces';
 import type { ProcessManager } from '../process/manager';
 import type { ReputationScorer } from '../reputation/scorer';
@@ -89,9 +95,6 @@ export class DiscordBridge {
 
   /** Users who have interacted at least once — used for first-interaction welcome tips. */
   private interactedUsers: Set<string> = new Set();
-
-  /** Channel → project name affinity — remembers which project was last used per channel. */
-  private channelProjectAffinity: Map<string, string> = new Map();
 
   /** Reputation scorer for reaction feedback. Set via setReputationScorer(). */
   private reputationScorer: ReputationScorer | null = null;
@@ -254,10 +257,23 @@ export class DiscordBridge {
 
     // Start periodic summary flush for crash recovery (every 5 minutes)
     this.summaryFlushTimer = setInterval(() => {
-      try {
-        this.processManager.flushActiveSessionSummaries();
-      } catch (err) {
-        log.warn('Summary flush failed', { error: err instanceof Error ? err.message : String(err) });
+      for (const sessionId of this.processManager.getActiveSessionIds()) {
+        try {
+          const messages = getSessionMessages(this.db, sessionId);
+          const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+          if (conversational.length === 0) continue;
+          const summary = summarizeConversation(conversational.map((m) => ({ role: m.role, content: m.content })));
+          updateSessionSummary(this.db, sessionId, summary);
+          const threadId = getThreadIdForSession(this.db, sessionId);
+          if (threadId) {
+            updateThreadSessionSummary(this.db, threadId, summary);
+          }
+        } catch (err) {
+          log.warn('Summary flush failed', {
+            sessionId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }, DiscordBridge.SUMMARY_FLUSH_INTERVAL_MS);
 
@@ -477,7 +493,6 @@ export class DiscordBridge {
       threadLastActivity: this.tsm.threadLastActivity,
       mentionSessions: this.tsm.mentionSessions,
       processedMessageIds: this.tsm.processedMessageIds,
-      channelProjectAffinity: this.channelProjectAffinity,
     };
     await handleMessageImpl(ctx, data);
   }
@@ -505,7 +520,6 @@ export class DiscordBridge {
       threadLastActivity: this.tsm.threadLastActivity,
       mentionSessions: this.tsm.mentionSessions,
       processedMessageIds: this.tsm.processedMessageIds,
-      channelProjectAffinity: this.channelProjectAffinity,
     };
     await sendTaskResultImpl(ctx, channelId, task, mentionUserId);
   }
