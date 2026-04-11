@@ -67,7 +67,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 116;
+const SCHEMA_VERSION = 117;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -234,6 +234,14 @@ const MIGRATIONS: Record<number, string[]> = {
     `ALTER TABLE governance_proposals ADD COLUMN voting_deadline TEXT DEFAULT NULL`,
     ...councils.tables.filter((s) => s.includes('proposal_vetoes')),
     ...councils.indexes.filter((s) => s.includes('proposal_vetoes')),
+  ],
+  117: [
+    // Channel-project affinity: tracks which project was last used in each Discord channel
+    `CREATE TABLE IF NOT EXISTS discord_channel_project (
+      channel_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
   ],
 };
 

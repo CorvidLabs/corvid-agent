@@ -9,6 +9,7 @@ import type { Database } from 'bun:sqlite';
 import type { SessionSource } from '../../shared/types';
 import { listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
+import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-project';
 import { updateDiscordConfig } from '../db/discord-config';
 import { getMentionSession, saveMentionSession, updateMentionSessionActivity } from '../db/discord-mention-sessions';
 import { deleteThreadSession, saveThreadSession, updateThreadSessionActivity } from '../db/discord-thread-sessions';
@@ -628,9 +629,13 @@ async function handleMentionReply(
   }
 
   const projects = listProjects(ctx.db);
-  const project = agent.defaultProjectId
-    ? (projects.find((p) => p.id === agent.defaultProjectId) ?? projects[0])
-    : projects[0];
+  // Prefer the project most recently used in this channel (affinity), then fall
+  // back to the agent's default project, then the first available project.
+  const channelProjectId = getChannelProjectId(ctx.db, channelId);
+  const project =
+    (channelProjectId ? projects.find((p) => p.id === channelProjectId) : undefined) ??
+    (agent.defaultProjectId ? projects.find((p) => p.id === agent.defaultProjectId) : undefined) ??
+    projects[0];
 
   if (!project) {
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No projects configured.');
@@ -671,6 +676,10 @@ async function handleMentionReply(
     source: 'discord' as SessionSource,
     workDir,
   });
+
+  // Record channel-project affinity so future @mentions in this channel
+  // default to the same project without the user needing to specify it.
+  setChannelProjectId(ctx.db, channelId, project.id);
 
   // Advisory: warn in-channel when Ollama is used for a complex task.
   const complexityWarning = buildOllamaComplexityWarning(cleanText, agent.model, agent.provider);
