@@ -305,46 +305,51 @@ describe('embed-response streaming edits', () => {
     }
   });
 
-  test('session_error without progress message sends new embed with Resume button', async () => {
-    const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
-    const pm = createMockProcessManager();
-    const delivery = new DeliveryTracker();
-    const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { cleanup, waitForCall } = installSnowflakeMock();
+  test(
+    'session_error without progress message sends new embed with Resume button',
+    async () => {
+      const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
+      const pm = createMockProcessManager();
+      const delivery = new DeliveryTracker();
+      const threadCallbacks = new Map<string, ThreadCallbackInfo>();
+      const { calls, cleanup } = installSnowflakeMock();
 
-    try {
-      subscribeForResponseWithEmbed(
-        pm,
-        delivery,
-        'test-token',
-        db,
-        threadCallbacks,
-        'session-err-noprog',
-        THREAD_ID,
-        'TestAgent',
-        'test-model',
-        'TestProject',
-      );
+      try {
+        subscribeForResponseWithEmbed(
+          pm,
+          delivery,
+          'test-token',
+          db,
+          threadCallbacks,
+          'session-err-noprog',
+          THREAD_ID,
+          'TestAgent',
+          'test-model',
+          'TestProject',
+        );
 
-      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
+        const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
 
-      // Fire error WITHOUT any prior tool_status (no progress message exists).
-      callback('session-err-noprog', {
-        type: 'session_error',
-        error: { errorType: 'context_exhausted', message: 'Context full' },
-      });
+        // Fire error WITHOUT any prior tool_status (no progress message exists).
+        // The mock sendMessage is invoked synchronously within the nested async chain,
+        // but yield a microtask to guarantee all intermediate promises settle.
+        callback('session-err-noprog', {
+          type: 'session_error',
+          error: { errorType: 'context_exhausted', message: 'Context full' },
+        });
+        await new Promise((resolve) => queueMicrotask(resolve));
 
-      // Wait for the send call with Resume button (uses event-driven waitForCall
-      // instead of a fixed timeout to avoid CI flakes).
-      const sendWithButtons = await waitForCall(
-        (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
-        5_000,
-      );
-      expect(sendWithButtons).toBeDefined();
-    } finally {
-      cleanup();
-    }
-  });
+        const sendWithButtons = calls.find(
+          (c: any) =>
+            c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
+        );
+        expect(sendWithButtons).toBeDefined();
+      } finally {
+        cleanup();
+      }
+    },
+    15_000,
+  );
 
   test('context_warning sends warning embed for critical level', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
