@@ -245,13 +245,3 @@ describe('memory leak simulation', () => {
   });
 });
 
-describe('flushActiveSessionSummaries', () => {
-  test('does not throw when no active processes exist', () => {
-    expect(() => pm.flushActiveSessionSummaries()).not.toThrow();
-  });
-
-  test('method exists and is callable', () => {
-    expect(typeof pm.flushActiveSessionSummaries).toBe('function');
-    pm.flushActiveSessionSummaries(); // no-op with empty processes map
-  });
-});

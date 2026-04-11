@@ -1843,17 +1843,6 @@ export class ProcessManager {
   }
 
   /**
-   * Flush conversation summaries for all active Discord thread sessions.
-   * Called periodically by the Discord bridge so that crash recovery
-   * has recent context even if the process never exits cleanly.
-   */
-  flushActiveSessionSummaries(): void {
-    for (const sessionId of this.processes.keys()) {
-      this.persistConversationSummary(sessionId);
-    }
-  }
-
-  /**
    * Clean up worktrees created for chat sessions (not work tasks).
    * Chat worktree directories contain `/chat-` in the path.
    * Also cleans up ephemeral project directories.
