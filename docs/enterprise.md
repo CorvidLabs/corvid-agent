@@ -304,7 +304,7 @@ cosign verify-attestation \
 
 ## API access
 
-- **REST API:** ~300 endpoints across 47 route modules
+- **REST API:** ~236 endpoints across 55 route modules
 - **OpenAPI spec:** `GET /api/openapi.json`
 - **Swagger UI:** `GET /api/docs`
 - **WebSocket:** Real-time streaming for sessions and events

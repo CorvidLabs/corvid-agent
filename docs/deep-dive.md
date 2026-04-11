@@ -36,7 +36,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 |--------|-------|
 | TypeScript LOC | 182,301 |
 | Server modules | 47 |
-| API routes | 51 modules (~300 endpoints) |
+| API routes | 55 modules (~236 endpoints) |
 | Database tables | 110 |
 | Database migrations | 41 (squashed baseline) |
 | MCP tools | 56 corvid_* handlers |
@@ -67,8 +67,8 @@ algochat/        21 files — On-chain identity, wallets, PSK messaging, agent d
 councils/        3 files  — Multi-agent deliberation, governance tiers, synthesis
 work/            1 file   — Self-improvement pipeline (worktrees, validation, PRs)
 process/         —          Session lifecycle, SDK + Ollama, approval flow, personas
-mcp/             17 files — 46 corvid_* tool handlers
-routes/          47 files — REST API (~300 endpoints)
+mcp/             17 files — 56 corvid_* tool handlers
+routes/          55 files — REST API (~236 endpoints)
 db/              —          SQLite schema, 11 migrations, 93 tables
 reputation/      5 files  — Scoring, attestation, verification, identity proofs
 memory/          8 files  — Vector embeddings, FTS5 search, decay, sync

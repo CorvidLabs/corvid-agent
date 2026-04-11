@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.63.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.63.0-4a90d9" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
@@ -99,7 +99,7 @@ corvid-agent init --mcp    # add corvid-agent MCP tools
 vibekit init               # add blockchain MCP tools (deploy, assets, indexer)
 ```
 
-Your AI editor gets 50 corvid-agent tools (code, GitHub, scheduling, agents) plus 42 VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
+Your AI editor gets 56 corvid-agent tools (code, GitHub, scheduling, agents) plus VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
 
 **[VibeKit integration guide →](docs/vibekit-integration.md)**
 
@@ -115,7 +115,7 @@ skills/
   github/SKILL.md          # PRs, issues, reviews
   smart-contracts/SKILL.md # VibeKit + Algorand contract tools
   scheduling/SKILL.md      # Cron-based task automation
-  ...30 skills total
+  ...29 skills total
 ```
 
 `corvid-agent init --mcp` copies skills to your editor automatically. **[Skill list →](skills/README.md)**
@@ -124,7 +124,7 @@ skills/
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 65 MCP tools, 382 API endpoints, 1,286 test files, 212 module specs. [Release notes →](docs/releases.html)
+Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 56 MCP tools, 236 API endpoints, 455 test files, 212 module specs. [Release notes →](docs/releases.html)
 
 **[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
 
