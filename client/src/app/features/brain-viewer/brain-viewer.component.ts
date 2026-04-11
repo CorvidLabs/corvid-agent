@@ -86,7 +86,43 @@ interface SyncStatus {
     imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent],
     template: `
         <div class="brain-viewer">
-            <h2>Brain Viewer</h2>
+            <div class="brain-viewer__title-row">
+                <h2>Brain Viewer</h2>
+                <div class="export-area">
+                    <button class="btn--export" (click)="toggleExportPanel()">Export</button>
+                    @if (showExportPanel()) {
+                        <div class="export-panel">
+                            <div class="export-panel__row">
+                                <label class="export-panel__label">Format</label>
+                                <div class="export-panel__btns">
+                                    <button class="chip" [class.chip--active]="exportFormat() === 'json'" (click)="exportFormat.set('json')">JSON</button>
+                                    <button class="chip" [class.chip--active]="exportFormat() === 'csv'" (click)="exportFormat.set('csv')">CSV</button>
+                                </div>
+                            </div>
+                            <div class="export-panel__row">
+                                <label class="export-panel__label">Tier</label>
+                                <div class="export-panel__btns">
+                                    <button class="chip" [class.chip--active]="exportTier() === 'all'" (click)="exportTier.set('all')">All</button>
+                                    <button class="chip" [class.chip--active]="exportTier() === 'long-term'" (click)="exportTier.set('long-term')">Long-term</button>
+                                    <button class="chip" [class.chip--active]="exportTier() === 'short-term'" (click)="exportTier.set('short-term')">Short-term</button>
+                                </div>
+                            </div>
+                            @if (categoryEntries().length > 0) {
+                                <div class="export-panel__row">
+                                    <label class="export-panel__label">Category</label>
+                                    <select class="export-panel__select" (change)="onExportCategoryChange($event)">
+                                        <option value="">All categories</option>
+                                        @for (cat of categoryEntries(); track cat.name) {
+                                            <option [value]="cat.name" [selected]="exportCategory() === cat.name">{{ cat.name }}</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            <button class="btn--export-go" (click)="doExport()">Download</button>
+                        </div>
+                    }
+                </div>
+            </div>
 
             @if (loading()) {
                 <div class="loading"><app-skeleton variant="card" [count]="4" /></div>
@@ -453,9 +489,84 @@ interface SyncStatus {
     `,
     styles: `
         .brain-viewer { padding: var(--space-6); }
-        .brain-viewer h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
+        .brain-viewer__title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .brain-viewer__title-row h2 { margin: 0; color: var(--text-primary); }
         .brain-viewer h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading { color: var(--text-secondary); }
+
+        /* ─── Export Panel ────── */
+        .export-area { position: relative; }
+        .btn--export {
+            padding: 0.35rem 0.85rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .btn--export:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .export-panel {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            min-width: 260px;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .export-panel__row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .export-panel__label {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            width: 60px;
+            flex-shrink: 0;
+        }
+        .export-panel__btns { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+        .export-panel__select {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-family: inherit;
+            padding: 0.2rem 0.4rem;
+            cursor: pointer;
+            flex: 1;
+        }
+        .btn--export-go {
+            align-self: flex-end;
+            padding: 0.35rem 0.85rem;
+            background: var(--accent-cyan-tint);
+            border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-sm);
+            color: var(--accent-cyan);
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn--export-go:hover { background: var(--accent-cyan-mid); }
 
         /* ─── Sync Banner ────── */
         .sync-banner {
@@ -991,6 +1102,12 @@ export class BrainViewerComponent implements OnInit {
     readonly agentFilter = signal<string | null>(null);
     readonly currentOffset = signal(0);
 
+    // Export
+    readonly showExportPanel = signal(false);
+    readonly exportFormat = signal<'json' | 'csv'>('json');
+    readonly exportTier = signal<'all' | 'long-term' | 'short-term'>('all');
+    readonly exportCategory = signal<string>('');
+
     readonly categoryEntries = computed(() => {
         const s = this.stats();
         if (!s) return [];
@@ -1128,6 +1245,45 @@ export class BrainViewerComponent implements OnInit {
         } catch {
             // Non-critical
         }
+    }
+
+    // ─── Export ─────────────────────────────────────────────────────────────
+
+    toggleExportPanel(): void {
+        this.showExportPanel.set(!this.showExportPanel());
+    }
+
+    onExportCategoryChange(event: Event): void {
+        this.exportCategory.set((event.target as HTMLSelectElement).value);
+    }
+
+    async doExport(): Promise<void> {
+        const params = new URLSearchParams();
+        params.set('format', this.exportFormat());
+        if (this.exportTier() !== 'all') params.set('tier', this.exportTier());
+        if (this.exportCategory()) params.set('category', this.exportCategory());
+        if (this.agentFilter()) params.set('agent_id', this.agentFilter()!);
+
+        try {
+            const blob = await firstValueFrom(
+                this.api.getBlob(`/dashboard/memories/export?${params.toString()}`),
+            );
+            const ext = this.exportFormat();
+            const filename = `memories-export-${new Date().toISOString().slice(0, 10)}.${ext}`;
+            this.downloadBlob(blob, filename);
+            this.showExportPanel.set(false);
+        } catch {
+            // Non-critical
+        }
+    }
+
+    private downloadBlob(blob: Blob, filename: string): void {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     // ─── Data loading ────────────────────────────────────────────────────────

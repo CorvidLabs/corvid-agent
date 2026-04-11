@@ -329,4 +329,104 @@ describe('Brain Viewer Routes', () => {
       expect(data.recentErrors.length).toBe(0);
     });
   });
+
+  // ── GET /api/dashboard/memories/export ──────────────────────────────
+
+  describe('GET /api/dashboard/memories/export', () => {
+    it('returns JSON export with all memories by default', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export');
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(200);
+      expect(res!.headers.get('Content-Type')).toBe('application/json');
+      expect(res!.headers.get('Content-Disposition')).toContain('attachment');
+      expect(res!.headers.get('Content-Disposition')).toContain('.json');
+
+      const data = await res!.json();
+      expect(data.exportedAt).toBeDefined();
+      expect(data.count).toBe(6);
+      expect(data.entries.length).toBe(6);
+    });
+
+    it('returns CSV export when format=csv', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?format=csv');
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(200);
+      expect(res!.headers.get('Content-Type')).toBe('text/csv');
+      expect(res!.headers.get('Content-Disposition')).toContain('.csv');
+
+      const text = await res!.text();
+      const lines = text.split('\n');
+      // Header + 6 data rows
+      expect(lines[0]).toBe('key,content,tier,category,agent,created_at,updated_at,decay_score');
+      expect(lines.length).toBe(7);
+    });
+
+    it('rejects invalid format', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?format=xml');
+      expect(res!.status).toBe(400);
+    });
+
+    it('rejects invalid tier', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?tier=bogus');
+      expect(res!.status).toBe(400);
+    });
+
+    it('filters by tier=long-term', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?format=json&tier=long-term');
+      const data = await res!.json();
+      // 3 confirmed with txid (2 agent1 + 1 agent2)
+      expect(data.count).toBe(3);
+    });
+
+    it('filters by tier=short-term', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?format=json&tier=short-term');
+      const data = await res!.json();
+      // 3 short-term (2 pending + 1 failed)
+      expect(data.count).toBe(3);
+    });
+
+    it('filters by agent_id', async () => {
+      const res = await callRoutes('GET', `/api/dashboard/memories/export?agent_id=${agentId1}`);
+      const data = await res!.json();
+      expect(data.count).toBe(5);
+    });
+
+    it('filters by category', async () => {
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?category=config');
+      const data = await res!.json();
+      expect(data.count).toBe(1);
+      expect(data.entries[0].key).toBe('api-preferences');
+    });
+
+    it('returns empty export when no matches', async () => {
+      const res = await callRoutes('GET', `/api/dashboard/memories/export?agent_id=${crypto.randomUUID()}`);
+      const data = await res!.json();
+      expect(data.count).toBe(0);
+      expect(data.entries).toEqual([]);
+    });
+
+    it('CSV escapes values with commas and quotes', async () => {
+      // Insert a memory with special characters
+      const specialId = crypto.randomUUID();
+      db.query(
+        `INSERT INTO agent_memories (id, agent_id, key, content, status) VALUES (?, ?, 'csv-test', 'value with, comma and "quotes"', 'pending')`,
+      ).run(specialId, agentId1);
+
+      const res = await callRoutes('GET', `/api/dashboard/memories/export?format=csv&agent_id=${agentId1}`);
+      const text = await res!.text();
+      // The content field should be escaped
+      expect(text).toContain('"value with, comma and ""quotes"""');
+
+      // Clean up
+      db.query('DELETE FROM agent_memories WHERE id = ?').run(specialId);
+    });
+
+    it('does not route export id to memory detail', async () => {
+      // Ensure /export is not treated as a memory ID
+      const res = await callRoutes('GET', '/api/dashboard/memories/export?format=json');
+      expect(res!.status).toBe(200);
+      const data = await res!.json();
+      expect(data.entries).toBeDefined();
+    });
+  });
 });
