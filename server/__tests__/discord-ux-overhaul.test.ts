@@ -12,6 +12,22 @@ mock.module('../lib/worktree', () => ({
   removeWorktree: async () => ({ success: true }),
 }));
 
+// Mock rest-client at the module level to guarantee a single shared singleton across
+// all importers (test file AND embeds.ts via embed-response.ts). Without this, Bun CI
+// can resolve rest-client.ts to separate module instances, causing _setRestClientForTesting
+// in the test to set a different variable than getRestClient reads in production code.
+let _sharedMockRestClient: unknown = null;
+mock.module('../discord/rest-client', () => ({
+  getRestClient: () => {
+    if (!_sharedMockRestClient) throw new Error('REST client not initialized. Call initializeRestClient() first.');
+    return _sharedMockRestClient;
+  },
+  _setRestClientForTesting: (client: unknown) => {
+    _sharedMockRestClient = client;
+  },
+  initializeRestClient: () => {},
+}));
+
 import { Database } from 'bun:sqlite';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
@@ -310,7 +326,7 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { cleanup, waitForCall } = installSnowflakeMock();
+    const { calls, cleanup } = installSnowflakeMock();
 
     try {
       subscribeForResponseWithEmbed(
@@ -334,8 +350,12 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Wait for the send call with Resume button (event-driven, no fixed timeout)
-      const sendWithButtons = await waitForCall(
+      // sendEmbedWithButtons is called synchronously in the callback chain —
+      // the mock sendMessage pushes to calls before the callback returns.
+      // Allow a microtask tick for safety, then check calls.
+      await new Promise((r) => setTimeout(r, 100));
+
+      const sendWithButtons = calls.find(
         (c: any) =>
           c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
       );
