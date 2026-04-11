@@ -355,12 +355,14 @@ describe('embed-response streaming edits', () => {
       console.log('[DIAG] After callback, calls:', calls.length, 'methods:', calls.map((c: any) => c.method));
       await new Promise((r) => setTimeout(r, 500));
       console.log('[DIAG] After 500ms, calls:', calls.length, 'methods:', calls.map((c: any) => c.method));
-      if (calls.length > 0) {
-        console.log('[DIAG] First call data keys:', Object.keys(calls[0] as any));
-        const first = calls[0] as any;
-        console.log('[DIAG] First call method:', first.method);
-        if (first.data) {
-          console.log('[DIAG] First call has embeds:', !!first.data.embeds, 'components:', !!first.data.components);
+      for (const call of calls) {
+        const c = call as any;
+        console.log('[DIAG] Call:', c.method, 'has components:', !!c.data?.components);
+        if (c.data?.components) {
+          console.log('[DIAG] components:', JSON.stringify(c.data.components));
+        }
+        if (c.data?.embeds) {
+          console.log('[DIAG] embeds title:', c.data.embeds?.[0]?.title);
         }
       }
 
