@@ -50,8 +50,20 @@ function countRouteModules(): number {
 }
 
 function countApiEndpoints(): number {
-  const registry = readFileSync(join(ROOT, 'server/openapi/route-registry.ts'), 'utf-8');
-  return (registry.match(/method:/g) || []).length;
+  // Count method: definitions across all route files in the routes directory
+  const routesDir = join(ROOT, 'server/openapi/routes');
+  let count = 0;
+  try {
+    for (const file of readdirSync(routesDir)) {
+      if (file.endsWith('.ts') && file !== 'types.ts' && file !== 'index.ts') {
+        const content = readFileSync(join(routesDir, file), 'utf-8');
+        count += (content.match(/method:/g) || []).length;
+      }
+    }
+  } catch {
+    /* directory may not exist */
+  }
+  return count;
 }
 
 function countDbTables(): number {
