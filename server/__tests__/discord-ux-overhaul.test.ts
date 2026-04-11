@@ -12,15 +12,15 @@ mock.module('../lib/worktree', () => ({
   removeWorktree: async () => ({ success: true }),
 }));
 
-
 import { Database } from 'bun:sqlite';
 import { createAgent } from '../db/agents';
+import { setChannelProjectId } from '../db/discord-channel-project';
 import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
-import type { ProcessManager } from '../process/manager';
-import { DeliveryTracker } from '../lib/delivery-tracker';
-import type { ThreadCallbackInfo } from '../discord/thread-session-map';
 import { _setRestClientForTesting, type DiscordRestClient } from '../discord/rest-client';
+import type { ThreadCallbackInfo } from '../discord/thread-session-map';
+import { DeliveryTracker } from '../lib/delivery-tracker';
+import type { ProcessManager } from '../process/manager';
 
 // Valid Discord snowflake IDs for testing
 const THREAD_ID = '400000000000000001';
@@ -814,7 +814,7 @@ describe('message-handler channel-project affinity', () => {
     const pm = createMockProcessManager();
     createAgent(db, { name: 'AffinityAgent' });
     createProject(db, { name: 'ProjectA', workingDir: '/tmp/a' });
-    createProject(db, { name: 'ProjectB', workingDir: '/tmp/b' });
+    const projectB = createProject(db, { name: 'ProjectB', workingDir: '/tmp/b' });
 
     const config = {
       botToken: 'test-token',
@@ -825,8 +825,8 @@ describe('message-handler channel-project affinity', () => {
     const botUserId = '999000000000000001';
     (bridge as any).botUserId = botUserId;
 
-    // Set channel affinity to ProjectB
-    (bridge as any).channelProjectAffinity.set(CHANNEL_ID, 'ProjectB');
+    // Set channel affinity to ProjectB via DB
+    setChannelProjectId(db, CHANNEL_ID, projectB.id);
 
     const { cleanup } = installSnowflakeMock();
 

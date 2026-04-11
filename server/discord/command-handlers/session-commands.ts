@@ -7,6 +7,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import type { SessionSource } from '../../../shared/types';
 import { listAgents } from '../../db/agents';
+import { setChannelProjectId } from '../../db/discord-channel-project';
 import { saveThreadSession } from '../../db/discord-thread-sessions';
 import { listProjects } from '../../db/projects';
 import { createSession } from '../../db/sessions';
@@ -109,6 +110,10 @@ export async function handleSessionCommand(
   // Create a standalone thread in the channel where the command was invoked
   const threadName = `${agent.name} — ${topic}`;
   const targetChannelId = interaction.channelId || ctx.config.channelId;
+
+  // Record channel-project affinity so future @mentions in this channel default
+  // to the same project without needing an explicit --project flag.
+  setChannelProjectId(ctx.db, targetChannelId, project.id);
   const threadId = await ctx.createStandaloneThread(targetChannelId, threadName);
   if (!threadId) {
     await editDeferredResponse(interaction, 'Failed to create conversation thread.');

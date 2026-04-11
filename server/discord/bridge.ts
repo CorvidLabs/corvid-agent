@@ -19,11 +19,15 @@
 import type { Database } from 'bun:sqlite';
 import type { BaseInteraction } from 'discord.js';
 import { getDiscordConfig } from '../db/discord-config';
-import { getThreadIdForSession, pruneOldThreadSessions, updateThreadSessionSummary } from '../db/discord-thread-sessions';
+import {
+  getThreadIdForSession,
+  pruneOldThreadSessions,
+  updateThreadSessionSummary,
+} from '../db/discord-thread-sessions';
 import { getSessionMessages, updateSessionSummary } from '../db/sessions';
-import { summarizeConversation } from '../process/context-management';
 import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
+import { summarizeConversation } from '../process/context-management';
 import type { EventCallback } from '../process/interfaces';
 import type { ProcessManager } from '../process/manager';
 import type { ReputationScorer } from '../reputation/scorer';
@@ -91,9 +95,6 @@ export class DiscordBridge {
 
   /** Users who have interacted at least once — used for first-interaction welcome tips. */
   private interactedUsers: Set<string> = new Set();
-
-  /** Channel → project name affinity — remembers which project was last used per channel. */
-  private channelProjectAffinity: Map<string, string> = new Map();
 
   /** Reputation scorer for reaction feedback. Set via setReputationScorer(). */
   private reputationScorer: ReputationScorer | null = null;
@@ -492,7 +493,6 @@ export class DiscordBridge {
       threadLastActivity: this.tsm.threadLastActivity,
       mentionSessions: this.tsm.mentionSessions,
       processedMessageIds: this.tsm.processedMessageIds,
-      channelProjectAffinity: this.channelProjectAffinity,
     };
     await handleMessageImpl(ctx, data);
   }
@@ -520,7 +520,6 @@ export class DiscordBridge {
       threadLastActivity: this.tsm.threadLastActivity,
       mentionSessions: this.tsm.mentionSessions,
       processedMessageIds: this.tsm.processedMessageIds,
-      channelProjectAffinity: this.channelProjectAffinity,
     };
     await sendTaskResultImpl(ctx, channelId, task, mentionUserId);
   }
