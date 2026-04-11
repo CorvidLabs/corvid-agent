@@ -93,12 +93,11 @@ export function initTelegramConfigFromEnv(db: Database): void {
     ['TELEGRAM_BRIDGE_MODE', 'mode'],
   ];
 
-  const stmt = db.prepare(
-    `INSERT OR IGNORE INTO telegram_config (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
-  );
-
   let seeded = 0;
   try {
+    const stmt = db.prepare(
+      `INSERT OR IGNORE INTO telegram_config (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
+    );
     writeTransaction(db, (_db) => {
       for (const [envKey, dbKey] of envMappings) {
         const value = process.env[envKey];
