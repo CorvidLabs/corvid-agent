@@ -310,7 +310,7 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { calls, cleanup } = installSnowflakeMock();
+    const { cleanup, waitForCall } = installSnowflakeMock();
 
     try {
       subscribeForResponseWithEmbed(
@@ -334,10 +334,8 @@ describe('embed-response streaming edits', () => {
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Allow async sendEmbedWithButtons chain to settle (delivery tracker + retry)
-      await new Promise((r) => setTimeout(r, 1500));
-
-      const sendWithButtons = calls.find(
+      // Wait for the send call with Resume button (event-driven, no fixed timeout)
+      const sendWithButtons = await waitForCall(
         (c: any) =>
           c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
       );
