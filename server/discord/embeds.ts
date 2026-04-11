@@ -386,12 +386,10 @@ export async function sendEmbedWithButtons(
   embed: DiscordEmbed,
   components: DiscordActionRow[],
 ): Promise<void> {
-  // Capture rest client eagerly to avoid races where the singleton is cleared
-  // between the caller and the async delivery callback (e.g., parallel test teardown).
-  const client = getRestClient();
   try {
     await delivery.sendWithReceipt('discord', async () => {
-      await client.sendMessage(channelId, { embeds: [embed], components });
+      const restClient = getRestClient();
+      await restClient.sendMessage(channelId, { embeds: [embed], components });
     });
   } catch {
     // Error already logged by DeliveryTracker
