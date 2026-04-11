@@ -65,6 +65,7 @@ import { handleAllowlistRoutes } from './allowlist';
 import { handleAnalyticsRoutes } from './analytics';
 import { handleAuthFlowRoutes } from './auth-flow';
 import { handleBillingRoutes } from './billing';
+import { handleBlockExplorerRoutes } from './block-explorer';
 import { handleBrainViewerRoutes } from './brain-viewer';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import { handleBuddyRoutes } from './buddy';
@@ -410,6 +411,10 @@ async function handleRoutes(
   // Library routes (CRVLIB — on-chain ARC-69 library entries)
   const libraryResponse = handleLibraryRoutes(req, url, db, context);
   if (libraryResponse) return libraryResponse;
+
+  // Block Explorer routes (on-chain Algorand data via indexer)
+  const explorerResponse = handleBlockExplorerRoutes(req, url, db, algochatBridge);
+  if (explorerResponse) return explorerResponse instanceof Promise ? await explorerResponse : explorerResponse;
 
   const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
   if (securityOverviewResponse) return securityOverviewResponse;
