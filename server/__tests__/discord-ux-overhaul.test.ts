@@ -310,7 +310,7 @@ describe('embed-response streaming edits', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
-    const { cleanup, waitForCall } = installSnowflakeMock();
+    const { calls, cleanup } = installSnowflakeMock();
 
     try {
       subscribeForResponseWithEmbed(
@@ -328,21 +328,26 @@ describe('embed-response streaming edits', () => {
 
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-err-noprog')!.callback;
 
-      // Fire error WITHOUT any prior tool_status (no progress message exists)
+      // Fire error WITHOUT any prior tool_status (no progress message exists).
+      // The sendEmbedWithButtons call inside the handler resolves synchronously
+      // through the mock chain (getRestClient -> sendMessage -> pushCall), so the
+      // entry lands in `calls` before the next microtask tick.
       callback('session-err-noprog', {
         type: 'session_error',
         error: { errorType: 'context_exhausted', message: 'Context full' },
       });
 
-      // Wait for the Resume button send
-      const sendWithButtons = await waitForCall(
+      // Flush microtasks to let any remaining async work settle
+      await new Promise((r) => setTimeout(r, 200));
+
+      const sendWithButtons = calls.find(
         (c: any) => c.method === 'send' && c.data?.components?.[0]?.components?.some((b: any) => b.label === 'Resume'),
       );
       expect(sendWithButtons).toBeDefined();
     } finally {
       cleanup();
     }
-  }, 15000);
+  });
 
   test('context_warning sends warning embed for critical level', async () => {
     const { subscribeForResponseWithEmbed } = await import('../discord/thread-response/embed-response');
