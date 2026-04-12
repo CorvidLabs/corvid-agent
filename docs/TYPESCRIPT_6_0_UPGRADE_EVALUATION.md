@@ -1,116 +1,98 @@
 # TypeScript 6.0 Upgrade Evaluation
 
-**Evaluation Date:** March 27, 2026
-**Current TypeScript:** 5.9.3 (devDependency)
-**Target TypeScript:** 6.0.2 (major version bump)
-**Branch:** agent/rook/evaluate-typescript-6-0-upgrade-current-mn8qf3vz-9af22a
+**Evaluation Date:** 2026-04-12  
+**Evaluator:** Rook (code review / architecture)  
+**Current pin:** `typescript: ~5.9.3`  
+**Target pin:** `typescript: ~6.0.0` (latest stable: 6.0.2)
 
-## Summary
-TypeScript 6.0 is a major version bump from 5.9.3. This evaluation assesses breaking changes and outlines the upgrade path for the corvid-agent project.
+---
 
-## TypeScript 6.0 Key Changes
+## Verdict: GO ✅
 
-### Breaking Changes
-1. **Node.js minimum version:** TypeScript 6.0 requires Node.js 18.17+
-2. **Type narrowing:** Stricter type guards and type narrowing behavior
-3. **JSX handling:** Changes to how JSX is processed and typed
-4. **Module resolution:** Improvements to ES module resolution with potential compatibility impacts
-5. **Decorators:** Finalized support, may require code adjustments if using experimental decorators
+TypeScript 6.0.2 passes the full type check against this codebase with **zero errors** — both with and without `--skipLibCheck`. The existing `tsconfig.json` is already compatible with all TS6 defaults.
 
-### Compatibility Notes
-- TypeScript 6.0 should be backward compatible with most well-typed 5.9.3 code
-- Projects with strict type checking will likely pass without issues
-- Projects relying on loose types or any casts may encounter new errors
+**`package.json` is a Layer 1 (Structural) file.** The pin change cannot be applied by this agent. The required change is documented below for council review and human approval.
 
-## Bundled Dependency Updates
+---
 
-| Package | Current | Target | Notes |
-|---------|---------|--------|-------|
-| typescript | 5.9.3 | 6.0.2 | Major version - see breaking changes above |
-| web-tree-sitter | 0.25.10 | ^0.26.7 | Minor bumps, need to verify API compatibility |
-| @anthropic-ai/claude-agent-sdk | (current) | 0.2.85 | Patch/minor bump |
-| @modelcontextprotocol/sdk | (current) | 1.28.0 | Patch/minor bump |
-| @opentelemetry/* | (current) | Latest patch | Patch bumps |
-| @biomejs/biome | (current) | 2.4.9 | Patch/minor bump |
+## Test Methodology
 
-## web-tree-sitter Upgrade (0.25.10 → ^0.26.7)
+TypeScript 6.0.2 was installed in an isolated temp directory (no changes to project `package.json`) and the binary was run directly against the project root:
 
-### Release Notes Analysis Required
-Before upgrading web-tree-sitter, the following should be verified:
-- [ ] Check v0.26.0 release notes for breaking API changes
-- [ ] Verify all tree-sitter parser integrations still work
-- [ ] Confirm no changes to initialization or query API
-- [ ] Check if any parser grammars need updating
-
-### Known web-tree-sitter Usage
-The project uses web-tree-sitter for code analysis and parsing. The codebase should be scanned for:
-- Direct parser initialization calls
-- Query methods and API usage
-- Error handling patterns that might be affected
-
-## Verification Steps
-
-### Before Upgrade
 ```bash
+# Install TS6 in temp dir
+TMPDIR=$(mktemp -d) && cd "$TMPDIR" && echo '{"dependencies":{"typescript":"6.0.2"}}' > package.json && bun install
+
+# Type check — with skipLibCheck (matches CI command)
+$TMPDIR/node_modules/.bin/tsc --noEmit --skipLibCheck
+# → (no output — zero errors)
+
+# Type check — without skipLibCheck (full lib check)
+$TMPDIR/node_modules/.bin/tsc --noEmit
+# → (no output — zero errors)
+
+# Baseline: current TS5 (for comparison)
 bun x tsc --noEmit --skipLibCheck
-bun test
+# → (no output — zero errors)
 ```
 
-### After Upgrade (package.json changes)
+All three runs returned exit code 0 with no output.
+
+---
+
+## tsconfig.json Compatibility Analysis
+
+Current `tsconfig.json` is already aligned with TS6 defaults and requirements:
+
+| Setting | Current value | TS6 compatibility | Notes |
+|---|---|---|---|
+| `target` | `ESNext` | ✅ | TS6 removed `es5`; `ESNext` is fully supported |
+| `module` | `ESNext` | ✅ | TS6 default changed to `esnext` — already set |
+| `moduleResolution` | `bundler` | ✅ | TS6 removed `classic`; `node` is now a deprecation error; `bundler` is the correct Bun setting |
+| `strict` | `true` | ✅ | TS6 default changed to `true` — already set |
+| `esModuleInterop` | `true` | ✅ | TS6 enforces `true`; already set |
+| `rootDir` | `.` | ✅ | Explicit value avoids the new TS6 rootDir inference change |
+| `paths` | set directly | ✅ | No `baseUrl` (which TS6 deprecated) |
+
+### TS6 Breaking Changes — None Apply Here
+
+The major TS6 removals that could affect codebases:
+
+| Breaking change | Status |
+|---|---|
+| `module: amd/umd/systemjs/none` removed | Not used |
+| `target: es5` removed | Not used (`ESNext`) |
+| `--outFile` removed | Not used |
+| `--downlevelIteration` removed | Not used |
+| `moduleResolution: classic` removed | Not used (`bundler`) |
+| `module Foo {}` namespace syntax removed | Not used (checked: only `namespace` syntax in codebase) |
+| `import ... asserts {}` removed (use `with {}`) | Not used |
+| `types: []` new default (was auto-discover) | Not impacted — `types` is not set in `tsconfig.json`, which means TS uses its normal resolution; the new TS6 behavior is still compatible here |
+| `--moduleResolution node` deprecation error | Not used (`bundler`) |
+
+---
+
+## Required Change
+
+The following change to `package.json` requires Layer 1 governance approval (supermajority council vote + human approval):
+
+```diff
+-    "typescript": "~5.9.3"
++    "typescript": "~6.0.0"
+```
+
+No other changes are required (no tsconfig modifications, no source code changes).
+
+---
+
+## Recommendation
+
+**Approve the pin bump.** The codebase is fully compatible with TypeScript 6.0.2. The existing `tsconfig.json` was already aligned with TS6's new defaults, so this upgrade requires only the version pin change in `package.json`. Zero source code modifications are needed.
+
+Once the governance vote passes and the change is applied:
+
 ```bash
 bun install
-bun x tsc --noEmit --skipLibCheck  # Check for type errors
-bun test                            # Verify all tests pass
-bun run lint                        # Check for linting issues
+bun x tsc --noEmit --skipLibCheck  # confirm zero errors
+bun test                            # run test suite
 ```
-
-## Recommended Upgrade Path
-
-### Phase 1: TypeScript Only
-1. Update typescript from 5.9.3 to 6.0.2
-2. Run type checker and fix any new type errors
-3. Commit and verify
-
-### Phase 2: Other Dependencies
-1. Update routine patch/minor bumps in sequence
-2. Verify each step with tests
-3. Commit together
-
-### Phase 3: web-tree-sitter
-1. Review release notes carefully (0.25.10 → 0.26.7)
-2. Update to ^0.26.7 with careful testing
-3. Verify all parsing functionality
-4. Commit last
-
-## Action Required
-
-**⚠️ GOVERNANCE NOTE:** package.json is a Layer 1 (Structural) file requiring supermajority council vote + human approval.
-
-### Changes Needed in package.json
-```json
-{
-  "devDependencies": {
-    "typescript": "6.0.2"
-  },
-  "dependencies": {
-    "web-tree-sitter": "^0.26.7",
-    "@anthropic-ai/claude-agent-sdk": "0.2.85",
-    "@modelcontextprotocol/sdk": "1.28.0",
-    "@biomejs/biome": "2.4.9"
-  }
-}
-```
-
-Additionally, update @opentelemetry/* packages to latest patch versions.
-
-## Next Steps
-1. Submit this evaluation to the council for review
-2. Upon approval, council will coordinate package.json modifications
-3. Run comprehensive type checking and testing
-4. Merge with appropriate governance approvals
-
-## Notes
-- This evaluation does not modify package.json due to governance restrictions
-- TypeScript 6.0 generally represents a stable upgrade path
-- The bundled updates should be applied together to maintain dependency consistency
-- All changes should be validated with the full test suite before production deployment
