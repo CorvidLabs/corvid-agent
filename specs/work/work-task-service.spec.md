@@ -278,7 +278,9 @@ The optional `agent_id` parameter on `corvid_create_work_task` allows the callin
 | No project ID (none provided, agent has no default) | Throws `Error("No projectId provided and agent has no defaultProjectId")` |
 | Project not found | Throws `Error("Project {id} not found")` |
 | Project has no workingDir | Throws `Error("Project {id} has no workingDir")` |
-| Another active task on same project | Throws `Error("Another task is already active on project {id}")` |
+| Another active task on same project (equal/higher priority) | New task is queued with status `'queued'` behind the active task |
+| Another active task on same project (lower priority) | Active task is paused and preempted; new task runs immediately |
+| Atomic insert race condition | New task is queued as fallback (never rejected) |
 | Git worktree creation fails | Task status set to `failed` with error message, task returned |
 | `cancelTask` with nonexistent ID | Returns `null` |
 
