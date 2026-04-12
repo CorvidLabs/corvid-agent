@@ -18,6 +18,7 @@ describe('SessionTimerManager', () => {
     callbacks = {
       onTimeout: (sessionId) => timeoutSessions.push(sessionId),
       onStablePeriod: (sessionId) => stableSessions.push(sessionId),
+      onStartupTimeout: (sessionId) => timeoutSessions.push(sessionId),
       isRunning: (sessionId) => runningSessions.has(sessionId),
       getLastActivityAt: (sessionId) => activityMap.get(sessionId),
     };
