@@ -44,7 +44,7 @@ jobs:
         uses: CorvidLabs/spec-sync@v4.1.2
         with:
           strict: 'true'
-          comment: 'true'
+          comment: 'false'
 
       - name: Build client
         run: bun run build:client
