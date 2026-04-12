@@ -46,6 +46,7 @@ import { type DetectedMention, filterNewMentions, GitHubSearcher, resolveFullRep
 const log = createLogger('MentionPoller');
 const TRIGGER_DEDUP_NS = 'polling:triggers';
 const ACK_DEDUP_NS = 'polling:ack-comments';
+const SESSION_DEDUP_NS = 'polling:session-dedup';
 
 /** How often we check which configs are due (main loop interval). */
 const POLL_LOOP_INTERVAL_MS = 15_000; // 15 seconds
@@ -90,6 +91,8 @@ export class MentionPollingService {
     this.dedup.register(TRIGGER_DEDUP_NS, { maxSize: 500, ttlMs: MIN_TRIGGER_GAP_MS });
     // Cross-config dedup for ack comments: same repo#number only gets one "looking into this"
     this.dedup.register(ACK_DEDUP_NS, { maxSize: 500, ttlMs: 5 * 60 * 1000 });
+    // Cross-config dedup for sessions: same repo#number only gets one session across all configs
+    this.dedup.register(SESSION_DEDUP_NS, { maxSize: 500, ttlMs: 5 * 60 * 1000 });
     this.searcher = new GitHubSearcher((args) => this.runGh(args));
 
     // Initialize sub-services
@@ -427,6 +430,20 @@ export class MentionPollingService {
       return false;
     }
 
+    // Cross-config dedup: if another config already triggered a session for the
+    // same repo#number within the TTL window, skip. This prevents multiple
+    // polling configs from independently reacting to the same PR review/comment.
+    const sessionDedupKey = `${fullRepo}#${mention.number}`;
+    if (this.dedup.has(SESSION_DEDUP_NS, sessionDedupKey)) {
+      log.debug('Skipping mention — cross-config session dedup', {
+        configId: config.id,
+        mentionId: mention.id,
+        number: mention.number,
+        repo: fullRepo,
+      });
+      return false;
+    }
+
     // Dependency check: skip if the issue has open blockers.
     // Returning false keeps the mention unprocessed so it retries next cycle.
     const openBlockers = await this.checkDependencies(fullRepo, mention);
@@ -479,6 +496,7 @@ export class MentionPollingService {
     const prompt = this.buildPrompt(config, mention);
 
     this.dedup.markSeen(TRIGGER_DEDUP_NS, rateLimitKey);
+    this.dedup.markSeen(SESSION_DEDUP_NS, sessionDedupKey);
 
     try {
       const session = createSession(this.db, {
