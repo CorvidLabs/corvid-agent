@@ -64,6 +64,7 @@ Initializes `DedupService` (namespace `polling:triggers`, maxSize 500, TTL 60s),
 15. **Completion tracking**: The service subscribes to session end events; on error or manual stop, a follow-up comment is posted to ensure the issue does not go silent after acknowledgment
 16. **Event-based schedule triggering**: After successful triggers, matching event-based schedules (type `github_poll`, action `mention`) are fired via the `SchedulerService`
 17. **Observability context**: Each poll config execution runs inside an event context via `runWithEventContext` for tracing
+18. **Cross-config session dedup**: When multiple polling configs detect the same repo#number, only the first config triggers a session. Managed by `DedupService` namespace `polling:session-dedup` (maxSize 500, TTL 5 minutes). Prevents duplicate agent responses when multiple configs overlap on the same repository
 
 ## Behavioral Examples
 
@@ -90,6 +91,12 @@ Initializes `DedupService` (namespace `polling:triggers`, maxSize 500, TTL 60s),
 - **Given** a PR authored by `agent-user` with a review also by `agent-user`
 - **When** the poll fetches PR reviews
 - **Then** the self-review is skipped (reviewer username matches mentionUsername)
+
+### Scenario: Cross-config session dedup prevents duplicate responses
+
+- **Given** two polling configs (A and B) both covering `owner/repo`
+- **When** a reviewer approves PR #226, detected by both configs
+- **Then** config A triggers a session; config B is skipped because `polling:session-dedup` already has the key `owner/repo#226`
 
 ### Scenario: Multiple mentions for same issue collapse
 

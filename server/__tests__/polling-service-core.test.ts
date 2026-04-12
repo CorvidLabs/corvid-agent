@@ -12,7 +12,9 @@ import { createAgent } from '../db/agents';
 import { createMentionPollingConfig } from '../db/mention-polling';
 import { createProject } from '../db/projects';
 import { runMigrations } from '../db/schema';
+import { DedupService } from '../lib/dedup';
 import type { DetectedMention } from '../polling/github-searcher';
+
 import { MentionPollingService } from '../polling/service';
 
 // ─── Test Setup ─────────────────────────────────────────────────────────────
@@ -20,6 +22,7 @@ import { MentionPollingService } from '../polling/service';
 let db: Database;
 let agentId: string;
 let projectId: string;
+let savedGhToken: string | undefined;
 
 const mockStartProcess = mock(() => {});
 
@@ -44,10 +47,21 @@ beforeEach(() => {
   projectId = project.id;
 
   mockStartProcess.mockReset();
+  DedupService.resetGlobal();
+
+  // Prevent real GitHub API calls from ack/completion comments.
+  // Saving and restoring GH_TOKEN so the test's mocked runGh can run
+  // without the github/operations module's addIssueComment hitting the real API.
+  savedGhToken = process.env.GH_TOKEN;
+  delete process.env.GH_TOKEN;
 });
 
 afterEach(() => {
   db.close();
+  // Restore GH_TOKEN after each test
+  if (savedGhToken !== undefined) {
+    process.env.GH_TOKEN = savedGhToken;
+  }
 });
 
 function createTestConfig(overrides?: Record<string, unknown>) {
@@ -427,6 +441,41 @@ describe('processMention', () => {
     // Should proceed past the assignee guard since it's an assignment type
     expect(result).toBe(true);
     expect(mockStartProcess).toHaveBeenCalledTimes(1);
+  });
+
+  test('cross-config session dedup prevents duplicate sessions for same PR', async () => {
+    const config1 = createTestConfig({ repo: 'CorvidLabs/spec-sync' });
+    const config2 = createTestConfig({ repo: 'CorvidLabs/spec-sync' });
+    const mention = makeMention({ id: 'review-999', number: 226 });
+
+    const service = new MentionPollingService(db, mockProcessManager);
+    const priv = getPrivate(service);
+
+    priv.runGh = mock(async (args: string[]) => {
+      if (args.some((a) => a.includes('.body'))) {
+        return { ok: true, stdout: 'PR body', stderr: '' };
+      }
+      if (args.some((a) => a.includes('[.assignees'))) {
+        return { ok: true, stdout: JSON.stringify([]), stderr: '' };
+      }
+      return { ok: true, stdout: '', stderr: '' };
+    });
+
+    // First config triggers successfully
+    const result1 = await priv.processMention(config1, mention);
+    expect(result1).toBe(true);
+    expect(mockStartProcess).toHaveBeenCalledTimes(1);
+
+    // Second config for the same repo#number is deduped
+    const result2 = await priv.processMention(config2, { ...mention, id: 'review-1000' });
+    expect(result2).toBe(false);
+    expect(mockStartProcess).toHaveBeenCalledTimes(1); // still 1
+
+    // Different PR number should still work
+    const differentMention = makeMention({ id: 'review-1001', number: 227 });
+    const result3 = await priv.processMention(config2, differentMention);
+    expect(result3).toBe(true);
+    expect(mockStartProcess).toHaveBeenCalledTimes(2);
   });
 
   test('creates session and calls startProcess on successful trigger', async () => {
