@@ -17,10 +17,7 @@ ignore:
   - "server/discord/command-handlers/**"  # Command handlers — require Discord interactions
   - "server/discord/thread-response/**"  # Thread response handlers — require live Discord threads
 
-comment:
-  layout: "reach,diff,flags,files"
-  behavior: default
-  require_changes: false
+comment: false
 
 flags:
   server:
