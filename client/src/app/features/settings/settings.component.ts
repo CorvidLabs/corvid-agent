@@ -7,6 +7,7 @@ import { SystemInfoSettingsComponent } from './system-info-settings.component';
 import type { SettingsData } from './system-info-settings.component';
 import { SystemHealthSettingsComponent } from './system-health-settings.component';
 import { DiscordSettingsComponent } from './discord-settings.component';
+import { TelegramSettingsComponent } from './telegram-settings.component';
 import { AlgochatSettingsComponent } from './algochat-settings.component';
 import { MobileSettingsComponent } from './mobile-settings.component';
 import { OperationalModeSettingsComponent } from './operational-mode-settings.component';
@@ -28,6 +29,7 @@ interface OperationalMode {
         SystemInfoSettingsComponent,
         SystemHealthSettingsComponent,
         DiscordSettingsComponent,
+        TelegramSettingsComponent,
         AlgochatSettingsComponent,
         MobileSettingsComponent,
         OperationalModeSettingsComponent,
@@ -46,6 +48,7 @@ interface OperationalMode {
                 <app-system-info-settings [settings]="settings()" />
                 <app-system-health-settings [settings]="settings()" [operationalMode]="operationalMode()" />
                 <app-discord-settings />
+                <app-telegram-settings />
                 <app-algochat-settings />
                 <app-mobile-settings />
                 <app-operational-mode-settings [initialMode]="operationalMode()" (modeChanged)="operationalMode.set($event)" />

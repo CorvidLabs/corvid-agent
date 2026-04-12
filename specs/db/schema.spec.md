@@ -23,6 +23,7 @@ files:
   - server/db/schema/reputation.ts
   - server/db/schema/schedules.ts
   - server/db/schema/sessions.ts
+  - server/db/schema/telegram.ts
   - server/db/schema/webhooks.ts
   - server/db/schema/work.ts
   - server/db/schema/workflows.ts

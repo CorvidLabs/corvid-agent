@@ -26,6 +26,7 @@ import * as projects from './projects';
 import * as reputation from './reputation';
 import * as schedules from './schedules';
 import * as sessions from './sessions';
+import * as telegram from './telegram';
 import * as webhooks from './webhooks';
 import * as work from './work';
 import * as workflows from './workflows';
@@ -52,6 +53,7 @@ const domains = [
   reputation,
   schedules,
   sessions,
+  telegram,
   webhooks,
   work,
   workflows,
@@ -67,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 118;
+const SCHEMA_VERSION = 119;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -246,6 +248,10 @@ const MIGRATIONS: Record<number, string[]> = {
   118: [
     // Durable conversation summary on thread sessions for context carry-over
     `ALTER TABLE discord_thread_sessions ADD COLUMN last_summary TEXT DEFAULT NULL`,
+  ],
+  119: [
+    // Telegram runtime configuration (mirrors discord_config pattern)
+    ...telegram.tables,
   ],
 };
 

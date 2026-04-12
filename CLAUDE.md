@@ -31,7 +31,7 @@ skills/          — AI agent skills (29 skill files)
 ## Tech Stack
 
 - **Runtime:** Bun
-- **Database:** bun:sqlite (41 migration files, schema version 118)
+- **Database:** bun:sqlite (42 migration files, schema version 119)
 - **Agent SDK:** @anthropic-ai/claude-agent-sdk
 - **MCP:** @modelcontextprotocol/sdk
 - **Frontend:** Angular (standalone components, signals)

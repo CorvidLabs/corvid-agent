@@ -167,6 +167,51 @@ describe('API Key Rotation Endpoint', () => {
   });
 });
 
+describe('Telegram Config Routes', () => {
+  it('GET /api/settings/telegram returns config', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/telegram');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+    expect(data.telegramConfig).toBeDefined();
+  });
+
+  it('PUT /api/settings/telegram updates valid keys', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/telegram', {
+      mode: 'work_intake',
+      allowed_user_ids: '111,222',
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.ok).toBe(true);
+    expect(data.updated).toBe(2);
+  });
+
+  it('PUT /api/settings/telegram rejects invalid keys', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/telegram', {
+      bot_token: 'secret',
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('Invalid config keys');
+  });
+
+  it('PUT /api/settings/telegram rejects empty body', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/telegram', {});
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('No valid config keys');
+  });
+});
+
 describe('API Key Status Endpoint', () => {
   it('GET /api/settings/api-key/status returns status with no expiry', async () => {
     const authConfig: AuthConfig = {

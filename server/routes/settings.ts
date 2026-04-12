@@ -11,6 +11,11 @@ import {
   updateDiscordConfigBatch,
   VALID_DISCORD_CONFIG_KEYS,
 } from '../db/discord-config';
+import {
+  getTelegramConfigRaw,
+  updateTelegramConfigBatch,
+  VALID_TELEGRAM_CONFIG_KEYS,
+} from '../db/telegram-config';
 import { purgeTestData } from '../db/purge-test-data';
 import { loadGuildCache } from '../discord/guild-api';
 import { json } from '../lib/response';
@@ -96,6 +101,24 @@ export function handleSettingsRoutes(
       if (denied) return denied;
     }
     return handleDeleteDiscordConfigKey(db, discordKeyMatch[1], context);
+  }
+
+  // GET /api/settings/telegram — get Telegram runtime config (operator+)
+  if (url.pathname === '/api/settings/telegram' && req.method === 'GET') {
+    if (context) {
+      const denied = tenantRoleGuard('operator')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleGetTelegramConfig(db);
+  }
+
+  // PUT /api/settings/telegram — update Telegram runtime config (owner-only)
+  if (url.pathname === '/api/settings/telegram' && req.method === 'PUT') {
+    if (context) {
+      const denied = tenantRoleGuard('owner')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleUpdateTelegramConfig(req, db, context);
   }
 
   // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
@@ -305,6 +328,53 @@ function handleGetGuildCache(db: Database): Response {
     roles: cache.roles,
     info: cache.info,
   });
+}
+
+// ─── Telegram Config ──────────────────────────────────────────────────────
+
+function handleGetTelegramConfig(db: Database): Response {
+  const config = getTelegramConfigRaw(db);
+  return json({ telegramConfig: config });
+}
+
+async function handleUpdateTelegramConfig(req: Request, db: Database, context?: RequestContext): Promise<Response> {
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  // Validate keys
+  const updates: Record<string, string> = {};
+  const invalidKeys: string[] = [];
+  for (const [key, value] of Object.entries(body)) {
+    if (!VALID_TELEGRAM_CONFIG_KEYS.has(key)) {
+      invalidKeys.push(key);
+      continue;
+    }
+    updates[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  if (invalidKeys.length > 0) {
+    return json(
+      {
+        error: `Invalid config keys: ${invalidKeys.join(', ')}`,
+        validKeys: [...VALID_TELEGRAM_CONFIG_KEYS],
+      },
+      400,
+    );
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return json({ error: 'No valid config keys provided' }, 400);
+  }
+
+  const count = updateTelegramConfigBatch(db, updates);
+  const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+  recordAudit(db, 'telegram_config_update', actor, 'telegram_config', null, JSON.stringify(Object.keys(updates)));
+
+  return json({ ok: true, updated: count });
 }
 
 async function handlePurgeTestData(req: Request, db: Database, context?: RequestContext): Promise<Response> {
