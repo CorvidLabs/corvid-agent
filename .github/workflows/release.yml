@@ -126,3 +126,10 @@ jobs:
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: false
           files: corvid-agent-${{ steps.tag.outputs.version }}.tar.gz
+
+      - name: Corvin celebrates
+        uses: CorvidLabs/corvid-pet@v1.0.0
+        with:
+          mode: release
+          event: auto
+          pet-name: Corvin

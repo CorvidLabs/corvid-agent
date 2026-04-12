@@ -27,6 +27,8 @@ jobs:
     name: Build & Test (ubuntu)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      spec-output: ${{ steps.spec-report.outputs.summary }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -42,7 +44,20 @@ jobs:
         run: bun test
 
       - name: Spec check
-        run: bash scripts/specsync.sh check --strict --require-coverage 100
+        id: spec-check
+        run: |
+          # Run spec check (preserve exit code)
+          bash scripts/specsync.sh check --strict --require-coverage 100
+      - name: Capture spec report
+        id: spec-report
+        if: always()
+        run: |
+          # Try GitHub-formatted comment output first, fall back to plain check
+          REPORT=$(bash scripts/specsync.sh comment --strict 2>/dev/null) || \
+          REPORT=$(bash scripts/specsync.sh check --strict --require-coverage 100 2>&1) || true
+          echo "summary<<SPEC_EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT" >> "$GITHUB_OUTPUT"
+          echo "SPEC_EOF" >> "$GITHUB_OUTPUT"
 
   # macOS (10x multiplier) and Windows (2x) only run on release tags to save CI minutes
   build-cross-platform:
@@ -70,8 +85,8 @@ jobs:
         # use 30s per-test timeout there to avoid flaky failures (default 10s via bunfig).
         run: bun test ${{ matrix.os == 'windows-latest' && '--timeout 30000' || '' }}
 
-  review:
-    name: PR Review
+  corvin:
+    name: Corvin
     runs-on: ubuntu-latest
     needs: [build]
     if: always() && github.event_name == 'pull_request'
@@ -79,18 +94,72 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - name: Approve or request changes
+
+      # ── Check Registry ──────────────────────────────────────────────
+      # To add a new check to the review:
+      #   1. Add a job above with outputs (result and optionally report)
+      #   2. Add the job name to `needs:` on this corvin job
+      #   3. Add one CHECK_* env var below: CHECK_<name>=<label>=<result>
+      #   4. Optionally add REPORT_<name> for expandable details
+      # The summary table and overall status build automatically.
+      # ─────────────────────────────────────────────────────────────────
+      - name: Determine combined status
+        id: status
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BUILD_RESULT: ${{ needs.build.result }}
+          # ── Register checks here (one line each) ──
+          CHECK_BUILD: "CI (tsc, tests, migrations)=${{ needs.build.result }}"
+          CHECK_SPEC: "Spec Validation=${{ needs.build.result }}"
+
+          # ── Register detail reports here (optional, matched by name) ──
+          REPORT_SPEC: ${{ needs.build.outputs.spec-output }}
         run: |
-          if [ "$BUILD_RESULT" = "success" ]; then
-            gh pr review "$PR_NUMBER" \
-              --approve \
-              --body "All CI checks passed (tsc, tests) on ubuntu. Cross-platform tests (macOS, Windows) run on release tags only."
-          else
-            gh pr review "$PR_NUMBER" \
-              --request-changes \
-              --body "CI checks failed. Please review the build logs and fix the issues before merging."
-          fi
+          OVERALL="success"
+          TABLE="| Check | Status |\n|-------|--------|\n"
+          DETAILS=""
+
+          # Iterate over all CHECK_* env vars
+          while IFS= read -r line; do
+            VAR_NAME="${line%%=*}"
+            VAR_VALUE="${!VAR_NAME}"
+            LABEL="${VAR_VALUE%%=*}"
+            RESULT="${VAR_VALUE##*=}"
+
+            # Status icon
+            if [ "$RESULT" = "success" ]; then
+              ICON="✅ Passed"
+            else
+              ICON="❌ ${RESULT}"
+              OVERALL="failure"
+            fi
+            TABLE+="| **${LABEL}** | ${ICON} |\n"
+
+            # Check for matching REPORT_* var
+            SUFFIX="${VAR_NAME#CHECK_}"
+            REPORT_VAR="REPORT_${SUFFIX}"
+            REPORT_VALUE="${!REPORT_VAR}"
+            if [ -n "$REPORT_VALUE" ]; then
+              DETAILS+="\n<details>\n<summary>📋 ${LABEL} Details</summary>\n\n${REPORT_VALUE}\n\n</details>\n"
+            fi
+          done < <(env | grep '^CHECK_' | sort)
+
+          echo "result=${OVERALL}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "context<<CONTEXT_EOF"
+            echo "### CI Summary"
+            echo ""
+            echo -e "$TABLE"
+            if [ -n "$DETAILS" ]; then
+              echo -e "$DETAILS"
+            fi
+            echo "CONTEXT_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: CorvidLabs/corvid-pet@v1.0.0
+        with:
+          mode: pr-comment
+          event: auto
+          pet-name: Corvin
+          review-on-pr: "true"
+          job-status: ${{ steps.status.outputs.result }}
+          context: ${{ steps.status.outputs.context }}
