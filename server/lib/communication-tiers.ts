@@ -46,7 +46,6 @@ const AGENT_COMMUNICATION_TIERS: Record<string, CommunicationTier> = {
   // Mid tier — capable agents that receive delegated work
   rook: 'mid',
   jackdaw: 'mid',
-  kite: 'mid',
   condor: 'mid',
 
   // Bottom tier — juniors, scouts, first responders
