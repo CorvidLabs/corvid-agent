@@ -128,7 +128,7 @@ jobs:
           files: corvid-agent-${{ steps.tag.outputs.version }}.tar.gz
 
       - name: Corvin celebrates
-        uses: CorvidLabs/corvid-pet@v1
+        uses: CorvidLabs/corvid-pet@v1.0.0
         with:
           mode: release
           event: auto

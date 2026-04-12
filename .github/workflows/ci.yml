@@ -27,6 +27,8 @@ jobs:
     name: Build & Test (ubuntu)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      spec-output: ${{ steps.spec-check.outputs.summary }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -42,7 +44,14 @@ jobs:
         run: bun test
 
       - name: Spec check
-        run: bash scripts/specsync.sh check --strict --require-coverage 100
+        id: spec-check
+        run: |
+          OUTPUT=$(bash scripts/specsync.sh check --strict --require-coverage 100 2>&1) || true
+          echo "summary<<SPEC_EOF" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "SPEC_EOF" >> "$GITHUB_OUTPUT"
+          # Re-run to preserve exit code
+          bash scripts/specsync.sh check --strict --require-coverage 100
 
   # macOS (10x multiplier) and Windows (2x) only run on release tags to save CI minutes
   build-cross-platform:
@@ -79,11 +88,19 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - uses: CorvidLabs/corvid-pet@v1
+      - uses: CorvidLabs/corvid-pet@v1.0.0
         with:
           mode: pr-comment
           event: auto
           pet-name: Corvin
           review-on-pr: "true"
           job-status: ${{ needs.build.result }}
-          context: "TypeScript check, unit tests, spec check — ${{ needs.build.result == 'success' && 'all passed on ubuntu' || 'failed — check build logs' }}. Cross-platform tests (macOS, Windows) run on release tags only."
+          context: |
+            **CI Summary** (${{ needs.build.result }}):
+            - TypeScript check, unit tests — ${{ needs.build.result == 'success' && 'passed' || 'failed' }}
+            - Cross-platform tests (macOS, Windows) run on release tags only
+
+            **Spec Validation:**
+            ```
+            ${{ needs.build.outputs.spec-output }}
+            ```
