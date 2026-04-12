@@ -94,3 +94,19 @@ jobs:
               --request-changes \
               --body "CI checks failed. Please review the build logs and fix the issues before merging."
           fi
+
+  corvin:
+    name: Corvin
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: CorvidLabs/corvid-pet@v1
+        with:
+          mode: pr-comment
+          event: auto
+          pet-name: Corvin
+          review-on-pr: "true"
