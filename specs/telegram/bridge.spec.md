@@ -146,6 +146,7 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | `server/db/agents.ts` | `getAgent`, `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
 | `server/db/projects.ts` | `listProjects` |
+| `server/db/telegram-config.ts` | `getTelegramConfig`, `initTelegramConfigFromEnv` — hot-reload dynamic settings |
 | `server/voice/stt.ts` | `transcribe` for voice note transcription |
 | `server/voice/tts.ts` | `synthesizeWithCache` for voice responses |
 | `server/lib/logger.ts` | `createLogger` |
@@ -160,10 +161,21 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | (required) | Telegram Bot API token |
-| `TELEGRAM_CHAT_ID` | (required) | Default chat ID for the bridge |
-| `TELEGRAM_ALLOWED_USERS` | `""` | Comma-separated list of allowed Telegram user IDs; empty = allow all |
+| `TELEGRAM_BOT_TOKEN` | (required) | Telegram Bot API token (env-only, not stored in DB) |
+| `TELEGRAM_CHAT_ID` | (required) | Default chat ID for the bridge (env-only, not stored in DB) |
+| `TELEGRAM_ALLOWED_USER_IDS` | `""` | Comma-separated list of allowed Telegram user IDs; seeded into `telegram_config` on startup (INSERT OR IGNORE) |
+| `TELEGRAM_BRIDGE_MODE` | `"chat"` | Bridge mode; seeded into `telegram_config` on startup (INSERT OR IGNORE) |
 | `OPENAI_API_KEY` | (optional) | Required for STT transcription and TTS voice responses |
+
+### Dynamic Configuration (DB-backed)
+
+Dynamic settings are stored in the `telegram_config` table and can be updated at runtime via `PUT /api/settings/telegram` without restarting the server. Environment variables seed the DB on first startup (INSERT OR IGNORE) and are overridden by any subsequent DB writes.
+
+| DB Key | Type | Description |
+|--------|------|-------------|
+| `allowed_user_ids` | comma-separated string | Telegram user IDs allowed to interact |
+| `mode` | `'chat' \| 'work_intake'` | Bridge operating mode |
+| `default_agent_id` | string | Default agent ID for new sessions |
 
 ## Change Log
 

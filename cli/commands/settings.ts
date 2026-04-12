@@ -26,7 +26,7 @@ interface ApiKeyStatusResponse {
     warning: string | null;
 }
 
-type SettingsAction = 'show' | 'credits' | 'discord' | 'api-key';
+type SettingsAction = 'show' | 'credits' | 'discord' | 'telegram' | 'api-key';
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
@@ -50,10 +50,15 @@ export async function settingsCommand(
                 return updateDiscord(client, args.key, args.value);
             }
             return showDiscord(client);
+        case 'telegram':
+            if (args.key && args.value !== undefined) {
+                return updateTelegram(client, args.key, args.value);
+            }
+            return showTelegram(client);
         case 'api-key':
             return showApiKeyStatus(client);
         default:
-            printError(`Unknown action: ${action}. Use: show, credits, discord, api-key`);
+            printError(`Unknown action: ${action}. Use: show, credits, discord, telegram, api-key`);
             process.exit(1);
     }
 }
@@ -175,6 +180,49 @@ async function updateDiscord(client: CorvidClient, key: string, value: string): 
     try {
         await client.put<{ ok: boolean }>('/api/settings/discord', { [key]: parsed });
         printSuccess(`discord.${key} updated`);
+    } catch (err) {
+        handleError(err);
+    }
+}
+
+// ─── Telegram ───────────────────────────────────────────────────────────────
+
+async function showTelegram(client: CorvidClient): Promise<void> {
+    const spinner = new Spinner('Fetching Telegram config...');
+    spinner.start();
+
+    try {
+        const data = await client.get<{ telegramConfig: Record<string, string> }>('/api/settings/telegram');
+        spinner.stop();
+
+        printHeader('Telegram Configuration');
+        const rows = Object.entries(data.telegramConfig).map(([k, v]) => {
+            const display = String(v).length > 60 ? String(v).slice(0, 57) + '...' : String(v);
+            return [k, display];
+        });
+        if (rows.length > 0) {
+            printTable(['Key', 'Value'], rows);
+        } else {
+            console.log(c.gray('  No Telegram config found'));
+        }
+    } catch (err) {
+        spinner.stop();
+        handleError(err);
+    }
+}
+
+async function updateTelegram(client: CorvidClient, key: string, value: string): Promise<void> {
+    // Try to parse as JSON for object/array values
+    let parsed: unknown = value;
+    try {
+        parsed = JSON.parse(value);
+    } catch {
+        // Use as plain string
+    }
+
+    try {
+        await client.put<{ ok: boolean }>('/api/settings/telegram', { [key]: parsed });
+        printSuccess(`telegram.${key} updated`);
     } catch (err) {
         handleError(err);
     }
