@@ -3,7 +3,7 @@
  *
  * Hierarchy: top → mid → bottom (messages flow downward).
  * - top (CorvidAgent): can message anyone
- * - mid (Rook, Jackdaw, Kite, Condor): can message mid + bottom
+ * - mid (Rook, Jackdaw, Condor): can message mid + bottom
  * - bottom (Magpie, Starling, Merlin): can message bottom only
  */
 import { describe, expect, it } from 'bun:test';
@@ -26,7 +26,6 @@ describe('getCommunicationTier', () => {
   it('returns "mid" for mid-tier agents', () => {
     expect(getCommunicationTier('Rook')).toBe('mid');
     expect(getCommunicationTier('Jackdaw')).toBe('mid');
-    expect(getCommunicationTier('Kite')).toBe('mid');
     expect(getCommunicationTier('Condor')).toBe('mid');
   });
 
@@ -63,7 +62,7 @@ describe('checkCommunicationTier', () => {
   // Mid tier can message mid + bottom
   it('allows mid → mid', () => {
     expect(checkCommunicationTier('Rook', 'Jackdaw')).toBeNull();
-    expect(checkCommunicationTier('Jackdaw', 'Kite')).toBeNull();
+    expect(checkCommunicationTier('Jackdaw', 'Condor')).toBeNull();
     expect(checkCommunicationTier('Condor', 'Rook')).toBeNull();
   });
 
