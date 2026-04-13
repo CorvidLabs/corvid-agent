@@ -1,0 +1,39 @@
+# Render deployment configuration for corvid-agent.
+# Deploy via the Render dashboard (New → Web Service → connect your repo)
+# or use the Render CLI: render deploy
+#
+# Docs: https://render.com/docs/render-yaml-spec
+
+services:
+  - type: web
+    name: corvid-agent
+    runtime: docker
+    dockerfilePath: deploy/Dockerfile
+    dockerContext: .
+    plan: standard         # 2 GB RAM; upgrade to pro for more
+    healthCheckPath: /health/live
+    autoDeploy: true
+
+    envVars:
+      - key: PORT
+        value: "10000"          # Render's default port
+      - key: BIND_HOST
+        value: "0.0.0.0"
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_PATH
+        value: /data/corvid-agent.db
+      - key: WALLET_KEYSTORE_PATH
+        value: /data/wallet-keystore.json
+      # Set secrets via Render dashboard — never commit them here:
+      # - key: ANTHROPIC_API_KEY
+      #   sync: false
+      # - key: API_KEY
+      #   generateValue: true     # Render can auto-generate this
+
+    disk:
+      name: corvid-data
+      mountPath: /data
+      sizeGB: 5
