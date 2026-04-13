@@ -275,3 +275,114 @@ describe('API Key Status Endpoint', () => {
     expect(resolved.status).toBe(503);
   });
 });
+
+describe('Env Status Endpoint', () => {
+  it('GET /api/settings/env-status returns status for known env vars', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/env-status');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+
+    // Should have entries for secret keys
+    expect(data.ANTHROPIC_API_KEY).toBeDefined();
+    expect(typeof data.ANTHROPIC_API_KEY.set).toBe('boolean');
+    expect(data.DISCORD_BOT_TOKEN).toBeDefined();
+
+    // Should have entries for safe keys with values
+    expect(data.ALGORAND_NETWORK).toBeDefined();
+    expect(data.ALGORAND_NETWORK.value).toBeDefined();
+    expect(data.LOG_LEVEL).toBeDefined();
+    expect(data.LOG_LEVEL.value).toBeDefined();
+  });
+
+  it('GET /api/settings/env-status masks secret values', async () => {
+    // Set a known key so we can verify masking
+    const original = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = 'sk-or-v1-abcdef123456789abcdef';
+    try {
+      const { req, url } = fakeReq('GET', '/api/settings/env-status');
+      const res = handleSettingsRoutes(req, url, db, adminContext());
+      const resolved = await Promise.resolve(res!);
+      const data = await resolved.json();
+      expect(data.OPENROUTER_API_KEY.set).toBe(true);
+      expect(data.OPENROUTER_API_KEY.masked).toBeDefined();
+      expect(data.OPENROUTER_API_KEY.masked).not.toBe('sk-or-v1-abcdef123456789abcdef');
+      expect(data.OPENROUTER_API_KEY.masked).toContain('***');
+    } finally {
+      if (original !== undefined) {
+        process.env.OPENROUTER_API_KEY = original;
+      } else {
+        delete process.env.OPENROUTER_API_KEY;
+      }
+    }
+  });
+});
+
+describe('Runtime Config Endpoints', () => {
+  it('GET /api/settings/runtime returns config map', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+    expect(typeof data).toBe('object');
+  });
+
+  it('PUT /api/settings/runtime updates valid keys', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/runtime', {
+      log_level: 'debug',
+      work_max_iterations: '5',
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.ok).toBe(true);
+    expect(data.updated).toBe(2);
+
+    // Verify persisted
+    const { req: gReq, url: gUrl } = fakeReq('GET', '/api/settings/runtime');
+    const gRes = await Promise.resolve(handleSettingsRoutes(gReq, gUrl, db, adminContext())!);
+    const config = await gRes.json();
+    expect(config.log_level).toBe('debug');
+    expect(config.work_max_iterations).toBe('5');
+  });
+
+  it('PUT /api/settings/runtime rejects invalid keys', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/runtime', {
+      invalid_key: 'value',
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('Invalid config keys');
+    expect(data.validKeys).toBeDefined();
+  });
+
+  it('PUT /api/settings/runtime rejects empty body', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/runtime', {});
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('No valid config keys');
+  });
+
+  it('PUT /api/settings/runtime rejects invalid JSON', async () => {
+    const url = new URL('http://localhost:3000/api/settings/runtime');
+    const req = new Request(url.toString(), {
+      method: 'PUT',
+      body: 'not json',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('Invalid JSON');
+  });
+});

@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 119;
+const SCHEMA_VERSION = 120;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -252,6 +252,14 @@ const MIGRATIONS: Record<number, string[]> = {
   119: [
     // Telegram runtime configuration (mirrors discord_config pattern)
     ...telegram.tables,
+  ],
+  120: [
+    // Runtime config: DB-backed settings changeable without server restart
+    `CREATE TABLE IF NOT EXISTS runtime_config (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
   ],
 };
 
