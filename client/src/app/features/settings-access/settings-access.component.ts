@@ -3,9 +3,9 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
-import { AllowlistComponent } from '../allowlist/allowlist.component';
-import { GitHubAllowlistComponent } from '../github-allowlist/github-allowlist.component';
-import { RepoBlocklistComponent } from '../repo-blocklist/repo-blocklist.component';
+import { AllowlistComponent } from './allowlist.component';
+import { GitHubAllowlistComponent } from './github-allowlist.component';
+import { RepoBlocklistComponent } from './repo-blocklist.component';
 
 type AccessSection = 'allowlist' | 'github' | 'repos';
 
