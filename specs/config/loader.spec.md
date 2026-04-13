@@ -39,6 +39,18 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 | Type | Description |
 |------|-------------|
 | `ConfigValidationError` | Validation error with `path` (dot-path to field) and `message` (human-readable description) |
+| `RuntimeConfigKey` | Union of valid runtime config key strings (from `RUNTIME_CONFIG_KEYS`) |
+
+### Runtime Config Exports (`server/db/runtime-config.ts`)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `RUNTIME_CONFIG_KEYS` | `const` | Array of valid runtime config key names |
+| `RuntimeConfigKey` | `type` | Union type derived from `RUNTIME_CONFIG_KEYS` |
+| `getRuntimeConfig` | `function(db) → Record<string, string>` | Returns all runtime_config rows as key→value map; returns `{}` if table missing |
+| `setRuntimeConfigKey` | `function(db, key, value) → void` | Upserts a single runtime config key |
+| `updateRuntimeConfigBatch` | `function(db, updates) → number` | Updates multiple keys in one transaction, returns count written |
+| `deleteRuntimeConfigKey` | `function(db, key) → boolean` | Deletes a runtime config key, returns true if row existed |
 
 ## Invariants
 
