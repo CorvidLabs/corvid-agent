@@ -53,11 +53,11 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 
 ### Exported Types and Functions (from cross-channel-guard.ts)
 
-| Symbol | Description |
-|--------|-------------|
-| `CrossChannelCheckResult` | Result type: `{ isCrossChannel: boolean; advisory?: string }` |
-| `checkCrossChannelSend(sessionSource, sessionId, agentId, targetAgentId)` | Detects cross-channel routing concerns; logs a structured warning and returns an advisory string when the session source is a channel-bound source (discord, telegram) |
-| `isChannelBoundSource(sessionSource)` | Returns true when the session source is a channel-bound source that triggers cross-channel enforcement |
+| Symbol | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `CrossChannelCheckResult` | — | — | Result type: `{ isCrossChannel: boolean; advisory?: string }` |
+| `checkCrossChannelSend` | `(sessionSource, sessionId, agentId, targetAgentId)` | `CrossChannelCheckResult` | Detects cross-channel routing concerns; logs a structured warning and returns an advisory string when the session source is a channel-bound source (discord, telegram) |
+| `isChannelBoundSource` | `(sessionSource)` | `boolean` | Returns true when the session source is a channel-bound source that triggers cross-channel enforcement |
 
 **Channel-bound sources** (where cross-channel enforcement applies): `discord`, `telegram`.
 **Non-channel-bound sources** (no enforcement): `web`, `algochat`, `agent`, undefined.
