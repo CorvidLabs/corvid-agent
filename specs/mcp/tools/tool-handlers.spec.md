@@ -6,6 +6,7 @@ files:
   - server/mcp/tool-handlers/index.ts
   - server/mcp/tool-handlers/types.ts
   - server/mcp/tool-handlers/messaging.ts
+  - server/mcp/tool-handlers/cross-channel-guard.ts
   - server/mcp/tool-handlers/memory.ts
   - server/mcp/tool-handlers/session.ts
   - server/mcp/tool-handlers/credits.ts
@@ -49,6 +50,17 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | Type | Description |
 |------|-------------|
 | `McpToolContext` | Context object passed to every handler: agentId, db, services, session metadata |
+
+### Exported Types and Functions (from cross-channel-guard.ts)
+
+| Symbol | Description |
+|--------|-------------|
+| `CrossChannelCheckResult` | Result type: `{ isCrossChannel: boolean; advisory?: string }` |
+| `checkCrossChannelSend(sessionSource, sessionId, agentId, targetAgentId)` | Detects cross-channel routing concerns; logs a structured warning and returns an advisory string when the session source is a channel-bound source (discord, telegram) |
+| `isChannelBoundSource(sessionSource)` | Returns true when the session source is a channel-bound source that triggers cross-channel enforcement |
+
+**Channel-bound sources** (where cross-channel enforcement applies): `discord`, `telegram`.
+**Non-channel-bound sources** (no enforcement): `web`, `algochat`, `agent`, undefined.
 
 ### Exported Helpers (from types.ts)
 
@@ -134,7 +146,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 
 ## Invariants
 
-1. **Invocation depth limit**: `MAX_INVOKE_DEPTH = 3`. `handleSendMessage` and `handleInvokeRemoteAgent` check `ctx.depth` and reject if exceeded, preventing circular invocation deadlocks
+1. **Cross-channel send enforcement**: `checkCrossChannelSend` (in `cross-channel-guard.ts`) MUST be called before dispatching an inter-agent message when `sessionSource` is `discord` or `telegram`. It logs a structured warning (`sessionSource`, `sessionId`, `agentId`, `targetAgentId`) and returns an advisory string. The advisory MUST be appended to the `handleSendMessage` tool result so the calling agent is informed of the routing constraint. This replaces the prompt-level-only hint that was the prior state (TODO #1067).
+2. **Invocation depth limit**: `MAX_INVOKE_DEPTH = 3`. `handleSendMessage` and `handleInvokeRemoteAgent` check `ctx.depth` and reject if exceeded, preventing circular invocation deadlocks
 2. **Message dedup**: `handleSendMessage` deduplicates by agent pair + first 200 chars of message within a 30-second window (`DEDUP_WINDOW_MS = 30,000`)
 3. **Work task daily rate limit**: `handleCreateWorkTask` enforces `WORK_TASK_MAX_PER_DAY` (default 100). Checked by counting today's tasks for the agent
 4. **Memory encryption**: `handleSaveMemory` encrypts content with the server mnemonic when available (except on localnet without a mnemonic)
@@ -145,6 +158,21 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 9. **Agent identity signature**: GitHub write operations (`handleGitHubCreatePr`, `handleGitHubCreateIssue`, `handleGitHubCommentOnPr`, `handleGitHubReviewPr`) append an agent identity footer to the body via `buildAgentSignature()`. If the agent cannot be resolved, no signature is appended (fail-open)
 
 ## Behavioral Examples
+
+### Scenario: Cross-channel send from Discord session
+
+- **Given** an agent session with `sessionSource = 'discord'`
+- **When** `handleSendMessage` is called targeting any agent
+- **Then** `checkCrossChannelSend` logs a warning with `{ sessionSource: 'discord', sessionId, agentId, targetAgentId }`
+- **And** the tool result includes the advisory text reminding the agent to reply directly in the Discord conversation
+- **And** the message is still delivered (enforcement is advisory, not blocking)
+
+### Scenario: No cross-channel enforcement for web session
+
+- **Given** an agent session with `sessionSource = 'web'`
+- **When** `handleSendMessage` is called targeting any agent
+- **Then** no cross-channel warning is logged
+- **And** no advisory is appended to the tool result
 
 ### Scenario: Send message with dedup
 
@@ -230,3 +258,4 @@ Internal constants (not env-configurable):
 | 2026-03-23 | corvid-agent | Added Discord messaging tools: handleDiscordSendMessage, handleDiscordSendImage (#1422) |
 | 2026-03-27 | corvid-agent | Added agent identity signature to GitHub write operations (#1555) |
 | 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |
+| 2026-04-13 | corvid-agent | Added cross-channel-guard.ts: runtime enforcement for TODO(#1067), advisory logging for channel-bound sessions |
