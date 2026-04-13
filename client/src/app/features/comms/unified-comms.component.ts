@@ -3,8 +3,8 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
-import { LiveFeedComponent } from '../feed/live-feed.component';
-import { AgentCommsComponent } from '../agent-comms/agent-comms.component';
+import { LiveFeedComponent } from './live-feed.component';
+import { AgentCommsComponent } from './agent-comms.component';
 
 type CommsView = 'feed' | 'network';
 

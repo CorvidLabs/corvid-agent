@@ -4,7 +4,7 @@ import {
     signal,
 } from '@angular/core';
 import { McpServerListComponent } from '../mcp-servers/mcp-server-list.component';
-import { ContactListComponent } from '../contacts/contact-list.component';
+import { ContactListComponent } from './contact-list.component';
 import { MarketplaceComponent } from '../marketplace/marketplace.component';
 
 type IntegrationsSection = 'mcp' | 'contacts' | 'marketplace';
