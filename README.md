@@ -227,6 +227,18 @@ See [skills/verification/SKILL.md](skills/verification/SKILL.md) for details.
 
 ---
 
+## Backup
+
+Back up `corvid-agent.db` daily via the built-in endpoint:
+
+```bash
+curl -X POST http://localhost:3000/api/backup -H "Authorization: Bearer $API_KEY"
+```
+
+Also back up `wallet-keystore.json` (encrypted) and `.env` — losing the keystore means permanent loss of agent wallet access. See **[Backup & Recovery →](docs/backup-and-recovery.md)** for full procedures including restore steps, scheduling, and disaster recovery.
+
+---
+
 ## Contributing
 
 Open source because AI agents should be owned by the people who run them.
