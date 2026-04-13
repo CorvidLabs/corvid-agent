@@ -11,12 +11,8 @@ import {
   updateDiscordConfigBatch,
   VALID_DISCORD_CONFIG_KEYS,
 } from '../db/discord-config';
-import {
-  getTelegramConfigRaw,
-  updateTelegramConfigBatch,
-  VALID_TELEGRAM_CONFIG_KEYS,
-} from '../db/telegram-config';
 import { purgeTestData } from '../db/purge-test-data';
+import { getTelegramConfigRaw, updateTelegramConfigBatch, VALID_TELEGRAM_CONFIG_KEYS } from '../db/telegram-config';
 import { loadGuildCache } from '../discord/guild-api';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, UpdateCreditConfigSchema, ValidationError } from '../lib/validation';
