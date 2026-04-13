@@ -254,12 +254,14 @@ export class ChatTabBarComponent {
     protected closeTab(sessionId: string, event: Event): void {
         event.preventDefault();
         event.stopPropagation();
+        const wasActive = this.tabsService.activeSessionId() === sessionId;
         const nextId = this.tabsService.closeTab(sessionId);
         if (nextId) {
             this.router.navigate(['/sessions', nextId]);
-        } else {
+        } else if (wasActive) {
             this.router.navigate(['/chat']);
         }
+        // Non-active tab closed — stay on current page
     }
 
     protected newChat(): void {

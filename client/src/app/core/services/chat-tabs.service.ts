@@ -20,7 +20,7 @@ export class ChatTabsService {
         return this.tabs().find((t) => t.sessionId === id) ?? null;
     });
 
-    openTab(sessionId: string, label: string, status = 'idle', agentName?: string): void {
+    openTab(sessionId: string, label: string, status = 'idle', agentName?: string, setActive = true): void {
         this.tabs.update((tabs) => {
             const existing = tabs.find((t) => t.sessionId === sessionId);
             if (existing) {
@@ -33,7 +33,9 @@ export class ChatTabsService {
             if (newTabs.length > MAX_TABS) newTabs.shift();
             return newTabs;
         });
-        this.activeSessionId.set(sessionId);
+        if (setActive) {
+            this.activeSessionId.set(sessionId);
+        }
         this.saveTabs();
     }
 

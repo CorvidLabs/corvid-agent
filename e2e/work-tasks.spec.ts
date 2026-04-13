@@ -81,8 +81,8 @@ test.describe('Work Tasks', () => {
         await expect(page.locator('.form-select')).toBeVisible();
         await expect(page.locator('.form-textarea')).toBeVisible();
 
-        // Cancel hides form
-        await page.locator('button:text("Cancel")').click();
+        // Cancel hides form — the toggle button (.create-btn) changes text to "Cancel" when form is open
+        await page.locator('button.create-btn').click();
         await expect(page.locator('.create-form')).not.toBeVisible({ timeout: 5000 });
     });
 
