@@ -228,7 +228,7 @@ describe('Telegram Config DELETE Routes', () => {
     // Ensure key does not exist by deleting first (if it does)
     const res = handleSettingsRoutes(req, url, db, adminContext());
     expect(res).not.toBeNull();
-    const resolved = await Promise.resolve(res!);
+    await Promise.resolve(res!);
     // Could be 200 or 404 depending on prior state; delete again to guarantee 404
     const { req: req2, url: url2 } = fakeReq('DELETE', '/api/settings/telegram/mode');
     const res2 = handleSettingsRoutes(req2, url2, db, adminContext());
