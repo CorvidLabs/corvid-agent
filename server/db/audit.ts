@@ -56,6 +56,7 @@ export type AuditAction =
   | 'discord_config_update'
   | 'discord_config_delete'
   | 'telegram_config_update'
+  | 'runtime_config_update'
   | 'key_access_decrypt'
   | 'key_access_encrypt'
   | 'key_access_sign'

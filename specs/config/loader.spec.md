@@ -1,10 +1,12 @@
 ---
 module: config-loader
-version: 1
+version: 2
 status: active
 files:
   - server/config/loader.ts
-db_tables: []
+  - server/db/runtime-config.ts
+db_tables:
+  - runtime_config
 depends_on:
   - specs/lib/infra/infra.spec.md
 tracks: [1490]
@@ -135,8 +137,23 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 | `DEFAULT_MODEL` | `claude-sonnet-4-20250514` | Default LLM model |
 | `DEFAULT_PROVIDER` | auto-detected | Default LLM provider |
 
+## Runtime Config API
+
+Three new endpoints for runtime-safe configuration without `.env` edits:
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/settings/env-status` | operator+ | Returns which env vars are set; secrets masked, safe values shown |
+| `GET /api/settings/runtime` | operator+ | Returns current `runtime_config` table as key→value map |
+| `PUT /api/settings/runtime` | owner | Updates one or more keys in `runtime_config` |
+
+Valid runtime config keys: `log_level`, `work_max_iterations`, `work_max_per_day`, `agent_timeout_ms`, `ollama_host`, `brave_search_api_key`.
+
+The `runtime_config` table is created by migration `120_runtime_config` (Layer 1 — requires human approval). Until the migration runs, GET endpoints return empty objects and PUT returns a SQLite error.
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-18 | corvid-agent | Initial spec |
+| 2026-04-13 | jackdaw | Add runtime config API section and runtime-config.ts to files list |

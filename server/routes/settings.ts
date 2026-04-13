@@ -11,12 +11,9 @@ import {
   updateDiscordConfigBatch,
   VALID_DISCORD_CONFIG_KEYS,
 } from '../db/discord-config';
-import {
-  getTelegramConfigRaw,
-  updateTelegramConfigBatch,
-  VALID_TELEGRAM_CONFIG_KEYS,
-} from '../db/telegram-config';
 import { purgeTestData } from '../db/purge-test-data';
+import { getRuntimeConfig, RUNTIME_CONFIG_KEYS, updateRuntimeConfigBatch } from '../db/runtime-config';
+import { getTelegramConfigRaw, updateTelegramConfigBatch, VALID_TELEGRAM_CONFIG_KEYS } from '../db/telegram-config';
 import { loadGuildCache } from '../discord/guild-api';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, UpdateCreditConfigSchema, ValidationError } from '../lib/validation';
@@ -119,6 +116,33 @@ export function handleSettingsRoutes(
       if (denied) return denied;
     }
     return handleUpdateTelegramConfig(req, db, context);
+  }
+
+  // GET /api/settings/env-status — which env vars are set (operator+)
+  if (url.pathname === '/api/settings/env-status' && req.method === 'GET') {
+    if (context) {
+      const denied = tenantRoleGuard('operator')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleGetEnvStatus();
+  }
+
+  // GET /api/settings/runtime — runtime_config table (operator+)
+  if (url.pathname === '/api/settings/runtime' && req.method === 'GET') {
+    if (context) {
+      const denied = tenantRoleGuard('operator')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleGetRuntimeConfig(db);
+  }
+
+  // PUT /api/settings/runtime — update runtime config keys (owner-only)
+  if (url.pathname === '/api/settings/runtime' && req.method === 'PUT') {
+    if (context) {
+      const denied = tenantRoleGuard('owner')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleUpdateRuntimeConfig(req, db, context);
   }
 
   // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
@@ -373,6 +397,103 @@ async function handleUpdateTelegramConfig(req: Request, db: Database, context?: 
   const count = updateTelegramConfigBatch(db, updates);
   const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
   recordAudit(db, 'telegram_config_update', actor, 'telegram_config', null, JSON.stringify(Object.keys(updates)));
+
+  return json({ ok: true, updated: count });
+}
+
+// ─── Env Status ───────────────────────────────────────────────────────────
+
+/** Mask a secret value: show first 6 chars + *** + last 3 chars. */
+function maskSecret(value: string): string {
+  if (value.length < 12) return '***';
+  return `${value.slice(0, 6)}***...${value.slice(-3)}`;
+}
+
+function handleGetEnvStatus(): Response {
+  const env = process.env;
+
+  // Secret keys: mask the value
+  const secretKeys = [
+    'ANTHROPIC_API_KEY',
+    'OPENROUTER_API_KEY',
+    'BRAVE_SEARCH_API_KEY',
+    'OPENAI_API_KEY',
+    'GH_TOKEN',
+    'DISCORD_BOT_TOKEN',
+    'TELEGRAM_BOT_TOKEN',
+    'SLACK_BOT_TOKEN',
+  ] as const;
+
+  // Safe keys: return actual value
+  const safeKeys = [
+    { key: 'ALGORAND_NETWORK', default: 'localnet' },
+    { key: 'OLLAMA_HOST', default: 'http://localhost:11434' },
+    { key: 'LOG_LEVEL', default: 'info' },
+  ] as const;
+
+  const result: Record<string, { set: boolean; masked?: string; value?: string }> = {};
+
+  for (const key of secretKeys) {
+    const value = env[key];
+    if (value) {
+      result[key] = { set: true, masked: maskSecret(value) };
+    } else {
+      result[key] = { set: false };
+    }
+  }
+
+  for (const { key, default: defaultVal } of safeKeys) {
+    const value = env[key];
+    result[key] = { set: !!value, value: value ?? defaultVal };
+  }
+
+  return json(result);
+}
+
+// ─── Runtime Config ───────────────────────────────────────────────────────
+
+function handleGetRuntimeConfig(db: Database): Response {
+  const config = getRuntimeConfig(db);
+  return json(config);
+}
+
+async function handleUpdateRuntimeConfig(req: Request, db: Database, context?: RequestContext): Promise<Response> {
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const validKeys = new Set<string>(RUNTIME_CONFIG_KEYS);
+  const updates: Record<string, string> = {};
+  const invalidKeys: string[] = [];
+
+  for (const [key, value] of Object.entries(body)) {
+    if (!validKeys.has(key)) {
+      invalidKeys.push(key);
+      continue;
+    }
+    updates[key] = String(value);
+  }
+
+  if (invalidKeys.length > 0) {
+    return json(
+      {
+        error: `Invalid config keys: ${invalidKeys.join(', ')}`,
+        validKeys: [...RUNTIME_CONFIG_KEYS],
+      },
+      400,
+    );
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return json({ error: 'No valid config keys provided' }, 400);
+  }
+
+  const count = updateRuntimeConfigBatch(db, updates);
+  const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+  recordAudit(db, 'runtime_config_update', actor, 'runtime_config', null, JSON.stringify(Object.keys(updates)));
 
   return json({ ok: true, updated: count });
 }
