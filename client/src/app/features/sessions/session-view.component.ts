@@ -363,12 +363,16 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         this.session.set(session);
         this.messages.set(messages);
 
-        // Register tab
+        // Register tab — if we've already navigated away, register passively (don't hijack active session)
         const tabLabel = session.name || session.initialPrompt?.slice(0, 40) || session.id.slice(0, 8);
-        this.chatTabs.openTab(session.id, tabLabel, session.status);
+        const isCurrentSession = this.sessionId === sid;
+        this.chatTabs.openTab(session.id, tabLabel, session.status, undefined, isCurrentSession);
 
         if (session.agentId) {
             this.agentService.getAgent(session.agentId).then((agent) => {
+                // Guard against stale callbacks: if we've navigated to a different session,
+                // don't re-add this session's tab (fixes race where getAgent resolves after tab close)
+                if (this.sessionId !== sid) return;
                 this.agentName.set(agent.name);
                 this.chatTabs.openTab(session.id, tabLabel, session.status, agent.name);
             }).catch(() => {});

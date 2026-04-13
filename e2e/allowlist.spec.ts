@@ -24,11 +24,11 @@ test.describe('Allowlist', () => {
     test('shows empty state or list', async ({ page }) => {
         await gotoWithRetry(page, '/allowlist', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
-        // Should show either the list with items or the empty state
-        const list = page.locator('.list');
-        const empty = page.locator('.empty');
-        const hasList = await list.count() > 0;
-        const hasEmpty = await empty.count() > 0;
+        // Wait for async data load (skeleton → content)
+        await page.waitForSelector('.list, .empty-state', { timeout: 10000 });
+
+        const hasList = await page.locator('.list').count() > 0;
+        const hasEmpty = await page.locator('.empty-state').count() > 0;
         expect(hasList || hasEmpty).toBe(true);
     });
 

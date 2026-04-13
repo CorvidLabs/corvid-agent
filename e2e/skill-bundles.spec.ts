@@ -71,6 +71,8 @@ test.describe('Skill Bundles', () => {
         await api.seedSkillBundle({ name: deleteName });
         await gotoWithRetry(page, '/skill-bundles');
 
+        // Accept the browser confirm() dialog that fires on delete
+        page.on('dialog', (dialog) => dialog.accept());
         await page.locator(`text=${deleteName}`).first().click();
         await page.locator('button:text("Delete")').first().click();
         await expect(page.locator('text=Bundle deleted').first()).toBeVisible({ timeout: 5000 });
@@ -137,6 +139,8 @@ test.describe('Skill Bundles', () => {
         await gotoWithRetry(page, '/skill-bundles');
 
         const tabs = page.locator('.filter-tab');
+        // Wait for async render before counting
+        await expect(tabs.first()).toBeVisible({ timeout: 10000 });
         expect(await tabs.count()).toBe(3); // All, Preset, Custom
 
         // First tab (All) should be active

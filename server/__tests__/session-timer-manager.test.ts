@@ -263,7 +263,11 @@ describe('SessionTimerManager', () => {
 
   describe('cleanupSession', () => {
     it('clears all timers including startup timeout', () => {
-      manager = new SessionTimerManager(callbacks, { stablePeriodMs: 10000, agentTimeoutMs: 10000, startupTimeoutMs: 10000 });
+      manager = new SessionTimerManager(callbacks, {
+        stablePeriodMs: 10000,
+        agentTimeoutMs: 10000,
+        startupTimeoutMs: 10000,
+      });
       runningSessions.add('s1');
       manager.startStableTimer('s1');
       manager.startSessionTimeout('s1');
