@@ -264,6 +264,7 @@ export const routes: Routes = [
     { path: 'automate', redirectTo: 'settings/automation', pathMatch: 'full' },
     { path: 'automate/workflows', redirectTo: 'settings/automation', pathMatch: 'full' },
     { path: 'automate/webhooks', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'automate/schedules', redirectTo: 'settings/automation', pathMatch: 'full' },
     { path: 'automate/mention-polling', redirectTo: 'settings/automation', pathMatch: 'full' },
     { path: 'automate/mcp-servers', redirectTo: 'settings/integrations', pathMatch: 'full' },
     { path: 'schedules', redirectTo: 'settings/automation', pathMatch: 'full' },
