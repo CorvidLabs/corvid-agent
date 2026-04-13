@@ -2,6 +2,149 @@
 
 All notable changes to this project will be documented in this file.
 
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [1.0.0] - 2026-04-13
+
+This is the **v1.0.0 mainnet release** of corvid-agent — the first stable, production-ready version of the decentralized AI agent platform built on Algorand.
+
+corvid-agent began as a proof-of-concept for on-chain agent coordination and grew — across 1,300+ commits, 42 database migrations, 56 MCP tools, 9,000+ tests, and an 8-month development arc — into a full multi-agent orchestration platform with encrypted on-chain identity, multi-bridge communication, voice, governance, and a complete developer-facing dashboard.
+
+### Core Platform Capabilities
+
+#### AlgoChat — On-Chain Encrypted Messaging
+- X25519 end-to-end encrypted messaging between agents over Algorand
+- PSK (pre-shared key) contacts for trusted agent-to-agent channels
+- Group message chunking with natural ordering and deduplication
+- On-chain message persistence and retrieval
+- Agent-to-agent depth-limited invocation chains
+- Conversation access control with allowlist/blocklist enforcement
+
+#### Multi-Agent Councils
+- Structured deliberation: `responding → discussing → reviewing → synthesizing`
+- Time-bound voting periods with governance tier classification (Layer 0/1/2)
+- Weighted vote evaluation and quorum checking
+- Veto mechanism for critical path changes
+- Real-time WebSocket vote events and council management UI
+- Buddy mode: lightweight 2-agent review loop with Discord-visible rounds
+
+#### Work Task System
+- Git worktree isolation per task — agent writes code, validates, opens PR automatically
+- Priority queue with preemption support for higher-priority tasks
+- Governance impact classification before validation
+- Reputation-gated work task creation
+- Intern PR guard (local Ollama models cannot create production PRs)
+- Retry UI and queuing for failed/conflicted tasks
+- Work delegation attribution and scheduler integration
+
+#### ARC-69 Memory System
+- Three-tier memory: SQLite (ephemeral/short-term) → ARC-69 ASA (long-term, mutable) → plain txn (permanent, immutable)
+- Short-term default: all new saves go to SQLite with explicit promotion to on-chain
+- TTL-based memory decay and cleanup with access-count retention policies
+- Memory consolidation service with duplicate detection and merge UI
+- Memory export API and UI for downloading snapshots
+- Confirmation gate for permanent plain-txn writes
+- Memory browser with full CRUD, search, filter, and pagination
+
+#### Discord Bridge
+- Raw WebSocket gateway (no discord.js dependency), auto-reconnect with exponential backoff
+- Complete REST client migration (5 phases), eliminating all raw fetch() calls
+- Per-user thread sessions with restart recovery and conversation context carryover
+- Slash commands: `/ask`, `/status`, `/help`, `/agent-skill`, `/agent-persona`, `/tasks`, `/schedule`, `/config`, `/session`, `/message`, `/voice`
+- Voice conversation loop: join → STT transcription → agent response → TTS playback
+- Pre-speech ring buffer, speaker identification, smart deafen/listen state management
+- Work task progress embeds (branching/running/validating)
+- Declarative permission middleware, guild API integration, admin setup commands
+- Public channel mode with role-based access control
+- Streaming message edits, contextual action buttons, thread continuity
+
+#### Telegram Bridge
+- Bidirectional long-polling bridge with voice note support
+- Automatic STT transcription for voice messages
+- Per-user sessions with authorization via `TELEGRAM_ALLOWED_USER_IDS`
+- Runtime configuration via DB-backed settings API and UI
+- Work-intake mode for submitting tasks directly from Telegram
+
+#### Flock Directory — On-Chain Agent Discovery
+- ARC-56 smart contract client for on-chain agent registration
+- Agent discovery, verification, and reputation across deployments
+- A2A HTTP transport for cross-machine testing and capability routing
+- Conflict resolution with claim/release semantics
+- Scheduled flock reputation refresh action
+- Flock Challenges dashboard and bot verification framework
+
+#### Voice (TTS/STT)
+- OpenAI TTS with 6 voice presets and SQLite-backed audio caching
+- OpenAI Whisper STT with language hint and speaker identification
+- Full Discord voice conversation loop (STT → agent → TTS → STT)
+- Pre-speech ring buffer preventing first-syllable clipping
+- Deafen/listen toggle with explicit state management
+- Natural context-dependent response lengths; markdown cleanup for speech
+
+#### Credit & Spending System
+- ALGO-denominated credit system for metered AlgoChat sessions
+- Per-agent daily spending caps and spending summaries
+- USDC deposit path and mainnet ASA ID `31566704`
+- Free credits for first-time wallets; owner sessions exempt
+- Usage metering and billing analytics
+
+### Added Since v1.0.0-rc (v0.60.0–v0.63.1)
+
+- **Voice conversation loop** — full STT → agent → TTS pipeline in Discord (#1903)
+- **Memory consolidation** — duplicate detection, merge UI, memory export API (#1948, #1949)
+- **Block explorer API** — on-chain Algorand block explorer for transactions, ASAs, accounts (#1951)
+- **ARC-69 CRUD** — full create/read/update/delete for on-chain memory store (#1861)
+- **Governance voting** — time-bound voting periods, veto mechanism, weighted quorum (#1889)
+- **Telegram runtime config** — DB-backed settings API + full settings UI (#1972)
+- **Discord REST client** — complete migration: Phases 1–5 eliminate all raw fetch() calls (#1825–#1855)
+- **Auth: proxy trust mode** — oauth2-proxy email tenant authentication via TRUST_PROXY (#1836)
+- **Weekly activity recap** — endpoint returning structured activity summaries (#1835)
+- **Reputation-gated work tasks** — minimum reputation required for work task creation (#1842)
+- **Mainnet preflight checks** — automated v1.0.0 readiness validation script (#1816)
+- **Memory short-term default** — all saves default to SQLite; explicit promotion to on-chain (#1741)
+- **Memory decay** — TTL-based cleanup, access-count retention, short-term expiry (#1760)
+- **Memory confirmation gates** — user approval required before permanent on-chain writes (#1780)
+- **Memory observations** — load relevant observations when resuming sessions (#1779)
+- **Flock Challenges dashboard** — `/agents/flock-challenges` UI for Flock Directory (#1777)
+- **GitHub Pages deployment** — automated docs site CI (#1726, #1736, #1737)
+- **TypeScript 6.0** — upgraded from 5.9.3 (#1735)
+
+### Security
+- Pinned `@anthropic-ai/sdk ≥0.82.0` to mitigate GHSA-5474-4w2j-mq4c (#1919, #1841)
+- SSRF guard for federation URL validation (#1817)
+- Strict CORS enforcement — wildcard CORS causes startup failure in remote mode (#1658)
+- Scope enforcement for multi-tenant API surface (#1784, #1811, #1798)
+- 10+ CodeQL alerts resolved: TOCTOU races, SQL injection, path traversal, fd leaks (#1858, #1710)
+- Rate limiting for anonymous feedback submissions (#1888)
+- Input validation with max-length constraints on agent and session schemas (#1827)
+- Injection guard + RBAC hardening across 6+ route modules
+- Supply chain: all GitHub Actions pinned to SHA digests (#1774)
+
+### Infrastructure
+- **Database schema version 119** — 42 migration files, all auto-applied on startup
+- **56 MCP tools** available to agents across all capability categories
+- **spec-sync v4.0.0** — 52 spec files with requirements, context, and DB schema validation
+- **GitHub Pages** — automated docs/blog deployment to corvid-agent.github.io
+- **corvid-pet (Corvin)** — added to CI and release workflows (#1977)
+- Biome linter with zero-warning policy enforced in CI
+- OpenTelemetry tracing, Prometheus metrics
+- Docker multi-stage build, docker-compose, systemd, macOS LaunchAgent
+- Playwright E2E tests, 9,000+ unit tests across 390+ files
+
+### Breaking Changes
+
+See [Migration Guide](#migration-guide) in docs/RELEASE-NOTES.md for full upgrade instructions.
+
+- **v0.25.0**: KMS migration required (`corvid-agent migrate-keys`)
+- **v0.45.0**: `ALLOWED_ORIGINS=*` causes startup failure when `BIND_HOST` is not `localhost`
+- **v0.52.0**: DB schema version 103 — 28 auto-applied migrations (backup recommended)
+- **v0.53.0**: `CURSOR_MAX_PARALLEL` renamed to `CURSOR_MAX_CONCURRENT`
+- **v0.55.0**: Intern PR guard — local Ollama agents cannot create production PRs
+- **v0.56.0**: `OLLAMA_DEFAULT_MODEL` / `OLLAMA_DEFAULT_LOCAL_MODEL` env vars added
+- **v0.61.0**: Memory writes to permanent (plain-txn) tier now require user confirmation
+
+---
+
 ## [0.63.1] - 2026-04-11
 
 ### Fixed
