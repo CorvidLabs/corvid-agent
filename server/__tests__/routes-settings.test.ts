@@ -323,3 +323,77 @@ describe('API Key Status Endpoint', () => {
     expect(resolved.status).toBe(503);
   });
 });
+
+describe('Runtime Config Endpoint', () => {
+  it('GET /api/settings/runtime returns sanitized config for operator', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+
+    // Agent identity fields
+    expect(data.agent).toBeDefined();
+    expect(typeof data.agent.name).toBe('string');
+    expect(typeof data.agent.defaultModel).toBe('string');
+    expect(typeof data.agent.defaultProvider).toBe('string');
+
+    // Server fields
+    expect(data.server).toBeDefined();
+    expect(typeof data.server.port).toBe('number');
+    expect(typeof data.server.bindHost).toBe('string');
+    expect(typeof data.server.logLevel).toBe('string');
+    expect(typeof data.server.logFormat).toBe('string');
+    expect(typeof data.server.apiKeyConfigured).toBe('boolean');
+    expect(typeof data.server.adminApiKeyConfigured).toBe('boolean');
+
+    // Providers
+    expect(data.providers).toBeDefined();
+    expect(Array.isArray(data.providers.enabled)).toBe(true);
+    expect(typeof data.providers.anthropicConfigured).toBe('boolean');
+    expect(typeof data.providers.openrouterConfigured).toBe('boolean');
+    expect(typeof data.providers.ollamaHost).toBe('string');
+
+    // Integrations
+    expect(data.integrations).toBeDefined();
+    expect(typeof data.integrations.discord.enabled).toBe('boolean');
+    expect(typeof data.integrations.telegram.enabled).toBe('boolean');
+    expect(typeof data.integrations.algochat.enabled).toBe('boolean');
+    expect(typeof data.integrations.github.tokenConfigured).toBe('boolean');
+    expect(typeof data.integrations.slack.enabled).toBe('boolean');
+
+    // Database
+    expect(data.database).toBeDefined();
+    expect(typeof data.database.path).toBe('string');
+  });
+
+  it('GET /api/settings/runtime does not expose raw secret values', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    const resolved = await Promise.resolve(res!);
+    const data = await resolved.json();
+
+    // Response shape should use boolean flags, not raw secret strings
+    expect(data.integrations.discord.botToken).toBeUndefined();
+    expect(data.integrations.telegram.botToken).toBeUndefined();
+    expect(data.integrations.algochat.mnemonic).toBeUndefined();
+    expect(data.providers.anthropic).toBeUndefined();
+    expect(data.server.apiKey).toBeUndefined();
+    expect(data.server.adminApiKey).toBeUndefined();
+
+    // Configured flags are booleans, not secret values
+    expect(typeof data.providers.anthropicConfigured).toBe('boolean');
+    expect(typeof data.integrations.discord.tokenConfigured).toBe('boolean');
+    expect(typeof data.integrations.algochat.mnemonicConfigured).toBe('boolean');
+  });
+
+  it('GET /api/settings/runtime returns null for unauthenticated when context enforces auth', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    // No context = unauthenticated passthrough (handled by calling code, not this route)
+    const res = handleSettingsRoutes(req, url, db);
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+  });
+});

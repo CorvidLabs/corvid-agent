@@ -55,7 +55,7 @@ interface OperationalMode {
                 <app-openrouter-settings />
                 <app-credits-settings [creditConfig]="settings()?.creditConfig ?? {}" />
                 <app-notifications-settings />
-                <app-environment-settings [openrouterStatus]="openrouterStatusForEnv()" [discordConfig]="discordConfigForEnv()" />
+                <app-environment-settings />
                 <app-database-settings />
             }
         </div>
@@ -73,8 +73,6 @@ export class SettingsComponent implements OnInit {
     readonly loading = signal(true);
     readonly settings = signal<SettingsData | null>(null);
     readonly operationalMode = signal('normal');
-    readonly openrouterStatusForEnv = signal<{ status: string } | null>(null);
-    readonly discordConfigForEnv = signal<Record<string, string> | null>(null);
 
     ngOnInit(): void {
         this.loadAll();
@@ -90,12 +88,6 @@ export class SettingsComponent implements OnInit {
             this.settings.set(settings);
             this.operationalMode.set(mode.mode);
             this.sessionService.loadAlgoChatStatus();
-
-            // Load openrouter status and discord config for environment panel
-            await Promise.all([
-                this.loadOpenrouterStatusForEnv(),
-                this.loadDiscordConfigForEnv(),
-            ]);
         } catch {
             // Non-critical
         } finally {
@@ -103,23 +95,4 @@ export class SettingsComponent implements OnInit {
         }
     }
 
-    private async loadOpenrouterStatusForEnv(): Promise<void> {
-        try {
-            const status = await firstValueFrom(this.api.get<{ status: string }>('/openrouter/status'));
-            this.openrouterStatusForEnv.set(status);
-        } catch {
-            this.openrouterStatusForEnv.set({ status: 'unavailable' });
-        }
-    }
-
-    private async loadDiscordConfigForEnv(): Promise<void> {
-        try {
-            const result = await firstValueFrom(
-                this.api.get<{ discordConfig: Record<string, string> | null }>('/settings/discord')
-            );
-            this.discordConfigForEnv.set(result.discordConfig);
-        } catch {
-            // Non-critical
-        }
-    }
 }
