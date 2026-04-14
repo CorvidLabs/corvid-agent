@@ -12,7 +12,12 @@ import {
   VALID_DISCORD_CONFIG_KEYS,
 } from '../db/discord-config';
 import { purgeTestData } from '../db/purge-test-data';
-import { getTelegramConfigRaw, updateTelegramConfigBatch, VALID_TELEGRAM_CONFIG_KEYS } from '../db/telegram-config';
+import {
+  deleteTelegramConfigKey,
+  getTelegramConfigRaw,
+  updateTelegramConfigBatch,
+  VALID_TELEGRAM_CONFIG_KEYS,
+} from '../db/telegram-config';
 import { loadGuildCache } from '../discord/guild-api';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, UpdateCreditConfigSchema, ValidationError } from '../lib/validation';
@@ -116,6 +121,17 @@ export function handleSettingsRoutes(
     }
     return handleUpdateTelegramConfig(req, db, context);
   }
+
+  // DELETE /api/settings/telegram/:key — delete a Telegram config key (owner-only)
+  const telegramKeyMatch = url.pathname.match(/^\/api\/settings\/telegram\/([a-z_]+)$/);
+  if (telegramKeyMatch && req.method === 'DELETE') {
+    if (context) {
+      const denied = tenantRoleGuard('owner')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleDeleteTelegramConfigKey(db, telegramKeyMatch[1], context);
+  }
+
 
   // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
   if (url.pathname === '/api/settings/purge-test-data' && req.method === 'POST') {
@@ -372,6 +388,22 @@ async function handleUpdateTelegramConfig(req: Request, db: Database, context?: 
 
   return json({ ok: true, updated: count });
 }
+
+function handleDeleteTelegramConfigKey(db: Database, key: string, context?: RequestContext): Response {
+  if (!VALID_TELEGRAM_CONFIG_KEYS.has(key)) {
+    return json({ error: `Invalid config key: ${key}` }, 400);
+  }
+
+  const deleted = deleteTelegramConfigKey(db, key);
+  if (!deleted) {
+    return json({ error: `Config key not found: ${key}` }, 404);
+  }
+
+  const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+  recordAudit(db, 'telegram_config_delete', actor, 'telegram_config', null, key);
+  return json({ ok: true, deleted: key });
+}
+
 
 async function handlePurgeTestData(req: Request, db: Database, context?: RequestContext): Promise<Response> {
   let dryRun = true;

@@ -9,6 +9,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { runMigrations } from '../db/schema';
 import {
+  deleteTelegramConfigKey,
   getTelegramConfig,
   getTelegramConfigRaw,
   initTelegramConfigFromEnv,
@@ -30,6 +31,7 @@ describe('getTelegramConfig', () => {
     const config = getTelegramConfig(db);
     expect(config.mode).toBe('chat');
     expect(config.allowedUserIds).toEqual([]);
+    expect(config.defaultAgentId).toBeNull();
   });
 
   test('reads stored config values', () => {
@@ -50,11 +52,18 @@ describe('getTelegramConfig', () => {
     expect(config.allowedUserIds).toEqual(['user1', 'user2', 'user3']);
   });
 
+  test('reads defaultAgentId from stored config', () => {
+    updateTelegramConfigBatch(db, { default_agent_id: 'agent-abc-123' });
+    const config = getTelegramConfig(db);
+    expect(config.defaultAgentId).toBe('agent-abc-123');
+  });
+
   test('returns defaults if table does not exist', () => {
     const emptyDb = new Database(':memory:');
     const config = getTelegramConfig(emptyDb);
     expect(config.mode).toBe('chat');
     expect(config.allowedUserIds).toEqual([]);
+    expect(config.defaultAgentId).toBeNull();
   });
 });
 
@@ -151,12 +160,42 @@ describe('initTelegramConfigFromEnv', () => {
   });
 });
 
+// ─── deleteTelegramConfigKey ────────────────────────────────────────────────
+
+describe('deleteTelegramConfigKey', () => {
+  test('deletes existing key and returns true', () => {
+    updateTelegramConfigBatch(db, { mode: 'work_intake' });
+    expect(deleteTelegramConfigKey(db, 'mode')).toBe(true);
+    const raw = getTelegramConfigRaw(db);
+    expect(raw.mode).toBeUndefined();
+  });
+
+  test('returns false for non-existent key', () => {
+    expect(deleteTelegramConfigKey(db, 'nonexistent')).toBe(false);
+  });
+
+  test('config falls back to default after key deletion', () => {
+    updateTelegramConfigBatch(db, { mode: 'work_intake' });
+    deleteTelegramConfigKey(db, 'mode');
+    const config = getTelegramConfig(db);
+    expect(config.mode).toBe('chat'); // default
+  });
+
+  test('deletes default_agent_id key', () => {
+    updateTelegramConfigBatch(db, { default_agent_id: 'agent-xyz' });
+    expect(deleteTelegramConfigKey(db, 'default_agent_id')).toBe(true);
+    const config = getTelegramConfig(db);
+    expect(config.defaultAgentId).toBeNull();
+  });
+});
+
 // ─── VALID_TELEGRAM_CONFIG_KEYS ──────────────────────────────────────────────
 
 describe('VALID_TELEGRAM_CONFIG_KEYS', () => {
   test('contains expected keys', () => {
     expect(VALID_TELEGRAM_CONFIG_KEYS.has('allowed_user_ids')).toBe(true);
     expect(VALID_TELEGRAM_CONFIG_KEYS.has('mode')).toBe(true);
+    expect(VALID_TELEGRAM_CONFIG_KEYS.has('default_agent_id')).toBe(true);
   });
 
   test('does not contain invalid keys', () => {

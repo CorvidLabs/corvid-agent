@@ -569,8 +569,13 @@ Every request passes through these stages in order:
 | PUT | `/api/settings/credits` | settings.ts | Update credit configuration |
 | POST | `/api/settings/api-key/rotate` | settings.ts | Rotate the API key |
 | GET | `/api/settings/api-key/status` | settings.ts | Get API key rotation and expiry status |
+| GET | `/api/settings/discord` | settings.ts | Get Discord runtime config (operator+) |
+| PUT | `/api/settings/discord` | settings.ts | Update Discord runtime config (owner only) |
+| DELETE | `/api/settings/discord/:key` | settings.ts | Delete a Discord config key (owner only) |
+| GET | `/api/settings/discord/guild-cache` | settings.ts | Get cached guild channels/roles (operator+) |
 | GET | `/api/settings/telegram` | settings.ts | Get Telegram runtime config (operator+) |
-| PUT | `/api/settings/telegram` | settings.ts | Update Telegram runtime config (owner-only) |
+| PUT | `/api/settings/telegram` | settings.ts | Update Telegram runtime config (owner only) |
+| DELETE | `/api/settings/telegram/:key` | settings.ts | Delete a Telegram config key (owner only) |
 
 ### Ollama
 

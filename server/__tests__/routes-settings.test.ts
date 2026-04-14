@@ -212,6 +212,54 @@ describe('Telegram Config Routes', () => {
   });
 });
 
+describe('Telegram Config DELETE Routes', () => {
+  it('DELETE /api/settings/telegram/:key returns 400 for invalid key', async () => {
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/bot_token');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(400);
+    const data = await resolved.json();
+    expect(data.error).toContain('Invalid config key');
+  });
+
+  it('DELETE /api/settings/telegram/:key returns 404 for non-existent key', async () => {
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/mode');
+    // Ensure key does not exist by deleting first (if it does)
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    await Promise.resolve(res!);
+    // Could be 200 or 404 depending on prior state; delete again to guarantee 404
+    const { req: req2, url: url2 } = fakeReq('DELETE', '/api/settings/telegram/mode');
+    const res2 = handleSettingsRoutes(req2, url2, db, adminContext());
+    expect(res2).not.toBeNull();
+    const resolved2 = await Promise.resolve(res2!);
+    expect(resolved2.status).toBe(404);
+    const data = await resolved2.json();
+    expect(data.error).toContain('Config key not found');
+  });
+
+  it('DELETE /api/settings/telegram/:key returns 200 on successful deletion', async () => {
+    // First, set a key
+    const { req: putReq, url: putUrl } = fakeReq('PUT', '/api/settings/telegram', {
+      default_agent_id: 'agent-to-delete',
+    });
+    const putRes = await handleSettingsRoutes(putReq, putUrl, db, adminContext());
+    expect(putRes).not.toBeNull();
+    expect(putRes!.status).toBe(200);
+
+    // Now delete it
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/default_agent_id');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+    expect(data.ok).toBe(true);
+    expect(data.deleted).toBe('default_agent_id');
+  });
+});
+
 describe('API Key Status Endpoint', () => {
   it('GET /api/settings/api-key/status returns status with no expiry', async () => {
     const authConfig: AuthConfig = {
