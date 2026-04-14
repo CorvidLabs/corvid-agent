@@ -37,7 +37,9 @@ ENV NODE_ENV=production
 
 # Run as non-root user (oven/bun:1 is Debian-slim — use native commands)
 RUN groupadd --system corvid && useradd --system --gid corvid corvid
-RUN chown -R corvid:corvid /app
+# Create the data directory for the persistent volume mount.
+# Without this, the volume mount replaces an unowned /app/data on first run.
+RUN mkdir -p /app/data && chown -R corvid:corvid /app
 USER corvid
 
 EXPOSE 3000
