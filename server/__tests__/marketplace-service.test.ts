@@ -545,7 +545,11 @@ describe('MarketplaceFederation', () => {
   test('syncInstance marks unreachable on failure', async () => {
     // Mock fetch to reject immediately instead of waiting for DNS timeout
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.reject(new Error('DNS resolution failed')));
+    const mockFn = Object.assign(
+      mock(() => Promise.reject(new Error('DNS resolution failed'))),
+      { preconnect: originalFetch.preconnect },
+    );
+    globalThis.fetch = mockFn as unknown as typeof fetch;
     try {
       fed.registerInstance('https://unreachable.invalid', 'Bad');
 
