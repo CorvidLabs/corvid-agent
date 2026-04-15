@@ -17,6 +17,8 @@ export interface SessionTimerCallbacks {
   onTimeout: (sessionId: string) => void;
   /** Called when a session has been stable long enough to reset its restart counter. */
   onStablePeriod: (sessionId: string) => void;
+  /** Called when a session produces no events within the startup window. */
+  onStartupTimeout: (sessionId: string) => void;
   /** Check whether a session has an active process. */
   isRunning: (sessionId: string) => boolean;
   /** Get the last activity timestamp for a session (epoch ms), or undefined if not tracked. */
@@ -30,12 +32,15 @@ export interface SessionTimerConfig {
   stablePeriodMs: number;
   /** Interval for the fallback timeout checker. Default: 60s. */
   timeoutCheckIntervalMs: number;
+  /** Max time (ms) to wait for the first event after process registration. Default: 90s. */
+  startupTimeoutMs: number;
 }
 
 const DEFAULT_CONFIG: SessionTimerConfig = {
   agentTimeoutMs: parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60 * 1000), 10),
   stablePeriodMs: 10 * 60 * 1000,
   timeoutCheckIntervalMs: 60_000,
+  startupTimeoutMs: parseInt(process.env.STARTUP_TIMEOUT_MS ?? '90000', 10),
 };
 
 export class SessionTimerManager {
@@ -44,6 +49,7 @@ export class SessionTimerManager {
 
   private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private sessionTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private startupTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private timeoutTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(callbacks: SessionTimerCallbacks, config: Partial<SessionTimerConfig> = {}) {
@@ -69,6 +75,32 @@ export class SessionTimerManager {
     if (timer) {
       clearTimeout(timer);
       this.stableTimers.delete(sessionId);
+    }
+  }
+
+  /**
+   * Start a startup timeout — fires if no events arrive within the startup window.
+   * Catches hung Ollama proxy requests, dead model endpoints, etc.
+   * Cleared automatically on the first event via clearStartupTimeout().
+   */
+  startStartupTimeout(sessionId: string): void {
+    this.clearStartupTimeout(sessionId);
+    const timer = setTimeout(() => {
+      this.startupTimeouts.delete(sessionId);
+      if (!this.callbacks.isRunning(sessionId)) return;
+      log.warn(`Session ${sessionId} produced no events within startup window`, {
+        timeoutMs: this.config.startupTimeoutMs,
+      });
+      this.callbacks.onStartupTimeout(sessionId);
+    }, this.config.startupTimeoutMs);
+    this.startupTimeouts.set(sessionId, timer);
+  }
+
+  clearStartupTimeout(sessionId: string): void {
+    const timer = this.startupTimeouts.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.startupTimeouts.delete(sessionId);
     }
   }
 
@@ -154,14 +186,16 @@ export class SessionTimerManager {
   cleanupSession(sessionId: string): void {
     this.clearStableTimer(sessionId);
     this.clearSessionTimeout(sessionId);
+    this.clearStartupTimeout(sessionId);
   }
 
   /**
    * Get the count of active timers for monitoring.
    */
-  getStats(): { sessionTimeouts: number; stableTimers: number } {
+  getStats(): { sessionTimeouts: number; stableTimers: number; startupTimeouts: number } {
     return {
       sessionTimeouts: this.sessionTimeouts.size,
+      startupTimeouts: this.startupTimeouts.size,
       stableTimers: this.stableTimers.size,
     };
   }

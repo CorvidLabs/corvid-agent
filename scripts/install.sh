@@ -4,14 +4,39 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
 #
+# Options:
+#   --yes, -y          Accept all defaults (non-interactive / CI mode)
+#   --dir <path>       Install to a custom directory (default: ~/corvid-agent)
+#   --no-start         Install only, do not start the server
+#
 # What it does:
 #   1. Checks/installs prerequisites (Bun, Git)
 #   2. Clones or updates corvid-agent
-#   3. Runs the setup script
-#   4. Starts the server
-#   5. Opens the dashboard
+#   3. Configures environment (.env)
+#   4. Installs dependencies and builds the dashboard
+#   5. Starts the server and opens the dashboard
 #
 set -euo pipefail
+
+# ─── Argument parsing ────────────────────────────────────────────────────────
+
+AUTO_YES=false
+NO_START=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --yes|-y)       AUTO_YES=true ;;
+        --no-start)     NO_START=true ;;
+        --dir)          shift; INSTALL_DIR="$1" ;;
+        --dir=*)        INSTALL_DIR="${1#--dir=}" ;;
+        --help|-h)
+            echo "Usage: install.sh [--yes] [--dir <path>] [--no-start]"
+            exit 0
+            ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+    shift
+done
 
 # When piped via `curl | bash`, stdin is the pipe — not the terminal.
 # Redirect all user prompts through /dev/tty so input works correctly.
@@ -42,7 +67,18 @@ echo "  ║      Your own AI developer.           ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 
-INSTALL_DIR="${CORVID_INSTALL_DIR:-$HOME/corvid-agent}"
+INSTALL_DIR="${INSTALL_DIR:-${CORVID_INSTALL_DIR:-$HOME/corvid-agent}}"
+
+# ─── Signal handling ─────────────────────────────────────────────────────────
+# Kill any background server we started if the user interrupts the install.
+SERVER_PID=""
+cleanup() {
+    if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        warn "Interrupted — stopping background server (PID $SERVER_PID)"
+        kill "$SERVER_PID" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
 
 # ─── Step 0: System check ─────────────────────────────────────────────────
 
@@ -112,8 +148,12 @@ if command -v bun &>/dev/null; then
     BUN_MINOR=$(echo "$BUN_VERSION" | cut -d. -f2)
     if [[ "$BUN_MAJOR" -lt 1 ]] || { [[ "$BUN_MAJOR" -eq 1 ]] && [[ "$BUN_MINOR" -lt 3 ]]; }; then
         warn "Bun $BUN_VERSION found but >= 1.3.0 required"
-        echo -n "Install/update Bun now? [Y/n] "
-        read -r INSTALL_BUN < "$USER_INPUT"
+        if $AUTO_YES; then
+            INSTALL_BUN="Y"
+        else
+            echo -n "Install/update Bun now? [Y/n] "
+            read -r INSTALL_BUN < "$USER_INPUT"
+        fi
         if [[ "${INSTALL_BUN:-Y}" =~ ^[Yy]$ ]]; then
             curl -fsSL https://bun.sh/install | bash
             export PATH="$HOME/.bun/bin:$PATH"
@@ -125,8 +165,12 @@ if command -v bun &>/dev/null; then
         info "bun $BUN_VERSION"
     fi
 else
-    echo -n "Bun is not installed. Install it now? [Y/n] "
-    read -r INSTALL_BUN < "$USER_INPUT"
+    if $AUTO_YES; then
+        INSTALL_BUN="Y"
+    else
+        echo -n "Bun is not installed. Install it now? [Y/n] "
+        read -r INSTALL_BUN < "$USER_INPUT"
+    fi
     if [[ "${INSTALL_BUN:-Y}" =~ ^[Yy]$ ]]; then
         curl -fsSL https://bun.sh/install | bash
         export PATH="$HOME/.bun/bin:$PATH"
@@ -205,17 +249,35 @@ if [[ ! -f .env ]]; then
     cp .env.example .env
     info "Created .env from template"
 
-    echo ""
-    echo "corvid-agent needs an AI provider. Choose one:"
-    echo ""
-    echo "  1) Anthropic API key (recommended — full capabilities)"
-    echo "  2) Claude Code CLI (uses your existing subscription)"
-    echo "  3) Ollama only (free, local, no API key needed)"
-    echo ""
-    echo -n "Choice [1/2/3]: "
-    read -r PROVIDER_CHOICE < "$USER_INPUT"
+    if $AUTO_YES; then
+        # Non-interactive: auto-detect provider from environment
+        if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+            if [[ "$(uname)" == "Darwin" ]]; then
+                sed -i '' "s|^# ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY|" .env
+            else
+                sed -i "s|^# ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY|" .env
+            fi
+            info "ANTHROPIC_API_KEY configured from environment"
+        elif command -v claude &>/dev/null; then
+            info "Claude Code CLI detected — no API key needed"
+        else
+            info "No AI provider configured — edit .env to add ANTHROPIC_API_KEY or OLLAMA_HOST"
+        fi
+        PROVIDER_CHOICE="skip"
+    else
+        echo ""
+        echo "corvid-agent needs an AI provider. Choose one:"
+        echo ""
+        echo "  1) Anthropic API key (recommended — full capabilities)"
+        echo "  2) Claude Code CLI (uses your existing subscription)"
+        echo "  3) Ollama only (free, local, no API key needed)"
+        echo ""
+        echo -n "Choice [1/2/3]: "
+        read -r PROVIDER_CHOICE < "$USER_INPUT"
+    fi
 
     case "${PROVIDER_CHOICE:-1}" in
+        skip) ;; # handled above in --yes mode
         1)
             echo -n "Enter your ANTHROPIC_API_KEY: "
             read -rs API_KEY_VAL < "$USER_INPUT"
@@ -255,17 +317,27 @@ if [[ ! -f .env ]]; then
             ;;
     esac
 
-    # GitHub token (optional)
-    echo ""
-    echo -n "GitHub token for PR/issue integration (optional, press Enter to skip): "
-    read -r GH_TOKEN_VAL < "$USER_INPUT"
-    if [[ -n "$GH_TOKEN_VAL" ]]; then
-        if [[ "$(uname)" == "Darwin" ]]; then
-            sed -i '' "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN_VAL|" .env
-        else
-            sed -i "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN_VAL|" .env
+    if ! $AUTO_YES; then
+        # GitHub token (optional)
+        echo ""
+        echo -n "GitHub token for PR/issue integration (optional, press Enter to skip): "
+        read -r GH_TOKEN_VAL < "$USER_INPUT"
+        if [[ -n "$GH_TOKEN_VAL" ]]; then
+            if [[ "$(uname)" == "Darwin" ]]; then
+                sed -i '' "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN_VAL|" .env
+            else
+                sed -i "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN_VAL|" .env
+            fi
+            info "GH_TOKEN configured"
         fi
-        info "GH_TOKEN configured"
+    elif [[ -n "${GH_TOKEN:-}" ]]; then
+        # In --yes mode, pick up GH_TOKEN from the environment
+        if [[ "$(uname)" == "Darwin" ]]; then
+            sed -i '' "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN|" .env
+        else
+            sed -i "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN|" .env
+        fi
+        info "GH_TOKEN configured from environment"
     fi
 else
     info ".env already exists — keeping current config"
@@ -287,46 +359,63 @@ fi
 
 # ─── Step 5: Start ──────────────────────────────────────────────────────────
 
-step "Starting corvid-agent"
-
-echo ""
-echo -e "${BOLD}Starting server...${NC}"
-echo ""
-
-# Start in background, wait for health
-bun server/index.ts &
-SERVER_PID=$!
-
-HEALTHY=false
-for i in $(seq 1 20); do
-    if curl -sf http://localhost:3000/api/health &>/dev/null; then
-        HEALTHY=true
-        break
-    fi
-    sleep 1
-done
-
-if [[ "$HEALTHY" == true ]]; then
-    info "Server running at http://localhost:3000"
-
-    # Try to open browser
-    if command -v open &>/dev/null; then
-        open http://localhost:3000
-    elif command -v xdg-open &>/dev/null; then
-        xdg-open http://localhost:3000
-    fi
+if $NO_START; then
+    info "Skipping server start (--no-start)"
 else
-    warn "Server didn't respond within 20s — check the terminal output above"
+    step "Starting corvid-agent"
+
+    PORT="${PORT:-3000}"
+    SERVER_LOG="$INSTALL_DIR/corvid-agent.log"
+
+    echo ""
+    echo -e "${BOLD}Starting server in background...${NC}"
+    echo "  Log: $SERVER_LOG"
+    echo ""
+
+    # Use nohup so the server survives the installer's shell exiting.
+    # stdout/stderr go to a log file so the user can inspect them.
+    nohup bun run start > "$SERVER_LOG" 2>&1 &
+    SERVER_PID=$!
+
+    # Poll /health/live (lightweight liveness check — no heavy dependency checks)
+    HEALTHY=false
+    for i in $(seq 1 30); do
+        if curl -sf "http://localhost:${PORT}/health/live" &>/dev/null; then
+            HEALTHY=true
+            break
+        fi
+        sleep 1
+    done
+
+    if [[ "$HEALTHY" == true ]]; then
+        info "Server running at http://localhost:${PORT} (PID $SERVER_PID)"
+        # Detach trap — server should keep running after install exits
+        trap - EXIT INT TERM
+        SERVER_PID=""
+
+        # Try to open browser
+        if command -v open &>/dev/null; then
+            open "http://localhost:${PORT}"
+        elif command -v xdg-open &>/dev/null; then
+            xdg-open "http://localhost:${PORT}"
+        fi
+    else
+        warn "Server didn't respond within 30s — check logs:"
+        warn "  tail -f $SERVER_LOG"
+    fi
 fi
 
 # ─── Done ────────────────────────────────────────────────────────────────────
+
+PORT="${PORT:-3000}"
 
 echo ""
 echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${GREEN}║     corvid-agent is ready! 🐦‍⬛        ║${NC}"
 echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
-echo "  Dashboard:  http://localhost:3000"
+echo "  Dashboard:  http://localhost:${PORT}"
+echo "  Logs:       $INSTALL_DIR/corvid-agent.log"
 echo "  Docs:       https://github.com/CorvidLabs/corvid-agent"
 echo ""
 echo "  Your agent is ready. Here's what to do:"
@@ -336,8 +425,10 @@ echo "    2. Start a new session"
 echo "    3. Tell it what to build:"
 echo "       \"Build me a personal portfolio website\""
 echo ""
-echo "  To stop:    kill $SERVER_PID"
-echo "  To restart: cd $INSTALL_DIR && bun run dev"
+echo "  Manage the server:"
+echo "    Stop:        pkill -f 'bun.*server/index' || kill \$(cat $INSTALL_DIR/.server.pid 2>/dev/null)"
+echo "    Restart:     cd $INSTALL_DIR && bun run start"
+echo "    Daemon:      cd $INSTALL_DIR && ./deploy/daemon.sh install"
 echo ""
 echo "  Want more? Add to your .env file and restart:"
 echo "    • GH_TOKEN=...       → agent can open PRs on your repos"

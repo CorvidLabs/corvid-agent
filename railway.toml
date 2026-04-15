@@ -1,0 +1,22 @@
+# Railway deployment configuration for corvid-agent.
+# Deploy: railway up
+# Docs:   https://docs.railway.app/deploy/deployments
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deploy/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health/live"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Railway injects PORT automatically — corvid-agent reads it from env.
+# Set these secrets via the Railway dashboard or `railway variables set`:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   API_KEY=<random-secret>           # required when BIND_HOST=0.0.0.0
+#   BIND_HOST=0.0.0.0                 # Railway routes external traffic in
+#
+# Data is stored in /app/data (mount a Railway volume at /app/data to persist).
+# Without a volume, data is lost on redeploy — see Railway docs for volumes.

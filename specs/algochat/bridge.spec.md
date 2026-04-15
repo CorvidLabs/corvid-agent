@@ -23,7 +23,7 @@ tracks: [1458]
 
 ## Purpose
 
-Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algorand blockchain messaging with the agent session system. Composes four focused services (ResponseFormatter, CommandHandler, SubscriptionManager, DiscoveryService) and handles message routing, PSK contact management, group message reassembly, approval/question forwarding, and discovery polling for unmatched contacts.
+Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algorand blockchain messaging with the agent session system. Composes seven focused services (ResponseFormatter, CommandHandler, SubscriptionManager, DiscoveryService, PSKContactManager, PSKDiscoveryPoller, MessageRouter) and handles message routing, PSK contact management, group message reassembly, approval/question forwarding, and discovery polling for unmatched contacts.
 
 ## Public API
 
@@ -40,7 +40,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 
 | Class | Description |
 |-------|-------------|
-| `AlgoChatBridge` | Central orchestrator composing ResponseFormatter, CommandHandler, SubscriptionManager, DiscoveryService |
+| `AlgoChatBridge` | Central orchestrator composing ResponseFormatter, CommandHandler, SubscriptionManager, DiscoveryService, PSKContactManager, PSKDiscoveryPoller, MessageRouter |
 | `PSKContactManager` | Manages PSK (pre-shared key) encrypted contacts for agent-to-mobile communication |
 | `PSKDiscoveryPoller` | Polls blockchain for undiscovered PSK contact addresses via trial decryption |
 | `MessageRouter` | Routes incoming messages to appropriate handlers based on source and content |
@@ -88,13 +88,17 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | `cancelPSKContact` | `(id: string)` | `boolean` | Deactivate a PSK contact and clean up |
 | `getPSKContactURI` | `(id: string)` | `string \| null` | Get the exchange URI for a specific contact |
 | `getCommandHandler` | `()` | `CommandHandler` | Access the command handler for route forwarding |
-| `handleLocalMessage` | `(agentId, content, sendFn, eventFn?)` | `Promise<void>` | Handle a message from the local web UI chat |
-| `handleIncomingMessage` | `(participant, content, confirmedRound, txid?)` | `Promise<void>` | Handle an incoming on-chain message (main routing logic) |
+| `setOnChainTransactor` | `(transactor: OnChainTransactor)` | `void` | Late-inject on-chain transactor for message delivery |
+| `getAlgoClients` | `()` | `{ algodClient, indexerClient, address }` | Expose Algorand clients for block explorer and read-only routes |
+| `sendMessage` | `(participant: string, content: string)` | `Promise<void>` | Send a message to a participant (ChannelAdapter) |
+| `onMessage` | `(handler: (msg: SessionMessage) => void)` | `void` | Register a handler for inbound ChannelAdapter messages |
+| `handleLocalMessage` | `(agentId, content, sendFn, projectId?, eventFn?, toolAllowList?)` | `Promise<void>` | Handle a message from the local web UI chat with optional project isolation and tool restrictions |
+| `handleIncomingMessage` | `(participant, content, confirmedRound, amount?)` | `Promise<void>` | Handle an incoming on-chain message (main routing logic) |
 
 ## Invariants
 
 1. **PSK contact isolation**: Each PSK contact has its own `PSKManager` instance. Mobile address discovery is per-contact, with reverse lookup via `pskAddressToId` map
-2. **On-chain message dedup**: Incoming messages are tracked by `txid` in `processedTxids` set. Set is pruned when it exceeds 500 entries (oldest removed)
+2. **On-chain message dedup**: Incoming messages are tracked by transaction ID using a centralized `DedupService` with a 5000-entry maximum size, 24-hour TTL, and SQLite persistence for crash recovery. Entries older than 24 hours are automatically pruned
 3. **Group message reassembly**: Multi-part group messages (prefixed with `[GRP:N/M]`) are buffered in `pendingGroupChunks` and reassembled when all parts arrive. Stale chunks (>5 minutes) are pruned
 4. **Owner authorization**: On-chain messages from non-owner addresses are rejected with an on-chain error reply. Owner addresses are checked against `config.ownerAddresses`
 5. **Approval forwarding**: When `approvalManager` is set, incoming messages are checked for approval responses (YES/NO patterns) before normal processing
@@ -103,6 +107,11 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 8. **Discovery polling**: Unmatched PSK contacts trigger a discovery poller that scans blockchain transactions to our address, trial-decrypts with each unmatched contact's PSK to find the sender's address
 9. **Session lifecycle**: Each conversation gets a linked session. The bridge subscribes to session events and forwards responses back on-chain. Session exit and errors are reported to the participant
 10. **Localnet auto-funding**: On localnet, new conversations from wallets with insufficient balance trigger auto-funding via `agentWalletService`
+11. **Device name envelope parsing**: PSK messages may include a JSON envelope `{m: text, d: deviceName}` to pass device context to the agent
+12. **Prompt injection scanning**: All incoming messages are scanned for prompt injection patterns. Blocked messages are logged to audit and generate on-chain error responses
+13. **Per-agent conversation access control**: Conversations can be routed to private agents. Non-owner access is checked against the per-agent conversation mode; denied requests fail silently without response
+14. **Session isolation**: AlgoChat-sourced sessions create isolated git worktrees for safe code execution
+15. **Session notification forwarding**: Approval requests, session errors, and session exits from AlgoChat-sourced sessions are forwarded as on-chain messages to the participant
 
 ## Behavioral Examples
 
@@ -143,6 +152,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | Message from non-owner address | On-chain error reply: owner-only access |
 | Agent not found for conversation | Message dropped with log warning |
 | Session start fails | Error sent on-chain to participant |
+| Worktree creation fails for isolated session | Error sent to UI; session startup is aborted |
 | PSK contact not found for cancel | Returns `false` |
 | Discovery poller finds no transactions | Continues polling at next interval |
 
@@ -179,3 +189,4 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Update service count (4→7), fix method signatures, update dedup invariant, add invariants 11-15, add missing methods, add worktree error case (#2018) |

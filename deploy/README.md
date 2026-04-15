@@ -1,19 +1,21 @@
 # Deployment Configs
 
-Optional configs for running CorvidAgent as a production service. For local development, just use `bun run dev`.
+Optional configs for running corvid-agent as a production service. For local development, just use `bun run dev`.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `Dockerfile` | Multi-stage Docker build (Angular client + Bun server) |
-| `docker-compose.yml` | Docker Compose orchestration with health checks |
+| `docker-compose.yml` | Docker Compose orchestration with health checks and persistent volume |
 | `daemon.sh` | Cross-platform daemon installer (auto-detects launchd/systemd) |
 | `corvid-agent.service` | systemd unit file (Linux) with security hardening |
 | `com.corvidlabs.corvid-agent.plist` | macOS launchd plist |
 | `corvid-agent.newsyslog.conf` | macOS log rotation |
 | `caddy/Caddyfile` | Caddy reverse proxy with auto-TLS |
 | `nginx/corvid-agent.conf` | nginx reverse proxy with rate limiting |
+| `k8s/` | Raw Kubernetes manifests (StatefulSet, Service, Ingress, ConfigMap, Secret) |
+| `helm/` | Helm chart for production Kubernetes deployments |
 
 ## Quick Start
 
@@ -21,9 +23,19 @@ Optional configs for running CorvidAgent as a production service. For local deve
 
 ```bash
 cp .env.example .env   # add your API keys
-cd deploy
-docker compose up -d
+docker compose up -d   # uses root-level docker-compose.yml
 ```
+
+Or from inside `deploy/`:
+
+```bash
+cp ../.env.example ../.env
+docker compose up -d   # uses deploy/docker-compose.yml (adds resource limits)
+```
+
+> **Data persistence**: Both compose files set `DATABASE_PATH=/app/data/corvid-agent.db` and
+> `WALLET_KEYSTORE_PATH=/app/data/wallet-keystore.json`, mounting a Docker volume at `/app/data`.
+> Your database and wallet keystore survive container restarts and upgrades.
 
 ### Running Inside Containers (with Algorand localnet)
 
@@ -93,6 +105,89 @@ sudo ln -s /etc/nginx/sites-available/corvid-agent.conf /etc/nginx/sites-enabled
 sudo certbot --nginx -d yourdomain.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+### Remote Access via Tailscale (recommended)
+
+Tailscale is the simplest way to access your corvid-agent dashboard remotely without exposing it to the public internet. It provides network-layer authentication — only your enrolled devices can reach the server, and your existing `API_KEY` auth stays in place as a second layer.
+
+**Setup (5 minutes):**
+
+1. Install Tailscale on the server machine and on your client device(s):
+   ```bash
+   # Server (Linux)
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+
+   # macOS
+   brew install tailscale && sudo tailscale up
+   ```
+
+2. Set `BIND_HOST=0.0.0.0` in your `.env` so the server listens on all interfaces:
+   ```bash
+   BIND_HOST=0.0.0.0
+   API_KEY=your-strong-api-key   # required when not on localhost
+   ```
+
+3. Find your Tailscale IP:
+   ```bash
+   tailscale ip -4   # e.g. 100.x.x.x
+   ```
+
+4. Access the dashboard from any enrolled device:
+   ```
+   http://100.x.x.x:3000
+   ```
+
+**Optional — HTTPS on the Tailscale interface:**
+
+Caddy can terminate TLS for the Tailscale IP using a self-signed cert (no DNS required):
+
+```bash
+caddy reverse-proxy --from https://100.x.x.x:443 --to http://localhost:3000
+```
+
+Or add the Tailscale IP to your `Caddyfile` alongside your domain.
+
+> **Security:** Tailscale handles device authentication. Even if `BIND_HOST=0.0.0.0`, non-Tailscale traffic from the LAN/internet cannot reach the Tailscale IP. The `API_KEY` provides a second layer. Do not set `BIND_HOST=0.0.0.0` without also setting `API_KEY`.
+
+## Cloud Deployment
+
+Three one-file configs in the repo root let you deploy to managed platforms:
+
+| Platform | File | Notes |
+|---|---|---|
+| [Railway](https://railway.app) | `railway.toml` | Add a volume at `/app/data` for persistence |
+| [Fly.io](https://fly.io) | `fly.toml` | Includes persistent volume at `/data`; run `fly volumes create corvid_data` first |
+| [Render](https://render.com) | `render.yaml` | Includes a 5 GB disk mounted at `/data` |
+
+### Railway
+
+```bash
+railway login
+railway init          # link or create project
+railway volume add    # mount at /app/data (5 GB+)
+railway secrets set ANTHROPIC_API_KEY=sk-ant-... API_KEY=$(openssl rand -hex 32)
+railway up
+```
+
+### Fly.io
+
+```bash
+fly auth login
+fly apps create corvid-agent
+fly volumes create corvid_data --size 5 --region iad
+fly secrets set ANTHROPIC_API_KEY=sk-ant-... API_KEY=$(openssl rand -hex 32)
+fly deploy
+```
+
+### Render
+
+Connect your GitHub repo in the Render dashboard and select **New → Web Service → Deploy with render.yaml**.
+Add `ANTHROPIC_API_KEY` and `API_KEY` as environment secrets in the Render UI.
+
+> **Note on Algorand / AlgoChat**: Cloud deployments cannot run AlgoKit localnet (no Docker-in-Docker).
+> Set `ALGORAND_NETWORK=testnet` or `mainnet` and provide an `ALGOCHAT_MNEMONIC` if you need on-chain
+> agent features. For pure AI agent workflows without on-chain messaging, localnet can be omitted.
 
 ## Security Notes
 

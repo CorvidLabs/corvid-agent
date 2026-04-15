@@ -3,6 +3,7 @@ import type { SessionSource } from '../../shared/types';
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { getAgent, listAgents } from '../db/agents';
 import { recordAudit } from '../db/audit';
+import { recordObservation } from '../db/observations';
 import { listProjects } from '../db/projects';
 import { createSession, getSession } from '../db/sessions';
 import { DedupService } from '../lib/dedup';
@@ -352,6 +353,16 @@ export class TelegramBridge {
 
       // Start the process
       this.processManager.startProcess(session, text);
+
+      // Record inbound Telegram message as a short-term observation
+      recordObservation(this.db, {
+        agentId: agent.id,
+        source: 'telegram',
+        sourceId: session.id,
+        content: `[telegram] user ${userId}: ${text.slice(0, 200)}`,
+        suggestedKey: `telegram:${session.id}`,
+        relevanceScore: 1.5,
+      });
 
       // Subscribe for responses
       this.subscribeForResponse(sessionId, chatId, replyTo);

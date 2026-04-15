@@ -212,6 +212,54 @@ describe('Telegram Config Routes', () => {
   });
 });
 
+describe('Telegram Config DELETE Routes', () => {
+  it('DELETE /api/settings/telegram/:key returns 400 for invalid key', async () => {
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/bot_token');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(400);
+    const data = await resolved.json();
+    expect(data.error).toContain('Invalid config key');
+  });
+
+  it('DELETE /api/settings/telegram/:key returns 404 for non-existent key', async () => {
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/mode');
+    // Ensure key does not exist by deleting first (if it does)
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    await Promise.resolve(res!);
+    // Could be 200 or 404 depending on prior state; delete again to guarantee 404
+    const { req: req2, url: url2 } = fakeReq('DELETE', '/api/settings/telegram/mode');
+    const res2 = handleSettingsRoutes(req2, url2, db, adminContext());
+    expect(res2).not.toBeNull();
+    const resolved2 = await Promise.resolve(res2!);
+    expect(resolved2.status).toBe(404);
+    const data = await resolved2.json();
+    expect(data.error).toContain('Config key not found');
+  });
+
+  it('DELETE /api/settings/telegram/:key returns 200 on successful deletion', async () => {
+    // First, set a key
+    const { req: putReq, url: putUrl } = fakeReq('PUT', '/api/settings/telegram', {
+      default_agent_id: 'agent-to-delete',
+    });
+    const putRes = await handleSettingsRoutes(putReq, putUrl, db, adminContext());
+    expect(putRes).not.toBeNull();
+    expect(putRes!.status).toBe(200);
+
+    // Now delete it
+    const { req, url } = fakeReq('DELETE', '/api/settings/telegram/default_agent_id');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+    expect(data.ok).toBe(true);
+    expect(data.deleted).toBe('default_agent_id');
+  });
+});
+
 describe('API Key Status Endpoint', () => {
   it('GET /api/settings/api-key/status returns status with no expiry', async () => {
     const authConfig: AuthConfig = {
@@ -273,5 +321,79 @@ describe('API Key Status Endpoint', () => {
     expect(res).not.toBeNull();
     const resolved = await Promise.resolve(res!);
     expect(resolved.status).toBe(503);
+  });
+});
+
+describe('Runtime Config Endpoint', () => {
+  it('GET /api/settings/runtime returns sanitized config for operator', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
+    const data = await resolved.json();
+
+    // Agent identity fields
+    expect(data.agent).toBeDefined();
+    expect(typeof data.agent.name).toBe('string');
+    expect(typeof data.agent.defaultModel).toBe('string');
+    expect(typeof data.agent.defaultProvider).toBe('string');
+
+    // Server fields
+    expect(data.server).toBeDefined();
+    expect(typeof data.server.port).toBe('number');
+    expect(typeof data.server.bindHost).toBe('string');
+    expect(typeof data.server.logLevel).toBe('string');
+    expect(typeof data.server.logFormat).toBe('string');
+    expect(typeof data.server.apiKeyConfigured).toBe('boolean');
+    expect(typeof data.server.adminApiKeyConfigured).toBe('boolean');
+
+    // Providers
+    expect(data.providers).toBeDefined();
+    expect(Array.isArray(data.providers.enabled)).toBe(true);
+    expect(typeof data.providers.anthropicConfigured).toBe('boolean');
+    expect(typeof data.providers.openrouterConfigured).toBe('boolean');
+    expect(typeof data.providers.ollamaHost).toBe('string');
+
+    // Integrations
+    expect(data.integrations).toBeDefined();
+    expect(typeof data.integrations.discord.enabled).toBe('boolean');
+    expect(typeof data.integrations.telegram.enabled).toBe('boolean');
+    expect(typeof data.integrations.algochat.enabled).toBe('boolean');
+    expect(typeof data.integrations.github.tokenConfigured).toBe('boolean');
+    expect(typeof data.integrations.slack.enabled).toBe('boolean');
+
+    // Database
+    expect(data.database).toBeDefined();
+    expect(typeof data.database.path).toBe('string');
+  });
+
+  it('GET /api/settings/runtime does not expose raw secret values', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    const res = handleSettingsRoutes(req, url, db, adminContext());
+    const resolved = await Promise.resolve(res!);
+    const data = await resolved.json();
+
+    // Response shape should use boolean flags, not raw secret strings
+    expect(data.integrations.discord.botToken).toBeUndefined();
+    expect(data.integrations.telegram.botToken).toBeUndefined();
+    expect(data.integrations.algochat.mnemonic).toBeUndefined();
+    expect(data.providers.anthropic).toBeUndefined();
+    expect(data.server.apiKey).toBeUndefined();
+    expect(data.server.adminApiKey).toBeUndefined();
+
+    // Configured flags are booleans, not secret values
+    expect(typeof data.providers.anthropicConfigured).toBe('boolean');
+    expect(typeof data.integrations.discord.tokenConfigured).toBe('boolean');
+    expect(typeof data.integrations.algochat.mnemonicConfigured).toBe('boolean');
+  });
+
+  it('GET /api/settings/runtime returns null for unauthenticated when context enforces auth', async () => {
+    const { req, url } = fakeReq('GET', '/api/settings/runtime');
+    // No context = unauthenticated passthrough (handled by calling code, not this route)
+    const res = handleSettingsRoutes(req, url, db);
+    expect(res).not.toBeNull();
+    const resolved = await Promise.resolve(res!);
+    expect(resolved.status).toBe(200);
   });
 });

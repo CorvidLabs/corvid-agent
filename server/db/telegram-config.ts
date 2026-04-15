@@ -2,8 +2,8 @@
  * Telegram runtime configuration — DB-backed settings that can be
  * changed without restarting the server.
  *
- * Static settings (bot token, chat ID) remain environment-only.
- * Dynamic settings (allowed users, mode) live here.
+ * Static settings (bot token, chat ID) remain environment-only for security.
+ * Dynamic settings (allowed users, mode, default agent) live here.
  */
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
@@ -14,10 +14,12 @@ const log = createLogger('TelegramConfig');
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export interface TelegramDynamicConfig {
-  /** Allowed Telegram user IDs (empty = allow all) */
+  /** Allowed Telegram user IDs (comma-separated in DB) */
   allowedUserIds: string[];
-  /** Bridge mode: 'chat' | 'work_intake' */
+  /** Bridge mode: 'chat' or 'work_intake' */
   mode: 'chat' | 'work_intake';
+  /** Default agent ID */
+  defaultAgentId: string | null;
 }
 
 // ─── Config helpers ───────────────────────────────────────────────────────
@@ -25,6 +27,7 @@ export interface TelegramDynamicConfig {
 const DEFAULTS: TelegramDynamicConfig = {
   allowedUserIds: [],
   mode: 'chat',
+  defaultAgentId: null,
 };
 
 function parseCommaSeparated(value: string | undefined): string[] {
@@ -48,6 +51,7 @@ export function getTelegramConfig(db: Database): TelegramDynamicConfig {
   return {
     allowedUserIds: parseCommaSeparated(map.get('allowed_user_ids')),
     mode: (map.get('mode') as 'chat' | 'work_intake') || DEFAULTS.mode,
+    defaultAgentId: map.get('default_agent_id') || null,
   };
 }
 
@@ -80,8 +84,13 @@ export function updateTelegramConfigBatch(db: Database, updates: Record<string, 
   return count;
 }
 
+export function deleteTelegramConfigKey(db: Database, key: string): boolean {
+  const result = db.prepare('DELETE FROM telegram_config WHERE key = ?').run(key);
+  return result.changes > 0;
+}
+
 /** Valid config keys that can be set via the API */
-export const VALID_TELEGRAM_CONFIG_KEYS = new Set(['allowed_user_ids', 'mode']);
+export const VALID_TELEGRAM_CONFIG_KEYS = new Set(['allowed_user_ids', 'mode', 'default_agent_id']);
 
 /**
  * Initialize telegram_config from environment variables.

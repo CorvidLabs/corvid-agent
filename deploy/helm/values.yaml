@@ -43,7 +43,7 @@ persistence:
 config:
   NODE_ENV: production
   PORT: "3578"
-  DB_PATH: /data/corvid-agent.db
+  DATABASE_PATH: /data/corvid-agent.db
   LOG_LEVEL: info
   # SANDBOX_ENABLED: "false"
   # ALGOCHAT_NETWORK: testnet

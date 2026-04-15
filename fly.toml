@@ -1,0 +1,55 @@
+# Fly.io deployment configuration for corvid-agent.
+#
+# Prerequisites:
+#   fly auth login
+#   fly apps create corvid-agent   # or choose your own name
+#   fly volumes create corvid_data --size 5 --region <your-region>
+#
+# Deploy:
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-... API_KEY=<random-secret>
+#   fly deploy
+#
+# Docs: https://fly.io/docs/
+
+app = "corvid-agent"
+primary_region = "iad"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+
+[env]
+  PORT = "3000"
+  BIND_HOST = "0.0.0.0"
+  LOG_LEVEL = "info"
+  NODE_ENV = "production"
+  # Database and wallet are stored in the persistent volume.
+  DATABASE_PATH = "/data/corvid-agent.db"
+  WALLET_KEYSTORE_PATH = "/data/wallet-keystore.json"
+
+# Secrets are injected via `fly secrets set` and do NOT belong in this file:
+#   ANTHROPIC_API_KEY, API_KEY, ADMIN_API_KEY, GH_TOKEN, etc.
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  path = "/health/live"
+  timeout = "5s"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "corvid_data"
+  destination = "/data"
+  initial_size = "5gb"

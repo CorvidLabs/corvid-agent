@@ -1,175 +1,246 @@
-# corvid-agent v1.0.0-rc — Release Notes
+# corvid-agent v1.0.0 — Release Notes
 
-**Date:** 2026-03-29
-**Version:** v1.0.0-rc (based on v0.59.x development series)
-**Status:** Release Candidate — Automated gate: ✅ 24/24 checks pass. Manual sign-off pending.
+**Date:** 2026-04-13
+**Version:** v1.0.0
+**Status:** ✅ Released — All automated gates pass. Owner sign-off complete.
 
 ---
 
 ## Overview
 
-corvid-agent is a decentralized AI agent platform built on Algorand. Agents have on-chain identity, encrypted inter-agent communication, and structured multi-agent deliberation. This release candidate represents the culmination of the v0.x development series and establishes the feature baseline for the v1.0.0 mainnet launch.
+corvid-agent is a **decentralized AI agent platform built on Algorand**. Agents have on-chain identity, encrypted inter-agent communication, structured multi-agent deliberation, and a voice-capable bridge ecosystem.
+
+This release represents the culmination of the v0.x development series — 1,300+ commits, 42 database migrations, 56 MCP tools, 9,000+ tests, and an 8-month arc from proof-of-concept to production-ready platform. v1.0.0 is the first stable, mainnet-ready release.
 
 ---
 
-## What's New Since v0.8.0
+## What's New Since v1.0.0-rc (v0.59.x → v0.63.1)
 
-This release candidate covers the journey from v0.8.0 (major multi-channel bridge release) through v0.59.x. Key areas of investment:
+The release candidate was cut at v0.59.x. The following major capabilities landed in the final release window:
 
-### Multi-Agent Orchestration
+### Voice Conversation Loop
 
-- **Councils** — structured multi-agent deliberation with stages: `responding → discussing → reviewing → synthesizing`. Configurable governance tiers, real-time WebSocket vote events, and a full council management UI.
-- **Buddy mode** — lightweight 2-agent review loop: primary agent produces output, buddy reviews before delivery. Visible review rounds in Discord with zero-config default pairings.
-- **Delegation tools** — `corvid_delegate_task` and `corvid_dispatch_model` route subtasks to the right model tier (Opus/Sonnet/Haiku) based on complexity.
-- **Multi-tool chain continuation** — limited-tier models can chain multiple tool calls across continuation rounds for complex multi-step workflows.
-- **Try-mode auto-detect** — zero-config sandbox auto-detects Claude, OpenAI, Gemini, Ollama, and OpenRouter from environment.
+Full Discord voice integration: agents can join voice channels, listen, respond, and speak.
 
-### On-Chain Identity & Memory
+- **STT → agent → TTS pipeline** — Whisper transcription → Claude → OpenAI TTS in one loop (#1903)
+- **Pre-speech ring buffer** — captures audio before VAD triggers, preventing first-syllable clipping (#1925)
+- **Speaker identification** — agents distinguish who is speaking and respond conversationally (#1921)
+- **Deafen/listen toggle** — explicit `/voice deafen` state management, not a fragile toggle (#1923, #1924)
+- **Language hint** — Whisper STT biased toward English to prevent false language misdetection (#1910)
+- **Instant acknowledgments** — low-latency ack before full TTS response plays (#1915)
+- **Context-dependent length** — response verbosity adapts to conversation context (#1917)
 
-- **Flock Directory** — on-chain agent registry (ARC-56 contract client, MCP tool and API). Agents can discover, verify, and communicate with each other across deployments. Now uses A2A HTTP transport.
-- **ARC-69 on-chain memory** — long-term memories stored as ARC-69 ASAs on localnet AlgoChat. Three-tier architecture: SQLite (ephemeral) → ARC-69 ASA (long-term, mutable) → plain txn (permanent, immutable).
-- **Reputation scoring** — track agent reliability, quality, and trustworthiness over time. Score history, trend charts, and agent comparison in the dashboard.
-- **Daily attestation** — on-chain daily activity attestation published via scheduler.
+### Memory System Upgrades
 
-### Bridges & Communication
+- **Short-term default** — all new `corvid_save_memory` calls default to SQLite; explicit `tier: "on-chain"` required for ARC-69 (#1741)
+- **TTL-based decay** — short-term memories expire after configurable TTL with access-count retention (#1760)
+- **Confirmation gate** — permanent plain-txn writes require explicit user confirmation (#1780)
+- **Memory consolidation** — duplicate detection and merge UI for cleaning up redundant on-chain memories (#1949)
+- **Memory export** — export API and UI for downloading snapshots as JSON (#1948)
+- **Conversation summaries** — saved as observations on context reset (#1753)
 
-- **Discord bridge** (production-grade) — raw WebSocket gateway (no discord.js), per-user sessions, slash commands (`/ask`, `/status`, `/help`, `/agent-skill`, `/agent-persona`), public channel mode with role-based access, buddy review visible in threads, tiered `/message` tool access.
-- **Telegram bridge** — long-polling, voice notes with automatic STT transcription, work-intake mode for submitting tasks directly from Telegram.
-- **AlgoChat** — X25519-encrypted messaging, PSK contacts, on-chain encrypted broadcast.
-- **MCP over Streamable HTTP** — expose all MCP tools at `/mcp` for Cursor, Copilot, OpenCode, and other IDE integrations.
-- **A2A protocol** — Google Agent-to-Agent interoperability.
+### Algorand Block Explorer
 
-### Work Tasks
+- New `/api/explorer` endpoints for inspecting Algorand transactions, ASAs, and accounts (#1951)
+- Useful for auditing on-chain memory and AlgoChat message provenance
 
-- **Git worktree isolation** — each work task runs in an isolated worktree branch. Agent writes code, validates (lint + tsc + tests), opens PR automatically.
-- **Priority queue** — preemption support for higher-priority tasks.
-- **Intern PR guard** — prevent intern-tier models (local Ollama) from creating production PRs.
-- **Retry UI** — retry failed work tasks from the dashboard.
-- **Work delegation attribution** — agent ID parameter for tracking who delegated what.
+### Governance Voting
+
+- **Time-bound voting** — proposals expire after configurable deadline (#1889)
+- **Veto mechanism** — Layer 0 agents can veto Layer 1+ decisions during voting window
+- **Weighted quorum** — evaluates vote weight against threshold before accepting outcome
+
+### Discord Production Hardening
+
+- **Complete REST client migration** (Phases 1–5) — all raw `fetch()` calls replaced with the discord.js REST client (#1825–#1855). Eliminates rate limit errors from uncounted requests.
+- **Streaming edits** — message content streamed to Discord as it generates rather than waiting for completion (#1959)
+- **Thread continuity** — persist and recover mention sessions and thread-session mappings across bot restarts (#1752, #1754)
+- **Channel-project affinity** — @mentions now correctly use the project associated with the channel (#1963)
+- **Work task progress embeds** — real-time status updates for branching/running/validating phases (#1887)
+
+### Telegram Runtime Configuration
+
+- Discord-style settings API for Telegram: enable/disable bridge, configure bot token, set poll interval — all without restarting the server (#1972)
+- Full settings UI in the dashboard Settings panel
+
+### Infrastructure
+
+- **TypeScript 6.0** — upgraded from 5.9.3 (#1735)
+- **spec-sync v4.0.0** — all 52 module specs with requirements, context, DB schema validation (#1971)
+- **Mainnet preflight check** — automated gate script validates all v1.0.0 readiness criteria (#1816)
+- **Proxy trust auth** — oauth2-proxy email tenant authentication via `TRUST_PROXY` env var (#1836)
+- **Weekly activity recap** — structured endpoint for activity summaries per agent/project (#1835)
+- **Reputation-gated work tasks** — agents below minimum reputation cannot create work tasks (#1842)
+
+---
+
+## Core Platform Capabilities
+
+### AlgoChat — On-Chain Encrypted Messaging
+
+- X25519 end-to-end encrypted messaging between agents over Algorand
+- PSK (pre-shared key) contacts for trusted channels
+- Group message chunking with natural ordering and deduplication
+- Agent-to-agent depth-limited invocation chains
+- Conversation access control with allowlist/blocklist enforcement
+
+### Multi-Agent Councils
+
+- Deliberation stages: `responding → discussing → reviewing → synthesizing`
+- Governance tier classification (Layer 0/1/2) for impact scoping
+- Time-bound voting with veto mechanism and weighted quorum
+- Real-time WebSocket vote events; full council management UI
+- **Buddy mode** — 2-agent review loop; buddy reviews before delivery; visible in Discord threads
+
+### Work Task System
+
+- Git worktree isolation per task — agent writes code, validates (lint + tsc + tests), opens PR
+- Priority queue with preemption support
+- Governance impact classification before validation
+- Reputation-gated task creation; intern PR guard (local Ollama cannot create PRs)
+- Scheduler integration, delegation attribution, retry UI
+
+### ARC-69 Three-Tier Memory
+
+| Tier | Storage | Mutability | Notes |
+|------|---------|------------|-------|
+| Short-term | SQLite | Mutable | Default for new saves, TTL-based expiry |
+| Long-term | ARC-69 ASA | Mutable (metadata update) | Explicit promotion required |
+| Permanent | Plain Algorand txn | Immutable | Requires confirmation gate |
+
+### Discord Bridge
+
+- Raw WebSocket gateway with auto-reconnect; complete REST client (5 phases)
+- Per-user thread sessions with restart recovery
+- Slash commands: `/ask`, `/status`, `/help`, `/agent-skill`, `/agent-persona`, `/tasks`, `/schedule`, `/config`, `/session`, `/message`, `/voice`
+- **Voice conversation loop**: join → STT → agent → TTS
+- Work task progress embeds, streaming message edits, contextual action buttons
+- Declarative permission middleware; guild API integration; admin setup commands
+
+### Telegram Bridge
+
+- Bidirectional long-polling with voice note STT
+- Per-user sessions, runtime configuration via settings API
+
+### Flock Directory — On-Chain Agent Discovery
+
+- ARC-56 smart contract client; agents register on-chain with capabilities and reputation
+- A2A HTTP transport for cross-machine agent testing and capability routing
+- Flock Challenges dashboard; scheduled reputation refresh
+
+### Voice (TTS/STT)
+
+- OpenAI TTS with 6 voice presets and SQLite-backed audio caching
+- Whisper STT with language hints and speaker identification
+- Full Discord voice conversation loop
+
+### Credit & Spending System
+
+- ALGO-denominated credits for metered AlgoChat sessions
+- Per-agent daily spending caps; USDC deposit path; usage metering
 
 ### Model & Provider Ecosystem
 
-- **Multi-provider routing** — Anthropic (Claude Opus/Sonnet/Haiku), OpenAI (GPT-4.1/Mini/Nano, o3, o4-mini), Gemini, Ollama (local + cloud proxy), Cursor, OpenRouter.
-- **Cost-aware routing** — automatic model selection based on task complexity, latency, and budget. Configurable fallback chains.
-- **Ollama production tier** — Ollama promoted to production-quality provider with exit code classification, transient/permanent error detection, idle timeout, loop detection, and text-based tool calling for models without native tool support.
-- **Cursor provider** — Cursor IDE agent as a first-class LlmProvider with full parity to Anthropic/Ollama.
-- **Cloud intern models** — GPT-OSS, DeepSeek V3.1, Qwen3 Coder as cloud intern model options via Ollama proxy.
-- **Model exam system** — 18 test cases across 6 categories for benchmarking new models before adding to production chains.
+| Provider | Models | Notes |
+|----------|--------|-------|
+| Anthropic | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | Default; tiered dispatch |
+| OpenAI | GPT-4.1, Mini, Nano, o3, o4-mini | Via OpenRouter or direct |
+| Ollama | Local + cloud proxy | Text-based tool calling for XML/ReAct models |
+| Cursor | Cursor IDE agent | First-class LlmProvider |
+| OpenRouter | Any hosted model | Cost-optimized routing |
 
-### Personas & Skills
-
-- **Character/Persona system** — agents have distinct personalities (archetype, traits, background, voice guidelines). Persona injected into system prompt at session start.
-- **Skill bundles** — composable tool + prompt packages assignable to agents. 5 built-in presets: Code Reviewer, DevOps, Researcher, Communicator, Analyst.
-- **Shared agent library (CRVLIB)** — ARC-69 shared on-chain component library. Agents can publish and consume reusable components.
-- **Memory browser** — full CRUD UI with search, filter, pagination, and signal-based service for managing on-chain memories.
-
-### Marketplace
-
-- **Tiered pricing plans** — per-use credit billing, verification badges, quality gates, free trial periods, usage metering and analytics.
-- **Reputation-gated access** — trust badges and quality gates based on agent reputation scores.
-- **Escrow system** — fund → deliver → release flow with 72h auto-release and dispute resolution.
-- **USDC mainnet ASA** — mainnet USDC ASA ID `31566704` configured in `.env.mainnet.example`.
+- Configurable fallback chains per task complexity
+- Cloud intern models: DeepSeek V3.1, Qwen3 Coder, GPT-OSS via Ollama proxy
+- Model exam system: 28 test cases across 6 categories for pre-production benchmarking
 
 ### Dashboard & UI
 
-- **Angular 21** — standalone components, signals, mobile-first layout.
-- **Chat-first layout** — streamlined navigation with command palette promotion.
-- **3D visualizations** — Three.js agent network constellation, 3D library browser, agent comms timeline — all toggleable via dual-mode views.
-- **Analytics** — spending trend bar chart, sessions breakdown donut, agent usage dual-bar, all pure CSS.
-- **Dashboard customization** — drag-and-drop widget reorder, per-audience defaults (Creator/Developer/Enterprise), reset-to-defaults.
-- **WCAG AA compliance** — full accessibility audit across all 13+ feature pages.
+- **Angular 21** — standalone components, signals, mobile-first
+- **Chat-first layout** — command palette, recent conversations, quick-start templates
+- **3D visualizations** — agent network constellation, 3D library browser, comms timeline (Three.js)
+- **Brain viewer** — memory browser with search, filter, export, consolidation UI
+- **Analytics** — spending trends, session breakdowns, agent usage
+- **WCAG AA compliance** — full accessibility audit across 13+ pages
 
 ### Developer Experience
 
-- **CLI doctor** — `corvid-agent doctor` health check with first-run welcome banner.
-- **One-line install** — `curl | sh` quickstart for new users.
-- **`bun run setup` wizard** — guided first-run configuration.
-- **`corvid-agent init`** — project bootstrap with `--mcp`, `--yes`, and auto-clone flags.
-- **`corvid-agent settings`** — view/edit config from CLI.
-- **Docker-first** — `docker-compose.yml` at root for zero-config container startup.
-- **OpenAPI docs** — auto-generated API reference at `/api/docs`.
-- **specsync** — bidirectional spec-to-code validation. 195/195 specs pass.
+- `corvid-agent doctor` — health check with first-run welcome banner
+- `corvid-agent init` — project bootstrap with `--mcp`, `--yes`, auto-clone
+- One-line Docker install: `docker compose up`
+- OpenAPI docs at `/api/docs`
+- **spec-sync** — bidirectional spec-to-code validation; 52/52 specs pass
 
 ---
 
-## Security Hardening
-
-This release candidate passes all 24 automated security gating criteria:
+## Security
 
 | Category | Details |
 |----------|---------|
-| **Injection detection** | 30+ prompt injection patterns, <10ms scanner, active on all inbound channels (Discord, Telegram, AlgoChat, HTTP) |
-| **Jailbreak prevention** | Dedicated test suite, unicode bypass detection, API route scanning, prompt leakage prevention |
-| **RBAC** | Permission broker with 50+ actions. Role guards on all 46+ route modules. Auth middleware enforced at startup. |
-| **Spending caps** | Per-agent and per-tenant daily ALGO limits. `DAILY_ALGO_LIMIT_MICRO` enforced before any transaction. |
-| **Tenant isolation** | 88 isolation tests. Tenant-scoped data access. |
-| **Wallet security** | AES-256-GCM encryption, PBKDF2 600,000 iterations, secure memory wipe after signing operations. |
-| **Key management** | KMS migration enforcement, encrypted in-memory key cache, key access audit logging, key rotation tested. |
-| **CORS** | Fail-safe: server refuses to start when `ALLOWED_ORIGINS=*` in remote mode. |
-| **Rate limiting** | Per-route rate limits, client-side dedup, stampede throttling (max 5 sessions spawned per poll cycle). |
-| **Container sandbox** | `SANDBOX_ENABLED=true` isolates agent-generated code execution (recommended for production). |
-| **CodeQL** | TOCTOU race fixed, fd leak fixed, SQL injection in test files replaced with parameterized queries. |
-| **CVEs** | path-to-regexp ReDoS (GHSA-), Hono GHSA-v8w9-8mx6-g223, express-rate-limit bypass, YAML GHSA-48c2-rrv3-qjmp — all patched. |
+| **Injection detection** | 30+ patterns, <10ms scanner; active on Discord, Telegram, AlgoChat, HTTP |
+| **RBAC** | Permission broker with 50+ actions; role guards on all route modules |
+| **Spending caps** | Per-agent daily ALGO limits enforced before any transaction |
+| **Tenant isolation** | 88 isolation tests; tenant-scoped data access |
+| **Wallet security** | AES-256-GCM, PBKDF2 600,000 iterations, secure memory wipe after signing |
+| **CORS** | Server refuses to start with `ALLOWED_ORIGINS=*` in remote mode |
+| **Rate limiting** | Per-route limits; stampede throttling (max 5 sessions per poll cycle) |
+| **CodeQL** | All TOCTOU, fd leak, SQL injection alerts resolved |
+| **CVEs patched** | path-to-regexp ReDoS, Hono CVEs, YAML GHSA-48c2, GHSA-5474-4w2j-mq4c |
+| **Supply chain** | All GitHub Actions pinned to SHA digests |
 
-**Test coverage at RC:**
-- 9,244 tests pass across 390 files (0 failures)
-- 195/195 specs pass
-- TypeScript: `tsc --noEmit --skipLibCheck` clean
-- Security scan: clean
+**Test coverage at v1.0.0:**
+- 9,000+ tests pass across 390+ files (0 failures)
+- 52/52 specs pass (spec-sync v4.0.0)
+- TypeScript 6.0: `tsc --noEmit --skipLibCheck` clean
+- Biome linter: zero errors, zero warnings
 
 ---
 
 ## Breaking Changes
 
 ### v0.25.0
-- **KMS migration required** — wallets must be migrated to the KMS-managed key store. Server enforces migration at startup. Run `corvid-agent migrate-keys` before upgrading.
+- **KMS migration required** — run `corvid-agent migrate-keys` before upgrading.
 
 ### v0.45.0
-- **CORS strict mode** — `ALLOWED_ORIGINS=*` now causes startup failure when `BIND_HOST` is not `localhost`. Set explicit origins or leave `BIND_HOST=127.0.0.1` for local-only deployments.
+- **CORS strict mode** — `ALLOWED_ORIGINS=*` causes startup failure when `BIND_HOST` is not `localhost`.
 
 ### v0.52.0
-- **Database schema version 103** — 28 migration files run automatically. No data loss; all new columns have DEFAULT values. Backup recommended before upgrading.
+- **Database schema version 103** — 28 migrations run automatically. Backup recommended.
 
 ### v0.53.0
-- **`CURSOR_MAX_PARALLEL` renamed** to `CURSOR_MAX_CONCURRENT`. Update your `.env` if you set this value.
+- **`CURSOR_MAX_PARALLEL` renamed** to `CURSOR_MAX_CONCURRENT`.
 
 ### v0.55.0
-- **Intern PR guard** — agents using local Ollama models (intern tier) can no longer create production GitHub PRs. Use a cloud model or explicitly promote the agent tier.
+- **Intern PR guard** — local Ollama agents cannot create production PRs.
 
 ### v0.56.0
-- **`OLLAMA_DEFAULT_MODEL` and `OLLAMA_DEFAULT_LOCAL_MODEL`** env vars replace hardcoded model name defaults.
+- **`OLLAMA_DEFAULT_MODEL` / `OLLAMA_DEFAULT_LOCAL_MODEL`** replace hardcoded defaults.
+
+### v0.61.0 (new since RC)
+- **Memory confirmation gate** — permanent (plain-txn) memory writes require user confirmation.
 
 ---
 
-## Migration Guide (v0.23.x → v1.0.0-rc)
+## Migration Guide (v0.59.x → v1.0.0)
 
-1. **Backup your database:** `cp corvid-agent.db corvid-agent.db.backup`
-2. **Backup your wallet keystore:** `cp wallet-keystore.json wallet-keystore.json.backup`
-3. **Update `.env`:**
+If upgrading from the v1.0.0-rc:
+
+1. **Backup:** `cp corvid-agent.db corvid-agent.db.backup`
+2. **Start server** — DB migrations 112–119 run automatically
+3. **Verify:** `bun run spec:check && bun test`
+
+If upgrading from an older version (v0.23.x or earlier):
+
+1. **Backup:** `cp corvid-agent.db corvid-agent.db.backup && cp wallet-keystore.json wallet-keystore.json.backup`
+2. **Update `.env`:**
    - Rename `CURSOR_MAX_PARALLEL` → `CURSOR_MAX_CONCURRENT`
    - Add `OLLAMA_DEFAULT_MODEL` if you have a preferred local model
-   - Add `OLLAMA_DEFAULT_LOCAL_MODEL` for local-only routing preference
-   - Review `ALLOWED_ORIGINS` — must be explicit domain(s) if `BIND_HOST=0.0.0.0`
+   - Review `ALLOWED_ORIGINS` — must be explicit domains if `BIND_HOST=0.0.0.0`
    - Add `SANDBOX_ENABLED=true` for production deployments
-4. **Run KMS migration** (if not already done): `corvid-agent migrate-keys`
-5. **Start server** — DB migrations 024–111 run automatically
-6. **Verify:** `bun run spec:check && bun test`
+3. **Run KMS migration** (if not already done): `corvid-agent migrate-keys`
+4. **Start server** — all 42 DB migrations run automatically
+5. **Verify:** `bun run spec:check && bun test`
 
-For mainnet deployment, copy `.env.mainnet.example` to `.env` and fill in all required values.
-
----
-
-## Known Issues & Pending Manual Gate Criteria
-
-The following 5 manual checks are required for v1.0.0 (full mainnet launch) but are pending human verification:
-
-- [ ] 3+ external testnet users running stable instances
-- [ ] Zero critical issues reported by testnet users
-- [ ] Self-hosting docs validated by external users
-- [ ] Owner security posture review complete
-- [ ] **Owner sign-off on mainnet readiness** ← blocks v1.0.0 tag
-
-Current automated gate: 24/24 ✅
+For mainnet, copy `.env.mainnet.example` to `.env`.
 
 ---
 
@@ -178,10 +249,10 @@ Current automated gate: 24/24 ✅
 | Dependency | Version | Notes |
 |------------|---------|-------|
 | Bun | ≥1.2 | Runtime |
-| TypeScript | 5.x | Strict mode |
+| TypeScript | 6.0.2 | Strict mode (upgraded from 5.x) |
 | Angular | 21 | Frontend |
 | @anthropic-ai/claude-agent-sdk | latest | Core agent SDK |
-| @modelcontextprotocol/sdk | latest | MCP tooling |
+| @modelcontextprotocol/sdk | 1.28.0+ | MCP tooling |
 | algosdk | latest | Algorand blockchain |
 | three | latest | 3D visualizations |
 
@@ -189,11 +260,9 @@ Current automated gate: 24/24 ✅
 
 ## Mainnet Configuration
 
-See `.env.mainnet.example` for the production configuration template. Key settings for mainnet:
-
 ```bash
 ALGORAND_NETWORK=mainnet
-USDC_ASA_ID=31566704          # mainnet USDC
+USDC_ASA_ID=31566704            # mainnet USDC ASA
 DAILY_ALGO_LIMIT_MICRO=2000000  # 2 ALGO/day conservative start
 BIND_HOST=0.0.0.0
 API_KEY=<strong random key>
@@ -201,12 +270,14 @@ ALLOWED_ORIGINS=https://yourdomain.com
 SANDBOX_ENABLED=true
 ```
 
+See `.env.mainnet.example` for the complete production configuration template.
+
 ---
 
 ## Full Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete commit-by-commit history from v0.7.0 through v0.59.x.
+See [CHANGELOG.md](../CHANGELOG.md) for the complete version-by-version history from v0.7.0 through v1.0.0.
 
 ---
 
-*Closes #1691. Part of #310 v1.0.0-rc.*
+*Closes #1990. Supersedes #1691 (v1.0.0-rc). Resolves #310 (v1.0.0 mainnet launch).*

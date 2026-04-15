@@ -31,7 +31,7 @@
     "@angular/forms": "^21.1.0",
     "@angular/platform-browser": "^21.1.0",
     "@angular/router": "^21.1.0",
-    "marked": "^17.0.5",
+    "marked": "^18.0.0",
     "qrcode": "^1.5.4",
     "rxjs": "~7.8.0",
     "three": "^0.183.2",

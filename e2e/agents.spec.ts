@@ -7,8 +7,8 @@ test.describe('Agents', () => {
         const agentName = `Playwright Agent ${Date.now()}`;
         await gotoWithRetry(page, '/agents');
 
-        // Click "New Agent" link (header button, not the empty-state CTA)
-        await page.locator('.page__header a[href="/agents/new"]').click();
+        // Click "New Agent" link (rendered in .page-shell__actions, not .page__header)
+        await page.locator('a[href="/agents/new"]').first().click();
         await page.waitForURL('/agents/new');
 
         // Fill in the agent form
@@ -71,8 +71,9 @@ test.describe('Agents', () => {
 
         await gotoWithRetry(page, `/agents/${agent.id}`);
 
-        // Verify tabs are present
+        // Verify tabs are present (wait for async render)
         const tabs = page.locator('.tab');
+        await expect(tabs.first()).toBeVisible({ timeout: 10000 });
         expect(await tabs.count()).toBeGreaterThanOrEqual(2);
 
         // First tab should be active (overview)

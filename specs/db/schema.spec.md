@@ -169,7 +169,7 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 ## Invariants
 
-1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 116) is the target. Versions must never be renumbered (version 11 was intentionally skipped; versions 52-67 and 71-77 were collapsed into the v78 baseline)
+1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 119) is the target. Versions must never be renumbered (version 11 was intentionally skipped; versions 52-67 and 71-77 were collapsed into the v78 baseline)
 2. **Single-transaction atomicity**: All pending migrations run inside a single `db.transaction()` call. Either all succeed or none apply
 3. **Idempotent ALTER TABLE**: Before executing `ALTER TABLE ADD COLUMN`, `hasColumn()` checks if the column already exists. `hasColumn()` validates table names against a `SAFE_SQL_IDENTIFIER` regex to prevent SQL injection
 4. **CREATE TABLE IF NOT EXISTS**: All table creation statements use `IF NOT EXISTS` for safety
@@ -189,17 +189,17 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 - **Given** a new empty database
 - **When** `runMigrations(db)` is called
-- **Then** `schema_version` table is created, all migrations from v78 baseline through v116 run, version is set to 116, then `reconcileTables()` runs as a safety net
+- **Then** `schema_version` table is created, all migrations from v78 baseline through v119 run, version is set to 119, then `reconcileTables()` runs as a safety net
 
 ### Scenario: Incremental migration
 
-- **Given** a database at version 112
+- **Given** a database at version 115
 - **When** `runMigrations(db)` is called
-- **Then** only migrations 113-116 are applied, version is updated to 116, then `reconcileTables()` runs
+- **Then** only migrations 116-119 are applied, version is updated to 119, then `reconcileTables()` runs
 
 ### Scenario: Already at current version
 
-- **Given** a database at version 116
+- **Given** a database at version 119
 - **When** `runMigrations(db)` is called
 - **Then** skips the migration transaction (no-op), but still runs `reconcileTables()` to ensure all idempotent statements are applied
 
@@ -245,7 +245,7 @@ Note: This module defines all other database tables in the system. Individual ta
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `SCHEMA_VERSION` | `116` | Target schema version |
+| `SCHEMA_VERSION` | `119` | Target schema version |
 
 ## Migration Summary
 
@@ -282,6 +282,9 @@ Note: This module defines all other database tables in the system. Individual ta
 | 114 | `tenant_members.email` + unique index (proxy trust mode) |
 | 115 | Deduplicate AlgoChat conversations: enforce unique `participant_addr` index |
 | 116 | `governance_proposals.voting_opened_at`, `governance_proposals.voting_deadline`, `proposal_vetoes` + indexes |
+| 117 | `discord_channel_project` — track last-used project per Discord channel |
+| 118 | `discord_thread_sessions.last_summary` — conversation summary for context carry-over |
+| 119 | Telegram runtime configuration tables (mirrors discord_config pattern) |
 
 ## Change Log
 

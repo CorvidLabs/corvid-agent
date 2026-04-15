@@ -3,8 +3,8 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
-import { BrainViewerComponent } from '../brain-viewer/brain-viewer.component';
-import { MemoryBrowserComponent } from '../memory-browser/memory-browser.component';
+import { BrainViewerComponent } from './brain-viewer.component';
+import { MemoryBrowserComponent } from './memory-browser.component';
 
 type MemoryView = 'overview' | 'browse';
 

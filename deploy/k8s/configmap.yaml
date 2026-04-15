@@ -8,7 +8,7 @@ metadata:
 data:
   NODE_ENV: "production"
   PORT: "3578"
-  DB_PATH: "/data/corvid-agent.db"
+  DATABASE_PATH: "/data/corvid-agent.db"
   LOG_LEVEL: "info"
   # Sandbox (requires Docker-in-Docker or privileged mode)
   # SANDBOX_ENABLED: "false"

@@ -5,7 +5,7 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { getBalance, grantCredits } from '../db/credits';
 import { runMigrations } from '../db/schema';
 import { MarketplaceFederation } from '../marketplace/federation';
@@ -543,11 +543,22 @@ describe('MarketplaceFederation', () => {
   });
 
   test('syncInstance marks unreachable on failure', async () => {
-    fed.registerInstance('https://unreachable.invalid', 'Bad');
+    // Mock fetch to reject immediately instead of waiting for DNS timeout
+    const originalFetch = globalThis.fetch;
+    const mockFn = Object.assign(
+      mock(() => Promise.reject(new Error('DNS resolution failed'))),
+      { preconnect: originalFetch.preconnect },
+    );
+    globalThis.fetch = mockFn as unknown as typeof fetch;
+    try {
+      fed.registerInstance('https://unreachable.invalid', 'Bad');
 
-    await fed.syncInstance('https://unreachable.invalid');
+      await fed.syncInstance('https://unreachable.invalid');
 
-    const instance = fed.getInstance('https://unreachable.invalid');
-    expect(instance!.status).toBe('unreachable');
+      const instance = fed.getInstance('https://unreachable.invalid');
+      expect(instance!.status).toBe('unreachable');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

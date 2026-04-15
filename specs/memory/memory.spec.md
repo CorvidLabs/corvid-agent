@@ -294,3 +294,4 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | 2026-03-17 | corvid-agent | Add session exit auto-save (invariant 21), behavioral scenarios (#1186) |
 | 2026-03-17 | corvid-agent | Add two-tier memory architecture (invariants 19-20), update purpose section (#1186) |
 | 2026-02-27 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Verified TTL mechanics (invariants 22-24), schema defaults, and expiry behavior are correct. Note: `expires_at` and `access_count` columns are added by migration 113, not in base schema definition (#2024) |

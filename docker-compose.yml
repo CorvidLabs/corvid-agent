@@ -25,6 +25,10 @@ services:
     environment:
       - PORT=3000
       - BIND_HOST=0.0.0.0
+      # Store DB and wallet in the persistent volume. Default path (./corvid-agent.db)
+      # resolves to /app/corvid-agent.db which is NOT in the volume — set explicitly.
+      - DATABASE_PATH=/app/data/corvid-agent.db
+      - WALLET_KEYSTORE_PATH=/app/data/wallet-keystore.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "bun", "-e", "const r = await fetch('http://localhost:3000/health/ready'); process.exit(r.ok ? 0 : 1)"]

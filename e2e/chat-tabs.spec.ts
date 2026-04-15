@@ -34,7 +34,7 @@ test.describe('Chat Tabs', () => {
         // Click Tab A — should switch back
         await tabAAfter.click();
         await page.waitForURL(`**/sessions/${sessionA.id}**`);
-        await expect(page.locator('.session-view')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('.session-view').first()).toBeVisible({ timeout: 10_000 });
         await expect(page.locator('.tab', { hasText: 'Session Alpha' })).toHaveClass(/tab--active/);
     });
 
@@ -57,13 +57,15 @@ test.describe('Chat Tabs', () => {
         await page.waitForURL(`**/sessions/${sessionA.id}**`);
         await expect(page.locator('.tab', { hasText: 'Stay Session' })).toHaveClass(/tab--active/);
 
-        // Close session B (non-active tab)
-        const closeBtn = page.locator('.tab', { hasText: 'Close Session' }).locator('.tab__close');
-        await closeBtn.click({ force: true });
+        // Close session B (non-active tab) — hover to reveal the button, then click
+        const closeBtnTab = page.locator('.tab', { hasText: 'Close Session' });
+        await closeBtnTab.hover();
+        const closeBtn = closeBtnTab.locator('.tab__close');
+        await closeBtn.click();
 
         // Should still be on session A
         await expect(page).toHaveURL(new RegExp(`sessions/${sessionA.id}`));
-        await expect(page.locator('.session-view')).toBeVisible();
+        await expect(page.locator('.session-view').first()).toBeVisible();
         await expect(page.locator('.tab', { hasText: 'Stay Session' })).toHaveClass(/tab--active/);
 
         // Closed tab should be gone
@@ -84,9 +86,11 @@ test.describe('Chat Tabs', () => {
             isRendered: async (p) => (await p.locator('.session-view').count()) > 0,
         });
 
-        // Close the active tab (session B)
-        const closeBtn = page.locator('.tab--active .tab__close');
-        await closeBtn.click({ force: true });
+        // Close the active tab (session B) — hover to reveal button, then click
+        const closeBtnTab = page.locator('.tab--active');
+        await closeBtnTab.hover();
+        const closeBtn = closeBtnTab.locator('.tab__close');
+        await closeBtn.click();
 
         // Should switch to session A
         await page.waitForURL(`**/sessions/${sessionA.id}**`);
@@ -102,9 +106,11 @@ test.describe('Chat Tabs', () => {
             isRendered: async (p) => (await p.locator('.session-view').count()) > 0,
         });
 
-        // Close the only tab
-        const closeBtn = page.locator('.tab--active .tab__close');
-        await closeBtn.click({ force: true });
+        // Close the only tab — hover to reveal button, then click
+        const closeBtnTab = page.locator('.tab--active');
+        await closeBtnTab.hover();
+        const closeBtn = closeBtnTab.locator('.tab__close');
+        await closeBtn.click();
 
         // Should navigate to /chat
         await page.waitForURL('**/chat**');

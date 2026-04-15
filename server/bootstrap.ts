@@ -18,6 +18,7 @@ import { BuddyService } from './buddy/service';
 import { closeDb } from './db/connection';
 import { MemorySyncService } from './db/memory-sync';
 import { createProject, listProjects } from './db/projects';
+import { getTelegramConfig, initTelegramConfigFromEnv } from './db/telegram-config';
 import { DiscordBridge } from './discord/bridge';
 import { OutcomeTrackerService } from './feedback/outcome-tracker';
 import { CapabilityRouter } from './flock-directory/capability-router';
@@ -432,17 +433,25 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
   // ── Communication bridges (opt-in via env vars) ──────────────────────
   let telegramBridge: TelegramBridge | null = null;
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    initTelegramConfigFromEnv(db);
+    const telegramDynamic = getTelegramConfig(db);
     telegramBridge = new TelegramBridge(
       db,
       processManager,
       {
         botToken: process.env.TELEGRAM_BOT_TOKEN,
         chatId: process.env.TELEGRAM_CHAT_ID,
-        allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        mode: (process.env.TELEGRAM_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined,
+        allowedUserIds:
+          telegramDynamic.allowedUserIds.length > 0
+            ? telegramDynamic.allowedUserIds
+            : (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '')
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
+        mode:
+          telegramDynamic.mode !== 'chat'
+            ? telegramDynamic.mode
+            : ((process.env.TELEGRAM_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined),
       },
       workTaskService,
     );

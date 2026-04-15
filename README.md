@@ -7,126 +7,235 @@
 
 # corvid-agent
 
-**Your own AI developer.** Tell it what you need — it writes the code, opens pull requests, and ships it.
+corvid-agent is an open-source AI agent platform that combines LLM-powered coding with on-chain identity (Algorand/AlgoChat), multi-agent orchestration, and integrations with Discord, Telegram, and GitHub. Agents can write code, open pull requests, send encrypted messages to each other on-chain, deliberate in multi-agent councils, and store long-term memories as Algorand assets — all coordinated through a web dashboard or chat interfaces.
 
-No coding experience required. You describe what you want in plain English, and your agent builds it.
-
-**[Website](https://corvid-agent.github.io)** | **[Docs](docs/README.md)** | **[Examples](docs/use-case-gallery.md)** | **[Blog](https://corvid-agent.github.io/blog)** | **[API Reference](docs/api-reference.md)**
+**[Website](https://corvid-agent.github.io)** | **[Docs](docs/README.md)** | **[Skills](skills/README.md)** | **[Architecture](docs/how-it-works.md)** | **[API Reference](docs/api-reference.md)**
 
 ---
 
-## Quick start
+## Prerequisites
 
-**Option A — one-line installer** (auto-detects everything):
-```bash
-curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
-```
+Before you start, make sure you have the following installed:
 
-**Option B — clone and setup**:
-```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
-bun run setup              # guided wizard: detects AI provider, creates .env, installs deps
-bun run dev                # starts server + dashboard at http://localhost:3000
-```
+| Tool | Purpose | Install |
+|------|---------|---------|
+| **Bun** ≥ 1.1 | Runtime, package manager, test runner | [bun.sh](https://bun.sh) |
+| **Docker** | AlgoKit localnet (Algorand blockchain) | [docker.com](https://www.docker.com) |
+| **AlgoKit** | Algorand local development tools | `pip install algokit` or [docs](https://developer.algorand.org/algokit) |
+| **Node.js** ≥ 20 | Angular CLI for the client | [nodejs.org](https://nodejs.org) |
+| **Anthropic API key** | Powers the AI agents (Claude) | [console.anthropic.com](https://console.anthropic.com) |
 
-**Option C — Docker** (no Bun/Node required):
-```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
-cp .env.example .env       # edit with your API keys (or leave defaults for local Ollama)
-docker compose up -d       # builds and starts at http://localhost:3000
-```
+> **Note:** If you have the Claude Code CLI installed (`claude` on PATH), the server will use your subscription automatically — no API key needed.
 
-Add corvid-agent tools to your AI editor (Claude Code, Cursor, Copilot):
+---
+
+## Quickstart
+
+Get from zero to running in under 10 minutes.
+
+### 1. Clone and install dependencies
 
 ```bash
-corvid-agent init --mcp    # configures MCP server + copies Agent Skills
+git clone https://github.com/CorvidLabs/corvid-agent.git
+cd corvid-agent
+bun install
 ```
 
-**[Full setup guide →](docs/quickstart.md)** | **[MCP setup →](docs/mcp-setup.md)** | **[VibeKit integration →](docs/vibekit-integration.md)**
-
-> **New here?** See what you can build: [Use-case gallery →](docs/use-case-gallery.md) | [Step-by-step recipes →](docs/recipes/your-first-agent.md)
-
----
-
-## What is corvid-agent?
-
-An open-source AI agent platform that writes code, opens pull requests, and ships software. It combines LLM-powered coding with on-chain identity (Algorand/AlgoChat), multi-agent orchestration, and integrations with Discord, Telegram, Slack, and GitHub.
-
-You describe what you want in plain English. Your agent designs, codes, tests, and deploys it.
-
----
-
-## What can it build?
-
-- "Build me a weather dashboard" → [it built this](https://corvid-agent.github.io/weather-dashboard/)
-- "Make a movie browser for classic films" → [it built this](https://corvid-agent.github.io/bw-cinema/)
-- "I need an earthquake tracker" → [it built this](https://corvid-agent.github.io/quake-tracker/)
-- "Create a poetry explorer" → [it built this](https://corvid-agent.github.io/poetry-atlas/)
-- "Build a pixel art editor" → [it built this](https://corvid-agent.github.io/pixel-forge/)
-
-Every app above was designed, coded, tested, and deployed by corvid-agent — zero human-written application code. [See all apps →](https://corvid-agent.github.io)
-
----
-
-## Who is it for?
-
-| | What you get |
-|---|---|
-| **Creators** — have ideas but don't code | Describe what you want in plain English. It designs, codes, and deploys. **[Get started →](docs/quickstart.md)** |
-| **Developers** — write code and want help | Automated PR reviews, CI fixes, test generation, issue triage. **[Use-case gallery →](docs/use-case-gallery.md)** |
-| **Teams** — need AI to handle dev work | Agents review code, write features, ship PRs. **[Business guide →](docs/business-guide.md)** |
-| **Enterprise** — need security, compliance, scale | Multi-tenant, RBAC, audit trails, Docker/K8s. **[Enterprise guide →](docs/enterprise.md)** |
-
----
-
-## Talk to it from anywhere
-
-| Channel | What you need |
-|---------|--------------|
-| **Web dashboard** | Nothing — included at `http://localhost:3000` |
-| **Terminal** | `corvid-agent` (interactive CLI) |
-| **Discord / Telegram / Slack** | Add a bot token to `.env` |
-| **Your AI editor** | `corvid-agent init --mcp` (Claude Code, Cursor, Copilot, etc.) |
-
----
-
-## Extend with VibeKit (Algorand smart contracts)
-
-corvid-agent handles dev orchestration. [VibeKit](https://getvibekit.ai) handles blockchain operations. Together they give you a complete Algorand development stack:
+### 2. Configure your environment
 
 ```bash
-corvid-agent init --mcp    # add corvid-agent MCP tools
-vibekit init               # add blockchain MCP tools (deploy, assets, indexer)
+cp .env.example .env
 ```
 
-Your AI editor gets 56 corvid-agent tools (code, GitHub, scheduling, agents) plus VibeKit tools (contract deploy, ASA management, transaction signing) — all working side by side.
+Open `.env` and set at minimum:
 
-**[VibeKit integration guide →](docs/vibekit-integration.md)**
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # Your Claude API key
+ALGORAND_NETWORK=localnet       # Always localnet for local dev
+```
+
+All other settings have sensible defaults. See `.env.example` for the full reference.
+
+### 3. Start Algorand localnet
+
+AlgoChat (on-chain agent messaging) requires a local Algorand node:
+
+```bash
+algokit localnet start
+```
+
+This starts a local Algorand blockchain using Docker. Keep it running in the background.
+
+### 4. Run the server
+
+```bash
+bun run dev
+```
+
+The server starts at `http://localhost:3000` with hot-reload. On first run it:
+- Runs all database migrations automatically
+- Creates the agent wallet on localnet
+- Starts the AlgoChat listener
+
+### 5. Run the client (optional)
+
+The Angular dashboard gives you a full web UI:
+
+```bash
+bun run dev:client
+```
+
+The dashboard opens at `http://localhost:4200`.
+
+You can also interact with agents directly via AlgoChat, Discord, or Telegram without the dashboard.
 
 ---
 
-## Agent Skills (skills-as-markdown)
+## What you can do
 
-Skills are markdown files in `.skills/` or `skills/` that teach AI assistants how to use corvid-agent. Each skill has a short description for discovery and a full body loaded on demand:
+### Work Tasks — automated code changes
+Tell an agent to implement a GitHub issue. It clones the repo into an isolated git worktree, writes code, runs tests, and opens a pull request — fully automated.
+
+```
+"Fix the bug in issue #42 and open a PR"
+```
+
+See [skills/work-tasks/SKILL.md](skills/work-tasks/SKILL.md) for details.
+
+### AlgoChat — on-chain encrypted messaging
+Agents communicate with each other via X25519-encrypted messages recorded on the Algorand blockchain. Every message is verifiable and tamper-evident. You can also send commands to agents through AlgoChat using pre-shared key (PSK) contacts.
+
+See [skills/algochat/SKILL.md](skills/algochat/SKILL.md) for details.
+
+### Multi-Agent Councils
+Spawn a council of agents that debate a problem through structured discussion rounds, then synthesize a final answer. Useful for code reviews, architecture decisions, and high-stakes tasks where a single agent opinion isn't enough.
+
+See [skills/orchestration/SKILL.md](skills/orchestration/SKILL.md) for details.
+
+### Memory — three-tier persistence
+Agents store memories at three levels:
+- **SQLite** — fast, ephemeral session state
+- **ARC-69 ASAs** — long-term mutable memories stored as Algorand assets
+- **Plain transactions** — permanent, immutable on-chain records
+
+See [skills/memory/SKILL.md](skills/memory/SKILL.md) for details.
+
+### Discord & Telegram bridges
+Connect an agent to a Discord channel or Telegram bot. Users chat with the agent naturally; the agent can send embeds, handle slash commands, and route messages between channels.
+
+See [skills/discord/SKILL.md](skills/discord/SKILL.md) and [skills/telegram/SKILL.md](skills/telegram/SKILL.md).
+
+### Scheduling
+Schedule agents to run on cron schedules — daily summaries, periodic health checks, automated issue triage, and more.
+
+See [skills/scheduling/SKILL.md](skills/scheduling/SKILL.md).
+
+---
+
+## Skills reference
+
+The `skills/` directory contains detailed guides for every capability:
 
 ```
 skills/
-  coding/SKILL.md          # File operations, shell commands
-  github/SKILL.md          # PRs, issues, reviews
-  smart-contracts/SKILL.md # VibeKit + Algorand contract tools
-  scheduling/SKILL.md      # Cron-based task automation
-  ...29 skills total
+  algochat/SKILL.md          # On-chain messaging and agent discovery
+  coding/SKILL.md            # File operations and shell commands
+  github/SKILL.md            # PRs, issues, reviews
+  memory/SKILL.md            # Three-tier memory system
+  orchestration/SKILL.md     # Councils and multi-agent workflows
+  work-tasks/SKILL.md        # Automated code changes and PRs
+  scheduling/SKILL.md        # Cron-based task automation
+  discord/SKILL.md           # Discord bridge
+  telegram/SKILL.md          # Telegram bridge
+  smart-contracts/SKILL.md   # Algorand smart contracts
+  ... 29 skills total
 ```
 
-`corvid-agent init --mcp` copies skills to your editor automatically. **[Skill list →](skills/README.md)**
+**[Full skill list →](skills/README.md)**
+
+---
+
+## Architecture
+
+```
+corvid-agent/
+├── server/          — Bun server (API, WebSocket, process management)
+│   ├── algochat/    — On-chain messaging, wallets, agent directory
+│   ├── db/          — SQLite via bun:sqlite (sessions, agents, projects, memory)
+│   ├── discord/     — Bidirectional Discord bridge
+│   ├── mcp/         — MCP tool definitions and handlers (corvid_* tools)
+│   ├── process/     — Session lifecycle, SDK integration, approval flow
+│   ├── routes/      — HTTP API routes (55+ modules)
+│   ├── telegram/    — Bidirectional Telegram bridge
+│   └── work/        — Work task service (branch, run agent, validate, PR)
+├── client/          — Angular 21 mobile-first dashboard
+├── shared/          — TypeScript types shared by server and client
+├── skills/          — AI agent skill documentation (29 skill files)
+├── specs/           — Module specifications (source of truth)
+└── deploy/          — Dockerfile, docker-compose, systemd, macOS LaunchAgent
+```
+
+The server exposes a REST API and WebSocket endpoint. The client connects to the server at `localhost:3000`. Agents run as child processes spawned by the server, communicate through the Claude Agent SDK, and have access to 56 MCP tools covering GitHub, AlgoChat, scheduling, memory, and more.
 
 ---
 
 ## Tech stack
 
-Bun + Angular 21 + SQLite + Claude Agent SDK + Algorand (on-chain identity). 56 MCP tools, 236 API endpoints, 455 test files, 212 module specs. [Release notes →](docs/releases.html)
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Bun |
+| Database | SQLite via `bun:sqlite` (42 migrations, schema v119) |
+| Agent SDK | `@anthropic-ai/claude-agent-sdk` |
+| MCP | `@modelcontextprotocol/sdk` |
+| Frontend | Angular 21 (standalone components, signals) |
+| Blockchain | Algorand (AlgoChat, wallets, ARC-69 memory) |
+| Voice | OpenAI TTS (`tts-1`) and Whisper (STT) |
 
-**[Architecture →](docs/how-it-works.md)** | **[Security →](SECURITY.md)** | **[Deployment →](docs/self-hosting.md)**
+---
+
+## Coding conventions
+
+- TypeScript strict mode, named exports (no default exports)
+- `bun:sqlite` for database, `bun:test` for tests
+- `createLogger('ModuleName')` for logging
+- `Bun.spawn` over `child_process` for subprocesses
+- Read the relevant spec in `specs/` before modifying any module
+
+---
+
+## Verification
+
+Run before committing:
+
+```bash
+bun run lint                          # Biome lint
+bun x tsc --noEmit --skipLibCheck    # TypeScript type check
+bun test                              # Test suite
+bun run spec:check                    # Spec invariant verification
+```
+
+See [skills/verification/SKILL.md](skills/verification/SKILL.md) for details.
+
+---
+
+## Algorand network
+
+- **`localnet`** — Used for all local development. Requires Docker + `algokit localnet start`. Free, instant, self-contained. This is always the right setting for `ALGORAND_NETWORK` in `.env`.
+- **`testnet` / `mainnet`** — Only for communicating with external users or other corvid-agent instances on different machines.
+
+**Never set `ALGORAND_NETWORK=testnet` for local development.** Testnet wallets cost real testnet ALGO and transactions are slow.
+
+---
+
+## Backup
+
+Back up `corvid-agent.db` daily via the built-in endpoint:
+
+```bash
+curl -X POST http://localhost:3000/api/backup -H "Authorization: Bearer $API_KEY"
+```
+
+Also back up `wallet-keystore.json` (encrypted) and `.env` — losing the keystore means permanent loss of agent wallet access. See **[Backup & Recovery →](docs/backup-and-recovery.md)** for full procedures including restore steps, scheduling, and disaster recovery.
 
 ---
 

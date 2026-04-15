@@ -3,9 +3,9 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
-import { SecurityOverviewComponent } from '../security-overview/security-overview.component';
-import { WalletViewerComponent } from '../wallets/wallet-viewer.component';
-import { SpendingComponent } from '../spending/spending.component';
+import { SecurityOverviewComponent } from './security-overview.component';
+import { WalletViewerComponent } from './wallet-viewer.component';
+import { SpendingComponent } from './spending.component';
 
 type SecuritySection = 'overview' | 'wallets' | 'spending';
 

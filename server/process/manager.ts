@@ -202,6 +202,22 @@ export class ProcessManager {
           meta.restartCount = 0;
         }
       },
+      onStartupTimeout: (sessionId) => {
+        const session = getSession(this.db, sessionId);
+        const meta = this.sessionMeta.get(sessionId);
+        log.error(`Session ${sessionId} startup timeout — no events received, killing session`, {
+          name: session?.name,
+          agentId: session?.agentId,
+          source: meta?.source ?? session?.source,
+        });
+        addSessionMessage(
+          this.db,
+          sessionId,
+          'system',
+          'Session timed out waiting for the model to respond. The model endpoint may be down or overloaded. Try again or use a different agent.',
+        );
+        this.stopProcess(sessionId, 'startup_timeout');
+      },
       isRunning: (sessionId) => this.processes.has(sessionId),
       getLastActivityAt: (sessionId) => this.sessionMeta.get(sessionId)?.lastActivityAt,
     });
@@ -827,6 +843,7 @@ export class ProcessManager {
 
     this.timerManager.startStableTimer(session.id);
     this.timerManager.startSessionTimeout(session.id);
+    this.timerManager.startStartupTimeout(session.id);
 
     log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
@@ -1552,6 +1569,8 @@ export class ProcessManager {
     if (meta) {
       meta.lastActivityAt = Date.now();
       this.timerManager.startSessionTimeout(sessionId);
+      // First event received — clear the startup timeout
+      this.timerManager.clearStartupTimeout(sessionId);
     }
 
     // Cursor (and similar): per-turn cost/metrics without broadcasting `result`

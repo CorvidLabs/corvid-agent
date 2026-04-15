@@ -20,7 +20,7 @@ test.describe('System Logs', () => {
         await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const hasList = await page.locator('.log-list').count() > 0;
-        const hasEmpty = await page.locator('.empty').count() > 0;
+        const hasEmpty = await page.locator('.empty-state').count() > 0;
         expect(hasList || hasEmpty).toBe(true);
 
         if (hasList) {

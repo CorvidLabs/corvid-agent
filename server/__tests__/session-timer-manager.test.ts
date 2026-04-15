@@ -18,6 +18,7 @@ describe('SessionTimerManager', () => {
     callbacks = {
       onTimeout: (sessionId) => timeoutSessions.push(sessionId),
       onStablePeriod: (sessionId) => stableSessions.push(sessionId),
+      onStartupTimeout: (sessionId) => timeoutSessions.push(sessionId),
       isRunning: (sessionId) => runningSessions.has(sessionId),
       getLastActivityAt: (sessionId) => activityMap.get(sessionId),
     };
@@ -33,6 +34,7 @@ describe('SessionTimerManager', () => {
       const stats = manager.getStats();
       expect(stats.sessionTimeouts).toBe(0);
       expect(stats.stableTimers).toBe(0);
+      expect(stats.startupTimeouts).toBe(0);
     });
 
     it('accepts custom config', () => {
@@ -190,18 +192,94 @@ describe('SessionTimerManager', () => {
     });
   });
 
+  describe('startStartupTimeout / clearStartupTimeout', () => {
+    it('fires onStartupTimeout when no events arrive within the window', async () => {
+      const startupTimeouts: string[] = [];
+      callbacks.onStartupTimeout = (sessionId) => startupTimeouts.push(sessionId);
+      runningSessions.add('s1');
+      manager = new SessionTimerManager(callbacks, { startupTimeoutMs: 50 });
+
+      manager.startStartupTimeout('s1');
+      expect(manager.getStats().startupTimeouts).toBe(1);
+
+      await new Promise((r) => setTimeout(r, 100));
+      expect(startupTimeouts).toContain('s1');
+      expect(manager.getStats().startupTimeouts).toBe(0);
+    });
+
+    it('does not fire if cleared before timeout', async () => {
+      const startupTimeouts: string[] = [];
+      callbacks.onStartupTimeout = (sessionId) => startupTimeouts.push(sessionId);
+      runningSessions.add('s1');
+      manager = new SessionTimerManager(callbacks, { startupTimeoutMs: 50 });
+
+      manager.startStartupTimeout('s1');
+      manager.clearStartupTimeout('s1');
+
+      await new Promise((r) => setTimeout(r, 100));
+      expect(startupTimeouts).toHaveLength(0);
+      expect(manager.getStats().startupTimeouts).toBe(0);
+    });
+
+    it('does not fire if session stopped running before timeout', async () => {
+      const startupTimeouts: string[] = [];
+      callbacks.onStartupTimeout = (sessionId) => startupTimeouts.push(sessionId);
+      runningSessions.add('s1');
+      manager = new SessionTimerManager(callbacks, { startupTimeoutMs: 50 });
+
+      manager.startStartupTimeout('s1');
+      runningSessions.delete('s1');
+
+      await new Promise((r) => setTimeout(r, 100));
+      expect(startupTimeouts).toHaveLength(0);
+    });
+
+    it('clearStartupTimeout is idempotent', () => {
+      manager = new SessionTimerManager(callbacks);
+      manager.clearStartupTimeout('nonexistent');
+      expect(manager.getStats().startupTimeouts).toBe(0);
+    });
+
+    it('startStartupTimeout resets existing timer', async () => {
+      const startupTimeouts: string[] = [];
+      callbacks.onStartupTimeout = (sessionId) => startupTimeouts.push(sessionId);
+      runningSessions.add('s1');
+      manager = new SessionTimerManager(callbacks, { startupTimeoutMs: 80 });
+
+      manager.startStartupTimeout('s1');
+      await new Promise((r) => setTimeout(r, 50));
+      manager.startStartupTimeout('s1');
+      expect(manager.getStats().startupTimeouts).toBe(1);
+
+      // Original timer would have fired at 80ms, but we reset at 50ms
+      await new Promise((r) => setTimeout(r, 50));
+      expect(startupTimeouts).toHaveLength(0);
+
+      // Reset timer fires at 130ms total
+      await new Promise((r) => setTimeout(r, 50));
+      expect(startupTimeouts).toContain('s1');
+    });
+  });
+
   describe('cleanupSession', () => {
-    it('clears both stable timer and session timeout', () => {
-      manager = new SessionTimerManager(callbacks, { stablePeriodMs: 10000, agentTimeoutMs: 10000 });
+    it('clears all timers including startup timeout', () => {
+      manager = new SessionTimerManager(callbacks, {
+        stablePeriodMs: 10000,
+        agentTimeoutMs: 10000,
+        startupTimeoutMs: 10000,
+      });
       runningSessions.add('s1');
       manager.startStableTimer('s1');
       manager.startSessionTimeout('s1');
+      manager.startStartupTimeout('s1');
       expect(manager.getStats().stableTimers).toBe(1);
       expect(manager.getStats().sessionTimeouts).toBe(1);
+      expect(manager.getStats().startupTimeouts).toBe(1);
 
       manager.cleanupSession('s1');
       expect(manager.getStats().stableTimers).toBe(0);
       expect(manager.getStats().sessionTimeouts).toBe(0);
+      expect(manager.getStats().startupTimeouts).toBe(0);
     });
   });
 
