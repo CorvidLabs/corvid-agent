@@ -17,6 +17,41 @@ const PR_URL_REGEX = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/;
 
 const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
 
+/**
+ * Error patterns that indicate session output is an error message, not a useful work summary.
+ * These should never appear verbatim in PR descriptions or task summaries.
+ */
+const ERROR_PATTERNS = [
+  /\berror\b.*\btimed?\s*out\b/i,
+  /\bollama_proxy_error\b/i,
+  /\bAPI\s*Error:\s*\d{3}\b/i,
+  /\brequest\s+failed\b/i,
+  /\bconnection\s+refused\b/i,
+  /\bECONNREFUSED\b/,
+  /\bENOTFOUND\b/,
+  /\bsocket\s+hang\s+up\b/i,
+  /\bfetch\s+failed\b/i,
+  /\bUnhandledPromiseRejection\b/,
+  /\bstack\s*trace\b/i,
+  /\bat\s+\S+\s+\(\S+:\d+:\d+\)/, // Stack frame pattern
+];
+
+/**
+ * Sanitize session output for use in PR summaries and task descriptions.
+ * If the output looks like an error/crash message, replace with a safe fallback.
+ */
+function sanitizeSessionSummary(output: string, maxLength: number): string {
+  const trimmed = output.slice(-maxLength).trim();
+  if (!trimmed) return '(no output captured)';
+
+  const isError = ERROR_PATTERNS.some((p) => p.test(trimmed));
+  if (isError) {
+    log.warn('Sanitized error message from session output (would have been used as PR summary)');
+    return '(session ended with an error — see task logs for details)';
+  }
+  return trimmed;
+}
+
 export interface SessionLifecycleContext {
   db: Database;
   processManager: ProcessManager;
@@ -60,7 +95,7 @@ export async function handleSessionEnd(
     // Max iterations reached — fail the task
     updateWorkTaskStatus(ctx.db, taskId, 'failed', {
       error: `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`,
-      summary: sessionOutput.slice(-500).trim(),
+      summary: sanitizeSessionSummary(sessionOutput, 500),
     });
     await cleanupWorktree(ctx.db, taskId);
     ctx.notifyCallbacks(taskId);
@@ -106,7 +141,7 @@ export async function finalizeTask(ctx: SessionLifecycleContext, taskId: string,
   }
 
   if (prUrl) {
-    const summary = sessionOutput.slice(-500).trim();
+    const summary = sanitizeSessionSummary(sessionOutput, 500);
     updateWorkTaskStatus(ctx.db, taskId, 'completed', { prUrl, summary });
     log.info('Work task completed with PR', { taskId, prUrl });
 
@@ -114,7 +149,7 @@ export async function finalizeTask(ctx: SessionLifecycleContext, taskId: string,
   } else {
     updateWorkTaskStatus(ctx.db, taskId, 'failed', {
       error: 'Session completed but no PR URL was found in output and service-level PR creation failed',
-      summary: sessionOutput.slice(-500).trim(),
+      summary: sanitizeSessionSummary(sessionOutput, 500),
     });
     log.warn('Work task completed without PR URL', { taskId });
   }
@@ -192,7 +227,7 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
 
     // Create PR via gh CLI
     const title = `[Agent] ${task.description.slice(0, 60)}`;
-    const baseBody = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sessionOutput.slice(-300).trim()}`;
+    const baseBody = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sanitizeSessionSummary(sessionOutput, 300)}`;
     const body = baseBody + formatAgentSignature(agent, taskId);
     log.info('Fallback: creating PR', { taskId, branch: task.branchName });
 
