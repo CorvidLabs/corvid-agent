@@ -19,6 +19,7 @@ import { getAgent } from '../db/agents';
 import { isAllowed } from '../db/allowlist';
 import { recordAudit } from '../db/audit';
 import { recordConversationMessage } from '../db/conversation-access';
+import { recordObservation } from '../db/observations';
 import { getProject } from '../db/projects';
 import {
   createConversation,
@@ -662,6 +663,15 @@ export class MessageRouter {
         // Handle session start failure
         try {
           this.processManager.startProcess(session, agentContent);
+          // Record inbound AlgoChat message as a short-term observation
+          recordObservation(this.db, {
+            agentId,
+            source: 'algochat',
+            sourceId: session.id,
+            content: `[algochat] ${participant.slice(0, 12)}: ${agentContent.slice(0, 200)}`,
+            suggestedKey: `algochat:${session.id}`,
+            relevanceScore: 1.5,
+          });
         } catch (err) {
           log.error('Failed to start process for new conversation', {
             sessionId: session.id,
@@ -707,6 +717,15 @@ export class MessageRouter {
               this.subscriptionManager.subscribeForResponse(session.id, participant);
               try {
                 this.processManager.startProcess(session, agentContent);
+                // Record inbound AlgoChat message as a short-term observation
+                recordObservation(this.db, {
+                  agentId,
+                  source: 'algochat',
+                  sourceId: session.id,
+                  content: `[algochat] ${participant.slice(0, 12)}: ${agentContent.slice(0, 200)}`,
+                  suggestedKey: `algochat:${session.id}`,
+                  relevanceScore: 1.5,
+                });
               } catch (err) {
                 log.error('Failed to start process for existing conversation', {
                   sessionId: session.id,

@@ -800,6 +800,49 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: v0.63 — Block Explorer, Memory Consolidation, and the Library Reorganization -->
+      <article class="post post--full" id="v0-63-block-explorer"
+               data-tags="milestone,engineering,memory" data-date="2026-04-15"
+               data-search="v0.63 block explorer memory consolidation export merge duplicate detection discord streaming UX channel affinity telegram configuration librarian CRVLIB permissions spec-sync v4 corvid-pet corvin">
+        <div class="post-meta">
+          <time datetime="2026-04-15">2026-04-15</time>
+          <span class="post-tag tag-milestone">MILESTONE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-memory">MEMORY</span>
+        </div>
+        <h2><a href="#v0-63-block-explorer">v0.63 &mdash; Block Explorer, Memory Consolidation, and the Library Reorganization</a></h2>
+
+        <p><strong>TL;DR:</strong> Agents can now browse on-chain Algorand data through a built-in block explorer. The memory system got its biggest upgrade yet &mdash; automatic duplicate detection, merge UI, and bulk export. Discord UX was overhauled with streaming message edits. And the shared knowledge library (CRVLIB) went from 50 scattered entries to 16 organized books with enforced write permissions.</p>
+
+        <h3>Block Explorer (v0.63)</h3>
+        <p>We shipped an on-chain block explorer API that lets agents (and the dashboard) browse Algorand transaction data directly. Blocks, transactions, accounts, ASAs &mdash; all queryable through the server API. This was the &ldquo;what&rsquo;s next&rdquo; item from the last post, and it&rsquo;s the foundation for the memory visualization features that followed.</p>
+
+        <h3>Memory Consolidation &amp; Export</h3>
+        <p>The memory system&rsquo;s biggest pain point: duplicate and overlapping memories accumulating over weeks of agent operation. The new consolidation service scans for duplicates using content similarity, suggests merges, and provides a UI for reviewing and executing them. Paired with the new memory export API, you can now dump an agent&rsquo;s entire memory state &mdash; useful for backup, migration, or auditing what an agent actually knows.</p>
+
+        <h3>Discord UX Overhaul</h3>
+        <p>Three improvements that make Discord interactions feel significantly more responsive: <strong>streaming message edits</strong> update the message in real-time as the agent generates (no more waiting for the full response), <strong>contextual action buttons</strong> surface relevant actions inline, and <strong>thread continuity</strong> preserves conversation context across session boundaries. Channel-project affinity also landed &mdash; each Discord channel now remembers which project it&rsquo;s associated with, fixing a long-standing bug where @mentions in project-specific channels would load the wrong context.</p>
+
+        <h3>CRVLIB: Library Reorganization</h3>
+        <p>The shared agent library had grown organically to 50 entries &mdash; duplicate references, 14-page security standards split across individual ASAs, three separate &ldquo;rules&rdquo; documents saying overlapping things. Today we consolidated it down to 16 well-organized books: one team directory, one combined rules standard, one communication guide, one security &amp; review standard. Each topic gets exactly one entry. A new <strong>librarian permission model</strong> controls who can write to the library, preventing unauthorized entries.</p>
+
+        <h3>Platform Housekeeping</h3>
+        <p>Telegram got runtime configuration &mdash; bot settings are now DB-backed with a settings API and UI, no more env-var restarts. <strong>spec-sync</strong> was upgraded to v4.0 with stricter validation. Kite (Cursor agent) was retired from the active roster. And <strong>corvid-pet</strong> (Corvin, the virtual companion) was integrated into CI and release workflows.</p>
+
+        <h3>By the Numbers</h3>
+        <ul>
+          <li>29 commits since last post</li>
+          <li>v0.63.0 &rarr; v0.63.1 released</li>
+          <li>CRVLIB: 50 entries &rarr; 16 organized books</li>
+          <li>6 new API endpoints (explorer, memory export, Telegram settings)</li>
+          <li>spec-sync v3.8 &rarr; v4.0 migration</li>
+          <li>Zero lint errors, zero type errors, all tests passing</li>
+        </ul>
+
+        <h3>What&rsquo;s Next</h3>
+        <p>Memory visualization in the brain viewer &mdash; interactive graphs showing how memories relate to each other and how they&rsquo;ve been consolidated over time. Session memory tab for browsing per-session context. And continued work on making the agent team more autonomous &mdash; less supervision, more self-coordination.</p>
+      </article>
+
       <!-- Post: Voice Conversations, Platform Hardening, and the Sound of Agents -->
       <article class="post post--full" id="voice-and-hardening"
                data-tags="engineering,release,research" data-date="2026-04-10"

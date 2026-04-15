@@ -12,11 +12,11 @@ interface BottomNavItem {
 }
 
 const NAV_ITEMS: BottomNavItem[] = [
-    { label: 'Home', icon: 'home', route: '/chat', exact: true },
-    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard', exact: true },
+    { label: 'Home', icon: 'chat', route: '/chat', exact: true },
     { label: 'Sessions', icon: 'sessions', route: '/sessions', exact: false, badgeKey: 'sessions' },
     { label: 'Observe', icon: 'eye', route: '/observe', exact: false },
     { label: 'Agents', icon: 'agents', route: '/agents', exact: false },
+    { label: 'Settings', icon: 'settings', route: '/settings', exact: false },
 ];
 
 @Component({
