@@ -63,7 +63,7 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 
 | Type | Description |
 |------|-------------|
-| `TrustLevel` | `'untrusted' \| 'low' \| 'medium' \| 'high' \| 'verified'` |
+| `TrustLevel` | `'untrusted' \| 'low' \| 'medium' \| 'high' \| 'verified' \| 'blacklisted'` |
 | `ReputationScore` | Full score with components, trust level, attestation hash, timestamp |
 | `ReputationComponents` | Five numeric component scores (0-100) |
 | `ReputationEvent` | Camel-case event record |
@@ -81,7 +81,7 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 
 1. All component scores are integers in the range [0, 100].
 2. Overall score is the weighted sum of components, clamped to [0, 100] and rounded to nearest integer.
-3. Trust level thresholds are fixed: verified >= 90, high >= 70, medium >= 50, low >= 25, untrusted < 25.
+3. Trust level thresholds are fixed: blacklisted (explicit blocklist), verified >= 90, high >= 70, medium >= 50, low >= 25, untrusted < 25.
 4. `computeScore()` always persists via INSERT OR REPLACE and returns the fresh score.
 5. `computeAllIfStale()` only recomputes agents whose `computed_at` is older than 5 minutes or missing.
 6. `computeAll()` and `computeAllIfStale()` return results sorted by `overallScore` descending.

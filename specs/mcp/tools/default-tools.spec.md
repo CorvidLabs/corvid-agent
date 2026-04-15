@@ -20,7 +20,7 @@ Defines the canonical list of default tools available to all agents when no expl
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `DEFAULT_CORE_TOOLS` | `readonly string[]` | 41-element array of tool name strings representing the union of tools from both the SDK-tools and direct-tools backends |
+| `DEFAULT_CORE_TOOLS` | `readonly string[]` | 59-element array of tool name strings representing the union of tools from both the SDK-tools and direct-tools backends |
 
 ## Invariants
 
@@ -34,7 +34,7 @@ Defines the canonical list of default tools available to all agents when no expl
 
 - **Given** a consumer module (e.g., skill-bundles) needs the default tool list
 - **When** it imports `DEFAULT_CORE_TOOLS`
-- **Then** it receives a readonly array of 41 tool name strings covering both SDK-tools and direct-tools backends
+- **Then** it receives a readonly array of 59 tool name strings covering both SDK-tools and direct-tools backends
 
 ## Error Cases
 
