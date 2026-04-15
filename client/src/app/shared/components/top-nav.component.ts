@@ -20,13 +20,20 @@ import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
+interface NavChild {
+    label: string;
+    icon: string;
+    route: string;
+    divider?: boolean; // show a separator line above this item
+}
+
 interface NavTab {
     key: string;
     label: string;
     icon: string;
     route: string;
     matchRoutes: string[];
-    children: { label: string; icon: string; route: string }[];
+    children: NavChild[];
 }
 
 const TABS: NavTab[] = [
@@ -51,21 +58,12 @@ const TABS: NavTab[] = [
         label: 'Sessions',
         icon: 'sessions',
         route: '/sessions',
-        matchRoutes: ['/sessions'],
+        matchRoutes: ['/sessions', '/observe', '/library'],
         children: [
             { label: 'Conversations', icon: 'sessions', route: '/sessions' },
             { label: 'Work Tasks', icon: 'list', route: '/sessions/work-tasks' },
             { label: 'Councils', icon: 'users', route: '/sessions/councils' },
-        ],
-    },
-    {
-        key: 'observe',
-        label: 'Observe',
-        icon: 'eye',
-        route: '/observe',
-        matchRoutes: ['/observe', '/library'],
-        children: [
-            { label: 'Comms', icon: 'activity', route: '/observe/comms' },
+            { label: 'Comms', icon: 'activity', route: '/observe/comms', divider: true },
             { label: 'Memory', icon: 'database', route: '/observe/memory' },
             { label: 'Library', icon: 'book-open', route: '/library' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
@@ -130,6 +128,9 @@ const TABS: NavTab[] = [
                             @if (openDropdown() === tab.key && tab.children.length > 1) {
                                 <div class="topnav__dropdown">
                                     @for (child of tab.children; track child.route) {
+                                        @if (child.divider) {
+                                            <div class="topnav__dropdown-divider"></div>
+                                        }
                                         <a
                                             class="topnav__dropdown-item"
                                             [routerLink]="child.route"
@@ -339,6 +340,11 @@ const TABS: NavTab[] = [
         .topnav__dropdown-item--active {
             color: var(--accent-cyan);
             background: var(--accent-cyan-dim);
+        }
+        .topnav__dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.25rem 0;
         }
 
         /* Right side */
