@@ -800,6 +800,62 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: Road to v1.0 — Settings Self-Service, Navigation Overhaul, and the 1000-PR Milestone -->
+      <article class="post post--full" id="road-to-v1"
+               data-tags="milestone,engineering,release" data-date="2026-04-15"
+               data-search="v1.0 settings runtime configuration tabbed UI navigation observe tab session memory cross-channel guard deployment cloud Tailscale TypeScript 6.0 e2e tests PR sanitization dependency audit changelog">
+        <div class="post-meta">
+          <time datetime="2026-04-15">2026-04-15</time>
+          <span class="post-tag tag-milestone">MILESTONE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-release">RELEASE</span>
+        </div>
+        <h2><a href="#road-to-v1">Road to v1.0 &mdash; Settings Self-Service, Navigation Overhaul, and the 1000-PR Milestone</a></h2>
+
+        <p><strong>TL;DR:</strong> Agents can now inspect their own runtime configuration through a new self-service settings API. The dashboard got a full navigation overhaul &mdash; tabbed settings, a dedicated Observe tab, and session memory browsing. Cross-channel messaging safety landed, deployment got easier with cloud options and Tailscale support, and we compiled the v1.0 changelog. 37 PRs merged in four days.</p>
+
+        <h3>Settings: Agents That Know Themselves</h3>
+        <p>A recurring pain point: agents couldn&rsquo;t see their own configuration. Which model am I running? What&rsquo;s my approval mode? Is voice enabled? The new <code>GET /api/settings/runtime</code> endpoint exposes non-sensitive runtime configuration to agents and the dashboard. It&rsquo;s read-only and deliberately excludes secrets &mdash; this is about transparency, not access control bypass.</p>
+        <p>On the UI side, the settings page was a single scrollable form. Now it&rsquo;s organized into three tabs: <strong>General</strong> (identity, model, approval mode), <strong>Channels</strong> (Discord, Telegram, AlgoChat), and <strong>Advanced</strong> (voice, scheduling, developer options). Telegram settings are fully runtime-configurable &mdash; bot token, allowed users, and mode are now DB-backed instead of requiring env-var restarts.</p>
+
+        <h3>Navigation: Less Chrome, More Signal</h3>
+        <p>The dashboard navigation was getting cluttered. We pulled monitoring into a dedicated <strong>Observe</strong> tab (health, reputation, credits &mdash; everything you check but don&rsquo;t change), cleaned up the Sessions dropdown to remove stale entries, and added a <strong>session memory tab</strong> that shows per-session observations and context. The result: fewer clicks to get to what you actually use, and a clear separation between &ldquo;do things&rdquo; and &ldquo;watch things.&rdquo;</p>
+
+        <h3>Cross-Channel Messaging Guard</h3>
+        <p>When an agent receives a message from Discord, its reply should go back to Discord &mdash; not get accidentally routed through AlgoChat or Telegram. The new cross-channel messaging guard enforces channel affinity at the tool level. If a session was initiated from Discord, <code>corvid_send_message</code> calls that would route to a different channel are blocked with a clear error. This fixes a class of subtle bugs where agents would &ldquo;reply&rdquo; to Discord messages by sending AlgoChat transactions.</p>
+
+        <h3>Deployment: From Laptop to Cloud</h3>
+        <p>Three changes that make deployment significantly more accessible: <strong>data persistence fixes</strong> in the Docker setup (SQLite volumes were silently being recreated on restart, losing all agent state), <strong>cloud deployment options</strong> in the install script for running on VPS/cloud instances, and a <strong>Tailscale remote access guide</strong> for secure tunneling to a home server. The goal: you should be able to go from <code>git clone</code> to running agents in under 10 minutes on any platform.</p>
+
+        <h3>v1.0 Changelog</h3>
+        <p>We compiled the full changelog from v0.1.0 through the current release. 1,985+ pull requests. Highlights that surprised even us: 119 database migrations, 55 API route modules, 29 skill files, and a spec-sync quality gate that validates all of it. The changelog itself is a document &mdash; it tells the story of a platform that started as a CLI wrapper and grew into a multi-agent orchestration system with on-chain identity, voice conversations, and automated governance.</p>
+
+        <h3>TypeScript 6.0</h3>
+        <p>We evaluated the TypeScript 6.0.2 upgrade and gave it a GO. The new <code>--erasableSyntaxOnly</code> flag, improved type narrowing, and faster incremental builds all benefit the codebase. No breaking changes in our usage patterns. The upgrade is staged for the next release cycle.</p>
+
+        <h3>Quality &amp; Testing</h3>
+        <ul>
+          <li><strong>E2E test stabilization</strong> &mdash; Three separate PRs fixed race conditions in the chat tab tests. Flaky tests are a tax on every PR; these are now deterministic.</li>
+          <li><strong>PR summary sanitization</strong> &mdash; Work task PRs were occasionally including raw error messages in their descriptions when the agent session failed mid-summary. Now sanitized.</li>
+          <li><strong>Client refactor</strong> &mdash; Consolidated dead feature directories from earlier migrations. The client directory structure now matches the actual routing.</li>
+          <li><strong>Dependency audits</strong> &mdash; Two audit passes bumped all outdated packages. SDK upgraded to 0.2.107.</li>
+          <li><strong>Session startup timeout</strong> &mdash; Sessions stuck on slow model endpoints now time out gracefully instead of hanging indefinitely.</li>
+        </ul>
+
+        <h3>By the Numbers</h3>
+        <ul>
+          <li>37 PRs merged in 4 days</li>
+          <li>3 new API endpoints (runtime settings, Telegram config, memory observations)</li>
+          <li>3 e2e test stabilization passes</li>
+          <li>2 full dependency audit sweeps</li>
+          <li>1 v1.0 changelog compiled (1,985+ PRs documented)</li>
+          <li>0 lint errors, 0 type errors, all specs passing</li>
+        </ul>
+
+        <h3>What&rsquo;s Next</h3>
+        <p>The v1.0 release itself. We have the changelog, the quality gates, and the feature set. What remains is the release checklist: final security audit, migration testing, documentation review, and a decision on whether the Algorand integration stays localnet-only or ships with testnet support. The platform is ready &mdash; now we make it official.</p>
+      </article>
+
       <!-- Post: v0.63 — Block Explorer, Memory Consolidation, and the Library Reorganization -->
       <article class="post post--full" id="v0-63-block-explorer"
                data-tags="milestone,engineering,memory" data-date="2026-04-15"
