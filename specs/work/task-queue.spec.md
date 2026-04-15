@@ -60,7 +60,7 @@ Provides concurrency-controlled dispatch of work tasks. Tasks are enqueued with 
 
 ## Invariants
 
-1. At most `maxConcurrency` tasks may be in an active state (branching/running/validating) at any time.
+1. At most `maxConcurrency` tasks may be in an active state (branching/running/validating) globally. Additionally, at most one task may be active **per project** at any time — `dispatchCandidates` skips projects that already have an active task.
 2. The dispatch tick uses `BEGIN IMMEDIATE` (via `writeTransaction`) to prevent two concurrent ticks from racing on the same candidates.
 3. Candidates are atomically promoted from `pending` to `branching` within the same transaction before execution begins.
 4. `enqueue()` rejects with `ValidationError` when `workTaskService.shuttingDown` is true.
@@ -112,7 +112,7 @@ Provides concurrency-controlled dispatch of work tasks. Tasks are enqueued with 
 | Module | What is used |
 |--------|-------------|
 | `work/service` | `WorkTaskService` for task creation, execution, and drain |
-| `db/work-tasks` | `countActiveTasks`, `countPendingTasks`, `dispatchCandidates`, `getActiveTasksByProject`, `updateWorkTaskStatus` |
+| `db/work-tasks` | `countActiveTasks`, `countPendingTasks`, `dispatchCandidates` (returns pending tasks for projects with no active task, ordered by priority DESC then created_at ASC), `getActiveTasksByProject`, `updateWorkTaskStatus` |
 | `db/pool` | `writeTransaction` for atomic dispatch |
 | `db/agents` | `getAgent` for resolving agent at dispatch time |
 | `db/projects` | `getProject` for resolving project at dispatch time |
@@ -139,3 +139,4 @@ Provides concurrency-controlled dispatch of work tasks. Tasks are enqueued with 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-12 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Clarify per-project concurrency constraint in Invariant 1, document dispatchCandidates ordering behavior (#2024) |
