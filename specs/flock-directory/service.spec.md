@@ -58,7 +58,7 @@ _No standalone exported functions. All functionality is exposed via the exported
 | `search` | `(params: FlockDirectorySearchParams)` | `FlockDirectorySearchResult` | Filtered search with pagination and sorting |
 | `computeReputation` | `(id: string)` | `FlockAgent \| null` | Computes composite 0–100 reputation score from uptime, attestations, council, heartbeat |
 | `recomputeAllReputations` | `()` | `number` | Recomputes scores for all non-deregistered agents |
-| `sweepStaleAgents` | `()` | `number` | Marks agents inactive if no heartbeat for 30 minutes |
+| `sweepStaleAgents` | `()` | `number` | Marks agents inactive if no heartbeat for 24 hours |
 | `getStats` | `()` | `{ total, active, inactive, onChainAppId }` | Directory statistics |
 | `selfRegister` | `(opts: { address, name, description, instanceUrl, capabilities })` | `Promise<FlockAgent>` | Idempotent self-registration for this corvid-agent instance |
 | `syncFromChain` | `(address: string)` | `Promise<OnChainAgentRecord \| null>` | Fetches on-chain record and enriches off-chain entry with tier/score |
@@ -70,7 +70,7 @@ _No standalone exported functions. All functionality is exposed via the exported
 3. Deregistration is a soft delete — sets `status = 'deregistered'`, never removes the row.
 4. Heartbeat only updates agents not in 'deregistered' status.
 5. `selfRegister` is idempotent — if already registered at the given address, it sends a heartbeat instead.
-6. Stale sweep threshold is 30 minutes without heartbeat.
+6. Stale sweep threshold is 24 hours without heartbeat.
 7. `computeReputation` score is always clamped to 0–100.
 8. Reputation weights: uptime 35%, attestations 25% (log scale, cap 20), council 20% (linear, cap 10), heartbeat 20% (active=full, inactive=half).
 9. Search defaults to sorting by reputation_score DESC when no sortBy is specified.
@@ -109,7 +109,7 @@ _No standalone exported functions. All functionality is exposed via the exported
 
 ### Scenario: Stale agent sweep
 
-- **Given** an agent's last heartbeat was 45 minutes ago
+- **Given** an agent's last heartbeat was 25 hours ago
 - **When** `sweepStaleAgents()` runs
 - **Then** the agent's status changes from 'active' to 'inactive'
 
