@@ -206,8 +206,10 @@ export function listLibraryEntriesGrouped(
   if (!includeArchived) {
     conditions.push('archived = 0');
   }
-  // Only return non-book entries OR page 1 of books
-  conditions.push('(book IS NULL OR page = 1)');
+  // Return page 1 of books, OR standalone entries that have no matching book
+  conditions.push(
+    '(page = 1 OR (book IS NULL AND key NOT IN (SELECT DISTINCT book FROM agent_library WHERE book IS NOT NULL AND archived = 0)))',
+  );
 
   if (category) {
     conditions.push('category = ?');
