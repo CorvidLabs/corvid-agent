@@ -4,6 +4,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { configFromEnv } from '../config/loader';
 import { recordAudit } from '../db/audit';
 import {
   deleteDiscordConfigKey,
@@ -42,6 +43,15 @@ export function handleSettingsRoutes(
   // GET /api/settings — all settings (system metadata is admin-only)
   if (url.pathname === '/api/settings' && req.method === 'GET') {
     return handleGetSettings(db, context?.role === 'admin');
+  }
+
+  // GET /api/settings/runtime — sanitized view of current runtime configuration (operator+)
+  if (url.pathname === '/api/settings/runtime' && req.method === 'GET') {
+    if (context) {
+      const denied = tenantRoleGuard('operator')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleGetRuntimeConfig();
   }
 
   // PUT /api/settings/credits — update credit config
@@ -138,6 +148,66 @@ export function handleSettingsRoutes(
   }
 
   return null;
+}
+
+function handleGetRuntimeConfig(): Response {
+  const config = configFromEnv();
+  const env = process.env;
+
+  return json({
+    agent: {
+      name: config.agent.name,
+      description: config.agent.description ?? null,
+      defaultModel: config.agent.defaultModel,
+      defaultProvider: config.agent.defaultProvider,
+    },
+    server: {
+      port: config.server.port,
+      bindHost: config.server.bindHost,
+      logLevel: config.server.logLevel ?? 'info',
+      logFormat: config.server.logFormat ?? 'text',
+      apiKeyConfigured: Boolean(config.server.apiKey),
+      adminApiKeyConfigured: Boolean(config.server.adminApiKey),
+      allowedOrigins: config.server.allowedOrigins ?? null,
+      publicUrl: config.server.publicUrl ?? null,
+    },
+    database: {
+      path: config.database.path,
+    },
+    providers: {
+      enabled: config.providers.enabledProviders,
+      anthropicConfigured: Boolean(config.providers.anthropic?.apiKey),
+      ollamaHost: config.providers.ollama?.host ?? 'http://localhost:11434',
+      openrouterConfigured: Boolean(env.OPENROUTER_API_KEY),
+      councilModel: config.providers.councilModel ?? null,
+    },
+    integrations: {
+      discord: {
+        enabled: config.integrations?.discord?.enabled ?? false,
+        tokenConfigured: Boolean(config.integrations?.discord?.botToken),
+        channelConfigured: Boolean(config.integrations?.discord?.channelId),
+      },
+      telegram: {
+        enabled: config.integrations?.telegram?.enabled ?? false,
+        tokenConfigured: Boolean(config.integrations?.telegram?.botToken),
+        chatIdConfigured: Boolean(config.integrations?.telegram?.chatId),
+      },
+      algochat: {
+        enabled: config.integrations?.algochat?.enabled ?? false,
+        mnemonicConfigured: Boolean(config.integrations?.algochat?.mnemonic),
+        network: config.integrations?.algochat?.network ?? 'localnet',
+      },
+      github: {
+        tokenConfigured: Boolean(config.integrations?.github?.token),
+        owner: config.integrations?.github?.owner ?? null,
+        repo: config.integrations?.github?.repo ?? null,
+      },
+      slack: {
+        enabled: config.integrations?.slack?.enabled ?? false,
+        tokenConfigured: Boolean(config.integrations?.slack?.botToken),
+      },
+    },
+  });
 }
 
 function handleGetSettings(db: Database, isAdmin: boolean): Response {

@@ -566,6 +566,7 @@ Every request passes through these stages in order:
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
 | GET | `/api/settings` | settings.ts | Get all settings (credits config, system stats) |
+| GET | `/api/settings/runtime` | settings.ts | Get sanitized view of current runtime configuration (operator+) |
 | PUT | `/api/settings/credits` | settings.ts | Update credit configuration |
 | POST | `/api/settings/api-key/rotate` | settings.ts | Rotate the API key |
 | GET | `/api/settings/api-key/status` | settings.ts | Get API key rotation and expiry status |
