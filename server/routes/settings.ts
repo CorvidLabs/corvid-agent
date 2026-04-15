@@ -132,7 +132,6 @@ export function handleSettingsRoutes(
     return handleDeleteTelegramConfigKey(db, telegramKeyMatch[1], context);
   }
 
-
   // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
   if (url.pathname === '/api/settings/purge-test-data' && req.method === 'POST') {
     return handlePurgeTestData(req, db, context);
@@ -403,7 +402,6 @@ function handleDeleteTelegramConfigKey(db: Database, key: string, context?: Requ
   recordAudit(db, 'telegram_config_delete', actor, 'telegram_config', null, key);
   return json({ ok: true, deleted: key });
 }
-
 
 async function handlePurgeTestData(req: Request, db: Database, context?: RequestContext): Promise<Response> {
   let dryRun = true;
