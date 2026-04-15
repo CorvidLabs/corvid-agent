@@ -9,11 +9,7 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/chat-home/chat-home.component').then((m) => m.ChatHomeComponent),
     },
-    {
-        path: 'dashboard',
-        loadComponent: () =>
-            import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-    },
+    { path: 'dashboard', redirectTo: 'chat', pathMatch: 'full' },
 
     // ── Agents (consolidated) ───────────────────────────────────────────
     {
@@ -143,12 +139,8 @@ export const routes: Routes = [
         ],
     },
 
-    // ── Library (CRVLIB knowledge base) ────────────────────────────
-    {
-        path: 'library',
-        loadComponent: () =>
-            import('./features/library/library.component').then((m) => m.LibraryComponent),
-    },
+    // ── Library (CRVLIB knowledge base) — redirect to observe tab ──
+    { path: 'library', redirectTo: 'observe/library', pathMatch: 'full' },
 
     // ── Observe (monitoring & analytics) ─────────────────────────────
     {
