@@ -77,8 +77,9 @@ type MemoryTab = 'observations' | 'longterm';
                     </div>
                 } @else if (observations().length === 0) {
                     <app-empty-state
+                        icon="visibility"
                         title="No observations yet"
-                        message="Short-term observations for this agent will appear here as they accumulate." />
+                        description="Short-term observations for this agent will appear here as they accumulate." />
                 } @else {
                     <div class="session-memory__list">
                         @for (obs of observations(); track obs.id) {
@@ -112,8 +113,9 @@ type MemoryTab = 'observations' | 'longterm';
                     </div>
                 } @else if (memories().length === 0) {
                     <app-empty-state
+                        icon="memory"
                         title="No on-chain memories"
-                        message="Long-term memories stored on Algorand for this agent will appear here." />
+                        description="Long-term memories stored on Algorand for this agent will appear here." />
                 } @else {
                     <div class="session-memory__list">
                         @for (mem of memories(); track mem.id) {
