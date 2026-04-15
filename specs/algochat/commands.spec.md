@@ -68,6 +68,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `setWorkCommandRouter` | `router: WorkCommandRouter` | `void` | Injects the optional work command router |
 | `setAgentMessenger` | `messenger: AgentMessenger` | `void` | Injects the optional agent messenger reference (used for council launches) |
 | `setSchedulerService` | `service: SchedulerService` | `void` | Injects the optional scheduler service reference |
+| `setSubscriptionManager` | `manager: SubscriptionManager` | `void` | Injects the subscription manager (required for /message command) |
 | `isOwner` | `participant: string` | `boolean` | Checks if a participant address is in the configured owner set; fail-closed (returns false when no owners configured) |
 | `handleCommand` | `participant: string, content: string, responseFn?: (text: string) => void` | `boolean` | Parses and dispatches a slash command; returns `true` if handled, `false` if not a command. When `responseFn` is provided (local/dashboard chat), responses go through it; otherwise responses are sent on-chain |
 
@@ -78,7 +79,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `constructor` | `db: Database` | `WorkCommandRouter` | Creates router with DB reference |
 | `setWorkTaskService` | `service: WorkTaskService` | `void` | Injects or updates the WorkTaskService dependency |
 | `hasService` | _(getter)_ | `boolean` | Returns whether a WorkTaskService is currently available |
-| `handleSlashCommand` | `participant: string, description: string, respond: (text: string) => void, findAgent: () => string \| null` | `void` | Handles `/work [--project <name>] <description>` from AlgoChat; parses optional `--project` flag, creates task, registers completion callback, responds with task confirmation and PR URL on completion |
+| `handleSlashCommand` | `participant: string, description: string, respond: (text: string) => void, findAgent: () => string \| null` | `void` | Handles `/work [--project <name>] [--buddy <agent>] [--rounds <n>] <description>` from AlgoChat; parses optional `--project`, `--buddy`, and `--rounds` flags (rounds clamped to [1, 10]), creates task with optional buddy config, registers completion callback, responds with task confirmation and PR URL on completion |
 | `handleAgentWorkRequest` | `params: AgentWorkRequestParams` | `Promise<AgentWorkRequestResult>` | Handles `[WORK]` prefix from agent-to-agent messages; creates agent_messages row, delegates to WorkTaskService, registers completion callback that updates message status |
 
 ## Invariants
@@ -125,6 +126,16 @@ _No standalone exported functions. All functionality is exposed via exported cla
 - **When** owner sends `/work --project nft-remix add unit tests for auth module`
 - **Then** a work task is created targeting the "nft-remix" project with the description "add unit tests for auth module"
 
+### Scenario: /work with --buddy flag
+- **Given** the work command router and WorkTaskService are available, and agents Alice and Bob exist
+- **When** owner sends `/work --buddy Bob fix the login page CSS`
+- **Then** a work task is created with buddy agent Bob configured for review
+
+### Scenario: /work same agent as buddy
+- **Given** the work command router is available and agent Alice exists
+- **When** owner sends `/work --buddy Alice fix the bug` (from Alice's chat)
+- **Then** responds with "Agent cannot be its own buddy"
+
 ### Scenario: /work with unknown project
 - **Given** the work command router is available but no project named "nonexistent" exists
 - **When** owner sends `/work --project nonexistent fix a bug`
@@ -154,6 +165,9 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `/work` without available agent | Responds "No agent available for work tasks" |
 | `/work --project unknown-name ...` | Responds with "Project not found" and lists available projects |
 | `/work --project name` (no description after) | Responds with usage message |
+| `/work --buddy <same-agent>` | Responds with "Agent cannot be its own buddy" |
+| `/work --buddy <unknown>` | Responds with "Buddy agent not found" |
+| `/work --rounds <n>` (n outside [1, 10]) | Value is clamped to valid range silently |
 | WorkTaskService.create fails | Error message sent via respond callback |
 | `[WORK]` with empty description | Throws `ValidationError` |
 | `[WORK]` without WorkTaskService | Throws `NotFoundError` |
@@ -199,3 +213,4 @@ _No standalone exported functions. All functionality is exposed via exported cla
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-10 | corvid-agent | v2: `/work` command now supports `--project <name>` flag for targeting specific projects. Improved response messages with ✓/✗ status indicators and completion notifications with PR URL and summary. Added behavioral examples for `--project` usage and unknown project error. Updated error cases |
+| 2026-04-14 | corvid-agent | v3: Document `setSubscriptionManager` method, `--buddy`/`--rounds` flags for `/work`, buddy error cases (#2025) |

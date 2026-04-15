@@ -28,9 +28,7 @@ the allowlist (or everyone, if the global allowlist is empty). This module
 adds a **per-agent** access layer with three modes — private, allowlist,
 public — plus per-address rate limiting and blocklisting.
 
-**Self-protection invariant:** The primary agent (CorvidAgent) defaults to
-`private` mode. Any mode change requires owner confirmation via the owner
-question system.
+**Self-protection note:** The primary agent (CorvidAgent) defaults to `private` mode. Self-protection enforcement (requiring owner confirmation for mode changes) is not currently implemented in the route handler.
 
 ## Public API
 
@@ -77,7 +75,7 @@ _None — this module uses pure functions backed by SQLite._
 3. **Private means private.** In `private` mode, only owner addresses may converse. No exceptions.
 4. **Silent denial.** Denied messages produce no response to the sender — no error, no acknowledgment.
 5. **Default mode is `private`.** New agents and existing agents without an explicit mode are treated as `private`.
-6. **Self-protection.** The primary agent (identified by `ALGOCHAT_PRIMARY_AGENT_ID` env var or the first agent created) cannot have its mode changed without owner confirmation.
+6. **Self-protection (not implemented).** The primary agent defaults to `private` mode (see default mode invariant #5), but mode changes via the API are not currently gated by owner confirmation. The `ALGOCHAT_PRIMARY_AGENT_ID` env var is parsed but not used for enforcement.
 7. **Rate limits are per-address per-agent.** Each agent can have its own rate-limit configuration. Default: 10 messages per 60 minutes for non-owner addresses.
 8. **Global allowlist is still checked first.** The per-agent access check runs _after_ the existing global allowlist gate. A participant must pass both.
 
@@ -118,12 +116,11 @@ _None — this module uses pure functions backed by SQLite._
 - **When** `OWNER...` sends a message
 - **Then** `checkConversationAccess` returns `{ allowed: true, reason: null }`
 
-### Scenario: Self-protection on mode change
+### Scenario: Mode change (self-protection not enforced)
 
 - **Given** agent "corvid-agent" is the primary agent
 - **When** an API request attempts to set `conversation_mode = 'public'`
-- **Then** the system sends an owner question: "Change corvid-agent conversation mode to public? This will allow anyone to message this agent."
-- **And** the mode is only changed if the owner approves
+- **Then** the mode is updated immediately — no owner confirmation is required (self-protection is not currently implemented)
 
 ## Error Cases
 
@@ -133,7 +130,7 @@ _None — this module uses pure functions backed by SQLite._
 | Agent disabled | Returns `{ allowed: false, reason: 'agent_disabled' }` |
 | Agent has no `conversation_mode` set | Treated as `'private'` |
 | Rate-limit table missing | Gracefully defaults to allowing (fail-open only for rate limits, not access) |
-| Invalid address format | Denied (treated as blocked) |
+| Invalid address format | No address-format validation is performed; any string is accepted as a participant address |
 
 ## Dependencies
 
@@ -196,12 +193,13 @@ _Note: `conversation_mode` is stored as a new column on the `agents` table._
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `ALGOCHAT_PRIMARY_AGENT_ID` | _(first agent)_ | Agent ID that requires owner confirmation for mode changes |
-| `CONVERSATION_RATE_LIMIT_WINDOW` | `3600` | Default rate-limit window (seconds) |
-| `CONVERSATION_RATE_LIMIT_MAX` | `10` | Default max messages per window |
+| `ALGOCHAT_PRIMARY_AGENT_ID` | _(first agent)_ | Parsed but not currently used for mode-change enforcement |
+| `CONVERSATION_RATE_LIMIT_WINDOW` | `3600` | Default rate-limit window (seconds) — written to agent columns at migration time, not read at access-check time |
+| `CONVERSATION_RATE_LIMIT_MAX` | `10` | Default max messages per window — written to agent columns at migration time, not read at access-check time |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-23 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Clarify self-protection as unimplemented, fix invalid-address error case, clarify env var semantics (#2019) |
