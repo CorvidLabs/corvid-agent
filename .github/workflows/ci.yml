@@ -66,12 +66,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Spec validation (strict + 100% coverage)
-        uses: CorvidLabs/spec-sync@v4.2.0
-        with:
-          strict: 'true'
-          comment: 'false'
-
-      - name: Spec check (script)
         id: spec-check
         run: |
           bash scripts/specsync.sh check --strict --require-coverage 100
