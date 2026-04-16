@@ -10,8 +10,8 @@ import { runMigrations } from '../db/schema';
 import { handleLibraryWrite } from '../mcp/tool-handlers/library';
 import type { McpToolContext } from '../mcp/tool-handlers/types';
 
-// CorvidAgent — the default librarian
-const CORVID_AGENT_ID = '90cf34fa-1478-454c-a789-1c87cbb0d552';
+// CorvidAgent — the default librarian (must match LIBRARIAN_AGENT_IDS in library.ts)
+const CORVID_AGENT_ID = '357251b1-128f-47a6-a8c1-d6cfa1c62b24';
 const OTHER_AGENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
 let db: Database;
