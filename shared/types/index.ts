@@ -14,6 +14,7 @@ export * from './projects';
 export * from './reputation';
 export * from './schedules';
 export * from './sessions';
+export * from './settings';
 export * from './skill-bundles';
 export * from './variants';
 export * from './voice';
