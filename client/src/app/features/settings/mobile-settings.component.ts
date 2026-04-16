@@ -106,30 +106,35 @@ interface PSKContact {
     `,
     styles: `
         ${SECTION_STYLES}
-        .connect-desc { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; }
+        .connect-desc { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem; }
         .contact-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; max-height: 500px; overflow-y: auto; }
-        .contact-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
-        .contact-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
-        .contact-nickname { font-weight: 700; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; }
+        .contact-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem; }
+        .contact-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+        .contact-nickname { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; }
         .contact-nickname-input {
-            padding: 0.25rem 0.4rem; background: var(--bg-input); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.8rem;
-            font-family: inherit; font-weight: 600; outline: none; width: 140px;
+            padding: 0.5rem 0.65rem; background: var(--bg-input); border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;
+            font-family: inherit; font-weight: 600; outline: none; width: 160px; min-height: 38px;
         }
-        .contact-status { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto; }
+        .contact-status { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto; }
         .contact-status--active { color: var(--accent-green); }
         .contact-status--waiting { color: var(--accent-gold); }
         .contact-address {
-            display: block; font-size: 0.6rem; color: var(--accent-magenta);
-            background: var(--bg-surface); padding: 2px 4px; border-radius: var(--radius-sm);
-            margin-bottom: 0.4rem; word-break: break-all;
+            display: block; font-size: 0.8rem; color: var(--accent-magenta);
+            background: var(--bg-surface); padding: 4px 8px; border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem; word-break: break-all;
         }
-        .contact-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-        .icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); }
-        .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface); }
+        .contact-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .icon-btn {
+            background: none; border: 1px solid var(--border); color: var(--text-secondary);
+            cursor: pointer; font-size: 1rem; padding: 0.35rem 0.5rem; border-radius: var(--radius-sm);
+            min-width: 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface); border-color: var(--border-bright); }
         .qr-container { display: flex; justify-content: center; margin-top: 0.75rem; }
         .qr-canvas { border-radius: var(--radius); border: 2px solid var(--accent-cyan); box-shadow: 0 0 12px var(--accent-cyan-mid); }
-        .add-contact { margin-top: 0.5rem; }
+        .add-contact { margin-top: 0.75rem; }
         .add-contact-form { display: flex; align-items: center; gap: 0.5rem; }
     `,
 })

@@ -282,59 +282,62 @@ interface SimpleAgent {
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        .discord-field { display: flex; flex-direction: column; gap: 0.2rem; }
+        .discord-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .discord-field--wide { grid-column: 1 / -1; }
-        .discord-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; }
+        .discord-label { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
         .discord-input, .discord-select, .discord-textarea {
-            padding: 0.45rem;
+            padding: 0.55rem 0.65rem;
             background: var(--bg-input);
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             font-family: inherit;
             width: 100%;
+            min-height: 44px;
         }
-        .discord-textarea { resize: vertical; font-size: 0.75rem; font-family: var(--font-mono); }
+        .discord-textarea { resize: vertical; font-size: 0.8rem; font-family: var(--font-mono); min-height: 60px; }
         .discord-select { cursor: pointer; }
         .discord-input:focus, .discord-select:focus, .discord-textarea:focus {
             border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
         }
-        .discord-desc { font-size: 0.6rem; color: var(--text-tertiary); }
-        .discord-select--sm { padding: 0.3rem; font-size: 0.75rem; width: auto; min-width: 120px; }
+        .discord-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: 0.1rem; }
+        .discord-select--sm { padding: 0.45rem 0.55rem; font-size: 0.8rem; width: auto; min-width: 130px; min-height: 38px; }
         .discord-actions { display: flex; gap: 0.5rem; align-items: center; }
-        .chip-list { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+        .chip-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
         .chip {
-            display: inline-flex; align-items: center; gap: 0.3rem;
-            padding: 0.2rem 0.5rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.35rem 0.6rem; background: var(--accent-cyan-dim); color: var(--accent-cyan);
             border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
-            font-size: 0.7rem; font-weight: 600;
+            font-size: 0.78rem; font-weight: 600; min-height: 32px;
         }
-        .chip-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; padding: 0.2rem 0.3rem; min-width: 24px; min-height: 24px; line-height: 1; opacity: 0.7; display: inline-flex; align-items: center; justify-content: center; }
+        .chip-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 1.1rem; padding: 0.25rem 0.35rem; min-width: 32px; min-height: 32px; line-height: 1; opacity: 0.7; display: inline-flex; align-items: center; justify-content: center; }
         .chip-remove:hover { opacity: 1; }
-        .picker-search { margin-bottom: 0.3rem; }
+        .picker-search { margin-bottom: 0.4rem; }
         .picker-results {
-            display: flex; flex-direction: column; gap: 0.15rem;
-            max-height: 160px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 0.2rem;
+            max-height: 200px; overflow-y: auto;
             background: var(--bg-raised); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 0.3rem;
+            border-radius: var(--radius); padding: 0.35rem;
         }
         .picker-item {
             background: none; border: none; color: var(--text-primary);
-            text-align: left; padding: 0.3rem 0.5rem; cursor: pointer;
-            border-radius: var(--radius-sm); font-size: 0.75rem; font-family: inherit;
+            text-align: left; padding: 0.5rem 0.65rem; cursor: pointer;
+            border-radius: var(--radius-sm); font-size: 0.8rem; font-family: inherit;
             display: flex; justify-content: space-between; align-items: center;
+            min-height: 40px; transition: background 0.12s;
         }
         .picker-item:hover { background: var(--bg-surface); color: var(--accent-cyan); }
-        .picker-id { font-size: 0.6rem; color: var(--text-tertiary); font-family: var(--font-mono); }
-        .picker-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.3rem 0.5rem; }
-        .role-perm-grid { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
+        .picker-id { font-size: 0.78rem; color: var(--text-tertiary); font-family: var(--font-mono); }
+        .picker-empty { font-size: 0.8rem; color: var(--text-tertiary); padding: 0.5rem 0.65rem; }
+        .role-perm-grid { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
         .role-perm-row {
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.3rem 0.5rem; background: var(--bg-raised); border-radius: var(--radius-sm);
+            padding: 0.5rem 0.65rem; background: var(--bg-raised); border-radius: var(--radius-sm);
+            min-height: 44px;
         }
-        .role-name { font-size: 0.75rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .channel-name { font-size: 0.75rem; font-weight: 600; flex: 1; color: var(--text-primary); }
+        .role-name { font-size: 0.8rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .channel-name { font-size: 0.8rem; font-weight: 600; flex: 1; color: var(--text-primary); }
         @media (max-width: 600px) { .discord-grid { grid-template-columns: 1fr; } }
     `,
 })

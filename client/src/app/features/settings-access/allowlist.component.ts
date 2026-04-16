@@ -82,17 +82,19 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         </app-page-shell>
     `,
     styles: `
-        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
         .input {
-            flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
+            flex: 1; padding: 0.55rem 0.85rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;
+            min-width: 0; transition: border-color 0.15s;
         }
+        .input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .input::placeholder { color: var(--text-tertiary); }
         .input--label { max-width: 200px; }
-        .input--inline { flex: 1; padding: 0.3rem var(--space-2); font-size: 0.8rem; }
+        .input--inline { flex: 1; padding: 0.5rem 0.65rem; font-size: 0.85rem; min-height: 38px; }
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
+            padding: 0.55rem 1.1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em;
             transition: background 0.15s, box-shadow 0.15s; background: transparent;
         }
         .btn:disabled { opacity: 0.4; cursor: default; }
@@ -100,22 +102,27 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
-        .list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .list { display: flex; flex-direction: column; gap: 0.6rem; }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
+            padding: 1rem 1.1rem; background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); transition: border-color 0.15s;
         }
+        .list__item:hover { border-color: var(--border-bright); }
         .list__item-main { flex: 1; min-width: 0; }
-        .list__item-address { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-primary); word-break: break-all; }
-        .list__item-label { font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+        .list__item-address { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .list__item-label { font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; }
         .list__item-label:hover { color: var(--text-primary); }
-        .label-row { margin-top: 0.25rem; }
-        .edit-row { display: flex; gap: 0.5rem; margin-top: 0.25rem; align-items: center; }
-        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: 0.75rem; color: var(--text-tertiary); margin-left: 1rem; }
+        .label-row { margin-top: 0.3rem; }
+        .edit-row { display: flex; gap: 0.5rem; margin-top: 0.3rem; align-items: center; }
+        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: 0.8rem; color: var(--text-tertiary); margin-left: 1rem; }
+        @media (max-width: 600px) {
+            .add-form { flex-direction: column; }
+            .input--label { max-width: none; }
+        }
     `,
 })
 export class AllowlistComponent implements OnInit {
