@@ -23,6 +23,7 @@ import {
   saveThreadSession,
   updateThreadSessionActivity,
 } from '../db/discord-thread-sessions';
+import { recordObservation } from '../db/observations';
 import { listProjects } from '../db/projects';
 import { createSession, getPreviousThreadSessionSummary, getSession, getSessionMessages } from '../db/sessions';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
@@ -750,6 +751,16 @@ async function handleMentionReply(
   );
   const promptWithContext = previousContext ? `${previousContext}\n\n${textWithUrls}` : textWithUrls;
   ctx.processManager.startProcess(session, promptWithContext);
+
+  // Record inbound Discord message as a short-term observation for context retention
+  recordObservation(ctx.db, {
+    agentId: agent.id,
+    source: 'discord',
+    sourceId: session.id,
+    content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
+    suggestedKey: `discord:${session.id}`,
+    relevanceScore: 1.5,
+  });
 
   const agentName = agent.name;
   const agentModel = agent.model || 'unknown';

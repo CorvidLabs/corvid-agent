@@ -32,7 +32,7 @@ const VALID_CATEGORIES: LibraryCategory[] = ['guide', 'reference', 'decision', '
  * All other callers receive an error. CorvidAgent is the default librarian.
  */
 const LIBRARIAN_AGENT_IDS: ReadonlySet<string> = new Set([
-  '90cf34fa-1478-454c-a789-1c87cbb0d552', // CorvidAgent — default librarian
+  '357251b1-128f-47a6-a8c1-d6cfa1c62b24', // CorvidAgent — default librarian
 ]);
 
 /**

@@ -12,6 +12,7 @@ files:
   - server/process/provider-routing.ts
   - server/process/session-exit-handler.ts
   - server/process/event-handler.ts
+  - server/process/approval-manager.ts
 db_tables:
   - sessions
   - session_messages
@@ -41,9 +42,10 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `ResolvedSessionConfig` | Complete resolved configuration for a session (from session-config-resolver.ts) |
 | `PausedSessionInfo` | Paused session tracking info: pausedAt, resumeAttempts, nextResumeAt (from session-resilience-manager.ts) |
 | `SessionResilienceCallbacks` | Callback interface for resilience manager: resumeProcess, stopProcess, isRunning, clearTimers, cancelApprovals (from session-resilience-manager.ts) |
-| `SessionTimerCallbacks` | Callback interface for timer manager: onTimeout, onStablePeriod, isRunning, getLastActivityAt (from session-timer-manager.ts) |
-| `SessionTimerConfig` | Timer configuration: agentTimeoutMs, stablePeriodMs, timeoutCheckIntervalMs (from session-timer-manager.ts) |
+| `SessionTimerCallbacks` | Callback interface for timer manager: onTimeout, onStablePeriod, onStartupTimeout, isRunning, getLastActivityAt (from session-timer-manager.ts) |
+| `SessionTimerConfig` | Timer configuration: agentTimeoutMs, stablePeriodMs, timeoutCheckIntervalMs, startupTimeoutMs (from session-timer-manager.ts) |
 | `RoutingDecision` | Result of a provider routing decision: provider, reason (`'default' \| 'agent_config' \| 'no_claude_access' \| 'cursor_binary_missing' \| 'ollama_via_claude_proxy'`), fallback flag, effectiveModel |
+| `OperationalMode` | `'normal' \| 'queued' \| 'paused'` — server operational mode managed by ApprovalManager |
 
 ### Exported Classes
 
@@ -51,6 +53,7 @@ This is the most complex module in the system (~1135 lines after decomposition).
 |-------|-------------|
 | `ProcessManager` | Session lifecycle orchestrator |
 | `McpServiceContainer` | Manages MCP service registration and tool context building (from mcp-service-container.ts) |
+| `ApprovalManager` | Manages tool approval queuing, operational mode (normal/queued/paused), and approval/denial flow (from approval-manager.ts) |
 | `SessionResilienceManager` | Handles session recovery: API outage pause/resume, crash restart with exponential backoff, orphan pruning (from session-resilience-manager.ts) |
 | `SessionTimerManager` | Manages timer-based session concerns: stable-period timers, per-session inactivity timeouts, fallback timeout checker (from session-timer-manager.ts) |
 
@@ -58,7 +61,7 @@ This is the most complex module in the system (~1135 lines after decomposition).
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `resolveProviderRouting` | `(opts: { providerType, agentModel, hasCursorBinary, hasClaudeAccess, hasOllamaProvider, ollamaDefaultModel? })` | `RoutingDecision` | Pure function to determine provider routing decision based on agent config and system state |
+| `resolveProviderRouting` | `(opts: { providerType, agentModel, hasCursorBinary, hasClaudeAccess, hasOllamaProvider, ollamaDefaultModel? })` | `RoutingDecision` | Re-exported from `provider-routing.ts` for backward compatibility |
 
 ### Exported Functions (from session-config-resolver.ts)
 
@@ -359,3 +362,4 @@ Internal constants (not env-configurable):
 | 2026-03-30 | corvid-agent | Context resets now save conversation summaries as memory observations (#1753) |
 | 2026-04-09 | corvid-agent | Added OLLAMA_USE_CLAUDE_PROXY routing, relevant observations loaded on session resume (#1779), zero-turn circuit breaker (3 consecutive zero-turn completions blocks resume) |
 | 2026-04-09 | corvid-agent | Added extracted sub-modules: provider-routing.ts, resume-prompt-builder.ts, event-handler.ts, session-exit-handler.ts (#1940) |
+| 2026-04-14 | corvid-agent | Add 15 missing modules to files list, fix SessionTimerCallbacks/Config types, clarify resolveProviderRouting re-export (#2022) |

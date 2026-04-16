@@ -46,7 +46,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 ## Invariants
 
 1. **Requires `PermissionLevel.BASIC` or higher** — rejects with permission error otherwise.
-2. **`agent` and `text` options are required** (legacy `message` option still accepted during rollout); responds with error if the body is missing. Optional **`project`** (autocomplete) overrides the agent default project when set. If `project` is omitted, resolution is the agent’s default project, else the first project in the DB — not a special “sandbox” unless that is how the project is named or configured.
+2. **`agent` and `text` options are required** (legacy `message` option still accepted during rollout); responds with error if the body is missing. Optional **`project`** (autocomplete) overrides the agent default project when set. If `project` is omitted, resolution is the agent’s default project, else the first project in the DB. Optional **`buddy`** (string) specifies a second agent to review the lead’s response. Optional **`rounds`** (integer) caps the buddy review loop, clamped to [1, 10], defaulting to the buddy service default (3) if omitted.
 3. **Agent name matching is case-insensitive** and strips model suffixes like ` (claude-opus-4-6)`.
 4. **BASIC/STANDARD callers use restricted tools** — receive `MESSAGE_BUILTIN_TOOLS` + `MESSAGE_MCP_TOOLS`.
 5. **Trusted STANDARD channels may use full tools** — full access is granted when channel is in `message_full_tool_channel_ids`, the user is STANDARD+, and the channel's permission floor in `channel_permissions` is STANDARD+.
@@ -55,7 +55,9 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 8. **Reply continuation enforces minimum responder tier** — full-access `/message` replies require STANDARD+, while restricted sessions allow BASIC+.
 9. **No worktree is created** — `/message` remains an inline channel conversation flow.
 10. **The mention session is persisted** both in-memory (`ctx.mentionSessions`) and in the database for server restart recovery.
-11. **Buddy sessions get visible callback** — when a buddy is specified, the `onRoundComplete` callback posts each round's output as a colored embed in the channel.
+11. **Buddy sessions get visible callback** — when a buddy is specified, the `onRoundComplete` callback posts each round's output as a colored embed in the channel. Lead output uses blue (0x3498db), buddy review uses purple (0x9b59b6), buddy approval uses green (0x2ecc71). Content longer than 3900 characters is truncated with "...*truncated*".
+12. **Buddy mode bypasses inline response** — when `buddy` is specified, no inline restricted session is created; the buddy service drives the full round-robin conversation, posting each turn as a visible embed. This prevents a double-response.
+13. **Buddy rounds are clamped** — the `rounds` option is clamped to [1, 10] before passing to the buddy service.
 
 ## Behavioral Examples
 
@@ -86,8 +88,10 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 ### Scenario: Message with buddy
 
 - **Given** a user sends `/message` with agent CorvidAgent, text `review this`, and buddy SonnetAgent
-- **When** the lead agent responds and buddy session starts
-- **Then** each buddy round is posted to the Discord channel as a colored embed (lead color vs buddy color)
+- **When** `handleMessageCommand` is called
+- **Then** no inline session is created; the buddy service drives the full conversation
+- **And** each round is posted to the channel as a colored embed (blue for lead, purple for buddy review, green for approval)
+- **And** no inline response from the `/message` command itself is sent
 
 ### Scenario: Insufficient permissions
 
@@ -109,7 +113,7 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | Missing agent or message body (`text` / legacy `message`) | Responds with "Please provide both an agent and a message." |
 | No agents configured | Responds with "No agents configured." |
 | Agent name not found | Responds with available agent names |
-| Buddy agent same as lead | Responds with "An agent cannot be its own buddy." |
+| Buddy agent same as lead | Responds with "An agent cannot be its own buddy. Choose a different buddy agent." |
 | No projects configured | Responds with "No projects configured." |
 | No channel ID on interaction | Responds with "Could not determine channel." |
 | DB persist failure for mention session | Logs warning, does not fail the command |
@@ -145,3 +149,4 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | 2026-03-25 | corvid-agent | v3: Reintroduce admin full-access `/message` sessions with explicit `Discord admin message:` naming and centralized permission-based policy resolver. |
 | 2026-03-25 | corvid-agent | v4: Optional `/message` `project` parameter (autocomplete); align project resolution with `/session`. |
 | 2026-03-25 | corvid-agent | v5: Slash option `message` renamed to `text` (handler still accepts legacy `message`); document default project resolution. |
+| 2026-04-14 | corvid-agent | v6: Document `buddy`/`rounds` options, rounds clamping, buddy-mode inline-response bypass, embed colors, fix error message text (#2023) |

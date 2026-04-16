@@ -20,13 +20,20 @@ import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
 
+interface NavChild {
+    label: string;
+    icon: string;
+    route: string;
+    divider?: boolean; // show a separator line above this item
+}
+
 interface NavTab {
     key: string;
     label: string;
     icon: string;
     route: string;
     matchRoutes: string[];
-    children: { label: string; icon: string; route: string }[];
+    children: NavChild[];
 }
 
 const TABS: NavTab[] = [
@@ -35,16 +42,11 @@ const TABS: NavTab[] = [
         label: 'Home',
         icon: 'chat',
         route: '/chat',
-        matchRoutes: ['/chat'],
-        children: [],
-    },
-    {
-        key: 'dashboard',
-        label: 'Dashboard',
-        icon: 'dashboard',
-        route: '/dashboard',
-        matchRoutes: ['/dashboard'],
-        children: [],
+        matchRoutes: ['/chat', '/dashboard'],
+        children: [
+            { label: 'Chat', icon: 'chat', route: '/chat' },
+            { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+        ],
     },
     {
         key: 'sessions',
@@ -67,10 +69,10 @@ const TABS: NavTab[] = [
         children: [
             { label: 'Comms', icon: 'activity', route: '/observe/comms' },
             { label: 'Memory', icon: 'database', route: '/observe/memory' },
-            { label: 'Library', icon: 'book-open', route: '/library' },
             { label: 'Analytics', icon: 'bar-chart', route: '/observe/analytics' },
             { label: 'Logs', icon: 'terminal', route: '/observe/logs' },
             { label: 'Reputation', icon: 'star', route: '/observe/reputation' },
+            { label: 'Library', icon: 'book-open', route: '/library' },
         ],
     },
     {
@@ -97,7 +99,6 @@ const TABS: NavTab[] = [
             { label: 'General', icon: 'settings', route: '/settings' },
             { label: 'Security', icon: 'shield', route: '/settings/security' },
             { label: 'Access Control', icon: 'lock', route: '/settings/access-control' },
-            { label: 'Automation', icon: 'clock', route: '/settings/automation' },
             { label: 'Integrations', icon: 'server', route: '/settings/integrations' },
         ],
     },
@@ -130,6 +131,9 @@ const TABS: NavTab[] = [
                             @if (openDropdown() === tab.key && tab.children.length > 1) {
                                 <div class="topnav__dropdown">
                                     @for (child of tab.children; track child.route) {
+                                        @if (child.divider) {
+                                            <div class="topnav__dropdown-divider"></div>
+                                        }
                                         <a
                                             class="topnav__dropdown-item"
                                             [routerLink]="child.route"
@@ -339,6 +343,11 @@ const TABS: NavTab[] = [
         .topnav__dropdown-item--active {
             color: var(--accent-cyan);
             background: var(--accent-cyan-dim);
+        }
+        .topnav__dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.25rem 0;
         }
 
         /* Right side */

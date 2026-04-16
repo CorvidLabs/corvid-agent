@@ -24,7 +24,10 @@ export type ObservationSource =
   | 'daily-review' // From daily review synthesis
   | 'health' // From health snapshot trends
   | 'pr-outcome' // From PR merge/rejection patterns
-  | 'manual'; // Explicitly recorded by agent or user
+  | 'manual' // Explicitly recorded by agent or user
+  | 'discord' // From Discord @mention or reply
+  | 'telegram' // From Telegram message
+  | 'algochat'; // From AlgoChat on-chain message
 
 export type ObservationStatus = 'active' | 'graduated' | 'expired' | 'dismissed';
 

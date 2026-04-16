@@ -8,6 +8,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SessionOutputComponent } from './session-output.component';
 import { SessionInputComponent } from './session-input.component';
+import { SessionMemoryComponent } from './session-memory.component';
 import { ApprovalDialogComponent, type ApprovalDecision } from './approval-dialog.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Session, SessionMessage } from '../../core/models/session.model';
@@ -15,10 +16,12 @@ import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '@share
 import { NotificationService } from '../../core/services/notification.service';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
 
+type SessionTab = 'conversation' | 'memory' | 'info';
+
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, SessionMemoryComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
     template: `
         @if (session(); as s) {
             <div class="session-view">
@@ -67,12 +70,45 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                     </div>
                 </div>
 
-                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use'" [agentName]="agentName()" />
+                <!-- Tab bar -->
+                <div class="session-view__tab-bar" role="tablist">
+                    <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'conversation'" (click)="activeTab.set('conversation')" role="tab">Conversation</button>
+                    @if (s.agentId) {
+                        <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'memory'" (click)="activeTab.set('memory')" role="tab">Memory</button>
+                    }
+                    <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'info'" (click)="activeTab.set('info')" role="tab">Info</button>
+                </div>
 
-                <app-session-input
-                    [disabled]="false"
-                    [placeholder]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use' ? 'Send message to session' : 'Send message to resume...'"
-                    (messageSent)="onSendMessage($event)" />
+                @if (activeTab() === 'conversation') {
+                    <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use'" [agentName]="agentName()" />
+
+                    <app-session-input
+                        [disabled]="false"
+                        [placeholder]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use' ? 'Send message to session' : 'Send message to resume...'"
+                        (messageSent)="onSendMessage($event)" />
+                }
+
+                @if (activeTab() === 'memory' && s.agentId) {
+                    <app-session-memory [agentId]="s.agentId" />
+                }
+
+                @if (activeTab() === 'info') {
+                    <div class="session-view__info-panel">
+                        <dl class="info-grid">
+                            <dt>Session ID</dt><dd class="mono">{{ s.id }}</dd>
+                            <dt>Agent</dt><dd>{{ agentName() }}@if (s.agentId) { <span class="mono text-tertiary"> ({{ s.agentId.slice(0, 8) }}…)</span> }</dd>
+                            <dt>Status</dt><dd><app-status-badge [status]="s.status" /></dd>
+                            <dt>Source</dt><dd>{{ s.source }}</dd>
+                            <dt>Turns</dt><dd>{{ s.totalTurns }}</dd>
+                            <dt>Cost</dt><dd>{{ '$' + (s.totalCostUsd | number:'1.2-4') }}</dd>
+                            <dt>Created</dt><dd>{{ s.createdAt | relativeTime }}</dd>
+                            <dt>Updated</dt><dd>{{ s.updatedAt | relativeTime }}</dd>
+                            @if (s.projectId) {
+                                <dt>Project</dt><dd class="mono">{{ s.projectId }}</dd>
+                            }
+                        </dl>
+                    </div>
+                }
             </div>
 
             @if (pendingApproval(); as approval) {
@@ -133,6 +169,60 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
             inset: 0;
         }
         .session-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+        .session-view__tab-bar {
+            display: flex;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .session-view__tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .session-view__tab:hover { color: var(--text-primary); }
+        .session-view__tab--active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+        .session-view__info-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            margin: 0;
+            font-size: 0.8rem;
+        }
+        .info-grid dt {
+            color: var(--text-tertiary);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            padding-top: 0.1rem;
+        }
+        .info-grid dd {
+            margin: 0;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .mono { font-family: var(--font-mono, monospace); font-size: 0.75rem; }
+        .text-tertiary { color: var(--text-tertiary); }
         .session-view__header {
             display: flex; align-items: center; gap: 1rem;
             padding: 0.75rem 1rem;
@@ -286,6 +376,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     protected readonly pendingQuestion = signal<OwnerQuestionWire | null>(null);
     protected readonly showDeleteConfirm = signal(false);
     protected readonly showMobileMenu = signal(false);
+    protected readonly activeTab = signal<SessionTab>('conversation');
 
     protected readonly events = computed(() => {
         const s = this.session();
@@ -316,6 +407,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         this.agentName.set('assistant');
         this.pendingApproval.set(null);
         this.pendingQuestion.set(null);
+        this.activeTab.set('conversation');
 
         // Subscribe to WebSocket FIRST so no events are missed during HTTP fetch
         this.sessionService.subscribeToSession(sid);

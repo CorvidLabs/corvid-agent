@@ -59,3 +59,4 @@ None — this module has no imports.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-20 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Update DEFAULT_CORE_TOOLS count from 41 to 59 (#2021) |

@@ -9,3 +9,6 @@ required_sections = ["Purpose", "Public API", "Invariants", "Behavioral Examples
 
 [lifecycle]
 track_history = false
+
+[companions]
+design = true
