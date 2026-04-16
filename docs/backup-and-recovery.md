@@ -269,13 +269,67 @@ You have:
 
 ---
 
+## Backup and restore scripts
+
+Two helper scripts are provided for full-instance backup and restore.
+
+### `scripts/backup.sh`
+
+Backs up the database, wallet keystore, and configuration in one command.
+
+```bash
+# Simple unencrypted backup
+bash scripts/backup.sh
+
+# Encrypted backup with a bundle tarball
+bash scripts/backup.sh --encrypt --bundle
+
+# Custom destination
+bash scripts/backup.sh --dir /srv/backups --encrypt --bundle
+
+# Use the HTTP API for the database (WAL checkpoint guaranteed)
+API_KEY=your_key bash scripts/backup.sh --api --encrypt
+```
+
+The script creates a timestamped directory (e.g. `~/corvid-agent-backups/20260415_120000/`) containing:
+- `corvid-agent.db` — SQLite database
+- `wallet-keystore.json[.gpg|.age]` — Wallet keystore (optionally encrypted)
+- `.env[.gpg|.age]` — Configuration (optionally encrypted)
+- `MANIFEST.txt` — Record of what was backed up and when
+
+A `latest` symlink is updated after each run.
+
+### `scripts/restore.sh`
+
+Restores a backup created by `scripts/backup.sh`.
+
+**Stop the server before restoring.**
+
+```bash
+# Restore from a directory backup
+bash scripts/restore.sh --from ~/corvid-agent-backups/latest
+
+# Restore from a bundle tarball
+bash scripts/restore.sh --from ~/corvid-agent-backups/corvid-agent-20260415_120000.tar.gz
+
+# Restore only the database (leave wallet and config intact)
+bash scripts/restore.sh --from ~/corvid-agent-backups/latest --skip-wallet --skip-config
+
+# Preview what would be restored (no files written)
+bash scripts/restore.sh --from ~/corvid-agent-backups/latest --dry-run
+```
+
+The script automatically detects encrypted files and invokes `gpg` or `age` as needed. It creates a pre-restore snapshot of the existing database before overwriting it.
+
+---
+
 ## Backup checklist
 
 Run through this before any major server change or monthly:
 
-- [ ] `POST /api/backup` succeeds and the file is written to `BACKUP_DIR`
+- [ ] `bash scripts/backup.sh --encrypt --bundle` succeeds
 - [ ] Latest backup is copied off-site (rsync / S3 / etc.)
 - [ ] `wallet-keystore.json` encrypted backup is stored off-site
 - [ ] `.env` encrypted backup is stored off-site
 - [ ] Backups are stored in a different physical location than the server
-- [ ] A test restore has been performed in the last 90 days
+- [ ] A test restore has been performed in the last 90 days (`bash scripts/restore.sh --dry-run`)
