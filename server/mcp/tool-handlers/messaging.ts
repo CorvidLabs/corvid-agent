@@ -46,6 +46,10 @@ export async function handleSendMessage(
   }
 
   try {
+    // TODO(#1067): When ctx.sessionSource is 'discord', consider warning or blocking
+    // cross-channel sends. For now, channel affinity is enforced via prompt-level routing
+    // hints in prependRoutingContext() and getResponseRoutingPrompt().
+
     // Resolve to_agent by name (case-insensitive) or ID
     const available = await ctx.agentDirectory.listAvailable();
     const match = available.find(
@@ -107,11 +111,10 @@ export async function handleSendMessage(
     // Record successful send for session rate limiting (#1054)
     ctx.messageRateLimiter?.record(match.agentId);
 
-    let result = `${response}\n\n[thread: ${threadId}]`;
     if (crossChannelCheck.isCrossChannel && crossChannelCheck.advisory) {
-      result += `\n\n${crossChannelCheck.advisory}`;
+      return textResult(`${response}\n\n[thread: ${threadId}]\n\n${crossChannelCheck.advisory}`);
     }
-    return textResult(result);
+    return textResult(`${response}\n\n[thread: ${threadId}]`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.error('MCP send_message failed', { error: message });
