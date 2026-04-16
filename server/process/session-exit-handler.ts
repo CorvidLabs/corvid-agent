@@ -11,6 +11,7 @@
 import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
 import { saveMemory } from '../db/agent-memories';
+import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { recordObservation } from '../db/observations';
 import { getProject } from '../db/projects';
 import {
@@ -270,6 +271,13 @@ export function persistConversationSummary(db: Database, sessionId: string): voi
 
     const summary = summarizeConversation(conversational.map((m) => ({ role: m.role, content: m.content })));
     updateSessionSummary(db, sessionId, summary);
+
+    // Also persist to the thread session mapping (durable — survives session deletion)
+    const threadId = getThreadIdForSession(db, sessionId);
+    if (threadId) {
+      updateThreadSessionSummary(db, threadId, summary);
+    }
+
     log.debug('Persisted conversation summary to session', { sessionId });
   } catch (err) {
     log.warn('Failed to persist conversation summary', {
