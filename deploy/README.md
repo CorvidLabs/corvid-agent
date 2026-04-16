@@ -106,6 +106,50 @@ sudo certbot --nginx -d yourdomain.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+### Remote Access via Tailscale (recommended)
+
+Tailscale is the simplest way to access your corvid-agent dashboard remotely without exposing it to the public internet. It provides network-layer authentication — only your enrolled devices can reach the server, and your existing `API_KEY` auth stays in place as a second layer.
+
+**Setup (5 minutes):**
+
+1. Install Tailscale on the server machine and on your client device(s):
+   ```bash
+   # Server (Linux)
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+
+   # macOS
+   brew install tailscale && sudo tailscale up
+   ```
+
+2. Set `BIND_HOST=0.0.0.0` in your `.env` so the server listens on all interfaces:
+   ```bash
+   BIND_HOST=0.0.0.0
+   API_KEY=your-strong-api-key   # required when not on localhost
+   ```
+
+3. Find your Tailscale IP:
+   ```bash
+   tailscale ip -4   # e.g. 100.x.x.x
+   ```
+
+4. Access the dashboard from any enrolled device:
+   ```
+   http://100.x.x.x:3000
+   ```
+
+**Optional — HTTPS on the Tailscale interface:**
+
+Caddy can terminate TLS for the Tailscale IP using a self-signed cert (no DNS required):
+
+```bash
+caddy reverse-proxy --from https://100.x.x.x:443 --to http://localhost:3000
+```
+
+Or add the Tailscale IP to your `Caddyfile` alongside your domain.
+
+> **Security:** Tailscale handles device authentication. Even if `BIND_HOST=0.0.0.0`, non-Tailscale traffic from the LAN/internet cannot reach the Tailscale IP. The `API_KEY` provides a second layer. Do not set `BIND_HOST=0.0.0.0` without also setting `API_KEY`.
+
 ## Cloud Deployment
 
 Three one-file configs in the repo root let you deploy to managed platforms:

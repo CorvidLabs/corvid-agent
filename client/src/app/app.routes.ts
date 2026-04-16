@@ -223,13 +223,8 @@ export const routes: Routes = [
             { path: 'allowlist', redirectTo: '/settings/access-control', pathMatch: 'full' },
             { path: 'github-allowlist', redirectTo: '/settings/access-control', pathMatch: 'full' },
             { path: 'repo-blocklist', redirectTo: '/settings/access-control', pathMatch: 'full' },
-            { path: 'schedules', redirectTo: '/settings', pathMatch: 'full' },
-            { path: 'workflows', redirectTo: '/settings', pathMatch: 'full' },
-            { path: 'webhooks', redirectTo: '/settings', pathMatch: 'full' },
-            { path: 'mention-polling', redirectTo: '/settings', pathMatch: 'full' },
-            { path: 'mcp-servers', redirectTo: '/settings', pathMatch: 'full' },
             { path: 'contacts', redirectTo: '/settings/integrations', pathMatch: 'full' },
-            { path: 'marketplace', redirectTo: '/settings', pathMatch: 'full' },
+            { path: 'automation', redirectTo: '/settings', pathMatch: 'full' },
         ],
     },
 
@@ -255,17 +250,17 @@ export const routes: Routes = [
     { path: 'memory-browser', redirectTo: 'observe/memory', pathMatch: 'full' },
     { path: 'agent-comms', redirectTo: 'observe/comms', pathMatch: 'full' },
 
-    // Old automate paths -> settings/*
-    { path: 'automate', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'automate/workflows', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'automate/webhooks', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'automate/schedules', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'automate/mention-polling', redirectTo: 'settings/automation', pathMatch: 'full' },
+    // Old automate paths -> settings
+    { path: 'automate', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'automate/workflows', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'automate/webhooks', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'automate/schedules', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'automate/mention-polling', redirectTo: 'settings', pathMatch: 'full' },
     { path: 'automate/mcp-servers', redirectTo: 'settings/integrations', pathMatch: 'full' },
-    { path: 'schedules', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'workflows', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'webhooks', redirectTo: 'settings/automation', pathMatch: 'full' },
-    { path: 'mention-polling', redirectTo: 'settings/automation', pathMatch: 'full' },
+    { path: 'schedules', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'workflows', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'webhooks', redirectTo: 'settings', pathMatch: 'full' },
+    { path: 'mention-polling', redirectTo: 'settings', pathMatch: 'full' },
     { path: 'mcp-servers', redirectTo: 'settings/integrations', pathMatch: 'full' },
 
     // Old flat settings paths

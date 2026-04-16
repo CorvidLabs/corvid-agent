@@ -65,13 +65,18 @@ _No standalone exported functions. All functionality is exposed via exported cla
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `constructor` | `db: Database, config: AlgoChatConfig, service: AlgoChatService` | `AgentWalletService` | Creates service with DB, config, and AlgoChat service references |
-| `ensureWallet` | `agentId: string` | `Promise<void>` | Ensures agent has a wallet on localnet: restores from keystore or auto-creates, funds, and publishes key. No-op on testnet/mainnet |
+| `constructor` | `db: Database, config: AlgoChatConfig, service: AlgoChatService, keyProvider?: KeyProvider` | `AgentWalletService` | Creates service with DB, config, AlgoChat service, and optional key provider for mnemonic encryption/decryption |
+| `ensureWallet` | `agentId: string` | `Promise<void>` | Ensures agent has a wallet on localnet: restores from keystore or auto-creates, funds, publishes key, and ensures USDC opt-in. No-op on testnet/mainnet |
 | `fundAgent` | `agentId: string, microAlgos: number` | `Promise<void>` | Funds an agent's wallet with a specific amount from the master account |
-| `getAgentChatAccount` | `agentId: string` | `Promise<AgentChatAccount \| null>` | Decrypts the stored mnemonic and returns the agent's ChatAccount; on localnet, re-creates wallet if decryption fails |
+| `getAgentChatAccount` | `agentId: string` | `Promise<AgentChatAccount \| null>` | Returns the agent's ChatAccount from in-memory cache (5-minute TTL); decrypts stored mnemonic on miss; on localnet, re-creates wallet if decryption fails |
 | `getBalance` | `address: string` | `Promise<number>` | Queries the on-chain ALGO balance in microAlgos for an address |
-| `checkAndRefill` | `agentId: string` | `Promise<void>` | On localnet, auto-refills agent wallet if balance drops below 1 ALGO (refills 5 ALGO) |
+| `checkAndRefill` | `agentId: string` | `Promise<void>` | On localnet, auto-refills agent wallet when balance drops below (minimum balance + 2 ALGO buffer); refills 10 ALGO |
 | `publishAllKeys` | _(none)_ | `Promise<void>` | Publishes encryption keys for all agents with wallets on localnet; called at startup |
+| `getAlgoChatService` | `()` | `AlgoChatService` | Exposes the underlying AlgoChatService |
+| `evictCachedKey` | `agentId: string` | `void` | Evict a specific agent's decrypted key from the in-memory cache |
+| `evictAllCachedKeys` | `()` | `void` | Evict all decrypted keys from the in-memory cache |
+| `ensureUsdcOptIn` | `agentId: string` | `Promise<void>` | Ensure the agent's wallet is opted into the USDC ASA (USDC_ASA_ID env var) |
+| `ensureAllUsdcOptIns` | `()` | `Promise<void>` | Ensure all agents' wallets are opted into USDC |
 
 #### DiscoveryService Methods
 
@@ -100,8 +105,10 @@ _No standalone exported functions. All functionality is exposed via exported cla
 6. `DiscoveryService.seedConversations()` sets `lastFetchedRound` to `lastRound + 1` to avoid re-processing already-seen messages.
 7. Agent wallet address cache in `DiscoveryService` has a 60-second TTL before refresh.
 8. Fast-polling automatically stops when the approval manager reports no pending requests.
-9. `checkAndRefill` only operates on localnet and uses a threshold of 1 ALGO and refill amount of 5 ALGO.
+9. `checkAndRefill` only operates on localnet. It refills 10 ALGO when the balance drops below the account minimum balance plus a 2 ALGO buffer (accounts for ASA opt-in reserves).
 10. Default funding amount for new agent wallets is 10 ALGO.
+11. `AgentWalletService` maintains an encrypted in-memory mnemonic cache with a 5-minute TTL to avoid repeated decryption operations. Cache entries are automatically evicted on expiry.
+12. USDC ASA opt-in is performed during `ensureWallet` and at startup via `ensureAllUsdcOptIns` when `USDC_ASA_ID` is configured. All wallet signing operations are recorded to the security audit log.
 
 ## Behavioral Examples
 
@@ -133,7 +140,8 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | Public key discovery fails during `resolve()` | Entry is returned with `publicKey: null`; logged at debug level |
 | Wallet creation fails on localnet | Error is logged; `ensureWallet` returns silently |
 | Mnemonic decryption fails on non-localnet | Returns `null`; error logged |
-| Mnemonic decryption fails on localnet | Wallet is re-created automatically; if re-creation also fails, returns `null` |
+| Mnemonic decryption fails on localnet | Wallet is re-created automatically (fund + publish key + USDC opt-in); if re-creation also fails, returns `null` |
+| KeyProvider not available on testnet/mainnet | `getAgentChatAccount` returns `null` with error logged; `ensureWallet` returns silently with warning |
 | No indexer client available | `discoverNewSenders()` returns immediately |
 | Balance query fails | Returns `0`; error logged |
 | KMD default wallet not found during funding | Throws `NotFoundError` |
@@ -171,3 +179,4 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-04-14 | corvid-agent | Add KeyProvider constructor param, 5 missing methods, fix checkAndRefill values, add USDC opt-in + caching invariants, add KeyProvider error case (#2025) |
