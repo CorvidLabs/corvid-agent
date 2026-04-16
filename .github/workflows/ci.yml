@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   build:
@@ -34,30 +35,58 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - uses: ./.github/actions/setup-workspace
 
+      - name: Governance tier check
+        if: github.event_name == 'pull_request'
+        run: bun run governance:check
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
       - name: TypeScript check
         run: bun x tsc --noEmit --skipLibCheck
 
       - name: Run database migrations
         run: bun run migrate:up
 
-      - name: Unit tests
-        run: bun test
+      - name: Unit tests with coverage
+        run: bun test --coverage --coverage-reporter=lcov --coverage-dir=coverage/server
 
-      - name: Spec check
+      - name: Client tests with coverage
+        run: cd client && npx vitest run --coverage
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'pull_request'
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad  # v5
+        with:
+          files: coverage/server/lcov.info,coverage/client/lcov.info
+          flags: server,client
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Spec validation (strict + 100% coverage)
+        uses: CorvidLabs/spec-sync@v4.2.0
+        with:
+          strict: 'true'
+          comment: 'false'
+
+      - name: Spec check (script)
         id: spec-check
         run: |
-          # Run spec check (preserve exit code)
           bash scripts/specsync.sh check --strict --require-coverage 100
       - name: Capture spec report
         id: spec-report
         if: always()
         run: |
-          # Try GitHub-formatted comment output first, fall back to plain check
           REPORT=$(bash scripts/specsync.sh comment --strict 2>/dev/null) || \
           REPORT=$(bash scripts/specsync.sh check --strict --require-coverage 100 2>&1) || true
           echo "summary<<SPEC_EOF" >> "$GITHUB_OUTPUT"
           echo "$REPORT" >> "$GITHUB_OUTPUT"
           echo "SPEC_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build client
+        run: bun run build:client
 
   # macOS (10x multiplier) and Windows (2x) only run on release tags to save CI minutes
   build-cross-platform:

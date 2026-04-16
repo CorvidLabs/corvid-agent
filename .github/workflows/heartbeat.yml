@@ -2,8 +2,8 @@ name: Heartbeat
 
 on:
   schedule:
-    # Every 5 minutes
-    - cron: '*/5 * * * *'
+    # Every 30 minutes (reduced from 5min to save ~30 hrs/week of CI)
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 permissions:
