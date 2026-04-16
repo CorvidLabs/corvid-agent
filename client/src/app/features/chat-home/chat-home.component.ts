@@ -38,6 +38,16 @@ import { OnboardingComponent } from './onboarding.component';
                         <kbd>Ctrl</kbd>+<kbd>K</kbd> command palette
                     </p>
 
+                    @if (runningCount() > 0) {
+                        <div class="chat-home__status-strip">
+                            <span class="chat-home__status-dot"></span>
+                            <span class="chat-home__status-text">
+                                {{ runningCount() }} session{{ runningCount() === 1 ? '' : 's' }} running
+                            </span>
+                            <button class="chat-home__status-link" (click)="viewAllSessions()">View all &rarr;</button>
+                        </div>
+                    }
+
                     <div class="chat-home__input-card">
                         <textarea
                             class="chat-home__textarea"
@@ -238,6 +248,47 @@ import { OnboardingComponent } from './onboarding.component';
             font-family: inherit;
             font-size: 0.7rem;
         }
+        /* Active sessions status strip */
+        .chat-home__status-strip {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: var(--radius-xl);
+            background: rgba(0, 255, 200, 0.04);
+            border: 1px solid var(--accent-cyan-dim);
+            font-size: 0.8rem;
+        }
+        .chat-home__status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 6px var(--accent-cyan);
+            animation: statusPulse 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .chat-home__status-text {
+            color: var(--text-secondary);
+            flex: 1;
+        }
+        .chat-home__status-link {
+            background: none;
+            border: none;
+            color: var(--accent-cyan);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-family: inherit;
+            padding: 0;
+            transition: opacity 0.15s;
+        }
+        .chat-home__status-link:hover { opacity: 0.7; }
+
         .chat-home__input-card {
             width: 100%;
             background: rgba(15, 16, 24, 0.7);
@@ -543,6 +594,9 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     readonly selectedProjectId = signal('');
     readonly launching = signal(false);
     readonly recentSessions = signal<Session[]>([]);
+    readonly runningCount = computed(() =>
+        this.sessionService.sessions().filter((s) => s.status === 'running').length,
+    );
 
     readonly templates = [
         {

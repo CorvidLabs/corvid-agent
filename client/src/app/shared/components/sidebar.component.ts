@@ -26,7 +26,7 @@ interface SidebarSection {
 }
 
 const SECTIONS: SidebarSection[] = [
-    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/dashboard', '/agents', '/library', '/observe'] },
+    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/chat', '/agents', '/observe'] },
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions'] },
     { key: 'config', label: 'Settings', collapsible: true, defaultCollapsed: false, routes: ['/settings'] },
 ];
@@ -72,12 +72,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     </a>
                 </li>
                 <li>
-                    <a class="sidebar__link" routerLink="/dashboard" routerLinkActive="sidebar__link--active" title="Dashboard">
-                        <span class="sidebar__label">Dashboard</span>
-                        <span class="sidebar__abbr">D</span>
-                    </a>
-                </li>
-                <li>
                     <a class="sidebar__link" routerLink="/sessions" routerLinkActive="sidebar__link--active" title="Sessions">
                         <span class="sidebar__label">Sessions</span>
                         <span class="sidebar__abbr">S</span>
@@ -87,12 +81,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/library" routerLinkActive="sidebar__link--active" title="Library">
-                        <span class="sidebar__label">Library</span>
-                        <span class="sidebar__abbr">L</span>
                     </a>
                 </li>
                 <li>
