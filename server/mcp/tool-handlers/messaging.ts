@@ -3,6 +3,7 @@ import { getAgent } from '../../db/agents';
 import { checkCommunicationTier } from '../../lib/communication-tiers';
 import { DedupService } from '../../lib/dedup';
 import { createLogger } from '../../lib/logger';
+import { checkCrossChannelSend } from './cross-channel-guard';
 import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
 
@@ -45,10 +46,6 @@ export async function handleSendMessage(
   }
 
   try {
-    // TODO(#1067): When ctx.sessionSource is 'discord', consider warning or blocking
-    // cross-channel sends. For now, channel affinity is enforced via prompt-level routing
-    // hints in prependRoutingContext() and getResponseRoutingPrompt().
-
     // Resolve to_agent by name (case-insensitive) or ID
     const available = await ctx.agentDirectory.listAvailable();
     const match = available.find(
@@ -62,6 +59,11 @@ export async function handleSendMessage(
     if (match.agentId === ctx.agentId) {
       return errorResult('Cannot send a message to yourself.');
     }
+
+    // Cross-channel routing check: detect when an agent in a Discord/Telegram session
+    // calls corvid_send_message. This is advisory-only — we warn the agent but allow
+    // the send to proceed.
+    const crossChannelCheck = checkCrossChannelSend(ctx.sessionSource, ctx.sessionId, ctx.agentId, match.agentId);
 
     // Communication tier enforcement: messages flow downward in the hierarchy.
     // Top → anyone, Mid → mid + bottom, Bottom → bottom only.
@@ -105,7 +107,11 @@ export async function handleSendMessage(
     // Record successful send for session rate limiting (#1054)
     ctx.messageRateLimiter?.record(match.agentId);
 
-    return textResult(`${response}\n\n[thread: ${threadId}]`);
+    let result = `${response}\n\n[thread: ${threadId}]`;
+    if (crossChannelCheck.isCrossChannel && crossChannelCheck.advisory) {
+      result += `\n\n${crossChannelCheck.advisory}`;
+    }
+    return textResult(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.error('MCP send_message failed', { error: message });
