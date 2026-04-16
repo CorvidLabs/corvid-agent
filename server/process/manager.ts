@@ -6,7 +6,7 @@ import { getAgent } from '../db/agents';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getThreadIdForSession, updateThreadSessionSummary } from '../db/discord-thread-sessions';
 import { getActiveServersForAgent } from '../db/mcp-servers';
-import { recordObservation } from '../db/observations';
+import { boostObservation, listObservations, recordObservation } from '../db/observations';
 import { getProject } from '../db/projects';
 import { insertSessionMetrics } from '../db/session-metrics';
 import {
@@ -34,8 +34,6 @@ import { startDirectProcess, summarizeConversation } from './direct-process';
 import { SessionEventBus } from './event-bus';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { OwnerQuestionManager } from './owner-question-manager';
-import { resolveDirectToolAllowList, resolveProviderRouting } from './provider-routing';
-import { buildResumePrompt } from './resume-prompt-builder';
 import { type SdkProcess, startSdkProcess } from './sdk-process';
 import { resolveSessionConfig } from './session-config-resolver';
 import { MAX_RESTARTS, SessionResilienceManager } from './session-resilience-manager';
@@ -46,11 +44,6 @@ import { extractContentText } from './types';
 // Re-export EventCallback from interfaces for backward compatibility —
 // callers importing { EventCallback } from './manager' continue to work.
 export type { EventCallback } from './interfaces';
-
-// Re-export routing types from provider-routing for backward compatibility —
-// callers importing { RoutingDecision, resolveProviderRouting } from './manager' continue to work.
-export type { RoutingDecision } from './provider-routing';
-export { resolveProviderRouting } from './provider-routing';
 
 import type { EventCallback } from './interfaces';
 
@@ -69,6 +62,88 @@ const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 // Circuit breaker: if the last N completions in a row were zero-turn,
 // refuse to resume — the session is in a death loop.
 const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
+
+/** Result of a provider routing decision — exported for testing. */
+export interface RoutingDecision {
+  /** Which provider to use (sdk, cursor, ollama). */
+  provider: string;
+  /** Why this provider was selected. */
+  reason: 'default' | 'agent_config' | 'no_claude_access' | 'cursor_binary_missing' | 'ollama_via_claude_proxy';
+  /** Whether this was a fallback from the original intent. */
+  fallback: boolean;
+  /** Model to use (may be cleared if original model is incompatible with the fallback provider). */
+  effectiveModel: string;
+}
+
+/**
+ * Determine the provider routing decision based on agent config and system state.
+ * Pure function — no side effects, suitable for unit testing.
+ */
+export function resolveProviderRouting(opts: {
+  providerType: LlmProviderType | undefined;
+  agentModel: string;
+  hasCursorBinary: boolean;
+  hasClaudeAccess: boolean;
+  hasOllamaProvider: boolean;
+  ollamaDefaultModel?: string;
+}): RoutingDecision {
+  const {
+    providerType,
+    agentModel,
+    hasCursorBinary,
+    hasClaudeAccess: hasCloud,
+    hasOllamaProvider,
+    ollamaDefaultModel,
+  } = opts;
+
+  // Cursor agent configured but binary missing → degrade to SDK
+  if (providerType === 'cursor' && !hasCursorBinary) {
+    const isCursorOnlyModel =
+      agentModel === 'auto' ||
+      agentModel.startsWith('composer') ||
+      agentModel.startsWith('gpt-') ||
+      agentModel.startsWith('gemini-') ||
+      agentModel.startsWith('grok-');
+    return {
+      provider: 'sdk',
+      reason: 'cursor_binary_missing',
+      fallback: true,
+      effectiveModel: isCursorOnlyModel ? '' : agentModel,
+    };
+  }
+
+  // No explicit provider + no cloud access → try Ollama
+  if (!providerType && !hasCloud && hasOllamaProvider) {
+    // Check if Ollama should use Claude Code proxy for better tool/reasoning support
+    if (process.env.OLLAMA_USE_CLAUDE_PROXY === 'true') {
+      log.info('OLLAMA_USE_CLAUDE_PROXY enabled — routing Ollama through SDK (Claude Code)');
+      const isOllamaModel =
+        !agentModel || agentModel.includes(':') || agentModel.startsWith('qwen') || agentModel.startsWith('llama');
+      return {
+        provider: 'sdk',
+        reason: 'ollama_via_claude_proxy',
+        fallback: true,
+        effectiveModel: isOllamaModel ? agentModel : (ollamaDefaultModel ?? ''),
+      };
+    }
+    const isOllamaModel =
+      !agentModel || agentModel.includes(':') || agentModel.startsWith('qwen') || agentModel.startsWith('llama');
+    return {
+      provider: 'ollama',
+      reason: 'no_claude_access',
+      fallback: true,
+      effectiveModel: isOllamaModel ? agentModel : (ollamaDefaultModel ?? ''),
+    };
+  }
+
+  // Normal routing
+  return {
+    provider: providerType ?? 'sdk',
+    reason: providerType ? 'agent_config' : 'default',
+    fallback: false,
+    effectiveModel: agentModel,
+  };
+}
 
 interface SessionMeta {
   startedAt: number;
@@ -710,7 +785,7 @@ export class ProcessManager {
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
     }
-    const resumePrompt = buildResumePrompt(this.db, session, this.sessionMeta.get(session.id), prompt);
+    const resumePrompt = this.buildResumePrompt(session, prompt);
 
     // Resolve agent and provider
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
@@ -966,7 +1041,7 @@ export class ProcessManager {
 
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
-    const resumePrompt = buildResumePrompt(this.db, session, this.sessionMeta.get(session.id), prompt);
+    const resumePrompt = this.buildResumePrompt(session, prompt);
 
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
@@ -1131,6 +1206,84 @@ export class ProcessManager {
 
     this.timerManager.startStableTimer(session.id);
     this.timerManager.startSessionTimeout(session.id);
+  }
+
+  private buildResumePrompt(session: Session, newPrompt?: string): string {
+    const messages = getSessionMessages(this.db, session.id);
+    const meta = this.sessionMeta.get(session.id);
+
+    // Check for a pending server-restart confirmation and clear it
+    const restartRow = this.db
+      .query('SELECT server_restart_initiated_at FROM sessions WHERE id = ?')
+      .get(session.id) as { server_restart_initiated_at: string | null } | null;
+    const restartInitiatedAt = restartRow?.server_restart_initiated_at ?? null;
+    if (restartInitiatedAt) {
+      this.db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
+    }
+
+    // Load recent active observations for this agent and increment their access count
+    const observations = session.agentId
+      ? listObservations(this.db, session.agentId, { status: 'active', limit: 5 })
+      : [];
+    for (const obs of observations) {
+      boostObservation(this.db, obs.id, 0);
+    }
+
+    if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
+
+    const recent = messages.slice(-20);
+    const historyLines = recent
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => {
+        const role = m.role === 'user' ? 'User' : 'Assistant';
+        const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+        return `[${role}]: ${text}`;
+      });
+
+    const instruction = newPrompt
+      ? 'The following is the conversation history from this session. Use it for context when responding to the new message.'
+      : 'The following is the conversation history from this session. The session was interrupted -- continue the conversation based on the history above.';
+
+    const parts: string[] = [];
+
+    // Prepend context summary from previous session lifetime if available
+    if (meta?.contextSummary) {
+      parts.push('<previous_context_summary>', meta.contextSummary, '</previous_context_summary>', '');
+    }
+
+    // Inject relevant short-term observations to restore per-agent context (#1751)
+    if (observations.length > 0) {
+      const obsLines = observations.map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`);
+      parts.push(
+        '<recent_observations>',
+        'Relevant observations from past sessions with this agent:',
+        '',
+        ...obsLines,
+        '</recent_observations>',
+        '',
+      );
+    }
+
+    parts.push('<conversation_history>', instruction, '', ...historyLines, '</conversation_history>');
+
+    // If a server restart was initiated from this session, inject a completion note
+    // so the agent does not re-trigger the restart on resume (fixes #1570).
+    if (restartInitiatedAt) {
+      parts.push(
+        '',
+        '<server_restart_completed>',
+        `The server was restarted during this session (initiated at ${restartInitiatedAt}).`,
+        'The restart completed successfully — the server is now running with updated code.',
+        'Do NOT restart the server again. Continue with the next task in your plan.',
+        '</server_restart_completed>',
+      );
+    }
+
+    if (newPrompt) {
+      parts.push('', newPrompt);
+    }
+
+    return parts.join('\n');
   }
 
   stopProcess(sessionId: string, reason?: string): void {
@@ -1806,4 +1959,45 @@ export class ProcessManager {
 
     return pruned;
   }
+}
+
+// SDK (Claude Code) tool names → direct-process (Ollama) equivalents
+const SDK_TO_DIRECT_TOOL_MAP: Record<string, string> = {
+  Read: 'read_file',
+  Write: 'write_file',
+  Edit: 'edit_file',
+  Glob: 'list_files',
+  Grep: 'search_files',
+  Shell: 'run_command',
+};
+
+/**
+ * Translate SDK-style tool names to direct-process names and merge
+ * mcpToolAllowList. Returns undefined if both inputs are empty/absent
+ * (meaning "allow all tools").
+ */
+function resolveDirectToolAllowList(toolAllowList?: string[], mcpToolAllowList?: string[]): string[] | undefined {
+  const hasToolList = toolAllowList && toolAllowList.length > 0;
+  const hasMcpList = mcpToolAllowList && mcpToolAllowList.length > 0;
+
+  if (!hasToolList && !hasMcpList) return undefined;
+
+  const result: string[] = [];
+
+  if (hasToolList) {
+    for (const name of toolAllowList) {
+      const mapped = SDK_TO_DIRECT_TOOL_MAP[name];
+      result.push(mapped ?? name);
+    }
+  }
+
+  if (hasMcpList) {
+    for (const name of mcpToolAllowList) {
+      if (!result.includes(name)) {
+        result.push(name);
+      }
+    }
+  }
+
+  return result.length > 0 ? result : undefined;
 }
