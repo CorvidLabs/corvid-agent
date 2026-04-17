@@ -68,7 +68,7 @@ import { createTextSprite } from './library-3d.utils';
         .lib3d {
             position: relative;
             width: 100%;
-            height: 600px;
+            height: clamp(400px, calc(100vh - 160px), 900px);
             min-height: 400px;
             background: #05050a;
             border-radius: var(--radius);

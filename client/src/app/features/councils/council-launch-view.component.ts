@@ -445,7 +445,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
             user-select: none;
         }
         .feed-content {
-            max-height: 600px; overflow-y: auto;
+            max-height: clamp(300px, 50vh, 600px); overflow-y: auto;
             margin: 0.4rem 0 0 0;
         }
         .feed-content--text {
@@ -517,7 +517,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         }
 
         .council-chat { margin-top: 1.5rem; }
-        .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 0.75rem; max-height: 500px; overflow-y: auto; }
+        .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 0.75rem; max-height: clamp(250px, 45vh, 500px); overflow-y: auto; }
         .council-chat__input { display: flex; gap: 0.5rem; align-items: center; }
         .council-chat__field { flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-bright); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; }
         .council-chat__field:focus { border-color: var(--accent-cyan); }

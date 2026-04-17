@@ -122,7 +122,7 @@ const TABS: NavTab[] = [
                                 [class.topnav__tab--active]="isTabActive(tab)"
                                 (click)="onTabClick(tab, $event)"
                                 type="button">
-                                <app-icon [name]="tab.icon" [size]="14" />
+                                <app-icon [name]="tab.icon" [size]="18" />
                                 {{ tab.label }}
                                 @if (tab.children.length > 1) {
                                     <span class="topnav__tab-chevron" [class.topnav__tab-chevron--open]="openDropdown() === tab.key">&#x25BE;</span>
@@ -140,7 +140,7 @@ const TABS: NavTab[] = [
                                             routerLinkActive="topnav__dropdown-item--active"
                                             [routerLinkActiveOptions]="{ exact: child.route === '/chat' }"
                                             (click)="closeDropdown()">
-                                            <app-icon [name]="child.icon" [size]="12" />
+                                            <app-icon [name]="child.icon" [size]="14" />
                                             {{ child.label }}
                                         </a>
                                     }
@@ -230,8 +230,8 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             justify-content: space-between;
-            height: 48px;
-            padding: 0 1.25rem;
+            height: clamp(48px, 4vw, 72px);
+            padding: 0 clamp(0.75rem, 2vw, 3rem);
             background: var(--glass-bg-solid);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -242,7 +242,7 @@ const TABS: NavTab[] = [
         .topnav__left {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: clamp(0.75rem, 2vw, 2rem);
         }
         .topnav__logo {
             text-decoration: none;
@@ -251,7 +251,7 @@ const TABS: NavTab[] = [
         }
         .topnav__logo-text {
             font-family: var(--font-display);
-            font-size: 1rem;
+            font-size: clamp(0.85rem, 0.6rem + 0.9vw, 1.5rem);
             font-weight: 700;
             background: var(--gradient-cyan-amber);
             background-size: 200% 200%;
@@ -264,7 +264,7 @@ const TABS: NavTab[] = [
         .topnav__tabs {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: clamp(0.125rem, 0.5vw, 0.75rem);
         }
         .topnav__tab-wrapper {
             position: relative;
@@ -272,20 +272,21 @@ const TABS: NavTab[] = [
         .topnav__tab {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
-            padding: 0.5rem 1rem;
+            gap: 0.5rem;
+            padding: 0.5rem clamp(0.75rem, 1.5vw, 2rem);
             background: none;
             border: none;
             color: var(--text-secondary);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: clamp(0.75rem, 0.55rem + 0.65vw, 1.25rem);
             font-weight: 600;
             letter-spacing: 0.04em;
             cursor: pointer;
             transition: color 0.15s, background 0.15s;
             border-bottom: 2px solid transparent;
-            height: 48px;
+            height: clamp(48px, 4vw, 72px);
             text-transform: uppercase;
+            border-radius: var(--radius) var(--radius) 0 0;
         }
         .topnav__tab:hover {
             color: var(--text-primary);
@@ -310,13 +311,13 @@ const TABS: NavTab[] = [
             position: absolute;
             top: 100%;
             left: 0;
-            min-width: 190px;
-            background: rgba(22, 24, 34, 0.92);
+            min-width: clamp(220px, 15vw, 300px);
+            background: rgba(22, 24, 34, 0.95);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid var(--border-faint);
             border-radius: var(--radius-lg);
-            padding: 0.4rem 0;
+            padding: 0.5rem 0;
             z-index: 200;
             box-shadow: 0 12px 40px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-subtle);
             animation: dropdownIn 0.15s ease-out;
@@ -328,13 +329,14 @@ const TABS: NavTab[] = [
         .topnav__dropdown-item {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.625rem;
+            padding: 0.625rem 1.25rem;
             color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.75rem;
+            font-size: var(--text-sm);
             letter-spacing: 0.03em;
             transition: background 0.1s, color 0.1s;
+            min-height: 44px;
         }
         .topnav__dropdown-item:hover {
             background: var(--bg-hover);
@@ -354,7 +356,7 @@ const TABS: NavTab[] = [
         .topnav__right {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: clamp(0.5rem, 1vw, 1rem);
         }
         .topnav__network {
             display: flex;
@@ -364,10 +366,10 @@ const TABS: NavTab[] = [
             overflow: hidden;
         }
         .network-btn {
-            padding: 0.35rem 0.6rem;
-            min-height: 28px;
+            padding: 0.4rem 0.85rem;
+            min-height: 36px;
             font-family: inherit;
-            font-size: 0.6rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             letter-spacing: 0.06em;
             border: none;
@@ -395,8 +397,8 @@ const TABS: NavTab[] = [
             align-items: center;
         }
         .topnav__help {
-            width: 28px;
-            height: 28px;
+            width: clamp(36px, 3vw, 44px);
+            height: clamp(36px, 3vw, 44px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -405,7 +407,7 @@ const TABS: NavTab[] = [
             border-radius: var(--radius);
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: var(--text-xs);
             font-weight: 700;
             cursor: pointer;
             transition: color 0.15s, border-color 0.15s;
@@ -418,16 +420,17 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.3rem 0.7rem;
+            padding: 0.5rem 1rem;
+            min-height: 36px;
             background: rgba(12, 13, 20, 0.6);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 0.7rem;
+            font-size: var(--text-sm);
             cursor: pointer;
             transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
-            min-width: 160px;
+            min-width: clamp(140px, 15vw, 260px);
         }
         .topnav__search-btn:hover {
             border-color: var(--accent-cyan-border);
@@ -439,12 +442,12 @@ const TABS: NavTab[] = [
             text-align: left;
         }
         .topnav__search-kbd {
-            padding: 0.08rem 0.3rem;
+            padding: 0.125rem 0.4rem;
             background: var(--bg-raised);
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             font-family: inherit;
-            font-size: 0.55rem;
+            font-size: var(--text-micro);
             color: var(--text-tertiary);
         }
 
@@ -454,18 +457,18 @@ const TABS: NavTab[] = [
             background: none;
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 0.35rem;
+            padding: 0.5rem;
             cursor: pointer;
-            width: 34px;
-            height: 34px;
+            width: 44px;
+            height: 44px;
             align-items: center;
             justify-content: center;
         }
         .topnav__hamburger-icon {
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            width: 16px;
+            gap: 4px;
+            width: 18px;
         }
         .topnav__hamburger-icon span {
             display: block;
@@ -473,6 +476,7 @@ const TABS: NavTab[] = [
             width: 100%;
             background: var(--text-secondary);
             border-radius: 1px;
+            transition: transform 0.2s ease, opacity 0.2s ease;
         }
 
         /* Mobile menu */
@@ -485,7 +489,8 @@ const TABS: NavTab[] = [
 
         @media (max-width: 767px) {
             .topnav {
-                height: 40px;
+                height: 48px;
+                padding: 0 var(--space-4);
             }
             .topnav__tabs, .topnav__right { display: none; }
             .topnav__hamburger { display: flex; }
@@ -495,30 +500,31 @@ const TABS: NavTab[] = [
                 position: fixed;
                 inset: 0;
                 background: var(--overlay);
-                backdrop-filter: blur(2px);
+                backdrop-filter: blur(4px);
                 z-index: 998;
             }
             .topnav-mobile {
                 display: flex;
                 flex-direction: column;
                 position: fixed;
-                top: 40px;
+                top: 48px;
                 left: 0;
                 right: 0;
                 bottom: 0;
                 background: var(--bg-surface);
                 z-index: 999;
                 overflow-y: auto;
-                padding: 1rem 0;
+                padding: var(--space-4) 0;
+                -webkit-overflow-scrolling: touch;
             }
             .topnav-mobile__section {
-                padding: 0.5rem 0;
+                padding: var(--space-3) 0;
                 border-bottom: 1px solid var(--border);
             }
             .topnav-mobile__section-label {
                 display: block;
-                padding: 0.4rem 1.5rem;
-                font-size: 0.6rem;
+                padding: var(--space-2) var(--space-5);
+                font-size: var(--text-xxs);
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
                 color: var(--text-tertiary);
@@ -527,12 +533,13 @@ const TABS: NavTab[] = [
             .topnav-mobile__link {
                 display: flex;
                 align-items: center;
-                gap: 0.6rem;
-                padding: 0.75rem 1.5rem;
+                gap: var(--space-3);
+                padding: var(--space-3) var(--space-5);
                 color: var(--text-secondary);
                 text-decoration: none;
-                font-size: 0.85rem;
+                font-size: var(--text-base);
                 transition: background 0.1s, color 0.1s;
+                min-height: 48px;
             }
             .topnav-mobile__link:hover {
                 background: var(--bg-hover);

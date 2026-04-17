@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { firstValueFrom } from 'rxjs';
 
 interface LogEntry {
@@ -31,11 +32,9 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="logs">
-            <h2>System Logs</h2>
-
+        <app-page-shell title="System Logs" icon="logs">
             <!-- Tab bar -->
             <div class="tabs">
                 <button
@@ -152,11 +151,9 @@ interface CreditTransaction {
                     }
                 }
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .logs { padding: var(--space-6); }
-        .logs h2 { margin: 0 0 1rem; color: var(--text-primary); }
         .loading { color: var(--text-secondary); }
         .empty { text-align: center; padding: var(--space-12); color: var(--text-tertiary); }
 

@@ -128,6 +128,13 @@ interface AutocompleteItem {
                     ></textarea>
                 </div>
                 <button
+                    class="terminal__send-btn"
+                    (click)="send()"
+                    [disabled]="!inputValue().trim() || inputDisabled()"
+                    aria-label="Send message"
+                    title="Send message"
+                >&rarr;</button>
+                <button
                     class="terminal__help-btn"
                     (click)="toggleHelp()"
                     aria-label="Show command help"
@@ -491,12 +498,12 @@ interface AutocompleteItem {
         }
         .terminal__input::placeholder { color: var(--terminal-text-faint); }
         .terminal__input:disabled { opacity: 0.3; }
-        .terminal__help-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--terminal-text-faint);
+        .terminal__send-btn {
+            background: var(--accent-cyan-dim);
+            border: 1px solid var(--accent-cyan-mid);
+            color: var(--accent-cyan);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: 1rem;
             font-weight: 700;
             width: 44px;
             height: 44px;
@@ -507,6 +514,33 @@ interface AutocompleteItem {
             justify-content: center;
             margin-left: 0.5rem;
             margin-top: 1px;
+            transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+            flex-shrink: 0;
+        }
+        .terminal__send-btn:hover:not(:disabled) {
+            background: var(--accent-cyan-border);
+            border-color: var(--accent-cyan);
+        }
+        .terminal__send-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+        .terminal__help-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--terminal-text-faint);
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 700;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 0.25rem;
+            margin-top: 5px;
             transition: color 0.15s, border-color 0.15s;
             flex-shrink: 0;
         }
@@ -876,7 +910,7 @@ export class TerminalChatComponent implements AfterViewChecked {
         }
     }
 
-    private send(): void {
+    protected send(): void {
         const content = this.inputValue().trim();
         if (!content) return;
 

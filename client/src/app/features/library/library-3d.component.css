@@ -1,7 +1,7 @@
 .lib3d {
     position: relative;
     width: 100%;
-    height: 600px;
+    height: clamp(400px, calc(100vh - 160px), 900px);
     min-height: 400px;
     background: #05050a;
     border-radius: var(--radius);
@@ -112,7 +112,7 @@ canvas {
 }
 
 @media (max-width: 600px) {
-    .lib3d { height: 450px; }
+    .lib3d { height: clamp(300px, calc(100vh - 120px), 600px); }
     .lib3d__minimap { width: 100px; height: 100px; }
     .lib3d__legend { gap: 2px; }
     .lib3d__legend-btn { font-size: 0.58rem; padding: 2px 6px; }

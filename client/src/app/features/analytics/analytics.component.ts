@@ -4,6 +4,7 @@ import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
+import { MetricCardComponent } from '../../shared/components/metric-card.component';
 
 interface OverviewData {
     totalSessions: number;
@@ -56,7 +57,7 @@ interface SessionStats {
 @Component({
     selector: 'app-analytics',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SkeletonComponent, PageShellComponent],
+    imports: [DecimalPipe, SkeletonComponent, PageShellComponent, MetricCardComponent],
     template: `
         <app-page-shell title="Analytics" icon="analytics">
 
@@ -65,38 +66,14 @@ interface SessionStats {
             } @else if (overview()) {
                 <!-- Overview Cards -->
                 <div class="analytics__cards stagger-scale">
-                    <div class="stat-card">
-                        <span class="stat-card__label">Total Sessions</span>
-                        <span class="stat-card__value">{{ overview()!.totalSessions }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">API Cost (USD)</span>
-                        <span class="stat-card__value stat-card__value--usd">\${{ overview()!.totalCostUsd | number:'1.2-4' }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">ALGO Spent</span>
-                        <span class="stat-card__value stat-card__value--algo">{{ (overview()!.totalAlgoSpent / 1000000) | number:'1.4-4' }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">Total Turns</span>
-                        <span class="stat-card__value">{{ overview()!.totalTurns }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">Active Now</span>
-                        <span class="stat-card__value stat-card__value--active">{{ overview()!.activeSessions }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">Messages</span>
-                        <span class="stat-card__value">{{ overview()!.agentMessages + overview()!.algochatMessages }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-card__label">Credits Used</span>
-                        <span class="stat-card__value">{{ overview()!.totalCreditsConsumed }}</span>
-                    </div>
-                    <div class="stat-card stat-card--today">
-                        <span class="stat-card__label">Today's Spend</span>
-                        <span class="stat-card__value stat-card__value--usd">\${{ overview()!.todaySpending.apiCostUsd | number:'1.2-4' }}</span>
-                    </div>
+                    <app-metric-card label="Total Sessions" accent="cyan">{{ overview()!.totalSessions }}</app-metric-card>
+                    <app-metric-card label="API Cost (USD)" accent="green">\${{ overview()!.totalCostUsd | number:'1.2-4' }}</app-metric-card>
+                    <app-metric-card label="ALGO Spent" accent="magenta">{{ (overview()!.totalAlgoSpent / 1000000) | number:'1.4-4' }}</app-metric-card>
+                    <app-metric-card label="Total Turns" accent="cyan">{{ overview()!.totalTurns }}</app-metric-card>
+                    <app-metric-card label="Active Now" accent="amber">{{ overview()!.activeSessions }}</app-metric-card>
+                    <app-metric-card label="Messages" accent="cyan">{{ overview()!.agentMessages + overview()!.algochatMessages }}</app-metric-card>
+                    <app-metric-card label="Credits Used" accent="cyan">{{ overview()!.totalCreditsConsumed }}</app-metric-card>
+                    <app-metric-card label="Today's Spend" accent="green" [highlight]="true">\${{ overview()!.todaySpending.apiCostUsd | number:'1.2-4' }}</app-metric-card>
                 </div>
 
                 <!-- Work Tasks Summary -->
@@ -226,35 +203,6 @@ interface SessionStats {
             gap: 0.75rem;
             margin-bottom: 2rem;
         }
-
-        .stat-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-        .stat-card--today {
-            border-color: var(--accent-amber);
-            border-style: dashed;
-        }
-        .stat-card__label {
-            font-size: 0.65rem;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-        .stat-card__value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
-            text-shadow: 0 0 10px var(--accent-cyan-dim);
-        }
-        .stat-card__value--usd { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
-        .stat-card__value--algo { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
-        .stat-card__value--active { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
 
         .analytics__section {
             background: var(--bg-surface);

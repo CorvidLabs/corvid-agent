@@ -9,7 +9,11 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/chat-home/chat-home.component').then((m) => m.ChatHomeComponent),
     },
-    { path: 'dashboard', redirectTo: 'chat', pathMatch: 'full' },
+    {
+        path: 'dashboard',
+        loadComponent: () =>
+            import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+    },
 
     // ── Agents (consolidated) ───────────────────────────────────────────
     {
@@ -160,7 +164,7 @@ export const routes: Routes = [
             {
                 path: 'library',
                 loadComponent: () =>
-                    import('./features/library/library-browser.component').then((m) => m.LibraryBrowserComponent),
+                    import('./features/library/library.component').then((m) => m.LibraryComponent),
             },
             {
                 path: 'analytics',

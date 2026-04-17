@@ -159,49 +159,45 @@ interface CreditTransaction {
         </div>
     `,
     styles: [`
-        .spending { padding: 1rem; }
-        .spending__section { margin-bottom: 2rem; }
-        .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
-        .spending__desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem; }
-        .spending__empty { color: var(--text-secondary); font-style: italic; }
-        .spending__table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .spending__table th, .spending__table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
-        .spending__table th { color: var(--text-secondary); font-weight: 600; }
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-top: 0.5rem; }
-        .info-item { display: flex; flex-direction: column; gap: 0.25rem; }
-        .info-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
-        .info-value { font-size: 1.2rem; font-weight: 600; }
-        .progress-bar { width: 80px; height: 6px; background: var(--bg-raised); border-radius: 3px; display: inline-block; vertical-align: middle; }
-        .progress-bar__fill { height: 100%; background: var(--accent-cyan); border-radius: 3px; transition: width 0.3s; }
+        .spending { padding: var(--space-5) 0; }
+        .spending h2 { font-size: var(--text-2xl); margin-bottom: var(--space-5); }
+        .spending__section { margin-bottom: var(--space-8); }
+        .spending__section h3 { font-size: var(--text-xl); margin-bottom: var(--space-4); border-bottom: 1px solid var(--border); padding-bottom: var(--space-3); }
+        .spending__desc { color: var(--text-secondary); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: var(--leading-relaxed); }
+        .spending__empty { color: var(--text-secondary); font-style: italic; font-size: var(--text-base); }
+        .spending__table { width: 100%; border-collapse: collapse; font-size: var(--text-base); }
+        .spending__table th, .spending__table td { padding: var(--space-3) var(--space-4); text-align: left; border-bottom: 1px solid var(--border); }
+        .spending__table th { color: var(--text-secondary); font-weight: 600; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.04em; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-5); margin-top: var(--space-4); }
+        .info-item { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+        .info-label { font-size: var(--text-sm); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+        .info-value { font-size: var(--text-2xl); font-weight: 600; }
+        .progress-bar { width: clamp(100px, 15vw, 160px); height: 10px; background: var(--bg-raised); border-radius: var(--radius); display: inline-block; vertical-align: middle; }
+        .progress-bar__fill { height: 100%; background: var(--accent-cyan); border-radius: var(--radius); transition: width 0.3s; }
         .progress-bar__fill--warning { background: var(--accent-amber); }
         .progress-bar__fill--danger { background: var(--accent-red); }
-        .progress-text { font-size: 0.75rem; margin-left: 0.5rem; }
-        .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: var(--bg-raised); }
+        .progress-text { font-size: var(--text-sm); margin-left: var(--space-2); }
+        .badge { font-size: var(--text-xs); padding: 0.25rem 0.625rem; border-radius: var(--radius); background: var(--bg-raised); }
         .badge--default { background: var(--bg-raised); color: var(--text-secondary); }
         .badge--purchase, .badge--usdc_deposit, .badge--grant { background: var(--accent-green-dim); color: var(--accent-green); }
         .badge--deduction, .badge--agent_message { background: var(--accent-red-dim); color: var(--accent-red); }
         .badge--reserve { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .badge--release, .badge--refund { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .txid { font-family: var(--font-mono); font-size: 0.8rem; }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
+        .txid { font-family: var(--font-mono); font-size: var(--text-sm); }
+        .btn--sm { padding: var(--space-2) var(--space-4); font-size: var(--text-sm); min-height: 40px; }
         .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-        .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px var(--accent-cyan-tint); }
-        .modal h3 { margin-bottom: 1rem; color: var(--text-primary); }
-        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
-        .form-group small { color: var(--text-secondary); font-size: 0.75rem; }
+        .modal { background: var(--bg-surface); padding: clamp(var(--space-5), 3vw, var(--space-8)); border-radius: var(--radius-xl); min-width: 360px; max-width: min(90vw, 520px); border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px var(--accent-cyan-tint); }
+        .modal h3 { margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-xl); }
+        .modal__actions { display: flex; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+        .form-group { margin-bottom: var(--space-5); }
+        .form-group label { display: block; margin-bottom: var(--space-2); font-size: var(--text-base); }
+        .form-group small { color: var(--text-secondary); font-size: var(--text-sm); }
         .loading { color: var(--text-secondary); }
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .spending__table { min-width: 500px; }
         @media (max-width: 767px) {
-            .spending { padding: 1rem; }
-            .info-grid { grid-template-columns: repeat(2, 1fr); }
-            .modal { min-width: auto; width: calc(100vw - 2rem); max-width: 400px; }
-        }
-        @media (max-width: 480px) {
-            .info-grid { grid-template-columns: 1fr; }
+            .modal { min-width: auto; width: calc(100vw - 2rem); }
         }
     `],
 })

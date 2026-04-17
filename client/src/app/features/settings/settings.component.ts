@@ -109,32 +109,34 @@ interface OperationalMode {
         }
         .settings__tabs {
             display: flex;
-            gap: 0.25rem;
-            padding: 0.75rem 1.25rem 0;
-            background: transparent;
+            gap: clamp(var(--space-2), 1vw, var(--space-4));
+            padding: var(--space-2) clamp(var(--space-3), 3vw, var(--space-8));
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(12, 13, 20, 0.3);
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
         }
         .settings__tabs::-webkit-scrollbar { display: none; }
         .settings__tab {
-            padding: 0.6rem 1.1rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            font-family: inherit;
-            letter-spacing: 0.01em;
+            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
+            font-size: var(--text-base);
+            font-weight: 600;
+            font-family: var(--font-body);
+            letter-spacing: 0.02em;
             background: transparent;
             border: none;
             border-radius: 8px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, background 0.15s;
-            min-height: 44px;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            border-radius: var(--radius) var(--radius) 0 0;
+            min-height: clamp(48px, 4vw, 56px);
         }
         .settings__tab:hover {
             color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--bg-hover);
         }
         .settings__tab--active {
             color: var(--accent-cyan);
@@ -143,13 +145,13 @@ interface OperationalMode {
         .settings__body {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem 1.25rem;
+            padding: clamp(var(--space-4), 3vw, var(--space-8)) clamp(var(--space-4), 4vw, var(--space-10));
             max-width: 1200px;
             width: 100%;
         }
         @media (max-width: 600px) {
-            .settings__tabs { padding: 0.5rem 0.75rem 0; }
-            .settings__body { padding: 1rem 0.75rem; }
+            .settings__tabs { padding: var(--space-2) var(--space-3) 0; }
+            .settings__body { padding: var(--space-4) var(--space-3); }
         }
     `,
 })

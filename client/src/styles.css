@@ -204,27 +204,40 @@
     --gradient-cyan-green: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
     --gradient-surface: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-deep) 100%);
 
-    /* ── Radius ── */
-    --radius-sm: 3px;
-    --radius: 6px;
-    --radius-lg: 10px;
-    --radius-xl: 16px;
+    /* ── Radius — slightly larger for modern feel ── */
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 20px;
+    --radius-2xl: 24px;
 
-    /* ── Typography scale (rem based, root 16px) ── */
-    --text-3xl: 2rem;
-    --text-2xl: 1.5rem;
-    --text-xl: 1.25rem;
-    --text-lg: 1rem;
-    --text-base: 1rem;
-    --text-sm: 0.875rem;
-    --text-xs: 0.75rem;
-    --text-xxs: 0.7rem;
-    --text-micro: 0.65rem;    /* Absolute minimum — badges, pills only */
+    /* ── Typography scale — fluid with clamp() for smooth scaling ── */
+    --text-4xl: clamp(2.5rem, 1.8rem + 3vw, 5rem);
+    --text-3xl: clamp(2.125rem, 1.6rem + 2.25vw, 4rem);
+    --text-2xl: clamp(1.75rem, 1.3rem + 1.75vw, 3rem);
+    --text-xl: clamp(1.375rem, 1.1rem + 1.1vw, 2.25rem);
+    --text-lg: clamp(1.1875rem, 1rem + 0.65vw, 1.625rem);
+    --text-base: clamp(1.0625rem, 0.95rem + 0.5vw, 1.375rem);
+    --text-sm: clamp(0.9375rem, 0.85rem + 0.4vw, 1.25rem);
+    --text-xs: clamp(0.875rem, 0.8rem + 0.35vw, 1.125rem);
+    --text-xxs: clamp(0.8125rem, 0.75rem + 0.3vw, 1.0625rem);
+    --text-micro: clamp(0.75rem, 0.7rem + 0.25vw, 1rem);
 
     /* ── Typography — line-heights ── */
     --leading-tight: 1.3;
     --leading-normal: 1.5;
     --leading-relaxed: 1.65;
+
+    /* ── Spacing scale — fluid with clamp() ── */
+    --space-1: 0.25rem;   /* 4px */
+    --space-2: 0.5rem;    /* 8px */
+    --space-3: 0.75rem;   /* 12px */
+    --space-4: 1rem;      /* 16px */
+    --space-5: 1.5rem;    /* 24px */
+    --space-6: clamp(1.5rem, 1.25rem + 1.25vw, 2.5rem);   /* 24–40px fluid */
+    --space-8: clamp(2rem, 1.5rem + 2.5vw, 4rem);          /* 32–64px fluid */
+    --space-10: clamp(3rem, 2rem + 4vw, 6rem);              /* 48–96px fluid */
+    --space-12: clamp(4rem, 3rem + 5vw, 8rem);              /* 64–128px fluid */
 
     /* ── Transitions ── */
     --transition-fast: 0.1s ease;
@@ -247,7 +260,7 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: var(--font-body);
-    font-size: 16px;
+    font-size: clamp(17px, 1rem + 0.5vw, 24px);
     line-height: 1.6;
     color: var(--text-primary);
     background: var(--bg-deep);
@@ -264,16 +277,6 @@ html, body {
         transition-duration: 0.01ms !important;
     }
     html { scroll-behavior: auto; }
-}
-
-/* Large displays (4K / high-res) */
-@media (min-height: 1200px) and (min-width: 1600px) {
-    html { font-size: 18px; }
-}
-
-/* Mobile: slightly smaller base (14px keeps --text-xs at 10.5px minimum) */
-@media (max-width: 480px) {
-    html { font-size: 14px; }
 }
 
 a {
@@ -357,7 +360,64 @@ select:focus-visible {
     text-overflow: ellipsis;
 }
 
+/* ── Card containment — prevents children from breaking bounds ── */
+.card-contain {
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* ── Filter pill / chip — reusable across all filter UIs ── */
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 32px;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.filter-pill:hover {
+    border-color: var(--accent-cyan-border);
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+.filter-pill--active,
+.filter-pill[data-active="true"] {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+}
+
+/* ── Stat grid — responsive grid for metric/stat cards ── */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+}
+@media (max-width: 480px) {
+    .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+}
+
 .page-title {
+    font-family: var(--font-display);
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.section-header {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
     font-weight: 700;
@@ -366,18 +426,9 @@ select:focus-visible {
     line-height: 1.4;
 }
 
-.section-header {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-    line-height: 1.5;
-}
-
 .card-title {
     font-family: var(--font-display);
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
@@ -431,10 +482,11 @@ select:focus-visible {
     letter-spacing: 0.08em;
 }
 .form__input {
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 0.875rem;
+    min-height: 44px;
     border: 1px solid var(--border-bright);
     border-radius: var(--radius);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-family: var(--font-body);
     background: var(--bg-input);
     color: var(--text-primary);
@@ -486,10 +538,10 @@ select:focus-visible {
 .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
 
 .btn {
-    padding: 0.5rem 1rem;
-    min-height: 36px;
+    padding: 0.625rem 1.25rem;
+    min-height: 44px;
     border-radius: var(--radius);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
     border: 1px solid;
@@ -682,14 +734,14 @@ button:active:not(:disabled) {
 /* ── Fluid grid utility ── */
 .fluid-grid {
     display: grid;
-    gap: 0.85rem;
+    gap: clamp(0.75rem, 0.5rem + 1vw, 1.5rem);
     grid-template-columns: repeat(auto-fill, minmax(var(--fluid-min, 280px), 1fr));
 }
 
-@container (max-width: 600px) {
-    .fluid-grid { grid-template-columns: 1fr; }
+@container (max-width: 500px) {
+    .fluid-grid { grid-template-columns: 1fr; gap: 0.75rem; }
 }
-@container (min-width: 601px) and (max-width: 900px) {
+@container (min-width: 501px) and (max-width: 900px) {
     .fluid-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -767,11 +819,7 @@ button:active:not(:disabled) {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Mobile: tighten page padding, improve touch targets */
-@media (max-width: 480px) {
-    .page-title { font-size: var(--text-xl); }
-    .section-header { font-size: var(--text-lg); }
-}
+/* Fluid typography handles mobile scaling automatically via clamp() */
 
 /* ── Modern panel transitions ── */
 .panel-resize {

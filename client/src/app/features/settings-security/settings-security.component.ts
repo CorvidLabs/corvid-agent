@@ -55,32 +55,36 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
         }
         .settings-section__nav {
             display: flex;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: clamp(var(--space-2), 1vw, var(--space-4));
+            padding: var(--space-2) clamp(var(--space-3), 2vw, var(--space-5));
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(12, 13, 20, 0.15);
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            margin-bottom: var(--space-5);
         }
         .settings-section__nav::-webkit-scrollbar { display: none; }
         .settings-section__btn {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-            font-weight: 500;
-            font-family: inherit;
-            letter-spacing: 0.01em;
+            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
+            font-size: var(--text-base);
+            font-weight: 600;
+            font-family: var(--font-body);
+            letter-spacing: 0.02em;
             background: transparent;
             border: 1px solid var(--border);
             border-radius: 100px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, background 0.15s, border-color 0.15s;
-            min-height: 40px;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            border-radius: var(--radius) var(--radius) 0 0;
+            min-height: 44px;
         }
         .settings-section__btn:hover {
             color: var(--text-primary);
-            border-color: var(--border-bright);
-            background: rgba(255, 255, 255, 0.03);
+            background: var(--bg-hover);
         }
         .settings-section__btn--active {
             color: var(--accent-cyan);

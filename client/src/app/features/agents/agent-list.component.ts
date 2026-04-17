@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, UpperCasePipe } from '@angular/common';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { PersonaService } from '../../core/services/persona.service';
@@ -29,13 +29,16 @@ const PROVIDER_COLORS: Record<string, { color: string; border: string; bg: strin
 
 const DEFAULT_PROVIDER_COLOR = { color: '#7a7d98', border: 'rgba(122, 125, 152, 0.4)', bg: 'rgba(122, 125, 152, 0.08)' };
 
+/** Map raw model IDs to short friendly names */
+import { friendlyModelName } from '../../shared/format-model';
+
 /** 7 days in milliseconds — agents with no session activity within this window are considered inactive */
 const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, DecimalPipe, UpperCasePipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell
             title="Agents"
@@ -137,14 +140,17 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                                     }
                                 </div>
                                 <div class="agent-card__badges">
-                                    @if (card.agent.provider || card.agent.model) {
+                                    @if (card.agent.provider) {
                                         <span
                                             class="badge badge--provider"
                                             [style.color]="getProviderColor(card.agent.provider).color"
                                             [style.border-color]="getProviderColor(card.agent.provider).border"
                                             [style.background]="getProviderColor(card.agent.provider).bg">
-                                            {{ card.agent.provider || 'anthropic' }}{{ card.agent.model ? ' / ' + card.agent.model : '' }}
+                                            {{ (card.agent.provider || 'anthropic') | uppercase }}
                                         </span>
+                                    }
+                                    @if (card.agent.model) {
+                                        <span class="badge badge--model">{{ getFriendlyModel(card.agent.model) }}</span>
                                     }
                                     @if (card.agent.algochatEnabled) {
                                         <span class="badge badge--algochat">AlgoChat</span>
@@ -183,18 +189,18 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
     `,
     styles: `
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: var(--text-xs); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .loading, .empty { color: var(--text-tertiary); font-size: 0.85rem; }
+        .loading, .empty { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         /* Search */
         .search-bar { margin-bottom: 0.85rem; }
         .search-input {
             width: 100%; padding: 0.6rem 0.85rem; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg);
-            font-size: 0.85rem; font-family: inherit; background: rgba(12, 13, 20, 0.6); color: var(--text-primary);
+            font-size: var(--text-sm); font-family: inherit; background: rgba(12, 13, 20, 0.6); color: var(--text-primary);
             box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s;
         }
         .search-input:focus { border-color: var(--accent-cyan-glow); box-shadow: 0 0 0 1px var(--accent-cyan-tint), 0 0 20px var(--accent-cyan-subtle); outline: none; }
@@ -204,7 +210,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .filter-group { display: flex; gap: 0.25rem; }
         .filter-chip {
             padding: var(--space-2) var(--space-3); min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: transparent; color: var(--text-secondary); font-size: var(--text-xs); font-family: inherit;
             cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: flex; align-items: center;
         }
         .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
@@ -212,21 +218,21 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .sort-group { margin-left: auto; }
         .sort-select {
             padding: 0.3rem var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-xs); font-family: inherit;
         }
         .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
 
         /* Hide-inactive toggle */
         .toggle-label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; user-select: none; }
         .toggle-input { accent-color: var(--accent-cyan); cursor: pointer; }
-        .toggle-text { font-size: 0.7rem; color: var(--text-secondary); }
+        .toggle-text { font-size: var(--text-xs); color: var(--text-secondary); }
 
         /* Agent Grid — fluid + container-query aware */
         :host { container-type: inline-size; }
         .agent-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-            gap: 0.85rem;
+            gap: clamp(0.85rem, 1vw, 1.5rem);
         }
         @container (max-width: 640px) {
             .agent-grid { grid-template-columns: 1fr; }
@@ -235,7 +241,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             .agent-grid { grid-template-columns: repeat(2, 1fr); }
         }
         @container (min-width: 1400px) {
-            .agent-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+            .agent-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
         }
         .agent-card {
             display: block;
@@ -244,9 +250,10 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: var(--radius-xl);
-            padding: 1.1rem;
+            padding: clamp(1.1rem, 1.5vw, 1.75rem);
             text-decoration: none;
             color: inherit;
+            overflow: hidden;
             transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s, background 0.25s;
             cursor: pointer;
             position: relative;
@@ -274,36 +281,37 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-bright); flex-shrink: 0; }
         .agent-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
         .agent-card__icon--fallback { font-size: 0.65rem; font-family: var(--font-mono); color: var(--text-tertiary); background: var(--bg-input); border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
-        .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
-        .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; }
+        .agent-card__top { display: flex; flex-direction: column; margin-bottom: 0.35rem; gap: 0.35rem; min-width: 0; }
+        .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
         .agent-card__health-dot {
             width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
         }
         .agent-card__health-dot[data-health="green"] { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green-glow); }
         .agent-card__health-dot[data-health="yellow"] { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber-glow); }
         .agent-card__health-dot[data-health="red"] { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red-glow); opacity: .6; }
-        .agent-card__name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+        .agent-card__name { font-weight: 700; font-size: var(--text-base); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .status-indicator { display: flex; align-items: center; gap: 0.25rem; }
-        .status-indicator__label { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+        .status-indicator__label { font-size: var(--text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
         .status-indicator--active .status-indicator__label { color: var(--accent-green); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .status-dot--active { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green-glow); }
-        .agent-card__badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
-        .badge { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase; }
+        .agent-card__badges { display: flex; gap: 0.25rem; flex-wrap: wrap; min-width: 0; flex-shrink: 1; }
+        .badge { font-size: var(--text-micro); padding: 3px 10px; border-radius: var(--radius-sm); font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
         .badge--provider { font-family: var(--font-mono); }
-        .badge--algochat { color: var(--accent-magenta); border-color: var(--accent-magenta-glow); }
-        .badge--persona { color: var(--accent-amber); border-color: var(--accent-amber-glow); }
-        .agent-card__desc { margin: 0 0 0.5rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .agent-card__stats { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+        .badge--model { color: var(--text-secondary); border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); }
+        .badge--algochat { color: var(--accent-magenta); border-color: var(--accent-magenta-glow); background: rgba(255, 0, 200, 0.06); }
+        .badge--persona { color: var(--accent-amber); border-color: var(--accent-amber-glow); background: rgba(255, 180, 0, 0.06); }
+        .agent-card__desc { margin: 0 0 0.5rem; font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .agent-card__stats { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
         .agent-card__stat { display: flex; flex-direction: column; gap: 0.1rem; }
-        .agent-card__stat-value { font-size: 0.95rem; font-weight: 700; color: var(--accent-cyan); }
-        .agent-card__stat-value--cost { color: var(--accent-green); font-size: 0.85rem; }
-        .agent-card__stat-value--time { font-size: 0.75rem; color: var(--text-secondary); }
-        .agent-card__stat-label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .agent-card__stat-value { font-size: var(--text-base); font-weight: 700; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .agent-card__stat-value--cost { color: var(--accent-green); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .agent-card__stat-value--time { font-size: var(--text-xs); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .agent-card__stat-label { font-size: var(--text-micro); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
         .agent-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid var(--border); }
-        .agent-card__perm { font-size: 0.65rem; color: var(--text-tertiary); text-transform: capitalize; }
+        .agent-card__perm { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: capitalize; }
         .agent-card__start-btn {
-            padding: var(--space-2) 0.85rem; min-height: 44px; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            padding: var(--space-2) var(--space-3); min-height: 44px; font-size: var(--text-xxs); font-weight: 600; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
             background: linear-gradient(135deg, var(--accent-cyan-tint), var(--accent-cyan-subtle));
             border: none; border-radius: var(--radius);
@@ -320,8 +328,6 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         @media (max-width: 480px) {
             .page { padding: var(--space-4); }
             .filter-group { flex-wrap: wrap; }
-            .agent-card__top { flex-direction: column; gap: 0.35rem; }
-            .agent-card__badges { order: -1; }
         }
     `,
 })
@@ -400,6 +406,10 @@ export class AgentListComponent implements OnInit {
 
     protected getProviderColor(provider?: string): { color: string; border: string; bg: string } {
         return PROVIDER_COLORS[provider ?? 'anthropic'] ?? DEFAULT_PROVIDER_COLOR;
+    }
+
+    protected getFriendlyModel(model?: string): string {
+        return friendlyModelName(model);
     }
 
     protected onAvatarError(agentId: string): void {

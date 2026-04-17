@@ -6,17 +6,17 @@ import { ProjectService } from '../../core/services/project.service';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import type { CreateAgentInput, ProviderInfo } from '../../core/models/agent.model';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Project } from '../../core/models/project.model';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
     selector: 'app-agent-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, PageShellComponent],
     template: `
-        <div class="page">
-            <h2>{{ id() ? 'Edit Agent' : 'New Agent' }}</h2>
-
+        <app-page-shell [title]="id() ? 'Edit Agent' : 'New Agent'" icon="agents"
+            [breadcrumbs]="[{label: 'Agents', route: '/agents'}, {label: id() ? 'Edit' : 'New'}]">
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
                     <label for="name" class="form__label">Name</label>
@@ -169,11 +169,10 @@ import { firstValueFrom } from 'rxjs';
                     <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
                 </div>
             </form>
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); max-width: 640px; }
-        .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
+        :host { max-width: 640px; display: block; }
         .form__textarea { min-height: 5em; line-height: 1.5; }
         .form__hint { font-style: italic; }
         .form__fieldset { background: var(--bg-surface); }

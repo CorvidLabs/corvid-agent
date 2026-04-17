@@ -5,6 +5,7 @@ import {
 } from '@angular/core';
 import { BrainViewerComponent } from './brain-viewer.component';
 import { MemoryBrowserComponent } from './memory-browser.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 type MemoryView = 'overview' | 'browse';
 
@@ -14,28 +15,25 @@ const STORAGE_KEY = 'memory_view_mode';
     selector: 'app-unified-memory',
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="unified-memory">
-            <header class="unified-memory__header">
-                <h2 class="unified-memory__title">Memory</h2>
-                <div class="unified-memory__modes" role="tablist" aria-label="Memory view mode">
-                    <button
-                        class="unified-memory__mode-btn"
-                        [class.unified-memory__mode-btn--active]="view() === 'overview'"
-                        (click)="setView('overview')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'overview'">
-                        Overview
-                    </button>
-                    <button
-                        class="unified-memory__mode-btn"
-                        [class.unified-memory__mode-btn--active]="view() === 'browse'"
-                        (click)="setView('browse')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'browse'">
-                        Browse
-                    </button>
-                </div>
-            </header>
+        <app-page-shell title="Memory" icon="memory">
+            <div actions class="unified-memory__modes" role="tablist" aria-label="Memory view mode">
+                <button
+                    class="unified-memory__mode-btn"
+                    [class.unified-memory__mode-btn--active]="view() === 'overview'"
+                    (click)="setView('overview')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'overview'">
+                    Overview
+                </button>
+                <button
+                    class="unified-memory__mode-btn"
+                    [class.unified-memory__mode-btn--active]="view() === 'browse'"
+                    (click)="setView('browse')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'browse'">
+                    Browse
+                </button>
+            </div>
             <div class="unified-memory__content">
                 @switch (view()) {
                     @case ('overview') {
@@ -46,29 +44,9 @@ const STORAGE_KEY = 'memory_view_mode';
                     }
                 }
             </div>
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .unified-memory {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .unified-memory__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: var(--space-3) var(--space-5);
-            background: rgba(12, 13, 20, 0.3);
-            border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0;
-        }
-        .unified-memory__title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
         .unified-memory__modes {
             display: flex;
             gap: 0;
@@ -104,16 +82,13 @@ const STORAGE_KEY = 'memory_view_mode';
         }
 
         @media (max-width: 767px) {
-            .unified-memory__header {
-                padding: var(--space-2) var(--space-3);
-            }
             .unified-memory__mode-btn {
                 padding: 0.3rem 0.65rem;
                 font-size: 0.68rem;
             }
         }
     `,
-    imports: [BrainViewerComponent, MemoryBrowserComponent],
+    imports: [BrainViewerComponent, MemoryBrowserComponent, PageShellComponent],
 })
 export class UnifiedMemoryComponent {
     readonly view = signal<MemoryView>(this.loadView());

@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { MetricCardComponent } from '../../shared/components/metric-card.component';
 import { firstValueFrom } from 'rxjs';
 
 // ─── API response types ─────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ interface ConsolidationResponse {
 @Component({
     selector: 'app-brain-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent],
+    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, MetricCardComponent],
     template: `
         <div class="brain-viewer">
             <div class="brain-viewer__title-row">
@@ -177,39 +178,15 @@ interface ConsolidationResponse {
                 <!-- Stats Cards -->
                 @if (stats()) {
                     <div class="stats-cards">
-                        <div class="stat-card">
-                            <span class="stat-card__label">Total Memories</span>
-                            <span class="stat-card__value">{{ stats()!.totalMemories }}</span>
-                        </div>
-                        <div class="stat-card stat-card--longterm">
-                            <span class="stat-card__label">Long-term</span>
-                            <span class="stat-card__value stat-card__value--longterm">{{ stats()!.byTier.longterm }}</span>
-                        </div>
-                        <div class="stat-card stat-card--shortterm">
-                            <span class="stat-card__label">Short-term</span>
-                            <span class="stat-card__value stat-card__value--shortterm">{{ stats()!.byTier.shortterm }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Avg Decay</span>
-                            <span class="stat-card__value stat-card__value--decay">{{ stats()!.averageDecayScore !== null ? (stats()!.averageDecayScore | number:'1.2-2') : '—' }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Confirmed</span>
-                            <span class="stat-card__value stat-card__value--confirmed">{{ stats()!.byStatus.confirmed }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Pending</span>
-                            <span class="stat-card__value stat-card__value--pending">{{ stats()!.byStatus.pending }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Failed</span>
-                            <span class="stat-card__value stat-card__value--failed">{{ stats()!.byStatus.failed }}</span>
-                        </div>
+                        <app-metric-card label="Total Memories" accent="cyan">{{ stats()!.totalMemories }}</app-metric-card>
+                        <app-metric-card label="Long-term" accent="purple">{{ stats()!.byTier.longterm }}</app-metric-card>
+                        <app-metric-card label="Short-term" accent="amber">{{ stats()!.byTier.shortterm }}</app-metric-card>
+                        <app-metric-card label="Avg Decay" accent="cyan">{{ stats()!.averageDecayScore !== null ? (stats()!.averageDecayScore | number:'1.2-2') : '—' }}</app-metric-card>
+                        <app-metric-card label="Confirmed" accent="green">{{ stats()!.byStatus.confirmed }}</app-metric-card>
+                        <app-metric-card label="Pending" accent="amber">{{ stats()!.byStatus.pending }}</app-metric-card>
+                        <app-metric-card label="Failed" accent="red">{{ stats()!.byStatus.failed }}</app-metric-card>
                         @if (obsStats()) {
-                            <div class="stat-card stat-card--observations">
-                                <span class="stat-card__label">Observations</span>
-                                <span class="stat-card__value stat-card__value--observations">{{ obsStats()!.totalActive }}</span>
-                            </div>
+                            <app-metric-card label="Observations" accent="magenta">{{ obsStats()!.totalActive }}</app-metric-card>
                         }
                     </div>
 
@@ -746,36 +723,6 @@ interface ConsolidationResponse {
             gap: 0.75rem;
             margin-bottom: 1.25rem;
         }
-        .stat-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-        .stat-card--longterm { border-color: var(--accent-cyan); border-style: dashed; }
-        .stat-card--shortterm { border-color: var(--accent-amber); border-style: dashed; }
-        .stat-card__label {
-            font-size: 0.65rem;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-        .stat-card__value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
-            text-shadow: 0 0 10px var(--accent-cyan-dim);
-        }
-        .stat-card__value--longterm { color: var(--accent-cyan); }
-        .stat-card__value--shortterm { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
-        .stat-card__value--decay { color: var(--accent-purple); text-shadow: 0 0 10px var(--accent-purple-dim); }
-        .stat-card__value--confirmed { color: var(--accent-green); text-shadow: 0 0 10px var(--accent-green-dim); }
-        .stat-card__value--pending { color: var(--accent-amber); text-shadow: 0 0 10px var(--accent-amber-dim); }
-        .stat-card__value--failed { color: var(--accent-red); text-shadow: 0 0 10px var(--accent-red-dim); }
-
         /* ─── Section ────── */
         .section {
             background: var(--bg-surface);
@@ -1102,8 +1049,6 @@ interface ConsolidationResponse {
         .error-row__time { color: var(--text-tertiary); flex-shrink: 0; }
 
         /* ─── Observations ────── */
-        .stat-card--observations { border-color: var(--accent-magenta); border-style: dashed; }
-        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px var(--accent-magenta-dim); }
 
         .obs-header {
             display: flex;
