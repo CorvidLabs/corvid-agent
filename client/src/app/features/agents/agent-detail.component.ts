@@ -13,6 +13,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { MetricCardComponent } from '../../shared/components/metric-card.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
@@ -22,6 +23,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { AgentPersona } from '../../core/models/persona.model';
 import type { AgentSkillAssignment } from '../../core/models/skill-bundle.model';
 import type { FlockAgent } from '@shared/types/flock-directory';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { firstValueFrom } from 'rxjs';
 
 type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'persona' | 'skills';
@@ -29,20 +31,15 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 @Component({
     selector: 'app-agent-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent],
+    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
     template: `
         @if (agent(); as a) {
-            <div class="page">
-                <div class="page__header">
-                    <div>
-                        <h2>{{ a.name }}</h2>
-                        <p class="page__desc">{{ a.description }}</p>
-                    </div>
-                    <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/agents', a.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                    </div>
-                </div>
+            <app-page-shell [title]="a.name" icon="agents" [subtitle]="a.description"
+                [breadcrumbs]="[{label: 'Agents', route: '/agents'}, {label: a.name}]">
+                <ng-container actions>
+                    <a class="btn btn--secondary" [routerLink]="['/agents', a.id, 'edit']">Edit</a>
+                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                </ng-container>
 
                 <!-- Tabs -->
                 <div class="tabs">
@@ -63,27 +60,12 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                 @if (activeTab() === 'overview') {
                     <!-- Stats Cards -->
                     <div class="stats-row">
-                        <div class="stat-card">
-                            <span class="stat-card__label">Total Sessions</span>
-                            <span class="stat-card__value">{{ agentSessions().length }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Running</span>
-                            <span class="stat-card__value stat-card__value--active">{{ agentRunningSessions().length }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Total Cost</span>
-                            <span class="stat-card__value stat-card__value--cost">\${{ totalCost() | number:'1.2-4' }}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Work Tasks</span>
-                            <span class="stat-card__value">{{ workTasks().length }}</span>
-                        </div>
+                        <app-metric-card label="Total Sessions" accent="cyan">{{ agentSessions().length }}</app-metric-card>
+                        <app-metric-card label="Running" accent="amber">{{ agentRunningSessions().length }}</app-metric-card>
+                        <app-metric-card label="Total Cost" accent="green">\${{ totalCost() | number:'1.2-4' }}</app-metric-card>
+                        <app-metric-card label="Work Tasks" accent="cyan">{{ workTasks().length }}</app-metric-card>
                         @if (a.walletAddress) {
-                            <div class="stat-card">
-                                <span class="stat-card__label">ALGO Balance</span>
-                                <span class="stat-card__value stat-card__value--algo">{{ walletBalance() / 1000000 | number:'1.2-6' }}</span>
-                            </div>
+                            <app-metric-card label="ALGO Balance" accent="magenta">{{ walletBalance() / 1000000 | number:'1.2-6' }}</app-metric-card>
                         }
                     </div>
 
@@ -379,21 +361,15 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                         </div>
                     }
                 }
-            </div>
+            </app-page-shell>
         } @else {
-            <div class="page">
+            <app-page-shell title="Loading..." icon="agents">
                 <app-skeleton variant="card" [count]="1" />
                 <app-skeleton variant="table" [count]="4" />
-            </div>
+            </app-page-shell>
         }
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
-        .page__actions { display: flex; gap: 0.5rem; }
-
         /* Tabs */
         .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
         .tab {
@@ -415,16 +391,6 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
             display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
             gap: 0.75rem; margin-bottom: 1.5rem;
         }
-        .stat-card {
-            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            padding: var(--space-3); display: flex; flex-direction: column; gap: 0.2rem;
-        }
-        .stat-card__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
-        .stat-card__value { font-size: 1.3rem; font-weight: 700; color: var(--accent-cyan); }
-        .stat-card__value--active { color: var(--accent-amber); }
-        .stat-card__value--cost { color: var(--accent-green); }
-        .stat-card__value--algo { color: var(--accent-magenta); }
-
         /* Session Table */
         .session-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
         .session-table__header {

@@ -168,48 +168,48 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; max-width: 960px; }
-        .page__header { margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
-        .error { color: var(--accent-red); padding: 0.75rem; background: var(--accent-red-tint); border-radius: var(--radius); }
+        .page { padding: clamp(var(--space-3), 2vw, var(--space-6)); }
+        .page__header { margin-bottom: var(--space-5); }
+        .page__header h2 { margin: 0; color: var(--text-primary); font-size: var(--text-xl); }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-base); }
+        .error { color: var(--accent-red); padding: var(--space-4); background: var(--accent-red-tint); border-radius: var(--radius-lg); font-size: var(--text-base); }
 
         .card {
             background: var(--bg-surface);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.25rem;
-            margin-bottom: 1rem;
+            border-radius: var(--radius-xl);
+            padding: clamp(var(--space-4), 2.5vw, var(--space-6));
+            margin-bottom: var(--space-5);
         }
         .card__title {
-            margin: 0 0 0.5rem;
-            font-size: 1rem;
+            margin: 0 0 var(--space-3);
+            font-size: var(--text-xl);
             color: var(--text-primary);
         }
         .card__subtitle {
-            margin: 0.75rem 0 0.4rem;
-            font-size: 0.8rem;
+            margin: var(--space-3) 0 var(--space-2);
+            font-size: var(--text-sm);
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .card__desc {
-            margin: 0 0 0.75rem;
-            font-size: 0.85rem;
+            margin: 0 0 var(--space-4);
+            font-size: var(--text-base);
             color: var(--text-secondary);
-            line-height: 1.5;
+            line-height: var(--leading-relaxed);
         }
         .card__checks {
             margin: 0;
-            padding-left: 1.25rem;
-            font-size: 0.85rem;
+            padding-left: var(--space-5);
+            font-size: var(--text-base);
             color: var(--text-secondary);
             line-height: 1.8;
         }
         .card__columns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: var(--space-5);
         }
         @media (max-width: 600px) {
             .card__columns { grid-template-columns: 1fr; }
@@ -218,18 +218,18 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         /* Tags */
         .tag-list {
             list-style: none;
-            margin: 0.25rem 0 0;
+            margin: var(--space-2) 0 0;
             padding: 0;
             display: flex;
             flex-wrap: wrap;
-            gap: 0.35rem;
+            gap: var(--space-2);
         }
         .tag-list--wrap { flex-wrap: wrap; }
         .tag {
             display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 3px;
-            font-size: 0.75rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius);
+            font-size: var(--text-sm);
             font-family: var(--font-mono);
         }
         .tag--file {
@@ -258,8 +258,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.35rem 0;
-            font-size: 0.8rem;
+            padding: 0.5rem 0;
+            font-size: var(--text-sm);
             border-bottom: 1px solid var(--border);
         }
         .pattern:last-child { border-bottom: none; }
@@ -269,7 +269,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .pattern--critical .pattern__name { color: var(--accent-red); }
         .pattern--warning .pattern__name { color: var(--accent-amber); }
         .pattern__cat {
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -278,16 +278,13 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         /* Governance tier cards */
         .tier-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-        }
-        @media (max-width: 600px) {
-            .tier-grid { grid-template-columns: 1fr; }
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: var(--space-4);
         }
         .tier-card {
             border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 0.75rem;
+            border-radius: var(--radius-lg);
+            padding: clamp(var(--space-3), 2vw, var(--space-5));
             background: var(--bg-raised);
         }
         .tier-card--layer0 { border-color: var(--accent-red); }
@@ -300,68 +297,66 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             margin-bottom: 0.4rem;
         }
         .tier-card__badge {
-            font-size: 0.65rem;
+            font-size: var(--text-xxs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 0.15rem 0.4rem;
-            border-radius: 3px;
+            padding: 0.2rem 0.5rem;
+            border-radius: var(--radius-sm);
         }
         .tier-card--layer0 .tier-card__badge { background: var(--accent-red-dim); color: var(--accent-red); }
         .tier-card--layer1 .tier-card__badge { background: rgba(255,183,77,0.15); color: var(--accent-amber); }
         .tier-card--layer2 .tier-card__badge { background: rgba(129,199,132,0.15); color: var(--accent-green); }
         .tier-card__label {
-            font-size: 0.9rem;
+            font-size: var(--text-base);
             font-weight: 600;
             color: var(--text-primary);
         }
         .tier-card__desc {
-            font-size: 0.75rem;
+            font-size: var(--text-sm);
             color: var(--text-secondary);
-            margin: 0 0 0.4rem;
-            line-height: 1.4;
+            margin: 0 0 var(--space-2);
+            line-height: var(--leading-normal);
         }
         .tier-card__props {
             list-style: none;
             margin: 0;
             padding: 0;
-            font-size: 0.75rem;
+            font-size: var(--text-sm);
             color: var(--text-tertiary);
         }
-        .tier-card__props li { padding: 0.1rem 0; }
+        .tier-card__props li { padding: 0.15rem 0; }
 
         /* Quick link cards */
         .link-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-        }
-        @media (max-width: 600px) {
-            .link-grid { grid-template-columns: 1fr; }
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-4);
         }
         .link-card {
             display: flex;
             flex-direction: column;
-            padding: 0.75rem 1rem;
+            padding: clamp(var(--space-3), 1.5vw, var(--space-5));
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: var(--radius-lg);
             background: var(--bg-raised);
             text-decoration: none;
             color: var(--text-primary);
-            transition: border-color 0.15s, background 0.15s;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
         }
         .link-card:hover {
             border-color: var(--accent-cyan);
             background: var(--bg-hover);
+            transform: translateY(-2px);
         }
         .link-card__label {
-            font-size: 0.85rem;
+            font-size: var(--text-base);
             font-weight: 600;
         }
         .link-card__count {
-            font-size: 0.75rem;
+            font-size: var(--text-sm);
             color: var(--text-tertiary);
-            margin-top: 0.2rem;
+            margin-top: var(--space-1);
         }
     `,
 })

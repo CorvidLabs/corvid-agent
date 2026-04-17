@@ -82,40 +82,42 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         </app-page-shell>
     `,
     styles: `
-        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .add-form { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; }
         .input {
-            flex: 1; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
+            flex: 1; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
+            min-height: 48px;
         }
         .input::placeholder { color: var(--text-tertiary); }
-        .input--label { max-width: 200px; }
-        .input--inline { flex: 1; padding: 0.3rem var(--space-2); font-size: 0.8rem; }
+        .input--label { max-width: 280px; min-width: 160px; }
+        .input--inline { flex: 1; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); min-height: 40px; }
         .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent;
+            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 48px;
         }
         .btn:disabled { opacity: 0.4; cursor: default; }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        .btn--small { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
-        .error { color: var(--accent-red); font-size: 0.85rem; margin-bottom: 1rem; }
-        .list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .error { color: var(--accent-red); font-size: var(--text-base); margin-bottom: var(--space-4); }
+        .list { display: flex; flex-direction: column; gap: var(--space-4); }
         .list__item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
+            padding: clamp(var(--space-3), 2vw, var(--space-5)); background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius-xl); transition: border-color 0.15s;
         }
+        .list__item:hover { border-color: var(--border-bright); }
         .list__item-main { flex: 1; min-width: 0; }
-        .list__item-username { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); }
-        .list__item-label { font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+        .list__item-username { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-primary); }
+        .list__item-label { font-size: var(--text-sm); color: var(--text-secondary); cursor: pointer; }
         .list__item-label:hover { color: var(--text-primary); }
-        .label-row { margin-top: 0.25rem; }
-        .edit-row { display: flex; gap: 0.5rem; margin-top: 0.25rem; align-items: center; }
-        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; font-size: 0.75rem; color: var(--text-tertiary); margin-left: 1rem; }
+        .label-row { margin-top: var(--space-2); }
+        .edit-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
+        .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-tertiary); margin-left: var(--space-4); }
     `,
 })
 export class GitHubAllowlistComponent implements OnInit {

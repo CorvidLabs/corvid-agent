@@ -3,15 +3,15 @@ import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ProjectService } from '../../core/services/project.service';
 import { DirBrowserComponent } from '../../shared/components/dir-browser.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-project-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, DirBrowserComponent],
+    imports: [ReactiveFormsModule, DirBrowserComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <h2>{{ id() ? 'Edit Project' : 'New Project' }}</h2>
-
+        <app-page-shell [title]="id() ? 'Edit Project' : 'New Project'" icon="projects"
+            [breadcrumbs]="[{label: 'Projects', route: '/agents/projects'}, {label: id() ? 'Edit' : 'New'}]">
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
                     <label for="name" class="form__label">Name</label>
@@ -61,11 +61,10 @@ import { DirBrowserComponent } from '../../shared/components/dir-browser.compone
                     <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
                 </div>
             </form>
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); max-width: 640px; }
-        .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
+        :host { max-width: 640px; display: block; }
     `,
 })
 export class ProjectFormComponent implements OnInit {

@@ -5,6 +5,7 @@ import {
 } from '@angular/core';
 import { LiveFeedComponent } from './live-feed.component';
 import { AgentCommsComponent } from './agent-comms.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 type CommsView = 'feed' | 'network';
 
@@ -13,30 +14,27 @@ const STORAGE_KEY = 'comms_view_mode';
 @Component({
     selector: 'app-unified-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LiveFeedComponent, AgentCommsComponent],
+    imports: [LiveFeedComponent, AgentCommsComponent, PageShellComponent],
     template: `
-        <div class="unified-comms">
-            <header class="unified-comms__header">
-                <h2 class="unified-comms__title">Comms</h2>
-                <div class="unified-comms__modes" role="tablist" aria-label="Comms view mode">
-                    <button
-                        class="unified-comms__mode-btn"
-                        [class.unified-comms__mode-btn--active]="view() === 'feed'"
-                        (click)="setView('feed')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'feed'">
-                        Feed
-                    </button>
-                    <button
-                        class="unified-comms__mode-btn"
-                        [class.unified-comms__mode-btn--active]="view() === 'network'"
-                        (click)="setView('network')"
-                        role="tab"
-                        [attr.aria-selected]="view() === 'network'">
-                        Network
-                    </button>
-                </div>
-            </header>
+        <app-page-shell title="Comms" icon="comms">
+            <div actions class="unified-comms__modes" role="tablist" aria-label="Comms view mode">
+                <button
+                    class="unified-comms__mode-btn"
+                    [class.unified-comms__mode-btn--active]="view() === 'feed'"
+                    (click)="setView('feed')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'feed'">
+                    Feed
+                </button>
+                <button
+                    class="unified-comms__mode-btn"
+                    [class.unified-comms__mode-btn--active]="view() === 'network'"
+                    (click)="setView('network')"
+                    role="tab"
+                    [attr.aria-selected]="view() === 'network'">
+                    Network
+                </button>
+            </div>
             <div class="unified-comms__content">
                 @switch (view()) {
                     @case ('feed') {
@@ -47,29 +45,9 @@ const STORAGE_KEY = 'comms_view_mode';
                     }
                 }
             </div>
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .unified-comms {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        .unified-comms__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: var(--space-3) var(--space-5);
-            background: rgba(12, 13, 20, 0.3);
-            border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0;
-        }
-        .unified-comms__title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
         .unified-comms__modes {
             display: flex;
             gap: 0;
@@ -105,9 +83,6 @@ const STORAGE_KEY = 'comms_view_mode';
         }
 
         @media (max-width: 767px) {
-            .unified-comms__header {
-                padding: var(--space-2) var(--space-3);
-            }
             .unified-comms__mode-btn {
                 padding: 0.3rem 0.65rem;
                 font-size: 0.68rem;

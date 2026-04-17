@@ -216,26 +216,26 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; height: 100%; display: flex; flex-direction: column; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__toolbar { margin-bottom: 1rem; }
+        .page { padding: clamp(var(--space-3), 2vw, var(--space-6)); height: 100%; display: flex; flex-direction: column; }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3); }
+        .page__header h2 { margin: 0; color: var(--text-primary); font-size: var(--text-xl); }
+        .page__toolbar { margin-bottom: var(--space-5); }
 
         .search-input {
-            width: 100%; max-width: 400px; padding: 0.5rem 0.75rem;
+            width: 100%; max-width: 520px; padding: var(--space-3) var(--space-4);
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary);
-            font-size: 0.85rem; font-family: inherit;
+            border-radius: var(--radius-lg); color: var(--text-primary);
+            font-size: var(--text-base); font-family: inherit; min-height: 48px;
             transition: border-color 0.2s;
         }
         .search-input:focus { outline: none; border-color: var(--accent-cyan); }
         .search-input::placeholder { color: var(--text-tertiary); }
 
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
+            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm);
             font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent;
+            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 48px;
         }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
@@ -244,24 +244,24 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .btn--ghost:hover { border-color: var(--text-tertiary); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
-        .btn--xs { padding: 0.3rem 0.5rem; font-size: 0.7rem; min-height: 28px; }
+        .btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
+        .btn--xs { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); min-height: 36px; }
 
         .contact-layout {
-            display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;
+            display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(var(--space-4), 2vw, var(--space-6));
             flex: 1; min-height: 0;
         }
 
         /* ── List panel ── */
         .contact-list {
-            display: flex; flex-direction: column; gap: 0.5rem;
+            display: flex; flex-direction: column; gap: var(--space-3);
             overflow-y: auto; max-height: calc(100vh - 220px);
         }
 
         .contact-card {
-            display: flex; align-items: center; gap: 0.75rem;
-            padding: 0.75rem 1rem; background: var(--bg-surface);
-            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            display: flex; align-items: center; gap: var(--space-3);
+            padding: clamp(var(--space-3), 1.5vw, var(--space-4)); background: var(--bg-surface);
+            border: 1px solid var(--border); border-radius: var(--radius-xl);
             cursor: pointer; text-align: left; width: 100%;
             font-family: inherit; color: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
@@ -270,22 +270,22 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .contact-card--active { border-color: var(--accent-cyan); box-shadow: 0 0 16px rgba(0, 200, 255, 0.12); }
 
         .contact-card__avatar {
-            width: 36px; height: 36px; border-radius: 50%;
+            width: 42px; height: 42px; border-radius: 50%;
             background: var(--accent-cyan-dim);
             color: var(--accent-cyan); display: flex; align-items: center;
-            justify-content: center; font-weight: 700; font-size: 0.9rem;
+            justify-content: center; font-weight: 700; font-size: var(--text-base);
             flex-shrink: 0;
         }
 
         .contact-card__info { flex: 1; min-width: 0; }
-        .contact-card__name { margin: 0 0 0.2rem; font-size: 0.9rem; color: var(--text-primary); }
-        .contact-card__platforms { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-        .contact-card__no-links { font-size: 0.7rem; color: var(--text-tertiary); }
-        .contact-card__time { font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; }
+        .contact-card__name { margin: 0 0 var(--space-1); font-size: var(--text-base); color: var(--text-primary); }
+        .contact-card__platforms { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+        .contact-card__no-links { font-size: var(--text-sm); color: var(--text-tertiary); }
+        .contact-card__time { font-size: var(--text-sm); color: var(--text-tertiary); white-space: nowrap; }
 
         .platform-chip {
-            display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
-            font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+            display: inline-block; padding: 0.2rem 0.5rem; border-radius: var(--radius);
+            font-size: var(--text-xxs); font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.03em; border: 1px solid;
         }
         .platform-chip--discord { color: #7289da; border-color: #7289da; background: rgba(114, 137, 218, 0.1); }
@@ -293,12 +293,12 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .platform-chip--github { color: #f0f0f0; border-color: var(--text-muted); background: rgba(255, 255, 255, 0.05); }
         .platform-chip--verified { box-shadow: 0 0 6px var(--accent-green-mid); }
 
-        .no-results { color: var(--text-tertiary); font-size: 0.85rem; padding: 1rem; }
+        .no-results { color: var(--text-tertiary); font-size: var(--text-base); padding: var(--space-5); }
 
         /* ── Detail panel ── */
         .contact-detail {
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: 1.5rem;
+            border-radius: var(--radius-xl); padding: clamp(var(--space-4), 2vw, var(--space-6));
             overflow-y: auto; max-height: calc(100vh - 220px);
         }
         .contact-detail--empty {
@@ -316,35 +316,35 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
             justify-content: center; font-weight: 700; font-size: 1.2rem;
             flex-shrink: 0;
         }
-        .detail-name { margin: 0; font-size: 1.1rem; color: var(--text-primary); }
-        .detail-meta { font-size: 0.75rem; color: var(--text-tertiary); }
-        .detail-header-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+        .detail-name { margin: 0; font-size: var(--text-xl); color: var(--text-primary); }
+        .detail-meta { font-size: var(--text-sm); color: var(--text-tertiary); }
+        .detail-header-actions { margin-left: auto; display: flex; gap: var(--space-2); }
 
-        .detail-section { margin-bottom: 1.5rem; }
-        .detail-title { margin: 0 0 1rem; color: var(--text-primary); }
+        .detail-section { margin-bottom: var(--space-5); }
+        .detail-title { margin: 0 0 var(--space-4); color: var(--text-primary); }
         .section-label {
-            margin: 0 0 0.5rem; font-size: 0.75rem; font-weight: 600;
+            margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600;
             color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .detail-notes { margin: 0; color: var(--text-secondary); font-size: 0.85rem; white-space: pre-wrap; }
+        .detail-notes { margin: 0; color: var(--text-secondary); font-size: var(--text-base); white-space: pre-wrap; line-height: var(--leading-relaxed); }
 
-        .detail-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .detail-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 
         /* ── Links section ── */
-        .links-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+        .links-list { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
         .link-row {
-            display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
-            background: var(--bg-base); border-radius: var(--radius);
+            display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+            background: var(--bg-base); border-radius: var(--radius-lg);
         }
         .link-id {
-            font-size: 0.8rem; color: var(--text-secondary); flex: 1;
+            font-size: var(--text-sm); color: var(--text-secondary); flex: 1;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .verified-badge {
-            font-size: 0.65rem; color: var(--accent-green);
+            font-size: var(--text-xxs); color: var(--accent-green);
             font-weight: 600; text-transform: uppercase;
         }
-        .empty-hint { color: var(--text-tertiary); font-size: 0.8rem; margin: 0.25rem 0; }
+        .empty-hint { color: var(--text-tertiary); font-size: var(--text-sm); margin: var(--space-1) 0; }
 
         /* ── Add link form ── */
         .add-link-form {
@@ -355,14 +355,14 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 
         /* ── Form fields ── */
         .field-label {
-            display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary);
-            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
+            display: block; font-size: var(--text-sm); font-weight: 600; color: var(--text-tertiary);
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-1); margin-top: var(--space-3);
         }
         .field-input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
-            box-sizing: border-box;
+            width: 100%; padding: var(--space-3) var(--space-4); background: var(--bg-base);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            color: var(--text-primary); font-size: var(--text-base); font-family: inherit;
+            box-sizing: border-box; min-height: 44px;
         }
         .field-input:focus { outline: none; border-color: var(--accent-cyan); }
         .field-textarea { resize: vertical; min-height: 60px; }
@@ -376,11 +376,11 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         }
         .modal {
             background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: 1.5rem;
-            width: 90%; max-width: 440px;
+            border-radius: var(--radius-xl); padding: clamp(var(--space-4), 3vw, var(--space-6));
+            width: 90%; max-width: 480px;
         }
-        .modal__title { margin: 0 0 0.5rem; color: var(--text-primary); }
-        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .modal__title { margin: 0 0 var(--space-2); color: var(--text-primary); font-size: var(--text-lg); }
+        .modal__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
 
         /* ── Responsive ── */
         @media (max-width: 767px) {

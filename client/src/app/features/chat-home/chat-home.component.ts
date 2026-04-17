@@ -168,8 +168,8 @@ import { OnboardingComponent } from './onboarding.component';
             top: -30%;
             left: 50%;
             transform: translateX(-50%);
-            width: 600px;
-            height: 600px;
+            width: clamp(300px, 50vw, 600px);
+            height: clamp(300px, 50vw, 600px);
             border-radius: 50%;
             background: radial-gradient(
                 circle,
@@ -296,7 +296,7 @@ import { OnboardingComponent } from './onboarding.component';
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius-xl);
-            overflow: hidden;
+            overflow: visible;
             transition: border-color 0.25s, box-shadow 0.25s;
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
         }
@@ -317,6 +317,7 @@ import { OnboardingComponent } from './onboarding.component';
             outline: none;
             max-height: 200px;
             overflow-y: auto;
+            box-sizing: border-box;
         }
         .chat-home__textarea::placeholder {
             color: var(--text-tertiary);
@@ -335,6 +336,9 @@ import { OnboardingComponent } from './onboarding.component';
             display: flex;
             align-items: center;
             gap: 1rem;
+            min-width: 0;
+            flex: 1 1 0;
+            flex-wrap: wrap;
         }
         .chat-home__agent-picker {
             display: flex;
@@ -358,6 +362,7 @@ import { OnboardingComponent } from './onboarding.component';
             font-size: 0.9rem;
             cursor: pointer;
             transition: border-color 0.15s;
+            min-width: 0;
         }
         .chat-home__select:focus {
             outline: none;
@@ -368,7 +373,7 @@ import { OnboardingComponent } from './onboarding.component';
             align-items: center;
             gap: 0.35rem;
             padding: var(--space-2) 1.4rem;
-            border: none;
+            border: 1px solid var(--accent-cyan-dim);
             border-radius: var(--radius-lg);
             background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-cyan-wash));
             color: var(--accent-cyan);
@@ -379,6 +384,7 @@ import { OnboardingComponent } from './onboarding.component';
             letter-spacing: 0.05em;
             cursor: pointer;
             transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+            flex-shrink: 0;
         }
         .chat-home__send:hover:not(:disabled) {
             background: linear-gradient(135deg, var(--accent-cyan-border), var(--accent-cyan-dim));
@@ -388,7 +394,7 @@ import { OnboardingComponent } from './onboarding.component';
             transform: scale(0.97);
         }
         .chat-home__send:disabled {
-            opacity: 0.3;
+            opacity: 0.5;
             cursor: not-allowed;
         }
         .chat-home__send-arrow {

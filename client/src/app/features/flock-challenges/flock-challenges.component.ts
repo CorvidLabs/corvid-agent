@@ -422,10 +422,10 @@ interface AgentTestRow {
                 padding: var(--space-2) 0.625rem; border-radius: 0.375rem;
                 background: var(--surface-1);
             }
-            .ch-challenge__id { font-size: 0.6875rem; font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; }
-            .ch-challenge__desc { flex: 1; font-size: 0.8125rem; }
+            .ch-challenge__id { font-size: 0.6875rem; font-family: var(--font-mono); color: var(--text-muted); min-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .ch-challenge__desc { flex: 1; font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .ch-challenge__meta { display: flex; gap: 0.5rem; }
-            .ch-challenge__timeout, .ch-challenge__weight { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; }
+            .ch-challenge__timeout, .ch-challenge__weight { font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
             /* Agent grid */
             .ch-agent-grid {

@@ -12,6 +12,7 @@ import { ApiService } from '../../core/services/api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
@@ -73,17 +74,12 @@ interface LibraryResponse {
 @Component({
     selector: 'app-models',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SlicePipe, SkeletonComponent],
+    imports: [DecimalPipe, SlicePipe, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Models</h2>
-                <div class="header__actions">
-                    <button class="btn btn--secondary" (click)="refresh()" [disabled]="loading()">
-                        Refresh
-                    </button>
-                </div>
-            </div>
+        <app-page-shell title="Models" icon="models">
+            <button actions class="btn btn--secondary" (click)="refresh()" [disabled]="loading()">
+                Refresh
+            </button>
 
             <!-- Status Banner -->
             <div class="status-banner" [class.status-banner--offline]="!ollamaAvailable()">
@@ -296,14 +292,9 @@ interface LibraryResponse {
                     </button>
                 </div>
             </section>
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; max-width: 960px; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .header__actions { display: flex; gap: 0.5rem; }
-
         /* Status Banner */
         .status-banner {
             display: flex; align-items: center; gap: 0.5rem;
@@ -342,8 +333,8 @@ interface LibraryResponse {
         .model-card:hover { border-color: var(--accent-cyan); }
         .model-card--installed { opacity: 0.7; }
         .model-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
-        .model-card__name { margin: 0; font-size: 0.9rem; color: var(--text-primary); font-weight: 600; }
-        .model-card__desc { margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
+        .model-card__name { margin: 0; font-size: 0.9rem; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .model-card__desc { margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         .model-card__info { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
         .model-card__meta { font-size: 0.72rem; color: var(--text-tertiary); background: var(--bg-raised); padding: 2px 8px; border-radius: var(--radius-sm); }
         .model-card__actions { display: flex; gap: 0.5rem; align-items: center; }

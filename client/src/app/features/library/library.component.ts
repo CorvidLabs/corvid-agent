@@ -12,6 +12,7 @@ import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
 import { MarkdownPipe } from '../../shared/pipes/markdown.pipe';
 import { Library3DComponent } from './library-3d.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 const CATEGORIES: { key: LibraryCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -35,16 +36,13 @@ type SortKey = 'date' | 'name' | 'author';
 @Component({
     selector: 'app-library',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe],
+    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe, PageShellComponent],
     template: `
-        <div class="library">
-            <div class="library__header">
-                <h2 class="library__title">Library</h2>
-                <app-view-mode-toggle
-                    [mode]="viewMode()"
-                    ariaLabel="Library view mode"
-                    (modeChange)="setViewMode($event)" />
-            </div>
+        <app-page-shell title="Library" icon="library">
+            <app-view-mode-toggle actions
+                [mode]="viewMode()"
+                ariaLabel="Library view mode"
+                (modeChange)="setViewMode($event)" />
 
             <!-- Stats bar -->
             <div class="library__stats">
@@ -269,27 +267,9 @@ type SortKey = 'date' | 'name' | 'author';
                     </div>
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .library {
-            padding: 1.5rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .library__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        .library__title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin: 0;
-        }
-
         /* Stats bar */
         .library__stats {
             display: flex;
@@ -684,6 +664,8 @@ type SortKey = 'date' | 'name' | 'author';
             letter-spacing: 0.05em;
             color: var(--text-tertiary);
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .library__overlay-type {
             font-size: 0.6rem;

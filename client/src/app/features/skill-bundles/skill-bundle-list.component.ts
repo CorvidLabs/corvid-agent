@@ -5,19 +5,17 @@ import { NotificationService } from '../../core/services/notification.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { SkillBundle } from '../../core/models/skill-bundle.model';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Skill Bundles</h2>
-                <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
-                    {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
-                </button>
-            </div>
+        <app-page-shell title="Skill Bundles" icon="skills">
+            <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+                {{ showCreateForm() ? 'Cancel' : '+ New Bundle' }}
+            </button>
 
             <!-- Filter tabs -->
             <div class="filter-tabs">
@@ -158,12 +156,9 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
                     }
                 </div>
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .create-btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);

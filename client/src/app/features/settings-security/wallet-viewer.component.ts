@@ -201,15 +201,16 @@ interface WalletMessage {
         </div>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .count { color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem; }
+        .page { padding: clamp(var(--space-3), 2vw, var(--space-6)); }
+        .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3); }
+        .page__header h2 { margin: 0; color: var(--text-primary); font-size: var(--text-xl); }
+        .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-base); }
 
-        .search-bar { margin-bottom: 1.5rem; }
+        .search-bar { margin-bottom: var(--space-5); }
         .input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary); font-family: inherit; font-size: 0.85rem;
+            width: 100%; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
+            min-height: 48px;
             transition: border-color var(--transition-fast), box-shadow var(--transition-base);
         }
         .input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
@@ -218,7 +219,7 @@ interface WalletMessage {
         .loading { color: var(--text-secondary); }
         .empty { color: var(--text-tertiary); }
 
-        .wallet-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .wallet-list { display: flex; flex-direction: column; gap: var(--space-4); }
 
         .wallet-card {
             background: var(--bg-surface); border: 1px solid var(--border);
@@ -230,37 +231,37 @@ interface WalletMessage {
 
         .wallet-card__header {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 1rem; cursor: pointer; gap: 1rem;
+            padding: var(--space-4); cursor: pointer; gap: var(--space-4);
         }
         .wallet-card__header:hover { background: var(--bg-hover); }
 
         .wallet-card__info { flex: 1; min-width: 0; }
         .wallet-card__address {
-            font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary);
-            display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+            font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-primary);
+            display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
         }
         .wallet-card__label {
-            font-size: 0.75rem; color: var(--accent-cyan); font-family: inherit;
-            background: var(--accent-cyan-wash); padding: 0.1rem 0.4rem; border-radius: 3px;
+            font-size: var(--text-sm); color: var(--accent-cyan); font-family: inherit;
+            background: var(--accent-cyan-wash); padding: 0.25rem 0.625rem; border-radius: var(--radius);
         }
 
         .wallet-card__stats {
-            display: flex; gap: 1rem; margin-top: 0.4rem; font-size: 0.75rem;
+            display: flex; gap: var(--space-4); margin-top: var(--space-2); font-size: var(--text-sm);
             color: var(--text-secondary); flex-wrap: wrap;
         }
-        .stat { display: flex; align-items: center; gap: 0.25rem; }
-        .stat__icon { font-size: 0.7rem; }
+        .stat { display: flex; align-items: center; gap: var(--space-1); }
+        .stat__icon { font-size: var(--text-sm); }
         .stat__icon--in { color: var(--accent-cyan); }
         .stat__icon--out { color: var(--accent-magenta); }
         .stat__icon--credits { color: var(--accent-green); }
         .stat--time { color: var(--text-tertiary); }
 
         .wallet-card__actions {
-            display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;
+            display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;
         }
 
         .badge {
-            font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px;
+            font-size: var(--text-xs); padding: 0.25rem 0.625rem; border-radius: var(--radius);
             font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .badge--allowed {
@@ -268,38 +269,38 @@ interface WalletMessage {
             border: 1px solid var(--accent-green-mid);
         }
 
-        .expand-icon { color: var(--text-tertiary); font-size: 0.7rem; }
+        .expand-icon { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm); font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent;
+            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 44px;
         }
         .btn:disabled { opacity: 0.4; cursor: default; }
         .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-tint); box-shadow: 0 0 8px var(--accent-cyan-mid); }
         .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        .btn--small { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
         .btn--ghost:hover { background: var(--bg-hover); }
 
         .wallet-card__messages {
-            border-top: 1px solid var(--border); padding: 1rem;
+            border-top: 1px solid var(--border); padding: clamp(var(--space-3), 2vw, var(--space-5));
             background: var(--bg-deep);
             animation: expandReveal 0.3s ease-out;
         }
 
         .full-address {
-            font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 0.75rem;
+            font-size: var(--text-sm); color: var(--text-tertiary); margin-bottom: var(--space-3);
             word-break: break-all;
         }
         .full-address code { font-family: var(--font-mono); color: var(--text-secondary); }
 
-        .message-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 400px; overflow-y: auto; }
+        .message-list { display: flex; flex-direction: column; gap: var(--space-3); max-height: 400px; overflow-y: auto; }
 
         .message {
-            padding: 0.6rem 0.75rem; border-radius: var(--radius);
+            padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg);
             border: 1px solid var(--border);
             transition: background var(--transition-fast), transform var(--transition-fast);
         }
@@ -309,10 +310,10 @@ interface WalletMessage {
         .message--status { border-left: 3px solid var(--accent-amber); background: rgba(255, 170, 0, 0.03); }
 
         .message__header {
-            display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;
-            font-size: 0.7rem;
+            display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1);
+            font-size: var(--text-sm);
         }
-        .message__dir { font-weight: 700; font-size: 0.65rem; }
+        .message__dir { font-weight: 700; font-size: var(--text-xs); }
         .message__time { color: var(--text-tertiary); }
         .message__fee { color: var(--accent-green); }
         .accent-cyan { color: var(--accent-cyan); }
@@ -320,7 +321,7 @@ interface WalletMessage {
         .accent-amber { color: var(--accent-amber); }
 
         .message__content {
-            font-size: 0.8rem; color: var(--text-primary); line-height: 1.6;
+            font-size: var(--text-base); color: var(--text-primary); line-height: var(--leading-relaxed);
             white-space: pre-wrap; word-break: break-word;
         }
 
@@ -335,19 +336,19 @@ interface WalletMessage {
         }
         .modal {
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-lg); padding: 1.5rem; width: 360px; max-width: 90vw;
+            border-radius: var(--radius-xl); padding: clamp(var(--space-4), 3vw, var(--space-6)); width: 420px; max-width: 90vw;
             box-shadow: 0 8px 32px var(--overlay), 0 0 0 1px var(--accent-cyan-tint);
             animation: modalSlideIn 0.2s ease-out;
         }
         @keyframes modalSlideIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .modal__title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; }
+        .modal__title { font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-1); }
         .modal__address {
-            font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-cyan);
-            margin-bottom: 1rem; word-break: break-all;
+            font-family: var(--font-mono); font-size: var(--text-xs); color: var(--accent-cyan);
+            margin-bottom: var(--space-4); word-break: break-all;
         }
-        .modal__field { margin-bottom: 0.75rem; }
-        .modal__label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
-        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .modal__field { margin-bottom: var(--space-3); }
+        .modal__label { display: block; font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-1); }
+        .modal__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); }
 
         .load-more { margin-top: 0.5rem; width: 100%; }
 

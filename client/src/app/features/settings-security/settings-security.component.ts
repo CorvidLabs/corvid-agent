@@ -55,31 +55,36 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
         }
         .settings-section__nav {
             display: flex;
-            gap: 0;
-            padding: 0 var(--space-4);
+            gap: clamp(var(--space-2), 1vw, var(--space-4));
+            padding: var(--space-2) clamp(var(--space-3), 2vw, var(--space-5));
             border-bottom: 1px solid var(--border-subtle);
-            background: rgba(12, 13, 20, 0.2);
+            background: rgba(12, 13, 20, 0.15);
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            margin-bottom: var(--space-5);
         }
         .settings-section__nav::-webkit-scrollbar { display: none; }
         .settings-section__btn {
-            padding: var(--space-2) 0.85rem;
-            font-size: 0.72rem;
+            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
+            font-size: var(--text-base);
             font-weight: 600;
-            font-family: inherit;
-            letter-spacing: 0.03em;
+            font-family: var(--font-body);
+            letter-spacing: 0.02em;
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            border-radius: var(--radius) var(--radius) 0 0;
+            min-height: 44px;
         }
         .settings-section__btn:hover {
             color: var(--text-primary);
+            background: var(--bg-hover);
         }
         .settings-section__btn--active {
             color: var(--accent-cyan);

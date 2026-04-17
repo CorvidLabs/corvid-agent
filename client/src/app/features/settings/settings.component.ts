@@ -109,31 +109,34 @@ interface OperationalMode {
         }
         .settings__tabs {
             display: flex;
-            gap: 0;
-            padding: 0 var(--space-4);
+            gap: clamp(var(--space-2), 1vw, var(--space-4));
+            padding: var(--space-2) clamp(var(--space-3), 3vw, var(--space-8));
             border-bottom: 1px solid var(--border-subtle);
-            background: rgba(12, 13, 20, 0.2);
+            background: rgba(12, 13, 20, 0.3);
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
         }
         .settings__tabs::-webkit-scrollbar { display: none; }
         .settings__tab {
-            padding: var(--space-3) 0.9rem;
-            font-size: 0.75rem;
+            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
+            font-size: var(--text-base);
             font-weight: 600;
-            font-family: inherit;
-            letter-spacing: 0.03em;
+            font-family: var(--font-body);
+            letter-spacing: 0.02em;
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            border-radius: var(--radius) var(--radius) 0 0;
+            min-height: clamp(48px, 4vw, 56px);
         }
         .settings__tab:hover {
             color: var(--text-primary);
+            background: var(--bg-hover);
         }
         .settings__tab--active {
             color: var(--accent-cyan);
@@ -142,12 +145,8 @@ interface OperationalMode {
         .settings__body {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
-            max-width: 900px;
+            padding: clamp(var(--space-4), 3vw, var(--space-8)) clamp(var(--space-4), 4vw, var(--space-10));
             width: 100%;
-        }
-        @media (max-width: 600px) {
-            .settings__body { padding: 1rem; }
         }
     `,
 })

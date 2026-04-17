@@ -83,7 +83,7 @@ export interface Breadcrumb {
             align-items: center;
             gap: var(--space-1);
             padding: var(--space-2) var(--space-6) 0;
-            font-size: 0.7rem;
+            font-size: var(--text-xxs);
             letter-spacing: 0.02em;
         }
         .page-shell__crumb {
@@ -101,7 +101,7 @@ export interface Breadcrumb {
         .page-shell__crumb-sep {
             color: var(--text-tertiary);
             opacity: 0.5;
-            font-size: 0.6rem;
+            font-size: var(--text-micro);
         }
 
         /* Header */
@@ -121,7 +121,7 @@ export interface Breadcrumb {
         }
         .page-shell__title {
             margin: 0;
-            font-size: 1.2rem;
+            font-size: var(--text-xl);
             font-weight: 700;
             letter-spacing: 0.02em;
             white-space: nowrap;
@@ -129,7 +129,7 @@ export interface Breadcrumb {
             text-overflow: ellipsis;
         }
         .page-shell__subtitle {
-            font-size: 0.75rem;
+            font-size: var(--text-sm);
             color: var(--text-tertiary);
             font-weight: 400;
         }

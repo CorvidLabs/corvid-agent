@@ -7,24 +7,20 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Project } from '../../core/models/project.model';
 import type { Session } from '../../core/models/session.model';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
 
 @Component({
     selector: 'app-project-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe],
+    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe, PageShellComponent],
     template: `
         @if (project(); as p) {
-            <div class="page">
-                <div class="page__header">
-                    <div>
-                        <h2>{{ p.name }}</h2>
-                        <p class="page__desc">{{ p.description }}</p>
-                    </div>
-                    <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
-                    </div>
-                </div>
+            <app-page-shell [title]="p.name" icon="projects" [subtitle]="p.description"
+                [breadcrumbs]="[{label: 'Projects', route: '/agents/projects'}, {label: p.name}]">
+                <ng-container actions>
+                    <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
+                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                </ng-container>
 
                 <div class="detail__info">
                     <dl>
@@ -60,20 +56,15 @@ import type { Session } from '../../core/models/session.model';
                         }
                     }
                 </div>
-            </div>
+            </app-page-shell>
         } @else {
-            <div class="page">
+            <app-page-shell title="Loading..." icon="projects">
                 <app-skeleton variant="card" [count]="1" />
                 <app-skeleton variant="table" [count]="3" />
-            </div>
+            </app-page-shell>
         }
     `,
     styles: `
-        .page { padding: var(--space-6); }
-        .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
-        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
-        .page__actions { display: flex; gap: 0.5rem; }
         .btn {
             padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;

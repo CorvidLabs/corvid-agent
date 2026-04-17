@@ -7,23 +7,22 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { PageShellComponent } from '../../shared/components/page-shell.component';
+import { MetricCardComponent } from '../../shared/components/metric-card.component';
 import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
     template: `
-        <div class="page">
-            <div class="page__header">
-                <h2>Agent Reputation</h2>
-                <button
-                    class="btn btn--primary"
-                    [disabled]="computing()"
-                    (click)="onComputeAll()">
-                    {{ computing() ? 'Computing...' : 'Compute All' }}
-                </button>
-            </div>
+        <app-page-shell title="Agent Reputation" icon="reputation">
+            <button actions
+                class="btn btn--primary"
+                [disabled]="computing()"
+                (click)="onComputeAll()">
+                {{ computing() ? 'Computing...' : 'Compute All' }}
+            </button>
 
             @if (reputationService.loading()) {
                 <app-skeleton variant="table" [count]="4" />
@@ -220,58 +219,26 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                                 <h4>Activity Breakdown</h4>
                                 <div class="stats-grid stagger-scale">
                                     @if (stats()!.feedbackTotal.total > 0) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="positive">&#128077;</div>
-                                            <div class="stat-card__value">{{ stats()!.feedbackTotal.positive }}</div>
-                                            <div class="stat-card__label">Likes</div>
-                                        </div>
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="negative">&#128078;</div>
-                                            <div class="stat-card__value">{{ stats()!.feedbackTotal.negative }}</div>
-                                            <div class="stat-card__label">Dislikes</div>
-                                        </div>
+                                        <app-metric-card label="Likes" emoji="&#128077;" accent="green">{{ stats()!.feedbackTotal.positive }}</app-metric-card>
+                                        <app-metric-card label="Dislikes" emoji="&#128078;" accent="red">{{ stats()!.feedbackTotal.negative }}</app-metric-card>
                                     }
                                     @if (stats()!.events['task_completed']; as tc) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="positive">&#10003;</div>
-                                            <div class="stat-card__value">{{ tc.count }}</div>
-                                            <div class="stat-card__label">Tasks Done</div>
-                                        </div>
+                                        <app-metric-card label="Tasks Done" emoji="&#10003;" accent="green">{{ tc.count }}</app-metric-card>
                                     }
                                     @if (stats()!.events['task_failed']; as tf) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="negative">&#10007;</div>
-                                            <div class="stat-card__value">{{ tf.count }}</div>
-                                            <div class="stat-card__label">Tasks Failed</div>
-                                        </div>
+                                        <app-metric-card label="Tasks Failed" emoji="&#10007;" accent="red">{{ tf.count }}</app-metric-card>
                                     }
                                     @if (stats()!.events['session_completed']; as sc) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon">&#9881;</div>
-                                            <div class="stat-card__value">{{ sc.count }}</div>
-                                            <div class="stat-card__label">Sessions</div>
-                                        </div>
+                                        <app-metric-card label="Sessions" emoji="&#9881;" accent="cyan">{{ sc.count }}</app-metric-card>
                                     }
                                     @if (stats()!.events['attestation_published']; as ap) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon">&#128279;</div>
-                                            <div class="stat-card__value">{{ ap.count }}</div>
-                                            <div class="stat-card__label">Attestations</div>
-                                        </div>
+                                        <app-metric-card label="Attestations" emoji="&#128279;" accent="cyan">{{ ap.count }}</app-metric-card>
                                     }
                                     @if (stats()!.events['improvement_loop_completed']; as ilc) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="positive">&#8634;</div>
-                                            <div class="stat-card__value">{{ ilc.count }}</div>
-                                            <div class="stat-card__label">Improvements</div>
-                                        </div>
+                                        <app-metric-card label="Improvements" emoji="&#8634;" accent="green">{{ ilc.count }}</app-metric-card>
                                     }
                                     @if (stats()!.events['security_violation']; as sv) {
-                                        <div class="stat-card">
-                                            <div class="stat-card__icon" data-type="negative">&#9888;</div>
-                                            <div class="stat-card__value">{{ sv.count }}</div>
-                                            <div class="stat-card__label">Violations</div>
-                                        </div>
+                                        <app-metric-card label="Violations" emoji="&#9888;" accent="red">{{ sv.count }}</app-metric-card>
                                     }
                                 </div>
                                 @if (hasFeedbackSources()) {
@@ -398,12 +365,9 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     </div>
                 }
             }
-        </div>
+        </app-page-shell>
     `,
     styles: `
-        .page { padding: 1.5rem; }
-        .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
         .error-banner {
             background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
@@ -553,16 +517,6 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .stats-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem;
         }
-        .stat-card {
-            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.75rem; text-align: center;
-        }
-        .stat-card__icon { font-size: 1.2rem; margin-bottom: 0.25rem; }
-        .stat-card__icon[data-type="positive"] { color: var(--accent-green); }
-        .stat-card__icon[data-type="negative"] { color: var(--accent-red); }
-        .stat-card__value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-        .stat-card__label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
-
         /* Feedback sources */
         .feedback-sources { display: flex; flex-direction: column; gap: 0.25rem; }
         .source-row {

@@ -17,12 +17,14 @@ import { GuidedTourService } from '../../core/services/guided-tour.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { IconComponent } from '../../shared/components/icon.component';
+import { MetricCardComponent } from '../../shared/components/metric-card.component';
 import { WidgetLayoutService, type WidgetId } from '../../core/services/widget-layout.service';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { FlockAgent } from '@shared/types/flock-directory';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
 import { firstValueFrom } from 'rxjs';
+import { friendlyModelName, friendlyProviderName } from '../../shared/format-model';
 
 interface OverviewData {
     totalSessions: number;
@@ -63,7 +65,7 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent, MetricCardComponent],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
@@ -173,72 +175,18 @@ interface ActivityEvent {
                         @if (widget.id === 'metrics') {
                             <div class="section section--metrics">
                             <div class="metrics-row stagger-scale">
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="agents" [size]="14" /></span>
-                                        <span class="metric-card__label">Total Agents</span>
-                                    </div>
-                                    <span class="metric-card__value">{{ agentService.agents().length }}</span>
-                                    <a class="metric-card__link" routerLink="/agents">View all</a>
-                                </div>
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--amber"><app-icon name="activity" [size]="14" /></span>
-                                        <span class="metric-card__label">Active Sessions</span>
-                                    </div>
-                                    <span class="metric-card__value metric-card__value--active">{{ runningSessions().length }}</span>
-                                    <a class="metric-card__link" routerLink="/sessions">View all</a>
-                                </div>
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--purple"><app-icon name="code" [size]="14" /></span>
-                                        <span class="metric-card__label">Total Projects</span>
-                                    </div>
-                                    <span class="metric-card__value">{{ projectService.projects().length }}</span>
-                                    <a class="metric-card__link" routerLink="/agents/projects">View all</a>
-                                </div>
-                                <div class="metric-card metric-card--highlight">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--green"><app-icon name="bar-chart" [size]="14" /></span>
-                                        <span class="metric-card__label">API Cost (Today)</span>
-                                    </div>
-                                    <span class="metric-card__value metric-card__value--usd">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</span>
-                                    <a class="metric-card__link" routerLink="/observe/analytics">Analytics</a>
-                                </div>
+                                <app-metric-card label="Total Agents" icon="agents" accent="cyan" link="/agents">{{ agentService.agents().length }}</app-metric-card>
+                                <app-metric-card label="Active Sessions" icon="activity" accent="amber" link="/sessions">{{ runningSessions().length }}</app-metric-card>
+                                <app-metric-card label="Total Projects" icon="code" accent="purple" link="/agents/projects">{{ projectService.projects().length }}</app-metric-card>
+                                <app-metric-card label="Cost Today" icon="bar-chart" accent="green" link="/observe/analytics" linkText="Analytics" [highlight]="true">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</app-metric-card>
                                 @if (algochatStatus(); as status) {
                                     @if (status.enabled && status.address !== 'local') {
-                                        <div class="metric-card">
-                                            <div class="metric-card__header">
-                                                <span class="metric-card__icon metric-card__icon--magenta"><app-icon name="wallet" [size]="14" /></span>
-                                                <span class="metric-card__label">ALGO Balance</span>
-                                            </div>
-                                            <span class="metric-card__value metric-card__value--algo">{{ (status.balance / 1000000) | number:'1.2-4' }}</span>
-                                            <span class="metric-card__sub">{{ status.network }}</span>
-                                        </div>
+                                        <app-metric-card label="ALGO Balance" icon="wallet" accent="magenta" [sub]="status.network">{{ (status.balance / 1000000) | number:'1.2-4' }}</app-metric-card>
                                     }
                                 }
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="zap" [size]="14" /></span>
-                                        <span class="metric-card__label">Credits Used</span>
-                                    </div>
-                                    <span class="metric-card__value">{{ overview()?.totalCreditsConsumed ?? 0 }}</span>
-                                </div>
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--amber"><app-icon name="terminal" [size]="14" /></span>
-                                        <span class="metric-card__label">Work Tasks</span>
-                                    </div>
-                                    <span class="metric-card__value metric-card__value--work">{{ activeWorkTaskCount() }}</span>
-                                    <a class="metric-card__link" routerLink="/sessions/work-tasks">View all</a>
-                                </div>
-                                <div class="metric-card">
-                                    <div class="metric-card__header">
-                                        <span class="metric-card__icon metric-card__icon--cyan"><app-icon name="sessions" [size]="14" /></span>
-                                        <span class="metric-card__label">Total Sessions</span>
-                                    </div>
-                                    <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
-                                </div>
+                                <app-metric-card label="Credits Used" icon="zap" accent="cyan">{{ overview()?.totalCreditsConsumed ?? 0 }}</app-metric-card>
+                                <app-metric-card label="Work Tasks" icon="terminal" accent="amber" link="/sessions/work-tasks">{{ activeWorkTaskCount() }}</app-metric-card>
+                                <app-metric-card label="Total Sessions" icon="sessions" accent="cyan">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</app-metric-card>
                             </div>
                             </div>
                         }
@@ -271,7 +219,7 @@ interface ActivityEvent {
                                                             <span class="agent-card__name">{{ summary.agent.name }}</span>
                                                         </div>
                                                         <span class="agent-card__provider-badge" [attr.data-provider]="summary.agent.provider || 'anthropic'">
-                                                            {{ summary.agent.provider || 'anthropic' }}{{ summary.agent.model ? ' / ' + summary.agent.model : '' }}
+                                                            {{ formatProvider(summary.agent.provider) }} · {{ formatModel(summary.agent.model) }}
                                                         </span>
                                                         @if (summary.reputationScore !== null) {
                                                             <div class="agent-card__reputation">
@@ -1065,6 +1013,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     protected getSparklineArea(agentId: string): string {
         return this.buildSparkline(agentId).area;
+    }
+
+    protected formatModel(model?: string): string {
+        return friendlyModelName(model);
+    }
+
+    protected formatProvider(provider?: string): string {
+        return friendlyProviderName(provider);
     }
 
     protected getAgentHealthClass(summary: AgentSummary): string {
