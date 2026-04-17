@@ -140,3 +140,4 @@ Provides concurrency-controlled dispatch of work tasks. Tasks are enqueued with 
 |------|--------|--------|
 | 2026-03-12 | corvid-agent | Initial spec |
 | 2026-04-14 | corvid-agent | Clarify per-project concurrency constraint in Invariant 1, document dispatchCandidates ordering behavior (#2024) |
+| 2026-04-17 | jackdaw | Verified server/work/queue.ts exists; TaskQueueService, maxConcurrency config, polling behavior, db/pool.writeTransaction, all match spec. No structural changes needed (#2024) |

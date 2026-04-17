@@ -129,9 +129,9 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 16. **Cosine similarity for zero vectors**: Both `cosineSimilaritySparse` and `cosineSimilarityDense` return 0 when either input is a zero vector (no division by zero).
 17. **Fast search scoring blend**: When TF-IDF produces non-zero query vectors, scores blend 40% FTS5 positional rank + 60% TF-IDF cosine. When TF-IDF zeroes out, 100% FTS5 rank is used.
 18. **Category fallback in search**: If category filtering eliminates all FTS5 candidates, the filter is dropped and unfiltered results are returned.
-19. **Short-term default**: Every new memory save writes to SQLite only with `status: 'short_term'`. On-chain promotion (ARC-69 ASA) requires an explicit `corvid_promote_memory` call. Updating an existing confirmed memory resets its status to `short_term` and clears txid until re-promoted.
+19. **Short-term default**: Every new memory save writes to SQLite only with `status: 'short_term'`. On-chain promotion (ARC-69 ASA) requires an explicit `corvid_promote_memory` call. Updating an existing `confirmed` or `pending` memory via `saveMemory()` **preserves** its status and txid — only non-promoted (`short_term`, `failed`) memories are reset to `short_term` on update.
 20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which saves to SQLite short-term storage. Channel of origin does not affect storage behavior. Promotion to on-chain is a separate explicit step via `corvid_promote_memory`.
-21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
+21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `short_term` (via the standard `saveMemory()` path). Sessions with no user messages are skipped. The summary enters the normal short-term lifecycle — it can be promoted explicitly via `corvid_promote_memory` or graduate through the observation pipeline. `MemorySyncService` does **not** pick it up automatically (it only processes `pending`/`failed` memories).
 22. **Short-term TTL**: Every `saveMemory()` call sets `expires_at = datetime('now', '+7 days')` (configurable via `ttlDays` param) for short-term memories. Promoted memories (`pending`, `confirmed`) have `expires_at = NULL`.
 23. **Access-based decay resistance**: `recallMemory()` increments `access_count` for `short_term` memories. When `access_count` reaches 3, the TTL is extended to `max(expires_at, datetime('now', '+14 days'))`, resisting automatic expiry.
 24. **Automatic expiry**: `expireShortTermMemories()` archives (`archived=1`) all `short_term` memories where `expires_at < datetime('now')`. Only `short_term` status memories are affected — promoted memories are never auto-archived.
@@ -182,7 +182,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 
 - **Given** a session with user and assistant messages exits cleanly (code 0)
 - **When** `handleExit` is called
-- **Then** a memory with key `session:{sessionId}:{date}` is saved with status `pending`, containing the session source, message counts, and a context summary
+- **Then** a memory with key `session:{sessionId}:{date}` is saved with status `short_term`, containing the session source, message counts, and a context summary
 
 ### Scenario: Empty session skips summary save
 
@@ -232,7 +232,8 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `server/index.ts` | `MemoryManager` |
 | `server/improvement/service.ts` | `MemoryManager`, `ScoredMemory` |
 | `server/improvement/prompt-builder.ts` | `ScoredMemory` |
-| `server/scheduler/service.ts` | `summarizeOldMemories` |
+| `server/scheduler/handlers/maintenance.ts` | `summarizeOldMemories` |
+| `server/memory/graduation-service.ts` | `expireShortTermMemories`, `purgeOldArchivedMemories` (called every 5 min via `MemoryGraduationService` tick) |
 | `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handlePromoteMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
 | `server/process/manager.ts` | `saveMemory` (session exit auto-save) |
 
@@ -295,3 +296,4 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | 2026-03-17 | corvid-agent | Add two-tier memory architecture (invariants 19-20), update purpose section (#1186) |
 | 2026-02-27 | corvid-agent | Initial spec |
 | 2026-04-14 | corvid-agent | Verified TTL mechanics (invariants 22-24), schema defaults, and expiry behavior are correct. Note: `expires_at` and `access_count` columns are added by migration 113, not in base schema definition (#2024) |
+| 2026-04-17 | jackdaw | Fix invariant 19: confirmed/pending status is preserved (not reset) on saveMemory() update. Fix invariant 21 + scenario: session exit saves with status short_term, not pending — MemorySyncService does not pick it up. Fix Consumed By: summarizeOldMemories is called from scheduler/handlers/maintenance.ts; graduation-service.ts calls expireShortTermMemories/purgeOldArchivedMemories (#2024) |
