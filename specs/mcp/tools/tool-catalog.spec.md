@@ -96,7 +96,11 @@ Provides a structured, categorized view of all available MCP tools for API endpo
 
 ## Tool Count
 
-The catalog contains 62 tools across 7 categories. Key additions since initial spec:
+The catalog contains 71 tools across 7 categories:
+- **56 corvid_* tools** (Agent SDK MCP tools): messaging, memory, library, discovery, work, projects, GitHub, Discord, admin, scheduling, workflows
+- **15 additional tools** (direct-tools and built-in operations): file operations (read_file, write_file, edit_file), command execution (run_command), filesystem navigation (list_files, search_files), and other utilities
+
+Key additions since initial spec:
 - `corvid_library_write/read/list/delete` (CRVLIB shared library tools, category: communication)
 - `corvid_discord_send_message/send_image` (Discord messaging, category: communication)
 - `corvid_promote_memory` (promote short-term to on-chain, category: communication)
@@ -111,3 +115,4 @@ The catalog contains 62 tools across 7 categories. Key additions since initial s
 | 2026-03-24 | corvid-agent | Initial spec |
 | 2026-04-09 | corvid-agent | Added 7 categories table, updated tool count to 55+, documented CRVLIB library tools, Discord messaging tools, promote_memory, workflow management, credit admin tools, and built-in file/code tools |
 | 2026-04-14 | corvid-agent | Update tool count from 55+ to 62 (#2021) |
+| 2026-04-17 | Magpie | Updated tool count from 62 to 71 exact; clarified breakdown (56 corvid_* tools + 15 direct-tools/built-ins); documented complete enumeration of tool categories and counts |
