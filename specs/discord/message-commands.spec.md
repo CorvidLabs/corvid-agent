@@ -1,6 +1,6 @@
 ---
 module: discord-message-commands
-version: 5
+version: 7
 status: draft
 files:
   - server/discord/command-handlers/message-commands.ts
@@ -66,12 +66,16 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 - **Given** a user with BASIC permission sends `/message` with agent CorvidAgent and text `Hello`
 - **When** `handleMessageCommand` is called
 - **Then** acknowledges the interaction, creates a restricted session with `MESSAGE_BUILTIN_TOOLS`, starts the process, and subscribes for inline response
+- **And** the mention session is persisted both in-memory (`ctx.mentionSessions`) and to the database via `saveMentionSession` for server restart recovery
+- **And** `minResponderPermLevel` is set to `PermissionLevel.BASIC` to allow other BASIC+ users to reply in follow-up mentions
 
 ### Scenario: Admin sends /message
 
 - **Given** an ADMIN user sends `/message` with agent CorvidAgent and text `fix the bug`
 - **When** `handleMessageCommand` is called
 - **Then** the session is created with full tool access (no `/message` allow-list restrictions), and session name prefix `Discord admin message:`
+- **And** the mention session is persisted with `minResponderPermLevel: PermissionLevel.STANDARD` to enforce higher tier replies
+- **And** the inline response is subscribed with full context (agent color, icon, avatar URL)
 
 ### Scenario: User picks an explicit project on /message
 
@@ -84,14 +88,39 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 - **Given** a STANDARD user sends `/message` in a channel listed in `message_full_tool_channel_ids`, and `channel_permissions[channelId] >= STANDARD`
 - **When** `handleMessageCommand` is called
 - **Then** the session is created with full tool access and session name prefix `Discord staff message:`
+- **And** `minResponderPermLevel` is set to `PermissionLevel.STANDARD` reflecting the elevated trust level
 
-### Scenario: Message with buddy
+### Scenario: Message with buddy — Round-by-round visible conversation
 
-- **Given** a user sends `/message` with agent CorvidAgent, text `review this`, and buddy SonnetAgent
+- **Given** a user sends `/message` with agent CorvidAgent, text `review this`, buddy SonnetAgent, and `rounds: 2`
 - **When** `handleMessageCommand` is called
-- **Then** no inline session is created; the buddy service drives the full conversation
-- **And** each round is posted to the channel as a colored embed (blue for lead, purple for buddy review, green for approval)
-- **And** no inline response from the `/message` command itself is sent
+- **Then** no inline restricted session is created; instead `ctx.buddyService.startSession()` is invoked with:
+  - `leadAgentId`: CorvidAgent's ID
+  - `buddyAgentId`: SonnetAgent's ID
+  - `prompt`: original message with author context via `withAuthorContext()`
+  - `source: 'discord'`
+  - `maxRounds: 2` (clamped to [1, 10])
+  - `onRoundComplete`: buddy Discord callback function
+- **And** the buddy service runs asynchronously, calling the callback for each round:
+  - **Round 1 (Lead)**: Lead agent processes the original prompt
+    - Callback posts blue embed (0x3498db) with title "💬 CorvidAgent" and status "Initial Response · Round 1/2"
+    - Mention session is created with `minResponderPermLevel: PermissionLevel.STANDARD` and persisted to DB
+  - **Round 1 (Buddy)**: Buddy agent reviews lead's output
+    - Callback posts purple embed (0x9b59b6) with title "🔍 SonnetAgent" and status "Review & Feedback · Round 1/2"
+    - Mention session persisted with `minResponderPermLevel: PermissionLevel.STANDARD`
+  - **Round 2 (Lead)**: If buddy did not approve, lead incorporates feedback
+    - Callback posts blue embed with "Revised Response (Round 2)" and "Round 2/2"
+    - Mention session persisted
+  - Each embed truncates content at 3900 characters with "...*truncated*" suffix
+  - If buddy approves early (detects "LGTM" in output), loop breaks and green approve embed (0x2ecc71) is posted with status "Approved"
+- **And** the `/message` acknowledgment is brief — it does NOT send duplicate inline response once buddy mode activates
+
+### Scenario: Buddy session fails to start
+
+- **Given** a user sends `/message` with buddy specified, but `ctx.buddyService` is undefined or throws an error
+- **When** the buddy callback is invoked
+- **Then** a warning is logged with error message, but the `/message` command response has already been sent
+- **And** the error does not crash the message handler
 
 ### Scenario: Insufficient permissions
 
@@ -104,6 +133,99 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 - **Given** the specified agent name does not match any configured agent
 - **When** `handleMessageCommand` is called
 - **Then** responds with the agent name and lists available agents
+
+## Buddy Mode Integration Details
+
+### Purpose
+
+Buddy mode enables collaborative multi-agent review within Discord `/message` conversations. A lead agent produces output and a buddy reviews it, with each round posted as a visible embed in the channel. This provides real-time transparency for complex tasks and validates output before final delivery.
+
+### ctx.buddyService Integration
+
+The `ctx.buddyService` (instance of `BuddyService` from `server/buddy/service.ts`) is injected into `InteractionContext` during Discord initialization. When a `/message` command includes a `buddy` parameter:
+
+1. **Session Creation** — `buddyService.startSession()` is called with:
+   - Lead agent ID, buddy agent ID, project context
+   - Original prompt enriched with Discord author context
+   - `onRoundComplete` callback for embed posting
+   - Optional `maxRounds` (clamped to [1, 10])
+
+2. **Async Round Loop** — The service runs a conversation loop asynchronously (does NOT block the `/message` command response):
+   - Round 1: Lead processes original prompt
+   - Each subsequent even-numbered round: Lead revises based on buddy feedback
+   - Each odd-numbered round ≥ 1: Buddy reviews and optionally approves
+   - Loops up to `maxRounds` or until buddy approval detected
+
+3. **Callback Invocation** — Each round invokes `onRoundCallback(event: BuddyRoundEvent)`:
+   - Event contains: `buddySessionId`, `agentName`, `role` ('lead' or 'buddy'), `round`, `maxRounds`, `content`, `approved`
+   - Callback is where Discord embeds are posted (see next section)
+
+4. **Session Completion** — Final status is persisted to `buddy_sessions` table with status 'completed' or 'failed'
+
+### Discord Embed Posting (onRoundComplete Callback)
+
+The buddy Discord callback (`createBuddyDiscordCallback`) posts each round as a colored embed:
+
+| Role | Round | Approval | Color | Icon | Status Label |
+|------|-------|----------|-------|------|--------------|
+| Lead | 1 | — | Blue (0x3498db) | 💬 | "Initial Response" |
+| Lead | 2+ | — | Blue (0x3498db) | 💬 | "Revised Response (Round N)" |
+| Buddy | any | No | Purple (0x9b59b6) | 🔍 | "Review & Feedback" |
+| Buddy | any | Yes | Green (0x2ecc71) | ✅ | "Approved" |
+
+Each embed:
+- Posts to `channelId` via `sendEmbed()` (REST API)
+- Includes `description: content` (truncated to 3900 chars + "...*truncated*" if longer)
+- Includes footer with agent name, round, and status
+- Creates a mention session in `ctx.mentionSessions` (in-memory cache)
+- Persists mention session to DB via `saveMentionSession()`
+
+### minResponderPermLevel — Per-Session Reply Tier Enforcement
+
+Each mention session has a `minResponderPermLevel` that controls who can reply in follow-up mentions. It is determined by the tool access level of the original `/message` session:
+
+| Tool Access Level | Restricted (MESSAGE_BUILTIN_TOOLS + MESSAGE_MCP_TOOLS) | Full | Full |
+|-------------------|------|------|------|
+| Caller Type | BASIC/STANDARD in public channel | STANDARD in trusted channel | ADMIN |
+| Session Prefix | `Discord message:<channelId>` | `Discord staff message:<channelId>` | `Discord admin message:<channelId>` |
+| **minResponderPermLevel** | **PermissionLevel.BASIC** | **PermissionLevel.STANDARD** | **PermissionLevel.STANDARD** |
+
+For **buddy mode specifically**, ALL mention sessions (lead, buddy, approval) get `minResponderPermLevel: PermissionLevel.STANDARD` regardless of the original caller's tier. This ensures only trusted responders can participate in collaborative buddy conversations.
+
+The `minResponderPermLevel` is:
+- Set when the inline response subscription is created (line 279) or buddy callback creates mention sessions (line 357)
+- Persisted to the database (column `minResponderPermLevel` in `discord_mention_sessions` table)
+- Checked when processing follow-up mentions (in `message-handler.ts`) to enforce reply tier
+
+### Session Persistence — In-Memory + Database Recovery
+
+Each mention session is persisted in two layers for fault tolerance:
+
+1. **In-Memory Cache** (`ctx.mentionSessions` — a Map<botMessageId, SessionInfo>)
+   - Populated immediately when session is created
+   - Fast lookup for handling quick follow-up mentions in the same session
+   - Survives within a single server process uptime
+
+2. **Database Persistence** (via `saveMentionSession()` → `discord_mention_sessions` table)
+   - Called in a try-catch block (does NOT fail the command if it fails)
+   - Stores: `botMessageId`, `sessionId`, `agentName`, `agentModel`, `projectName`, `channelId`, `conversationOnly`, `minResponderPermLevel`, and optional agent display properties
+   - Allows recovery when:
+     - Server restarts and in-memory cache is cleared
+     - New process loads mention session from DB when a follow-up mention arrives
+     - Preserves tool access tier and responder permissions across restarts
+
+Database persistence failures are logged as warnings (not errors) because:
+- The session still works if the user mentions within the same process
+- Subsequent restarts may succeed in persisting (eventual consistency)
+- Failing the entire `/message` command due to DB persistence is poor UX
+
+The recovery flow on follow-up mention after server restart:
+1. User mentions in response to a message from a prior process
+2. Message handler checks `ctx.mentionSessions` (miss — process is new)
+3. Falls back to querying `getMentionSession(botMessageId)` from DB
+4. Restores session context: agent, project, permissions, tier
+5. Creates a new session linked to the original session ID
+6. Proceeds with inline response as if session never lapsed
 
 ## Error Cases
 
@@ -125,20 +247,24 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 
 | Module | What is used |
 |--------|-------------|
-| `server/discord/commands` | `InteractionContext` type |
-| `server/discord/types` | `PermissionLevel` |
-| `server/db/agents` | `listAgents` |
-| `server/db/sessions` | `createSession` |
-| `server/db/projects` | `listProjects` |
-| `server/db/discord-mention-sessions` | `saveMentionSession` |
-| `server/discord/message-handler` | `withAuthorContext` |
-| `server/discord/embeds` | `respondToInteraction`, `sendTypingIndicator`, `sendEmbed` |
+| `server/discord/commands` | `InteractionContext` type with `db`, `config`, `processManager`, `buddyService`, `mentionSessions`, `subscribeForInlineResponse`, `delivery` fields |
+| `server/discord/types` | `PermissionLevel` enum (BASIC, STANDARD, ADMIN) |
+| `server/db/agents` | `listAgents()` for agent name resolution |
+| `server/db/sessions` | `createSession()` for inline `/message` sessions (non-buddy mode) |
+| `server/db/projects` | `listProjects()` for project resolution and default project fallback |
+| `server/db/discord-mention-sessions` | `saveMentionSession()` for dual-layer session persistence and server restart recovery |
+| `server/discord/message-handler` | `withAuthorContext()` to enrich prompt with user, username, and channel context |
+| `server/discord/embeds` | `respondToInteraction()`, `sendTypingIndicator()`, `sendEmbed()` for user feedback and buddy round posting |
+| `server/buddy/service` | `BuddyService.startSession()` to launch collaborative buddy round-robin when buddy parameter is set |
+| `shared/types/buddy` | `BuddyRoundEvent` type for callback event structure |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `server/discord/commands.ts` | Command dispatch routing for `/message` |
+| `server/discord/commands.ts` | Command dispatch routing for `/message` slash command |
+| `server/discord/bridge.ts` | Injects `buddyService` into `InteractionContext` during bootstrap |
+| `server/discord/message-handler.ts` | Recovers persisted mention sessions on follow-up mentions (DB fallback if in-memory cache miss) |
 
 ## Change Log
 
@@ -150,3 +276,4 @@ Handles the Discord `/message` slash command with permission-tiered tool access.
 | 2026-03-25 | corvid-agent | v4: Optional `/message` `project` parameter (autocomplete); align project resolution with `/session`. |
 | 2026-03-25 | corvid-agent | v5: Slash option `message` renamed to `text` (handler still accepts legacy `message`); document default project resolution. |
 | 2026-04-14 | corvid-agent | v6: Document `buddy`/`rounds` options, rounds clamping, buddy-mode inline-response bypass, embed colors, fix error message text (#2023) |
+| 2026-04-17 | magpie | v7: Expand buddy mode behavioral examples with detailed round-by-round flow. Add comprehensive "Buddy Mode Integration Details" section documenting ctx.buddyService, embed posting, onRoundComplete callback, and round loop lifecycle. Document minResponderPermLevel per-tier enforcement table and buddy-mode STANDARD tier enforcement. Expand session persistence section with dual-layer architecture (in-memory + database), saveMentionSession usage, and server restart recovery flow. Update Dependencies to include BuddyService, buddy types, and mention-session recovery pattern. Closes #2023. |
