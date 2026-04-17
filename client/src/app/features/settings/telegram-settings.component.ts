@@ -70,24 +70,25 @@ interface TelegramConfig {
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        .tg-field { display: flex; flex-direction: column; gap: 0.2rem; }
+        .tg-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .tg-field--wide { grid-column: 1 / -1; }
-        .tg-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; }
+        .tg-label { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
         .tg-input, .tg-select {
-            padding: 0.45rem;
+            padding: 0.55rem 0.65rem;
             background: var(--bg-input);
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-primary);
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             font-family: inherit;
             width: 100%;
+            min-height: 44px;
         }
         .tg-select { cursor: pointer; }
         .tg-input:focus, .tg-select:focus {
             border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
         }
-        .tg-desc { font-size: 0.6rem; color: var(--text-tertiary); }
+        .tg-desc { font-size: 0.78rem; color: var(--text-tertiary); }
         .tg-actions { display: flex; gap: 0.5rem; align-items: center; }
         @media (max-width: 600px) { .tg-grid { grid-template-columns: 1fr; } }
     `,

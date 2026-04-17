@@ -55,35 +55,37 @@ type AccessSection = 'allowlist' | 'github' | 'repos';
         }
         .settings-section__nav {
             display: flex;
-            gap: 0;
-            padding: 0 var(--space-4);
-            border-bottom: 1px solid var(--border-subtle);
-            background: rgba(12, 13, 20, 0.2);
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
         }
         .settings-section__nav::-webkit-scrollbar { display: none; }
         .settings-section__btn {
-            padding: var(--space-2) 0.85rem;
-            font-size: 0.72rem;
-            font-weight: 600;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
             font-family: inherit;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.01em;
             background: transparent;
-            border: none;
-            border-bottom: 2px solid transparent;
+            border: 1px solid var(--border);
+            border-radius: 100px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s;
+            transition: color 0.15s, background 0.15s, border-color 0.15s;
+            min-height: 40px;
         }
         .settings-section__btn:hover {
             color: var(--text-primary);
+            border-color: var(--border-bright);
+            background: rgba(255, 255, 255, 0.03);
         }
         .settings-section__btn--active {
             color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
+            background: var(--accent-cyan-dim);
+            border-color: rgba(0, 229, 255, 0.3);
         }
         .settings-section__content {
             flex: 1;

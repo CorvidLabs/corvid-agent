@@ -109,45 +109,47 @@ interface OperationalMode {
         }
         .settings__tabs {
             display: flex;
-            gap: 0;
-            padding: 0 var(--space-4);
-            border-bottom: 1px solid var(--border-subtle);
-            background: rgba(12, 13, 20, 0.2);
+            gap: 0.25rem;
+            padding: 0.75rem 1.25rem 0;
+            background: transparent;
             overflow-x: auto;
             scrollbar-width: none;
             flex-shrink: 0;
         }
         .settings__tabs::-webkit-scrollbar { display: none; }
         .settings__tab {
-            padding: var(--space-3) 0.9rem;
-            font-size: 0.75rem;
-            font-weight: 600;
+            padding: 0.6rem 1.1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
             font-family: inherit;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.01em;
             background: transparent;
             border: none;
-            border-bottom: 2px solid transparent;
+            border-radius: 8px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s;
+            transition: color 0.15s, background 0.15s;
+            min-height: 44px;
         }
         .settings__tab:hover {
             color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
         }
         .settings__tab--active {
             color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
+            background: var(--accent-cyan-dim);
         }
         .settings__body {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
-            max-width: 900px;
+            padding: 1.5rem 1.25rem;
+            max-width: 1200px;
             width: 100%;
         }
         @media (max-width: 600px) {
-            .settings__body { padding: 1rem; }
+            .settings__tabs { padding: 0.5rem 0.75rem 0; }
+            .settings__body { padding: 1rem 0.75rem; }
         }
     `,
 })
