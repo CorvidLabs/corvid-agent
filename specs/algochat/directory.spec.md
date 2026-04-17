@@ -1,6 +1,6 @@
 ---
 module: directory
-version: 1
+version: 2
 status: active
 files:
   - server/algochat/agent-directory.ts
@@ -40,7 +40,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | Type | Description |
 |------|-------------|
 | `AgentDirectoryEntry` | Interface representing a resolved agent: `agentId`, `agentName`, `walletAddress` (string or null), `publicKey` (Uint8Array or null) |
-| `AgentChatAccount` | Interface wrapping an agent's wallet address and its `ChatAccount` from `@corvidlabs/ts-algochat` |
+| `AgentChatAccount` | Interface wrapping an agent's wallet address and its `ChatAccount` from `@corvidlabs/ts-algochat`. Fields: `address: string` (Algorand wallet address) and `account: ChatAccount` (the ts-algochat account object providing encryption keys and signing capability) |
 | `IsOwnerFn` | Type alias `(participant: string) => boolean` for authorization check injection |
 
 ### Exported Classes
@@ -58,7 +58,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `constructor` | `db: Database, agentWalletService: AgentWalletService` | `AgentDirectory` | Creates directory with DB and wallet service references |
 | `resolve` | `agentId: string` | `Promise<AgentDirectoryEntry \| null>` | Resolves an agent ID to its directory entry with wallet address and public key; results are cached |
 | `findAgentByAddress` | `walletAddress: string` | `string \| null` | Reverse-lookup: finds an agent ID by Algorand wallet address; checks cache then queries DB |
-| `listAvailable` | _(none)_ | `Promise<AgentDirectoryEntry[]>` | Lists all agents from DB and resolves each to a directory entry |
+| `listAvailable` | _(none)_ | `Promise<AgentDirectoryEntry[]>` | Lists all non-disabled agents from DB and resolves each to a directory entry; agents with `disabled: true` are excluded and will not appear as targets for `corvid_send_message` or directory listings |
 | `clearCache` | _(none)_ | `void` | Clears the in-memory resolution cache |
 
 #### AgentWalletService Methods
@@ -109,6 +109,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 10. Default funding amount for new agent wallets is 10 ALGO.
 11. `AgentWalletService` maintains an encrypted in-memory mnemonic cache with a 5-minute TTL to avoid repeated decryption operations. Cache entries are automatically evicted on expiry.
 12. USDC ASA opt-in is performed during `ensureWallet` and at startup via `ensureAllUsdcOptIns` when `USDC_ASA_ID` is configured. All wallet signing operations are recorded to the security audit log.
+13. `AgentDirectory.listAvailable()` excludes agents with `disabled: true`. Disabled agents are never returned as directory entries, even if they have valid wallets and on-chain keys.
 
 ## Behavioral Examples
 
@@ -180,3 +181,4 @@ _No standalone exported functions. All functionality is exposed via exported cla
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-04-14 | corvid-agent | Add KeyProvider constructor param, 5 missing methods, fix checkAndRefill values, add USDC opt-in + caching invariants, add KeyProvider error case (#2025) |
+| 2026-04-17 | corvid-agent | Clarify AgentChatAccount field names (address, account); make listAvailable() disabled-agent filtering explicit; add invariant 13 (#2025) |
