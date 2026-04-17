@@ -1,39 +1,33 @@
 name: E2E
 
 on:
-  # Push/PR triggers disabled while E2E tests are paused (conserving CI minutes).
-  # Re-enable push/pull_request triggers when credits are replenished and the
-  # job below is uncommented.  See #1436.
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# E2E tests temporarily disabled to conserve CI minutes.
-# Uncomment the job below when GitHub Actions credits are replenished.
 jobs:
-  skip:
-    name: E2E (skipped)
+  e2e:
+    name: E2E Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - run: echo "E2E tests temporarily disabled — see #1436"
-  # e2e:
-  #   name: E2E Tests
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 20
-  #
-  #   steps:
-  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-  #     - uses: ./.github/actions/setup-workspace
-  #
-  #     - name: Build client
-  #       run: bun run build:client
-  #
-  #     - name: Install Playwright
-  #       run: npx playwright install chromium --with-deps
-  #
-  #     - name: Run E2E tests
-  #       run: npx playwright test --config=playwright.config.js
-  #       env:
-  #         CI: true
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Build client
+        run: bun run build:client
+
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: npx playwright test --config=playwright.config.js
+        env:
+          CI: true
