@@ -932,6 +932,15 @@ export class WorkTaskService {
     callbacks.add(callback);
   }
 
+  /** Remove a specific completion callback (e.g. when a WebSocket disconnects). */
+  offComplete(taskId: string, callback: CompletionCallback): void {
+    const callbacks = this.completionCallbacks.get(taskId);
+    if (callbacks) {
+      callbacks.delete(callback);
+      if (callbacks.size === 0) this.completionCallbacks.delete(taskId);
+    }
+  }
+
   /** Subscribe to status changes for a task (branching, running, validating, etc.). */
   onStatusChange(taskId: string, callback: StatusChangeCallback): void {
     let callbacks = this.statusChangeCallbacks.get(taskId);

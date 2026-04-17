@@ -38,6 +38,8 @@ export interface WsData {
   heartbeatTimer?: ReturnType<typeof setInterval> | null;
   pongTimeoutTimer?: ReturnType<typeof setTimeout> | null;
   authTimeoutTimer?: ReturnType<typeof setTimeout> | null;
+  /** Track work-task completion callbacks so they can be removed on disconnect. */
+  workTaskCallbacks?: Map<string, (task: import('../../shared/types').WorkTask) => void>;
 }
 
 /**
@@ -220,6 +222,17 @@ export function createWebSocketHandler(
           processManager.unsubscribe(sessionId, callback);
         }
         ws.data.subscriptions.clear();
+      }
+
+      // Clean up work-task completion callbacks to prevent leaks
+      if (ws.data?.workTaskCallbacks?.size) {
+        const wts = getWorkTaskService?.();
+        if (wts) {
+          for (const [taskId, callback] of ws.data.workTaskCallbacks) {
+            wts.offComplete(taskId, callback);
+          }
+        }
+        ws.data.workTaskCallbacks.clear();
       }
     },
   };
@@ -472,11 +485,15 @@ function handleClientMessage(
           const serverMsg: ServerMessage = { type: 'work_task_update', task };
           safeSend(ws, serverMsg);
 
-          // Register for completion update
-          workTaskService.onComplete(task.id, (completedTask) => {
+          // Register for completion update, tracking the callback for cleanup on disconnect
+          const completionCb = (completedTask: typeof task) => {
+            ws.data?.workTaskCallbacks?.delete(task.id);
             const updateMsg: ServerMessage = { type: 'work_task_update', task: completedTask };
             safeSend(ws, updateMsg);
-          });
+          };
+          if (!ws.data.workTaskCallbacks) ws.data.workTaskCallbacks = new Map();
+          ws.data.workTaskCallbacks.set(task.id, completionCb);
+          workTaskService.onComplete(task.id, completionCb);
         })
         .catch((err) => {
           log.error('Work task error', { error: err instanceof Error ? err.message : String(err) });
