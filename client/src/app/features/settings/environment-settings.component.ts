@@ -203,25 +203,26 @@ interface RuntimeConfig {
     `,
     styles: `
         ${SECTION_STYLES}
-        .config-group { margin-bottom: 0.75rem; }
+        .config-group { margin-bottom: 0.85rem; }
         .config-group:last-of-type { margin-bottom: 0; }
         .config-group-title {
-            font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-            color: var(--text-tertiary); margin-bottom: 0.35rem;
+            font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-tertiary); margin-bottom: 0.4rem;
         }
-        .config-grid { display: flex; flex-direction: column; gap: 0.2rem; }
+        .config-grid { display: flex; flex-direction: column; gap: 0.3rem; }
         .config-item {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0.35rem 0.65rem; background: var(--bg-raised); border-radius: var(--radius);
+            padding: 0.55rem 0.75rem; background: var(--bg-raised); border-radius: var(--radius);
+            min-height: 40px;
         }
-        .config-key { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); }
-        .config-value { font-size: 0.7rem; font-weight: 600; color: var(--text-primary); text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .config-value--mono { font-family: var(--font-mono); font-size: 0.65rem; }
+        .config-key { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+        .config-value { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .config-value--mono { font-family: var(--font-mono); font-size: 0.82rem; }
         .config-value--set { color: var(--accent-green); }
         .config-value--unset { color: var(--text-tertiary); }
-        .env-hint { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 0.5rem; }
-        .env-hint code { background: var(--bg-raised); padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; border: 1px solid var(--border); }
-        .muted { font-size: 0.7rem; color: var(--text-tertiary); margin: 0; }
+        .env-hint { font-size: 0.8rem; color: var(--text-tertiary); margin-top: 0.75rem; }
+        .env-hint code { background: var(--bg-raised); padding: 2px 6px; border-radius: 3px; font-size: 0.78rem; border: 1px solid var(--border); }
+        .muted { font-size: 0.8rem; color: var(--text-tertiary); margin: 0; }
     `,
 })
 export class EnvironmentSettingsComponent implements OnInit {

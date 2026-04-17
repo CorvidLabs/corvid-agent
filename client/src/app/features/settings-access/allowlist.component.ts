@@ -86,8 +86,9 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .input {
             flex: 1; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
             border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
-            min-height: 48px;
+            min-height: 48px; min-width: 0; transition: border-color 0.15s;
         }
+        .input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .input::placeholder { color: var(--text-tertiary); }
         .input--label { max-width: 280px; min-width: 160px; }
         .input--inline { flex: 1; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); min-height: 40px; }
@@ -118,6 +119,10 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .label-row { margin-top: var(--space-2); }
         .edit-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
         .list__item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-tertiary); margin-left: var(--space-4); }
+        @media (max-width: 600px) {
+            .add-form { flex-direction: column; }
+            .input--label { max-width: none; }
+        }
     `,
 })
 export class AllowlistComponent implements OnInit {

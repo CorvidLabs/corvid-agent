@@ -21,7 +21,7 @@ Exposes corvid-agent MCP tools over Streamable HTTP at the `/mcp` endpoint. This
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleMcpHttpRequest` | `req: Request, baseUrl: string` | `Promise<Response>` | Routes an incoming HTTP request to the appropriate MCP transport. Creates new sessions for POST/GET, routes existing sessions by `mcp-session-id` header, returns 405 for unsupported methods. Internally creates an `McpServer` with 24 corvid tools (health, agents, sessions, messaging, memory, observations, work tasks, projects) that proxy to the local REST API. |
+| `handleMcpHttpRequest` | `req: Request, baseUrl: string` | `Promise<Response>` | Routes an incoming HTTP request to the appropriate MCP transport. Creates new sessions for POST/GET, routes existing sessions by `mcp-session-id` header, returns 405 for unsupported methods. Internally creates an `McpServer` with 56 corvid tools spanning agent discovery, memory management, work tasks, GitHub operations, messaging, and more that proxy to the local REST API. |
 
 ## Invariants
 
@@ -91,34 +91,103 @@ Exposes corvid-agent MCP tools over Streamable HTTP at the `/mcp` endpoint. This
 
 ## MCP Tools Exposed
 
-The MCP server exposes 24 tools that proxy to the local REST API:
+The MCP server exposes 56 tools that proxy to the local REST API, organized by category:
 
-| Tool | Category | Description |
-|------|----------|-------------|
-| `corvid_health` | Health | Check server health status |
-| `corvid_list_agents` | Agents | List all registered agents |
-| `corvid_get_agent` | Agents | Get agent details by ID |
-| `corvid_create_session` | Sessions | Create a new agent session |
-| `corvid_list_sessions` | Sessions | List sessions with optional status filter |
-| `corvid_get_session` | Sessions | Get session details by ID |
-| `corvid_stop_session` | Sessions | Stop a running session |
-| `corvid_send_message` | Messaging | Send a message to another agent |
-| `corvid_save_memory` | Memory | Save to short-term SQLite storage |
-| `corvid_recall_memory` | Memory | Recall memories by key/query |
-| `corvid_read_on_chain_memories` | Memory | Read from Algorand blockchain |
-| `corvid_sync_on_chain_memories` | Memory | Sync on-chain to local cache |
-| `corvid_delete_memory` | Memory | Delete an ARC-69 memory |
-| `corvid_promote_memory` | Memory | Promote short-term to on-chain |
-| `corvid_record_observation` | Observations | Record a short-term observation |
-| `corvid_list_observations` | Observations | List/search observations |
-| `corvid_boost_observation` | Observations | Boost observation relevance |
-| `corvid_dismiss_observation` | Observations | Dismiss an observation |
-| `corvid_observation_stats` | Observations | Get observation statistics |
-| `corvid_create_work_task` | Work Tasks | Create a work task on a branch |
-| `corvid_list_work_tasks` | Work Tasks | List work tasks with optional filter |
-| `corvid_get_work_task` | Work Tasks | Get work task details by ID |
-| `corvid_list_projects` | Projects | List all configured projects |
-| `corvid_get_project` | Projects | Get project details by ID |
+### Memory Management
+| Tool | Description |
+|------|-------------|
+| `corvid_save_memory` | Save to short-term SQLite storage |
+| `corvid_recall_memory` | Recall memories by key/query |
+| `corvid_read_on_chain_memories` | Read from Algorand blockchain |
+| `corvid_sync_on_chain_memories` | Sync on-chain to local cache |
+| `corvid_delete_memory` | Delete an ARC-69 memory |
+| `corvid_promote_memory` | Promote short-term to on-chain |
+
+### Shared Library (CRVLIB)
+| Tool | Description |
+|------|-------------|
+| `corvid_library_write` | Publish/update shared library entry |
+| `corvid_library_read` | Read library entries by key/query |
+| `corvid_library_list` | List on-chain library entries |
+| `corvid_library_delete` | Delete library entry |
+
+### Agent Discovery & Identity
+| Tool | Description |
+|------|-------------|
+| `corvid_list_agents` | List all registered agents |
+| `corvid_discover_agent` | Discover agents by capability/name |
+| `corvid_flock_directory` | Query Flock Directory smart contract |
+| `corvid_lookup_contact` | Look up contact across platforms |
+| `corvid_check_reputation` | Check agent reputation score |
+| `corvid_verify_agent_reputation` | Verify on-chain attestations |
+| `corvid_publish_attestation` | Publish reputation attestation |
+
+### Work Tasks
+| Tool | Description |
+|------|-------------|
+| `corvid_create_work_task` | Create a work task on a branch |
+| `corvid_list_work_tasks` | List work tasks with optional filter |
+| `corvid_check_work_status` | Get work task status by ID |
+
+### Projects
+| Tool | Description |
+|------|-------------|
+| `corvid_list_projects` | List all configured projects |
+| `corvid_current_project` | Get current default project |
+
+### Messaging & Communication
+| Tool | Description |
+|------|-------------|
+| `corvid_send_message` | Send message to another agent |
+| `corvid_invoke_remote_agent` | Invoke remote agent on different machine |
+| `corvid_discord_send_message` | Send message to Discord channel |
+| `corvid_discord_send_image` | Send image to Discord channel |
+
+### Multi-Agent Orchestration
+| Tool | Description |
+|------|-------------|
+| `corvid_launch_council` | Launch multi-agent council session |
+| `corvid_manage_workflow` | Manage graph-based workflows |
+| `corvid_manage_schedule` | Manage automated schedules |
+
+### GitHub Integration (11 tools)
+| Tool | Description |
+|------|-------------|
+| `corvid_github_create_issue` | Create issue in repository |
+| `corvid_github_create_pr` | Create pull request |
+| `corvid_github_review_pr` | Submit PR review |
+| `corvid_github_comment_on_pr` | Add comment to PR |
+| `corvid_github_list_issues` | List issues with filtering |
+| `corvid_github_list_prs` | List pull requests |
+| `corvid_github_get_pr_diff` | Get PR diff/patch |
+| `corvid_github_repo_info` | Get repository information |
+| `corvid_github_star_repo` | Star a repository |
+| `corvid_github_unstar_repo` | Remove star from repository |
+| `corvid_github_fork_repo` | Fork a repository |
+| `corvid_github_follow_user` | Follow a GitHub user |
+
+### Code Analysis & Research
+| Tool | Description |
+|------|-------------|
+| `corvid_code_symbols` | Search for code symbols (functions, classes, etc.) |
+| `corvid_find_references` | Find all references to a symbol |
+| `corvid_deep_research` | Research topic with multiple search angles |
+| `corvid_web_search` | Search the web for information |
+| `corvid_browser` | Control browser automation |
+
+### Admin & Configuration
+| Tool | Description |
+|------|-------------|
+| `corvid_ask_owner` | Ask owner for input/decision |
+| `corvid_notify_owner` | Send notification to owner |
+| `corvid_check_credits` | Check wallet credit balance |
+| `corvid_grant_credits` | Grant free credits to wallet |
+| `corvid_credit_config` | Get credit system configuration |
+| `corvid_configure_notifications` | Manage notification channels |
+| `corvid_extend_timeout` | Request additional session time |
+| `corvid_restart_server` | Restart the corvid-agent server |
+| `corvid_check_health_trends` | Check health metric trends |
+| `corvid_repo_blocklist` | Manage repository blocklist |
 
 ## Change Log
 
@@ -126,3 +195,4 @@ The MCP server exposes 24 tools that proxy to the local REST API:
 |------|--------|--------|
 | 2026-03-19 | corvid-agent | Initial spec |
 | 2026-04-09 | corvid-agent | Updated tool count from 17 to 24: added corvid_promote_memory, corvid_delete_memory, corvid_record_observation, corvid_list_observations, corvid_boost_observation, corvid_dismiss_observation, corvid_observation_stats. Added corvid_save_memory description updated to short-term SQLite |
+| 2026-04-17 | Magpie | Updated tool count from 24 to 56; reorganized tool table by category; comprehensive enumeration of all exposed tools including GitHub (12), library (4), discovery (7), work (3), messaging (4), schedule/workflow (3), code analysis (5), admin (10) |

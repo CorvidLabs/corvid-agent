@@ -70,33 +70,33 @@ import { SECTION_STYLES } from './settings-shared.styles';
     `,
     styles: `
         ${SECTION_STYLES}
-        .notification-prefs { display: flex; flex-direction: column; gap: 0.35rem; }
+        .notification-prefs { display: flex; flex-direction: column; gap: 0.4rem; }
         .notif-row {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0.55rem 0.65rem; background: var(--bg-raised);
-            border-radius: var(--radius); gap: 1rem;
+            padding: 0.7rem 0.85rem; background: var(--bg-raised);
+            border-radius: var(--radius); gap: 1rem; min-height: 56px;
         }
-        .notif-info { display: flex; flex-direction: column; gap: 0.1rem; }
-        .notif-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
-        .notif-desc { font-size: 0.6rem; color: var(--text-tertiary); }
-        .notif-toggle { position: relative; display: inline-flex; cursor: pointer; }
+        .notif-info { display: flex; flex-direction: column; gap: 0.15rem; }
+        .notif-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+        .notif-desc { font-size: 0.78rem; color: var(--text-tertiary); }
+        .notif-toggle { position: relative; display: inline-flex; cursor: pointer; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
         .notif-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
         .notif-toggle__track {
-            width: 36px; height: 20px; border-radius: 10px;
+            width: 44px; height: 24px; border-radius: 12px;
             background: var(--border-bright); transition: background 0.2s;
             position: relative; flex-shrink: 0;
         }
         .notif-toggle input:checked + .notif-toggle__track { background: var(--accent-cyan); }
         .notif-toggle__thumb {
             position: absolute; top: 2px; left: 2px;
-            width: 16px; height: 16px; border-radius: 50%;
+            width: 20px; height: 20px; border-radius: 50%;
             background: var(--text-primary); transition: transform 0.2s;
         }
         .notif-toggle input:checked + .notif-toggle__track .notif-toggle__thumb {
-            transform: translateX(16px);
+            transform: translateX(20px);
             background: var(--bg-deep);
         }
-        @media (max-width: 600px) { .notif-row { flex-direction: column; align-items: stretch; gap: 0.35rem; } .notif-toggle { align-self: flex-end; } }
+        @media (max-width: 600px) { .notif-row { flex-direction: column; align-items: stretch; gap: 0.4rem; } .notif-toggle { align-self: flex-end; } }
     `,
 })
 export class NotificationsSettingsComponent implements OnInit {

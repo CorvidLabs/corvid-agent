@@ -53,14 +53,14 @@ import { SECTION_STYLES } from './settings-shared.styles';
     `,
     styles: `
         ${SECTION_STYLES}
-        .status-badge { font-size: 0.55rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: 0.04em; }
+        .status-badge { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: 0.04em; }
         .status-badge--ok { background: var(--accent-green-dim); color: var(--accent-green); border: 1px solid var(--accent-green); }
-        .openrouter-models { margin-top: 0.75rem; }
-        .openrouter-models h4 { font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 0.5rem; }
-        .model-list { display: flex; flex-direction: column; gap: 0.3rem; }
-        .model-item { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: var(--bg-raised); border-radius: var(--radius-sm); }
-        .model-name { font-size: 0.75rem; color: var(--text-primary); font-weight: 600; }
-        .model-price { font-size: 0.65rem; color: var(--text-tertiary); font-family: var(--font-mono); }
+        .openrouter-models { margin-top: 0.85rem; }
+        .openrouter-models h4 { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 0.5rem; }
+        .model-list { display: flex; flex-direction: column; gap: 0.35rem; }
+        .model-item { display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.65rem; background: var(--bg-raised); border-radius: var(--radius-sm); min-height: 40px; }
+        .model-name { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; }
+        .model-price { font-size: 0.8rem; color: var(--text-tertiary); font-family: var(--font-mono); }
     `,
 })
 export class OpenrouterSettingsComponent implements OnInit {

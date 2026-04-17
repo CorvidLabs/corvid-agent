@@ -73,8 +73,8 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
             font-family: var(--font-body);
             letter-spacing: 0.02em;
             background: transparent;
-            border: none;
-            border-bottom: 2px solid transparent;
+            border: 1px solid var(--border);
+            border-radius: 100px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
@@ -88,7 +88,8 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
         }
         .settings-section__btn--active {
             color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
+            background: var(--accent-cyan-dim);
+            border-color: rgba(0, 229, 255, 0.3);
         }
         .settings-section__content {
             flex: 1;

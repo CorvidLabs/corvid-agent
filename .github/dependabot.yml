@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "security"
@@ -19,6 +19,10 @@ updates:
       # will silently break the patch. Review these manually.
       - dependency-name: "@corvidlabs/ts-algochat"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    groups:
+      # Group all minor/patch updates into a single PR
+      server-minor-patch:
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "deps"
 
@@ -28,10 +32,13 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "security"
+    groups:
+      client-minor-patch:
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "deps(client)"
 
@@ -41,9 +48,12 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
     labels:
       - "dependencies"
       - "ci"
+    groups:
+      actions-all:
+        patterns: ["*"]
     commit-message:
       prefix: "ci"

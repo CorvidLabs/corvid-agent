@@ -126,7 +126,7 @@ interface OperationalMode {
             letter-spacing: 0.02em;
             background: transparent;
             border: none;
-            border-bottom: 2px solid transparent;
+            border-radius: 8px;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
@@ -140,13 +140,18 @@ interface OperationalMode {
         }
         .settings__tab--active {
             color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
+            background: var(--accent-cyan-dim);
         }
         .settings__body {
             flex: 1;
             overflow-y: auto;
             padding: clamp(var(--space-4), 3vw, var(--space-8)) clamp(var(--space-4), 4vw, var(--space-10));
+            max-width: 1200px;
             width: 100%;
+        }
+        @media (max-width: 600px) {
+            .settings__tabs { padding: var(--space-2) var(--space-3) 0; }
+            .settings__body { padding: var(--space-4) var(--space-3); }
         }
     `,
 })
