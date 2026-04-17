@@ -1,5 +1,7 @@
 import { Database } from 'bun:sqlite';
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { runMigrations } from '../db/schema';
 import type { AuthConfig } from '../middleware/auth';
 import type { RequestContext } from '../middleware/guards';
@@ -366,6 +368,13 @@ describe('Runtime Config Endpoint', () => {
     // Database
     expect(data.database).toBeDefined();
     expect(typeof data.database.path).toBe('string');
+
+    // Configurable keys for env-var editing
+    expect(data.configurableKeys).toBeDefined();
+    expect(Array.isArray(data.configurableKeys)).toBe(true);
+    expect(data.configurableKeys.length).toBeGreaterThan(0);
+    expect(data.configurableKeys).toContain('ANTHROPIC_API_KEY');
+    expect(data.configurableKeys).toContain('LOG_LEVEL');
   });
 
   it('GET /api/settings/runtime does not expose raw secret values', async () => {
@@ -395,5 +404,138 @@ describe('Runtime Config Endpoint', () => {
     expect(res).not.toBeNull();
     const resolved = await Promise.resolve(res!);
     expect(resolved.status).toBe(200);
+  });
+});
+
+describe('Env Vars Endpoint', () => {
+  const envPath = resolve(process.cwd(), '.env');
+  let originalEnvContent: string | null = null;
+
+  beforeEach(() => {
+    try {
+      originalEnvContent = readFileSync(envPath, 'utf-8');
+    } catch {
+      originalEnvContent = null;
+    }
+  });
+
+  afterEach(() => {
+    if (originalEnvContent !== null) {
+      writeFileSync(envPath, originalEnvContent, 'utf-8');
+    } else {
+      try {
+        unlinkSync(envPath);
+      } catch {
+        // File may not exist
+      }
+    }
+  });
+
+  it('PUT /api/settings/env-vars rejects invalid JSON', async () => {
+    const url = new URL('http://localhost:3000/api/settings/env-vars');
+    const req = new Request(url.toString(), {
+      method: 'PUT',
+      body: 'not json',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('Invalid JSON');
+  });
+
+  it('PUT /api/settings/env-vars rejects non-array updates', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', { updates: 'not-array' });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('updates must be an array');
+  });
+
+  it('PUT /api/settings/env-vars rejects non-string key/value', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', {
+      updates: [{ key: 123, value: 'val' }],
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('string key and value');
+  });
+
+  it('PUT /api/settings/env-vars rejects disallowed keys', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', {
+      updates: [{ key: 'SECRET_KEY', value: 'val' }],
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('not in allowlist');
+    expect(data.error).toContain('SECRET_KEY');
+  });
+
+  it('PUT /api/settings/env-vars rejects empty updates array', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', { updates: [] });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    const data = await res!.json();
+    expect(data.error).toContain('No valid updates');
+  });
+
+  it('PUT /api/settings/env-vars writes allowed keys and returns success', async () => {
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', {
+      updates: [
+        { key: 'LOG_LEVEL', value: 'debug' },
+        { key: 'AGENT_NAME', value: 'TestAgent' },
+      ],
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.success).toBe(true);
+    expect(data.requiresRestart).toBe(true);
+    expect(data.updated).toContain('LOG_LEVEL');
+    expect(data.updated).toContain('AGENT_NAME');
+
+    // Verify written to .env
+    const content = readFileSync(envPath, 'utf-8');
+    expect(content).toContain('LOG_LEVEL=debug');
+    expect(content).toContain('AGENT_NAME=TestAgent');
+  });
+
+  it('PUT /api/settings/env-vars updates existing keys in-place', async () => {
+    writeFileSync(envPath, '# comment\nLOG_LEVEL=info\nOTHER=keep\n', 'utf-8');
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', {
+      updates: [{ key: 'LOG_LEVEL', value: 'warn' }],
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+
+    const content = readFileSync(envPath, 'utf-8');
+    expect(content).toContain('LOG_LEVEL=warn');
+    expect(content).toContain('# comment');
+    expect(content).toContain('OTHER=keep');
+    // Should not have duplicate LOG_LEVEL lines
+    expect(content.match(/LOG_LEVEL=/g)?.length).toBe(1);
+  });
+
+  it('PUT /api/settings/env-vars escapes values with quotes', async () => {
+    writeFileSync(envPath, '', 'utf-8');
+    const { req, url } = fakeReq('PUT', '/api/settings/env-vars', {
+      updates: [{ key: 'AGENT_DESCRIPTION', value: 'line1\nline2' }],
+    });
+    const res = await handleSettingsRoutes(req, url, db, adminContext());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+
+    const content = readFileSync(envPath, 'utf-8');
+    // Value with newline should be quoted
+    expect(content).toContain('AGENT_DESCRIPTION="line1');
   });
 });

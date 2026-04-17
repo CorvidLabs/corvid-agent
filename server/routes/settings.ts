@@ -4,6 +4,8 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { configFromEnv } from '../config/loader';
 import { recordAudit } from '../db/audit';
 import {
@@ -142,6 +144,15 @@ export function handleSettingsRoutes(
     return handleDeleteTelegramConfigKey(db, telegramKeyMatch[1], context);
   }
 
+  // PUT /api/settings/env-vars — write allowlisted env vars to .env (owner-only)
+  if (url.pathname === '/api/settings/env-vars' && req.method === 'PUT') {
+    if (context) {
+      const denied = tenantRoleGuard('owner')(req, url, context);
+      if (denied) return denied;
+    }
+    return handleUpdateEnvVars(req);
+  }
+
   // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
   if (url.pathname === '/api/settings/purge-test-data' && req.method === 'POST') {
     return handlePurgeTestData(req, db, context);
@@ -150,11 +161,34 @@ export function handleSettingsRoutes(
   return null;
 }
 
+/** Keys users are allowed to write via the dashboard UI. */
+const ALLOWED_ENV_KEYS = new Set([
+  'ANTHROPIC_API_KEY',
+  'OPENROUTER_API_KEY',
+  'OPENAI_API_KEY',
+  'ENABLED_PROVIDERS',
+  'COUNCIL_MODEL',
+  'GH_TOKEN',
+  'GITHUB_OWNER',
+  'GITHUB_REPO',
+  'OLLAMA_HOST',
+  'OLLAMA_DEFAULT_MODEL',
+  'BRAVE_SEARCH_API_KEY',
+  'LOG_LEVEL',
+  'LOG_FORMAT',
+  'PUBLIC_URL',
+  'AGENT_NAME',
+  'AGENT_DESCRIPTION',
+  'WORK_MAX_ITERATIONS',
+  'WORK_TASK_MAX_PER_DAY',
+]);
+
 function handleGetRuntimeConfig(): Response {
   const config = configFromEnv();
   const env = process.env;
 
   return json({
+    configurableKeys: [...ALLOWED_ENV_KEYS],
     agent: {
       name: config.agent.name,
       description: config.agent.description ?? null,
@@ -208,6 +242,70 @@ function handleGetRuntimeConfig(): Response {
       },
     },
   });
+}
+
+async function handleUpdateEnvVars(req: Request): Promise<Response> {
+  let body: { updates?: unknown };
+  try {
+    body = (await req.json()) as { updates?: unknown };
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  if (!Array.isArray(body.updates)) {
+    return json({ error: 'updates must be an array' }, 400);
+  }
+
+  const updates = body.updates as Array<{ key?: unknown; value?: unknown }>;
+  const rejected: string[] = [];
+  const valid: Array<{ key: string; value: string }> = [];
+
+  for (const update of updates) {
+    if (typeof update.key !== 'string' || typeof update.value !== 'string') {
+      return json({ error: 'Each update must have string key and value' }, 400);
+    }
+    if (!ALLOWED_ENV_KEYS.has(update.key)) {
+      rejected.push(update.key);
+    } else {
+      valid.push({ key: update.key, value: update.value });
+    }
+  }
+
+  if (rejected.length > 0) {
+    return json({ error: `Keys not in allowlist: ${rejected.join(', ')}` }, 400);
+  }
+
+  if (valid.length === 0) {
+    return json({ error: 'No valid updates provided' }, 400);
+  }
+
+  // Read existing .env, update or append keys, write back
+  const envPath = resolve(process.cwd(), '.env');
+  let envContent = '';
+  try {
+    envContent = readFileSync(envPath, 'utf-8');
+  } catch {
+    // .env may not exist yet — start empty
+  }
+
+  const lines = envContent.split('\n');
+  const updated: string[] = [];
+
+  for (const { key, value } of valid) {
+    const escaped = value.includes('\n') || value.includes('"') ? `"${value.replace(/"/g, '\\"')}"` : value;
+    const newLine = `${key}=${escaped}`;
+    const idx = lines.findIndex((l) => l.match(new RegExp(`^\\s*${key}\\s*=`)));
+    if (idx >= 0) {
+      lines[idx] = newLine;
+    } else {
+      lines.push(newLine);
+    }
+    updated.push(key);
+  }
+
+  writeFileSync(envPath, lines.join('\n'), 'utf-8');
+
+  return json({ success: true, requiresRestart: true, updated });
 }
 
 function handleGetSettings(db: Database, isAdmin: boolean): Response {
