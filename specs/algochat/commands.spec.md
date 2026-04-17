@@ -1,6 +1,6 @@
 ---
 module: commands
-version: 2
+version: 4
 status: active
 files:
   - server/algochat/command-handler.ts
@@ -38,6 +38,37 @@ depends_on:
 ## Purpose
 
 Processes slash commands from AlgoChat messages and routes work task requests (both from slash commands and agent-to-agent `[WORK]` prefixed messages) through a unified WorkTaskService interface.
+
+## Routing Flow
+
+`WorkCommandRouter` consolidates two distinct paths into a single `WorkTaskService` call:
+
+```
+Path 1 — Slash command (/work)
+  AlgoChat message → CommandHandler.handleCommand()
+    → WorkCommandRouter.handleSlashCommand()
+      → WorkTaskService.create({ source: 'algochat' })
+      → respond() callback with task confirmation
+      → WorkTaskService.onComplete() → respond() with PR URL
+
+Path 2 — Agent-to-agent [WORK] prefix
+  AgentMessenger (on-chain or PSK message) → WorkCommandRouter.handleAgentWorkRequest()
+    → createAgentMessage() row (status: 'pending')
+    → WorkTaskService.create({ source: 'agent', sourceId: agentMessage.id })
+    → updateAgentMessageStatus('processing')
+    → WorkTaskService.onComplete() → updateAgentMessageStatus('completed'|'failed')
+```
+
+Key differences between the two paths:
+
+| Aspect | Slash command | Agent [WORK] |
+|--------|--------------|--------------|
+| Caller | `CommandHandler` | `AgentMessenger` |
+| Authorization | Owner check (or bypassed for local chat) | Pre-authorized by `MessagingGuard` |
+| DB row created | No agent_messages row | `agent_messages` row created first |
+| Flags supported | `--project`, `--buddy`, `--rounds` | `projectId` param only |
+| Error handling | `respond()` callback | Throws `ValidationError`/`NotFoundError`; sets message status `'failed'` |
+| WorkTaskService source | `'algochat'` | `'agent'` |
 
 ## Public API
 
@@ -214,3 +245,4 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-10 | corvid-agent | v2: `/work` command now supports `--project <name>` flag for targeting specific projects. Improved response messages with ✓/✗ status indicators and completion notifications with PR URL and summary. Added behavioral examples for `--project` usage and unknown project error. Updated error cases |
 | 2026-04-14 | corvid-agent | v3: Document `setSubscriptionManager` method, `--buddy`/`--rounds` flags for `/work`, buddy error cases (#2025) |
+| 2026-04-17 | corvid-agent | v4: Add Routing Flow section explaining two-path WorkCommandRouter architecture; clarify slash vs agent [WORK] differences (#2025) |
