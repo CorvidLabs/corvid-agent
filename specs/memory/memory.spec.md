@@ -11,6 +11,8 @@ files:
   - server/memory/cache.ts
   - server/memory/categories.ts
   - server/memory/schema.ts
+  - server/memory/graduation-service.ts
+  - server/memory/consolidation.ts
 db_tables:
   - agent_memories
 depends_on: []
@@ -71,6 +73,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `MemoryManager` | Unified manager wrapping CRUD with auto-categorization, embeddings, caching, and search |
 | `IDFCorpus` | In-memory IDF corpus tracker for TF-IDF vector generation |
 | `LRUCache` | LRU cache with configurable max size and TTL-based expiration |
+| `MemoryGraduationService` | Periodic service (5-min interval) that expires short-term memories, purges archived memories, and graduates high-value observations to long-term ARC-69 memories |
 
 #### MemoryManager Methods
 
@@ -108,6 +111,50 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `invalidatePrefix` | `(prefix: string)` | `number` | Remove all entries matching a key prefix |
 | `clear` | `()` | `void` | Remove all entries |
 | `prune` | `()` | `number` | Remove expired entries, return count removed |
+
+#### MemoryGraduationService Methods
+
+Defined in `server/memory/graduation-service.ts`. Runs on a 5-minute interval. Responsible for TTL expiry, purge, and promotion of high-value observations to long-term memory.
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `start` | _(none)_ | `void` | Starts the 5-minute graduation tick interval with a 30s startup delay |
+| `stop` | _(none)_ | `void` | Stops the graduation timer |
+| `tick` | _(none)_ | `Promise<void>` | Runs one graduation cycle: expire observations, purge old observations, expire short-term memories, purge archived memories, graduate qualifying observations |
+| `setServices` | `(agentMessenger, serverMnemonic, network)` | `void` | Configures network context for ARC-69 graduation |
+| `setWalletService` | `(walletService)` | `void` | Provides wallet access for immediate ARC-69 ASA creation |
+| `getStats` | _(none)_ | `{ isRunning, agentStats[] }` | Returns graduation pipeline stats per agent |
+
+**Graduation criteria:** observations with `relevance_score >= 3.0` AND `access_count >= 2` are graduated (batch of 5 per tick per agent).
+
+**TTL lifecycle (called each tick):**
+1. `expireObservations()` — marks stale `memory_observations` as expired
+2. `purgeOldObservations()` — permanently deletes old expired/dismissed observations
+3. `expireShortTermMemories()` — archives `short_term` `agent_memories` where `expires_at < now`
+4. `purgeOldArchivedMemories()` — deletes archived short-term memories older than 30 days
+
+### Exported Functions (consolidation.ts)
+
+Defined in `server/memory/consolidation.ts`. Provides duplicate detection and merge tooling for the memory system.
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `findDuplicates` | `(db, agentId, threshold?)` | `DuplicatePair[]` | Finds near-duplicate memory pairs using TF-IDF cosine + Jaccard overlap; default threshold 0.7 |
+| `suggestMerges` | `(db, agentId?, threshold?)` | `MergeSuggestion[]` | Groups duplicates by key prefix and content similarity into merge suggestions; default threshold 0.6 |
+| `executeMerge` | `(db, params)` | `ExecuteMergeResult` | Updates the primary memory with merged content and archives duplicates |
+| `bulkArchive` | `(db, filter)` | `BulkArchiveResult` | Archives memories matching a decay score, age, or status filter |
+
+### Exported Types (consolidation.ts)
+
+| Type | Description |
+|------|-------------|
+| `MemoryRecord` | Flat memory record used internally by consolidation functions |
+| `DuplicatePair` | Two memories with a pairwise similarity score and detection method |
+| `MergeSuggestion` | Group of memories to merge, with primary, duplicates, and preview content |
+| `BulkArchiveFilter` | Filter options for bulk archiving (agentId, maxDecayScore, olderThanDays, statuses) |
+| `BulkArchiveResult` | Count and keys of archived memories |
+| `ExecuteMergeParams` | Primary ID, duplicate IDs, and optional merged content override |
+| `ExecuteMergeResult` | Success flag, primary key, merged content, and archived count/keys |
 
 ## Invariants
 
@@ -222,7 +269,8 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 
 | Module | What is used |
 |--------|-------------|
-| `server/db/agent-memories.ts` | `saveMemory`, `recallMemory`, `listMemories`, `searchMemories` |
+| `server/db/agent-memories.ts` | `saveMemory`, `recallMemory`, `listMemories`, `searchMemories`, `archiveMemory`, `expireShortTermMemories`, `purgeOldArchivedMemories`, `updateMemoryTxid`, `updateMemoryAsaId` |
+| `server/db/observations.ts` | `expireObservations`, `purgeOldObservations`, `getGraduationCandidates`, `markGraduated`, `countObservations` |
 | `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
@@ -236,6 +284,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `server/memory/graduation-service.ts` | `expireShortTermMemories`, `purgeOldArchivedMemories` (called every 5 min via `MemoryGraduationService` tick) |
 | `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handlePromoteMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
 | `server/process/manager.ts` | `saveMemory` (session exit auto-save) |
+| `server/bootstrap.ts` | `MemoryGraduationService` (started at server startup) |
 
 ## Database Tables
 
@@ -297,3 +346,4 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | 2026-02-27 | corvid-agent | Initial spec |
 | 2026-04-14 | corvid-agent | Verified TTL mechanics (invariants 22-24), schema defaults, and expiry behavior are correct. Note: `expires_at` and `access_count` columns are added by migration 113, not in base schema definition (#2024) |
 | 2026-04-17 | jackdaw | Fix invariant 19: confirmed/pending status is preserved (not reset) on saveMemory() update. Fix invariant 21 + scenario: session exit saves with status short_term, not pending — MemorySyncService does not pick it up. Fix Consumed By: summarizeOldMemories is called from scheduler/handlers/maintenance.ts; graduation-service.ts calls expireShortTermMemories/purgeOldArchivedMemories (#2024) |
+| 2026-04-17 | Rook | Add graduation-service.ts and consolidation.ts to files frontmatter; document MemoryGraduationService TTL lifecycle (expireShortTermMemories, purgeOldArchivedMemories called each 5-min tick); document consolidation exports; update Dependencies to include observations.ts and full agent-memories.ts import set (#2024) |
