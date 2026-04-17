@@ -170,12 +170,19 @@ export class VoiceSessionRouter {
         // Session is gone — create a new one
         log.info('Voice session expired, creating new one', { guildId });
         this.sessions.delete(guildId);
-        this.ensureSession(guildId).then((newSession) => {
-          if (newSession) {
-            newSession.responding = true;
-            this.processManager.sendMessage(newSession.sessionId, combinedMessage);
-          }
-        });
+        this.ensureSession(guildId)
+          .then((newSession) => {
+            if (newSession) {
+              newSession.responding = true;
+              this.processManager.sendMessage(newSession.sessionId, combinedMessage);
+            }
+          })
+          .catch((err) => {
+            log.error('Failed to create voice session', {
+              guildId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
       }
     }
   }
