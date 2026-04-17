@@ -487,6 +487,35 @@ describe('OllamaProvider', () => {
     provider.releaseSlot('model-a');
   });
 
+  test('acquireSlot returns false when queue timeout fires before slot is available', async () => {
+    // Fill up the single slot
+    await provider.acquireSlot('model-a');
+
+    // Try to acquire with a very short timeout (10ms)
+    const acquirePromise = provider.acquireSlot('model-b', undefined, undefined, 10);
+    const acquired = await acquirePromise;
+    expect(acquired).toBe(false);
+
+    // Original slot holder is unaffected — release it normally
+    provider.releaseSlot('model-a');
+  });
+
+  test('acquireSlot succeeds when slot is released before timeout fires', async () => {
+    // Fill up the single slot
+    await provider.acquireSlot('model-a');
+
+    // Request second slot with a generous timeout
+    const acquirePromise = provider.acquireSlot('model-b', undefined, undefined, 5000);
+
+    // Release first slot — should unblock model-b immediately
+    provider.releaseSlot('model-a');
+    const acquired = await acquirePromise;
+    expect(acquired).toBe(true);
+
+    // Clean up
+    provider.releaseSlot('model-b');
+  });
+
   // ─── deleteModel ──────────────────────────────────────────────────
 
   test('deleteModel returns error when Ollama is down', async () => {
