@@ -68,16 +68,27 @@ public — plus per-address rate limiting and blocklisting.
 
 _None — this module uses pure functions backed by SQLite._
 
+## Enforcement Architecture
+
+`conversation-access.ts` is a **pure decision layer** — it evaluates the per-agent rules and returns a result, but never directly silences a sender or reads global state. The behaviors below are split across three layers:
+
+| Layer | Module | Responsibility |
+|-------|--------|---------------|
+| **Global gate** | `server/algochat/message-router.ts` (line ~565) | Checks the global allowlist via `isAllowed()` before per-agent access is evaluated. Non-allowlisted addresses are dropped silently here. |
+| **Per-agent decision** | `server/algochat/conversation-access.ts` | Evaluates blocklist, mode (private/allowlist/public), and rate limits. Returns `ConversationAccessResult` — does not send any response. |
+| **Silent denial** | `server/algochat/message-router.ts` (line ~631) | Receives `ConversationAccessResult`; if `!allowed`, calls `return` with no reply — the silent drop is a routing-layer responsibility. |
+| **Mode change API** | `server/routes/agents.ts` | Accepts `PATCH /api/agents/:id/conversation-mode`; calls `setAgentConversationMode()`. Owner confirmation is **not** enforced here. |
+
 ## Invariants
 
-1. **Owner always passes.** If the participant is in `config.ownerAddresses`, access is granted regardless of mode, blocklist, or rate limits.
-2. **Blocklist before allowlist.** A blocked address is denied even if it appears on the allowlist.
-3. **Private means private.** In `private` mode, only owner addresses may converse. No exceptions.
-4. **Silent denial.** Denied messages produce no response to the sender — no error, no acknowledgment.
-5. **Default mode is `private`.** New agents and existing agents without an explicit mode are treated as `private`.
-6. **Self-protection (not implemented).** The primary agent defaults to `private` mode (see default mode invariant #5), but mode changes via the API are not currently gated by owner confirmation. The `ALGOCHAT_PRIMARY_AGENT_ID` env var is parsed but not used for enforcement.
-7. **Rate limits are per-address per-agent.** Each agent can have its own rate-limit configuration. Default: 10 messages per 60 minutes for non-owner addresses.
-8. **Global allowlist is still checked first.** The per-agent access check runs _after_ the existing global allowlist gate. A participant must pass both.
+1. **Owner always passes.** If the participant is in `config.ownerAddresses`, access is granted regardless of mode, blocklist, or rate limits. _Enforced in `conversation-access.ts:checkConversationAccess()`._
+2. **Blocklist before allowlist.** A blocked address is denied even if it appears on the allowlist. _Enforced in `conversation-access.ts:checkConversationAccess()`._
+3. **Private means private.** In `private` mode, only owner addresses may converse. No exceptions. _Enforced in `conversation-access.ts:checkConversationAccess()`._
+4. **Silent denial.** Denied messages produce no response to the sender — no error, no acknowledgment. _Enforced in `message-router.ts` — the routing layer calls `return` after a denied `ConversationAccessResult`. This module only returns a result; it never suppresses a response itself._
+5. **Default mode is `private`.** New agents and existing agents without an explicit mode are treated as `private`. _Enforced in `conversation-access.ts:checkConversationAccess()` via `agent.conversationMode || 'private'`._
+6. **Self-protection (not implemented).** The primary agent defaults to `private` mode (see invariant #5), but mode changes via the API are not currently gated by owner confirmation. _The `ALGOCHAT_PRIMARY_AGENT_ID` env var is parsed in `config.ts` but not used for enforcement. The route handler in `server/routes/agents.ts` applies mode changes unconditionally._
+7. **Rate limits are per-address per-agent.** Each agent can have its own rate-limit configuration. Default: 10 messages per 60 minutes for non-owner addresses. _Enforced in `conversation-access.ts:checkConversationAccess()`._
+8. **Global allowlist is checked before per-agent access.** The global allowlist gate in `message-router.ts` runs _before_ `checkConversationAccess()`. A participant must pass both. _This module does not perform the global allowlist check — that logic lives in `message-router.ts` via `isAllowed()` from `server/db/allowlist.ts`._
 
 ## Behavioral Examples
 
@@ -202,4 +213,4 @@ _Note: `conversation_mode` is stored as a new column on the `agents` table._
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-23 | corvid-agent | Initial spec |
-| 2026-04-14 | corvid-agent | Clarify self-protection as unimplemented, fix invalid-address error case, clarify env var semantics (#2019) |
+| 2026-04-17 | Jackdaw | Add Enforcement Architecture section; update invariants 4, 6, 8 with cross-references to message-router.ts and routes/agents.ts; clarify module boundary (#2019) |
