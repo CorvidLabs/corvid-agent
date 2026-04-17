@@ -56,12 +56,6 @@ type EditSection = {
     fields: EditField[];
 };
 
-function maskValue(value: string): string {
-    if (!value) return '';
-    if (value.length > 8) return '****' + value.slice(-4);
-    return '****';
-}
-
 @Component({
     selector: 'app-environment-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
