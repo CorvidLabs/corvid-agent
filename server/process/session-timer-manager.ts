@@ -216,5 +216,9 @@ export class SessionTimerManager {
       clearTimeout(timer);
     }
     this.sessionTimeouts.clear();
+    for (const timer of this.startupTimeouts.values()) {
+      clearTimeout(timer);
+    }
+    this.startupTimeouts.clear();
   }
 }
