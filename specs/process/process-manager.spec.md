@@ -33,19 +33,23 @@ This is the most complex module in the system (~1135 lines after decomposition).
 
 ### Exported Types
 
-| Type | Description |
-|------|-------------|
-| `EventCallback` | `(sessionId: string, event: ClaudeStreamEvent) => void` — re-exported from `./interfaces` |
-| `McpServices` | Interface for registering all MCP-related services (from mcp-service-container.ts) |
-| `BuildContextOptions` | Options for building MCP tool context (from mcp-service-container.ts) |
-| `SessionPrompts` | Resolved persona + skill prompts for a session (from session-config-resolver.ts) |
-| `ResolvedSessionConfig` | Complete resolved configuration for a session (from session-config-resolver.ts) |
-| `PausedSessionInfo` | Paused session tracking info: pausedAt, resumeAttempts, nextResumeAt (from session-resilience-manager.ts) |
-| `SessionResilienceCallbacks` | Callback interface for resilience manager: resumeProcess, stopProcess, isRunning, clearTimers, cancelApprovals (from session-resilience-manager.ts) |
-| `SessionTimerCallbacks` | Callback interface for timer manager: onTimeout, onStablePeriod, onStartupTimeout, isRunning, getLastActivityAt (from session-timer-manager.ts) |
-| `SessionTimerConfig` | Timer configuration: agentTimeoutMs, stablePeriodMs, timeoutCheckIntervalMs, startupTimeoutMs (from session-timer-manager.ts) |
-| `RoutingDecision` | Result of a provider routing decision: provider, reason (`'default' \| 'agent_config' \| 'no_claude_access' \| 'cursor_binary_missing' \| 'ollama_via_claude_proxy'`), fallback flag, effectiveModel |
-| `OperationalMode` | `'normal' \| 'queued' \| 'paused'` — server operational mode managed by ApprovalManager |
+| Type | Source | Description |
+|------|--------|-------------|
+| `EventCallback` | `./interfaces` | `(sessionId: string, event: ClaudeStreamEvent) => void` |
+| `McpServices` | `mcp-service-container.ts` | Interface for registering all MCP-related services |
+| `BuildContextOptions` | `mcp-service-container.ts` | Options for building MCP tool context |
+| `SessionPrompts` | `session-config-resolver.ts` | Resolved persona + skill prompts for a session |
+| `ResolvedSessionConfig` | `session-config-resolver.ts` | Complete resolved configuration for a session |
+| `PausedSessionInfo` | `session-resilience-manager.ts` | Paused session tracking info: `pausedAt`, `resumeAttempts`, `nextResumeAt` |
+| `SessionResilienceCallbacks` | `session-resilience-manager.ts` | Callbacks for resilience manager: `resumeProcess`, `stopProcess`, `isRunning`, `clearTimers`, `cancelApprovals` |
+| `SessionTimerCallbacks` | `session-timer-manager.ts` | Callbacks for timer manager: `onTimeout`, `onStablePeriod`, `onStartupTimeout`, `isRunning`, `getLastActivityAt` |
+| `SessionTimerConfig` | `session-timer-manager.ts` | Timer configuration: `agentTimeoutMs`, `stablePeriodMs`, `timeoutCheckIntervalMs`, `startupTimeoutMs` |
+| `RoutingDecision` | `provider-routing.ts` | Provider routing result: `provider`, `reason`, `fallback`, `effectiveModel` |
+| `OperationalMode` | `approval-manager.ts` | `'normal' \| 'queued' \| 'paused'` — server operational mode |
+| `EventHandlerDeps` | `event-handler.ts` | Dependencies needed by the event handler |
+| `SessionMetaForEvents` | `event-handler.ts` | Session metadata slice needed for event processing |
+| `ExitHandlerDeps` | `session-exit-handler.ts` | Dependencies needed by the exit handler |
+| `SessionMetaForExit` | `session-exit-handler.ts` | Mutable session metadata tracked in-memory for exit processing |
 
 ### Exported Classes
 
@@ -76,13 +80,7 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `resolveProviderRouting` | `(opts: { providerType, agentModel, hasCursorBinary, hasClaudeAccess, hasOllamaProvider, ollamaDefaultModel? })` | `RoutingDecision` | Pure function to determine provider routing decision based on agent config and system state |
-| `resolveDirectToolAllowList` | `(toolAllowList?, mcpToolAllowList?)` | `string[] \| undefined` | Map SDK tool permissions to direct-process tool allow list |
-
-### Exported Types (from provider-routing.ts)
-
-| Type | Description |
-|------|-------------|
-| `RoutingDecision` | Result of a provider routing decision: provider, reason, fallback flag, effectiveModel |
+| `resolveDirectToolAllowList` | `(toolAllowList?, mcpToolAllowList?)` | `string[] \| undefined` | Translate SDK tool names to direct-process allow list and merge `mcpToolAllowList` |
 
 ### Exported Functions (from resume-prompt-builder.ts)
 
@@ -95,33 +93,39 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleSessionEvent` | `(deps: EventHandlerDeps, sessionId, event)` | `void` | Process SDK/direct-process events: persist messages, broadcast activity, handle cost/credits |
-| `applyCostUpdate` | `(deps, sessionId, event)` | `void` | Apply cost update from a stream event |
+| `applyCostUpdate` | `(deps, sessionId, event)` | `boolean` | Apply cost update from a stream event. Returns `false` if the session was stopped (credits exhausted) |
 | `persistDirectSessionMetrics` | `(db, sessionId, metrics)` | `void` | Persist metrics from a direct-process session |
 | `broadcastActivityStatus` | `(deps, sessionId, status)` | `void` | Broadcast activity status to WebSocket subscribers |
 
-### Exported Types (from event-handler.ts)
+`EventHandlerDeps` fields: `db`, `eventBus`, `broadcastFn`, `isOwnerAddress`, `getSessionMeta`, `stopProcess`, `resetSessionTimeout`.
 
-| Type | Description |
-|------|-------------|
-| `EventHandlerDeps` | Dependencies needed by the event handler (db, eventBus, broadcast, etc.) |
-| `SessionMetaForEvents` | Session metadata needed for event processing |
+`SessionMetaForEvents` fields: `lastActivityAt`, `lastKnownCostUsd`, `source`.
 
 ### Exported Functions (from session-exit-handler.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleSessionExit` | `(deps: ExitHandlerDeps, sessionId, code, errorMessage?)` | `void` | Process session exit: save summary, cleanup worktree, manage auto-restart |
-| `saveSessionSummaryToMemory` | `(db, sessionId)` | `void` | Save session summary to agent memory |
-| `saveContextSummaryObservation` | `(db, session, summary)` | `void` | Save context summary as an observation for session continuity |
-| `persistConversationSummary` | `(db, sessionId)` | `void` | Persist conversation summary to session record |
-| `cleanupChatWorktree` | `(deps, sessionId)` | `void` | Clean up worktree for a chat session |
+| `saveSessionSummaryToMemory` | `(db, sessionId)` | `void` | Save session summary to long-term memory on clean exit (two-tier memory architecture) |
+| `saveContextSummaryObservation` | `(db, session, summary)` | `void` | Save context summary as a short-term observation for memory graduation pipeline |
+| `persistConversationSummary` | `(db, sessionId)` | `void` | Persist conversation summary to session record for context continuity on resume |
+| `cleanupChatWorktree` | `(deps, sessionId)` | `void` | Clean up worktrees created for chat sessions and ephemeral project directories |
 
-### Exported Types (from session-exit-handler.ts)
+`ExitHandlerDeps` fields: `db`, `eventBus`, `broadcastFn`, `processes`, `sessionMeta`, `ephemeralDirs`, `resilienceManager`, `timerManager`, `approvalManager`, `ownerQuestionManager`, `cleanupSessionState`.
 
-| Type | Description |
-|------|-------------|
-| `ExitHandlerDeps` | Dependencies needed by the exit handler (db, eventBus, resilience, etc.) |
-| `SessionMetaForExit` | Session metadata needed for exit processing |
+`SessionMetaForExit` fields: `startedAt`, `source`, `restartCount`, `lastKnownCostUsd`, `turnCount`, `lastActivityAt`, `contextSummary?`.
+
+#### McpServiceContainer Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `setServices` | `(services: McpServices)` | `void` | Register all external service dependencies for MCP tools |
+| `buildContext` | `(options: BuildContextOptions)` | `McpToolContext \| null` | Build a per-session MCP tool context. Returns `null` if services are not yet registered |
+| `isAvailable` | _(getter)_ | `boolean` | Whether services have been registered (i.e., `setServices` has been called) |
+
+`McpServices` fields: `messenger`, `directory`, `walletService`, `encryptionConfig?`, `workTaskService?`, `schedulerService?`, `workflowService?`, `notificationService?`, `questionDispatcher?`, `reputationScorer?`, `reputationAttestation?`, `reputationVerifier?`, `astParserService?`, `permissionBroker?`, `processManager?`, `flockDirectoryService?`, `browserService?`.
+
+`BuildContextOptions` fields: `agentId`, `db`, `sessionSource?`, `sessionId?`, `depth?`, `schedulerMode?`, `schedulerActionType?`, `resolvedToolPermissions?`, `emitStatus?`, `extendTimeout?`, `broadcastOwnerMessage?`, `ownerQuestionManager?`.
 
 ### Exported Constants (server/process/session-resilience-manager.ts)
 
@@ -153,13 +157,15 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `constructor` | `callbacks: SessionTimerCallbacks, config?: Partial<SessionTimerConfig>` | `SessionTimerManager` | Creates timer manager with callbacks and optional config overrides |
 | `startStableTimer` | `(sessionId: string)` | `void` | Start stable-period timer. After continuous uptime (default 10min), fires onStablePeriod to reset restart counter |
 | `clearStableTimer` | `(sessionId: string)` | `void` | Clear the stable-period timer for a session |
+| `startStartupTimeout` | `(sessionId: string)` | `void` | Start startup timeout (default 90s). If no event arrives in time, fires `onStartupTimeout` |
+| `clearStartupTimeout` | `(sessionId: string)` | `void` | Clear the startup timeout for a session (called on first event) |
 | `startSessionTimeout` | `(sessionId: string, timeoutMs?: number)` | `void` | Start or reset per-session inactivity timeout (default 30min via AGENT_TIMEOUT_MS) |
 | `extendTimeout` | `(sessionId: string, additionalMs: number)` | `boolean` | Extend a running session's timeout (clamped to 4x agentTimeoutMs). Returns false if not running |
 | `clearSessionTimeout` | `(sessionId: string)` | `void` | Clear the inactivity timeout for a session |
 | `startTimeoutChecker` | `(getSessionIds?: () => string[])` | `void` | Start polling fallback that catches sessions surviving past their inactivity timeout (safety net, every 60s) |
 | `checkTimeouts` | `(sessionIds: string[])` | `void` | Check all provided session IDs for timeout violations |
 | `cleanupSession` | `(sessionId: string)` | `void` | Clean up all timers for a session to prevent timer leaks |
-| `getStats` | `()` | `{ sessionTimeouts: number; stableTimers: number }` | Get count of active timers for monitoring |
+| `getStats` | `()` | `{ sessionTimeouts: number; stableTimers: number; startupTimeouts: number }` | Get count of active timers for monitoring |
 | `shutdown` | `()` | `void` | Shut down all timers |
 
 #### ProcessManager Constructor
@@ -184,17 +190,18 @@ Side effects on construction:
 | `setMcpServices` | `(services: McpServices)` | `void` | Register all MCP-related services for corvid_* tools (delegates to McpServiceContainer) |
 | `startProcess` | `(session: Session, prompt?: string, options?: { depth?, schedulerMode? })` | `void` | Start a new agent process. Routes to SDK or direct based on provider |
 | `resumeProcess` | `(session: Session, prompt?: string)` | `void` | Resume an existing session. Builds history-aware prompt, handles context reset |
-| `stopProcess` | `(sessionId: string)` | `void` | Kill process, set status to stopped, emit session_stopped, clean up state |
+| `stopProcess` | `(sessionId: string, reason?: string)` | `void` | Kill process, set status to stopped, emit session_stopped, clean up state |
 | `cleanupSessionState` | `(sessionId: string)` | `void` | Remove all in-memory state for a session (idempotent) |
-| `getMemoryStats` | `()` | `{ processes, subscribers, sessionMeta, pausedSessions, sessionTimeouts, stableTimers, globalSubscribers }` | Snapshot of in-memory map sizes |
-| `sendMessage` | `(sessionId: string, content: string)` | `boolean` | Send a message to a running process. Persists to DB, tracks turns |
+| `getMemoryStats` | `()` | `{ processes, subscribers, sessionMeta, pausedSessions, sessionTimeouts, stableTimers, startupTimeouts, globalSubscribers }` | Snapshot of in-memory map sizes |
+| `sendMessage` | `(sessionId: string, content: string \| ContentBlockParam[])` | `boolean` | Send a message to a running process. Persists to DB, tracks turns |
 | `isRunning` | `(sessionId: string)` | `boolean` | Check if a process is active |
 | `subscribe` | `(sessionId: string, callback: EventCallback)` | `void` | Subscribe to session events (replays thinking state for late subscribers) |
 | `unsubscribe` | `(sessionId: string, callback: EventCallback)` | `void` | Unsubscribe from session events |
 | `subscribeAll` | `(callback: EventCallback)` | `void` | Subscribe to events from all sessions |
 | `unsubscribeAll` | `(callback: EventCallback)` | `void` | Unsubscribe from global events |
 | `getActiveSessionIds` | `()` | `string[]` | List all sessions with running processes |
-| `shutdown` | `()` | `void` | Stop all processes, clear all timers and state |
+| `flushActiveSessionSummaries` | `()` | `void` | Force-persist conversation summaries for all active sessions (called on graceful shutdown) |
+| `shutdown` | `()` | `void` | Stop all processes, flush summaries, clear all timers and state |
 | `resumeSession` | `(sessionId: string)` | `boolean` | Resume a paused session (from API outage). Returns false if not paused |
 | `isPaused` | `(sessionId: string)` | `boolean` | Check if a session is paused |
 | `getPausedSessionIds` | `()` | `string[]` | List all paused session IDs |
@@ -363,3 +370,4 @@ Internal constants (not env-configurable):
 | 2026-04-09 | corvid-agent | Added OLLAMA_USE_CLAUDE_PROXY routing, relevant observations loaded on session resume (#1779), zero-turn circuit breaker (3 consecutive zero-turn completions blocks resume) |
 | 2026-04-09 | corvid-agent | Added extracted sub-modules: provider-routing.ts, resume-prompt-builder.ts, event-handler.ts, session-exit-handler.ts (#1940) |
 | 2026-04-14 | corvid-agent | Add 15 missing modules to files list, fix SessionTimerCallbacks/Config types, clarify resolveProviderRouting re-export (#2022) |
+| 2026-04-16 | corvid-agent | Document McpServiceContainer methods/isAvailable, full McpServices/BuildContextOptions fields, startStartupTimeout/clearStartupTimeout, fix applyCostUpdate return type (boolean), fix sendMessage signature (ContentBlockParam[]), add flushActiveSessionSummaries, fix getStats to include startupTimeouts, inline EventHandlerDeps/ExitHandlerDeps fields, remove RoutingDecision duplicate, collapse exported-types table with Source column (#2022) |
