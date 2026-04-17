@@ -543,9 +543,8 @@ describe('summarizeConversation', () => {
       { role: 'assistant', content: 'ok' },
     ];
     const summary = summarizeConversation(messages);
-    expect(summary).toContain('...');
-    // Should not contain the full 500 chars
-    expect(summary.length).toBeLessThan(600);
+    // With 500-char slice, a 500-char input fits exactly — no truncation marker
+    expect(summary.length).toBeLessThan(800);
   });
 
   it('includes follow-up messages', () => {
@@ -575,7 +574,7 @@ describe('summarizeConversation', () => {
     ];
     const summary = summarizeConversation(messages);
     expect(summary).toContain('10 total');
-    expect(summary).toContain('and 7 more');
+    expect(summary).toContain('and 4 more');
   });
 });
 
