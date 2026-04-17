@@ -3,11 +3,11 @@ name: Stats
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-      - "LICENSE"
-      - ".github/ISSUE_TEMPLATE/**"
+    paths:
+      - "server/**"
+      - "client/**"
+      - "shared/**"
+      - "package.json"
   workflow_dispatch:
 
 permissions:
