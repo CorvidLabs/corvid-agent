@@ -790,8 +790,8 @@ export class MessageRouter {
   ): Promise<{ workDir: string; branch: string } | undefined> {
     if (!projectId) return undefined;
     const project = getProject(this.db, projectId);
-    if (!project?.workingDir && !project?.gitUrl) return undefined;
     if (!project) return undefined;
+    if (!project.workingDir && !project.gitUrl) return undefined;
 
     const sessionId = crypto.randomUUID();
     const result = await resolveAndCreateWorktree(project, 'algochat', sessionId);

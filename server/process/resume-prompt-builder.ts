@@ -51,7 +51,7 @@ export function buildResumePrompt(
 
   if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
-  const recent = messages.slice(-20);
+  const recent = messages.slice(-40);
   const historyLines = recent
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => {

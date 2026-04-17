@@ -73,6 +73,27 @@ export async function cleanupEphemeralDir(resolved: ResolvedDir): Promise<void> 
 // ─── Strategy implementations ────────────────────────────────────────────────
 
 function resolvePersistent(project: Project): ResolvedDir {
+  if (!project.workingDir) {
+    return { dir: '', ephemeral: false, error: 'Project has no workingDir configured' };
+  }
+
+  if (!existsSync(project.workingDir)) {
+    return {
+      dir: project.workingDir,
+      ephemeral: false,
+      error: `Project directory does not exist: ${project.workingDir}`,
+    };
+  }
+
+  // Validate it's actually a git repository
+  if (!existsSync(resolve(project.workingDir, '.git'))) {
+    return {
+      dir: project.workingDir,
+      ephemeral: false,
+      error: `Project directory is not a git repository: ${project.workingDir}`,
+    };
+  }
+
   return { dir: project.workingDir, ephemeral: false };
 }
 

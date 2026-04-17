@@ -27,8 +27,9 @@ function makeTestProject(overrides: Partial<Project> = {}): Project {
 
 beforeEach(() => {
   mkdirSync(TEST_BASE, { recursive: true });
-  // Create a minimal git repo for testing
+  // Create a minimal git repo for testing (needs .git dir for validation)
   mkdirSync(FAKE_REPO, { recursive: true });
+  mkdirSync(resolve(FAKE_REPO, '.git'), { recursive: true });
 });
 
 afterEach(() => {

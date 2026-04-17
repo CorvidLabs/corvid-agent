@@ -187,8 +187,8 @@ export function summarizeConversation(
   // Extract key user requests
   const userMessages = messages.filter((m) => m.role === 'user');
   if (userMessages.length > 0) {
-    const firstRequest = userMessages[0].content.slice(0, 300).replace(/\n/g, ' ').trim();
-    points.push(`Original request: ${firstRequest}${userMessages[0].content.length > 300 ? '...' : ''}`);
+    const firstRequest = userMessages[0].content.slice(0, 500).replace(/\n/g, ' ').trim();
+    points.push(`Original request: ${firstRequest}${userMessages[0].content.length > 500 ? '...' : ''}`);
   }
 
   // Extract tool usage summary
@@ -199,23 +199,29 @@ export function summarizeConversation(
 
   // Extract key assistant conclusions (last few assistant messages)
   const assistantMessages = messages.filter((m) => m.role === 'assistant');
-  if (assistantMessages.length > 0) {
-    const last = assistantMessages[assistantMessages.length - 1];
-    const conclusion = last.content.slice(0, 300).replace(/\n/g, ' ').trim();
-    points.push(`Last assistant response: ${conclusion}${last.content.length > 300 ? '...' : ''}`);
+  if (assistantMessages.length > 1) {
+    // Include the last 3 assistant messages for better continuity
+    const recentAssistant = assistantMessages.slice(-3);
+    for (const msg of recentAssistant) {
+      const conclusion = msg.content.slice(0, 400).replace(/\n/g, ' ').trim();
+      points.push(`Last assistant response: ${conclusion}${msg.content.length > 400 ? '...' : ''}`);
+    }
+  } else if (assistantMessages.length === 1) {
+    const conclusion = assistantMessages[0].content.slice(0, 400).replace(/\n/g, ' ').trim();
+    points.push(`Last assistant response: ${conclusion}${assistantMessages[0].content.length > 400 ? '...' : ''}`);
   }
 
-  // Summarize intermediate user follow-ups
+  // Summarize intermediate user follow-ups — keep more context
   if (userMessages.length > 1) {
     const followUps = userMessages.slice(1).map((m) => {
-      const text = m.content.slice(0, 100).replace(/\n/g, ' ').trim();
-      return text + (m.content.length > 100 ? '...' : '');
+      const text = m.content.slice(0, 200).replace(/\n/g, ' ').trim();
+      return text + (m.content.length > 200 ? '...' : '');
     });
-    if (followUps.length <= 5) {
+    if (followUps.length <= 8) {
       points.push(`Follow-up messages: ${followUps.join('; ')}`);
     } else {
       points.push(
-        `Follow-up messages (${followUps.length} total): ${followUps.slice(0, 3).join('; ')}; ... and ${followUps.length - 3} more`,
+        `Follow-up messages (${followUps.length} total): ${followUps.slice(0, 6).join('; ')}; ... and ${followUps.length - 6} more`,
       );
     }
   }

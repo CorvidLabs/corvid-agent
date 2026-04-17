@@ -53,10 +53,11 @@ const log = createLogger('ProcessManager');
 // through the capped resume path to keep context size manageable.
 //
 // Rationale: Each "turn" (user message + assistant response + tool calls) grows
-// the in-context prompt significantly. Empirically, ~8 turns keeps most sessions
-// well under context-window limits while leaving headroom for tool outputs,
-// system messages, and safety buffers. Revisit if model context windows change.
-const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
+// the in-context prompt significantly. With modern 200k context windows, 20 turns
+// provides enough continuity for multi-turn Discord conversations while staying
+// well within limits. The progressive compression tiers in context-management.ts
+// handle the cases where individual turns are unusually large.
+const MAX_TURNS_BEFORE_CONTEXT_RESET = 20;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 // Circuit breaker: if the last N completions in a row were zero-turn,
