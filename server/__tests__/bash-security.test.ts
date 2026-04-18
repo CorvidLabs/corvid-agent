@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   analyzeBashCommand,
   detectDangerousPatterns,
+  detectGitBranchViolation,
   EXPANDED_WRITE_OPERATORS,
   extractPathsFromCommand,
   tokenizeBashCommand,
@@ -363,5 +364,84 @@ describe('EXPANDED_WRITE_OPERATORS', () => {
 
   test('does not match safe find command', () => {
     expect(EXPANDED_WRITE_OPERATORS.test('find . -name "*.ts" -print')).toBe(false);
+  });
+});
+
+// ── detectGitBranchViolation ────────────────────────────────────────────
+
+describe('detectGitBranchViolation', () => {
+  test('blocks git checkout -b with non-chat branch', () => {
+    const result = detectGitBranchViolation('git checkout -b feature/my-thing');
+    expect(result.isDangerous).toBe(true);
+    expect(result.reason).toContain('branch isolation');
+  });
+
+  test('allows git checkout -b with chat/ branch', () => {
+    const result = detectGitBranchViolation('git checkout -b chat/session-123');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('blocks git switch -c with non-chat branch', () => {
+    const result = detectGitBranchViolation('git switch -c fix/something');
+    expect(result.isDangerous).toBe(true);
+    expect(result.reason).toContain('branch isolation');
+  });
+
+  test('allows git switch -c with chat/ branch', () => {
+    const result = detectGitBranchViolation('git switch -c chat/abc');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('blocks git branch with non-chat name', () => {
+    const result = detectGitBranchViolation('git branch my-new-branch');
+    expect(result.isDangerous).toBe(true);
+    expect(result.reason).toContain('branch isolation');
+  });
+
+  test('allows git branch with chat/ name', () => {
+    const result = detectGitBranchViolation('git branch chat/session-456');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('ignores git branch listing flags', () => {
+    const result = detectGitBranchViolation('git branch -a');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('ignores non-git commands', () => {
+    const result = detectGitBranchViolation('ls -la');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('ignores git commands without branch creation', () => {
+    const result = detectGitBranchViolation('git status');
+    expect(result.isDangerous).toBe(false);
+  });
+
+  test('ignores git checkout without -b flag', () => {
+    const result = detectGitBranchViolation('git checkout main');
+    expect(result.isDangerous).toBe(false);
+  });
+});
+
+// ── analyzeBashCommand with git branch violation ────────────────────────
+
+describe('analyzeBashCommand git branch integration', () => {
+  test('flags gitBranchViolation for non-chat branch creation', () => {
+    const result = analyzeBashCommand('git checkout -b feature/xyz');
+    expect(result.hasDangerousPatterns).toBe(true);
+    expect(result.gitBranchViolation).toBe(true);
+    expect(result.reason).toContain('branch isolation');
+  });
+
+  test('no gitBranchViolation for chat/ branch', () => {
+    const result = analyzeBashCommand('git checkout -b chat/my-session');
+    expect(result.hasDangerousPatterns).toBe(false);
+    expect(result.gitBranchViolation).toBe(false);
+  });
+
+  test('no gitBranchViolation for non-git commands', () => {
+    const result = analyzeBashCommand('rm /tmp/file.txt');
+    expect(result.gitBranchViolation).toBe(false);
   });
 });
