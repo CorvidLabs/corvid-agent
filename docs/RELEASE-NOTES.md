@@ -179,7 +179,7 @@ Full Discord voice integration: agents can join voice channels, listen, respond,
 | **Injection detection** | 30+ patterns, <10ms scanner; active on Discord, Telegram, AlgoChat, HTTP |
 | **RBAC** | Permission broker with 50+ actions; role guards on all route modules |
 | **Spending caps** | Per-agent daily ALGO limits enforced before any transaction |
-| **Tenant isolation** | 88 isolation tests; tenant-scoped data access |
+| **Tenant isolation** | 99 isolation tests; tenant-scoped data access |
 | **Wallet security** | AES-256-GCM, PBKDF2 600,000 iterations, secure memory wipe after signing |
 | **CORS** | Server refuses to start with `ALLOWED_ORIGINS=*` in remote mode |
 | **Rate limiting** | Per-route limits; stampede throttling (max 5 sessions per poll cycle) |
@@ -188,10 +188,11 @@ Full Discord voice integration: agents can join voice channels, listen, respond,
 | **Supply chain** | All GitHub Actions pinned to SHA digests |
 
 **Test coverage at v1.0.0:**
-- 9,000+ tests pass across 390+ files (0 failures)
-- 52/52 specs pass (spec-sync v4.0.0)
+- 10,320 tests pass across 456 files (0 failures, 26,897 assertions)
+- 52/52 specs pass at 100% file and LOC coverage (spec-sync v4.2.0)
 - TypeScript 6.0: `tsc --noEmit --skipLibCheck` clean
 - Biome linter: zero errors, zero warnings
+- 370 security-specific tests; 99 tenant isolation tests
 
 ---
 

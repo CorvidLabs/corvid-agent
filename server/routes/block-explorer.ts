@@ -17,6 +17,7 @@ import type { Database } from 'bun:sqlite';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import { getWalletSummaries } from '../db/algochat-messages';
 import { json, safeNumParam } from '../lib/response';
+import type { RequestContext } from '../middleware/guards';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -216,6 +217,7 @@ export function handleBlockExplorerRoutes(
   url: URL,
   db: Database,
   algochatBridge: AlgoChatBridge | null,
+  _context?: RequestContext,
 ): Response | Promise<Response> | null {
   if (!url.pathname.startsWith('/api/explorer')) return null;
   if (req.method !== 'GET') return null;

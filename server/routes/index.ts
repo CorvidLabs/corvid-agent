@@ -388,7 +388,7 @@ async function handleRoutes(
   if (mcpServerResponse) return mcpServerResponse;
 
   // Tool catalog (public, no auth required)
-  const toolCatalogResponse = handleToolCatalogRoutes(req, url);
+  const toolCatalogResponse = handleToolCatalogRoutes(req, url, context);
   if (toolCatalogResponse) return toolCatalogResponse;
 
   const allowlistResponse = handleAllowlistRoutes(req, url, db);
@@ -413,7 +413,7 @@ async function handleRoutes(
   if (libraryResponse) return libraryResponse;
 
   // Block Explorer routes (on-chain Algorand data via indexer)
-  const explorerResponse = handleBlockExplorerRoutes(req, url, db, algochatBridge);
+  const explorerResponse = handleBlockExplorerRoutes(req, url, db, algochatBridge, context);
   if (explorerResponse) return explorerResponse instanceof Promise ? await explorerResponse : explorerResponse;
 
   const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
@@ -439,7 +439,7 @@ async function handleRoutes(
   const openRouterResponse = handleOpenRouterRoutes(req, url, context);
   if (openRouterResponse) return openRouterResponse instanceof Promise ? await openRouterResponse : openRouterResponse;
 
-  const cursorResponse = handleCursorRoutes(req, url);
+  const cursorResponse = handleCursorRoutes(req, url, context);
   if (cursorResponse) return cursorResponse instanceof Promise ? await cursorResponse : cursorResponse;
 
   const performanceResponse = handlePerformanceRoutes(req, url, db, performanceCollector ?? null);
