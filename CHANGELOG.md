@@ -4,11 +4,51 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — v1.0.0 Hardening
+
+Post-v1.0.0 infrastructure hardening and reliability improvements.
+
+### Fixed
+- Timer and callback leaks for long-running server stability (#2068)
+- Worktree creation for non-default projects and context loss reduction (#2067)
+- Ollama queue timeout in acquireSlot() (#2072)
+- Missing .catch() on voice session creation (#2069)
+- Enforced chat/* branch naming during worktree sessions (#2073)
+- Bumped hono >=4.12.14 for HTML injection CVE (#2054)
+- Critical CVE: protobufjs arbitrary code execution GHSA-xq3m-2v4x-88gg (#2052)
+- Chat tab race conditions and e2e test stabilization (#2014)
+- Session exit handler: persist thread session summary (#2042)
+- Work task PR summary sanitization (#2015)
+- Startup timeout for sessions stuck on slow model endpoints (#1983)
+- Prevent duplicate PR comments from cross-config polling (#1985)
+
+### Added
+- v1.0.0 API and SQLite performance benchmarks with SLA docs (#2062)
+- Editable environment config UI (#2040)
+- Cross-channel messaging guard (#2041, #2008)
+- Shared metric-card and progress-bar UI components (#2047)
+- Backup and restore scripts for full instance operations (#2035)
+- Tailscale remote access guide (#2013)
+- RBAC guards on all 52 route modules (cursor, tool-catalog, block-explorer)
+
+### Changed
+- Process manager decomposed into focused sub-modules (#2043, #2046)
+- CI usage reduced ~75% (#2039)
+- Client UI: consolidated feature directories, 5-item nav, tabbed settings (#2032, #1997, #1996)
+- All GitHub Actions pinned to commit SHA (#2074)
+- spec-sync upgraded v3.8.0 → v4.2.0 (#2034)
+
+### Security
+- RC checklist: 24/24 automated checks pass (370 security tests, 99 tenant isolation tests)
+- 10,320 tests pass across 456 files (0 failures, 26,897 assertions)
+
+---
+
 ## [1.0.0] - 2026-04-13
 
 This is the **v1.0.0 mainnet release** of corvid-agent — the first stable, production-ready version of the decentralized AI agent platform built on Algorand.
 
-corvid-agent began as a proof-of-concept for on-chain agent coordination and grew — across 1,300+ commits, 42 database migrations, 56 MCP tools, 9,000+ tests, and an 8-month development arc — into a full multi-agent orchestration platform with encrypted on-chain identity, multi-bridge communication, voice, governance, and a complete developer-facing dashboard.
+corvid-agent began as a proof-of-concept for on-chain agent coordination and grew — across 1,300+ commits, 42 database migrations, 56 MCP tools, 10,320+ tests, and an 8-month development arc — into a full multi-agent orchestration platform with encrypted on-chain identity, multi-bridge communication, voice, governance, and a complete developer-facing dashboard.
 
 ### Core Platform Capabilities
 

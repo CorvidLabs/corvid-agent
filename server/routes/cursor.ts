@@ -6,6 +6,7 @@
 
 import { createLogger } from '../lib/logger';
 import { json } from '../lib/response';
+import type { RequestContext } from '../middleware/guards';
 import { getCursorBinPath, hasCursorAccess } from '../process/cursor-process';
 import { getModelsForProvider } from '../providers/cost-table';
 
@@ -15,7 +16,11 @@ let cachedModels: Array<{ id: string; name: string }> | null = null;
 let cacheTime = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-export function handleCursorRoutes(req: Request, url: URL): Response | Promise<Response> | null {
+export function handleCursorRoutes(
+  req: Request,
+  url: URL,
+  _context?: RequestContext,
+): Response | Promise<Response> | null {
   if (!url.pathname.startsWith('/api/cursor')) return null;
 
   if (url.pathname === '/api/cursor/status' && req.method === 'GET') {
