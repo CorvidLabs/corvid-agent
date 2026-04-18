@@ -1,11 +1,14 @@
 import { Component, ChangeDetectionStrategy, output, signal, input, ElementRef, viewChild, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
 @Component({
     selector: 'app-session-input',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe],
+    imports: [FormsModule, DecimalPipe, MatButtonModule, MatFormFieldModule, MatInputModule],
     template: `
         <div class="input-bar" [class.input-bar--focused]="focused()">
             <label for="messageInput" class="sr-only">Send message to session</label>
@@ -32,12 +35,11 @@ import { DecimalPipe } from '@angular/common';
                     <span class="input-bar__kbd-label">new line</span>
                 </div>
             </div>
-            <button
+            <button mat-stroked-button
                 class="input-bar__send"
                 (click)="onSend()"
                 [disabled]="disabled() || messageText().trim().length === 0"
                 aria-label="Send message">
-                <span class="input-bar__send-icon" aria-hidden="true">&#9654;</span>
                 Send
             </button>
         </div>
@@ -117,27 +119,8 @@ import { DecimalPipe } from '@angular/common';
             color: var(--text-tertiary);
         }
         .input-bar__send {
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            padding: var(--space-2) var(--space-4);
-            background: transparent;
-            color: var(--accent-cyan);
-            border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius);
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-family: inherit;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
             align-self: flex-end;
         }
-        .input-bar__send:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .input-bar__send:active:not(:disabled) { transform: scale(0.97); }
-        .input-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
-        .input-bar__send-icon { font-size: var(--text-xxs); }
 
         /* Mobile: tighter input bar */
         @media (max-width: 767px) {

@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { SecurityOverviewComponent } from './security-overview.component';
 import { WalletViewerComponent } from './wallet-viewer.component';
 import { SpendingComponent } from './spending.component';
@@ -12,31 +13,15 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
 @Component({
     selector: 'app-settings-security',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SecurityOverviewComponent, WalletViewerComponent, SpendingComponent],
+    imports: [SecurityOverviewComponent, WalletViewerComponent, SpendingComponent, MatButtonToggleModule],
     template: `
         <div class="settings-section">
-            <div class="settings-section__nav" role="tablist" aria-label="Security sections">
-                <button
-                    class="settings-section__btn"
-                    [class.settings-section__btn--active]="section() === 'overview'"
-                    (click)="section.set('overview')"
-                    role="tab">
-                    Security
-                </button>
-                <button
-                    class="settings-section__btn"
-                    [class.settings-section__btn--active]="section() === 'wallets'"
-                    (click)="section.set('wallets')"
-                    role="tab">
-                    Wallets
-                </button>
-                <button
-                    class="settings-section__btn"
-                    [class.settings-section__btn--active]="section() === 'spending'"
-                    (click)="section.set('spending')"
-                    role="tab">
-                    Spending
-                </button>
+            <div class="settings-section__nav" aria-label="Security sections">
+                <mat-button-toggle-group [value]="section()" (change)="section.set($event.value)" hideSingleSelectionIndicator>
+                    <mat-button-toggle value="overview">Security</mat-button-toggle>
+                    <mat-button-toggle value="wallets">Wallets</mat-button-toggle>
+                    <mat-button-toggle value="spending">Spending</mat-button-toggle>
+                </mat-button-toggle-group>
             </div>
             <div class="settings-section__content">
                 @switch (section()) {
@@ -54,8 +39,6 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
             height: 100%;
         }
         .settings-section__nav {
-            display: flex;
-            gap: clamp(var(--space-2), 1vw, var(--space-4));
             padding: var(--space-2) clamp(var(--space-3), 2vw, var(--space-5));
             border-bottom: 1px solid var(--border-subtle);
             background: rgba(12, 13, 20, 0.15);
@@ -66,31 +49,6 @@ type SecuritySection = 'overview' | 'wallets' | 'spending';
             margin-bottom: var(--space-5);
         }
         .settings-section__nav::-webkit-scrollbar { display: none; }
-        .settings-section__btn {
-            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
-            font-size: var(--text-base);
-            font-weight: 600;
-            font-family: var(--font-body);
-            letter-spacing: 0.02em;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 100px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s, background 0.15s;
-            border-radius: var(--radius) var(--radius) 0 0;
-            min-height: 44px;
-        }
-        .settings-section__btn:hover {
-            color: var(--text-primary);
-            background: var(--bg-hover);
-        }
-        .settings-section__btn--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-dim);
-            border-color: rgba(0, 229, 255, 0.3);
-        }
         .settings-section__content {
             flex: 1;
             overflow-y: auto;

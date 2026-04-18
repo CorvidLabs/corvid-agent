@@ -7,6 +7,11 @@ import {
     OnInit,
     OnDestroy,
 } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { ViewModeService } from '../../core/services/view-mode.service';
 import { ViewModeToggleComponent, type ViewMode } from '../../shared/components/view-mode-toggle.component';
@@ -36,7 +41,7 @@ type SortKey = 'date' | 'name' | 'author';
 @Component({
     selector: 'app-library',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe, PageShellComponent],
+    imports: [ViewModeToggleComponent, Library3DComponent, MarkdownPipe, PageShellComponent, MatButtonToggleModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule],
     template: `
         <app-page-shell title="Library" icon="library">
             <app-view-mode-toggle actions
@@ -56,37 +61,29 @@ type SortKey = 'date' | 'name' | 'author';
 
             @if (viewMode() === 'basic') {
                 <!-- Category filter tabs -->
-                <div class="library__tabs" role="tablist">
-                    @for (cat of categories; track cat.key) {
-                        <button
-                            class="library__tab"
-                            [class.library__tab--active]="activeCategory() === cat.key"
-                            (click)="selectCategory(cat.key)"
-                            role="tab"
-                            [attr.aria-selected]="activeCategory() === cat.key">
-                            {{ cat.label }}
-                        </button>
-                    }
+                <div class="library__tabs">
+                    <mat-button-toggle-group [value]="activeCategory()" (change)="selectCategory($event.value)" hideSingleSelectionIndicator>
+                        @for (cat of categories; track cat.key) {
+                            <mat-button-toggle [value]="cat.key">{{ cat.label }}</mat-button-toggle>
+                        }
+                    </mat-button-toggle-group>
                 </div>
 
                 <!-- Search + Sort row -->
                 <div class="library__toolbar">
-                    <input
-                        class="library__search"
-                        type="text"
-                        placeholder="Search by title, key, or tags..."
-                        [value]="searchQuery()"
-                        (input)="onSearch($event)" />
-                    <div class="library__sort-buttons">
+                    <mat-form-field appearance="outline" class="library__search-field" subscriptSizing="dynamic">
+                        <mat-icon matPrefix>search</mat-icon>
+                        <input matInput
+                            type="text"
+                            placeholder="Search by title, key, or tags..."
+                            [value]="searchQuery()"
+                            (input)="onSearch($event)" />
+                    </mat-form-field>
+                    <mat-button-toggle-group [value]="sortKey()" (change)="sortKey.set($event.value)" hideSingleSelectionIndicator class="library__sort-buttons">
                         @for (s of sortOptions; track s.key) {
-                            <button
-                                class="library__sort-btn"
-                                [class.library__sort-btn--active]="sortKey() === s.key"
-                                (click)="sortKey.set(s.key)">
-                                {{ s.label }}
-                            </button>
+                            <mat-button-toggle [value]="s.key">{{ s.label }}</mat-button-toggle>
                         }
-                    </div>
+                    </mat-button-toggle-group>
                 </div>
 
                 <!-- Stats bar -->
@@ -106,7 +103,7 @@ type SortKey = 'date' | 'name' | 'author';
                         <span class="library__filter-label">Tag:</span>
                         <span class="library__filter-chip">
                             {{ activeTag() }}
-                            <button class="library__filter-clear" (click)="clearTagFilter()">&#x2715;</button>
+                            <button mat-icon-button (click)="clearTagFilter()" class="library__filter-clear" aria-label="Clear filter"><mat-icon>close</mat-icon></button>
                         </span>
                     </div>
                 }
@@ -166,24 +163,23 @@ type SortKey = 'date' | 'name' | 'author';
                             <div class="library__search-panel-header">
                                 <span class="library__search-panel-title">Search Library</span>
                                 <span class="library__search-panel-count">{{ searchResults().length }} entries</span>
-                                <button class="library__overlay-close" (click)="closeSearch()">&#x2715;</button>
+                                <button mat-icon-button (click)="closeSearch()" aria-label="Close search"><mat-icon>close</mat-icon></button>
                             </div>
-                            <input
-                                class="library__search library__search--panel"
-                                type="text"
-                                placeholder="Search by title, tags, or content..."
-                                [value]="orbSearchQuery()"
-                                (input)="onOrbSearch($event)"
-                                autofocus />
+                            <mat-form-field appearance="outline" class="library__search-field" subscriptSizing="dynamic">
+                                <mat-icon matPrefix>search</mat-icon>
+                                <input matInput
+                                    type="text"
+                                    placeholder="Search by title, tags, or content..."
+                                    [value]="orbSearchQuery()"
+                                    (input)="onOrbSearch($event)"
+                                    autofocus />
+                            </mat-form-field>
                             <div class="library__search-panel-tabs">
-                                @for (cat of categories; track cat.key) {
-                                    <button
-                                        class="library__tab"
-                                        [class.library__tab--active]="orbSearchCategory() === cat.key"
-                                        (click)="orbSearchCategory.set(cat.key)">
-                                        {{ cat.label }}
-                                    </button>
-                                }
+                                <mat-button-toggle-group [value]="orbSearchCategory()" (change)="orbSearchCategory.set($event.value)" hideSingleSelectionIndicator>
+                                    @for (cat of categories; track cat.key) {
+                                        <mat-button-toggle [value]="cat.key">{{ cat.label }}</mat-button-toggle>
+                                    }
+                                </mat-button-toggle-group>
                             </div>
                             <div class="library__search-results">
                                 @for (entry of searchResults(); track entry.id) {
@@ -236,7 +232,7 @@ type SortKey = 'date' | 'name' | 'author';
                             } @else {
                                 <span class="library__overlay-type">Note</span>
                             }
-                            <button class="library__overlay-close" (click)="clearSelection()">&#x2715;</button>
+                            <button mat-icon-button (click)="clearSelection()" aria-label="Close"><mat-icon>close</mat-icon></button>
                         </div>
                         <div class="library__overlay-meta">
                             {{ selectedEntry()!.authorName }} · {{ formatDate(selectedEntry()!.updatedAt) }}
@@ -293,35 +289,8 @@ type SortKey = 'date' | 'name' | 'author';
         }
 
         .library__tabs {
-            display: flex;
-            gap: 0;
             margin-bottom: 0.75rem;
-            background: var(--glass-bg-solid);
-            border: 1px solid var(--border-subtle);
-            border-radius: 6px;
             overflow-x: auto;
-        }
-        .library__tab {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.72rem;
-            font-weight: 600;
-            font-family: inherit;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: color 0.15s, background 0.15s;
-            white-space: nowrap;
-        }
-        .library__tab:hover {
-            color: var(--text-primary);
-            background: var(--bg-hover);
-        }
-        .library__tab--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-subtle);
         }
         .library__toolbar {
             display: flex;
@@ -329,49 +298,11 @@ type SortKey = 'date' | 'name' | 'author';
             margin-bottom: 0.75rem;
             align-items: center;
         }
-        .library__search {
+        .library__search-field {
             flex: 1;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem;
-            font-family: inherit;
-            background: var(--input-bg);
-            border: 1px solid var(--border-subtle);
-            border-radius: 6px;
-            color: var(--text-primary);
-            outline: none;
-            transition: border-color 0.15s;
-        }
-        .library__search:focus {
-            border-color: var(--accent-cyan);
         }
         .library__sort-buttons {
-            display: flex;
-            gap: 0;
-            background: var(--glass-bg-solid);
-            border: 1px solid var(--border-subtle);
-            border-radius: 6px;
             flex-shrink: 0;
-        }
-        .library__sort-btn {
-            padding: 0.4rem 0.6rem;
-            font-size: 0.68rem;
-            font-weight: 600;
-            font-family: inherit;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: color 0.15s, background 0.15s;
-            white-space: nowrap;
-        }
-        .library__sort-btn:hover {
-            color: var(--text-primary);
-        }
-        .library__sort-btn--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-subtle);
         }
         .library__stats {
             display: flex;
@@ -610,20 +541,6 @@ type SortKey = 'date' | 'name' | 'author';
             color: var(--text-primary);
             flex: 1;
         }
-        .library__overlay-close {
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        .library__overlay-close:hover {
-            color: var(--text-primary);
-            border-color: var(--border-bright);
-        }
         .library__overlay-meta {
             font-size: 0.72rem;
             color: var(--text-secondary);
@@ -719,17 +636,9 @@ type SortKey = 'date' | 'name' | 'author';
             font-weight: 600;
         }
         .library__filter-clear {
-            background: transparent;
-            border: none;
-            color: var(--accent-purple);
-            cursor: pointer;
-            font-size: 0.6rem;
-            padding: 0 2px;
-            font-family: inherit;
-            line-height: 1;
-        }
-        .library__filter-clear:hover {
-            color: var(--text-primary);
+            --mdc-icon-button-icon-size: 14px;
+            width: 24px;
+            height: 24px;
         }
 
         /* Page navigation */
@@ -885,15 +794,7 @@ type SortKey = 'date' | 'name' | 'author';
             font-size: 0.65rem;
             color: var(--text-secondary);
         }
-        .library__search--panel {
-            margin-bottom: 0;
-        }
         .library__search-panel-tabs {
-            display: flex;
-            gap: 0;
-            background: var(--glass-bg-solid);
-            border: 1px solid var(--border-subtle);
-            border-radius: 6px;
             overflow-x: auto;
         }
         .library__search-results {

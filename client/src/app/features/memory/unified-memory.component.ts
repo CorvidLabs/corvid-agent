@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     signal,
 } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { BrainViewerComponent } from './brain-viewer.component';
 import { MemoryBrowserComponent } from './memory-browser.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
@@ -16,24 +17,10 @@ const STORAGE_KEY = 'memory_view_mode';
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <app-page-shell title="Memory" icon="memory">
-            <div actions class="unified-memory__modes" role="tablist" aria-label="Memory view mode">
-                <button
-                    class="unified-memory__mode-btn"
-                    [class.unified-memory__mode-btn--active]="view() === 'overview'"
-                    (click)="setView('overview')"
-                    role="tab"
-                    [attr.aria-selected]="view() === 'overview'">
-                    Overview
-                </button>
-                <button
-                    class="unified-memory__mode-btn"
-                    [class.unified-memory__mode-btn--active]="view() === 'browse'"
-                    (click)="setView('browse')"
-                    role="tab"
-                    [attr.aria-selected]="view() === 'browse'">
-                    Browse
-                </button>
-            </div>
+            <mat-button-toggle-group actions [value]="view()" (change)="setView($event.value)" hideSingleSelectionIndicator aria-label="Memory view mode">
+                <mat-button-toggle value="overview">Overview</mat-button-toggle>
+                <mat-button-toggle value="browse">Browse</mat-button-toggle>
+            </mat-button-toggle-group>
             <div class="unified-memory__content">
                 @switch (view()) {
                     @case ('overview') {
@@ -47,48 +34,12 @@ const STORAGE_KEY = 'memory_view_mode';
         </app-page-shell>
     `,
     styles: `
-        .unified-memory__modes {
-            display: flex;
-            gap: 0;
-            background: var(--glass-bg-solid);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-        .unified-memory__mode-btn {
-            padding: 0.35rem 0.85rem;
-            font-size: 0.72rem;
-            font-weight: 600;
-            font-family: inherit;
-            letter-spacing: 0.03em;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: color 0.15s, background 0.15s;
-        }
-        .unified-memory__mode-btn:hover {
-            color: var(--text-primary);
-            background: var(--bg-hover);
-        }
-        .unified-memory__mode-btn--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-subtle);
-            text-shadow: 0 0 8px var(--accent-cyan-border);
-        }
         .unified-memory__content {
             flex: 1;
             overflow-y: auto;
         }
-
-        @media (max-width: 767px) {
-            .unified-memory__mode-btn {
-                padding: 0.3rem 0.65rem;
-                font-size: 0.68rem;
-            }
-        }
     `,
-    imports: [BrainViewerComponent, MemoryBrowserComponent, PageShellComponent],
+    imports: [BrainViewerComponent, MemoryBrowserComponent, PageShellComponent, MatButtonToggleModule],
 })
 export class UnifiedMemoryComponent {
     readonly view = signal<MemoryView>(this.loadView());

@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { SessionService } from '../../core/services/session.service';
@@ -46,20 +47,16 @@ interface OperationalMode {
         SettingsSecurityComponent,
         SettingsAccessComponent,
         SettingsIntegrationsComponent,
+        MatButtonToggleModule,
     ],
     template: `
         <div class="settings">
-            <nav class="settings__tabs" role="tablist" aria-label="Settings sections">
-                @for (tab of tabs; track tab.id) {
-                    <button
-                        class="settings__tab"
-                        [class.settings__tab--active]="activeTab() === tab.id"
-                        (click)="setTab(tab.id)"
-                        role="tab"
-                        [attr.aria-selected]="activeTab() === tab.id">
-                        {{ tab.label }}
-                    </button>
-                }
+            <nav class="settings__tabs" aria-label="Settings sections">
+                <mat-button-toggle-group [value]="activeTab()" (change)="setTab($event.value)" hideSingleSelectionIndicator>
+                    @for (tab of tabs; track tab.id) {
+                        <mat-button-toggle [value]="tab.id">{{ tab.label }}</mat-button-toggle>
+                    }
+                </mat-button-toggle-group>
             </nav>
             <div class="settings__body">
                 @if (loading() && (activeTab() === 'general' || activeTab() === 'channels' || activeTab() === 'ai')) {
@@ -108,8 +105,6 @@ interface OperationalMode {
             overflow: hidden;
         }
         .settings__tabs {
-            display: flex;
-            gap: clamp(var(--space-2), 1vw, var(--space-4));
             padding: var(--space-2) clamp(var(--space-3), 3vw, var(--space-8));
             border-bottom: 1px solid var(--border-subtle);
             background: rgba(12, 13, 20, 0.3);
@@ -118,30 +113,6 @@ interface OperationalMode {
             flex-shrink: 0;
         }
         .settings__tabs::-webkit-scrollbar { display: none; }
-        .settings__tab {
-            padding: var(--space-3) clamp(var(--space-3), 1.5vw, var(--space-6));
-            font-size: var(--text-base);
-            font-weight: 600;
-            font-family: var(--font-body);
-            letter-spacing: 0.02em;
-            background: transparent;
-            border: none;
-            border-radius: 8px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            white-space: nowrap;
-            transition: color 0.15s, border-color 0.15s, background 0.15s;
-            border-radius: var(--radius) var(--radius) 0 0;
-            min-height: clamp(48px, 4vw, 56px);
-        }
-        .settings__tab:hover {
-            color: var(--text-primary);
-            background: var(--bg-hover);
-        }
-        .settings__tab--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-dim);
-        }
         .settings__body {
             flex: 1;
             overflow-y: auto;
