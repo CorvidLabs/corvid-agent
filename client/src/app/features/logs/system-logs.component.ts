@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal }
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
@@ -35,22 +36,13 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="System Logs" icon="logs">
-            <!-- Tab bar -->
-            <div class="tabs">
-                <button
-                    class="tab-btn"
-                    [class.tab-btn--active]="activeTab() === 'logs'"
-                    (click)="switchTab('logs')"
-                >Event Logs</button>
-                <button
-                    class="tab-btn"
-                    [class.tab-btn--active]="activeTab() === 'credits'"
-                    (click)="switchTab('credits')"
-                >Credit Transactions</button>
-            </div>
+            <mat-button-toggle-group [value]="activeTab()" (change)="switchTab($event.value)" aria-label="Log type">
+                <mat-button-toggle value="logs">Event Logs</mat-button-toggle>
+                <mat-button-toggle value="credits">Credit Transactions</mat-button-toggle>
+            </mat-button-toggle-group>
 
             @if (activeTab() === 'logs') {
                 <!-- Search & Controls -->
@@ -162,27 +154,7 @@ interface CreditTransaction {
         .loading { color: var(--text-secondary); }
         .empty { text-align: center; padding: var(--space-12); color: var(--text-tertiary); }
 
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 0.35rem;
-            margin-bottom: 1rem;
-        }
-        .tab-btn {
-            padding: 0.45rem var(--space-4);
-            min-height: 32px;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            font-family: inherit;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .tab-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .tab-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+        mat-button-toggle-group { margin-bottom: 1rem; }
 
         /* Toolbar */
         .log-toolbar {

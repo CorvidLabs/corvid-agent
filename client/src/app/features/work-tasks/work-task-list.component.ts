@@ -257,8 +257,6 @@ import { MatIconModule } from '@angular/material/icon';
         }
         .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
-        .tasks__filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; }
-
         .tasks__search-row {
             display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
         }
