@@ -1,6 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
@@ -40,7 +43,7 @@ interface CreditTransaction {
 @Component({
     selector: 'app-spending',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, SkeletonComponent],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, DecimalPipe, SkeletonComponent],
     template: `
         <div class="spending">
             <h2>Spending Controls</h2>
@@ -87,9 +90,9 @@ interface CreditTransaction {
                                         <span class="progress-text">{{ getUsagePercent(info) | number:'1.0-0' }}%</span>
                                     </td>
                                     <td>
-                                        <button class="btn btn--sm" (click)="editCap(info)">Edit</button>
+                                        <button mat-stroked-button (click)="editCap(info)">Edit</button>
                                         @if (!info.cap.isDefault) {
-                                            <button class="btn btn--sm btn--danger" (click)="removeCap(info.agentId)">Remove</button>
+                                            <button mat-stroked-button color="warn" (click)="removeCap(info.agentId)">Remove</button>
                                         }
                                     </td>
                                 </tr>
@@ -105,19 +108,21 @@ interface CreditTransaction {
                         <div class="modal" (click)="$event.stopPropagation()">
                             <h3>Set Spending Cap: {{ editingAgent()?.agentName }}</h3>
                             <div class="form-group">
-                                <label>Daily ALGO Limit</label>
-                                <input
-                                    type="number"
-                                    [ngModel]="editAlgoLimit()"
-                                    (ngModelChange)="editAlgoLimit.set($event)"
-                                    min="0"
-                                    step="0.1"
-                                    class="input" />
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Daily ALGO Limit</mat-label>
+                                    <input
+                                        matInput
+                                        type="number"
+                                        [ngModel]="editAlgoLimit()"
+                                        (ngModelChange)="editAlgoLimit.set($event)"
+                                        min="0"
+                                        step="0.1" />
+                                </mat-form-field>
                                 <small>Set to 0 for unlimited</small>
                             </div>
                             <div class="modal__actions">
-                                <button class="btn" (click)="saveCap()">Save</button>
-                                <button class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+                                <button mat-flat-button color="primary" (click)="saveCap()">Save</button>
+                                <button mat-stroked-button (click)="cancelEdit()">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -184,8 +189,7 @@ interface CreditTransaction {
         .badge--reserve { background: var(--accent-amber-dim); color: var(--accent-amber); }
         .badge--release, .badge--refund { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .txid { font-family: var(--font-mono); font-size: var(--text-sm); }
-        .btn--sm { padding: var(--space-2) var(--space-4); font-size: var(--text-sm); min-height: 40px; }
-        .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .full-width { width: 100%; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         .modal { background: var(--bg-surface); padding: clamp(var(--space-5), 3vw, var(--space-8)); border-radius: var(--radius-xl); min-width: 360px; max-width: min(90vw, 520px); border: 1px solid var(--border-bright); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px var(--accent-cyan-tint); }
         .modal h3 { margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--text-xl); }

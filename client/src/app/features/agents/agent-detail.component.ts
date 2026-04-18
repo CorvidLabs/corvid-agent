@@ -2,6 +2,12 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, O
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatChipsModule } from '@angular/material/chips';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
@@ -31,30 +37,29 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 @Component({
     selector: 'app-agent-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
+    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, MatButtonModule, MatTabsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatChipsModule, StatusBadgeComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
     template: `
         @if (agent(); as a) {
             <app-page-shell [title]="a.name" icon="agents" [subtitle]="a.description"
                 [breadcrumbs]="[{label: 'Agents', route: '/agents'}, {label: a.name}]">
                 <ng-container actions>
-                    <a class="btn btn--secondary" [routerLink]="['/agents', a.id, 'edit']">Edit</a>
-                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                    <a mat-stroked-button [routerLink]="['/agents', a.id, 'edit']">Edit</a>
+                    <button mat-stroked-button color="warn" (click)="onDelete()">Delete</button>
                 </ng-container>
 
                 <!-- Tabs -->
-                <div class="tabs">
+                <mat-tab-group (selectedIndexChange)="onTabChange($event)" [selectedIndex]="tabIndex()">
                     @for (tab of tabs; track tab.key) {
-                        <button
-                            class="tab"
-                            [class.tab--active]="activeTab() === tab.key"
-                            (click)="activeTab.set(tab.key)">
-                            {{ tab.label }}
-                            @if (tab.count !== undefined && tab.count > 0) {
-                                <span class="tab__count">{{ tab.count }}</span>
-                            }
-                        </button>
+                        <mat-tab>
+                            <ng-template mat-tab-label>
+                                {{ tab.label }}
+                                @if (tab.count !== undefined && tab.count > 0) {
+                                    <span class="tab__count">{{ tab.count }}</span>
+                                }
+                            </ng-template>
+                        </mat-tab>
                     }
-                </div>
+                </mat-tab-group>
 
                 <!-- Overview Tab -->
                 @if (activeTab() === 'overview') {
@@ -176,20 +181,20 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
 
                     <div class="invoke-form">
                         <h4>Invoke Another Agent</h4>
-                        <select class="invoke-select" [(ngModel)]="invokeTargetId" aria-label="Select target agent">
-                            <option value="" disabled>Select target agent...</option>
-                            @for (other of otherAgents(); track other.id) {
-                                <option [value]="other.id">{{ other.name }}</option>
-                            }
-                        </select>
-                        <textarea
-                            class="invoke-textarea"
-                            [(ngModel)]="invokeContent"
-                            placeholder="Message content..."
-                            rows="3"
-                        ></textarea>
-                        <button
-                            class="btn btn--primary"
+                        <mat-form-field appearance="outline">
+                            <mat-label>Target Agent</mat-label>
+                            <mat-select [(ngModel)]="invokeTargetId">
+                                @for (other of otherAgents(); track other.id) {
+                                    <mat-option [value]="other.id">{{ other.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                        <mat-form-field appearance="outline">
+                            <mat-label>Message</mat-label>
+                            <textarea matInput [(ngModel)]="invokeContent"
+                                placeholder="Message content..." rows="3"></textarea>
+                        </mat-form-field>
+                        <button mat-flat-button color="primary"
                             [disabled]="!invokeTargetId || !invokeContent || invoking()"
                             (click)="onInvoke()"
                         >{{ invoking() ? 'Sending...' : 'Send Message' }}</button>
@@ -199,14 +204,13 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                 <!-- Work Tasks Tab -->
                 @if (activeTab() === 'work-tasks') {
                     <div class="work-form">
-                        <textarea
-                            class="invoke-textarea"
-                            [(ngModel)]="workDescription"
-                            placeholder="Describe the task (e.g. 'Fix the login button alignment')..."
-                            rows="3"
-                        ></textarea>
-                        <button
-                            class="btn btn--primary"
+                        <mat-form-field appearance="outline">
+                            <mat-label>Task Description</mat-label>
+                            <textarea matInput [(ngModel)]="workDescription"
+                                placeholder="Describe the task (e.g. 'Fix the login button alignment')..."
+                                rows="3"></textarea>
+                        </mat-form-field>
+                        <button mat-flat-button color="primary"
                             [disabled]="!workDescription || creatingWork()"
                             (click)="onCreateWork()"
                         >{{ creatingWork() ? 'Starting...' : 'Start Work Task' }}</button>
@@ -237,7 +241,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                                         <a class="work-task-row__session" [routerLink]="['/sessions', task.sessionId]">View Session</a>
                                     }
                                     @if (task.status === 'running' || task.status === 'branching') {
-                                        <button class="btn btn--danger btn--sm" (click)="onCancelWork(task.id)">Cancel</button>
+                                        <button mat-stroked-button color="warn" (click)="onCancelWork(task.id)">Cancel</button>
                                     }
                                 </div>
                             }
@@ -275,10 +279,10 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                                 }
                             </div>
                             <div class="flock-profile__actions">
-                                <button class="btn btn--secondary btn--sm" [disabled]="sendingHeartbeat()" (click)="sendHeartbeat()">
+                                <button mat-stroked-button [disabled]="sendingHeartbeat()" (click)="sendHeartbeat()">
                                     {{ sendingHeartbeat() ? 'Sending...' : 'Send Heartbeat' }}
                                 </button>
-                                <button class="btn btn--secondary btn--sm" [disabled]="runningTest() || isTestOnCooldown()" (click)="runFlockTest()">
+                                <button mat-stroked-button [disabled]="runningTest() || isTestOnCooldown()" (click)="runFlockTest()">
                                     @if (runningTest()) {
                                         Testing...
                                     } @else if (isTestOnCooldown()) {
@@ -307,7 +311,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                             @if (!a.walletAddress) {
                                 <p class="flock-register__hint" style="color: var(--color-warning)">This agent needs a wallet before it can register.</p>
                             }
-                            <button class="btn btn--primary" [disabled]="registeringFlock() || !a.walletAddress" (click)="registerInFlock()">
+                            <button mat-flat-button color="primary" [disabled]="registeringFlock() || !a.walletAddress" (click)="registerInFlock()">
                                 {{ registeringFlock() ? 'Registering...' : 'Register in Flock' }}
                             </button>
                         </div>
@@ -331,7 +335,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                                 <p class="persona-info__text"><strong>Background:</strong> {{ p.background }}</p>
                             }
                         </div>
-                        <button class="btn btn--secondary btn--sm" routerLink="/agents/personas">Edit Persona</button>
+                        <button mat-stroked-button routerLink="/agents/personas">Edit Persona</button>
                     } @else {
                         <p class="detail__empty">No persona configured. <a routerLink="/agents/personas">Configure one</a></p>
                     }
@@ -340,13 +344,15 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                 <!-- Skills Tab -->
                 @if (activeTab() === 'skills') {
                     <div class="skills-assign">
-                        <select class="skills-assign__select" #bundleSelect>
-                            <option value="">Add a skill bundle...</option>
-                            @for (b of availableBundles(); track b.id) {
-                                <option [value]="b.id">{{ b.name }}</option>
-                            }
-                        </select>
-                        <button class="skills-assign__btn" (click)="assignBundle(bundleSelect.value); bundleSelect.value = ''" [disabled]="!bundleSelect.value">Add</button>
+                        <mat-form-field appearance="outline" class="skills-assign__select">
+                            <mat-label>Add a skill bundle</mat-label>
+                            <mat-select #bundleSelect>
+                                @for (b of availableBundles(); track b.id) {
+                                    <mat-option [value]="b.id">{{ b.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                        <button mat-flat-button color="primary" (click)="assignBundle(bundleSelect.value); bundleSelect.value = ''" [disabled]="!bundleSelect.value">Add</button>
                     </div>
                     @if (agentBundles().length === 0) {
                         <p class="detail__empty">No skill bundles assigned. <a routerLink="/agents/skill-bundles">Manage bundles</a></p>
@@ -371,20 +377,12 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
     `,
     styles: `
         /* Tabs */
-        .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
-        .tab {
-            padding: var(--space-2) var(--space-4); background: transparent; border: none; border-bottom: 2px solid transparent;
-            color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; font-family: inherit;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
-            white-space: nowrap; display: flex; align-items: center; gap: 0.35rem;
-        }
-        .tab:hover { color: var(--text-primary); }
-        .tab--active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
         .tab__count {
             font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-tertiary); border: 1px solid var(--border);
+            margin-left: 0.35rem;
         }
-        .tab--active .tab__count { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        mat-tab-group { margin-bottom: 1.5rem; }
 
         /* Stats Row */
         .stats-row {
@@ -417,21 +415,6 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .cost-bar-row__bar { height: 100%; background: linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan)); border-radius: 2px; min-width: 1px; transition: width 0.3s; }
         .cost-bar-row__value { width: 64px; flex-shrink: 0; font-size: 0.6rem; color: var(--accent-green); text-align: right; }
 
-        /* Shared styles from original */
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
-        }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
-        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
-        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; margin-top: 0.5rem; }
-
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .detail__info dd { margin: 0; color: var(--text-primary); }
@@ -458,13 +441,12 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .message-row__response { margin: 0.25rem 0; color: var(--accent-cyan); font-style: italic; font-size: 0.85rem; }
         .message-row__session { font-size: 0.75rem; color: var(--accent-cyan); text-decoration: none; }
 
-        .invoke-form { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 500px; }
-        .invoke-form h4 { margin: 0; color: var(--text-primary); }
-        .invoke-select, .invoke-textarea { padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
-        .invoke-select:focus, .invoke-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .invoke-textarea { resize: vertical; min-height: 5em; line-height: 1.5; }
+        .invoke-form { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem; max-width: 500px; }
+        .invoke-form h4 { margin: 0 0 0.5rem; color: var(--text-primary); }
+        .invoke-form mat-form-field { width: 100%; }
 
-        .work-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 500px; margin-bottom: 1rem; }
+        .work-form { display: flex; flex-direction: column; gap: 0.25rem; max-width: 500px; margin-bottom: 1rem; }
+        .work-form mat-form-field { width: 100%; }
         .work-tasks-list { display: flex; flex-direction: column; gap: 0.75rem; }
         .work-task-row { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3); }
         .work-task-row__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
@@ -484,10 +466,8 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .persona-info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
         .persona-info dd { margin: 0; color: var(--text-primary); }
         .persona-info__text { font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0; }
-        .skills-assign { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-        .skills-assign__select { flex: 1; padding: 0.4rem var(--space-2); background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); font-size: 0.8rem; }
-        .skills-assign__btn { padding: 0.4rem var(--space-4); background: var(--accent-cyan); color: var(--bg-primary); border: none; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; }
-        .skills-assign__btn:disabled { opacity: 0.4; cursor: default; }
+        .skills-assign { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+        .skills-assign__select { flex: 1; }
         .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .skill-tag { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
         .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0.2rem 0.3rem; min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.6; }
@@ -565,6 +545,8 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly testCooldownUntil = signal<string | null>(null);
     protected readonly lastTestScore = signal<number | null>(null);
     protected readonly activeTab = signal<Tab>('overview');
+    private readonly tabKeys: Tab[] = ['overview', 'sessions', 'messages', 'work-tasks', 'flock', 'persona', 'skills'];
+    protected readonly tabIndex = computed(() => this.tabKeys.indexOf(this.activeTab()));
 
     protected invokeTargetId = '';
     protected invokeContent = '';
@@ -802,6 +784,10 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         const until = this.testCooldownUntil();
         if (!until) return false;
         return new Date(until).getTime() > Date.now();
+    }
+
+    protected onTabChange(index: number): void {
+        this.activeTab.set(this.tabKeys[index] ?? 'overview');
     }
 
     async onDelete(): Promise<void> {

@@ -1,6 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatChipsModule } from '@angular/material/chips';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
@@ -25,20 +30,16 @@ interface CouncilCard {
 @Component({
     selector: 'app-council-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
+    imports: [RouterLink, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatChipsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
     template: `
         <app-page-shell title="Councils" icon="councils">
             <ng-container actions>
                 @if (hasTestCouncils()) {
-                    <button
-                        class="btn btn--ghost"
-                        (click)="toggleTestFilter()"
-                        [attr.aria-pressed]="hideTestData()"
-                    >
+                    <button mat-stroked-button (click)="toggleTestFilter()" [attr.aria-pressed]="hideTestData()">
                         {{ hideTestData() ? 'Show all' : 'Hide test data' }}
                     </button>
                 }
-                <a class="btn btn--primary" routerLink="/sessions/councils/new">New Council</a>
+                <a mat-flat-button color="primary" routerLink="/sessions/councils/new">New Council</a>
             </ng-container>
 
             @if (councilService.loading()) {
@@ -53,27 +54,28 @@ interface CouncilCard {
                     actionAriaLabel="Create your first multi-agent council" />
             } @else {
                 <!-- Search & Filters -->
-                <div class="search-bar">
-                    <input
-                        class="search-input"
-                        placeholder="Search councils..."
-                        [(ngModel)]="searchQuery"
+                <mat-form-field appearance="outline" class="search-field">
+                    <mat-label>Search councils</mat-label>
+                    <input matInput [(ngModel)]="searchQuery"
                         (input)="searchQuery = $any($event.target).value; currentPage.set(1)" />
-                </div>
+                </mat-form-field>
                 <div class="filters">
-                    <div class="filter-group">
-                        <button class="filter-chip" [class.filter-chip--active]="filterStage() === null" (click)="filterStage.set(null); currentPage.set(1)">All</button>
+                    <mat-chip-set class="filter-group">
+                        <mat-chip-option [selected]="filterStage() === null" (click)="filterStage.set(null); currentPage.set(1)">All</mat-chip-option>
                         @for (stage of stageOptions; track stage) {
-                            <button class="filter-chip" [class.filter-chip--active]="filterStage() === stage" (click)="filterStage.set(filterStage() === stage ? null : stage); currentPage.set(1)">{{ stage }}</button>
+                            <mat-chip-option [selected]="filterStage() === stage" (click)="filterStage.set(filterStage() === stage ? null : stage); currentPage.set(1)">{{ stage }}</mat-chip-option>
                         }
-                    </div>
+                    </mat-chip-set>
                     <div class="sort-group">
-                        <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event" aria-label="Sort councils by">
-                            <option value="name">Sort: Name</option>
-                            <option value="updated">Sort: Updated</option>
-                            <option value="lastLaunch">Sort: Last Launch</option>
-                            <option value="members">Sort: Members</option>
-                        </select>
+                        <mat-form-field appearance="outline" class="sort-field">
+                            <mat-label>Sort by</mat-label>
+                            <mat-select [(ngModel)]="sortBy">
+                                <mat-option value="name">Name</mat-option>
+                                <mat-option value="updated">Updated</mat-option>
+                                <mat-option value="lastLaunch">Last Launch</mat-option>
+                                <mat-option value="members">Members</mat-option>
+                            </mat-select>
+                        </mat-form-field>
                     </div>
                 </div>
 
@@ -136,9 +138,9 @@ interface CouncilCard {
                     <!-- Pagination -->
                     @if (totalPages() > 1) {
                         <div class="pagination">
-                            <button class="pagination__btn" [disabled]="currentPage() === 1" (click)="currentPage.set(currentPage() - 1)">&laquo; Prev</button>
+                            <button mat-stroked-button [disabled]="currentPage() === 1" (click)="currentPage.set(currentPage() - 1)">Prev</button>
                             <span class="pagination__info">{{ currentPage() }} / {{ totalPages() }}</span>
-                            <button class="pagination__btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.set(currentPage() + 1)">Next &raquo;</button>
+                            <button mat-stroked-button [disabled]="currentPage() === totalPages()" (click)="currentPage.set(currentPage() + 1)">Next</button>
                         </div>
                     }
                 }
@@ -146,51 +148,12 @@ interface CouncilCard {
         </app-page-shell>
     `,
     styles: `
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
-        .btn--ghost:hover { border-color: var(--text-tertiary); color: var(--text-primary); }
-        .loading { color: var(--text-tertiary); font-size: 0.85rem; }
-
-        /* Search */
-        .search-bar { margin-bottom: 0.75rem; }
-        .search-input {
-            width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-            box-sizing: border-box;
-        }
-        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-
-        /* Filters */
+        .search-field { width: 100%; margin-bottom: 0.5rem; }
         .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
-        .filter-group { display: flex; gap: 0.25rem; }
-        .filter-chip {
-            padding: 0.4rem 0.75rem; min-height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-            cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: inline-flex; align-items: center;
-        }
-        .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .filter-group { flex: 1; }
         .sort-group { margin-left: auto; }
-        .sort-select {
-            padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-        }
-        .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
-
-        /* Pagination */
+        .sort-field { width: 160px; }
         .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
-        .pagination__btn {
-            padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit; cursor: pointer;
-        }
-        .pagination__btn:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .pagination__btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .pagination__info { font-size: 0.7rem; color: var(--text-tertiary); }
 
         .empty-filtered { color: var(--text-tertiary); font-size: 0.85rem; }

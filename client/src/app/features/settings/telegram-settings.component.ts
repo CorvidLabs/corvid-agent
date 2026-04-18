@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
@@ -13,7 +17,7 @@ interface TelegramConfig {
 @Component({
     selector: 'app-telegram-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         @if (telegramEnabled()) {
             <div class="settings__section">
@@ -28,34 +32,37 @@ interface TelegramConfig {
                     <div class="tg-grid section-collapse">
                         <!-- Mode -->
                         <div class="tg-field">
-                            <label class="tg-label" for="tg_mode">Bridge Mode</label>
-                            <select class="tg-select" id="tg_mode"
-                                [ngModel]="telegramValues()['mode'] ?? telegramConfig()?.mode ?? 'chat'"
-                                (ngModelChange)="setTelegramValue('mode', $event)">
-                                <option value="chat">Chat</option>
-                                <option value="work_intake">Work Intake</option>
-                            </select>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Bridge Mode</mat-label>
+                                <mat-select
+                                    [ngModel]="telegramValues()['mode'] ?? telegramConfig()?.mode ?? 'chat'"
+                                    (selectionChange)="setTelegramValue('mode', $event.value)">
+                                    <mat-option value="chat">Chat</mat-option>
+                                    <mat-option value="work_intake">Work Intake</mat-option>
+                                </mat-select>
+                            </mat-form-field>
                             <span class="tg-desc">Chat: interactive sessions. Work Intake: creates work tasks.</span>
                         </div>
 
                         <!-- Allowed Users -->
                         <div class="tg-field tg-field--wide">
-                            <label class="tg-label" for="tg_users">Allowed User IDs</label>
-                            <input class="tg-input" id="tg_users"
-                                [ngModel]="telegramValues()['allowed_user_ids'] ?? telegramConfig()?.allowed_user_ids ?? ''"
-                                (ngModelChange)="setTelegramValue('allowed_user_ids', $event)"
-                                placeholder="Telegram user IDs, comma-separated (empty = allow all)" />
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Allowed User IDs</mat-label>
+                                <input matInput
+                                    [ngModel]="telegramValues()['allowed_user_ids'] ?? telegramConfig()?.allowed_user_ids ?? ''"
+                                    (ngModelChange)="setTelegramValue('allowed_user_ids', $event)"
+                                    placeholder="Telegram user IDs, comma-separated (empty = allow all)" />
+                            </mat-form-field>
                             <span class="tg-desc">Comma-separated Telegram user IDs allowed to interact. Leave empty to allow all users.</span>
                         </div>
                     </div>
                     <div class="tg-actions">
-                        <button
-                            class="save-btn"
+                        <button mat-flat-button color="primary"
                             [disabled]="savingTelegram() || !telegramDirty()"
                             (click)="saveTelegramConfig()"
                         >{{ savingTelegram() ? 'Saving...' : 'Save Telegram Config' }}</button>
                         @if (telegramDirty()) {
-                            <button class="cancel-btn cancel-btn--sm" (click)="resetTelegramChanges()">Discard Changes</button>
+                            <button mat-stroked-button (click)="resetTelegramChanges()">Discard Changes</button>
                         }
                     </div>
                 }
@@ -72,23 +79,8 @@ interface TelegramConfig {
         }
         .tg-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .tg-field--wide { grid-column: 1 / -1; }
-        .tg-label { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
-        .tg-input, .tg-select {
-            padding: 0.55rem 0.65rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            font-family: inherit;
-            width: 100%;
-            min-height: 44px;
-        }
-        .tg-select { cursor: pointer; }
-        .tg-input:focus, .tg-select:focus {
-            border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
-        }
-        .tg-desc { font-size: 0.78rem; color: var(--text-tertiary); }
+        .field { width: 100%; }
+        .tg-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: -0.5rem; }
         .tg-actions { display: flex; gap: 0.5rem; align-items: center; }
         @media (max-width: 600px) { .tg-grid { grid-template-columns: 1fr; } }
     `,

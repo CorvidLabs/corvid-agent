@@ -2,6 +2,10 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, O
 import { ActivatedRoute, Router } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { Subscription } from 'rxjs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -21,7 +25,7 @@ type SessionTab = 'conversation' | 'memory' | 'info';
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, SessionMemoryComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, SessionMemoryComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe, MatButtonModule, MatTabsModule, MatFormFieldModule, MatInputModule],
     template: `
         @if (session(); as s) {
             <div class="session-view">
@@ -42,20 +46,20 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                     </div>
                     <div class="session-view__actions">
                         <div class="export-group">
-                            <button class="btn btn--secondary" (click)="onCopyLog()">
+                            <button mat-stroked-button (click)="onCopyLog()">
                                 {{ logCopied() ? 'Copied!' : 'Copy Log' }}
                             </button>
-                            <button class="btn btn--secondary" (click)="onExportJson()">JSON</button>
-                            <button class="btn btn--secondary" (click)="onExportMarkdown()">MD</button>
+                            <button mat-stroked-button (click)="onExportJson()">JSON</button>
+                            <button mat-stroked-button (click)="onExportMarkdown()">MD</button>
                         </div>
                         @if (s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use') {
-                            <button class="btn btn--danger" (click)="onStop()">Stop</button>
+                            <button mat-stroked-button color="warn" (click)="onStop()">Stop</button>
                         } @else {
-                            <button class="btn btn--primary" (click)="onResume()">Resume</button>
+                            <button mat-flat-button color="primary" (click)="onResume()">Resume</button>
                         }
-                        <button class="btn btn--secondary" (click)="showDeleteConfirm.set(true)">Delete</button>
+                        <button mat-stroked-button (click)="showDeleteConfirm.set(true)">Delete</button>
                         <div class="mobile-menu-wrapper">
-                            <button class="btn btn--secondary mobile-menu-btn" (click)="showMobileMenu.set(!showMobileMenu())" title="More actions">···</button>
+                            <button mat-stroked-button class="mobile-menu-btn" (click)="showMobileMenu.set(!showMobileMenu())" title="More actions">···</button>
                             @if (showMobileMenu()) {
                                 <div class="mobile-menu-backdrop" (click)="showMobileMenu.set(false)"></div>
                                 <div class="mobile-menu">
@@ -71,13 +75,13 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                 </div>
 
                 <!-- Tab bar -->
-                <div class="session-view__tab-bar" role="tablist">
-                    <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'conversation'" (click)="activeTab.set('conversation')" role="tab">Conversation</button>
+                <mat-tab-group (selectedIndexChange)="onSessionTabChange($event, s.agentId)" [selectedIndex]="sessionTabIndex(s.agentId)">
+                    <mat-tab label="Conversation" />
                     @if (s.agentId) {
-                        <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'memory'" (click)="activeTab.set('memory')" role="tab">Memory</button>
+                        <mat-tab label="Memory" />
                     }
-                    <button class="session-view__tab" [class.session-view__tab--active]="activeTab() === 'info'" (click)="activeTab.set('info')" role="tab">Info</button>
-                </div>
+                    <mat-tab label="Info" />
+                </mat-tab-group>
 
                 @if (activeTab() === 'conversation') {
                     <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use'" [agentName]="agentName()" />
@@ -127,14 +131,16 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                     @if (q.options && q.options.length > 0) {
                         <div class="question-card__options">
                             @for (opt of q.options; track opt; let i = $index) {
-                                <button class="btn btn--secondary" (click)="onQuestionOption(q, i, opt)">{{ opt }}</button>
+                                <button mat-stroked-button (click)="onQuestionOption(q, i, opt)">{{ opt }}</button>
                             }
                         </div>
                     } @else {
                         <div class="question-card__input">
-                            <input #answerInput type="text" placeholder="Type your answer..."
-                                (keyup.enter)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''" />
-                            <button class="btn btn--primary" (click)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''">Send</button>
+                            <mat-form-field appearance="outline" class="question-card__field">
+                                <input matInput #answerInput placeholder="Type your answer..."
+                                    (keyup.enter)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''" />
+                            </mat-form-field>
+                            <button mat-flat-button color="primary" (click)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''">Send</button>
                         </div>
                     }
                 </div>
@@ -145,8 +151,8 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                         <h3 class="confirm-dialog__title">Delete session?</h3>
                         <p class="confirm-dialog__text">This will permanently delete this session and all its messages. This cannot be undone.</p>
                         <div class="confirm-dialog__actions">
-                            <button class="btn btn--secondary" (click)="showDeleteConfirm.set(false)">Cancel</button>
-                            <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                            <button mat-stroked-button (click)="showDeleteConfirm.set(false)">Cancel</button>
+                            <button mat-flat-button color="warn" (click)="onDelete()">Delete</button>
                         </div>
                     </div>
                 </div>
@@ -169,31 +175,7 @@ type SessionTab = 'conversation' | 'memory' | 'info';
             inset: 0;
         }
         .session-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-        .session-view__tab-bar {
-            display: flex;
-            background: var(--bg-surface);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        .session-view__tab {
-            padding: 0.5rem 1rem;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--text-secondary);
-            font-family: inherit;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            cursor: pointer;
-            transition: color 0.15s, border-color 0.15s;
-        }
-        .session-view__tab:hover { color: var(--text-primary); }
-        .session-view__tab--active {
-            color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
-        }
+        mat-tab-group { flex-shrink: 0; }
         .session-view__info-panel {
             flex: 1;
             overflow-y: auto;
@@ -244,47 +226,24 @@ type SessionTab = 'conversation' | 'memory' | 'info';
         .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
         .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.05em; margin-right: 0.2rem; }
-        .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
         .export-group { display: flex; gap: 0.25rem; }
-        .btn {
-            padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
 
-        /* Mobile: compact header — hide meta, shrink actions */
         @media (max-width: 767px) {
             .session-view__header {
                 flex-wrap: wrap;
                 padding: 0.5rem 0.75rem;
                 gap: 0.5rem;
             }
-            .session-view__meta {
-                display: none;
-            }
-            .session-view__actions {
-                gap: 0.25rem;
-            }
-            .export-group {
-                display: none;
-            }
-            .btn {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.65rem;
-            }
+            .session-view__meta { display: none; }
+            .session-view__actions { gap: 0.25rem; }
+            .export-group { display: none; }
             .question-card {
                 margin: 0.5rem 0.5rem;
                 padding: 0.75rem;
             }
             .question-card__options { gap: 0.375rem; }
         }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px var(--accent-red-border); }
-        .page { padding: 1.5rem; color: var(--text-primary); }
         .question-card {
             margin: 0.75rem 1rem; padding: 1rem; border-radius: var(--radius);
             background: var(--bg-surface); border: 1px solid var(--accent-cyan);
@@ -294,13 +253,8 @@ type SessionTab = 'conversation' | 'memory' | 'info';
         .question-card__text { margin: 0 0 0.5rem; color: var(--text-primary); font-size: 0.875rem; }
         .question-card__context { margin: 0 0 0.75rem; color: var(--text-secondary); font-size: 0.75rem; font-style: italic; }
         .question-card__options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .question-card__input { display: flex; gap: 0.5rem; }
-        .question-card__input input {
-            flex: 1; padding: 0.375rem 0.75rem; border-radius: var(--radius);
-            background: var(--bg-primary); border: 1px solid var(--border-bright);
-            color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
-        }
-        .question-card__input input:focus { outline: none; border-color: var(--accent-cyan); }
+        .question-card__input { display: flex; gap: 0.5rem; align-items: center; }
+        .question-card__field { flex: 1; }
 
         /* Delete confirmation overlay */
         .confirm-overlay {
@@ -377,6 +331,19 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     protected readonly showDeleteConfirm = signal(false);
     protected readonly showMobileMenu = signal(false);
     protected readonly activeTab = signal<SessionTab>('conversation');
+
+    protected sessionTabIndex(agentId: string | null | undefined): number {
+        const tab = this.activeTab();
+        if (tab === 'conversation') return 0;
+        if (tab === 'memory' && agentId) return 1;
+        if (tab === 'info') return agentId ? 2 : 1;
+        return 0;
+    }
+
+    protected onSessionTabChange(index: number, agentId: string | null | undefined): void {
+        const tabs: SessionTab[] = agentId ? ['conversation', 'memory', 'info'] : ['conversation', 'info'];
+        this.activeTab.set(tabs[index] ?? 'conversation');
+    }
 
     protected readonly events = computed(() => {
         const s = this.session();

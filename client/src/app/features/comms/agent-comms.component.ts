@@ -10,6 +10,9 @@ import {
     viewChild,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { AgentNetworkVisComponent } from './agent-network-vis.component';
@@ -44,7 +47,7 @@ interface CommEntry {
 @Component({
     selector: 'app-agent-comms',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent, AgentNetwork3DComponent, ViewModeToggleComponent],
+    imports: [DatePipe, MatButtonModule, MatFormFieldModule, MatSelectModule, EmptyStateComponent, SkeletonComponent, AgentNetworkVisComponent, AgentNetwork3DComponent, ViewModeToggleComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -71,7 +74,7 @@ interface CommEntry {
                         />
                     }
                     @if (viewMode() === 'list') {
-                        <button class="btn btn--secondary" (click)="toggleAutoScroll()">
+                        <button mat-stroked-button (click)="toggleAutoScroll()">
                             Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
                         </button>
                     }
@@ -83,18 +86,19 @@ interface CommEntry {
 
             <div class="comms__filters">
                 <div class="comms__filter-group">
-                    <label class="comms__filter-label">Agent</label>
-                    <select
-                        class="comms__select"
-                        [value]="agentFilter()"
-                        (change)="onAgentFilterChange($event)"
-                        aria-label="Filter by agent"
-                    >
-                        <option value="">All Agents</option>
-                        @for (agent of agents(); track agent.id) {
-                            <option [value]="agent.id">{{ agent.name }}</option>
-                        }
-                    </select>
+                    <mat-form-field appearance="outline" class="comms__agent-field">
+                        <mat-label>Agent</mat-label>
+                        <mat-select
+                            [value]="agentFilter()"
+                            (selectionChange)="agentFilter.set($event.value)"
+                            aria-label="Filter by agent"
+                        >
+                            <mat-option value="">All Agents</mat-option>
+                            @for (agent of agents(); track agent.id) {
+                                <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
                 </div>
                 <div class="comms__filter-group">
                     <label class="comms__filter-label">Channel</label>
@@ -232,14 +236,6 @@ interface CommEntry {
         }
         @keyframes live-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
-        .btn {
-            padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s;
-        }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-
         /* ── Filters ──────────────────────────────────────────────── */
         .comms__filters {
             display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-shrink: 0; flex-wrap: wrap;
@@ -247,13 +243,7 @@ interface CommEntry {
         }
         .comms__filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
         .comms__filter-label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
-        .comms__select {
-            padding: 0.35rem 0.6rem; font-size: 0.75rem; font-family: inherit;
-            background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-bright);
-            border-radius: var(--radius); outline: none; cursor: pointer;
-            min-width: 140px;
-        }
-        .comms__select:focus { border-color: var(--accent-cyan); }
+        .comms__agent-field { min-width: 160px; }
         .comms__channel-chips { display: flex; gap: 0.25rem; flex-wrap: wrap; }
         .ch-chip {
             padding: 0.35rem 0.65rem; min-height: 28px; background: var(--bg-surface); border: 1px solid var(--border);

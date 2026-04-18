@@ -7,6 +7,11 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -28,7 +33,7 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SkeletonComponent, EmptyStateComponent],
+    imports: [SkeletonComponent, EmptyStateComponent, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatChipsModule],
     template: `
         <div class="flock-page">
             <!-- Stats Header -->
@@ -63,37 +68,40 @@ interface FlockStats {
 
             <!-- Search & Filters -->
             <div class="flock-controls">
-                <div class="flock-search">
-                    <span class="flock-search__icon">/</span>
-                    <input
-                        class="flock-search__input"
-                        type="text"
-                        placeholder="Search agents..."
-                        [value]="searchQuery()"
-                        (input)="onSearchInput($event)"
-                        autocomplete="off"
-                        spellcheck="false" />
-                </div>
+                <mat-form-field appearance="outline" class="flock-search-field">
+                    <mat-label>Search agents</mat-label>
+                    <input matInput [value]="searchQuery()" (input)="onSearchInput($event)"
+                        autocomplete="off" spellcheck="false" />
+                </mat-form-field>
                 <div class="flock-filters">
-                    <select class="flock-filter" [value]="statusFilter()" (change)="onStatusChange($event)" aria-label="Filter by status">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                    <select class="flock-filter" [value]="capabilityFilter()" (change)="onCapabilityChange($event)" aria-label="Filter by capability">
-                        <option value="">All Capabilities</option>
-                        @for (cap of allCapabilities(); track cap) {
-                            <option [value]="cap">{{ cap }}</option>
-                        }
-                    </select>
-                    <select class="flock-filter" [value]="sortBy()" (change)="onSortByChange($event)" aria-label="Sort by">
-                        <option value="reputation">Reputation</option>
-                        <option value="name">Name</option>
-                        <option value="uptime">Uptime</option>
-                        <option value="registered">Newest</option>
-                        <option value="attestations">Attestations</option>
-                    </select>
-                    <button class="flock-sort-toggle" (click)="toggleSortOrder()" [title]="sortOrder() === 'desc' ? 'Descending' : 'Ascending'">
+                    <mat-form-field appearance="outline" class="flock-filter-field">
+                        <mat-label>Status</mat-label>
+                        <mat-select [value]="statusFilter()" (selectionChange)="onStatusChangeMat($event.value)">
+                            <mat-option value="">All Status</mat-option>
+                            <mat-option value="active">Active</mat-option>
+                            <mat-option value="inactive">Inactive</mat-option>
+                        </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="flock-filter-field">
+                        <mat-label>Capability</mat-label>
+                        <mat-select [value]="capabilityFilter()" (selectionChange)="onCapabilityChangeMat($event.value)">
+                            <mat-option value="">All Capabilities</mat-option>
+                            @for (cap of allCapabilities(); track cap) {
+                                <mat-option [value]="cap">{{ cap }}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="flock-filter-field">
+                        <mat-label>Sort by</mat-label>
+                        <mat-select [value]="sortBy()" (selectionChange)="onSortByChangeMat($event.value)">
+                            <mat-option value="reputation">Reputation</mat-option>
+                            <mat-option value="name">Name</mat-option>
+                            <mat-option value="uptime">Uptime</mat-option>
+                            <mat-option value="registered">Newest</mat-option>
+                            <mat-option value="attestations">Attestations</mat-option>
+                        </mat-select>
+                    </mat-form-field>
+                    <button mat-icon-button (click)="toggleSortOrder()" [title]="sortOrder() === 'desc' ? 'Descending' : 'Ascending'">
                         {{ sortOrder() === 'desc' ? '↓' : '↑' }}
                     </button>
                 </div>
@@ -101,16 +109,15 @@ interface FlockStats {
 
             <!-- Capability Quick-Filters -->
             @if (allCapabilities().length > 0) {
-                <div class="flock-cap-bar">
+                <mat-chip-set class="flock-cap-bar">
                     @for (cap of allCapabilities(); track cap) {
-                        <button
-                            class="flock-cap-pill"
-                            [class.flock-cap-pill--active]="capabilityFilter() === cap"
+                        <mat-chip-option
+                            [selected]="capabilityFilter() === cap"
                             (click)="toggleCapability(cap)">
                             {{ cap }}
-                        </button>
+                        </mat-chip-option>
                     }
-                </div>
+                </mat-chip-set>
             }
 
             <!-- Loading -->
@@ -166,11 +173,11 @@ interface FlockStats {
                     <!-- Pagination -->
                     @if (totalAgents() > pageSize) {
                         <div class="flock-pagination">
-                            <button class="flock-pagination__btn" [disabled]="currentPage() === 0" (click)="prevPage()">← Prev</button>
+                            <button mat-stroked-button [disabled]="currentPage() === 0" (click)="prevPage()">Prev</button>
                             <span class="flock-pagination__info">
                                 {{ currentPage() * pageSize + 1 }}–{{ min((currentPage() + 1) * pageSize, totalAgents()) }} of {{ totalAgents() }}
                             </span>
-                            <button class="flock-pagination__btn" [disabled]="(currentPage() + 1) * pageSize >= totalAgents()" (click)="nextPage()">Next →</button>
+                            <button mat-stroked-button [disabled]="(currentPage() + 1) * pageSize >= totalAgents()" (click)="nextPage()">Next</button>
                         </div>
                     }
                 }
@@ -336,97 +343,20 @@ interface FlockStats {
             gap: 0.75rem;
             margin-bottom: 1rem;
             flex-wrap: wrap;
-        }
-        .flock-search {
-            display: flex;
             align-items: center;
-            gap: 0.5rem;
-            flex: 1;
-            min-width: 200px;
-            padding: 0.5rem 0.75rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            transition: border-color 0.15s;
         }
-        .flock-search:focus-within { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-        .flock-search__icon {
-            color: var(--accent-cyan);
-            font-weight: 700;
-            font-size: 0.85rem;
-            flex-shrink: 0;
-        }
-        .flock-search__input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.8rem;
-            outline: none;
-        }
-        .flock-search__input::placeholder { color: var(--text-tertiary); }
-
+        .flock-search-field { flex: 1; min-width: 200px; }
         .flock-filters {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             flex-wrap: wrap;
         }
-        .flock-filter {
-            padding: 0.4rem 0.6rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-secondary);
-            font-family: inherit;
-            font-size: 0.7rem;
-            cursor: pointer;
-            outline: none;
-            transition: border-color var(--transition-fast), box-shadow var(--transition-base);
-        }
-        .flock-filter:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-        .flock-filter option { background: var(--bg-surface); }
-
-        .flock-sort-toggle {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: background 0.1s;
-        }
-        .flock-sort-toggle:hover { background: var(--bg-hover); }
+        .flock-filter-field { width: 140px; }
 
         /* Capability Quick-Filters */
         .flock-cap-bar {
-            display: flex;
-            gap: 0.35rem;
             margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-        .flock-cap-pill {
-            padding: 0.2rem 0.5rem;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--text-tertiary);
-            font-family: inherit;
-            font-size: 0.6rem;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        .flock-cap-pill:hover { border-color: var(--accent-magenta); color: var(--accent-magenta); }
-        .flock-cap-pill--active {
-            background: rgba(255, 0, 128, 0.1);
-            border-color: var(--accent-magenta);
-            color: var(--accent-magenta);
         }
 
         /* Loading */
@@ -595,19 +525,6 @@ interface FlockStats {
             gap: 1rem;
             padding: 1.5rem 0;
         }
-        .flock-pagination__btn {
-            padding: 0.35rem 0.75rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-secondary);
-            font-family: inherit;
-            font-size: 0.7rem;
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-        .flock-pagination__btn:hover:not(:disabled) { background: var(--bg-hover); }
-        .flock-pagination__btn:disabled { opacity: 0.4; cursor: default; }
         .flock-pagination__info { font-size: 0.7rem; color: var(--text-tertiary); }
 
         /* Detail Panel (Overlay) */
@@ -868,14 +785,31 @@ export class FlockDirectoryComponent implements OnInit {
         this.search();
     }
 
+    onStatusChangeMat(value: string): void {
+        this.statusFilter.set(value as FlockAgentStatus | '');
+        this.currentPage.set(0);
+        this.search();
+    }
+
     onCapabilityChange(event: Event): void {
         this.capabilityFilter.set((event.target as HTMLSelectElement).value);
         this.currentPage.set(0);
         this.search();
     }
 
+    onCapabilityChangeMat(value: string): void {
+        this.capabilityFilter.set(value);
+        this.currentPage.set(0);
+        this.search();
+    }
+
     onSortByChange(event: Event): void {
         this.sortBy.set((event.target as HTMLSelectElement).value as FlockSortField);
+        this.search();
+    }
+
+    onSortByChangeMat(value: string): void {
+        this.sortBy.set(value as FlockSortField);
         this.search();
     }
 

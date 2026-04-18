@@ -4,6 +4,9 @@ import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
 import QRCode from 'qrcode';
 import { SECTION_STYLES } from './settings-shared.styles';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
 interface PSKContact {
     id: string;
@@ -18,7 +21,7 @@ interface PSKContact {
 @Component({
     selector: 'app-mobile-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [],
+    imports: [MatButtonModule, MatFormFieldModule, MatInputModule],
     template: `
         <div class="settings__section">
             <h3 class="section-toggle" (click)="toggleSection()">
@@ -40,18 +43,20 @@ interface PSKContact {
                             <div class="contact-card contact-interactive">
                                 <div class="contact-header">
                                     @if (editingContactId() === contact.id) {
-                                        <input
-                                            class="contact-nickname-input"
-                                            [value]="editingNickname()"
-                                            (input)="editingNickname.set(asInputValue($event))"
-                                            (keydown.enter)="saveNickname(contact.id)"
-                                            (keydown.escape)="cancelEditNickname()"
-                                        />
-                                        <button class="icon-btn" (click)="saveNickname(contact.id)" title="Save">&#10003;</button>
-                                        <button class="icon-btn" (click)="cancelEditNickname()" title="Cancel">&#10005;</button>
+                                        <mat-form-field appearance="outline" class="contact-nickname-field">
+                                            <mat-label>Nickname</mat-label>
+                                            <input matInput
+                                                [value]="editingNickname()"
+                                                (input)="editingNickname.set(asInputValue($event))"
+                                                (keydown.enter)="saveNickname(contact.id)"
+                                                (keydown.escape)="cancelEditNickname()"
+                                            />
+                                        </mat-form-field>
+                                        <button mat-icon-button (click)="saveNickname(contact.id)" title="Save">&#10003;</button>
+                                        <button mat-icon-button (click)="cancelEditNickname()" title="Cancel">&#10005;</button>
                                     } @else {
                                         <span class="contact-nickname" (dblclick)="startEditNickname(contact)">{{ contact.nickname }}</span>
-                                        <button class="icon-btn" (click)="startEditNickname(contact)" title="Rename">&#9998;</button>
+                                        <button mat-icon-button (click)="startEditNickname(contact)" title="Rename">&#9998;</button>
                                     }
                                     <span class="contact-status" [class.contact-status--active]="contact.mobileAddress"
                                           [class.contact-status--waiting]="!contact.mobileAddress">
@@ -62,11 +67,11 @@ interface PSKContact {
                                     <code class="contact-address">{{ contact.mobileAddress }}</code>
                                 }
                                 <div class="contact-actions">
-                                    <button class="save-btn save-btn--sm" (click)="toggleQR(contact)">
+                                    <button mat-stroked-button (click)="toggleQR(contact)">
                                         {{ expandedContactId() === contact.id ? 'Hide QR' : 'Show QR' }}
                                     </button>
-                                    <button class="save-btn save-btn--sm" (click)="copyContactUri(contact)">Copy URI</button>
-                                    <button class="cancel-btn cancel-btn--sm" (click)="cancelContact(contact)">Delete</button>
+                                    <button mat-stroked-button (click)="copyContactUri(contact)">Copy URI</button>
+                                    <button mat-stroked-button color="warn" (click)="cancelContact(contact)">Delete</button>
                                 </div>
                                 @if (expandedContactId() === contact.id && contact.uri) {
                                     <div class="qr-container">
@@ -84,21 +89,22 @@ interface PSKContact {
                 <div class="add-contact">
                     @if (addingContact()) {
                         <div class="add-contact-form">
-                            <input
-                                class="contact-nickname-input"
-                                placeholder="Nickname (e.g. Alice)"
-                                [value]="newContactNickname()"
-                                (input)="newContactNickname.set(asInputValue($event))"
-                                (keydown.enter)="createContact()"
-                                (keydown.escape)="addingContact.set(false)"
-                            />
-                            <button class="save-btn save-btn--sm" [disabled]="creatingContact()" (click)="createContact()">
+                            <mat-form-field appearance="outline" class="contact-nickname-field">
+                                <mat-label>Nickname (e.g. Alice)</mat-label>
+                                <input matInput
+                                    [value]="newContactNickname()"
+                                    (input)="newContactNickname.set(asInputValue($event))"
+                                    (keydown.enter)="createContact()"
+                                    (keydown.escape)="addingContact.set(false)"
+                                />
+                            </mat-form-field>
+                            <button mat-flat-button color="primary" [disabled]="creatingContact()" (click)="createContact()">
                                 {{ creatingContact() ? 'Creating...' : 'Create' }}
                             </button>
-                            <button class="icon-btn" (click)="addingContact.set(false)">&#10005;</button>
+                            <button mat-icon-button (click)="addingContact.set(false)">&#10005;</button>
                         </div>
                     } @else {
-                        <button class="save-btn" (click)="addingContact.set(true)">+ Add Contact</button>
+                        <button mat-flat-button color="primary" (click)="addingContact.set(true)">+ Add Contact</button>
                     }
                 </div>
             }
@@ -111,11 +117,7 @@ interface PSKContact {
         .contact-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem; }
         .contact-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
         .contact-nickname { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; }
-        .contact-nickname-input {
-            padding: 0.5rem 0.65rem; background: var(--bg-input); border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;
-            font-family: inherit; font-weight: 600; outline: none; width: 160px; min-height: 38px;
-        }
+        .contact-nickname-field { width: 160px; }
         .contact-status { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto; }
         .contact-status--active { color: var(--accent-green); }
         .contact-status--waiting { color: var(--accent-gold); }
@@ -125,13 +127,6 @@ interface PSKContact {
             margin-bottom: 0.5rem; word-break: break-all;
         }
         .contact-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .icon-btn {
-            background: none; border: 1px solid var(--border); color: var(--text-secondary);
-            cursor: pointer; font-size: 1rem; padding: 0.35rem 0.5rem; border-radius: var(--radius-sm);
-            min-width: 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center;
-            transition: background 0.15s, border-color 0.15s;
-        }
-        .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface); border-color: var(--border-bright); }
         .qr-container { display: flex; justify-content: center; margin-top: 0.75rem; }
         .qr-canvas { border-radius: var(--radius); border: 2px solid var(--accent-cyan); box-shadow: 0 0 12px var(--accent-cyan-mid); }
         .add-contact { margin-top: 0.75rem; }

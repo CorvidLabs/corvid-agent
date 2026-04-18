@@ -7,6 +7,10 @@ import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
 import type { ProviderInfo } from '../../core/models/agent.model';
 import { firstValueFrom } from 'rxjs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 
 interface HealthStatus {
     database: boolean;
@@ -71,7 +75,7 @@ const TEMPLATES: AgentTemplate[] = [
 @Component({
     selector: 'app-welcome-wizard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         <div class="wizard">
             <div class="wizard__header">
@@ -126,40 +130,40 @@ const TEMPLATES: AgentTemplate[] = [
                         @if (selectedTemplate()) {
                             <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form">
                                 <div class="field-row">
-                                    <div class="field">
-                                        <label for="wiz-name" class="field__label">Name</label>
-                                        <input id="wiz-name" formControlName="name" class="field__input"
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Name</mat-label>
+                                        <input matInput formControlName="name"
                                                placeholder="e.g. Corvid, Scout" autocomplete="off" />
-                                    </div>
-                                    <div class="field">
-                                        <label for="wiz-provider" class="field__label">Provider</label>
-                                        <select id="wiz-provider" formControlName="provider" class="field__input"
-                                                (change)="onProviderChange()">
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Provider</mat-label>
+                                        <mat-select formControlName="provider"
+                                                (selectionChange)="onProviderChange()">
                                             @for (p of providers(); track p.type) {
-                                                <option [value]="p.type">{{ p.name }}</option>
+                                                <mat-option [value]="p.type">{{ p.name }}</mat-option>
                                             }
-                                        </select>
-                                    </div>
+                                        </mat-select>
+                                    </mat-form-field>
                                 </div>
 
                                 <div class="field-row">
-                                    <div class="field">
-                                        <label for="wiz-model" class="field__label">Model</label>
-                                        <select id="wiz-model" formControlName="model" class="field__input">
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Model</mat-label>
+                                        <mat-select formControlName="model">
                                             @for (m of availableModels(); track m) {
-                                                <option [value]="m">{{ m }}</option>
+                                                <mat-option [value]="m">{{ m }}</mat-option>
                                             }
-                                        </select>
-                                    </div>
-                                    <div class="field">
-                                        <label for="wiz-project" class="field__label">Project</label>
-                                        <select id="wiz-project" formControlName="defaultProjectId" class="field__input">
-                                            <option [value]="null">None</option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Project</mat-label>
+                                        <mat-select formControlName="defaultProjectId">
+                                            <mat-option [value]="null">None</mat-option>
                                             @for (p of projectService.projects(); track p.id) {
-                                                <option [value]="p.id">{{ p.name }}</option>
+                                                <mat-option [value]="p.id">{{ p.name }}</mat-option>
                                             }
-                                        </select>
-                                    </div>
+                                        </mat-select>
+                                    </mat-form-field>
                                 </div>
 
                                 @if (selectedTemplate()!.skillBundleIds.length > 0) {
@@ -171,7 +175,7 @@ const TEMPLATES: AgentTemplate[] = [
                                 }
 
                                 <div class="wizard__actions">
-                                    <button type="submit" class="wizard__btn wizard__btn--primary"
+                                    <button type="submit" mat-flat-button color="primary"
                                             [disabled]="form.invalid || creating()">
                                         {{ creating() ? 'Creating...' : 'Create Agent' }}
                                     </button>
@@ -199,10 +203,10 @@ const TEMPLATES: AgentTemplate[] = [
                         </div>
 
                         <div class="done__actions">
-                            <button class="wizard__btn wizard__btn--primary" (click)="startChat()">
+                            <button mat-flat-button color="primary" (click)="startChat()">
                                 Start Chatting
                             </button>
-                            <button class="wizard__btn" (click)="goToDashboard()">
+                            <button mat-stroked-button (click)="goToDashboard()">
                                 Go to Dashboard
                             </button>
                         </div>
@@ -351,28 +355,7 @@ const TEMPLATES: AgentTemplate[] = [
             grid-template-columns: 1fr 1fr;
             gap: 0.75rem;
         }
-        .field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .field__label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-        .field__input {
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius);
-            font-size: 0.85rem;
-            font-family: inherit;
-            background: var(--bg-input);
-            color: var(--text-primary);
-        }
-        .field__input:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
-            box-shadow: var(--glow-cyan);
-        }
+        .field { flex: 1; }
 
         /* Skill Tags */
         .skill-tags {
@@ -397,31 +380,6 @@ const TEMPLATES: AgentTemplate[] = [
             justify-content: flex-end;
             margin-top: 0.25rem;
         }
-        .wizard__btn {
-            padding: 0.55rem 1.2rem;
-            border-radius: var(--radius);
-            font-size: 0.8rem;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            border: 1px solid var(--border-bright);
-            background: transparent;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: background 0.15s, border-color 0.15s;
-        }
-        .wizard__btn:hover { background: var(--bg-hover); }
-        .wizard__btn--primary {
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-subtle);
-        }
-        .wizard__btn--primary:hover:not(:disabled) {
-            background: var(--accent-cyan-dim);
-            box-shadow: var(--glow-cyan);
-        }
-        .wizard__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         /* Warning */
         .wizard__warning {

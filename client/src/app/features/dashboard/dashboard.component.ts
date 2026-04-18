@@ -25,6 +25,8 @@ import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
 import { firstValueFrom } from 'rxjs';
 import { friendlyModelName, friendlyProviderName } from '../../shared/format-model';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 interface OverviewData {
     totalSessions: number;
@@ -65,7 +67,7 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent, MetricCardComponent],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent, MetricCardComponent, MatButtonModule, MatIconModule],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
@@ -115,7 +117,7 @@ interface ActivityEvent {
                     }
                 </div>
                 <div class="dash-toolbar__right">
-                    <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
+                    <button mat-stroked-button (click)="layoutService.customizing.set(!layoutService.customizing())">
                         {{ layoutService.customizing() ? 'Done' : 'Customize' }}
                     </button>
                 </div>
@@ -268,8 +270,8 @@ interface ActivityEvent {
                                                     </svg>
                                                 </div>
                                                 <div class="agent-card__actions">
-                                                    <button class="agent-card__btn" (click)="startChat(summary.agent.id, $event)">Chat</button>
-                                                    <button class="agent-card__btn" (click)="startWorkTask(summary.agent.id, $event)">Work Task</button>
+                                                    <button mat-stroked-button (click)="startChat(summary.agent.id, $event)">Chat</button>
+                                                    <button mat-stroked-button (click)="startWorkTask(summary.agent.id, $event)">Work Task</button>
                                                 </div>
                                             </a>
                                         }
@@ -279,7 +281,7 @@ interface ActivityEvent {
                                 <div class="simple-hero">
                                     <h2 class="simple-hero__title">What do you want to build?</h2>
                                     <p class="simple-hero__desc">Pick an agent and start a conversation.</p>
-                                    <button class="simple-hero__btn" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
+                                    <button mat-flat-button color="primary" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
                                 </div>
                             }
                         }
@@ -385,10 +387,10 @@ interface ActivityEvent {
                             <div class="section section--actions">
                                 <h3><app-icon name="zap" [size]="14" /> Quick Actions</h3>
                                 <div class="quick-actions">
-                                    <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
-                                    <button class="action-btn" (click)="navigateTo('/sessions/councils')">Launch Council</button>
-                                    <button class="action-btn" (click)="navigateTo('/sessions/work-tasks')">Create Work Task</button>
-                                    <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
+                                    <button mat-stroked-button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
+                                    <button mat-stroked-button class="action-btn" (click)="navigateTo('/sessions/councils')">Launch Council</button>
+                                    <button mat-stroked-button class="action-btn" (click)="navigateTo('/sessions/work-tasks')">Create Work Task</button>
+                                    <button mat-stroked-button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
                                         {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
                                     </button>
                                 </div>

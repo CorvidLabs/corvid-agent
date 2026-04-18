@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
 import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -14,11 +15,11 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
 @Component({
     selector: 'app-reputation',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
+    imports: [FormsModule, DecimalPipe, MatButtonModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent, MetricCardComponent],
     template: `
         <app-page-shell title="Agent Reputation" icon="reputation">
             <button actions
-                class="btn btn--primary"
+                mat-flat-button color="primary"
                 [disabled]="computing()"
                 (click)="onComputeAll()">
                 {{ computing() ? 'Computing...' : 'Compute All' }}
@@ -98,7 +99,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                 @if (reputationService.scores().length > 1) {
                     <div class="compare-section">
                         <h4>
-                            <button class="btn btn--sm" [class.btn--primary]="compareMode()" (click)="compareMode.set(!compareMode())">
+                            <button mat-stroked-button [color]="compareMode() ? 'primary' : undefined" (click)="compareMode.set(!compareMode())">
                                 {{ compareMode() ? 'Exit Compare' : 'Compare Agents' }}
                             </button>
                         </h4>
@@ -258,7 +259,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                             @if (s.attestationHash) {
                                 <p class="attestation">Attestation: <code>{{ s.attestationHash }}</code></p>
                             } @else {
-                                <button class="btn btn--primary btn--sm" (click)="onCreateAttestation(s.agentId)">Create Attestation</button>
+                                <button mat-flat-button color="primary" (click)="onCreateAttestation(s.agentId)">Create Attestation</button>
                             }
                         }
 
@@ -549,15 +550,6 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .event-impact[data-impact="negative"] { color: var(--accent-red); }
         .event-time { color: var(--text-secondary); margin-left: auto; font-size: 0.75rem; }
 
-        /* Buttons */
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
-        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
-        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Trend chart */
         .trend-chart {

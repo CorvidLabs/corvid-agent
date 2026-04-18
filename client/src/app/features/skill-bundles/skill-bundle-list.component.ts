@@ -1,5 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -10,7 +13,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="Skill Bundles" icon="skills">
             <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
@@ -43,34 +46,32 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                 <div class="create-form">
                     <h3>Create Bundle</h3>
                     <div class="form-grid">
-                        <div class="form-field">
-                            <label>Name</label>
-                            <input [(ngModel)]="formName" class="form-input" placeholder="e.g. Code Review Tools" />
-                        </div>
-                        <div class="form-field">
-                            <label>Description</label>
-                            <input [(ngModel)]="formDescription" class="form-input" placeholder="What this bundle provides..." />
-                        </div>
-                        <div class="form-field span-2">
-                            <label>Tools (one per line)</label>
-                            <textarea
+                        <mat-form-field appearance="outline" class="form-field">
+                            <mat-label>Name</mat-label>
+                            <input matInput [(ngModel)]="formName" placeholder="e.g. Code Review Tools" />
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="form-field">
+                            <mat-label>Description</mat-label>
+                            <input matInput [(ngModel)]="formDescription" placeholder="What this bundle provides..." />
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="form-field span-2">
+                            <mat-label>Tools (one per line)</mat-label>
+                            <textarea matInput
                                 [(ngModel)]="formTools"
-                                class="form-textarea"
                                 rows="4"
                                 placeholder="Read\nEdit\nBash"></textarea>
-                        </div>
-                        <div class="form-field span-2">
-                            <label>Prompt Additions</label>
-                            <textarea
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="form-field span-2">
+                            <mat-label>Prompt Additions</mat-label>
+                            <textarea matInput
                                 [(ngModel)]="formPromptAdditions"
-                                class="form-textarea"
                                 rows="3"
                                 placeholder="Additional instructions for the agent..."></textarea>
-                        </div>
+                        </mat-form-field>
                     </div>
                     <div class="form-actions">
                         <button
-                            class="btn btn--primary"
+                            mat-flat-button color="primary"
                             [disabled]="creating() || !formName"
                             (click)="onCreate()">
                             {{ creating() ? 'Creating...' : 'Create Bundle' }}
@@ -111,26 +112,26 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                                 <div class="bundle-card__details">
                                     @if (editingId() === bundle.id) {
                                         <div class="form-grid">
-                                            <div class="form-field">
-                                                <label>Name</label>
-                                                <input [(ngModel)]="editName" class="form-input" />
-                                            </div>
-                                            <div class="form-field">
-                                                <label>Description</label>
-                                                <input [(ngModel)]="editDescription" class="form-input" />
-                                            </div>
-                                            <div class="form-field span-2">
-                                                <label>Tools (one per line)</label>
-                                                <textarea [(ngModel)]="editTools" class="form-textarea" rows="4"></textarea>
-                                            </div>
-                                            <div class="form-field span-2">
-                                                <label>Prompt Additions</label>
-                                                <textarea [(ngModel)]="editPromptAdditions" class="form-textarea" rows="3"></textarea>
-                                            </div>
+                                            <mat-form-field appearance="outline" class="form-field">
+                                                <mat-label>Name</mat-label>
+                                                <input matInput [(ngModel)]="editName" />
+                                            </mat-form-field>
+                                            <mat-form-field appearance="outline" class="form-field">
+                                                <mat-label>Description</mat-label>
+                                                <input matInput [(ngModel)]="editDescription" />
+                                            </mat-form-field>
+                                            <mat-form-field appearance="outline" class="form-field span-2">
+                                                <mat-label>Tools (one per line)</mat-label>
+                                                <textarea matInput [(ngModel)]="editTools" rows="4"></textarea>
+                                            </mat-form-field>
+                                            <mat-form-field appearance="outline" class="form-field span-2">
+                                                <mat-label>Prompt Additions</mat-label>
+                                                <textarea matInput [(ngModel)]="editPromptAdditions" rows="3"></textarea>
+                                            </mat-form-field>
                                         </div>
                                         <div class="form-actions">
-                                            <button class="btn btn--primary" (click)="onSaveEdit(bundle.id)">Save</button>
-                                            <button class="btn btn--secondary" (click)="editingId.set(null)">Cancel</button>
+                                            <button mat-flat-button color="primary" (click)="onSaveEdit(bundle.id)">Save</button>
+                                            <button mat-stroked-button (click)="editingId.set(null)">Cancel</button>
                                         </div>
                                     } @else {
                                         <div class="bundle-card__tools-list">
@@ -145,8 +146,8 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                                         }
                                         <div class="form-actions">
                                             @if (!bundle.preset) {
-                                                <button class="btn btn--secondary" (click)="startEdit(bundle)">Edit</button>
-                                                <button class="btn btn--danger" (click)="onDelete(bundle)">Delete</button>
+                                                <button mat-stroked-button (click)="startEdit(bundle)">Edit</button>
+                                                <button mat-stroked-button color="warn" (click)="onDelete(bundle)">Delete</button>
                                             }
                                         </div>
                                     }
@@ -178,26 +179,8 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         }
         .create-form h3 { margin: 0 0 1rem; color: var(--text-primary); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
-        .form-input, .form-select, .form-textarea {
-            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-            box-sizing: border-box;
-        }
-        .form-input:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .form-textarea { resize: vertical; min-height: 4em; line-height: 1.5; }
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
-        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
         .bundle-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .bundle-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);

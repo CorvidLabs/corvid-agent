@@ -3,11 +3,12 @@ import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
 import { SECTION_STYLES } from './settings-shared.styles';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
     selector: 'app-database-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [],
+    imports: [MatButtonModule],
     template: `
         <div class="settings__section">
             <h3 class="section-toggle" (click)="toggleSection()">
@@ -15,8 +16,7 @@ import { SECTION_STYLES } from './settings-shared.styles';
                 Database
             </h3>
             @if (!collapsed()) {
-                <button
-                    class="backup-btn"
+                <button mat-flat-button color="primary"
                     [disabled]="backingUp()"
                     (click)="runBackup()"
                 >{{ backingUp() ? 'Backing up...' : 'Create Backup' }}</button>

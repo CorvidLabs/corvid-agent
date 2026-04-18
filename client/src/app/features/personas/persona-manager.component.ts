@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { AgentService } from '../../core/services/agent.service';
 import { PersonaService } from '../../core/services/persona.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -11,7 +15,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-persona-manager',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="Persona Manager" icon="personas">
             @if (agentService.loading()) {
@@ -57,59 +61,55 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                         }
 
                         <div class="form-grid">
-                            <div class="form-field">
-                                <label>Archetype</label>
-                                <select [(ngModel)]="formArchetype" class="form-select">
-                                    <option value="custom">Custom</option>
-                                    <option value="professional">Professional</option>
-                                    <option value="friendly">Friendly</option>
-                                    <option value="technical">Technical</option>
-                                    <option value="creative">Creative</option>
-                                    <option value="formal">Formal</option>
-                                </select>
-                            </div>
-                            <div class="form-field">
-                                <label>Traits (comma-separated)</label>
-                                <input
+                            <mat-form-field appearance="outline" class="form-field">
+                                <mat-label>Archetype</mat-label>
+                                <mat-select [(ngModel)]="formArchetype">
+                                    <mat-option value="custom">Custom</mat-option>
+                                    <mat-option value="professional">Professional</mat-option>
+                                    <mat-option value="friendly">Friendly</mat-option>
+                                    <mat-option value="technical">Technical</mat-option>
+                                    <mat-option value="creative">Creative</mat-option>
+                                    <mat-option value="formal">Formal</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="form-field">
+                                <mat-label>Traits (comma-separated)</mat-label>
+                                <input matInput
                                     [(ngModel)]="formTraits"
-                                    class="form-input"
                                     placeholder="helpful, concise, thorough" />
-                            </div>
-                            <div class="form-field span-2">
-                                <label>Voice Guidelines</label>
-                                <textarea
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="form-field span-2">
+                                <mat-label>Voice Guidelines</mat-label>
+                                <textarea matInput
                                     [(ngModel)]="formVoiceGuidelines"
-                                    class="form-textarea"
                                     rows="3"
                                     placeholder="How the agent should communicate..."></textarea>
-                            </div>
-                            <div class="form-field span-2">
-                                <label>Background</label>
-                                <textarea
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="form-field span-2">
+                                <mat-label>Background</mat-label>
+                                <textarea matInput
                                     [(ngModel)]="formBackground"
-                                    class="form-textarea"
                                     rows="3"
                                     placeholder="Agent background context..."></textarea>
-                            </div>
-                            <div class="form-field span-2">
-                                <label>Example Messages (one per line)</label>
-                                <textarea
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="form-field span-2">
+                                <mat-label>Example Messages (one per line)</mat-label>
+                                <textarea matInput
                                     [(ngModel)]="formExampleMessages"
-                                    class="form-textarea"
                                     rows="4"
                                     placeholder="Example response 1\nExample response 2"></textarea>
-                            </div>
+                            </mat-form-field>
                         </div>
                         <div class="form-actions">
                             <button
-                                class="btn btn--primary"
+                                mat-flat-button color="primary"
                                 [disabled]="saving()"
                                 (click)="onSave()">
                                 {{ saving() ? 'Saving...' : 'Save Persona' }}
                             </button>
                             @if (personaService.persona()) {
                                 <button
-                                    class="btn btn--danger"
+                                    mat-stroked-button color="warn"
                                     [disabled]="saving()"
                                     (click)="onDelete()">
                                     Delete Persona
@@ -170,26 +170,8 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         }
         .no-persona-banner p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
-        .form-input, .form-select, .form-textarea {
-            width: 100%; padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-            box-sizing: border-box;
-        }
-        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .form-textarea { resize: vertical; min-height: 4em; line-height: 1.5; }
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
-        }
-        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
-        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover:not(:disabled) { background: var(--accent-red-dim); }
         @media (max-width: 480px) {
             .form-grid { grid-template-columns: 1fr; }
             .span-2 { grid-column: span 1; }

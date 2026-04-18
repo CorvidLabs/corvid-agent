@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, Input, inject, signal } from '@angu
 import { Router } from '@angular/router';
 import { GuidedTourService } from '../../core/services/guided-tour.service';
 import { SECTION_STYLES } from './settings-shared.styles';
+import { MatButtonModule } from '@angular/material/button';
 
 export interface SettingsData {
     creditConfig: Record<string, string>;
@@ -16,7 +17,7 @@ export interface SettingsData {
 @Component({
     selector: 'app-system-info-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [],
+    imports: [MatButtonModule],
     template: `
         <!-- System Info -->
         <div class="settings__section">
@@ -56,7 +57,7 @@ export interface SettingsData {
                 <div class="info-grid section-collapse">
                     <div class="info-item info-item--action">
                         <span class="info-label">Guided Tour</span>
-                        <button class="save-btn save-btn--sm" (click)="replayTour()">Replay Tour</button>
+                        <button mat-flat-button color="primary" (click)="replayTour()">Replay Tour</button>
                     </div>
                     <div class="info-item info-item--action">
                         <span class="info-label">Keyboard Shortcuts</span>

@@ -11,6 +11,13 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
 import { PageShellComponent } from '../../shared/components/page-shell.component';
 import type { Agent } from '../../core/models/agent.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatIconModule } from '@angular/material/icon';
 
 interface AgentCard {
     agent: Agent;
@@ -38,66 +45,50 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, UpperCasePipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, DecimalPipe, UpperCasePipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent, PageShellComponent, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatSlideToggleModule, MatIconModule],
     template: `
         <app-page-shell
             title="Agents"
             icon="agents"
             [breadcrumbs]="[]">
-            <a actions class="btn btn--primary" routerLink="/agents/new">+ New Agent</a>
+            <a actions mat-flat-button color="primary" routerLink="/agents/new">+ New Agent</a>
 
             <!-- Search + Filters (sticky) -->
             <div toolbar class="sticky-toolbar">
-            <div class="search-bar">
-                <input
-                    class="search-input"
+            <mat-form-field class="search-field" appearance="outline" subscriptSizing="dynamic">
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput
                     placeholder="Search agents..."
                     [(ngModel)]="searchQuery"
                     (input)="searchQuery = $any($event.target).value" />
-            </div>
+            </mat-form-field>
 
-            <!-- Filter Chips -->
+            <!-- Filter Controls -->
             <div class="filters">
-                <div class="filter-group">
-                    <button
-                        class="filter-chip"
-                        [class.filter-chip--active]="filterAlgoChat() === null"
-                        (click)="filterAlgoChat.set(null)">All</button>
-                    <button
-                        class="filter-chip"
-                        [class.filter-chip--active]="filterAlgoChat() === true"
-                        (click)="filterAlgoChat.set(true)">AlgoChat</button>
-                    <button
-                        class="filter-chip"
-                        [class.filter-chip--active]="filterAlgoChat() === false"
-                        (click)="filterAlgoChat.set(false)">No AlgoChat</button>
-                </div>
-                <div class="filter-group">
+                <mat-button-toggle-group [value]="filterAlgoChat()" (change)="filterAlgoChat.set($event.value)" hideSingleSelectionIndicator>
+                    <mat-button-toggle [value]="null">All</mat-button-toggle>
+                    <mat-button-toggle [value]="true">AlgoChat</mat-button-toggle>
+                    <mat-button-toggle [value]="false">No AlgoChat</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-button-toggle-group [value]="filterPermission()" (change)="filterPermission.set($event.value === filterPermission() ? null : $event.value)" hideSingleSelectionIndicator>
                     @for (mode of permissionModes; track mode) {
-                        <button
-                            class="filter-chip"
-                            [class.filter-chip--active]="filterPermission() === mode"
-                            (click)="filterPermission.set(filterPermission() === mode ? null : mode)">
-                            {{ mode }}
-                        </button>
+                        <mat-button-toggle [value]="mode">{{ mode }}</mat-button-toggle>
                     }
-                </div>
-                <label class="toggle-label">
-                    <input
-                        type="checkbox"
-                        class="toggle-input"
-                        [checked]="hideInactive()"
-                        (change)="hideInactive.set($any($event.target).checked)" />
-                    <span class="toggle-text">Hide inactive</span>
-                </label>
-                <div class="sort-group">
-                    <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event" aria-label="Sort agents by">
-                        <option value="name">Sort: Name</option>
-                        <option value="created">Sort: Created</option>
-                        <option value="lastActive">Sort: Last Active</option>
-                        <option value="sessions">Sort: Sessions</option>
-                    </select>
-                </div>
+                </mat-button-toggle-group>
+                <mat-slide-toggle
+                    [checked]="hideInactive()"
+                    (change)="hideInactive.set($event.checked)"
+                    labelPosition="after">
+                    Hide inactive
+                </mat-slide-toggle>
+                <mat-form-field class="sort-field" appearance="outline" subscriptSizing="dynamic">
+                    <mat-select [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event">
+                        <mat-option value="name">Sort: Name</mat-option>
+                        <mat-option value="created">Sort: Created</mat-option>
+                        <mat-option value="lastActive">Sort: Last Active</mat-option>
+                        <mat-option value="sessions">Sort: Sessions</mat-option>
+                    </mat-select>
+                </mat-form-field>
             </div>
             </div>
 
@@ -179,7 +170,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                             </div>
                             <div class="agent-card__footer">
                                 <span class="agent-card__perm">{{ card.agent.permissionMode }}</span>
-                                <button class="agent-card__start-btn" (click)="startSession(card.agent.id, $event)">Start Session</button>
+                                <button mat-stroked-button class="agent-card__start-btn" (click)="startSession(card.agent.id, $event)">Start Session</button>
                             </div>
                         </a>
                     }
@@ -188,44 +179,17 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         </app-page-shell>
     `,
     styles: `
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: var(--text-xs); font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .loading, .empty { color: var(--text-tertiary); font-size: var(--text-sm); }
 
         /* Search */
-        .search-bar { margin-bottom: 0.85rem; }
-        .search-input {
-            width: 100%; padding: 0.6rem 0.85rem; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg);
-            font-size: var(--text-sm); font-family: inherit; background: rgba(12, 13, 20, 0.6); color: var(--text-primary);
-            box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .search-input:focus { border-color: var(--accent-cyan-glow); box-shadow: 0 0 0 1px var(--accent-cyan-tint), 0 0 20px var(--accent-cyan-subtle); outline: none; }
+        .search-field { width: 100%; margin-bottom: 0.5rem; }
+        .search-field .mat-mdc-form-field-icon-prefix { padding-right: 0.5rem; color: var(--text-tertiary); }
 
         /* Filters */
         .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
-        .filter-group { display: flex; gap: 0.25rem; }
-        .filter-chip {
-            padding: var(--space-2) var(--space-3); min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: var(--text-xs); font-family: inherit;
-            cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: flex; align-items: center;
-        }
-        .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .sort-group { margin-left: auto; }
-        .sort-select {
-            padding: 0.3rem var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-xs); font-family: inherit;
-        }
-        .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
-
-        /* Hide-inactive toggle */
-        .toggle-label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; user-select: none; }
-        .toggle-input { accent-color: var(--accent-cyan); cursor: pointer; }
-        .toggle-text { font-size: var(--text-xs); color: var(--text-secondary); }
+        .filters ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; text-transform: capitalize; }
+        .sort-field { width: 160px; flex-shrink: 0; margin-left: auto; }
+        .sort-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
 
         /* Agent Grid — fluid + container-query aware */
         :host { container-type: inline-size; }
@@ -310,14 +274,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card__stat-label { font-size: var(--text-micro); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
         .agent-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid var(--border); }
         .agent-card__perm { font-size: var(--text-xxs); color: var(--text-tertiary); text-transform: capitalize; }
-        .agent-card__start-btn {
-            padding: var(--space-2) var(--space-3); min-height: 44px; font-size: var(--text-xxs); font-weight: 600; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
-            background: linear-gradient(135deg, var(--accent-cyan-tint), var(--accent-cyan-subtle));
-            border: none; border-radius: var(--radius);
-            color: var(--accent-cyan); transition: all 0.2s; display: flex; align-items: center;
-        }
-        .agent-card__start-btn:hover { background: linear-gradient(135deg, var(--accent-cyan-mid), var(--accent-cyan-tint)); box-shadow: 0 0 16px var(--accent-cyan-dim); }
+        .agent-card__start-btn { font-size: var(--text-xxs); text-transform: uppercase; letter-spacing: 0.05em; }
 
         @media (max-width: 767px) {
             .agent-grid { grid-template-columns: 1fr; }

@@ -5,6 +5,11 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { MetricCardComponent } from '../../shared/components/metric-card.component';
 import { firstValueFrom } from 'rxjs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatChipsModule } from '@angular/material/chips';
 
 // ─── API response types ─────────────────────────────────────────────────────
 
@@ -112,42 +117,44 @@ interface ConsolidationResponse {
 @Component({
     selector: 'app-brain-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, MetricCardComponent],
+    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, MetricCardComponent, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatChipsModule],
     template: `
         <div class="brain-viewer">
             <div class="brain-viewer__title-row">
                 <h2>Brain Viewer</h2>
                 <div class="export-area">
-                    <button class="btn--export" (click)="toggleExportPanel()">Export</button>
+                    <button mat-stroked-button (click)="toggleExportPanel()">Export</button>
                     @if (showExportPanel()) {
                         <div class="export-panel">
                             <div class="export-panel__row">
                                 <label class="export-panel__label">Format</label>
-                                <div class="export-panel__btns">
-                                    <button class="chip" [class.chip--active]="exportFormat() === 'json'" (click)="exportFormat.set('json')">JSON</button>
-                                    <button class="chip" [class.chip--active]="exportFormat() === 'csv'" (click)="exportFormat.set('csv')">CSV</button>
-                                </div>
+                                <mat-chip-listbox class="export-panel__chips" [value]="exportFormat()" (change)="exportFormat.set($event.value)">
+                                    <mat-chip-option value="json">JSON</mat-chip-option>
+                                    <mat-chip-option value="csv">CSV</mat-chip-option>
+                                </mat-chip-listbox>
                             </div>
                             <div class="export-panel__row">
                                 <label class="export-panel__label">Tier</label>
-                                <div class="export-panel__btns">
-                                    <button class="chip" [class.chip--active]="exportTier() === 'all'" (click)="exportTier.set('all')">All</button>
-                                    <button class="chip" [class.chip--active]="exportTier() === 'long-term'" (click)="exportTier.set('long-term')">Long-term</button>
-                                    <button class="chip" [class.chip--active]="exportTier() === 'short-term'" (click)="exportTier.set('short-term')">Short-term</button>
-                                </div>
+                                <mat-chip-listbox class="export-panel__chips" [value]="exportTier()" (change)="exportTier.set($event.value)">
+                                    <mat-chip-option value="all">All</mat-chip-option>
+                                    <mat-chip-option value="long-term">Long-term</mat-chip-option>
+                                    <mat-chip-option value="short-term">Short-term</mat-chip-option>
+                                </mat-chip-listbox>
                             </div>
                             @if (categoryEntries().length > 0) {
                                 <div class="export-panel__row">
-                                    <label class="export-panel__label">Category</label>
-                                    <select class="export-panel__select" (change)="onExportCategoryChange($event)">
-                                        <option value="">All categories</option>
-                                        @for (cat of categoryEntries(); track cat.name) {
-                                            <option [value]="cat.name" [selected]="exportCategory() === cat.name">{{ cat.name }}</option>
-                                        }
-                                    </select>
+                                    <mat-form-field appearance="outline" class="export-category-field">
+                                        <mat-label>Category</mat-label>
+                                        <mat-select [value]="exportCategory()" (selectionChange)="onExportCategoryChangeMat($event.value)">
+                                            <mat-option value="">All categories</mat-option>
+                                            @for (cat of categoryEntries(); track cat.name) {
+                                                <mat-option [value]="cat.name">{{ cat.name }}</mat-option>
+                                            }
+                                        </mat-select>
+                                    </mat-form-field>
                                 </div>
                             }
-                            <button class="btn--export-go" (click)="doExport()">Download</button>
+                            <button mat-flat-button color="primary" (click)="doExport()">Download</button>
                         </div>
                     }
                 </div>
@@ -241,8 +248,8 @@ interface ConsolidationResponse {
                             <div class="category-chips">
                                 @for (cat of categoryEntries(); track cat.name) {
                                     <button
-                                        class="chip"
-                                        [class.chip--active]="categoryFilter() === cat.name"
+                                        mat-stroked-button
+                                        [class.category-chip--active]="categoryFilter() === cat.name"
                                         (click)="toggleCategory(cat.name)">
                                         {{ cat.name }} ({{ cat.count }})
                                     </button>
@@ -256,26 +263,28 @@ interface ConsolidationResponse {
                 <div class="section">
                     <h3>Memory Explorer</h3>
                     <div class="filters">
-                        <input
-                            class="search-input"
-                            type="text"
-                            placeholder="Search memories..."
-                            [value]="searchQuery()"
-                            (input)="onSearchInput($event)"
-                            (keydown.enter)="applySearch()" />
-                        <div class="filter-chips">
-                            <button class="chip" [class.chip--active]="tierFilter() === null" (click)="setTier(null)">All</button>
-                            <button class="chip chip--lt" [class.chip--active]="tierFilter() === 'longterm'" (click)="setTier('longterm')">Long-term</button>
-                            <button class="chip chip--st" [class.chip--active]="tierFilter() === 'shortterm'" (click)="setTier('shortterm')">Short-term</button>
-                        </div>
-                        <div class="filter-chips">
-                            <button class="chip" [class.chip--active]="statusFilter() === null" (click)="setStatus(null)">All</button>
-                            <button class="chip" [class.chip--active]="statusFilter() === 'confirmed'" (click)="setStatus('confirmed')">Confirmed</button>
-                            <button class="chip" [class.chip--active]="statusFilter() === 'pending'" (click)="setStatus('pending')">Pending</button>
-                            <button class="chip" [class.chip--active]="statusFilter() === 'failed'" (click)="setStatus('failed')">Failed</button>
-                        </div>
+                        <mat-form-field appearance="outline" class="search-field">
+                            <mat-label>Search</mat-label>
+                            <input matInput
+                                type="text"
+                                placeholder="Search memories..."
+                                [value]="searchQuery()"
+                                (input)="onSearchInput($event)"
+                                (keydown.enter)="applySearch()" />
+                        </mat-form-field>
+                        <mat-chip-listbox class="filter-chips" [value]="tierFilter() ?? 'all'" (change)="setTier($event.value === 'all' ? null : $event.value)">
+                            <mat-chip-option value="all">All</mat-chip-option>
+                            <mat-chip-option value="longterm">Long-term</mat-chip-option>
+                            <mat-chip-option value="shortterm">Short-term</mat-chip-option>
+                        </mat-chip-listbox>
+                        <mat-chip-listbox class="filter-chips" [value]="statusFilter() ?? 'all'" (change)="setStatus($event.value === 'all' ? null : $event.value)">
+                            <mat-chip-option value="all">All</mat-chip-option>
+                            <mat-chip-option value="confirmed">Confirmed</mat-chip-option>
+                            <mat-chip-option value="pending">Pending</mat-chip-option>
+                            <mat-chip-option value="failed">Failed</mat-chip-option>
+                        </mat-chip-listbox>
                         @if (agentFilter()) {
-                            <button class="chip chip--clear" (click)="clearAgentFilter()">Agent: {{ agentFilter() }} &times;</button>
+                            <button mat-stroked-button class="agent-clear-btn" (click)="clearAgentFilter()">Agent: {{ agentFilter() }} &times;</button>
                         }
                     </div>
                 </div>
@@ -288,9 +297,9 @@ interface ConsolidationResponse {
                         <div class="list-header">
                             <span class="list-header__count">{{ listTotal() }} memories</span>
                             <div class="pagination">
-                                <button class="btn--sm" [disabled]="currentOffset() === 0" (click)="prevPage()">Prev</button>
+                                <button mat-stroked-button [disabled]="currentOffset() === 0" (click)="prevPage()">Prev</button>
                                 <span class="page-info">{{ currentOffset() + 1 }}–{{ Math.min(currentOffset() + pageSize(), listTotal()) }}</span>
-                                <button class="btn--sm" [disabled]="currentOffset() + pageSize() >= listTotal()" (click)="nextPage()">Next</button>
+                                <button mat-stroked-button [disabled]="currentOffset() + pageSize() >= listTotal()" (click)="nextPage()">Next</button>
                             </div>
                         </div>
 
@@ -399,13 +408,13 @@ interface ConsolidationResponse {
                             </span>
                         }
                     </div>
-                    <div class="filter-chips" style="margin-bottom: 0.75rem;">
-                        <button class="chip" [class.chip--active]="obsStatusFilter() === null" (click)="setObsStatus(null)">All</button>
-                        <button class="chip chip--obs-active" [class.chip--active]="obsStatusFilter() === 'active'" (click)="setObsStatus('active')">Active</button>
-                        <button class="chip chip--obs-graduated" [class.chip--active]="obsStatusFilter() === 'graduated'" (click)="setObsStatus('graduated')">Graduated</button>
-                        <button class="chip chip--obs-expired" [class.chip--active]="obsStatusFilter() === 'expired'" (click)="setObsStatus('expired')">Expired</button>
-                        <button class="chip chip--obs-dismissed" [class.chip--active]="obsStatusFilter() === 'dismissed'" (click)="setObsStatus('dismissed')">Dismissed</button>
-                    </div>
+                    <mat-chip-listbox class="filter-chips" style="margin-bottom: 0.75rem;" [value]="obsStatusFilter() ?? 'all'" (change)="setObsStatus($event.value === 'all' ? null : $event.value)">
+                        <mat-chip-option value="all">All</mat-chip-option>
+                        <mat-chip-option value="active">Active</mat-chip-option>
+                        <mat-chip-option value="graduated">Graduated</mat-chip-option>
+                        <mat-chip-option value="expired">Expired</mat-chip-option>
+                        <mat-chip-option value="dismissed">Dismissed</mat-chip-option>
+                    </mat-chip-listbox>
 
                     @if (obsLoading()) {
                         <p class="loading">Loading observations...</p>
@@ -471,12 +480,12 @@ interface ConsolidationResponse {
                                             </div>
                                             @if (obs.status === 'active') {
                                                 <div class="obs-card__actions">
-                                                    <button class="btn--action btn--graduate"
+                                                    <button mat-flat-button color="primary"
                                                             [disabled]="graduatingId() === obs.id"
                                                             (click)="forceGraduate(obs.id, $event)">
                                                         {{ graduatingId() === obs.id ? 'Graduating...' : 'Force Graduate' }}
                                                     </button>
-                                                    <button class="btn--action btn--boost"
+                                                    <button mat-stroked-button
                                                             (click)="boostObs(obs.id, $event)">
                                                         Boost +1
                                                     </button>
@@ -501,7 +510,7 @@ interface ConsolidationResponse {
                                        [value]="consolidationThreshold()"
                                        (input)="onThresholdChange($event)" />
                             </label>
-                            <button class="btn--sm" (click)="loadConsolidation()" [disabled]="consolidationLoading()">
+                            <button mat-stroked-button (click)="loadConsolidation()" [disabled]="consolidationLoading()">
                                 {{ consolidationLoading() ? 'Scanning...' : 'Scan for Duplicates' }}
                             </button>
                         </div>
@@ -544,7 +553,7 @@ interface ConsolidationResponse {
                                                         <pre class="detail-pre merge-preview__pre">{{ sug.previewContent }}</pre>
                                                     </div>
                                                     <div class="merge-card__actions">
-                                                        <button class="btn--action btn--merge"
+                                                        <button mat-flat-button color="warn"
                                                                 [disabled]="mergingId() === sug.id"
                                                                 (click)="executeMerge(sug, $event)">
                                                             {{ mergingId() === sug.id ? 'Merging...' : 'Execute Merge' }}
@@ -578,20 +587,24 @@ interface ConsolidationResponse {
                                 <h4>Bulk Archive</h4>
                                 <div class="archive-controls">
                                     <div class="archive-field">
-                                        <label>Max Decay Score (0–1)</label>
-                                        <input type="number" class="archive-input" min="0" max="1" step="0.05"
-                                               placeholder="e.g. 0.3"
-                                               [value]="archiveDecayThreshold()"
-                                               (input)="onArchiveDecayChange($event)" />
+                                        <mat-form-field appearance="outline" class="archive-form-field">
+                                            <mat-label>Max Decay Score (0-1)</mat-label>
+                                            <input matInput type="number" min="0" max="1" step="0.05"
+                                                   placeholder="e.g. 0.3"
+                                                   [value]="archiveDecayThreshold()"
+                                                   (input)="onArchiveDecayChange($event)" />
+                                        </mat-form-field>
                                     </div>
                                     <div class="archive-field">
-                                        <label>Older Than (days)</label>
-                                        <input type="number" class="archive-input" min="0" step="1"
-                                               placeholder="e.g. 30"
-                                               [value]="archiveOlderThanDays()"
-                                               (input)="onArchiveOlderThanChange($event)" />
+                                        <mat-form-field appearance="outline" class="archive-form-field">
+                                            <mat-label>Older Than (days)</mat-label>
+                                            <input matInput type="number" min="0" step="1"
+                                                   placeholder="e.g. 30"
+                                                   [value]="archiveOlderThanDays()"
+                                                   (input)="onArchiveOlderThanChange($event)" />
+                                        </mat-form-field>
                                     </div>
-                                    <button class="btn--action btn--archive"
+                                    <button mat-stroked-button color="warn"
                                             [disabled]="archiving()"
                                             (click)="executeBulkArchive()">
                                         {{ archiving() ? 'Archiving...' : 'Bulk Archive' }}
@@ -626,18 +639,6 @@ interface ConsolidationResponse {
 
         /* ─── Export Panel ────── */
         .export-area { position: relative; }
-        .btn--export {
-            padding: 0.35rem 0.85rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .btn--export:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
         .export-panel {
             position: absolute;
             right: 0;
@@ -666,32 +667,10 @@ interface ConsolidationResponse {
             width: 60px;
             flex-shrink: 0;
         }
-        .export-panel__btns { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-        .export-panel__select {
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-family: inherit;
-            padding: 0.2rem 0.4rem;
-            cursor: pointer;
-            flex: 1;
-        }
-        .btn--export-go {
-            align-self: flex-end;
-            padding: 0.35rem 0.85rem;
-            background: var(--accent-cyan-tint);
-            border: 1px solid var(--accent-cyan);
-            border-radius: var(--radius-sm);
-            color: var(--accent-cyan);
-            font-size: 0.7rem;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .btn--export-go:hover { background: var(--accent-cyan-mid); }
+        .export-panel__chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+        .export-category-field { width: 100%; }
+        .export-category-field .mat-mdc-form-field-infix { padding-top: 8px; padding-bottom: 8px; }
+        .export-panel button[mat-flat-button] { align-self: flex-end; }
 
         /* ─── Sync Banner ────── */
         .sync-banner {
@@ -792,25 +771,14 @@ interface ConsolidationResponse {
             flex-wrap: wrap;
             gap: 0.4rem;
         }
-        .chip {
-            padding: 0.3rem 0.65rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
+        .category-chip--active {
+            border-color: var(--accent-cyan) !important;
+            color: var(--accent-cyan) !important;
+            background: var(--accent-cyan-dim) !important;
         }
-        .chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
-        .chip--lt.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--st.chip--active { border-color: var(--accent-amber); color: var(--accent-amber); background: var(--accent-amber-dim); }
-        .chip--clear {
-            border-color: var(--accent-magenta);
-            color: var(--accent-magenta);
-            background: var(--accent-magenta-subtle);
+        .agent-clear-btn {
+            border-color: var(--accent-magenta) !important;
+            color: var(--accent-magenta) !important;
         }
 
         /* ─── Filters ────── */
@@ -819,20 +787,7 @@ interface ConsolidationResponse {
             flex-direction: column;
             gap: 0.6rem;
         }
-        .search-input {
-            width: 100%;
-            padding: var(--space-2) var(--space-3);
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.8rem;
-            outline: none;
-            transition: border-color 0.15s;
-        }
-        .search-input:focus { border-color: var(--accent-cyan); }
-        .search-input::placeholder { color: var(--text-tertiary); }
+        .search-field { width: 100%; }
         .filter-chips {
             display: flex;
             flex-wrap: wrap;
@@ -861,20 +816,7 @@ interface ConsolidationResponse {
             font-size: 0.7rem;
             color: var(--text-secondary);
         }
-        .btn--sm {
-            padding: 0.4rem 0.75rem;
-            min-height: 32px;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .btn--sm:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .btn--sm:disabled { opacity: 0.35; cursor: not-allowed; }
+        .pagination button { font-size: 0.75rem; }
 
         /* ─── Empty State ────── */
         .empty-state {
@@ -1065,10 +1007,6 @@ interface ConsolidationResponse {
             color: var(--text-tertiary);
             font-size: 0.75rem;
         }
-        .chip--obs-active.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: var(--accent-green-wash); }
-        .chip--obs-expired.chip--active { border-color: var(--text-tertiary); color: var(--text-tertiary); }
-        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: var(--accent-red-wash); }
 
         .obs-list { display: flex; flex-direction: column; gap: 4px; }
         .obs-card {
@@ -1135,29 +1073,7 @@ interface ConsolidationResponse {
             padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
-        .btn--action {
-            padding: 0.35rem var(--space-3);
-            border-radius: var(--radius-sm);
-            font-size: 0.65rem;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            border: 1px solid;
-            transition: opacity 0.15s;
-        }
-        .btn--action:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn--graduate {
-            background: var(--accent-green-tint);
-            border-color: var(--accent-green);
-            color: var(--accent-green);
-        }
-        .btn--graduate:hover:not(:disabled) { background: var(--accent-green-mid); }
-        .btn--boost {
-            background: var(--accent-cyan-tint);
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
-        }
-        .btn--boost:hover { background: var(--accent-cyan-mid); }
+        .obs-card__actions button { font-size: 0.75rem; }
 
         /* ─── Consolidation ────── */
         .section--consolidation { border-color: var(--accent-orange, #f59e0b); }
@@ -1254,12 +1170,7 @@ interface ConsolidationResponse {
             padding-top: var(--space-2);
             border-top: 1px solid var(--border);
         }
-        .btn--merge {
-            background: var(--accent-orange-dim, rgba(245,158,11,0.15));
-            border-color: var(--accent-orange, #f59e0b);
-            color: var(--accent-orange, #f59e0b);
-        }
-        .btn--merge:hover:not(:disabled) { background: rgba(245,158,11,0.3); }
+        .merge-card__actions button { font-size: 0.75rem; }
 
         /* Duplicate rows */
         .dup-row {
@@ -1298,30 +1209,9 @@ interface ConsolidationResponse {
             gap: 0.75rem;
             flex-wrap: wrap;
         }
-        .archive-field {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        .archive-field label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
-        .archive-input {
-            width: 120px;
-            padding: var(--space-1) var(--space-2);
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.75rem;
-            outline: none;
-        }
-        .archive-input:focus { border-color: var(--accent-amber); }
-        .btn--archive {
-            background: var(--accent-amber-dim);
-            border-color: var(--accent-amber);
-            color: var(--accent-amber);
-        }
-        .btn--archive:hover:not(:disabled) { background: var(--accent-amber-mid, rgba(245,158,11,0.25)); }
+        .archive-field { display: flex; flex-direction: column; }
+        .archive-form-field { width: 120px; }
+        .archive-controls button { align-self: flex-end; }
         .archive-result {
             margin-top: 0.5rem;
             font-size: 0.7rem;
@@ -1615,6 +1505,10 @@ export class BrainViewerComponent implements OnInit {
 
     onExportCategoryChange(event: Event): void {
         this.exportCategory.set((event.target as HTMLSelectElement).value);
+    }
+
+    onExportCategoryChangeMat(value: string): void {
+        this.exportCategory.set(value);
     }
 
     async doExport(): Promise<void> {

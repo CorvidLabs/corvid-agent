@@ -3,11 +3,12 @@ import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
 import { SECTION_STYLES } from './settings-shared.styles';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
     selector: 'app-operational-mode-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [],
+    imports: [MatButtonModule],
     template: `
         <div class="settings__section">
             <h3 class="section-toggle" (click)="toggleSection()">
@@ -18,8 +19,7 @@ import { SECTION_STYLES } from './settings-shared.styles';
             @if (!collapsed()) {
                 <div class="mode-selector section-collapse">
                     @for (mode of modes; track mode) {
-                        <button
-                            class="mode-btn"
+                        <button mat-stroked-button
                             [class.mode-btn--active]="operationalMode() === mode"
                             (click)="setMode(mode)"
                         >{{ mode }}</button>
@@ -41,14 +41,7 @@ import { SECTION_STYLES } from './settings-shared.styles';
         .section-badge--mode[data-mode="queued"] { color: var(--accent-amber); border-color: var(--accent-amber); background: var(--accent-amber-dim); }
         .section-badge--mode[data-mode="paused"] { color: var(--accent-red); border-color: var(--accent-red); background: var(--accent-red-dim); }
         .mode-selector { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-        .mode-btn {
-            padding: 0.45rem 0.85rem; background: var(--bg-raised); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-secondary); font-size: 0.75rem;
-            font-family: inherit; font-weight: 600; cursor: pointer; text-transform: capitalize;
-            transition: border-color 0.15s, color 0.15s, background 0.15s;
-        }
-        .mode-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .mode-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+        .mode-btn--active { border-color: var(--accent-cyan) !important; color: var(--accent-cyan) !important; background: var(--accent-cyan-dim) !important; }
         .mode-desc { font-size: 0.7rem; color: var(--text-tertiary); margin: 0; }
         @media (max-width: 600px) { .mode-selector { flex-wrap: wrap; } }
     `,

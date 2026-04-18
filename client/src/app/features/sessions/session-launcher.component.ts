@@ -5,53 +5,56 @@ import { ProjectService } from '../../core/services/project.service';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 
 @Component({
     selector: 'app-session-launcher',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         <div class="page">
             <h2>Launch Session</h2>
 
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
-                <div class="form__field">
-                    <label for="projectId" class="form__label">Project</label>
-                    <select id="projectId" formControlName="projectId" class="form__input">
-                        <option value="" disabled>Select a project...</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Project</mat-label>
+                    <mat-select formControlName="projectId">
                         @for (project of projectService.projects(); track project.id) {
-                            <option [value]="project.id">{{ project.name }}</option>
+                            <mat-option [value]="project.id">{{ project.name }}</mat-option>
                         }
-                    </select>
-                </div>
+                    </mat-select>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="agentId" class="form__label">Agent (optional)</label>
-                    <select id="agentId" formControlName="agentId" class="form__input">
-                        <option value="">No agent (defaults)</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Agent (optional)</mat-label>
+                    <mat-select formControlName="agentId">
+                        <mat-option value="">No agent (defaults)</mat-option>
                         @for (agent of agentService.agents(); track agent.id) {
-                            <option [value]="agent.id">{{ agent.name }}</option>
+                            <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
                         }
-                    </select>
-                </div>
+                    </mat-select>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="name" class="form__label">Session Name</label>
-                    <input id="name" formControlName="name" class="form__input"
+                <mat-form-field appearance="outline">
+                    <mat-label>Session Name</mat-label>
+                    <input matInput formControlName="name"
                            placeholder="Optional label for this session" />
-                </div>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="initialPrompt" class="form__label">Initial Prompt</label>
-                    <textarea id="initialPrompt" formControlName="initialPrompt" class="form__input form__textarea"
+                <mat-form-field appearance="outline">
+                    <mat-label>Initial Prompt</mat-label>
+                    <textarea matInput formControlName="initialPrompt"
                               rows="6" placeholder="What should Claude do?"></textarea>
-                </div>
+                </mat-form-field>
 
                 <div class="form__actions">
-                    <button type="submit" class="btn btn--primary" [disabled]="form.invalid || launching()">
+                    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || launching()">
                         {{ launching() ? 'Launching...' : 'Launch' }}
                     </button>
-                    <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
+                    <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
                 </div>
             </form>
         </div>
@@ -59,26 +62,8 @@ import { NotificationService } from '../../core/services/notification.service';
     styles: `
         .page { padding: var(--space-6); max-width: 640px; }
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .form { display: flex; flex-direction: column; gap: 1rem; }
-        .form__field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .form__label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-        .form__input {
-            padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-        }
-        .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-        .form__textarea { resize: vertical; }
+        .form { display: flex; flex-direction: column; gap: 0.5rem; }
         .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); }
     `,
 })
 export class SessionLauncherComponent implements OnInit {

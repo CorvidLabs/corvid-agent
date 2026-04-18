@@ -7,6 +7,10 @@ import {
     OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
 import { MemoryBrowserService } from '../../core/services/memory-browser.service';
 import type { MemoryEntry, MemoryTier } from '../../core/services/memory-browser.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
@@ -16,7 +20,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 @Component({
     selector: 'app-memory-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -49,32 +53,27 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
             <!-- Toolbar: search + filters -->
             <div class="page__toolbar">
-                <input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search by key or content..."
-                    [ngModel]="searchQuery()"
-                    (ngModelChange)="onSearchChange($event)"
-                    aria-label="Search memories" />
-                <select
-                    class="filter-select"
-                    [ngModel]="tierFilter()"
-                    (ngModelChange)="onTierChange($event)"
-                    aria-label="Filter by tier">
-                    <option value="">All Tiers</option>
-                    <option value="longterm">On-Chain (longterm)</option>
-                    <option value="shortterm">Pending (shortterm)</option>
-                </select>
-                <select
-                    class="filter-select"
-                    [ngModel]="statusFilter()"
-                    (ngModelChange)="onStatusChange($event)"
-                    aria-label="Filter by status">
-                    <option value="">All Statuses</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="pending">Pending</option>
-                    <option value="failed">Failed</option>
-                </select>
+                <mat-form-field appearance="outline" class="toolbar__search">
+                    <mat-label>Search memories</mat-label>
+                    <input matInput [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="toolbar__filter">
+                    <mat-label>Tier</mat-label>
+                    <mat-select [ngModel]="tierFilter()" (ngModelChange)="onTierChange($event)">
+                        <mat-option value="">All Tiers</mat-option>
+                        <mat-option value="longterm">On-Chain (longterm)</mat-option>
+                        <mat-option value="shortterm">Pending (shortterm)</mat-option>
+                    </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="toolbar__filter">
+                    <mat-label>Status</mat-label>
+                    <mat-select [ngModel]="statusFilter()" (ngModelChange)="onStatusChange($event)">
+                        <mat-option value="">All Statuses</mat-option>
+                        <mat-option value="confirmed">Confirmed</mat-option>
+                        <mat-option value="pending">Pending</mat-option>
+                        <mat-option value="failed">Failed</mat-option>
+                    </mat-select>
+                </mat-form-field>
             </div>
 
             @if (memoryService.loading()) {
@@ -116,16 +115,14 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                         <!-- Pagination -->
                         @if (memoryService.total() > pageSize) {
                             <div class="pagination">
-                                <button
-                                    class="btn btn--ghost btn--sm"
+                                <button mat-stroked-button
                                     [disabled]="currentPage() <= 1"
                                     (click)="goToPage(currentPage() - 1)">Prev</button>
                                 <span class="pagination__info">
                                     Page {{ currentPage() }} of {{ totalPages() }}
                                     ({{ memoryService.total() }} total)
                                 </span>
-                                <button
-                                    class="btn btn--ghost btn--sm"
+                                <button mat-stroked-button
                                     [disabled]="currentPage() >= totalPages()"
                                     (click)="goToPage(currentPage() + 1)">Next</button>
                             </div>
@@ -138,23 +135,21 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                             @if (editing()) {
                                 <div class="detail-section">
                                     <h3 class="detail-title">Edit Memory</h3>
-                                    <label class="field-label">Key</label>
-                                    <input
-                                        class="field-input field-input--disabled"
-                                        type="text"
-                                        [value]="mem.key"
-                                        disabled />
-                                    <label class="field-label">Content</label>
-                                    <textarea
-                                        class="field-input field-textarea"
-                                        rows="10"
-                                        [ngModel]="editContent()"
-                                        (ngModelChange)="editContent.set($event)"></textarea>
+                                    <mat-form-field appearance="outline" class="detail-field">
+                                        <mat-label>Key</mat-label>
+                                        <input matInput [value]="mem.key" disabled />
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="detail-field">
+                                        <mat-label>Content</mat-label>
+                                        <textarea matInput rows="10"
+                                            [ngModel]="editContent()"
+                                            (ngModelChange)="editContent.set($event)"></textarea>
+                                    </mat-form-field>
                                     <div class="detail-actions">
-                                        <button class="btn btn--primary" (click)="saveEdit()" [disabled]="saving()">
+                                        <button mat-flat-button color="primary" (click)="saveEdit()" [disabled]="saving()">
                                             {{ saving() ? 'Saving...' : 'Save' }}
                                         </button>
-                                        <button class="btn btn--ghost" (click)="editing.set(false)">Cancel</button>
+                                        <button mat-stroked-button (click)="editing.set(false)">Cancel</button>
                                     </div>
                                 </div>
                             } @else {
@@ -166,8 +161,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                         <span class="detail-meta">Updated {{ mem.updatedAt | relativeTime }}</span>
                                     </div>
                                     <div class="detail-header-actions">
-                                        <button class="btn btn--ghost btn--sm" (click)="startEdit()">Edit</button>
-                                        <button class="btn btn--danger btn--sm" (click)="confirmDelete()">Delete</button>
+                                        <button mat-stroked-button (click)="startEdit()">Edit</button>
+                                        <button mat-stroked-button color="warn" (click)="confirmDelete()">Delete</button>
                                     </div>
                                 </div>
 
@@ -265,40 +260,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .stat--shortterm .stat__value { color: var(--accent-yellow); }
 
         /* ── Search & filters ── */
-        .search-input {
-            flex: 1; min-width: 200px; padding: 0.5rem 0.75rem;
-            background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-primary);
-            font-size: 0.85rem; font-family: inherit;
-            transition: border-color 0.2s;
-        }
-        .search-input:focus { outline: none; border-color: var(--accent-cyan); }
-        .search-input::placeholder { color: var(--text-tertiary); }
-
-        .filter-select {
-            padding: 0.5rem 0.75rem; background: var(--bg-surface);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
-            appearance: auto; cursor: pointer;
-        }
-        .filter-select:focus { outline: none; border-color: var(--accent-cyan); }
-
-        /* ── Buttons ── */
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem;
-            font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent;
-        }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn--ghost { color: var(--text-secondary); border-color: var(--border); }
-        .btn--ghost:hover { border-color: var(--text-tertiary); }
-        .btn--ghost:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        .toolbar__search { flex: 1; min-width: 200px; }
+        .toolbar__filter { width: 160px; }
 
         /* ── Layout ── */
         .memory-layout {
@@ -444,22 +407,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .detail-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 
         /* ── Form fields ── */
-        .field-label {
-            display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary);
-            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; margin-top: 0.75rem;
-        }
-        .field-input {
-            width: 100%; padding: 0.5rem 0.75rem; background: var(--bg-base);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            color: var(--text-primary); font-size: 0.85rem; font-family: inherit;
-            box-sizing: border-box;
-        }
-        .field-input:focus { outline: none; border-color: var(--accent-cyan); }
-        .field-input--disabled { opacity: 0.5; cursor: not-allowed; }
-        .field-textarea {
-            resize: vertical; min-height: 120px;
-            font-family: var(--font-mono); font-size: 0.8rem;
-        }
+        .detail-field { width: 100%; }
 
         /* ── Responsive (mobile-first) ── */
         @media (max-width: 767px) {
@@ -472,7 +420,6 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             .stat__value { font-size: 1rem; }
             .meta-grid { grid-template-columns: 1fr 1fr; }
             .page__toolbar { flex-direction: column; }
-            .search-input { min-width: unset; }
         }
     `,
 })

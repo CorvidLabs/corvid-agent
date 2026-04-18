@@ -8,17 +8,18 @@ import {
     ElementRef,
     inject,
 } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
     selector: 'app-dir-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [MatButtonModule],
     template: `
         <div class="overlay" (click)="onBackdropClick($event)" (keydown.escape)="onCancel()">
             <div class="browser" role="dialog" aria-label="Browse directories">
                 <div class="browser__header">
                     <span class="browser__path" [title]="currentPath()">{{ currentPath() }}</span>
-                    <button
-                        class="browser__up btn btn--icon"
+                    <button mat-stroked-button
                         (click)="navigateUp()"
                         [disabled]="!parentPath()"
                         aria-label="Go to parent directory">
@@ -56,8 +57,8 @@ import {
                         Show hidden
                     </label>
                     <div class="browser__buttons">
-                        <button class="btn btn--primary" (click)="onSelect()">Select</button>
-                        <button class="btn btn--secondary" (click)="onCancel()">Cancel</button>
+                        <button mat-flat-button color="primary" (click)="onSelect()">Select</button>
+                        <button mat-stroked-button (click)="onCancel()">Cancel</button>
                     </div>
                 </div>
             </div>

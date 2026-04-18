@@ -1,4 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { GitHubAllowlistService } from '../../core/services/github-allowlist.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -9,7 +12,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-github-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
+    imports: [MatButtonModule, MatFormFieldModule, MatInputModule, RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent, PageShellComponent],
     template: `
         <app-page-shell
             title="GitHub Allowlist"
@@ -17,20 +20,26 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
             [subtitle]="service.entries().length > 0 ? '(' + service.entries().length + ')' : ''">
 
             <div class="add-form">
-                <input
-                    class="input"
-                    type="text"
-                    placeholder="GitHub username"
-                    [value]="newUsername()"
-                    (input)="newUsername.set(toInputValue($event))" />
-                <input
-                    class="input input--label"
-                    type="text"
-                    placeholder="Label (optional)"
-                    [value]="newLabel()"
-                    (input)="newLabel.set(toInputValue($event))" />
+                <mat-form-field appearance="outline" class="add-form__field">
+                    <mat-label>GitHub username</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="GitHub username"
+                        [value]="newUsername()"
+                        (input)="newUsername.set(toInputValue($event))" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="add-form__field add-form__field--label">
+                    <mat-label>Label (optional)</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="Label (optional)"
+                        [value]="newLabel()"
+                        (input)="newLabel.set(toInputValue($event))" />
+                </mat-form-field>
                 <button
-                    class="btn btn--primary"
+                    mat-flat-button color="primary"
                     [disabled]="!newUsername().trim()"
                     (click)="add()">Add</button>
             </div>
@@ -54,14 +63,17 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                                 <div class="list__item-username">{{ entry.username }}</div>
                                 @if (editingUsername() === entry.username) {
                                     <div class="edit-row">
-                                        <input
-                                            class="input input--inline"
-                                            type="text"
-                                            [value]="editLabel()"
-                                            (input)="editLabel.set(toInputValue($event))"
-                                            (keyup.enter)="saveLabel(entry.username)" />
-                                        <button class="btn btn--small" (click)="saveLabel(entry.username)">Save</button>
-                                        <button class="btn btn--small btn--ghost" (click)="editingUsername.set(null)">Cancel</button>
+                                        <mat-form-field appearance="outline" class="edit-row__field">
+                                            <mat-label>Label</mat-label>
+                                            <input
+                                                matInput
+                                                type="text"
+                                                [value]="editLabel()"
+                                                (input)="editLabel.set(toInputValue($event))"
+                                                (keyup.enter)="saveLabel(entry.username)" />
+                                        </mat-form-field>
+                                        <button mat-flat-button color="primary" (click)="saveLabel(entry.username)">Save</button>
+                                        <button mat-stroked-button (click)="editingUsername.set(null)">Cancel</button>
                                     </div>
                                 } @else {
                                     <div class="label-row">
@@ -73,7 +85,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                             </div>
                             <div class="list__item-meta">
                                 <span>{{ entry.createdAt | relativeTime }}</span>
-                                <button class="btn btn--danger btn--small" (click)="remove(entry.username)">Remove</button>
+                                <button mat-stroked-button color="warn" (click)="remove(entry.username)">Remove</button>
                             </div>
                         </div>
                     }
@@ -82,27 +94,10 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         </app-page-shell>
     `,
     styles: `
-        .add-form { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; }
-        .input {
-            flex: 1; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
-            min-height: 48px;
-        }
-        .input::placeholder { color: var(--text-tertiary); }
-        .input--label { max-width: 280px; min-width: 160px; }
-        .input--inline { flex: 1; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); min-height: 40px; }
-        .btn {
-            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm); font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 48px;
-        }
-        .btn:disabled { opacity: 0.4; cursor: default; }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
-        .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
+        .add-form { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; align-items: flex-start; }
+        .add-form__field { flex: 1; min-width: 0; }
+        .add-form__field--label { max-width: 280px; min-width: 160px; }
+        .edit-row__field { flex: 1; }
         .error { color: var(--accent-red); font-size: var(--text-base); margin-bottom: var(--space-4); }
         .list { display: flex; flex-direction: column; gap: var(--space-4); }
         .list__item {

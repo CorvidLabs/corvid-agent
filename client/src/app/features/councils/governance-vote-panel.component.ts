@@ -8,6 +8,7 @@ import {
     OnInit,
     OnDestroy,
 } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { GovernanceService } from '../../core/services/governance.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -22,6 +23,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
 @Component({
     selector: 'app-governance-vote-panel',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [MatButtonModule],
     template: `
         @if (voteStatus(); as vs) {
             <div class="vote-panel" [class.vote-panel--resolved]="isResolved()">
@@ -121,7 +123,7 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
 
                 @if (vs.evaluation.awaitingHumanApproval && !vs.humanApproved) {
                     <div class="vote-panel__human-action">
-                        <button class="btn btn--primary"
+                        <button mat-flat-button color="primary"
                                 [disabled]="approving()"
                                 (click)="onApproveHuman()">
                             {{ approving() ? 'APPROVING...' : 'APPROVE (HUMAN)' }}
@@ -274,22 +276,6 @@ import type { ServerWsMessage } from '@shared/ws-protocol';
             margin-top: 0.75rem;
             display: flex; justify-content: center;
         }
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius);
-            font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid;
-            font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .btn--primary {
-            background: transparent;
-            color: var(--accent-cyan); border-color: var(--accent-cyan);
-        }
-        .btn--primary:hover:not(:disabled) {
-            background: var(--accent-cyan-dim);
-            box-shadow: var(--glow-cyan);
-        }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
         /* Resolution banner */
         .vote-panel__resolution {

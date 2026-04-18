@@ -1,6 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
@@ -15,7 +18,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 @Component({
     selector: 'app-council-launch-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DatePipe, SessionOutputComponent, StatusBadgeComponent, GovernanceVotePanelComponent],
+    imports: [RouterLink, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, SessionOutputComponent, StatusBadgeComponent, GovernanceVotePanelComponent],
     template: `
         @if (launch(); as l) {
             <div class="page">
@@ -24,7 +27,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
                         <h2>Council Launch</h2>
                         <p class="page__prompt">{{ l.prompt }}</p>
                     </div>
-                    <a class="btn btn--secondary" [routerLink]="['/sessions/councils', l.councilId]">Back to Council</a>
+                    <a mat-stroked-button [routerLink]="['/sessions/councils', l.councilId]">Back to Council</a>
                 </div>
 
                 <div class="stage-bar">
@@ -60,7 +63,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
                             <span class="auto-label">Auto-advancing to discussion...</span>
                         }
                         <button
-                            class="btn btn--secondary btn--sm"
+                            mat-stroked-button
                             [disabled]="!allMembersDone() || triggeringReview()"
                             (click)="onStartReview()"
                         >{{ triggeringReview() ? 'Starting...' : 'Skip Discussion & Start Review' }}</button>
@@ -75,19 +78,19 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
                             <span class="auto-label">Auto-advancing to synthesis...</span>
                         }
                         <button
-                            class="btn btn--secondary btn--sm"
+                            mat-stroked-button
                             [disabled]="!allReviewsDone() || triggeringSynthesis()"
                             (click)="onSynthesize()"
                         >{{ triggeringSynthesis() ? 'Starting...' : 'Synthesize Now' }}</button>
                     }
                     @if (l.stage !== 'complete') {
                         <button
-                            class="btn btn--danger btn--sm"
+                            mat-stroked-button color="warn"
                             [disabled]="aborting()"
                             (click)="onAbort()"
                         >{{ aborting() ? 'Ending...' : 'End Council' }}</button>
                     }
-                    <button class="btn btn--secondary btn--sm" (click)="logsOpen.set(!logsOpen())">
+                    <button mat-stroked-button (click)="logsOpen.set(!logsOpen())">
                         {{ logsOpen() ? 'Hide' : 'Show' }} Logs ({{ logs().length }})
                     </button>
                 </div>
@@ -315,17 +318,19 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
                                 </div>
                             }
                             <div class="council-chat__input">
-                                <input
-                                    class="council-chat__field"
-                                    type="text"
-                                    placeholder="Ask a follow-up question about the council's decision..."
-                                    [value]="chatInput()"
-                                    (input)="chatInput.set($any($event.target).value)"
-                                    (keydown.enter)="onSendChat()"
-                                    [disabled]="chatSending()"
-                                />
+                                <mat-form-field appearance="outline" class="council-chat__field-wrap">
+                                    <mat-label>Follow-up question</mat-label>
+                                    <input matInput
+                                        type="text"
+                                        placeholder="Ask a follow-up question about the council's decision..."
+                                        [value]="chatInput()"
+                                        (input)="chatInput.set($any($event.target).value)"
+                                        (keydown.enter)="onSendChat()"
+                                        [disabled]="chatSending()"
+                                    />
+                                </mat-form-field>
                                 <button
-                                    class="btn btn--primary btn--sm"
+                                    mat-flat-button color="primary"
                                     (click)="onSendChat()"
                                     [disabled]="chatSending() || !chatInput().trim()"
                                 >{{ chatSending() ? 'Sending...' : 'Send' }}</button>
@@ -343,18 +348,6 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__prompt { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.9rem; max-width: 600px; }
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { font-size: 0.7rem; padding: 0.4rem 0.75rem; min-height: 32px; }
 
         .auto-label {
             font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;
@@ -519,9 +512,7 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .council-chat { margin-top: 1.5rem; }
         .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 0.75rem; max-height: clamp(250px, 45vh, 500px); overflow-y: auto; }
         .council-chat__input { display: flex; gap: 0.5rem; align-items: center; }
-        .council-chat__field { flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-bright); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; }
-        .council-chat__field:focus { border-color: var(--accent-cyan); }
-        .council-chat__field:disabled { opacity: 0.5; }
+        .council-chat__field-wrap { flex: 1; }
     `,
 })
 export class CouncilLaunchViewComponent implements OnInit, OnDestroy {

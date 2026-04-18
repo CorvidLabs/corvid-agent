@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
@@ -59,7 +63,7 @@ type EditSection = {
 @Component({
     selector: 'app-environment-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         <div class="settings__section">
             <h3 class="section-toggle" (click)="toggleSection()">
@@ -231,7 +235,7 @@ type EditSection = {
                         </div>
 
                         <div class="edit-row">
-                            <button class="save-btn save-btn--sm" (click)="enterEditMode()">Edit Settings</button>
+                            <button mat-flat-button color="primary" (click)="enterEditMode()">Edit Settings</button>
                         </div>
                     } @else {
                         <!-- EDIT MODE -->
@@ -241,28 +245,31 @@ type EditSection = {
                                 <div class="edit-fields">
                                     @for (field of section.fields; track field.key) {
                                         <div class="edit-field">
-                                            <label class="edit-label" [for]="'env_' + field.key">{{ field.label }}</label>
                                             @if (field.type === 'select') {
-                                                <select class="edit-input" [id]="'env_' + field.key"
-                                                    [ngModel]="editValues()[field.key] ?? ''"
-                                                    (ngModelChange)="setEditValue(field.key, $event)">
-                                                    <option value="">-- unchanged --</option>
-                                                    @for (opt of field.options; track opt) {
-                                                        <option [value]="opt">{{ opt }}</option>
-                                                    }
-                                                </select>
+                                                <mat-form-field appearance="outline" class="field">
+                                                    <mat-label>{{ field.label }}</mat-label>
+                                                    <mat-select
+                                                        [ngModel]="editValues()[field.key] ?? ''"
+                                                        (selectionChange)="setEditValue(field.key, $event.value)">
+                                                        <mat-option value="">-- unchanged --</mat-option>
+                                                        @for (opt of field.options; track opt) {
+                                                            <mat-option [value]="opt">{{ opt }}</mat-option>
+                                                        }
+                                                    </mat-select>
+                                                </mat-form-field>
                                             } @else {
                                                 <div class="edit-input-row">
-                                                    <input
-                                                        [id]="'env_' + field.key"
-                                                        class="edit-input"
-                                                        [type]="field.masked && !showFields()[field.key] ? 'password' : 'text'"
-                                                        [placeholder]="field.masked ? maskPlaceholder(field.key) : ''"
-                                                        [ngModel]="editValues()[field.key] ?? ''"
-                                                        (ngModelChange)="setEditValue(field.key, $event)"
-                                                    />
+                                                    <mat-form-field appearance="outline" class="field">
+                                                        <mat-label>{{ field.label }}</mat-label>
+                                                        <input matInput
+                                                            [type]="field.masked && !showFields()[field.key] ? 'password' : 'text'"
+                                                            [placeholder]="field.masked ? maskPlaceholder(field.key) : ''"
+                                                            [ngModel]="editValues()[field.key] ?? ''"
+                                                            (ngModelChange)="setEditValue(field.key, $event)"
+                                                        />
+                                                    </mat-form-field>
                                                     @if (field.masked) {
-                                                        <button class="show-btn" type="button" (click)="toggleShow(field.key)">
+                                                        <button mat-stroked-button type="button" class="show-btn" (click)="toggleShow(field.key)">
                                                             {{ showFields()[field.key] ? 'Hide' : 'Show' }}
                                                         </button>
                                                     }
@@ -275,10 +282,10 @@ type EditSection = {
                         }
 
                         <div class="edit-actions">
-                            <button class="save-btn save-btn--sm" [disabled]="saving()" (click)="saveEnvVars()">
+                            <button mat-flat-button color="primary" [disabled]="saving()" (click)="saveEnvVars()">
                                 {{ saving() ? 'Saving...' : 'Save' }}
                             </button>
-                            <button class="cancel-btn cancel-btn--sm" (click)="cancelEdit()">Cancel</button>
+                            <button mat-stroked-button (click)="cancelEdit()">Cancel</button>
                         </div>
                     }
                 }
@@ -310,21 +317,9 @@ type EditSection = {
         .edit-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem; }
         .edit-fields { display: flex; flex-direction: column; gap: 0.4rem; }
         .edit-field { display: flex; flex-direction: column; gap: 0.2rem; }
-        .edit-label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
         .edit-input-row { display: flex; gap: 0.4rem; align-items: center; }
-        .edit-input {
-            flex: 1; padding: 0.45rem 0.6rem; background: var(--bg-raised);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
-        }
-        .edit-input:focus { outline: none; border-color: var(--accent-cyan); }
-        .show-btn {
-            font-size: 0.7rem; font-weight: 600; padding: 0.3rem 0.5rem;
-            background: var(--bg-raised); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--text-secondary); cursor: pointer;
-            white-space: nowrap;
-        }
-        .show-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .field { width: 100%; flex: 1; }
+        .show-btn { white-space: nowrap; }
         .restart-banner {
             background: var(--accent-amber-dim); border: 1px solid var(--accent-amber);
             border-radius: var(--radius); padding: 0.5rem 0.75rem;

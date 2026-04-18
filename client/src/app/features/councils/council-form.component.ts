@@ -1,6 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import type { Agent } from '../../core/models/agent.model';
@@ -8,85 +13,73 @@ import type { Agent } from '../../core/models/agent.model';
 @Component({
     selector: 'app-council-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatCheckboxModule],
     template: `
         <div class="page">
             <h2>{{ editId() ? 'Edit Council' : 'New Council' }}</h2>
 
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
-                <div class="form__field">
-                    <label for="name" class="form__label">Name</label>
-                    <input id="name" formControlName="name" class="form__input"
-                           [attr.aria-describedby]="form.get('name')?.invalid && form.get('name')?.touched ? 'name-error' : null" />
+                <mat-form-field appearance="outline">
+                    <mat-label>Name</mat-label>
+                    <input matInput formControlName="name" />
                     @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-                        <span id="name-error" class="form__error" role="alert">Council name is required.</span>
+                        <mat-error>Council name is required.</mat-error>
                     }
-                </div>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="description" class="form__label">Description</label>
-                    <textarea id="description" formControlName="description" class="form__input form__textarea"
-                              rows="2"></textarea>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Description</mat-label>
+                    <textarea matInput formControlName="description" rows="2"></textarea>
+                </mat-form-field>
 
                 <fieldset class="form__fieldset">
                     <legend class="form__legend">Members</legend>
                     <p class="form__hint">Select agents to include in this council.</p>
                     @for (agent of allAgents(); track agent.id) {
-                        <label class="form__checkbox">
-                            <input
-                                type="checkbox"
-                                [checked]="selectedAgentIds().has(agent.id)"
-                                (change)="toggleAgent(agent.id, $event)"
-                            />
+                        <mat-checkbox
+                            [checked]="selectedAgentIds().has(agent.id)"
+                            (change)="toggleAgentMat(agent.id, $event.checked)">
                             {{ agent.name }}
                             <span class="agent-meta">{{ agent.model || 'default' }} / {{ agent.permissionMode }}</span>
-                        </label>
+                        </mat-checkbox>
                     }
                     @if (allAgents().length === 0) {
                         <p class="form__hint">No agents available. Create agents first.</p>
                     }
                 </fieldset>
 
-                <div class="form__field">
-                    <label for="discussionRounds" class="form__label">Discussion Rounds</label>
-                    <input
-                        id="discussionRounds"
-                        type="number"
-                        formControlName="discussionRounds"
-                        class="form__input"
-                        min="0"
-                        max="10"
-                    />
-                    <p class="form__hint">Number of agent-to-agent discussion rounds between responding and reviewing. Set to 0 to skip.</p>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Discussion Rounds</mat-label>
+                    <input matInput type="number" formControlName="discussionRounds" min="0" max="10" />
+                    <mat-hint>Number of agent-to-agent discussion rounds. Set to 0 to skip.</mat-hint>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="onChainMode" class="form__label">Governance Tier</label>
-                    <select id="onChainMode" formControlName="onChainMode" class="form__input">
-                        <option value="off">Off</option>
-                        <option value="attestation">Attestation</option>
-                        <option value="full">Full</option>
-                    </select>
-                    <p class="form__hint">Controls on-chain recording: off (local only), attestation (hash on-chain), or full (all data on-chain).</p>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Governance Tier</mat-label>
+                    <mat-select formControlName="onChainMode">
+                        <mat-option value="off">Off</mat-option>
+                        <mat-option value="attestation">Attestation</mat-option>
+                        <mat-option value="full">Full</mat-option>
+                    </mat-select>
+                    <mat-hint>Controls on-chain recording: off, attestation (hash), or full (all data).</mat-hint>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="chairman" class="form__label">Chairman (optional)</label>
-                    <select #chairmanSelect id="chairman" class="form__input" (change)="onChairmanChange($event)">
-                        <option value="">None</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Chairman (optional)</mat-label>
+                    <mat-select [value]="chairmanId()" (selectionChange)="chairmanId.set($event.value)">
+                        <mat-option value="">None</mat-option>
                         @for (agent of selectedAgentsList(); track agent.id) {
-                            <option [value]="agent.id" [selected]="agent.id === chairmanId()">{{ agent.name }}</option>
+                            <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
                         }
-                    </select>
-                    <p class="form__hint">The chairman produces the final synthesized answer.</p>
-                </div>
+                    </mat-select>
+                    <mat-hint>The chairman produces the final synthesized answer.</mat-hint>
+                </mat-form-field>
 
                 <div class="form__actions">
-                    <button type="submit" class="btn btn--primary" [disabled]="form.invalid || selectedAgentIds().size === 0 || saving()">
+                    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || selectedAgentIds().size === 0 || saving()">
                         {{ saving() ? 'Saving...' : 'Save' }}
                     </button>
-                    <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
+                    <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
                 </div>
             </form>
         </div>
@@ -94,10 +87,14 @@ import type { Agent } from '../../core/models/agent.model';
     styles: `
         .page { padding: var(--space-6); max-width: 640px; }
         .page h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
-        .form__fieldset { background: var(--bg-surface); }
-        .form__legend { color: var(--accent-magenta); }
-        .form__checkbox input[type="checkbox"] { accent-color: var(--accent-cyan); }
+        .form { display: flex; flex-direction: column; gap: 0.25rem; }
+        mat-form-field { width: 100%; }
+        .form__fieldset { background: var(--bg-surface); padding: 1rem; border: 1px solid var(--border); border-radius: 8px; margin: 0.5rem 0; }
+        .form__legend { color: var(--accent-magenta); font-weight: 600; }
+        .form__hint { font-size: 0.8rem; color: var(--text-secondary); margin: 0.25rem 0; }
+        mat-checkbox { display: block; margin: 0.25rem 0; }
         .agent-meta { font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 0.25rem; }
+        .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
     `,
 })
 export class CouncilFormComponent implements OnInit {
@@ -149,6 +146,10 @@ export class CouncilFormComponent implements OnInit {
 
     protected toggleAgent(agentId: string, event: Event): void {
         const checked = (event.target as HTMLInputElement).checked;
+        this.toggleAgentMat(agentId, checked);
+    }
+
+    protected toggleAgentMat(agentId: string, checked: boolean): void {
         const current = new Set(this.selectedAgentIds());
         if (checked) {
             current.add(agentId);
