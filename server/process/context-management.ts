@@ -206,6 +206,18 @@ export function summarizeConversation(
     points.push(`Key decisions/findings:\n${decisions.map((d) => `  - ${d}`).join('\n')}`);
   }
 
+  // Extract errors encountered and their resolutions
+  const errors = extractErrorsAndResolutions(messages);
+  if (errors.length > 0) {
+    points.push(`Errors/resolutions:\n${errors.map((e) => `  - ${e}`).join('\n')}`);
+  }
+
+  // Extract configuration values discovered
+  const configs = extractConfigValues(messages);
+  if (configs.length > 0) {
+    points.push(`Config values: ${configs.join(', ')}`);
+  }
+
   // Extract in-progress work status from the last few assistant messages
   if (assistantMessages.length > 0) {
     const recentAssistant = assistantMessages.slice(-3);
@@ -241,22 +253,25 @@ export function summarizeConversation(
 
 const FILE_PATH_PATTERN = /(?:^|\s|['"`])(\/?(?:[\w.-]+\/){1,10}[\w.-]+\.[\w]+)/g;
 const GIT_FILE_PATTERN = /(?:modified|created|deleted|renamed):\s+([\w./-]+)/g;
+const TOOL_FILE_PATTERN =
+  /(?:Reading|Read|Wrote|Writing|Editing|Created|Deleted|file_path|path)[:\s]+['"`]?((?:\/|\.\.?\/)[\w./-]+)['"`]?/g;
+const IMPORT_PATTERN = /(?:from|require\()\s*['"]([^'"]+)['"]/g;
 
 function extractMentionedFilePaths(messages: Array<{ role: string; content: string }>): string[] {
   const paths = new Set<string>();
+  const filePatterns = [FILE_PATH_PATTERN, GIT_FILE_PATTERN, TOOL_FILE_PATTERN, IMPORT_PATTERN];
+
   for (const msg of messages) {
     if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
-    let match: RegExpExecArray | null;
-    FILE_PATH_PATTERN.lastIndex = 0;
-    while ((match = FILE_PATH_PATTERN.exec(msg.content)) !== null) {
-      const p = match[1];
-      if (p.includes('/') && !p.startsWith('http') && !p.startsWith('//')) {
-        paths.add(p);
+    for (const pattern of filePatterns) {
+      pattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(msg.content)) !== null) {
+        const p = match[1];
+        if (p.includes('/') && !p.startsWith('http') && !p.startsWith('//')) {
+          paths.add(p);
+        }
       }
-    }
-    GIT_FILE_PATTERN.lastIndex = 0;
-    while ((match = GIT_FILE_PATTERN.exec(msg.content)) !== null) {
-      paths.add(match[1]);
     }
   }
   return [...paths];
@@ -268,21 +283,84 @@ function extractKeyDecisions(assistantMessages: Array<{ content: string }>): str
     /(?:root cause|the issue|the problem|the bug)[:\s]+(.{20,200}?)(?:\.|$)/gi,
     /(?:fixed|resolved|implemented|added|removed|changed|updated)[:\s]+(.{20,200}?)(?:\.|$)/gi,
     /(?:decided to|going to|plan is to|approach is to)[:\s]+(.{20,200}?)(?:\.|$)/gi,
+    /(?:approved|allowed|denied|rejected|confirmed)[:\s]+(.{10,200}?)(?:\.|$)/gi,
+    /(?:chose|selected|picked|using|switched to|migrated to)[:\s]+(.{10,200}?)(?:(?:\s+instead|\s+over|\s+rather).*?)?(?:\.|$)/gi,
+    /(?:the solution|the fix|the workaround|the approach)[:\s]+(.{20,200}?)(?:\.|$)/gi,
+    /(?:discovered|found|noticed|identified|determined)[:\s]+that\s+(.{20,200}?)(?:\.|$)/gi,
+    /(?:must|need to|should|cannot|can't|won't)[:\s]+(.{15,200}?)(?:\s+because\s+.{10,100}?)?(?:\.|$)/gi,
   ];
-  for (const msg of assistantMessages.slice(-6)) {
+  const maxDecisions = 12;
+  for (const msg of assistantMessages.slice(-10)) {
     for (const pattern of decisionPatterns) {
       pattern.lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = pattern.exec(msg.content)) !== null) {
         const decision = match[0].slice(0, 200).replace(/\n/g, ' ').trim();
-        if (!decisions.includes(decision)) {
+        if (decision.length >= 15 && !decisions.includes(decision)) {
           decisions.push(decision);
         }
-        if (decisions.length >= 8) return decisions;
+        if (decisions.length >= maxDecisions) return decisions;
       }
     }
   }
   return decisions;
+}
+
+function extractErrorsAndResolutions(messages: Array<{ role: string; content: string }>): string[] {
+  const results: string[] = [];
+  const errorPattern = /(?:Error|error|ERROR|Exception|FAIL|failed|failure)[:\s]+(.{10,300}?)(?:\n|$)/g;
+  const resolutionPattern = /(?:fixed by|resolved by|solution was|fix was|worked around)[:\s]+(.{10,200}?)(?:\.|$)/gi;
+
+  for (const msg of messages) {
+    if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
+
+    errorPattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = errorPattern.exec(msg.content)) !== null) {
+      const err = match[0].slice(0, 200).replace(/\n/g, ' ').trim();
+      if (err.length >= 15 && !results.includes(err)) {
+        results.push(err);
+      }
+      if (results.length >= 8) break;
+    }
+
+    resolutionPattern.lastIndex = 0;
+    while ((match = resolutionPattern.exec(msg.content)) !== null) {
+      const res = match[0].slice(0, 200).replace(/\n/g, ' ').trim();
+      if (!results.includes(res)) {
+        results.push(res);
+      }
+      if (results.length >= 10) break;
+    }
+  }
+  return results;
+}
+
+function extractConfigValues(messages: Array<{ role: string; content: string }>): string[] {
+  const configs: string[] = [];
+  const envPattern = /([A-Z][A-Z0-9_]{2,})=(['"]?)([^\s'"]{1,100})\2/g;
+  const configPattern =
+    /(?:set|configured|config|setting|port|host|version|using)\s+[`"']?(\w[\w.-]*)[`"']?\s*(?:to|=|:)\s*[`"']?([^\s`"']{1,80})[`"']?/gi;
+
+  for (const msg of messages) {
+    if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
+
+    envPattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = envPattern.exec(msg.content)) !== null) {
+      const entry = `${match[1]}=${match[3]}`;
+      if (!configs.includes(entry)) configs.push(entry);
+      if (configs.length >= 10) break;
+    }
+
+    configPattern.lastIndex = 0;
+    while ((match = configPattern.exec(msg.content)) !== null) {
+      const entry = `${match[1]}=${match[2]}`;
+      if (!configs.includes(entry)) configs.push(entry);
+      if (configs.length >= 10) break;
+    }
+  }
+  return configs;
 }
 
 /**
@@ -319,8 +397,23 @@ function trimMessagesTier2(messages: ConversationMessage[], _systemPrompt?: stri
   const discarded = messages.slice(1, -keepCount);
   const recent = messages.slice(-keepCount);
 
-  // Summarize discarded tool results so the model retains some context
   const summaries: string[] = [];
+
+  const discardedPaths = extractMentionedFilePaths(discarded);
+  if (discardedPaths.length > 0) {
+    summaries.push(`[Files from earlier context: ${discardedPaths.slice(0, 20).join(', ')}]`);
+  }
+
+  const discardedDecisions = extractKeyDecisions(discarded.filter((m) => m.role === 'assistant'));
+  if (discardedDecisions.length > 0) {
+    summaries.push(`[Earlier decisions: ${discardedDecisions.map((d) => d.slice(0, 150)).join('; ')}]`);
+  }
+
+  const discardedErrors = extractErrorsAndResolutions(discarded);
+  if (discardedErrors.length > 0) {
+    summaries.push(`[Earlier errors/resolutions: ${discardedErrors.map((e) => e.slice(0, 150)).join('; ')}]`);
+  }
+
   for (const msg of discarded) {
     if (msg.role === 'tool' && msg.content.length > 0) {
       const preview = msg.content.slice(0, 200).replace(/\n/g, ' ').trim();
@@ -388,6 +481,22 @@ export function trimMessages(messages: ConversationMessage[], systemPrompt?: str
     // One-line summaries for all tool results older than 2 turns (4 messages)
     const discarded = messages.slice(0, -keepLast);
     const summaries: string[] = [];
+
+    const discardedPaths = extractMentionedFilePaths(discarded);
+    if (discardedPaths.length > 0) {
+      summaries.push(`[Files from earlier context: ${discardedPaths.slice(0, 15).join(', ')}]`);
+    }
+
+    const discardedDecisions = extractKeyDecisions(discarded.filter((m) => m.role === 'assistant'));
+    if (discardedDecisions.length > 0) {
+      summaries.push(`[Earlier decisions: ${discardedDecisions.map((d) => d.slice(0, 100)).join('; ')}]`);
+    }
+
+    const discardedErrors = extractErrorsAndResolutions(discarded);
+    if (discardedErrors.length > 0) {
+      summaries.push(`[Earlier errors/resolutions: ${discardedErrors.map((e) => e.slice(0, 100)).join('; ')}]`);
+    }
+
     for (const msg of discarded) {
       if (msg.role === 'tool' && msg.content.length > 0) {
         const preview = msg.content.slice(0, 80).replace(/\n/g, ' ').trim();
