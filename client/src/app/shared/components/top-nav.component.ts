@@ -7,7 +7,6 @@ import {
     OnInit,
     OnDestroy,
     HostListener,
-    ElementRef,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
@@ -19,12 +18,16 @@ import { IconComponent } from './icon.component';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
 import { firstValueFrom } from 'rxjs';
 import type { AlgoChatNetwork } from '../../core/models/session.model';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatIconModule } from '@angular/material/icon';
 
 interface NavChild {
     label: string;
     icon: string;
     route: string;
-    divider?: boolean; // show a separator line above this item
+    divider?: boolean;
 }
 
 interface NavTab {
@@ -107,52 +110,69 @@ const TABS: NavTab[] = [
 @Component({
     selector: 'app-top-nav',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RouterLinkActive, StatusBadgeComponent, IconComponent],
+    imports: [
+        RouterLink,
+        RouterLinkActive,
+        StatusBadgeComponent,
+        IconComponent,
+        MatToolbarModule,
+        MatButtonModule,
+        MatMenuModule,
+        MatIconModule,
+    ],
     template: `
-        <nav class="topnav" role="navigation" aria-label="Main navigation">
+        <mat-toolbar class="topnav" role="navigation" aria-label="Main navigation">
             <div class="topnav__left">
                 <a class="topnav__logo" routerLink="/chat">
                     <span class="topnav__logo-text">CorvidAgent</span>
                 </a>
                 <div class="topnav__tabs">
                     @for (tab of tabs(); track tab.key) {
-                        <div class="topnav__tab-wrapper">
+                        @if (tab.children.length > 1) {
                             <button
+                                mat-button
                                 class="topnav__tab"
                                 [class.topnav__tab--active]="isTabActive(tab)"
-                                (click)="onTabClick(tab, $event)"
+                                [matMenuTriggerFor]="tabMenu"
                                 type="button">
                                 <app-icon [name]="tab.icon" [size]="18" />
                                 {{ tab.label }}
-                                @if (tab.children.length > 1) {
-                                    <span class="topnav__tab-chevron" [class.topnav__tab-chevron--open]="openDropdown() === tab.key">&#x25BE;</span>
-                                }
+                                <span class="topnav__tab-chevron">&#x25BE;</span>
                             </button>
-                            @if (openDropdown() === tab.key && tab.children.length > 1) {
-                                <div class="topnav__dropdown">
-                                    @for (child of tab.children; track child.route) {
-                                        @if (child.divider) {
-                                            <div class="topnav__dropdown-divider"></div>
-                                        }
-                                        <a
-                                            class="topnav__dropdown-item"
-                                            [routerLink]="child.route"
-                                            routerLinkActive="topnav__dropdown-item--active"
-                                            [routerLinkActiveOptions]="{ exact: child.route === '/chat' }"
-                                            (click)="closeDropdown()">
-                                            <app-icon [name]="child.icon" [size]="14" />
-                                            {{ child.label }}
-                                        </a>
+                            <mat-menu #tabMenu="matMenu" class="topnav-dropdown">
+                                @for (child of tab.children; track child.route) {
+                                    @if (child.divider) {
+                                        <mat-divider />
                                     }
-                                </div>
-                            }
-                        </div>
+                                    <a
+                                        mat-menu-item
+                                        class="topnav__menu-item"
+                                        [routerLink]="child.route"
+                                        routerLinkActive="topnav__menu-item--active"
+                                        [routerLinkActiveOptions]="{ exact: child.route === '/chat' }">
+                                        <app-icon [name]="child.icon" [size]="14" />
+                                        {{ child.label }}
+                                    </a>
+                                }
+                            </mat-menu>
+                        } @else {
+                            <button
+                                mat-button
+                                class="topnav__tab"
+                                [class.topnav__tab--active]="isTabActive(tab)"
+                                (click)="router.navigate([tab.route])"
+                                type="button">
+                                <app-icon [name]="tab.icon" [size]="18" />
+                                {{ tab.label }}
+                            </button>
+                        }
                     }
                 </div>
             </div>
             <div class="topnav__right">
                 <div class="topnav__network" role="group" aria-label="Network selector">
                     <button
+                        mat-button
                         class="network-btn"
                         [class.network-btn--active]="currentNetwork() === 'testnet'"
                         [class.network-btn--testnet]="currentNetwork() === 'testnet'"
@@ -161,6 +181,7 @@ const TABS: NavTab[] = [
                         aria-label="Switch to testnet"
                     >TEST</button>
                     <button
+                        mat-button
                         class="network-btn"
                         [class.network-btn--active]="currentNetwork() === 'mainnet'"
                         [class.network-btn--mainnet]="currentNetwork() === 'mainnet'"
@@ -182,9 +203,11 @@ const TABS: NavTab[] = [
                     <app-status-badge [status]="wsService.connectionStatus()" />
                 </div>
                 <button
+                    mat-icon-button
                     class="topnav__help"
                     (click)="openHelp()"
                     title="Keyboard shortcuts (?)"
+                    aria-label="Keyboard shortcuts"
                     type="button">
                     <app-icon name="help" [size]="14" />
                 </button>
@@ -192,6 +215,7 @@ const TABS: NavTab[] = [
 
             <!-- Mobile hamburger -->
             <button
+                mat-icon-button
                 class="topnav__hamburger"
                 (click)="mobileOpen.set(!mobileOpen())"
                 [attr.aria-expanded]="mobileOpen()"
@@ -201,7 +225,7 @@ const TABS: NavTab[] = [
                     <span></span><span></span><span></span>
                 </span>
             </button>
-        </nav>
+        </mat-toolbar>
 
         <!-- Mobile menu -->
         @if (mobileOpen()) {
@@ -226,11 +250,17 @@ const TABS: NavTab[] = [
         }
     `,
     styles: `
-        .topnav {
+        :host {
+            display: block;
+        }
+
+        /* Override mat-toolbar defaults to preserve glassmorphism */
+        .topnav.mat-toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             height: clamp(48px, 4vw, 72px);
+            min-height: unset;
             padding: 0 clamp(0.75rem, 2vw, 3rem);
             background: var(--glass-bg-solid);
             backdrop-filter: blur(12px);
@@ -238,6 +268,7 @@ const TABS: NavTab[] = [
             border-bottom: 1px solid var(--border-subtle);
             position: relative;
             z-index: 100;
+            color: var(--text-primary);
         }
         .topnav__left {
             display: flex;
@@ -266,33 +297,29 @@ const TABS: NavTab[] = [
             align-items: center;
             gap: clamp(0.125rem, 0.5vw, 0.75rem);
         }
-        .topnav__tab-wrapper {
-            position: relative;
-        }
-        .topnav__tab {
+
+        /* Override mat-button styles for nav tabs */
+        .topnav__tab.mat-mdc-button {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem clamp(0.75rem, 1.5vw, 2rem);
-            background: none;
-            border: none;
             color: var(--text-secondary);
             font-family: inherit;
             font-size: clamp(0.75rem, 0.55rem + 0.65vw, 1.25rem);
             font-weight: 600;
             letter-spacing: 0.04em;
-            cursor: pointer;
-            transition: color 0.15s, background 0.15s;
             border-bottom: 2px solid transparent;
             height: clamp(48px, 4vw, 72px);
             text-transform: uppercase;
             border-radius: var(--radius) var(--radius) 0 0;
+            min-width: unset;
         }
-        .topnav__tab:hover {
+        .topnav__tab.mat-mdc-button:hover {
             color: var(--text-primary);
             background: var(--bg-hover);
         }
-        .topnav__tab--active {
+        .topnav__tab--active.mat-mdc-button {
             color: var(--accent-cyan);
             border-bottom-color: var(--accent-cyan);
             text-shadow: 0 0 8px var(--accent-cyan-border);
@@ -300,56 +327,7 @@ const TABS: NavTab[] = [
         }
         .topnav__tab-chevron {
             font-size: 0.6rem;
-            transition: transform 150ms ease;
-        }
-        .topnav__tab-chevron--open {
-            transform: rotate(180deg);
-        }
-
-        /* Dropdown */
-        .topnav__dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            min-width: clamp(220px, 15vw, 300px);
-            background: rgba(22, 24, 34, 0.95);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--border-faint);
-            border-radius: var(--radius-lg);
-            padding: 0.5rem 0;
-            z-index: 200;
-            box-shadow: 0 12px 40px var(--shadow-deep), 0 0 0 1px var(--accent-cyan-subtle);
-            animation: dropdownIn 0.15s ease-out;
-        }
-        @keyframes dropdownIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .topnav__dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-            padding: 0.625rem 1.25rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: var(--text-sm);
-            letter-spacing: 0.03em;
-            transition: background 0.1s, color 0.1s;
-            min-height: 44px;
-        }
-        .topnav__dropdown-item:hover {
-            background: var(--bg-hover);
-            color: var(--accent-cyan);
-        }
-        .topnav__dropdown-item--active {
-            color: var(--accent-cyan);
-            background: var(--accent-cyan-dim);
-        }
-        .topnav__dropdown-divider {
-            height: 1px;
-            background: var(--border);
-            margin: 0.25rem 0;
+            margin-left: 0.15rem;
         }
 
         /* Right side */
@@ -365,30 +343,28 @@ const TABS: NavTab[] = [
             border-radius: var(--radius);
             overflow: hidden;
         }
-        .network-btn {
+        .network-btn.mat-mdc-button {
             padding: 0.4rem 0.85rem;
             min-height: 36px;
+            min-width: unset;
             font-family: inherit;
             font-size: var(--text-xxs);
             font-weight: 700;
             letter-spacing: 0.06em;
-            border: none;
             background: transparent;
             color: var(--text-tertiary);
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s;
             text-transform: uppercase;
         }
-        .network-btn:hover:not(:disabled):not(.network-btn--active) {
+        .network-btn.mat-mdc-button:hover:not(:disabled):not(.network-btn--active) {
             background: var(--bg-hover);
             color: var(--text-secondary);
         }
-        .network-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .network-btn--active.network-btn--testnet {
+        .network-btn.mat-mdc-button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .network-btn--active.network-btn--testnet.mat-mdc-button {
             background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
             color: var(--network-testnet);
         }
-        .network-btn--active.network-btn--mainnet {
+        .network-btn--active.network-btn--mainnet.mat-mdc-button {
             background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
             color: var(--network-mainnet);
         }
@@ -396,23 +372,14 @@ const TABS: NavTab[] = [
             display: flex;
             align-items: center;
         }
-        .topnav__help {
+        .topnav__help.mat-mdc-icon-button {
             width: clamp(36px, 3vw, 44px);
             height: clamp(36px, 3vw, 44px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: none;
             border: 1px solid var(--border-bright);
             border-radius: var(--radius);
             color: var(--text-tertiary);
-            font-family: inherit;
-            font-size: var(--text-xs);
-            font-weight: 700;
-            cursor: pointer;
-            transition: color 0.15s, border-color 0.15s;
         }
-        .topnav__help:hover {
+        .topnav__help.mat-mdc-icon-button:hover {
             color: var(--accent-cyan);
             border-color: var(--accent-cyan);
         }
@@ -452,17 +419,14 @@ const TABS: NavTab[] = [
         }
 
         /* Mobile hamburger */
-        .topnav__hamburger {
+        .topnav__hamburger.mat-mdc-icon-button {
             display: none;
             background: none;
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 0.5rem;
-            cursor: pointer;
             width: 44px;
             height: 44px;
-            align-items: center;
-            justify-content: center;
+            color: var(--text-secondary);
         }
         .topnav__hamburger-icon {
             display: flex;
@@ -488,12 +452,12 @@ const TABS: NavTab[] = [
         }
 
         @media (max-width: 767px) {
-            .topnav {
+            .topnav.mat-toolbar {
                 height: 48px;
                 padding: 0 var(--space-4);
             }
             .topnav__tabs, .topnav__right { display: none; }
-            .topnav__hamburger { display: flex; }
+            .topnav__hamburger.mat-mdc-icon-button { display: flex; }
 
             .topnav-mobile-backdrop {
                 display: block;
@@ -556,13 +520,10 @@ export class TopNavComponent implements OnInit, OnDestroy {
     protected readonly wsService = inject(WebSocketService);
     private readonly sessionService = inject(SessionService);
     private readonly apiService = inject(ApiService);
-    private readonly router = inject(Router);
+    protected readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
-    private readonly elRef = inject(ElementRef);
 
-    /** All tabs are always visible regardless of view mode — simple mode only affects dashboard widgets */
     protected readonly tabs = computed<NavTab[]>(() => TABS);
-    protected readonly openDropdown = signal<string | null>(null);
     protected readonly mobileOpen = signal(false);
     protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
     protected readonly switching = signal(false);
@@ -576,7 +537,7 @@ export class TopNavComponent implements OnInit, OnDestroy {
             .pipe(filter((e) => e instanceof NavigationEnd))
             .subscribe((e) => {
                 this.currentUrl = (e as NavigationEnd).urlAfterRedirects;
-                this.closeDropdown();
+                this.mobileOpen.set(false);
             });
         this.loadNetwork();
     }
@@ -585,16 +546,8 @@ export class TopNavComponent implements OnInit, OnDestroy {
         this.routerSub?.unsubscribe();
     }
 
-    @HostListener('document:click', ['$event'])
-    onDocumentClick(event: Event): void {
-        if (!this.elRef.nativeElement.contains(event.target)) {
-            this.closeDropdown();
-        }
-    }
-
     @HostListener('document:keydown.escape')
     onEscape(): void {
-        this.closeDropdown();
         this.mobileOpen.set(false);
     }
 
@@ -602,27 +555,7 @@ export class TopNavComponent implements OnInit, OnDestroy {
         return tab.matchRoutes.some((r) => this.currentUrl.startsWith(r));
     }
 
-    protected onTabClick(tab: NavTab, event: Event): void {
-        event.stopPropagation();
-        if (this.openDropdown() === tab.key) {
-            this.closeDropdown();
-            return;
-        }
-        if (tab.children.length > 1) {
-            this.openDropdown.set(tab.key);
-            // Don't navigate when opening dropdown — let user pick a sub-item
-            return;
-        }
-        // Only navigate for tabs without children (Home, Dashboard)
-        this.router.navigate([tab.route]);
-    }
-
-    protected closeDropdown(): void {
-        this.openDropdown.set(null);
-    }
-
     protected openCommandPalette(): void {
-        // Simulate Cmd+K to open the palette
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
     }
 

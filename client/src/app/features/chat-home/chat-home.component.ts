@@ -18,11 +18,23 @@ import type { Agent } from '../../core/models/agent.model';
 import type { Session } from '../../core/models/session.model';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
 import { OnboardingComponent } from './onboarding.component';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
     selector: 'app-chat-home',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [OnboardingComponent],
+    imports: [
+        OnboardingComponent,
+        MatCardModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+        MatButtonModule,
+    ],
     template: `
         @if (showOnboarding()) {
             <app-onboarding (done)="onboardingSkipped.set(true)" />
@@ -48,74 +60,83 @@ import { OnboardingComponent } from './onboarding.component';
                         </div>
                     }
 
-                    <div class="chat-home__input-card">
-                        <textarea
-                            class="chat-home__textarea"
-                            #promptInput
-                            [value]="prompt()"
-                            (input)="onPromptInput($event)"
-                            (keydown)="onKeydown($event)"
-                            placeholder="Ask anything..."
-                            rows="2"
-                            [disabled]="launching()"
-                            aria-label="Chat prompt"
-                        ></textarea>
-                        <div class="chat-home__actions">
-                            <div class="chat-home__pickers">
-                                <div class="chat-home__agent-picker">
-                                    <label for="agentSelect" class="chat-home__picker-label">Agent</label>
-                                    <select
-                                        id="agentSelect"
-                                        class="chat-home__select"
-                                        [value]="selectedAgentId()"
-                                        (change)="onAgentChange($event)"
-                                    >
-                                        <option value="">Default</option>
-                                        @for (agent of agents(); track agent.id) {
-                                            <option [value]="agent.id">{{ agent.name }}</option>
-                                        }
-                                    </select>
+                    <mat-card class="chat-home__input-card" appearance="outlined">
+                        <mat-card-content class="chat-home__card-content">
+                            <mat-form-field appearance="outline" class="chat-home__form-field" subscriptSizing="dynamic">
+                                <textarea
+                                    matInput
+                                    #promptInput
+                                    [value]="prompt()"
+                                    (input)="onPromptInput($event)"
+                                    (keydown)="onKeydown($event)"
+                                    placeholder="Ask anything..."
+                                    rows="2"
+                                    [disabled]="launching()"
+                                    aria-label="Chat prompt"
+                                    class="chat-home__textarea"
+                                ></textarea>
+                            </mat-form-field>
+                            <div class="chat-home__actions">
+                                <div class="chat-home__pickers">
+                                    <mat-form-field appearance="outline" class="chat-home__picker-field" subscriptSizing="dynamic">
+                                        <mat-label>Agent</mat-label>
+                                        <mat-select
+                                            [value]="selectedAgentId()"
+                                            (selectionChange)="selectedAgentId.set($event.value)">
+                                            <mat-option value="">Default</mat-option>
+                                            @for (agent of agents(); track agent.id) {
+                                                <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
+                                            }
+                                        </mat-select>
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="chat-home__picker-field" subscriptSizing="dynamic">
+                                        <mat-label>Project</mat-label>
+                                        <mat-select
+                                            [value]="selectedProjectId()"
+                                            (selectionChange)="selectedProjectId.set($event.value)">
+                                            <mat-option value="">Sandbox</mat-option>
+                                            @for (project of projects(); track project.id) {
+                                                <mat-option [value]="project.id">{{ project.name }}</mat-option>
+                                            }
+                                        </mat-select>
+                                    </mat-form-field>
                                 </div>
-                                <div class="chat-home__agent-picker">
-                                    <label for="projectSelect" class="chat-home__picker-label">Project</label>
-                                    <select
-                                        id="projectSelect"
-                                        class="chat-home__select"
-                                        [value]="selectedProjectId()"
-                                        (change)="onProjectChange($event)"
-                                    >
-                                        <option value="">Sandbox</option>
-                                        @for (project of projects(); track project.id) {
-                                            <option [value]="project.id">{{ project.name }}</option>
-                                        }
-                                    </select>
-                                </div>
+                                <button
+                                    mat-flat-button
+                                    class="chat-home__send"
+                                    [disabled]="!prompt().trim() || launching()"
+                                    (click)="onSend()">
+                                    @if (launching()) {
+                                        <span class="chat-home__send-spinner"></span>
+                                        Starting...
+                                    } @else {
+                                        Send
+                                        <span class="chat-home__send-arrow">&rarr;</span>
+                                    }
+                                </button>
                             </div>
-                            <button
-                                class="chat-home__send"
-                                [disabled]="!prompt().trim() || launching()"
-                                (click)="onSend()"
-                            >
-                                @if (launching()) {
-                                    <span class="chat-home__send-spinner"></span>
-                                    Starting...
-                                } @else {
-                                    Send
-                                    <span class="chat-home__send-arrow">&rarr;</span>
-                                }
-                            </button>
-                        </div>
-                    </div>
+                        </mat-card-content>
+                    </mat-card>
 
                     <div class="chat-home__templates">
                         @for (tpl of templates; track tpl.label) {
-                            <button class="chat-home__template" (click)="useHint(tpl.prompt)">
-                                <span class="chat-home__template-icon">{{ tpl.icon }}</span>
-                                <span class="chat-home__template-text">
-                                    <span class="chat-home__template-label">{{ tpl.label }}</span>
-                                    <span class="chat-home__template-desc">{{ tpl.desc }}</span>
-                                </span>
-                            </button>
+                            <mat-card
+                                class="chat-home__template"
+                                appearance="outlined"
+                                tabindex="0"
+                                role="button"
+                                [attr.aria-label]="tpl.label + ': ' + tpl.desc"
+                                (click)="useHint(tpl.prompt)"
+                                (keydown.enter)="useHint(tpl.prompt)"
+                                (keydown.space)="useHint(tpl.prompt)">
+                                <mat-card-content class="chat-home__template-content">
+                                    <span class="chat-home__template-icon">{{ tpl.icon }}</span>
+                                    <div class="chat-home__template-text">
+                                        <span class="chat-home__template-label">{{ tpl.label }}</span>
+                                        <span class="chat-home__template-desc">{{ tpl.desc }}</span>
+                                    </div>
+                                </mat-card-content>
+                            </mat-card>
                         }
                     </div>
 
@@ -248,6 +269,7 @@ import { OnboardingComponent } from './onboarding.component';
             font-family: inherit;
             font-size: 0.7rem;
         }
+
         /* Active sessions status strip */
         .chat-home__status-strip {
             display: flex;
@@ -289,7 +311,8 @@ import { OnboardingComponent } from './onboarding.component';
         }
         .chat-home__status-link:hover { opacity: 0.7; }
 
-        .chat-home__input-card {
+        /* Input card — override mat-card defaults for glassmorphism */
+        .chat-home__input-card.mat-mdc-card {
             width: 100%;
             background: rgba(15, 16, 24, 0.7);
             backdrop-filter: blur(12px);
@@ -300,24 +323,36 @@ import { OnboardingComponent } from './onboarding.component';
             transition: border-color 0.25s, box-shadow 0.25s;
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
         }
-        .chat-home__input-card:focus-within {
+        .chat-home__input-card.mat-mdc-card:focus-within {
             border-color: var(--accent-cyan-glow);
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--accent-cyan-dim), 0 0 30px var(--accent-cyan-subtle);
         }
-        .chat-home__textarea {
+        .chat-home__card-content {
+            padding: 0 !important;
+        }
+
+        /* Mat form field for the prompt textarea */
+        .chat-home__form-field {
             width: 100%;
-            padding: var(--space-5) var(--space-5) var(--space-2);
-            border: none;
+        }
+        .chat-home__form-field .mat-mdc-form-field-flex {
             background: transparent;
+        }
+        /* Override mat-form-field outline color to match corvid theme */
+        .chat-home__form-field .mdc-notched-outline__leading,
+        .chat-home__form-field .mdc-notched-outline__notch,
+        .chat-home__form-field .mdc-notched-outline__trailing {
+            border-color: transparent !important;
+        }
+        .chat-home__textarea {
             color: var(--text-primary);
             font-family: inherit;
             font-size: 1rem;
             line-height: 1.6;
             resize: none;
-            outline: none;
             max-height: 200px;
             overflow-y: auto;
-            box-sizing: border-box;
+            padding: var(--space-3) 0;
         }
         .chat-home__textarea::placeholder {
             color: var(--text-tertiary);
@@ -325,6 +360,7 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home__textarea:disabled {
             opacity: 0.5;
         }
+
         .chat-home__actions {
             display: flex;
             align-items: center;
@@ -335,40 +371,31 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home__pickers {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             min-width: 0;
             flex: 1 1 0;
             flex-wrap: wrap;
         }
-        .chat-home__agent-picker {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+
+        /* Picker mat-form-fields */
+        .chat-home__picker-field {
+            min-width: 120px;
+            max-width: 180px;
         }
-        .chat-home__picker-label {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+        .chat-home__picker-field .mdc-notched-outline__leading,
+        .chat-home__picker-field .mdc-notched-outline__notch,
+        .chat-home__picker-field .mdc-notched-outline__trailing {
+            border-color: var(--border) !important;
         }
-        .chat-home__select {
-            padding: 0.35rem 0.6rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--bg-input);
+        .chat-home__picker-field .mat-mdc-select-value {
             color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: border-color 0.15s;
-            min-width: 0;
         }
-        .chat-home__select:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
+        .chat-home__picker-field label {
+            color: var(--text-tertiary);
         }
-        .chat-home__send {
+
+        /* Send button */
+        .chat-home__send.mat-mdc-button-base {
             display: flex;
             align-items: center;
             gap: 0.35rem;
@@ -385,15 +412,16 @@ import { OnboardingComponent } from './onboarding.component';
             cursor: pointer;
             transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
             flex-shrink: 0;
+            height: auto;
         }
-        .chat-home__send:hover:not(:disabled) {
+        .chat-home__send.mat-mdc-button-base:hover:not(:disabled) {
             background: linear-gradient(135deg, var(--accent-cyan-border), var(--accent-cyan-dim));
             box-shadow: 0 0 20px var(--accent-cyan-dim);
         }
-        .chat-home__send:active:not(:disabled) {
+        .chat-home__send.mat-mdc-button-base:active:not(:disabled) {
             transform: scale(0.97);
         }
-        .chat-home__send:disabled {
+        .chat-home__send.mat-mdc-button-base:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
@@ -402,7 +430,7 @@ import { OnboardingComponent } from './onboarding.component';
             line-height: 1;
             transition: transform 0.15s;
         }
-        .chat-home__send:hover:not(:disabled) .chat-home__send-arrow {
+        .chat-home__send.mat-mdc-button-base:hover:not(:disabled) .chat-home__send-arrow {
             transform: translateX(2px);
         }
         .chat-home__send-spinner {
@@ -417,7 +445,7 @@ import { OnboardingComponent } from './onboarding.component';
             to { transform: rotate(360deg); }
         }
 
-        /* Quick-start templates */
+        /* Quick-start template cards */
         .chat-home__templates {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -430,27 +458,31 @@ import { OnboardingComponent } from './onboarding.component';
                 grid-template-columns: repeat(3, 1fr);
             }
         }
-        .chat-home__template {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.6rem;
-            padding: 0.85rem var(--space-4);
+        .chat-home__template.mat-mdc-card {
+            cursor: pointer;
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: var(--radius-lg);
             background: rgba(15, 16, 24, 0.5);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             color: var(--text-secondary);
-            font-family: inherit;
-            font-size: 0.85rem;
-            cursor: pointer;
             transition: border-color 0.2s, background 0.2s, transform 0.15s;
-            text-align: left;
+            padding: 0;
         }
-        .chat-home__template:hover {
+        .chat-home__template.mat-mdc-card:hover,
+        .chat-home__template.mat-mdc-card:focus {
             border-color: var(--accent-cyan-glow);
             background: var(--accent-cyan-subtle);
             transform: translateY(-1px);
+            outline: none;
+        }
+        .chat-home__template-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.85rem var(--space-4) !important;
+            font-size: 0.85rem;
+            text-align: left;
         }
         .chat-home__template-icon {
             font-size: 1.25rem;
@@ -467,11 +499,13 @@ import { OnboardingComponent } from './onboarding.component';
             font-weight: 600;
             color: var(--text-primary);
             font-size: 0.9rem;
+            display: block;
         }
         .chat-home__template-desc {
             color: var(--text-tertiary);
             font-size: 0.8rem;
             line-height: 1.3;
+            display: block;
         }
 
         /* Recent conversations */
@@ -571,7 +605,7 @@ import { OnboardingComponent } from './onboarding.component';
             .chat-home__logo-mark { width: 44px; height: 44px; font-size: 1.2rem; }
             .chat-home__actions { flex-direction: column; align-items: stretch; }
             .chat-home__pickers { flex-wrap: wrap; }
-            .chat-home__agent-picker { justify-content: space-between; }
+            .chat-home__picker-field { max-width: 100%; flex: 1; }
             .chat-home__bg-glow { width: 300px; height: 300px; }
             .chat-home__templates { grid-template-columns: 1fr; }
             .chat-home__shortcut-hint { display: none; }
@@ -663,14 +697,6 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }
 
-    onAgentChange(event: Event): void {
-        this.selectedAgentId.set((event.target as HTMLSelectElement).value);
-    }
-
-    onProjectChange(event: Event): void {
-        this.selectedProjectId.set((event.target as HTMLSelectElement).value);
-    }
-
     onKeydown(event: KeyboardEvent): void {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
@@ -721,10 +747,8 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         this.launching.set(true);
 
         try {
-            // Use selected project, or reuse/create the shared Sandbox project
             let projectId = this.selectedProjectId() || undefined;
             if (!projectId) {
-                // Look for an existing Sandbox project first
                 const existing = this.projects().find(
                     (p) => p.name.toLowerCase() === 'sandbox',
                 );
@@ -760,7 +784,6 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         try {
             await this.sessionService.loadSessions();
             const sessions = this.sessionService.sessions();
-            // Show 5 most recent sessions
             this.recentSessions.set(sessions.slice(0, 5));
         } catch {
             // Non-critical — silently ignore if sessions can't load
