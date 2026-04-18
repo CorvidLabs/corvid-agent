@@ -308,71 +308,36 @@ export class OllamaProvider extends BaseLlmProvider {
    * Acquire an inference slot for the given model. Blocks until enough
    * weight budget is available. Called once before an agent's agentic loop
    * so the model stays loaded (preserves KV cache across turns).
-   *
-   * @param timeoutMs - Max ms to wait in queue before giving up. Defaults to
-   *   OLLAMA_SLOT_WAIT_TIMEOUT_MS env var, or 5 minutes if not set.
-   *   Pass 0 to wait indefinitely (not recommended).
    */
-  async acquireSlot(
-    model: string,
-    signal?: AbortSignal,
-    onStatus?: (msg: string) => void,
-    timeoutMs?: number,
-  ): Promise<boolean> {
+  async acquireSlot(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<boolean> {
     const weight = this.getModelWeight(model);
     if (this.activeWeight > 0 && this.activeWeight + weight > this.maxWeight) {
-      const effectiveTimeout =
-        timeoutMs !== undefined
-          ? timeoutMs
-          : parseInt(process.env.OLLAMA_SLOT_WAIT_TIMEOUT_MS ?? String(5 * 60 * 1000), 10);
       const mode = this.gpuDetected === null ? 'detecting' : this.gpuDetected ? 'GPU' : 'CPU';
       onStatus?.(
         `Queued — waiting for model slot (need ${weight}, ${this.activeWeight}/${this.maxWeight} in use, ${mode})`,
       );
-      // Track whether releaseWaiters() granted us the slot before abort/timeout fired
+      // Track whether releaseWaiters() granted us the slot before abort fired
       let granted = false;
-      let timedOut = false;
       await new Promise<void>((resolve) => {
         const waiter = { weight, resolve };
         this.waitQueue.push(waiter);
-
-        // Helper to remove from queue if still waiting
-        const removeFromQueue = (): boolean => {
-          const idx = this.waitQueue.indexOf(waiter);
-          if (idx >= 0) {
-            this.waitQueue.splice(idx, 1);
-            return true; // was still in queue
-          }
-          // releaseWaiters() already popped us and incremented activeWeight
-          granted = true;
-          return false;
-        };
-
         // If caller aborts while queued, remove from wait queue
         signal?.addEventListener(
           'abort',
           () => {
-            removeFromQueue();
+            const idx = this.waitQueue.indexOf(waiter);
+            if (idx >= 0) {
+              // Still in queue — activeWeight was never incremented
+              this.waitQueue.splice(idx, 1);
+            } else {
+              // releaseWaiters() already popped us and incremented activeWeight
+              granted = true;
+            }
             resolve(); // unblock the await
           },
           { once: true },
         );
-
-        // Queue timeout: stop waiting if slot not granted within timeoutMs
-        if (effectiveTimeout > 0) {
-          setTimeout(() => {
-            const stillInQueue = removeFromQueue();
-            if (stillInQueue) {
-              timedOut = true;
-              log.warn(
-                `acquireSlot timed out after ${effectiveTimeout}ms waiting for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight}, queue=${this.waitQueue.length})`,
-              );
-              resolve();
-            }
-          }, effectiveTimeout);
-        }
       });
-      if (timedOut) return false;
       if (signal?.aborted) {
         if (granted) {
           // Slot was acquired by releaseWaiters before abort — caller owns it

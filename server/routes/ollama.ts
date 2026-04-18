@@ -794,8 +794,7 @@ async function handleClaudeProxyMessages(req: Request): Promise<Response> {
       }
     }
 
-    // Acquire slot — uses OLLAMA_SLOT_WAIT_TIMEOUT_MS timeout (default 5 min)
-    // to prevent indefinite queue buildup if Ollama stalls or a slot leaks.
+    // Acquire slot
     const slotAcquired = await provider.acquireSlot(ollamaModel);
     if (!slotAcquired) {
       return json({ error: 'Model is busy - try again later' }, 503);
