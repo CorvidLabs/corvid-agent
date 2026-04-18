@@ -12,6 +12,8 @@ import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { pageRouteAnimation } from './animations/route-transitions';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { TopNavComponent } from './shared/components/top-nav.component';
 import { ChatTabBarComponent } from './shared/components/chat-tab-bar.component';
 import { ActivityRailComponent } from './shared/components/activity-rail.component';
@@ -29,7 +31,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [pageRouteAnimation],
-    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent],
+    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent, MatButtonModule, MatIconModule],
     template: `
         <div class="app-layout" [class.app-layout--session]="isSessionView()">
             <app-top-nav />
@@ -45,7 +47,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 <div class="app-layout__banner" role="alert">
                     <span class="app-layout__banner-dot"></span>
                     Connection lost — reconnecting...
-                    <button class="app-layout__banner-retry" (click)="retryConnection()" type="button">Retry now</button>
+                    <button mat-stroked-button (click)="retryConnection()" type="button" class="app-layout__banner-retry">Retry now</button>
                 </div>
             }
             <div class="app-layout__body">
@@ -60,12 +62,14 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
                 <app-activity-rail />
             </div>
         </div>
-        <button
+        <button mat-fab
             class="scroll-to-top"
             [class.scroll-to-top--visible]="showScrollTop()"
             (click)="scrollToTop()"
             aria-label="Scroll to top"
-            title="Scroll to top">&#x25B2;</button>
+            title="Scroll to top">
+            <mat-icon>arrow_upward</mat-icon>
+        </button>
         @if (!isSessionView()) {
             <app-mobile-bottom-nav />
         }
@@ -128,22 +132,6 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         }
         .app-layout__banner-retry {
             margin-left: 0.75rem;
-            padding: 0.15rem 0.6rem;
-            background: transparent;
-            border: 1px solid currentColor;
-            border-radius: var(--radius-sm, 4px);
-            color: inherit;
-            font-family: inherit;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s;
-        }
-        .app-layout__banner-retry:hover {
-            background: currentColor;
-            color: var(--bg-deep, #0a0a12);
         }
         .app-layout__banner--restart {
             background: var(--accent-yellow-dim, rgba(255, 204, 0, 0.1));
