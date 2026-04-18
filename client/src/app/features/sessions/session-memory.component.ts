@@ -6,6 +6,7 @@ import {
     signal,
     OnInit,
 } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ApiService } from '../../core/services/api.service';
 import { MemoryBrowserService } from '../../core/services/memory-browser.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
@@ -38,33 +39,25 @@ type MemoryTab = 'observations' | 'longterm';
 @Component({
     selector: 'app-session-memory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent, MatButtonToggleModule],
     template: `
         <div class="session-memory">
             <!-- Tab bar -->
-            <div class="session-memory__tabs" role="tablist">
-                <button
-                    class="session-memory__tab"
-                    [class.session-memory__tab--active]="activeTab() === 'observations'"
-                    (click)="activeTab.set('observations')"
-                    role="tab"
-                    [attr.aria-selected]="activeTab() === 'observations'">
-                    Short-term
-                    @if (observations().length > 0) {
-                        <span class="session-memory__badge">{{ observations().length }}</span>
-                    }
-                </button>
-                <button
-                    class="session-memory__tab"
-                    [class.session-memory__tab--active]="activeTab() === 'longterm'"
-                    (click)="activeTab.set('longterm')"
-                    role="tab"
-                    [attr.aria-selected]="activeTab() === 'longterm'">
-                    On-Chain
-                    @if (memories().length > 0) {
-                        <span class="session-memory__badge session-memory__badge--chain">{{ memories().length }}</span>
-                    }
-                </button>
+            <div class="session-memory__tabs">
+                <mat-button-toggle-group [value]="activeTab()" (change)="activeTab.set($event.value)" hideSingleSelectionIndicator>
+                    <mat-button-toggle value="observations">
+                        Short-term
+                        @if (observations().length > 0) {
+                            <span class="session-memory__badge">{{ observations().length }}</span>
+                        }
+                    </mat-button-toggle>
+                    <mat-button-toggle value="longterm">
+                        On-Chain
+                        @if (memories().length > 0) {
+                            <span class="session-memory__badge session-memory__badge--chain">{{ memories().length }}</span>
+                        }
+                    </mat-button-toggle>
+                </mat-button-toggle-group>
             </div>
 
             <!-- Short-term observations -->
@@ -147,33 +140,10 @@ type MemoryTab = 'observations' | 'longterm';
             overflow: hidden;
         }
         .session-memory__tabs {
-            display: flex;
-            gap: 0;
             border-bottom: 1px solid var(--border);
             background: var(--bg-surface);
             flex-shrink: 0;
-        }
-        .session-memory__tab {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.6rem 1rem;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--text-secondary);
-            font-family: inherit;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            cursor: pointer;
-            transition: color 0.15s, border-color 0.15s;
-        }
-        .session-memory__tab:hover { color: var(--text-primary); }
-        .session-memory__tab--active {
-            color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
+            padding: var(--space-2);
         }
         .session-memory__badge {
             padding: 0.1rem 0.4rem;

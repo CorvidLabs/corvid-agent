@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit, output } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
@@ -9,7 +10,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
 @Component({
     selector: 'app-header',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent],
+    imports: [StatusBadgeComponent, MatButtonToggleModule],
     template: `
         <header class="header" role="banner">
             <div class="header__brand">
@@ -28,24 +29,16 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                 <h1 class="header__title">CorvidAgent</h1>
             </div>
             <div class="header__controls">
-                <div class="header__network" role="group" aria-label="Network selector">
-                    <button
-                        class="network-btn"
-                        [class.network-btn--active]="currentNetwork() === 'testnet'"
-                        [class.network-btn--testnet]="currentNetwork() === 'testnet'"
-                        [disabled]="switching()"
-                        (click)="switchNetwork('testnet')"
-                        aria-label="Switch to testnet"
-                    >TESTNET</button>
-                    <button
-                        class="network-btn"
-                        [class.network-btn--active]="currentNetwork() === 'mainnet'"
-                        [class.network-btn--mainnet]="currentNetwork() === 'mainnet'"
-                        [disabled]="switching()"
-                        (click)="switchNetwork('mainnet')"
-                        aria-label="Switch to mainnet"
-                    >MAINNET</button>
-                </div>
+                <mat-button-toggle-group
+                    [value]="currentNetwork()"
+                    (change)="switchNetwork($event.value)"
+                    [disabled]="switching()"
+                    hideSingleSelectionIndicator
+                    class="header__network"
+                    aria-label="Network selector">
+                    <mat-button-toggle value="testnet" [class.network--testnet]="currentNetwork() === 'testnet'">TESTNET</mat-button-toggle>
+                    <mat-button-toggle value="mainnet" [class.network--mainnet]="currentNetwork() === 'mainnet'">MAINNET</mat-button-toggle>
+                </mat-button-toggle-group>
                 <div class="header__status">
                     <span class="header__label">WS:</span>
                     <app-status-badge [status]="wsService.connectionStatus()" />
@@ -86,46 +79,15 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             gap: 1rem;
         }
         .header__network {
-            display: flex;
-            gap: 0;
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-        .network-btn {
-            padding: 0.3rem 0.6rem;
-            font-family: inherit;
             font-size: 0.6rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            border: none;
-            background: transparent;
-            color: var(--text-tertiary);
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
-            text-transform: uppercase;
         }
-        .network-btn:hover:not(:disabled):not(.network-btn--active) {
-            background: var(--bg-hover);
-            color: var(--text-secondary);
-            transform: translateY(-1px);
+        .network--testnet {
+            --mat-button-toggle-selected-state-background-color: color-mix(in srgb, var(--network-testnet) 15%, transparent);
+            --mat-button-toggle-selected-state-text-color: var(--network-testnet);
         }
-        .network-btn:active:not(:disabled) {
-            transform: scale(0.95);
-        }
-        .network-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        .network-btn--active.network-btn--testnet {
-            background: color-mix(in srgb, var(--network-testnet) 15%, transparent);
-            color: var(--network-testnet);
-            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-testnet) 20%, transparent);
-        }
-        .network-btn--active.network-btn--mainnet {
-            background: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
-            color: var(--network-mainnet);
-            box-shadow: inset 0 0 8px color-mix(in srgb, var(--network-mainnet) 20%, transparent);
+        .network--mainnet {
+            --mat-button-toggle-selected-state-background-color: color-mix(in srgb, var(--network-mainnet) 15%, transparent);
+            --mat-button-toggle-selected-state-text-color: var(--network-mainnet);
         }
         .header__status {
             display: flex;

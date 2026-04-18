@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -57,7 +58,7 @@ interface SessionStats {
 @Component({
     selector: 'app-analytics',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SkeletonComponent, PageShellComponent, MetricCardComponent],
+    imports: [DecimalPipe, SkeletonComponent, PageShellComponent, MetricCardComponent, MatButtonToggleModule],
     template: `
         <app-page-shell title="Analytics" icon="analytics">
 
@@ -100,10 +101,12 @@ interface SessionStats {
                     <div class="analytics__section">
                         <h3>Daily API Cost (Last {{ spendingDays() }} Days)</h3>
                         <div class="chart-controls">
-                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 7" (click)="loadSpending(7)">7d</button>
-                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 14" (click)="loadSpending(14)">14d</button>
-                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 30" (click)="loadSpending(30)">30d</button>
-                            <button class="chart-btn" [class.chart-btn--active]="spendingDays() === 90" (click)="loadSpending(90)">90d</button>
+                            <mat-button-toggle-group [value]="spendingDays()" (change)="loadSpending($event.value)" hideSingleSelectionIndicator>
+                                <mat-button-toggle [value]="7">7d</mat-button-toggle>
+                                <mat-button-toggle [value]="14">14d</mat-button-toggle>
+                                <mat-button-toggle [value]="30">30d</mat-button-toggle>
+                                <mat-button-toggle [value]="90">90d</mat-button-toggle>
+                            </mat-button-toggle-group>
                         </div>
                         <div class="ascii-chart">
                             @for (bar of spendingBars(); track bar.date) {
@@ -251,23 +254,8 @@ interface SessionStats {
 
         /* Chart controls */
         .chart-controls {
-            display: flex;
-            gap: 0.35rem;
             margin-bottom: 0.75rem;
         }
-        .chart-btn {
-            padding: 0.3rem 0.65rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .chart-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .chart-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
 
         /* ASCII bar chart */
         .ascii-chart { display: flex; flex-direction: column; gap: 3px; }

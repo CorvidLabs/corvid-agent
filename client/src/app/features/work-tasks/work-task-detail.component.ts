@@ -1,4 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, computed, OnInit, OnChanges } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -30,23 +34,17 @@ interface DiffFile {
     selector: 'app-work-task-detail',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent],
+    imports: [RelativeTimePipe, SkeletonComponent, MatButtonToggleModule, MatButtonModule, MatFormFieldModule, MatInputModule],
     template: `
         <div class="detail">
             <!-- Tab bar -->
             <div class="detail__tabs">
-                <button
-                    class="detail__tab"
-                    [class.detail__tab--active]="activeTab() === 'logs'"
-                    (click)="activeTab.set('logs')"
-                >Session Logs</button>
-                @if (task().prUrl) {
-                    <button
-                        class="detail__tab"
-                        [class.detail__tab--active]="activeTab() === 'diff'"
-                        (click)="switchToDiff()"
-                    >PR Diff</button>
-                }
+                <mat-button-toggle-group [value]="activeTab()" hideSingleSelectionIndicator>
+                    <mat-button-toggle value="logs" (change)="activeTab.set('logs')">Session Logs</mat-button-toggle>
+                    @if (task().prUrl) {
+                        <mat-button-toggle value="diff" (change)="switchToDiff()">PR Diff</mat-button-toggle>
+                    }
+                </mat-button-toggle-group>
             </div>
 
             <!-- Log viewer -->
@@ -59,13 +57,15 @@ interface DiffFile {
                     <p class="detail__empty">No log entries found.</p>
                 } @else {
                     <div class="log-controls">
-                        <div class="log-filters">
-                            <button class="log-filter" [class.log-filter--active]="logLevel() === 'all'" (click)="logLevel.set('all')">All ({{ messages().length }})</button>
-                            <button class="log-filter" [class.log-filter--active]="logLevel() === 'user'" (click)="logLevel.set('user')">User</button>
-                            <button class="log-filter" [class.log-filter--active]="logLevel() === 'assistant'" (click)="logLevel.set('assistant')">Assistant</button>
-                            <button class="log-filter" [class.log-filter--active]="logLevel() === 'system'" (click)="logLevel.set('system')">System</button>
-                        </div>
-                        <input class="log-search" placeholder="Search logs..." (input)="logSearch.set($any($event.target).value)" />
+                        <mat-button-toggle-group [value]="logLevel()" (change)="logLevel.set($event.value)" hideSingleSelectionIndicator class="log-filters">
+                            <mat-button-toggle value="all">All ({{ messages().length }})</mat-button-toggle>
+                            <mat-button-toggle value="user">User</mat-button-toggle>
+                            <mat-button-toggle value="assistant">Assistant</mat-button-toggle>
+                            <mat-button-toggle value="system">System</mat-button-toggle>
+                        </mat-button-toggle-group>
+                        <mat-form-field appearance="outline" class="log-search-field" subscriptSizing="dynamic">
+                            <input matInput placeholder="Search logs..." (input)="logSearch.set($any($event.target).value)" />
+                        </mat-form-field>
                     </div>
                     <div class="log-list">
                         @for (msg of filteredMessages(); track msg.id) {
@@ -130,32 +130,14 @@ interface DiffFile {
         .detail { padding: 0.75rem 0 0; }
 
         /* Tabs */
-        .detail__tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
-        .detail__tab {
-            padding: 0.3rem 0.6rem; background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            color: var(--text-tertiary); font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.15s;
-        }
-        .detail__tab:hover { border-color: var(--border-bright); color: var(--text-secondary); }
-        .detail__tab--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+        .detail__tabs { margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
 
         .detail__empty { color: var(--text-tertiary); font-size: 0.75rem; text-align: center; padding: 1.5rem; }
         .detail__error { color: var(--accent-red); font-size: 0.75rem; text-align: center; padding: 1.5rem; }
 
         /* Log controls */
         .log-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
-        .log-filters { display: flex; gap: 0.25rem; }
-        .log-filter {
-            padding: 0.2rem 0.45rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px;
-            color: var(--text-tertiary); font-size: 0.6rem; font-family: inherit; cursor: pointer; transition: all 0.15s;
-        }
-        .log-filter:hover { border-color: var(--border-bright); color: var(--text-secondary); }
-        .log-filter--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
-        .log-search {
-            flex: 1; min-width: 120px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius-sm);
-            font-size: 0.7rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
-        }
-        .log-search:focus { border-color: var(--accent-cyan); outline: none; }
+        .log-search-field { flex: 1; min-width: 120px; }
 
         /* Log list */
         .log-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 400px; overflow-y: auto; }
