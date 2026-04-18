@@ -1,5 +1,8 @@
 import { Component, ChangeDetectionStrategy, Input, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
@@ -8,7 +11,7 @@ import { SECTION_STYLES } from './settings-shared.styles';
 @Component({
     selector: 'app-credits-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule],
     template: `
         <div class="settings__section">
             <h3 class="section-toggle" (click)="toggleSection()">
@@ -22,27 +25,26 @@ import { SECTION_STYLES } from './settings-shared.styles';
                 <div class="credit-grid section-collapse">
                     @for (field of creditFields; track field.key) {
                         <div class="credit-field">
-                            <label class="credit-label" [for]="'credit_' + field.key">{{ field.label }}</label>
-                            <input
-                                class="credit-input"
-                                [class.credit-input--dirty]="isCreditDirty(field.key)"
-                                type="number"
-                                [id]="'credit_' + field.key"
-                                [ngModel]="getCreditValue(field.key)"
-                                (ngModelChange)="setCreditValue(field.key, $event)"
-                            />
+                            <mat-form-field appearance="outline" class="field"
+                                [class.field--dirty]="isCreditDirty(field.key)">
+                                <mat-label>{{ field.label }}</mat-label>
+                                <input matInput
+                                    type="number"
+                                    [ngModel]="getCreditValue(field.key)"
+                                    (ngModelChange)="setCreditValue(field.key, $event)"
+                                />
+                            </mat-form-field>
                             <span class="credit-desc">{{ field.description }}</span>
                         </div>
                     }
                 </div>
                 <div class="credit-actions">
-                    <button
-                        class="save-btn"
+                    <button mat-flat-button color="primary"
                         [disabled]="saving() || !isDirty()"
                         (click)="saveCreditConfig()"
                     >{{ saving() ? 'Saving...' : 'Save Credit Config' }}</button>
                     @if (isDirty()) {
-                        <button class="cancel-btn cancel-btn--sm" (click)="resetCreditChanges()">Discard Changes</button>
+                        <button mat-stroked-button (click)="resetCreditChanges()">Discard Changes</button>
                     }
                 </div>
             }
@@ -52,15 +54,11 @@ import { SECTION_STYLES } from './settings-shared.styles';
         ${SECTION_STYLES}
         .credit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
         .credit-field { display: flex; flex-direction: column; gap: 0.3rem; }
-        .credit-label { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
-        .credit-input {
-            padding: 0.55rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border-bright);
-            border-radius: var(--radius); color: var(--text-primary); font-size: 0.9rem;
-            font-family: inherit; width: 100%; min-height: 44px;
-        }
-        .credit-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .credit-input--dirty { border-color: var(--accent-amber) !important; }
-        .credit-desc { font-size: 0.78rem; color: var(--text-tertiary); }
+        .field { width: 100%; }
+        .field--dirty ::ng-deep .mdc-notched-outline__leading,
+        .field--dirty ::ng-deep .mdc-notched-outline__notch,
+        .field--dirty ::ng-deep .mdc-notched-outline__trailing { border-color: var(--accent-amber) !important; }
+        .credit-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: -0.5rem; }
         .credit-actions { display: flex; gap: 0.5rem; align-items: center; }
         @media (max-width: 600px) { .credit-grid { grid-template-columns: 1fr; } }
     `,

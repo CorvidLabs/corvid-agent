@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { firstValueFrom } from 'rxjs';
@@ -43,7 +47,7 @@ interface SimpleAgent {
 @Component({
     selector: 'app-discord-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         @if (discordConfig()) {
             <div class="settings__section">
@@ -58,78 +62,93 @@ interface SimpleAgent {
                     <div class="discord-grid section-collapse">
                         <!-- Row 1: Mode + Public -->
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_mode">Bridge Mode</label>
-                            <select class="discord-select" id="discord_mode"
-                                [ngModel]="discordValues()['mode'] ?? discordConfig()?.mode ?? 'chat'"
-                                (ngModelChange)="setDiscordValue('mode', $event)">
-                                <option value="chat">Chat</option>
-                                <option value="work_intake">Work Intake</option>
-                            </select>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Bridge Mode</mat-label>
+                                <mat-select
+                                    [ngModel]="discordValues()['mode'] ?? discordConfig()?.mode ?? 'chat'"
+                                    (selectionChange)="setDiscordValue('mode', $event.value)">
+                                    <mat-option value="chat">Chat</mat-option>
+                                    <mat-option value="work_intake">Work Intake</mat-option>
+                                </mat-select>
+                            </mat-form-field>
                             <span class="discord-desc">Chat: interactive sessions. Work Intake: creates work tasks.</span>
                         </div>
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_public_mode">Public Mode</label>
-                            <select class="discord-select" id="discord_public_mode"
-                                [ngModel]="discordValues()['public_mode'] ?? discordConfig()?.public_mode ?? 'false'"
-                                (ngModelChange)="setDiscordValue('public_mode', $event)">
-                                <option value="false">Off (allowlist only)</option>
-                                <option value="true">On (role-based access)</option>
-                            </select>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Public Mode</mat-label>
+                                <mat-select
+                                    [ngModel]="discordValues()['public_mode'] ?? discordConfig()?.public_mode ?? 'false'"
+                                    (selectionChange)="setDiscordValue('public_mode', $event.value)">
+                                    <mat-option value="false">Off (allowlist only)</mat-option>
+                                    <mat-option value="true">On (role-based access)</mat-option>
+                                </mat-select>
+                            </mat-form-field>
                             <span class="discord-desc">When on, anyone can interact (subject to role permissions).</span>
                         </div>
 
                         <!-- Row 2: Permission + Activity -->
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_default_perm">Default Permission Level</label>
-                            <select class="discord-select" id="discord_default_perm"
-                                [ngModel]="discordValues()['default_permission_level'] ?? discordConfig()?.default_permission_level ?? '1'"
-                                (ngModelChange)="setDiscordValue('default_permission_level', $event)">
-                                <option value="0">0 — Blocked</option>
-                                <option value="1">1 — Basic (chat, mention)</option>
-                                <option value="2">2 — Standard (slash commands)</option>
-                                <option value="3">3 — Admin (council, work intake)</option>
-                            </select>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Default Permission Level</mat-label>
+                                <mat-select
+                                    [ngModel]="discordValues()['default_permission_level'] ?? discordConfig()?.default_permission_level ?? '1'"
+                                    (selectionChange)="setDiscordValue('default_permission_level', $event.value)">
+                                    <mat-option value="0">0 — Blocked</mat-option>
+                                    <mat-option value="1">1 — Basic (chat, mention)</mat-option>
+                                    <mat-option value="2">2 — Standard (slash commands)</mat-option>
+                                    <mat-option value="3">3 — Admin (council, work intake)</mat-option>
+                                </mat-select>
+                            </mat-form-field>
                             <span class="discord-desc">Permission level for users with no matching role (public mode only).</span>
                         </div>
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_activity_type">Activity Type</label>
-                            <select class="discord-select" id="discord_activity_type"
-                                [ngModel]="discordValues()['activity_type'] ?? discordConfig()?.activity_type ?? '3'"
-                                (ngModelChange)="setDiscordValue('activity_type', $event)">
-                                <option value="0">Playing</option>
-                                <option value="1">Streaming</option>
-                                <option value="2">Listening to</option>
-                                <option value="3">Watching</option>
-                                <option value="5">Competing in</option>
-                            </select>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Activity Type</mat-label>
+                                <mat-select
+                                    [ngModel]="discordValues()['activity_type'] ?? discordConfig()?.activity_type ?? '3'"
+                                    (selectionChange)="setDiscordValue('activity_type', $event.value)">
+                                    <mat-option value="0">Playing</mat-option>
+                                    <mat-option value="1">Streaming</mat-option>
+                                    <mat-option value="2">Listening to</mat-option>
+                                    <mat-option value="3">Watching</mat-option>
+                                    <mat-option value="5">Competing in</mat-option>
+                                </mat-select>
+                            </mat-form-field>
                             <span class="discord-desc">Bot presence activity type.</span>
                         </div>
 
                         <!-- Status + Default Agent -->
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_status_text">Status Text</label>
-                            <input class="discord-input" id="discord_status_text"
-                                [ngModel]="discordValues()['status_text'] ?? discordConfig()?.status_text ?? ''"
-                                (ngModelChange)="setDiscordValue('status_text', $event)"
-                                placeholder="corvid-agent" />
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Status Text</mat-label>
+                                <input matInput
+                                    [ngModel]="discordValues()['status_text'] ?? discordConfig()?.status_text ?? ''"
+                                    (ngModelChange)="setDiscordValue('status_text', $event)"
+                                    placeholder="corvid-agent" />
+                            </mat-form-field>
                             <span class="discord-desc">Text shown in the bot's presence status.</span>
                         </div>
                         <div class="discord-field">
-                            <label class="discord-label" for="discord_default_agent">Default Agent</label>
                             @if (agentsList().length > 0) {
-                                <select class="discord-select" id="discord_default_agent"
-                                    [ngModel]="discordValues()['default_agent_id'] ?? discordConfig()?.default_agent_id ?? ''"
-                                    (ngModelChange)="setDiscordValue('default_agent_id', $event)">
-                                    <option value="">First available</option>
-                                    @for (agent of agentsList(); track agent.id) {
-                                        <option [value]="agent.id">{{ agent.name }}</option>
-                                    }
-                                </select>
+                                <mat-form-field appearance="outline" class="field">
+                                    <mat-label>Default Agent</mat-label>
+                                    <mat-select
+                                        [ngModel]="discordValues()['default_agent_id'] ?? discordConfig()?.default_agent_id ?? ''"
+                                        (selectionChange)="setDiscordValue('default_agent_id', $event.value)">
+                                        <mat-option value="">First available</mat-option>
+                                        @for (agent of agentsList(); track agent.id) {
+                                            <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
                             } @else {
-                                <input class="discord-input" id="discord_default_agent"
-                                    [ngModel]="discordValues()['default_agent_id'] ?? discordConfig()?.default_agent_id ?? ''"
-                                    (ngModelChange)="setDiscordValue('default_agent_id', $event)"
-                                    placeholder="Agent UUID" />
+                                <mat-form-field appearance="outline" class="field">
+                                    <mat-label>Default Agent</mat-label>
+                                    <input matInput
+                                        [ngModel]="discordValues()['default_agent_id'] ?? discordConfig()?.default_agent_id ?? ''"
+                                        (ngModelChange)="setDiscordValue('default_agent_id', $event)"
+                                        placeholder="Agent UUID" />
+                                </mat-form-field>
                             }
                             <span class="discord-desc">Default agent for @mention replies.</span>
                         </div>
@@ -144,9 +163,12 @@ interface SimpleAgent {
                             </div>
                             @if (guildChannels().length > 0) {
                                 <div class="picker-search">
-                                    <input class="discord-input" placeholder="Search channels..."
-                                        [ngModel]="channelSearch()"
-                                        (ngModelChange)="channelSearch.set($event)" />
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Search channels</mat-label>
+                                        <input matInput placeholder="Search channels..."
+                                            [ngModel]="channelSearch()"
+                                            (ngModelChange)="channelSearch.set($event)" />
+                                    </mat-form-field>
                                 </div>
                                 @if (channelSearch()) {
                                     <div class="picker-results">
@@ -162,21 +184,26 @@ interface SimpleAgent {
                                     </div>
                                 }
                             } @else {
-                                <input class="discord-input"
-                                    [ngModel]="discordValues()['additional_channel_ids'] ?? discordConfig()?.additional_channel_ids ?? ''"
-                                    (ngModelChange)="setDiscordValue('additional_channel_ids', $event)"
-                                    placeholder="Channel IDs, comma-separated" />
+                                <mat-form-field appearance="outline" class="field">
+                                    <mat-label>Channel IDs</mat-label>
+                                    <input matInput
+                                        [ngModel]="discordValues()['additional_channel_ids'] ?? discordConfig()?.additional_channel_ids ?? ''"
+                                        (ngModelChange)="setDiscordValue('additional_channel_ids', $event)"
+                                        placeholder="Channel IDs, comma-separated" />
+                                </mat-form-field>
                             }
                             <span class="discord-desc">Extra channels to monitor (beyond the primary channel).</span>
                         </div>
 
                         <!-- Allowed Users -->
                         <div class="discord-field discord-field--wide">
-                            <label class="discord-label" for="discord_users">Allowed Users (Legacy)</label>
-                            <input class="discord-input" id="discord_users"
-                                [ngModel]="discordValues()['allowed_user_ids'] ?? discordConfig()?.allowed_user_ids ?? ''"
-                                (ngModelChange)="setDiscordValue('allowed_user_ids', $event)"
-                                placeholder="User IDs, comma-separated" />
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Allowed Users (Legacy)</mat-label>
+                                <input matInput
+                                    [ngModel]="discordValues()['allowed_user_ids'] ?? discordConfig()?.allowed_user_ids ?? ''"
+                                    (ngModelChange)="setDiscordValue('allowed_user_ids', $event)"
+                                    placeholder="User IDs, comma-separated" />
+                            </mat-form-field>
                             <span class="discord-desc">User allowlist for legacy mode (ignored when public mode is on).</span>
                         </div>
 
@@ -188,23 +215,28 @@ interface SimpleAgent {
                                     @for (role of getConfigurableRoles(); track role.id) {
                                         <div class="role-perm-row">
                                             <span class="role-name" [style.color]="roleColor(role)">{{ role.name }}</span>
-                                            <select class="discord-select discord-select--sm"
-                                                [ngModel]="getRolePermLevel(role.id)"
-                                                (ngModelChange)="setRolePermLevel(role.id, $event)">
-                                                <option value="">— No override —</option>
-                                                <option value="0">Blocked</option>
-                                                <option value="1">Basic</option>
-                                                <option value="2">Standard</option>
-                                                <option value="3">Admin</option>
-                                            </select>
+                                            <mat-form-field appearance="outline" class="field--sm">
+                                                <mat-select
+                                                    [ngModel]="getRolePermLevel(role.id)"
+                                                    (selectionChange)="setRolePermLevel(role.id, $event.value)">
+                                                    <mat-option value="">— No override —</mat-option>
+                                                    <mat-option value="0">Blocked</mat-option>
+                                                    <mat-option value="1">Basic</mat-option>
+                                                    <mat-option value="2">Standard</mat-option>
+                                                    <mat-option value="3">Admin</mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
                                         </div>
                                     }
                                 </div>
                             } @else {
-                                <textarea class="discord-textarea" rows="3"
-                                    [ngModel]="discordValues()['role_permissions'] ?? discordConfig()?.role_permissions ?? '{}'"
-                                    (ngModelChange)="setDiscordValue('role_permissions', $event)"
-                                    placeholder='{"role_id": 3, "other_role_id": 1}'></textarea>
+                                <mat-form-field appearance="outline" class="field">
+                                    <mat-label>Role Permissions (JSON)</mat-label>
+                                    <textarea matInput rows="3"
+                                        [ngModel]="discordValues()['role_permissions'] ?? discordConfig()?.role_permissions ?? '{}'"
+                                        (ngModelChange)="setDiscordValue('role_permissions', $event)"
+                                        placeholder='{"role_id": 3, "other_role_id": 1}'></textarea>
+                                </mat-form-field>
                             }
                             <span class="discord-desc">Maps Discord roles to permission levels (0-3).</span>
                         </div>
@@ -216,23 +248,28 @@ interface SimpleAgent {
                                 @for (entry of getChannelPermEntries(); track entry.id) {
                                     <div class="role-perm-row">
                                         <span class="channel-name">#{{ entry.name }}</span>
-                                        <select class="discord-select discord-select--sm"
-                                            [ngModel]="String(entry.level)"
-                                            (ngModelChange)="setChannelPermLevel(entry.id, $event)">
-                                            <option value="0">Blocked</option>
-                                            <option value="1">Basic</option>
-                                            <option value="2">Standard</option>
-                                            <option value="3">Admin</option>
-                                        </select>
+                                        <mat-form-field appearance="outline" class="field--sm">
+                                            <mat-select
+                                                [ngModel]="String(entry.level)"
+                                                (selectionChange)="setChannelPermLevel(entry.id, $event.value)">
+                                                <mat-option value="0">Blocked</mat-option>
+                                                <mat-option value="1">Basic</mat-option>
+                                                <mat-option value="2">Standard</mat-option>
+                                                <mat-option value="3">Admin</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
                                         <button class="chip-remove" (click)="removeChannelPerm(entry.id)">&times;</button>
                                     </div>
                                 }
                             </div>
                             @if (guildChannels().length > 0) {
                                 <div class="picker-search">
-                                    <input class="discord-input" placeholder="Add channel permission..."
-                                        [ngModel]="channelPermSearch()"
-                                        (ngModelChange)="channelPermSearch.set($event)" />
+                                    <mat-form-field appearance="outline" class="field">
+                                        <mat-label>Add channel permission</mat-label>
+                                        <input matInput placeholder="Add channel permission..."
+                                            [ngModel]="channelPermSearch()"
+                                            (ngModelChange)="channelPermSearch.set($event)" />
+                                    </mat-form-field>
                                 </div>
                                 @if (channelPermSearch()) {
                                     <div class="picker-results">
@@ -252,22 +289,23 @@ interface SimpleAgent {
 
                         <!-- Rate Limits -->
                         <div class="discord-field discord-field--wide">
-                            <label class="discord-label" for="discord_rate_limits">Rate Limits by Level (JSON)</label>
-                            <textarea class="discord-textarea" id="discord_rate_limits" rows="2"
-                                [ngModel]="discordValues()['rate_limit_by_level'] ?? discordConfig()?.rate_limit_by_level ?? '{}'"
-                                (ngModelChange)="setDiscordValue('rate_limit_by_level', $event)"
-                                placeholder='{"1": 5, "2": 15, "3": 50}'></textarea>
+                            <mat-form-field appearance="outline" class="field">
+                                <mat-label>Rate Limits by Level (JSON)</mat-label>
+                                <textarea matInput rows="2"
+                                    [ngModel]="discordValues()['rate_limit_by_level'] ?? discordConfig()?.rate_limit_by_level ?? '{}'"
+                                    (ngModelChange)="setDiscordValue('rate_limit_by_level', $event)"
+                                    placeholder='{"1": 5, "2": 15, "3": 50}'></textarea>
+                            </mat-form-field>
                             <span class="discord-desc">Max messages per window by permission level. JSON object.</span>
                         </div>
                     </div>
                     <div class="discord-actions">
-                        <button
-                            class="save-btn"
+                        <button mat-flat-button color="primary"
                             [disabled]="savingDiscord() || !discordDirty()"
                             (click)="saveDiscordConfig()"
                         >{{ savingDiscord() ? 'Saving...' : 'Save Discord Config' }}</button>
                         @if (discordDirty()) {
-                            <button class="cancel-btn cancel-btn--sm" (click)="resetDiscordChanges()">Discard Changes</button>
+                            <button mat-stroked-button (click)="resetDiscordChanges()">Discard Changes</button>
                         }
                     </div>
                 }
@@ -285,24 +323,9 @@ interface SimpleAgent {
         .discord-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .discord-field--wide { grid-column: 1 / -1; }
         .discord-label { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
-        .discord-input, .discord-select, .discord-textarea {
-            padding: 0.55rem 0.65rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            font-family: inherit;
-            width: 100%;
-            min-height: 44px;
-        }
-        .discord-textarea { resize: vertical; font-size: 0.8rem; font-family: var(--font-mono); min-height: 60px; }
-        .discord-select { cursor: pointer; }
-        .discord-input:focus, .discord-select:focus, .discord-textarea:focus {
-            border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
-        }
-        .discord-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: 0.1rem; }
-        .discord-select--sm { padding: 0.45rem 0.55rem; font-size: 0.8rem; width: auto; min-width: 130px; min-height: 38px; }
+        .field { width: 100%; }
+        .field--sm { width: auto; min-width: 130px; }
+        .discord-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: -0.5rem; }
         .discord-actions { display: flex; gap: 0.5rem; align-items: center; }
         .chip-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
         .chip {
