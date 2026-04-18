@@ -11,6 +11,12 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { NotificationService } from '../../core/services/notification.service';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatIconModule } from '@angular/material/icon';
 import type { Session, SessionStatus } from '../../core/models/session.model';
 
 interface SessionGroup {
@@ -22,44 +28,39 @@ interface SessionGroup {
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent, PageShellComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent, PageShellComponent, SkeletonComponent, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule],
     template: `
         <app-page-shell
             title="Conversations"
             icon="sessions"
             [breadcrumbs]="[]">
-            <a actions class="btn btn--primary" routerLink="/sessions/new">+ New Conversation</a>
+            <a actions mat-flat-button color="primary" routerLink="/sessions/new">+ New Conversation</a>
 
             <!-- Search + Filters (sticky) -->
             <div toolbar class="sticky-toolbar">
-            <div class="search-bar">
-                <input
-                    class="search-input"
+            <mat-form-field class="search-field" appearance="outline" subscriptSizing="dynamic">
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput
                     placeholder="Search by name or prompt..."
                     [(ngModel)]="searchQuery"
                     (input)="searchQuery = $any($event.target).value" />
-            </div>
+            </mat-form-field>
 
             <!-- Filter Tabs -->
-            <div class="filter-tabs">
-                <button class="filter-tab" [class.filter-tab--active]="statusFilter() === null" (click)="statusFilter.set(null)">
-                    All ({{ sessionService.sessions().length }})
-                </button>
-                <button class="filter-tab" [class.filter-tab--active]="statusFilter() === 'running'" (click)="statusFilter.set('running')">
-                    Running ({{ countByStatus('running') }})
-                </button>
-                <button class="filter-tab" [class.filter-tab--active]="statusFilter() === 'stopped'" (click)="statusFilter.set('stopped')">
-                    Completed ({{ countByStatus('stopped') + countByStatus('idle') }})
-                </button>
-                <button class="filter-tab" [class.filter-tab--active]="statusFilter() === 'error'" (click)="statusFilter.set('error')">
-                    Failed ({{ countByStatus('error') }})
-                </button>
-                <div class="filter-tabs__spacer"></div>
-                <select class="source-select" [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event" aria-label="Filter by source">
-                    <option value="">All Sources</option>
-                    <option value="web">Web</option>
-                    <option value="algochat">AlgoChat</option>
-                </select>
+            <div class="filter-row">
+                <mat-button-toggle-group [value]="statusFilter()" (change)="statusFilter.set($event.value)" hideSingleSelectionIndicator>
+                    <mat-button-toggle [value]="null">All ({{ sessionService.sessions().length }})</mat-button-toggle>
+                    <mat-button-toggle value="running">Running ({{ countByStatus('running') }})</mat-button-toggle>
+                    <mat-button-toggle value="stopped">Completed ({{ countByStatus('stopped') + countByStatus('idle') }})</mat-button-toggle>
+                    <mat-button-toggle value="error">Failed ({{ countByStatus('error') }})</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-form-field class="source-field" appearance="outline" subscriptSizing="dynamic">
+                    <mat-select [(ngModel)]="sourceFilter" (ngModelChange)="sourceFilter = $event" placeholder="All Sources">
+                        <mat-option value="">All Sources</mat-option>
+                        <mat-option value="web">Web</mat-option>
+                        <mat-option value="algochat">AlgoChat</mat-option>
+                    </mat-select>
+                </mat-form-field>
             </div>
 
             </div>
@@ -68,7 +69,7 @@ interface SessionGroup {
             @if (runningCount() > 0 || completedCount() > 0) {
                 <div class="bulk-actions">
                     @if (runningCount() > 0) {
-                        <button class="btn btn--sm btn--danger" (click)="stopAllRunning()">Stop All Running ({{ runningCount() }})</button>
+                        <button mat-stroked-button color="warn" (click)="stopAllRunning()">Stop All Running ({{ runningCount() }})</button>
                     }
                 </div>
             }
@@ -111,7 +112,7 @@ interface SessionGroup {
                             }
                         </div>
                         @if (group.total > group.sessions.length) {
-                            <button class="show-more" (click)="showMore(group.label)">
+                            <button mat-stroked-button class="show-more" (click)="showMore(group.label)">
                                 Show more ({{ group.total - group.sessions.length }} remaining)
                             </button>
                         }
@@ -121,33 +122,18 @@ interface SessionGroup {
         </app-page-shell>
     `,
     styles: `
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
         .loading, .empty { color: var(--text-tertiary); font-size: 0.85rem; }
 
-        .search-bar { margin-bottom: 0.75rem; }
-        .search-input {
-            width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
-        }
-        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+        .search-field { width: 100%; margin-bottom: 0.5rem; }
+        .search-field .mat-mdc-form-field-icon-prefix { padding-right: 0.5rem; color: var(--text-tertiary); }
 
-        .filter-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
-        .filter-tab {
-            padding: 0.35rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-            cursor: pointer; transition: all 0.15s;
-        }
-        .filter-tab:hover { border-color: var(--border-bright); }
-        .filter-tab--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .filter-tabs__spacer { flex: 1; }
-        .source-select {
-            padding: 0.35rem var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-        }
+        .filter-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+        .filter-row mat-button-toggle-group { font-size: 0.75rem; }
+        .filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; }
+        .source-field { width: 140px; flex-shrink: 0; }
+        .source-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-
 
         /* Session groups */
         .session-group { margin-bottom: 1.5rem; }
@@ -179,22 +165,19 @@ interface SessionGroup {
         .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
 
         .show-more {
-            display: block; width: 100%; margin-top: 0.5rem; padding: var(--space-2);
-            background: transparent; border: 1px dashed var(--border-bright); border-radius: var(--radius);
-            color: var(--accent-cyan); font-size: 0.75rem; font-family: inherit; font-weight: 600;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
+            display: block; width: 100%; margin-top: 0.5rem;
+            color: var(--accent-cyan); font-size: 0.75rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .show-more:hover { background: var(--accent-cyan-dim); }
 
         @media (max-width: 767px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
-            .filter-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0.15rem; }
-            .filter-tabs::-webkit-scrollbar { display: none; }
-            .filter-tab { white-space: nowrap; flex-shrink: 0; font-size: 0.65rem; padding: 0.3rem var(--space-2); }
-            .filter-tabs__spacer { display: none; }
-            .source-select { flex-shrink: 0; font-size: 0.65rem; }
-            .search-input { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
+            .filter-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+            .filter-row::-webkit-scrollbar { display: none; }
+            .filter-row mat-button-toggle-group { flex-shrink: 0; }
+            .filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 8px; font-size: 0.65rem; }
+            .source-field { width: 120px; }
         }
     `,
 })

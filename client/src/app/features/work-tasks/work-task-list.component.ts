@@ -11,28 +11,37 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { WorkTask } from '../../core/models/work-task.model';
 import { WorkTaskDetailComponent } from './work-task-detail.component';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent, WorkTaskDetailComponent, PageShellComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent, WorkTaskDetailComponent, PageShellComponent, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule],
     template: `
         <app-page-shell title="Work Tasks" icon="work-tasks">
-            <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+            <button actions mat-flat-button color="primary" (click)="showCreateForm.set(!showCreateForm())">
                 {{ showCreateForm() ? 'Cancel' : '+ New Task' }}
             </button>
 
             @if (showCreateForm()) {
                 <div class="create-form">
                     <div class="create-form__row">
-                        <select class="form-select" [(ngModel)]="createAgentId">
-                            <option value="" disabled>Select agent...</option>
-                            @for (agent of agentService.agents(); track agent.id) {
-                                <option [value]="agent.id">{{ agent.name }}</option>
-                            }
-                        </select>
-                        <textarea class="form-textarea" [(ngModel)]="createDescription" placeholder="Describe the task..." rows="2"></textarea>
-                        <button class="btn btn--primary" [disabled]="!createAgentId || !createDescription || creating()" (click)="onCreateTask()">
+                        <mat-form-field class="create-form__agent" appearance="outline" subscriptSizing="dynamic">
+                            <mat-select [(ngModel)]="createAgentId" placeholder="Select agent...">
+                                @for (agent of agentService.agents(); track agent.id) {
+                                    <mat-option [value]="agent.id">{{ agent.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                        <mat-form-field class="create-form__desc" appearance="outline" subscriptSizing="dynamic">
+                            <textarea matInput [(ngModel)]="createDescription" placeholder="Describe the task..." rows="2"></textarea>
+                        </mat-form-field>
+                        <button mat-flat-button color="primary" [disabled]="!createAgentId || !createDescription || creating()" (click)="onCreateTask()">
                             {{ creating() ? 'Creating...' : 'Create' }}
                         </button>
                     </div>
@@ -40,41 +49,30 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
             }
 
             <div toolbar class="tasks__filter-row sticky-toolbar">
-                <div class="tasks__filters">
-                    <button
-                        class="filter-btn"
-                        [class.filter-btn--active]="activeFilter() === 'all'"
-                        (click)="setFilter('all')"
-                    >All ({{ allTasks().length }})</button>
-                    <button
-                        class="filter-btn"
-                        [class.filter-btn--active]="activeFilter() === 'active'"
-                        (click)="setFilter('active')"
-                    >Active ({{ activeTasks().length }})</button>
-                    <button
-                        class="filter-btn"
-                        [class.filter-btn--active]="activeFilter() === 'completed'"
-                        (click)="setFilter('completed')"
-                    >Completed ({{ completedTasks().length }})</button>
-                    <button
-                        class="filter-btn"
-                        [class.filter-btn--active]="activeFilter() === 'failed'"
-                        (click)="setFilter('failed')"
-                    >Failed ({{ failedTasks().length }})</button>
-                </div>
+                <mat-button-toggle-group [value]="activeFilter()" (change)="setFilter($event.value)" hideSingleSelectionIndicator>
+                    <mat-button-toggle value="all">All ({{ allTasks().length }})</mat-button-toggle>
+                    <mat-button-toggle value="active">Active ({{ activeTasks().length }})</mat-button-toggle>
+                    <mat-button-toggle value="completed">Completed ({{ completedTasks().length }})</mat-button-toggle>
+                    <mat-button-toggle value="failed">Failed ({{ failedTasks().length }})</mat-button-toggle>
+                </mat-button-toggle-group>
                 <div class="tasks__search-row">
-                    <input class="search-input" type="text" placeholder="Search tasks..."
-                           [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+                    <mat-form-field class="search-field" appearance="outline" subscriptSizing="dynamic">
+                        <mat-icon matPrefix>search</mat-icon>
+                        <input matInput placeholder="Search tasks..."
+                               [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+                    </mat-form-field>
                     @if (agentOptions().length > 1) {
-                        <select class="agent-filter-select" [value]="agentFilter()" (change)="agentFilter.set($any($event.target).value)">
-                            <option value="">All agents</option>
-                            @for (opt of agentOptions(); track opt.id) {
-                                <option [value]="opt.id">{{ opt.name }}</option>
-                            }
-                        </select>
+                        <mat-form-field class="agent-filter-field" appearance="outline" subscriptSizing="dynamic">
+                            <mat-select [value]="agentFilter()" (selectionChange)="agentFilter.set($event.value)">
+                                <mat-option value="">All agents</mat-option>
+                                @for (opt of agentOptions(); track opt.id) {
+                                    <mat-option [value]="opt.id">{{ opt.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
                     }
                     @if (searchQuery() || agentFilter()) {
-                        <button class="clear-filters-btn" (click)="searchQuery.set(''); agentFilter.set('')">Clear</button>
+                        <button mat-button (click)="searchQuery.set(''); agentFilter.set('')">Clear</button>
                     }
                 </div>
             </div>
@@ -179,12 +177,12 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
                             }
                             @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
                                 <div class="task-actions">
-                                    <button class="action-btn action-btn--cancel" (click)="onCancel(task.id)">Cancel</button>
+                                    <button mat-stroked-button color="warn" (click)="onCancel(task.id)">Cancel</button>
                                 </div>
                             }
                             @if (task.status === 'failed') {
                                 <div class="task-actions">
-                                    <button class="action-btn action-btn--retry" (click)="onRetry(task.id)" [disabled]="retrying().has(task.id)">
+                                    <button mat-stroked-button (click)="onRetry(task.id)" [disabled]="retrying().has(task.id)">
                                         {{ retrying().has(task.id) ? 'Retrying...' : 'Retry' }}
                                     </button>
                                 </div>
@@ -204,21 +202,10 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         </app-page-shell>
     `,
     styles: `
-        .create-btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
-            color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-        }
         .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); margin-bottom: 1rem; animation: expandReveal 0.25s ease-out; }
         .create-form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
-        .form-select, .form-textarea { padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
-        .form-select { min-width: 150px; }
-        .form-textarea { flex: 1; resize: vertical; min-height: 2.5em; line-height: 1.5; }
-        .form-select, .form-textarea { transition: border-color var(--transition-fast), box-shadow var(--transition-base); }
-        .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .btn { padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
-        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
-        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .create-form__agent { min-width: 150px; }
+        .create-form__desc { flex: 1; }
         .tasks__filter-row { margin-bottom: 1rem; }
         .loading { color: var(--text-secondary); }
         .task-agent { font-size: 0.65rem; color: var(--accent-cyan); font-weight: 600; }
@@ -261,12 +248,6 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         @keyframes stage-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-cyan-glow); } 50% { opacity: 0.7; box-shadow: 0 0 6px 2px var(--accent-cyan-mid); } }
         .task-actions { margin-top: 0.5rem; }
-        .action-btn { padding: var(--space-1) 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
-        .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
-        .action-btn--cancel:hover { background: var(--accent-red-dim); }
-        .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        .action-btn--retry:hover { background: var(--accent-cyan-dim); }
-        .action-btn--retry:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .detail-toggle {
             display: inline-block; margin-top: 0.5rem; padding: var(--space-1) 0.6rem;
@@ -276,50 +257,15 @@ import { WorkTaskDetailComponent } from './work-task-detail.component';
         }
         .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
-        .tasks__filters {
-            display: flex;
-            gap: 0.35rem;
-        }
-        .filter-btn {
-            padding: 0.35rem 0.65rem;
-            background: var(--bg-raised);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .filter-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
-        .filter-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: 0 0 8px var(--accent-cyan-dim); }
+        .tasks__filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; }
 
         .tasks__search-row {
             display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
         }
-        .search-input {
-            flex: 1; padding: 0.4rem 0.65rem; font-size: 0.75rem; font-family: inherit;
-            background: var(--bg-input); color: var(--text-primary);
-            border: 1px solid var(--border); border-radius: var(--radius-sm);
-            transition: border-color 0.15s, box-shadow 0.15s; min-width: 0;
-        }
-        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .search-input::placeholder { color: var(--text-tertiary); }
-        .agent-filter-select {
-            padding: 0.4rem var(--space-2); font-size: 0.7rem; font-family: inherit;
-            background: var(--bg-input); color: var(--text-primary);
-            border: 1px solid var(--border); border-radius: var(--radius-sm);
-            cursor: pointer; min-width: 120px;
-        }
-        .agent-filter-select:focus { border-color: var(--accent-cyan); outline: none; }
-        .clear-filters-btn {
-            padding: 0.35rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            background: transparent; border: 1px solid var(--border);
-            border-radius: var(--radius-sm); color: var(--text-tertiary);
-            cursor: pointer; white-space: nowrap; transition: all 0.15s;
-        }
-        .clear-filters-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .search-field { flex: 1; min-width: 0; }
+        .search-field .mat-mdc-form-field-icon-prefix { padding-right: 0.5rem; color: var(--text-tertiary); }
+        .agent-filter-field { width: 160px; flex-shrink: 0; }
+        .agent-filter-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
 
         .empty {
             text-align: center;
