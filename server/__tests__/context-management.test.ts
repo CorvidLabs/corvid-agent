@@ -8,6 +8,7 @@ import {
   estimateTokens,
   getContextBudget,
   isContextOverflowError,
+  logTokenEstimationAccuracy,
   summarizeConversation,
   trimMessages,
   truncateCouncilContext,
@@ -58,6 +59,61 @@ describe('estimateTokens', () => {
     const prose = 'a'.repeat(length);
     const code = '{x=1;}'.repeat(Math.ceil(length / 6)).slice(0, length);
     expect(estimateTokens(code)).toBeGreaterThan(estimateTokens(prose));
+  });
+
+  it('estimates JSON at ~3.3 chars per token', () => {
+    const json = JSON.stringify({ name: 'corvid', version: '1.0', active: true, count: 42 });
+    expect(estimateTokens(json)).toBe(Math.ceil(json.length / 3.3));
+  });
+
+  it('estimates JSON arrays at ~3.3 chars per token', () => {
+    const json = JSON.stringify([{ id: 1, label: 'alpha' }, { id: 2, label: 'beta' }]);
+    expect(estimateTokens(json)).toBe(Math.ceil(json.length / 3.3));
+  });
+
+  it('estimates YAML-like content at ~3.5 chars per token', () => {
+    const yaml = 'name: corvid\nversion: 1.0\nactive: true\nport: 8080\nhost: localhost';
+    expect(estimateTokens(yaml)).toBe(Math.ceil(yaml.length / 3.5));
+  });
+
+  it('JSON produces more tokens per char than prose', () => {
+    const len = 120;
+    const prose = 'word '.repeat(Math.ceil(len / 5)).slice(0, len);
+    const jsonStr = JSON.stringify({ a: 'x'.repeat(len - 20) }).slice(0, len);
+    expect(estimateTokens(jsonStr)).toBeGreaterThan(estimateTokens(prose));
+  });
+
+  it('does not classify plain text starting with a brace without quotes as JSON', () => {
+    // No double-quotes present — skips JSON path, falls through to prose (low code ratio)
+    const notJson = '{plain text without quotes}';
+    expect(estimateTokens(notJson)).toBe(Math.ceil(notJson.length / 4));
+  });
+
+  it('does not classify two-line key-value text as YAML (below threshold)', () => {
+    const twoLines = 'name: foo\nversion: bar';
+    // Only 2 yaml lines — below the 3-line threshold, falls to prose
+    expect(estimateTokens(twoLines)).toBe(Math.ceil(twoLines.length / 4));
+  });
+});
+
+// ── logTokenEstimationAccuracy ────────────────────────────────────────────
+
+describe('logTokenEstimationAccuracy', () => {
+  it('does not throw when DEBUG_TOKEN_ESTIMATION is unset', () => {
+    delete process.env.DEBUG_TOKEN_ESTIMATION;
+    expect(() => logTokenEstimationAccuracy('test', 'some text', 10)).not.toThrow();
+  });
+
+  it('does not throw when DEBUG_TOKEN_ESTIMATION is set', () => {
+    process.env.DEBUG_TOKEN_ESTIMATION = '1';
+    expect(() => logTokenEstimationAccuracy('test', 'some text', 10)).not.toThrow();
+    delete process.env.DEBUG_TOKEN_ESTIMATION;
+  });
+
+  it('handles zero actual tokens without divide-by-zero', () => {
+    process.env.DEBUG_TOKEN_ESTIMATION = '1';
+    expect(() => logTokenEstimationAccuracy('test', 'text', 0)).not.toThrow();
+    delete process.env.DEBUG_TOKEN_ESTIMATION;
   });
 });
 

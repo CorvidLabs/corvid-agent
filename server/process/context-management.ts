@@ -15,21 +15,47 @@ const KEEP_RECENT = 30;
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 /**
- * Content-aware token estimation.
- * Code-heavy content averages ~0.33 tokens/char (more tokens per char due to
- * operators, short identifiers, indentation). Prose averages ~0.25 tokens/char.
- * We use a simple heuristic: if the text has many code indicators, use the
- * code factor; otherwise use prose.
+ * Content-aware token estimation. Four categories checked in order:
+ * - JSON (~3.3 chars/token): starts with { or [ and contains double-quotes
+ * - YAML-like (~3.5 chars/token): 3+ "key: value" line patterns
+ * - Code (~3 chars/token): >8% operator/symbol characters
+ * - Prose (~4 chars/token): everything else
  */
 export function estimateTokens(text: string): number {
   if (!text) return 0;
-  // Simple heuristic: count code-like characters
+  const len = text.length;
+
+  // JSON detection: tool results are frequently JSON objects/arrays
+  const trimmed = text.trimStart();
+  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && text.includes('"')) {
+    return Math.ceil(len / 3.3);
+  }
+
+  // YAML-like detection: structured key-value data (e.g. grep output, config)
+  const yamlLines = (text.match(/^\s*[\w-]+:\s+\S/gm) || []).length;
+  if (yamlLines >= 3) {
+    return Math.ceil(len / 3.5);
+  }
+
+  // Code detection: high density of operator/symbol characters
   const codeIndicators = (text.match(/[{}();=<>[\]|&!+\-*/\\^~`]/g) || []).length;
-  const codeRatio = codeIndicators / text.length;
-  // If >8% of chars are code-like, use code factor (3 chars/token)
-  // Otherwise use prose factor (4 chars/token)
-  const charsPerToken = codeRatio > 0.08 ? 3 : 4;
-  return Math.ceil(text.length / charsPerToken);
+  if (codeIndicators / len > 0.08) {
+    return Math.ceil(len / 3);
+  }
+
+  // Prose default
+  return Math.ceil(len / 4);
+}
+
+/**
+ * Compare an estimate against actual token count and log the accuracy.
+ * Only active when DEBUG_TOKEN_ESTIMATION env var is set.
+ */
+export function logTokenEstimationAccuracy(label: string, text: string, actualTokens: number): void {
+  if (!process.env.DEBUG_TOKEN_ESTIMATION) return;
+  const estimated = estimateTokens(text);
+  const errorPct = actualTokens > 0 ? ((Math.abs(estimated - actualTokens) / actualTokens) * 100).toFixed(1) : 'N/A';
+  log.debug(`Token estimation [${label}]: estimated=${estimated}, actual=${actualTokens}, error=${errorPct}%`);
 }
 
 /**

@@ -26,7 +26,7 @@ Context management helpers for direct-process sessions. Handles token estimation
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `estimateTokens` | `(text: string)` | `number` | Content-aware token estimation: ~0.33 tokens/char for code-heavy, ~0.25 for prose |
+| `estimateTokens` | `(text: string)` | `number` | Content-aware token estimation: 4 categories — JSON (~3.3 chars/token), YAML-like (~3.5 chars/token), code (~3 chars/token), prose (~4 chars/token) |
 | `getContextBudget` | `(model?: string)` | `number` | Get the context window size: checks model pricing table first, falls back to `OLLAMA_NUM_CTX` env var, then DEFAULT_CONTEXT_WINDOW (128000) |
 | `isContextOverflowError` | `(errorMsg: string)` | `boolean` | Detect whether an error message indicates a context overflow from any provider (Anthropic, OpenAI, Ollama, OpenRouter) |
 | `calculateMaxToolResultChars` | `(messages: Array<{role, content}>, systemPrompt: string)` | `number` | Max tool result size in chars: capped at 30% of context window, scales down under pressure. Min 1000 chars |
@@ -37,10 +37,11 @@ Context management helpers for direct-process sessions. Handles token estimation
 | `trimMessages` | `(messages: ConversationMessage[], systemPrompt?: string)` | `void` | Trim conversation history using progressive compression tiers based on context usage and message count |
 | `computeContextUsage` | `(msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean, model?: string)` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state |
 | `determineWarningLevel` | `(usagePercent: number)` | `{level, message} \| null` | Determine warning level and message for a given usage percent. Returns null below 50% |
+| `logTokenEstimationAccuracy` | `(label: string, text: string, actualTokens: number)` | `void` | Compare estimated vs actual token count and log accuracy at debug level. No-op unless `DEBUG_TOKEN_ESTIMATION` env var is set |
 
 ## Invariants
 
-1. **Token estimation heuristic**: Code-heavy text (>8% code-like chars) uses 3 chars/token; prose uses 4 chars/token
+1. **Token estimation heuristic**: Four content categories — JSON (starts with `{`/`[` with quotes, ~3.3 chars/token), YAML-like structured data (3+ `key: value` lines, ~3.5 chars/token), code-heavy text (>8% operator chars, ~3 chars/token), and prose (~4 chars/token). Checked in that order.
 2. **Tool result capped at 30% context**: `calculateMaxToolResultChars()` limits any single tool result to 30% of context window, scaling down further under budget pressure. Minimum 1,000 chars
 3. **Progressive compression tiers**: Tier 1 (60%) light tool summarization, Tier 2 (75%) reduce window + summarize discarded, Tier 3 (85%) aggressive 4-exchange keep, Tier 4 (90%) full summary + 2 exchanges
 4. **Count-based trim at >40 messages**: `trimMessages()` triggers Tier 2 when message count exceeds `MAX_MESSAGES` (40)
@@ -106,3 +107,4 @@ Internal constants:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-21 | corvid-agent | Initial spec — extracted from direct-process |
+| 2026-04-18 | corvid-agent | Improve token estimation heuristic: add JSON/YAML categories; add debug accuracy logging — closes #2086 |
