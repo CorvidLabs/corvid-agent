@@ -2,6 +2,9 @@ import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/c
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { IconComponent } from './icon.component';
 import { SessionService } from '../../core/services/session.service';
+import { MatButtonModule } from '@angular/material/button';
+import { MatBadgeModule } from '@angular/material/badge';
+import { MatIconModule } from '@angular/material/icon';
 
 interface BottomNavItem {
     label: string;
@@ -23,7 +26,7 @@ const NAV_ITEMS: BottomNavItem[] = [
     selector: 'app-mobile-bottom-nav',
     changeDetection: ChangeDetectionStrategy.OnPush,
     standalone: true,
-    imports: [RouterLink, RouterLinkActive, IconComponent],
+    imports: [RouterLink, RouterLinkActive, IconComponent, MatButtonModule, MatBadgeModule, MatIconModule],
     template: `
         <nav class="bottom-nav" role="navigation" aria-label="Mobile navigation">
             @for (item of items; track item.route) {
@@ -33,16 +36,20 @@ const NAV_ITEMS: BottomNavItem[] = [
                     routerLinkActive="bottom-nav__item--active"
                     [routerLinkActiveOptions]="{ exact: item.exact }"
                     [attr.aria-label]="item.label">
-                    <span class="bottom-nav__icon-wrapper">
+                    <span
+                        class="bottom-nav__icon-wrapper"
+                        [matBadge]="item.badgeKey === 'sessions' && activeSessionCount() > 0 ? (activeSessionCount() > 9 ? '9+' : activeSessionCount()) : null"
+                        matBadgeColor="accent"
+                        matBadgeSize="small"
+                        [matBadgeHidden]="!(item.badgeKey === 'sessions' && activeSessionCount() > 0)"
+                        [attr.aria-label]="item.badgeKey === 'sessions' && activeSessionCount() > 0 ? activeSessionCount() + ' active sessions' : null">
                         <app-icon [name]="item.icon" [size]="20" />
-                        @if (item.badgeKey === 'sessions' && activeSessionCount() > 0) {
-                            <span class="bottom-nav__badge" [attr.aria-label]="activeSessionCount() + ' active sessions'">{{ activeSessionCount() > 9 ? '9+' : activeSessionCount() }}</span>
-                        }
                     </span>
                     <span class="bottom-nav__label">{{ item.label }}</span>
                 </a>
             }
             <button
+                mat-icon-button
                 class="bottom-nav__item bottom-nav__item--search"
                 (click)="openCommandPalette()"
                 type="button"
@@ -132,31 +139,8 @@ const NAV_ITEMS: BottomNavItem[] = [
             position: relative;
             display: inline-flex;
         }
-        .bottom-nav__badge {
-            position: absolute;
-            top: -4px;
-            right: -8px;
-            min-width: 16px;
-            height: 16px;
-            padding: 0 3px;
-            border-radius: var(--radius-md);
-            background: var(--accent-cyan);
-            color: var(--bg-deep);
-            font-size: 0.6rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            box-shadow: 0 0 6px var(--accent-cyan-glow);
-            animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        @keyframes badgePop {
-            from { transform: scale(0); }
-            to { transform: scale(1); }
-        }
 
-        /* Add active icon scale */
+        /* Active icon scale */
         .bottom-nav__item--active .bottom-nav__icon-wrapper {
             transform: scale(1.1);
             transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -168,13 +152,17 @@ const NAV_ITEMS: BottomNavItem[] = [
             transform: scale(0.9);
         }
 
-        /* Search button — reset button styles, match nav item appearance */
-        button.bottom-nav__item {
+        /* Search button — reset mat-icon-button styles, match nav item appearance */
+        button.bottom-nav__item.mat-mdc-icon-button {
             background: none;
             border: none;
             font-family: inherit;
             cursor: pointer;
             padding: 0;
+            width: unset;
+            height: unset;
+            border-radius: 0;
+            flex: 1;
         }
         .bottom-nav__item--search {
             color: var(--text-tertiary);
@@ -183,6 +171,15 @@ const NAV_ITEMS: BottomNavItem[] = [
         .bottom-nav__item--search:hover,
         .bottom-nav__item--search:active {
             color: var(--accent-cyan);
+        }
+
+        /* Override Material badge positioning */
+        ::ng-deep .bottom-nav__icon-wrapper .mat-badge-content {
+            background: var(--accent-cyan);
+            color: var(--bg-deep);
+            font-size: 0.55rem;
+            font-weight: 700;
+            box-shadow: 0 0 6px var(--accent-cyan-glow);
         }
     `,
 })

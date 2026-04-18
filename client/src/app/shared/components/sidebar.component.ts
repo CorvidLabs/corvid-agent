@@ -15,6 +15,8 @@ import { filter, Subscription } from 'rxjs';
 import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
 import { WidgetLayoutService } from '../../core/services/widget-layout.service';
 import { ResizeHandleComponent } from './resize-handle.component';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatListModule } from '@angular/material/list';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -36,7 +38,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
 @Component({
     selector: 'app-sidebar',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RouterLinkActive, ResizeHandleComponent],
+    imports: [RouterLink, RouterLinkActive, ResizeHandleComponent, MatSidenavModule, MatListModule],
     template: `
         @if (sidebarOpen()) {
             <div
@@ -53,54 +55,65 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             role="navigation"
             aria-label="Main navigation"
             #sidebarEl>
-            <ul class="sidebar__list">
-                <!-- Core -->
-                <li class="sidebar__section">
+            <mat-nav-list class="sidebar__list">
+                <!-- Core section -->
+                <div class="sidebar__section">
                     <span class="sidebar__section-label">Core</span>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/chat"
-                        routerLinkActive="sidebar__link--active"
-                        [routerLinkActiveOptions]="{exact: true}"
-                        aria-current="page"
-                        title="Chat"
-                        #firstLink>
-                        <span class="sidebar__label">Chat</span>
-                        <span class="sidebar__abbr">Ch</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/sessions" routerLinkActive="sidebar__link--active" title="Sessions">
-                        <span class="sidebar__label">Sessions</span>
-                        <span class="sidebar__abbr">S</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
-                        <span class="sidebar__label">Agents</span>
-                        <span class="sidebar__abbr">A</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/observe" routerLinkActive="sidebar__link--active" title="Observe">
-                        <span class="sidebar__label">Observe</span>
-                        <span class="sidebar__abbr">O</span>
-                    </a>
-                </li>
+                </div>
+                <a
+                    mat-list-item
+                    class="sidebar__link"
+                    routerLink="/chat"
+                    routerLinkActive="sidebar__link--active"
+                    [routerLinkActiveOptions]="{exact: true}"
+                    aria-current="page"
+                    title="Chat"
+                    #firstLink>
+                    <span class="sidebar__label">Chat</span>
+                    <span class="sidebar__abbr">Ch</span>
+                </a>
+                <a
+                    mat-list-item
+                    class="sidebar__link"
+                    routerLink="/sessions"
+                    routerLinkActive="sidebar__link--active"
+                    title="Sessions">
+                    <span class="sidebar__label">Sessions</span>
+                    <span class="sidebar__abbr">S</span>
+                </a>
+                <a
+                    mat-list-item
+                    class="sidebar__link"
+                    routerLink="/agents"
+                    routerLinkActive="sidebar__link--active"
+                    title="Agents">
+                    <span class="sidebar__label">Agents</span>
+                    <span class="sidebar__abbr">A</span>
+                </a>
+                <a
+                    mat-list-item
+                    class="sidebar__link"
+                    routerLink="/observe"
+                    routerLinkActive="sidebar__link--active"
+                    title="Observe">
+                    <span class="sidebar__label">Observe</span>
+                    <span class="sidebar__abbr">O</span>
+                </a>
 
-                <!-- Settings -->
-                <li class="sidebar__section">
+                <!-- Settings section -->
+                <div class="sidebar__section">
                     <span class="sidebar__section-label">Config</span>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
-                        <span class="sidebar__label">Settings</span>
-                        <span class="sidebar__abbr">Se</span>
-                    </a>
-                </li>
-            </ul>
+                </div>
+                <a
+                    mat-list-item
+                    class="sidebar__link"
+                    routerLink="/settings"
+                    routerLinkActive="sidebar__link--active"
+                    title="Settings">
+                    <span class="sidebar__label">Settings</span>
+                    <span class="sidebar__abbr">Se</span>
+                </a>
+            </mat-nav-list>
             <button
                 class="sidebar__help-btn"
                 (click)="openHelp()"
@@ -142,17 +155,19 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             flex-direction: column;
             overflow: hidden;
         }
-        .sidebar__list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
+
+        /* mat-nav-list overrides */
+        mat-nav-list.sidebar__list {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--border-bright) transparent;
+            padding: 0;
         }
-        .sidebar__link {
+
+        /* Preserve sidebar link styles on mat-list-item */
+        .sidebar__link.mat-mdc-list-item {
             display: flex;
             align-items: center;
             padding: var(--space-3) var(--space-6);
@@ -163,9 +178,12 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease, padding-left 0.15s ease;
             border-left: 3px solid transparent;
             position: relative;
+            border-radius: 0;
+            height: auto;
+            min-height: 40px;
         }
         /* Hover glow line indicator */
-        .sidebar__link::before {
+        .sidebar__link.mat-mdc-list-item::before {
             content: '';
             position: absolute;
             left: 0;
@@ -178,45 +196,28 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             border-radius: 0 2px 2px 0;
         }
         @media (hover: hover) {
-            .sidebar__link:hover {
+            .sidebar__link.mat-mdc-list-item:hover {
                 background: var(--bg-hover);
                 color: var(--accent-cyan);
                 padding-left: 1.65rem;
             }
-            .sidebar__link:hover::before {
+            .sidebar__link.mat-mdc-list-item:hover::before {
                 transform: scaleY(1);
             }
         }
-        .sidebar__link--active {
+        .sidebar__link--active.mat-mdc-list-item,
+        .sidebar__link.mat-mdc-list-item.sidebar__link--active {
             color: var(--accent-cyan);
             background: linear-gradient(90deg, var(--accent-cyan-subtle) 0%, transparent 100%);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px var(--accent-cyan-border);
-            animation: sidebarActiveGlow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        @keyframes sidebarActiveGlow {
-            from {
-                background: transparent;
-                border-left-color: transparent;
-                padding-left: var(--space-4);
-            }
-            to {
-                padding-left: var(--space-6);
-            }
-        }
-        .sidebar__link--active::before {
+        .sidebar__link--active.mat-mdc-list-item::before {
             display: none;
-        }
-        .sidebar__divider {
-            height: 1px;
-            background: var(--border);
-            margin: 0.5rem 1.5rem;
-            list-style: none;
         }
 
         /* Section headers */
         .sidebar__section {
-            list-style: none;
             padding: var(--space-2) var(--space-6) 0.2rem;
             margin-top: 0.4rem;
             border-top: 1px solid var(--border);
@@ -231,63 +232,6 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             letter-spacing: 0.1em;
             color: var(--text-tertiary);
             font-weight: 600;
-        }
-
-        /* Collapsible section toggle button */
-        .sidebar__section-toggle {
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
-            width: 100%;
-            padding: 0;
-            margin: 0;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-family: inherit;
-            color: inherit;
-            border-radius: var(--radius-sm);
-        }
-        .sidebar__section-toggle:hover .sidebar__section-label {
-            color: var(--text-secondary);
-        }
-        .sidebar__section-toggle:focus-visible {
-            outline: 2px solid var(--accent-cyan);
-            outline-offset: 2px;
-        }
-
-        /* Chevron indicator */
-        .sidebar__chevron {
-            font-size: 0.55rem;
-            color: var(--text-tertiary);
-            transition: transform 150ms ease;
-            display: inline-block;
-            line-height: 1;
-        }
-        .sidebar__chevron--open {
-            transform: rotate(90deg);
-        }
-
-        /* Section items container (CSS-animated collapse) */
-        .sidebar__section-items {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            overflow: hidden;
-            max-height: 500px;
-            opacity: 1;
-            transition:
-                max-height var(--motion-collapse-duration) var(--motion-ease-out),
-                opacity calc(var(--motion-collapse-duration) * 0.85) var(--motion-ease-out);
-        }
-        .sidebar__section-items--collapsed {
-            max-height: 0;
-            opacity: 0;
-        }
-        .sidebar__section-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
         }
 
         /* Abbreviation labels (hidden by default) */
@@ -349,12 +293,13 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         .sidebar--collapsed .sidebar__abbr {
             display: inline;
         }
-        .sidebar--collapsed .sidebar__link {
+        .sidebar--collapsed .sidebar__link.mat-mdc-list-item {
             padding: var(--space-3) 0;
             text-align: center;
             border-left-width: 2px;
+            justify-content: center;
         }
-        .sidebar--collapsed .sidebar__link--active {
+        .sidebar--collapsed .sidebar__link--active.mat-mdc-list-item {
             border-left-width: 2px;
         }
         .sidebar--collapsed .sidebar__section {
@@ -363,17 +308,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         .sidebar--collapsed .sidebar__section-label {
             display: none;
         }
-        .sidebar--collapsed .sidebar__chevron {
-            display: none;
-        }
-        .sidebar--collapsed .sidebar__section-toggle {
-            justify-content: center;
-        }
 
         /* Touch: ensure 44px minimum tap targets */
         @media (pointer: coarse) {
-            .sidebar__link { min-height: 44px; display: flex; align-items: center; }
-            .sidebar__section-toggle { min-height: 44px; }
+            .sidebar__link.mat-mdc-list-item { min-height: 44px; }
             .sidebar__help-btn { min-height: 44px; }
             .sidebar__collapse-btn { min-height: 44px; }
         }
@@ -412,19 +350,17 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             .sidebar--collapsed .sidebar__abbr {
                 display: none;
             }
-            .sidebar--collapsed .sidebar__link {
+            .sidebar--collapsed .sidebar__link.mat-mdc-list-item {
                 padding: var(--space-3) var(--space-6);
                 text-align: left;
                 border-left-width: 3px;
+                justify-content: flex-start;
             }
             .sidebar--collapsed .sidebar__section {
                 padding: var(--space-2) var(--space-6) 0.2rem;
             }
             .sidebar--collapsed .sidebar__section-label {
                 display: inline;
-            }
-            .sidebar--collapsed .sidebar__chevron {
-                display: inline-block;
             }
             .sidebar__collapse-btn {
                 display: none;
@@ -440,7 +376,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Two-way binding with parent for open/close state */
     readonly sidebarOpen = model(false);
 
-    /** Collapsed state — persisted in localStorage; auto-collapse for normal audience */
+    /** Collapsed state — persisted in localStorage */
     readonly collapsed = signal(this.loadCollapsed());
 
     /** Custom width — persisted in localStorage */
@@ -463,15 +399,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     private hamburgerRef: HTMLElement | null = null;
 
     ngAfterViewInit(): void {
-        // Close sidebar on navigation (route change) + auto-expand active section
         this.routerSub = this.router.events
             .pipe(filter((e) => e instanceof NavigationEnd))
             .subscribe((e) => {
                 this.closeSidebar();
                 this.autoExpandActiveSection((e as NavigationEnd).urlAfterRedirects);
             });
-
-        // Auto-expand for current route on init
         this.autoExpandActiveSection(this.router.url);
     }
 
@@ -541,7 +474,6 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Focus trap: keep Tab cycling within the sidebar overlay on mobile */
     protected onTab(event: Event): void {
         if (!this.sidebarOpen()) return;
-        // Only trap focus when sidebar is an overlay (mobile <768px)
         if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
 
         const nav = this.sidebarEl()?.nativeElement;

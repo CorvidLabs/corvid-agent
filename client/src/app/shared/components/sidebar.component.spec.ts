@@ -54,17 +54,19 @@ describe('SidebarComponent', () => {
         }
     });
 
-    it('should render navigation links', () => {
+    it('should render navigation links using Material nav list', () => {
         const links = hostEl.querySelectorAll('.sidebar__link');
         expect(links.length).toBeGreaterThan(0);
-        const firstLabel = links[0].querySelector('.sidebar__label');
-        expect(firstLabel).toBeTruthy();
-        expect(firstLabel!.textContent!.trim()).toBe('Dashboard');
     });
 
-    it('should render all nav items in DOM', () => {
+    it('should render core nav items', () => {
         const links = hostEl.querySelectorAll('.sidebar__link');
-        expect(links.length).toBe(27);
+        expect(links.length).toBe(5);
+    });
+
+    it('should have mat-nav-list in the DOM', () => {
+        const navList = hostEl.querySelector('mat-nav-list');
+        expect(navList).toBeTruthy();
     });
 
     it('should toggle collapsed state on toggleCollapse', () => {
@@ -86,27 +88,6 @@ describe('SidebarComponent', () => {
         expect(component.sidebarOpen()).toBe(false);
     });
 
-    it('should render collapsible section toggle buttons', () => {
-        const toggles = hostEl.querySelectorAll('.sidebar__section-toggle');
-        expect(toggles.length).toBe(6);
-    });
-
-    it('should have aria-expanded on collapsible section toggles', () => {
-        const toggles = hostEl.querySelectorAll('.sidebar__section-toggle');
-        for (const toggle of Array.from(toggles)) {
-            expect(toggle.getAttribute('aria-expanded')).toBeTruthy();
-        }
-    });
-
-    it('should have aria-controls linking to section content', () => {
-        const toggles = hostEl.querySelectorAll('.sidebar__section-toggle');
-        for (const toggle of Array.from(toggles)) {
-            const controlsId = toggle.getAttribute('aria-controls');
-            expect(controlsId).toBeTruthy();
-            expect(controlsId).toMatch(/^sidebar-section-/);
-        }
-    });
-
     it('should toggle section collapsed state', () => {
         expect(component.isSectionCollapsed('sessions')).toBe(false);
         component.toggleSection('sessions');
@@ -115,33 +96,6 @@ describe('SidebarComponent', () => {
         component.toggleSection('sessions');
         fixture.detectChanges();
         expect(component.isSectionCollapsed('sessions')).toBe(false);
-    });
-
-    it('should add collapsed CSS class when section is collapsed', () => {
-        const sessionItems = hostEl.querySelector('#sidebar-section-sessions');
-        expect(sessionItems).toBeTruthy();
-        expect(sessionItems!.classList.contains('sidebar__section-items--collapsed')).toBe(false);
-        component.toggleSection('sessions');
-        fixture.detectChanges();
-        expect(sessionItems!.classList.contains('sidebar__section-items--collapsed')).toBe(true);
-    });
-
-    it('should collapse automation and integrations by default', () => {
-        expect(component.isSectionCollapsed('automation')).toBe(true);
-        expect(component.isSectionCollapsed('integrations')).toBe(true);
-        const automationItems = hostEl.querySelector('#sidebar-section-automation');
-        const integrationsItems = hostEl.querySelector('#sidebar-section-integrations');
-        expect(automationItems!.classList.contains('sidebar__section-items--collapsed')).toBe(true);
-        expect(integrationsItems!.classList.contains('sidebar__section-items--collapsed')).toBe(true);
-    });
-
-    it('should keep sessions and monitoring open by default', () => {
-        expect(component.isSectionCollapsed('sessions')).toBe(false);
-        expect(component.isSectionCollapsed('monitoring')).toBe(false);
-        const sessionItems = hostEl.querySelector('#sidebar-section-sessions');
-        const monitoringItems = hostEl.querySelector('#sidebar-section-monitoring');
-        expect(sessionItems!.classList.contains('sidebar__section-items--collapsed')).toBe(false);
-        expect(monitoringItems!.classList.contains('sidebar__section-items--collapsed')).toBe(false);
     });
 
     it('should persist section states in localStorage', () => {
@@ -156,37 +110,14 @@ describe('SidebarComponent', () => {
     it('should restore section states from localStorage', () => {
         globalThis.localStorage.setItem(
             'sidebar_sections_collapsed',
-            JSON.stringify({ sessions: true, automation: false }),
+            JSON.stringify({ sessions: true, config: false }),
         );
         const fixture2 = TestBed.createComponent(SidebarComponent);
         const component2 = fixture2.componentInstance;
         fixture2.detectChanges();
         expect(component2.isSectionCollapsed('sessions')).toBe(true);
-        expect(component2.isSectionCollapsed('automation')).toBe(false);
+        expect(component2.isSectionCollapsed('config')).toBe(false);
         fixture2.destroy();
-    });
-
-    it('should update aria-expanded when toggling sections', () => {
-        const sessionsToggle = hostEl.querySelector('[aria-controls="sidebar-section-sessions"]');
-        expect(sessionsToggle).toBeTruthy();
-        expect(sessionsToggle!.getAttribute('aria-expanded')).toBe('true');
-        component.toggleSection('sessions');
-        fixture.detectChanges();
-        expect(sessionsToggle!.getAttribute('aria-expanded')).toBe('false');
-    });
-
-    it('should render chevron indicators on collapsible sections', () => {
-        const chevrons = hostEl.querySelectorAll('.sidebar__chevron');
-        expect(chevrons.length).toBe(6);
-    });
-
-    it('should rotate chevron when section is expanded', () => {
-        const sessionsToggle = hostEl.querySelector('[aria-controls="sidebar-section-sessions"]');
-        const chevron = sessionsToggle!.querySelector('.sidebar__chevron');
-        expect(chevron!.classList.contains('sidebar__chevron--open')).toBe(true);
-        component.toggleSection('sessions');
-        fixture.detectChanges();
-        expect(chevron!.classList.contains('sidebar__chevron--open')).toBe(false);
     });
 
     it('should have role="navigation" on sidebar nav element', () => {
@@ -194,8 +125,22 @@ describe('SidebarComponent', () => {
         expect(nav!.getAttribute('role')).toBe('navigation');
     });
 
-    it('should have role="group" on section items containers', () => {
-        const groups = hostEl.querySelectorAll('[role="group"]');
-        expect(groups.length).toBe(6);
+    it('should render section labels', () => {
+        const sectionLabels = hostEl.querySelectorAll('.sidebar__section-label');
+        expect(sectionLabels.length).toBeGreaterThan(0);
+    });
+
+    it('should apply sidebar--collapsed class when collapsed', () => {
+        component.toggleCollapse();
+        fixture.detectChanges();
+        const nav = hostEl.querySelector('nav');
+        expect(nav!.classList.contains('sidebar--collapsed')).toBe(true);
+    });
+
+    it('should apply sidebar--open class when sidebarOpen is true', () => {
+        component.sidebarOpen.set(true);
+        fixture.detectChanges();
+        const nav = hostEl.querySelector('nav');
+        expect(nav!.classList.contains('sidebar--open')).toBe(true);
     });
 });

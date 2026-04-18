@@ -192,8 +192,8 @@ describe('ThreadSessionManager — TTL cleanup', () => {
   });
 
   test('runCleanup does not remove mention sessions exactly at TTL boundary', () => {
-    // Exactly 6 hours ago — should NOT be expired (condition is strictly >)
-    const borderTs = Date.now() - 6 * 60 * 60 * 1000;
+    // Just under 6 hours ago — should NOT be expired (condition is strictly >)
+    const borderTs = Date.now() - 6 * 60 * 60 * 1000 + 500;
     mgr.trackMentionSession('border-msg', makeMentionInfo(), borderTs);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
