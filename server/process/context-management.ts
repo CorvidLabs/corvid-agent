@@ -14,22 +14,67 @@ const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 
+// Chars-per-token ratios calibrated against Claude tokenizer on representative samples
+const CHARS_PER_TOKEN_STRUCTURED = 2.5; // JSON/YAML: repeated keys, brackets, short values
+const CHARS_PER_TOKEN_CODE = 3; // Source code: operators, short identifiers
+const CHARS_PER_TOKEN_PROSE = 4; // Natural language prose
+
 /**
- * Content-aware token estimation.
- * Code-heavy content averages ~0.33 tokens/char (more tokens per char due to
- * operators, short identifiers, indentation). Prose averages ~0.25 tokens/char.
- * We use a simple heuristic: if the text has many code indicators, use the
- * code factor; otherwise use prose.
+ * Content-aware token estimation with three content classes.
+ *
+ * Detects structured data (JSON/YAML), source code, and prose, then applies a
+ * weighted blend when content is mixed. Structured data tokenizes more densely
+ * than code due to repeated delimiters and short values.
  */
 export function estimateTokens(text: string): number {
   if (!text) return 0;
-  // Simple heuristic: count code-like characters
+
+  const len = text.length;
   const codeIndicators = (text.match(/[{}();=<>[\]|&!+\-*/\\^~`]/g) || []).length;
-  const codeRatio = codeIndicators / text.length;
-  // If >8% of chars are code-like, use code factor (3 chars/token)
-  // Otherwise use prose factor (4 chars/token)
-  const charsPerToken = codeRatio > 0.08 ? 3 : 4;
-  return Math.ceil(text.length / charsPerToken);
+  const codeRatio = codeIndicators / len;
+
+  const structuredRatio = detectStructuredDataRatio(text, len);
+
+  let charsPerToken: number;
+  if (structuredRatio > 0.5) {
+    // Predominantly structured data — blend structured + code/prose remainder
+    const remainderRatio = codeRatio > 0.08 ? CHARS_PER_TOKEN_CODE : CHARS_PER_TOKEN_PROSE;
+    charsPerToken = structuredRatio * CHARS_PER_TOKEN_STRUCTURED + (1 - structuredRatio) * remainderRatio;
+  } else if (codeRatio > 0.12) {
+    charsPerToken = CHARS_PER_TOKEN_CODE;
+  } else if (codeRatio > 0.05) {
+    // Mixed content — blend code and prose proportionally
+    const blend = (codeRatio - 0.05) / 0.07; // 0..1 across the 0.05-0.12 range
+    charsPerToken = blend * CHARS_PER_TOKEN_CODE + (1 - blend) * CHARS_PER_TOKEN_PROSE;
+  } else {
+    charsPerToken = CHARS_PER_TOKEN_PROSE;
+  }
+
+  return Math.ceil(len / charsPerToken);
+}
+
+/**
+ * Detect what fraction of the text is structured data (JSON, YAML, TOML).
+ * Uses lightweight heuristics rather than parsing.
+ */
+function detectStructuredDataRatio(text: string, len: number): number {
+  if (len < 20) return 0;
+
+  let score = 0;
+
+  // JSON indicators: starts with { or [, has "key": patterns
+  const jsonKeyMatches = text.match(/"[\w$-]+"\s*:/g);
+  if (jsonKeyMatches) {
+    score += Math.min(jsonKeyMatches.length * 15, len) / len;
+  }
+
+  // YAML indicators: key: value at line starts, --- document markers
+  const yamlKeyMatches = text.match(/^[\w][\w.-]*:\s/gm);
+  if (yamlKeyMatches) {
+    score += Math.min(yamlKeyMatches.length * 12, len) / len;
+  }
+
+  return Math.min(score, 1);
 }
 
 /**
@@ -137,7 +182,13 @@ export function truncateCouncilContext(
  * Progressive compression tiers based on context usage percentage.
  * Each tier applies increasingly aggressive compression to keep the
  * conversation within the context window.
+ *
+ * Tier 0 (proactive) runs before the numbered tiers — it ages out large
+ * tool results that have already been consumed by the assistant, providing
+ * a smoother degradation curve instead of cliff-edge compression at 70%.
  */
+const PROACTIVE_THRESHOLD = 0.6;
+
 const COMPRESSION_TIERS = [
   { name: 'tier1', threshold: 0.7, description: 'light tool result summarization' },
   { name: 'tier2', threshold: 0.8, description: 'reduce recent window + summarize discarded' },
@@ -364,6 +415,49 @@ function extractConfigValues(messages: Array<{ role: string; content: string }>)
 }
 
 /**
+ * Proactively summarize large tool results that have already been consumed
+ * by an assistant response. A tool result is "consumed" if it appears before
+ * a subsequent assistant message that references file paths or content from it.
+ *
+ * Replaces consumed tool results with a compact summary preserving key info
+ * (file paths, line counts, error indicators) while dramatically reducing size.
+ */
+export function summarizeConsumedToolResults(
+  messages: ConversationMessage[],
+  minSizeChars: number = 500,
+  recentWindow: number = 6,
+): number {
+  let summarized = 0;
+  const cutoff = messages.length - recentWindow;
+
+  for (let i = 0; i < cutoff; i++) {
+    const msg = messages[i];
+    if (msg.role !== 'tool' || msg.content.length <= minSizeChars) continue;
+
+    // Check if an assistant message follows that "consumes" this result
+    const hasFollowingAssistant = messages.slice(i + 1, cutoff + 2).some((m) => m.role === 'assistant');
+    if (!hasFollowingAssistant) continue;
+
+    const original = msg.content;
+    const lineCount = (original.match(/\n/g) || []).length + 1;
+    const paths = [...new Set((original.match(/(?:\/[\w.-]+){2,}/g) || []).slice(0, 5))];
+    const hasError = /(?:error|Error|ERROR|fail|FAIL)/i.test(original);
+
+    const parts: string[] = [];
+    parts.push(`[Summarized tool result, was ${original.length} chars, ${lineCount} lines]`);
+    if (paths.length > 0) parts.push(`Files: ${paths.join(', ')}`);
+    if (hasError) parts.push('(contained errors)');
+    // Keep a small preview of the beginning for orientation
+    parts.push(original.slice(0, 150).replace(/\n/g, ' ').trim());
+
+    msg.content = parts.join('\n');
+    summarized++;
+  }
+
+  return summarized;
+}
+
+/**
  * Truncate tool result messages older than `ageThreshold` positions from the
  * end to at most `maxChars`, appending a truncation notice.
  * This is a post-trim pass for additional size reduction.
@@ -553,6 +647,18 @@ export function trimMessages(messages: ConversationMessage[], systemPrompt?: str
     return;
   }
 
+  if (usageRatio >= PROACTIVE_THRESHOLD) {
+    // Pre-tier: proactively summarize consumed tool results before compression kicks in
+    const summarized = summarizeConsumedToolResults(messages, 500, 8);
+    if (summarized > 0) {
+      const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+      log.info(
+        `Proactively summarized ${summarized} consumed tool results — token budget (${totalTokens}→${newTokens} of ${ctxSize})`,
+      );
+    }
+    return;
+  }
+
   // Below all thresholds — no action needed
 }
 
@@ -566,6 +672,15 @@ export function computeContextUsage(
   const contextWindow = getContextBudget(model);
   const estimatedTokens = estimateTokens(sysPrompt) + msgs.reduce((sum, m) => sum + estimateTokens(m.content), 0);
   const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+
+  if (process.env.DEBUG_TOKEN_ESTIMATION) {
+    const totalChars = (sysPrompt?.length ?? 0) + msgs.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+    const avgCharsPerToken = totalChars / Math.max(estimatedTokens, 1);
+    log.debug(
+      `Token estimation: ${estimatedTokens} tokens from ${totalChars} chars (avg ${avgCharsPerToken.toFixed(2)} ch/tok), ${usagePercent}% of ${contextWindow} budget`,
+    );
+  }
+
   return { estimatedTokens, contextWindow, usagePercent, messagesCount: msgs.length, trimmed };
 }
 
