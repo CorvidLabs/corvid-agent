@@ -189,7 +189,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
         .filters mat-button-toggle-group { text-transform: capitalize; }
         .sort-field { width: 160px; flex-shrink: 0; margin-left: auto; }
-        .sort-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
+        .sort-field { --mat-select-trigger-text-size: 0.75rem; }
 
         /* Agent Grid — fluid + container-query aware */
         :host { container-type: inline-size; }

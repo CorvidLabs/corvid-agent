@@ -83,4 +83,56 @@ $corvid-theme: mat.define-theme((
   --mat-option-selected-state-label-text-color: #00e5ff;
   --mat-option-label-text-color: #e8e6f0;
   --mat-option-hover-state-layer-color: rgba(0, 229, 255, 0.08);
+
+  // Tabs — dark surfaces with cyan indicator
+  --mat-tab-header-active-label-text-color: #00e5ff;
+  --mat-tab-header-active-focus-label-text-color: #00e5ff;
+  --mat-tab-header-active-hover-label-text-color: #00e5ff;
+  --mat-tab-header-inactive-label-text-color: #9490ad;
+  --mat-tab-header-inactive-hover-label-text-color: #e8e6f0;
+  --mat-tab-header-active-focus-indicator-color: #00e5ff;
+  --mat-tab-header-active-hover-indicator-color: #00e5ff;
+  --mdc-tab-indicator-active-indicator-color: #00e5ff;
+
+  // Menu — dark panel
+  --mat-menu-container-color: #191b26;
+  --mat-menu-item-label-text-color: #e8e6f0;
+  --mat-menu-item-icon-color: #9490ad;
+  --mat-menu-item-hover-state-layer-color: rgba(0, 229, 255, 0.08);
+  --mat-menu-item-focus-state-layer-color: rgba(0, 229, 255, 0.08);
+  --mat-menu-divider-color: #222438;
+
+  // Card
+  --mdc-elevated-card-container-color: #12131c;
+  --mdc-outlined-card-container-color: #12131c;
+  --mdc-outlined-card-outline-color: #222438;
+
+  // Checkbox — cyan when checked
+  --mdc-checkbox-selected-checkmark-color: #0c0c14;
+  --mdc-checkbox-selected-focus-icon-color: #00e5ff;
+  --mdc-checkbox-selected-hover-icon-color: #00e5ff;
+  --mdc-checkbox-selected-icon-color: #00e5ff;
+  --mdc-checkbox-selected-pressed-icon-color: #00e5ff;
+  --mdc-checkbox-unselected-icon-color: #9490ad;
+  --mdc-checkbox-unselected-hover-icon-color: #e8e6f0;
+
+  // Chips
+  --mat-chip-elevated-container-color: rgba(0, 229, 255, 0.08);
+  --mat-chip-elevated-selected-container-color: rgba(0, 229, 255, 0.15);
+  --mat-chip-label-text-color: #e8e6f0;
+  --mat-chip-selected-label-text-color: #00e5ff;
+  --mat-chip-hover-state-layer-color: rgba(0, 229, 255, 0.08);
+
+  // Divider
+  --mat-divider-color: #222438;
+
+  // List
+  --mat-list-active-indicator-color: rgba(0, 229, 255, 0.1);
+  --mdc-list-list-item-label-text-color: #e8e6f0;
+  --mdc-list-list-item-hover-label-text-color: #e8e6f0;
+  --mdc-list-list-item-hover-state-layer-color: rgba(0, 229, 255, 0.08);
+
+  // Badge
+  --mat-badge-background-color: #00e5ff;
+  --mat-badge-text-color: #0c0c14;
 }

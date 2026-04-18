@@ -173,13 +173,11 @@ const NAV_ITEMS: BottomNavItem[] = [
             color: var(--accent-cyan);
         }
 
-        /* Override Material badge positioning */
-        ::ng-deep .bottom-nav__icon-wrapper .mat-badge-content {
-            background: var(--accent-cyan);
-            color: var(--bg-deep);
-            font-size: 0.55rem;
-            font-weight: 700;
-            box-shadow: 0 0 6px var(--accent-cyan-glow);
+        .bottom-nav__icon-wrapper {
+            --mat-badge-background-color: var(--accent-cyan);
+            --mat-badge-text-color: var(--bg-deep);
+            --mat-badge-text-size: 0.55rem;
+            --mat-badge-text-weight: 700;
         }
     `,
 })

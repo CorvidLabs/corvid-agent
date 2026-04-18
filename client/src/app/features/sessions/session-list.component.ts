@@ -130,7 +130,7 @@ interface SessionGroup {
         .filter-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
         .filter-row mat-button-toggle-group { font-size: 0.75rem; }
         .source-field { width: 140px; flex-shrink: 0; }
-        .source-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
+        .source-field { --mat-select-trigger-text-size: 0.75rem; }
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 

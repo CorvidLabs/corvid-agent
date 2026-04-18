@@ -334,15 +334,10 @@ import { MatButtonModule } from '@angular/material/button';
         /* Mat form field for the prompt textarea */
         .chat-home__form-field {
             width: 100%;
-        }
-        .chat-home__form-field .mat-mdc-form-field-flex {
-            background: transparent;
-        }
-        /* Override mat-form-field outline color to match corvid theme */
-        .chat-home__form-field .mdc-notched-outline__leading,
-        .chat-home__form-field .mdc-notched-outline__notch,
-        .chat-home__form-field .mdc-notched-outline__trailing {
-            border-color: transparent !important;
+            --mdc-outlined-text-field-container-color: transparent;
+            --mdc-outlined-text-field-outline-color: transparent;
+            --mdc-outlined-text-field-hover-outline-color: transparent;
+            --mdc-outlined-text-field-focus-outline-color: transparent;
         }
         .chat-home__textarea {
             color: var(--text-primary);
@@ -382,16 +377,11 @@ import { MatButtonModule } from '@angular/material/button';
             min-width: 120px;
             max-width: 180px;
         }
-        .chat-home__picker-field .mdc-notched-outline__leading,
-        .chat-home__picker-field .mdc-notched-outline__notch,
-        .chat-home__picker-field .mdc-notched-outline__trailing {
-            border-color: var(--border) !important;
-        }
-        .chat-home__picker-field .mat-mdc-select-value {
-            color: var(--text-primary);
-        }
-        .chat-home__picker-field label {
-            color: var(--text-tertiary);
+        .chat-home__picker-field {
+            --mdc-outlined-text-field-outline-color: var(--border);
+            --mdc-outlined-text-field-hover-outline-color: var(--border);
+            --mat-select-trigger-text-color: var(--text-primary);
+            --mdc-outlined-text-field-label-text-color: var(--text-tertiary);
         }
 
         /* Send button */

@@ -55,9 +55,11 @@ import { SECTION_STYLES } from './settings-shared.styles';
         .credit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
         .credit-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .field { width: 100%; }
-        .field--dirty ::ng-deep .mdc-notched-outline__leading,
-        .field--dirty ::ng-deep .mdc-notched-outline__notch,
-        .field--dirty ::ng-deep .mdc-notched-outline__trailing { border-color: var(--accent-amber) !important; }
+        .field--dirty {
+            --mdc-outlined-text-field-outline-color: var(--accent-amber);
+            --mdc-outlined-text-field-hover-outline-color: var(--accent-amber);
+            --mdc-outlined-text-field-focus-outline-color: var(--accent-amber);
+        }
         .credit-desc { font-size: 0.78rem; color: var(--text-tertiary); margin-top: -0.5rem; }
         .credit-actions { display: flex; gap: 0.5rem; align-items: center; }
         @media (max-width: 600px) { .credit-grid { grid-template-columns: 1fr; } }
