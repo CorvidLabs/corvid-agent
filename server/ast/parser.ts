@@ -21,7 +21,7 @@ const LANGUAGE_WASM_FILES: Record<AstLanguage, string> = {
  */
 export async function initParser(): Promise<void> {
   if (initialized) return;
-  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'tree-sitter.wasm');
+  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'web-tree-sitter.wasm');
   await Parser.init({
     locateFile: () => wasmPath,
   } as object);
