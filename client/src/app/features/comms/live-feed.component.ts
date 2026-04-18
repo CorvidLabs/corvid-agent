@@ -1,5 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy, ElementRef, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -28,36 +31,38 @@ interface FeedEntry {
 @Component({
     selector: 'app-live-feed',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DatePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
                 <h2>Feed</h2>
                 <div class="page__actions">
                     <span class="feed__count">{{ totalMessages() }} messages</span>
-                    <button class="btn btn--secondary" (click)="toggleAutoScroll()">
+                    <button mat-stroked-button (click)="toggleAutoScroll()">
                         Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
                     </button>
-                    <button class="btn btn--secondary" (click)="collapseAll()">Collapse all</button>
-                    <button class="btn btn--danger" (click)="onClear()">Clear</button>
+                    <button mat-stroked-button (click)="collapseAll()">Collapse all</button>
+                    <button mat-stroked-button color="warn" (click)="onClear()">Clear</button>
                 </div>
             </div>
 
             <div class="feed__toolbar">
-                <input
-                    class="feed__search"
-                    type="search"
-                    placeholder="Search messages..."
-                    [value]="searchTerm()"
-                    (input)="onSearchInput($event)"
-                    aria-label="Search messages"
-                />
+                <mat-form-field appearance="outline" class="feed__search-field">
+                    <mat-label>Search messages</mat-label>
+                    <input
+                        matInput
+                        type="search"
+                        placeholder="Search messages..."
+                        [value]="searchTerm()"
+                        (input)="onSearchInput($event)"
+                    />
+                </mat-form-field>
                 @if (activeThreadFilter()) {
                     <button class="btn btn--filter" (click)="clearThreadFilter()">
                         thread:{{ activeThreadFilter()!.slice(0, 6) }} ✕
                     </button>
                 }
-                <button class="btn btn--secondary" (click)="onExportFeed()">Export</button>
+                <button mat-stroked-button (click)="onExportFeed()">Export</button>
             </div>
 
             <div class="feed__direction-filters">
@@ -76,8 +81,8 @@ interface FeedEntry {
                         Showing {{ currentOffset() + 1 }}–{{ showingEnd() }} of {{ totalMessages() }}
                     </span>
                     <div class="feed__page-controls">
-                        <button class="btn btn--secondary" [disabled]="!hasPrevPage()" (click)="prevPage()">Previous</button>
-                        <button class="btn btn--secondary" [disabled]="!hasNextPage()" (click)="nextPage()">Next</button>
+                        <button mat-stroked-button [disabled]="!hasPrevPage()" (click)="prevPage()">Previous</button>
+                        <button mat-stroked-button [disabled]="!hasNextPage()" (click)="nextPage()">Next</button>
                     </div>
                 </div>
             }
@@ -133,25 +138,10 @@ interface FeedEntry {
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__actions { display: flex; align-items: center; gap: 0.75rem; }
         .feed__count { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-        .btn {
-            padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s;
-        }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
         .feed__toolbar {
             display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-shrink: 0;
         }
-        .feed__search {
-            flex: 1; padding: 0.4rem var(--space-3); font-size: 0.8rem; font-family: inherit;
-            background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-bright);
-            border-radius: var(--radius); outline: none;
-        }
-        .feed__search:focus { border-color: var(--accent-cyan); }
-        .feed__search::placeholder { color: var(--text-secondary); opacity: 0.6; }
+        .feed__search-field { flex: 1; }
         .btn--filter {
             background: rgba(255, 215, 0, 0.1); color: var(--accent-yellow);
             border: 1px solid rgba(255, 215, 0, 0.3); padding: 0.3rem 0.6rem; border-radius: var(--radius);

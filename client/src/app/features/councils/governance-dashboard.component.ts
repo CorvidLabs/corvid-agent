@@ -8,6 +8,7 @@ import {
     OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
 import { GovernanceService } from '../../core/services/governance.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type {
@@ -26,12 +27,12 @@ interface ProposalViewModel extends GovernanceProposal {
 @Component({
     selector: 'app-governance-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [CommonModule, RelativeTimePipe],
+    imports: [CommonModule, MatButtonModule, RelativeTimePipe],
     template: `
         <div class="gov-dashboard">
             <div class="gov-dashboard__header">
                 <h3 class="gov-dashboard__title">Governance Proposals</h3>
-                <button class="btn btn--sm btn--secondary" (click)="refresh()">Refresh</button>
+                <button mat-stroked-button (click)="refresh()">Refresh</button>
             </div>
 
             @if (loading()) {
@@ -92,14 +93,14 @@ interface ProposalViewModel extends GovernanceProposal {
 
                                 <div class="proposal-card__actions">
                                     @if (p.status === 'open') {
-                                        <button class="btn btn--sm btn--primary" (click)="openVoting(p)">Open Voting</button>
+                                        <button mat-flat-button color="primary" (click)="openVoting(p)">Open Voting</button>
                                     }
                                     @if (p.status === 'voting') {
-                                        <button class="btn btn--sm btn--primary" (click)="decide(p, 'approved')">Approve</button>
-                                        <button class="btn btn--sm btn--danger" (click)="decide(p, 'rejected')">Reject</button>
+                                        <button mat-flat-button color="primary" (click)="decide(p, 'approved')">Approve</button>
+                                        <button mat-stroked-button color="warn" (click)="decide(p, 'rejected')">Reject</button>
                                     }
                                     @if (p.status !== 'decided' && p.status !== 'enacted') {
-                                        <button class="btn btn--sm btn--veto" (click)="veto(p)">Veto</button>
+                                        <button mat-stroked-button color="warn" (click)="veto(p)">Veto</button>
                                     }
                                 </div>
                             </div>
@@ -203,21 +204,6 @@ interface ProposalViewModel extends GovernanceProposal {
         .tally-bar__legend--reject { color: var(--accent-red); }
         .tally-bar__legend--threshold { color: var(--text-tertiary); margin-left: auto; }
 
-        .btn {
-            padding: 0.4rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
-            background: transparent;
-        }
-        .btn--sm { padding: 0.25rem 0.6rem; font-size: 0.7rem; }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); }
-        .btn--secondary { color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
-        .btn--veto { color: var(--accent-magenta); border-color: var(--accent-magenta); }
-        .btn--veto:hover { background: var(--accent-magenta-dim, rgba(255,0,255,0.1)); }
     `,
 })
 export class GovernanceDashboardComponent implements OnInit {

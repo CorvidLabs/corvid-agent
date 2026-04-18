@@ -1,6 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -32,7 +35,7 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="System Logs" icon="logs">
             <!-- Tab bar -->
@@ -52,15 +55,17 @@ interface CreditTransaction {
             @if (activeTab() === 'logs') {
                 <!-- Search & Controls -->
                 <div class="log-toolbar">
-                    <input
-                        class="log-search"
-                        placeholder="Search logs..."
-                        [(ngModel)]="searchQuery"
-                        (input)="onSearch()" />
-                    <button class="btn btn--secondary btn--sm" [class.btn--active]="autoRefresh()" (click)="toggleAutoRefresh()">
+                    <mat-form-field appearance="outline" class="log-search-field">
+                        <mat-label>Search logs</mat-label>
+                        <input matInput
+                            placeholder="Search logs..."
+                            [(ngModel)]="searchQuery"
+                            (input)="onSearch()" />
+                    </mat-form-field>
+                    <button mat-stroked-button [color]="autoRefresh() ? 'primary' : undefined" (click)="toggleAutoRefresh()">
                         Auto-refresh: {{ autoRefresh() ? 'ON' : 'OFF' }}
                     </button>
-                    <button class="btn btn--secondary btn--sm" (click)="onExportLogs()">Export</button>
+                    <button mat-stroked-button (click)="onExportLogs()">Export</button>
                 </div>
 
                 <!-- Log type + level filters -->
@@ -183,13 +188,7 @@ interface CreditTransaction {
         .log-toolbar {
             display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
         }
-        .log-search {
-            flex: 1; padding: 0.4rem var(--space-3); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.8rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
-        }
-        .log-search:focus { border-color: var(--accent-cyan); outline: none; }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
-        .btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .log-search-field { flex: 1; }
 
         /* Log filters */
         .log-filters {

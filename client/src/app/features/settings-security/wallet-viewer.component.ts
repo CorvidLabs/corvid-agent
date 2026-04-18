@@ -11,6 +11,9 @@ import { ApiService } from '../../core/services/api.service';
 import { AllowlistService } from '../../core/services/allowlist.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -40,7 +43,7 @@ interface WalletMessage {
 @Component({
     selector: 'app-wallet-viewer',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [MatButtonModule, MatFormFieldModule, MatInputModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -53,12 +56,15 @@ interface WalletMessage {
             </div>
 
             <div class="search-bar">
-                <input
-                    class="input"
-                    type="text"
-                    placeholder="Search by address or label..."
-                    [value]="searchQuery()"
-                    (input)="onSearch(toInputValue($event))" />
+                <mat-form-field appearance="outline" class="search-field">
+                    <mat-label>Search by address or label</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="Search by address or label..."
+                        [value]="searchQuery()"
+                        (input)="onSearch(toInputValue($event))" />
+                </mat-form-field>
             </div>
 
             @if (loading()) {
@@ -105,19 +111,19 @@ interface WalletMessage {
                                     @if (wallet.onAllowlist) {
                                         <span class="badge badge--allowed">Allowed</span>
                                         <button
-                                            class="btn btn--small btn--danger"
+                                            mat-stroked-button color="warn"
                                             (click)="removeFromAllowlist($event, wallet.address)">
                                             Remove
                                         </button>
                                     } @else {
                                         <button
-                                            class="btn btn--small btn--primary"
+                                            mat-flat-button color="primary"
                                             (click)="addToAllowlist($event, wallet.address)">
                                             Allow
                                         </button>
                                     }
                                     <button
-                                        class="btn btn--small btn--grant"
+                                        mat-stroked-button
                                         (click)="openGrant($event, wallet.address)">
                                         Grant
                                     </button>
@@ -158,7 +164,7 @@ interface WalletMessage {
                                             }
                                         </div>
                                         @if (messageTotal() > messages().length) {
-                                            <button class="btn btn--small btn--ghost load-more" (click)="loadMoreMessages(wallet.address)">
+                                            <button mat-stroked-button class="load-more" (click)="loadMoreMessages(wallet.address)">
                                                 Load more ({{ messageTotal() - messages().length }} remaining)
                                             </button>
                                         }
@@ -176,24 +182,28 @@ interface WalletMessage {
                         <div class="modal__title">Grant Credits</div>
                         <div class="modal__address">{{ truncateAddress(grantAddress()!) }}</div>
                         <div class="modal__field">
-                            <label class="modal__label">Amount</label>
-                            <input class="input" type="number" min="1" step="1" placeholder="100"
-                                #grantAmountInput
-                                (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Amount</mat-label>
+                                <input matInput type="number" min="1" step="1" placeholder="100"
+                                    #grantAmountInput
+                                    (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                            </mat-form-field>
                         </div>
                         <div class="modal__field">
-                            <label class="modal__label">Reference (optional)</label>
-                            <input class="input" type="text" placeholder="e.g. bonus, promo"
-                                #grantRefInput
-                                (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Reference (optional)</mat-label>
+                                <input matInput type="text" placeholder="e.g. bonus, promo"
+                                    #grantRefInput
+                                    (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                            </mat-form-field>
                         </div>
                         <div class="modal__actions">
-                            <button class="btn btn--small btn--primary"
+                            <button mat-flat-button color="primary"
                                 [disabled]="grantBusy()"
                                 (click)="submitGrant(grantAmountInput.value, grantRefInput.value)">
                                 {{ grantBusy() ? 'Granting...' : 'Grant' }}
                             </button>
-                            <button class="btn btn--small btn--ghost" (click)="closeGrant()">Cancel</button>
+                            <button mat-stroked-button (click)="closeGrant()">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -207,14 +217,8 @@ interface WalletMessage {
         .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-base); }
 
         .search-bar { margin-bottom: var(--space-5); }
-        .input {
-            width: 100%; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
-            min-height: 48px;
-            transition: border-color var(--transition-fast), box-shadow var(--transition-base);
-        }
-        .input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .input::placeholder { color: var(--text-tertiary); }
+        .search-field { width: 100%; }
+        .full-width { width: 100%; }
 
         .loading { color: var(--text-secondary); }
         .empty { color: var(--text-tertiary); }
@@ -271,19 +275,7 @@ interface WalletMessage {
 
         .expand-icon { color: var(--text-tertiary); font-size: var(--text-sm); }
 
-        .btn {
-            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm); font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 44px;
-        }
-        .btn:disabled { opacity: 0.4; cursor: default; }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-tint); box-shadow: 0 0 8px var(--accent-cyan-mid); }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
-        .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
-        .btn--ghost:hover { background: var(--bg-hover); }
+
 
         .wallet-card__messages {
             border-top: 1px solid var(--border); padding: clamp(var(--space-3), 2vw, var(--space-5));
@@ -325,9 +317,6 @@ interface WalletMessage {
             white-space: pre-wrap; word-break: break-word;
         }
 
-        .btn--grant { color: var(--accent-green); border-color: var(--accent-green); }
-        .btn--grant:hover { background: var(--accent-green-tint); box-shadow: 0 0 8px var(--accent-green-mid); }
-
         .modal-overlay {
             position: fixed; inset: 0; z-index: 1000;
             background: var(--overlay-heavy); backdrop-filter: blur(4px);
@@ -347,7 +336,6 @@ interface WalletMessage {
             margin-bottom: var(--space-4); word-break: break-all;
         }
         .modal__field { margin-bottom: var(--space-3); }
-        .modal__label { display: block; font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-1); }
         .modal__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); }
 
         .load-more { margin-top: 0.5rem; width: 100%; }

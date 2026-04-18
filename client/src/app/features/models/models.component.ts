@@ -8,6 +8,9 @@ import {
     computed,
 } from '@angular/core';
 import { DecimalPipe, SlicePipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ApiService } from '../../core/services/api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -74,10 +77,10 @@ interface LibraryResponse {
 @Component({
     selector: 'app-models',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, SlicePipe, SkeletonComponent, PageShellComponent],
+    imports: [DecimalPipe, SlicePipe, MatButtonModule, MatFormFieldModule, MatInputModule, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="Models" icon="models">
-            <button actions class="btn btn--secondary" (click)="refresh()" [disabled]="loading()">
+            <button actions mat-stroked-button (click)="refresh()" [disabled]="loading()">
                 Refresh
             </button>
 
@@ -176,7 +179,7 @@ interface LibraryResponse {
                                 </div>
                                 <div class="model-card__actions">
                                     <button
-                                        class="btn btn--danger btn--sm"
+                                        mat-stroked-button color="warn"
                                         (click)="deleteModel(model.name)"
                                         [disabled]="deletingModel() === model.name">
                                         {{ deletingModel() === model.name ? 'Deleting...' : 'Delete' }}
@@ -191,12 +194,15 @@ interface LibraryResponse {
             <!-- Library Tab -->
             @if (activeTab() === 'library') {
                 <div class="library-controls">
-                    <input
-                        type="text"
-                        class="search-input"
-                        placeholder="Search models..."
-                        [value]="libraryQuery()"
-                        (input)="onSearchInput($event)" />
+                    <mat-form-field appearance="outline" class="library-search-field">
+                        <mat-label>Search models</mat-label>
+                        <input
+                            matInput
+                            type="text"
+                            placeholder="Search models..."
+                            [value]="libraryQuery()"
+                            (input)="onSearchInput($event)" />
+                    </mat-form-field>
                     <div class="category-filters">
                         @for (cat of libraryCategories(); track cat) {
                             <button
@@ -234,7 +240,7 @@ interface LibraryResponse {
                                         <span class="pulling-label">Downloading...</span>
                                     } @else {
                                         <button
-                                            class="btn btn--primary btn--sm"
+                                            mat-flat-button color="primary"
                                             (click)="pullModel(model.pullCommand)"
                                             [disabled]="!ollamaAvailable()">
                                             Download
@@ -279,13 +285,16 @@ interface LibraryResponse {
             <section class="section manual-pull">
                 <h3 class="section__title">Pull Custom Model</h3>
                 <div class="manual-pull__form">
-                    <input
-                        type="text"
-                        class="search-input"
-                        placeholder="e.g. qwen3:8b, llama3.1:70b"
-                        #customModelInput />
+                    <mat-form-field appearance="outline" class="manual-pull__field">
+                        <mat-label>Model name</mat-label>
+                        <input
+                            matInput
+                            type="text"
+                            placeholder="e.g. qwen3:8b, llama3.1:70b"
+                            #customModelInput />
+                    </mat-form-field>
                     <button
-                        class="btn btn--primary"
+                        mat-flat-button color="primary"
                         (click)="pullModel(customModelInput.value); customModelInput.value = ''"
                         [disabled]="!ollamaAvailable()">
                         Pull
@@ -376,12 +385,6 @@ interface LibraryResponse {
 
         /* Library Controls */
         .library-controls { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-        .search-input {
-            padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-            width: 100%;
-        }
-        .search-input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .category-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
         .filter-chip {
             padding: 0.4rem 0.75rem; min-height: 32px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
@@ -401,22 +404,9 @@ interface LibraryResponse {
         .manual-pull__form { display: flex; gap: 0.5rem; }
         .manual-pull__form .search-input { flex: 1; }
 
-        /* Buttons */
-        .btn {
-            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase;
-            letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); }
-        .btn--secondary:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--danger { background: transparent; color: #ff5050; border-color: rgba(255, 80, 80, 0.4); }
-        .btn--danger:hover { background: rgba(255, 80, 80, 0.08); box-shadow: 0 0 8px rgba(255, 80, 80, 0.15); }
-        .btn--danger:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; min-height: 32px; }
+        /* Layout helpers */
+        .library-search-field { width: 100%; }
+        .manual-pull__field { flex: 1; }
 
         .hint { color: var(--text-tertiary); font-size: 0.82rem; }
         .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }

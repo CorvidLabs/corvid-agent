@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { LibraryService, type LibraryCategory, type LibraryEntry } from '../../core/services/library.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -17,27 +21,33 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
 @Component({
     selector: 'app-library-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
                 <h2>Shared Library (CRVLIB)</h2>
-                <button class="btn btn--primary btn--sm" (click)="refresh()" [disabled]="libraryService.loading()">
+                <button mat-stroked-button (click)="refresh()" [disabled]="libraryService.loading()">
                     {{ libraryService.loading() ? 'Loading...' : 'Refresh' }}
                 </button>
             </div>
 
             <div class="toolbar">
-                <input
-                    class="search-input"
-                    placeholder="Filter by key or content..."
-                    [(ngModel)]="searchQuery"
-                    (input)="searchQuery = $any($event.target).value" />
-                <select class="category-select" [(ngModel)]="categoryFilter" (ngModelChange)="onCategoryChange($event)">
-                    @for (cat of categories; track cat.value) {
-                        <option [value]="cat.value">{{ cat.label }}</option>
-                    }
-                </select>
+                <mat-form-field appearance="outline" class="toolbar__search">
+                    <mat-label>Filter by key or content</mat-label>
+                    <input
+                        matInput
+                        placeholder="Filter by key or content..."
+                        [(ngModel)]="searchQuery"
+                        (input)="searchQuery = $any($event.target).value" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="toolbar__category">
+                    <mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="categoryFilter" (ngModelChange)="onCategoryChange($event)">
+                        @for (cat of categories; track cat.value) {
+                            <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
             </div>
 
             @if (libraryService.loading()) {
@@ -112,16 +122,9 @@ const CATEGORIES: { value: LibraryCategory | ''; label: string }[] = [
         .page__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .page__header h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 
-        .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-        .search-input {
-            flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
-        }
-        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .category-select {
-            padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
-            background: var(--bg-input); color: var(--text-secondary); font-size: 0.85rem; font-family: inherit;
-        }
+        .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; align-items: flex-start; }
+        .toolbar__search { flex: 1; }
+        .toolbar__category { min-width: 160px; }
 
         .empty { color: var(--text-tertiary); font-size: 0.85rem; }
 

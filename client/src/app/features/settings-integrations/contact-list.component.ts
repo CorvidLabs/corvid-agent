@@ -7,6 +7,10 @@ import {
     OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ContactService } from '../../core/services/contact.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -23,22 +27,24 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
 @Component({
     selector: 'app-contact-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, IconComponent],
     template: `
         <div class="page">
             <div class="page__header">
                 <h2 class="page-title">Contacts</h2>
-                <button class="btn btn--primary" (click)="openCreate()">+ New Contact</button>
+                <button mat-flat-button color="primary" (click)="openCreate()">+ New Contact</button>
             </div>
 
             <div class="page__toolbar">
-                <input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search contacts..."
-                    [ngModel]="searchQuery()"
-                    (ngModelChange)="searchQuery.set($event)"
-                    aria-label="Search contacts" />
+                <mat-form-field appearance="outline" class="search-field">
+                    <mat-label>Search contacts</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="Search contacts..."
+                        [ngModel]="searchQuery()"
+                        (ngModelChange)="searchQuery.set($event)" />
+                </mat-form-field>
             </div>
 
             @if (contactService.loading()) {
@@ -91,21 +97,25 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                             @if (editing()) {
                                 <div class="detail-section">
                                     <h3 class="detail-title">Edit Contact</h3>
-                                    <label class="field-label">Name</label>
-                                    <input
-                                        class="field-input"
-                                        type="text"
-                                        [ngModel]="editName()"
-                                        (ngModelChange)="editName.set($event)" />
-                                    <label class="field-label">Notes</label>
-                                    <textarea
-                                        class="field-input field-textarea"
-                                        rows="4"
-                                        [ngModel]="editNotes()"
-                                        (ngModelChange)="editNotes.set($event)"></textarea>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Name</mat-label>
+                                        <input
+                                            matInput
+                                            type="text"
+                                            [ngModel]="editName()"
+                                            (ngModelChange)="editName.set($event)" />
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Notes</mat-label>
+                                        <textarea
+                                            matInput
+                                            rows="4"
+                                            [ngModel]="editNotes()"
+                                            (ngModelChange)="editNotes.set($event)"></textarea>
+                                    </mat-form-field>
                                     <div class="detail-actions">
-                                        <button class="btn btn--primary" (click)="saveEdit()">Save</button>
-                                        <button class="btn btn--ghost" (click)="editing.set(false)">Cancel</button>
+                                        <button mat-flat-button color="primary" (click)="saveEdit()">Save</button>
+                                        <button mat-stroked-button (click)="editing.set(false)">Cancel</button>
                                     </div>
                                 </div>
                             } @else {
@@ -118,8 +128,8 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                                         <span class="detail-meta">Added {{ selectedContact()!.createdAt | relativeTime }}</span>
                                     </div>
                                     <div class="detail-header-actions">
-                                        <button class="btn btn--ghost btn--sm" (click)="startEdit()">Edit</button>
-                                        <button class="btn btn--danger btn--sm" (click)="confirmDelete()">Delete</button>
+                                        <button mat-stroked-button (click)="startEdit()">Edit</button>
+                                        <button mat-stroked-button color="warn" (click)="confirmDelete()">Delete</button>
                                     </div>
                                 </div>
 
@@ -142,11 +152,11 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                                             </span>
                                             <code class="link-id">{{ link.platformId }}</code>
                                             @if (!link.verified) {
-                                                <button class="btn btn--ghost btn--xs" (click)="verifyLink(link)">Verify</button>
+                                                <button mat-stroked-button (click)="verifyLink(link)">Verify</button>
                                             } @else {
                                                 <span class="verified-badge">Verified</span>
                                             }
-                                            <button class="btn btn--danger btn--xs" (click)="removeLink(link)">Remove</button>
+                                            <button mat-stroked-button color="warn" (click)="removeLink(link)">Remove</button>
                                         </div>
                                     } @empty {
                                         <p class="empty-hint">No platform accounts linked yet.</p>
@@ -156,26 +166,32 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                                 <!-- Add link form -->
                                 @if (addingLink()) {
                                     <div class="add-link-form">
-                                        <select class="field-input field-select"
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Platform</mat-label>
+                                            <mat-select
                                                 [ngModel]="newLinkPlatform()"
                                                 (ngModelChange)="newLinkPlatform.set($event)">
-                                            <option value="discord">Discord</option>
-                                            <option value="algochat">AlgoChat</option>
-                                            <option value="github">GitHub</option>
-                                        </select>
-                                        <input
-                                            class="field-input"
-                                            type="text"
-                                            placeholder="Platform ID (e.g. Discord user ID, GitHub handle)"
-                                            [ngModel]="newLinkId()"
-                                            (ngModelChange)="newLinkId.set($event)" />
+                                                <mat-option value="discord">Discord</mat-option>
+                                                <mat-option value="algochat">AlgoChat</mat-option>
+                                                <mat-option value="github">GitHub</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Platform ID</mat-label>
+                                            <input
+                                                matInput
+                                                type="text"
+                                                placeholder="Platform ID (e.g. Discord user ID, GitHub handle)"
+                                                [ngModel]="newLinkId()"
+                                                (ngModelChange)="newLinkId.set($event)" />
+                                        </mat-form-field>
                                         <div class="detail-actions">
-                                            <button class="btn btn--primary btn--sm" (click)="saveLink()">Add</button>
-                                            <button class="btn btn--ghost btn--sm" (click)="addingLink.set(false)">Cancel</button>
+                                            <button mat-flat-button color="primary" (click)="saveLink()">Add</button>
+                                            <button mat-stroked-button (click)="addingLink.set(false)">Cancel</button>
                                         </div>
                                     </div>
                                 } @else {
-                                    <button class="btn btn--ghost btn--sm" (click)="openAddLink()">+ Add Link</button>
+                                    <button mat-stroked-button (click)="openAddLink()">+ Add Link</button>
                                 }
                             </div>
                         </div>
@@ -192,23 +208,27 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
                 <div class="modal-overlay" (click)="creating.set(false)">
                     <div class="modal" (click)="$event.stopPropagation()">
                         <h3 class="modal__title">New Contact</h3>
-                        <label class="field-label">Name</label>
-                        <input
-                            class="field-input"
-                            type="text"
-                            placeholder="Display name"
-                            [ngModel]="createName()"
-                            (ngModelChange)="createName.set($event)" />
-                        <label class="field-label">Notes</label>
-                        <textarea
-                            class="field-input field-textarea"
-                            rows="3"
-                            placeholder="Role, context, anything helpful..."
-                            [ngModel]="createNotes()"
-                            (ngModelChange)="createNotes.set($event)"></textarea>
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Name</mat-label>
+                            <input
+                                matInput
+                                type="text"
+                                placeholder="Display name"
+                                [ngModel]="createName()"
+                                (ngModelChange)="createName.set($event)" />
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Notes</mat-label>
+                            <textarea
+                                matInput
+                                rows="3"
+                                placeholder="Role, context, anything helpful..."
+                                [ngModel]="createNotes()"
+                                (ngModelChange)="createNotes.set($event)"></textarea>
+                        </mat-form-field>
                         <div class="modal__actions">
-                            <button class="btn btn--primary" (click)="saveCreate()" [disabled]="!createName()?.trim()">Create</button>
-                            <button class="btn btn--ghost" (click)="creating.set(false)">Cancel</button>
+                            <button mat-flat-button color="primary" (click)="saveCreate()" [disabled]="!createName()?.trim()">Create</button>
+                            <button mat-stroked-button (click)="creating.set(false)">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -221,31 +241,8 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         .page__header h2 { margin: 0; color: var(--text-primary); font-size: var(--text-xl); }
         .page__toolbar { margin-bottom: var(--space-5); }
 
-        .search-input {
-            width: 100%; max-width: 520px; padding: var(--space-3) var(--space-4);
-            background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); color: var(--text-primary);
-            font-size: var(--text-base); font-family: inherit; min-height: 48px;
-            transition: border-color 0.2s;
-        }
-        .search-input:focus { outline: none; border-color: var(--accent-cyan); }
-        .search-input::placeholder { color: var(--text-tertiary); }
-
-        .btn {
-            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm);
-            font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 48px;
-        }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn--ghost { color: var(--text-secondary); border-color: var(--border); }
-        .btn--ghost:hover { border-color: var(--text-tertiary); }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: rgba(255, 85, 85, 0.1); }
-        .btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
-        .btn--xs { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); min-height: 36px; }
+        .search-field { width: 100%; max-width: 520px; }
+        .full-width { width: 100%; }
 
         .contact-layout {
             display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(var(--space-4), 2vw, var(--space-6));
@@ -354,19 +351,6 @@ const PLATFORM_LABELS: Record<ContactPlatform, string> = {
         }
 
         /* ── Form fields ── */
-        .field-label {
-            display: block; font-size: var(--text-sm); font-weight: 600; color: var(--text-tertiary);
-            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-1); margin-top: var(--space-3);
-        }
-        .field-input {
-            width: 100%; padding: var(--space-3) var(--space-4); background: var(--bg-base);
-            border: 1px solid var(--border); border-radius: var(--radius-lg);
-            color: var(--text-primary); font-size: var(--text-base); font-family: inherit;
-            box-sizing: border-box; min-height: 44px;
-        }
-        .field-input:focus { outline: none; border-color: var(--accent-cyan); }
-        .field-textarea { resize: vertical; min-height: 60px; }
-        .field-select { appearance: auto; cursor: pointer; }
 
         /* ── Modal ── */
         .modal-overlay {

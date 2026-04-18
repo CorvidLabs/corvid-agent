@@ -1,6 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { ProjectService } from '../../core/services/project.service';
 import { DirBrowserComponent } from '../../shared/components/dir-browser.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
@@ -8,31 +11,33 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-project-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, DirBrowserComponent, PageShellComponent],
+    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, DirBrowserComponent, PageShellComponent],
     template: `
         <app-page-shell [title]="id() ? 'Edit Project' : 'New Project'" icon="projects"
             [breadcrumbs]="[{label: 'Projects', route: '/agents/projects'}, {label: id() ? 'Edit' : 'New'}]">
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
-                <div class="form__field">
-                    <label for="name" class="form__label">Name</label>
-                    <input id="name" formControlName="name" class="form__input"
+                <mat-form-field appearance="outline" class="form__field">
+                    <mat-label>Name</mat-label>
+                    <input matInput id="name" formControlName="name"
                            [attr.aria-describedby]="form.get('name')?.invalid && form.get('name')?.touched ? 'name-error' : null" />
                     @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-                        <span id="name-error" class="form__error" role="alert">Project name is required.</span>
+                        <mat-error id="name-error">Project name is required.</mat-error>
                     }
-                </div>
+                </mat-form-field>
 
                 <div class="form__field">
-                    <label for="workingDir" class="form__label">Working Directory</label>
                     <div class="form__row">
-                        <input id="workingDir" formControlName="workingDir" class="form__input"
-                               placeholder="/path/to/project"
-                               [attr.aria-describedby]="form.get('workingDir')?.invalid && form.get('workingDir')?.touched ? 'workingDir-error' : null" />
-                        <button type="button" class="btn btn--secondary" (click)="showBrowser.set(true)">Browse</button>
+                        <mat-form-field appearance="outline" class="form__row-field">
+                            <mat-label>Working Directory</mat-label>
+                            <input matInput id="workingDir" formControlName="workingDir"
+                                   placeholder="/path/to/project"
+                                   [attr.aria-describedby]="form.get('workingDir')?.invalid && form.get('workingDir')?.touched ? 'workingDir-error' : null" />
+                            @if (form.get('workingDir')?.hasError('required') && form.get('workingDir')?.touched) {
+                                <mat-error id="workingDir-error">Working directory is required.</mat-error>
+                            }
+                        </mat-form-field>
+                        <button type="button" mat-stroked-button (click)="showBrowser.set(true)">Browse</button>
                     </div>
-                    @if (form.get('workingDir')?.hasError('required') && form.get('workingDir')?.touched) {
-                        <span id="workingDir-error" class="form__error" role="alert">Working directory is required.</span>
-                    }
                 </div>
 
                 @if (showBrowser()) {
@@ -42,29 +47,33 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                         (cancelled)="showBrowser.set(false)" />
                 }
 
-                <div class="form__field">
-                    <label for="description" class="form__label">Description</label>
-                    <textarea id="description" formControlName="description" class="form__input form__textarea"
+                <mat-form-field appearance="outline" class="form__field">
+                    <mat-label>Description</mat-label>
+                    <textarea matInput id="description" formControlName="description"
                               rows="3"></textarea>
-                </div>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="claudeMd" class="form__label">CLAUDE.md Content</label>
-                    <textarea id="claudeMd" formControlName="claudeMd" class="form__input form__textarea"
+                <mat-form-field appearance="outline" class="form__field">
+                    <mat-label>CLAUDE.md Content</mat-label>
+                    <textarea matInput id="claudeMd" formControlName="claudeMd"
                               rows="6" placeholder="Project instructions for Claude..."></textarea>
-                </div>
+                </mat-form-field>
 
                 <div class="form__actions">
-                    <button type="submit" class="btn btn--primary" [disabled]="form.invalid || saving()">
+                    <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving()">
                         {{ saving() ? 'Saving...' : 'Save' }}
                     </button>
-                    <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
+                    <button type="button" mat-stroked-button (click)="onCancel()">Cancel</button>
                 </div>
             </form>
         </app-page-shell>
     `,
     styles: `
         :host { max-width: 640px; display: block; }
+        .form__field { width: 100%; margin-bottom: 0.5rem; }
+        .form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
+        .form__row-field { flex: 1; }
+        .form__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
     `,
 })
 export class ProjectFormComponent implements OnInit {

@@ -7,6 +7,10 @@ import {
     OnInit,
 } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { ApiService } from '../../core/services/api.service';
@@ -63,7 +67,7 @@ const TEMPLATES: AgentTemplate[] = [
 @Component({
     selector: 'app-onboarding',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
     template: `
         <div class="onboard">
             @if (step() === 'pick') {
@@ -94,32 +98,30 @@ const TEMPLATES: AgentTemplate[] = [
                     <p class="onboard__sub">Give your agent a name and pick a model.</p>
                 </div>
                 <form class="onboard__form" [formGroup]="form" (ngSubmit)="createAgent()">
-                    <div class="field">
-                        <label class="field__label" for="agent-name">Agent name</label>
-                        <input
-                            class="field__input"
+                    <mat-form-field appearance="outline" class="field">
+                        <mat-label>Agent name</mat-label>
+                        <input matInput
                             id="agent-name"
                             formControlName="name"
                             placeholder="e.g. Builder, Scout, Helper"
                             autocomplete="off" />
-                    </div>
-                    <div class="field">
-                        <label class="field__label" for="agent-model">Model</label>
-                        <select
-                            class="field__input"
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="field">
+                        <mat-label>Model</mat-label>
+                        <mat-select
                             id="agent-model"
                             formControlName="model">
                             @for (p of providers(); track p.name) {
                                 @for (m of p.models; track m) {
-                                    <option [value]="m">{{ p.name }}: {{ m }}</option>
+                                    <mat-option [value]="m">{{ p.name }}: {{ m }}</mat-option>
                                 }
                             }
-                        </select>
-                    </div>
+                        </mat-select>
+                    </mat-form-field>
                     <div class="onboard__form-actions">
-                        <button class="btn btn--ghost" type="button" (click)="step.set('pick')">Back</button>
+                        <button mat-stroked-button type="button" (click)="step.set('pick')">Back</button>
                         <button
-                            class="btn btn--primary"
+                            mat-flat-button color="primary"
                             type="submit"
                             [disabled]="form.invalid || creating()">
                             {{ creating() ? 'Creating...' : 'Create Agent' }}
@@ -134,7 +136,7 @@ const TEMPLATES: AgentTemplate[] = [
                     <h1 class="onboard__title">{{ createdAgentName() }} is ready</h1>
                     <p class="onboard__sub">Start a conversation or explore the platform.</p>
                     <div class="onboard__done-actions">
-                        <button class="btn btn--primary btn--large" (click)="done.emit()" type="button">
+                        <button mat-flat-button color="primary" class="btn--large" (click)="done.emit()" type="button">
                             Start chatting
                         </button>
                     </div>
@@ -238,64 +240,13 @@ const TEMPLATES: AgentTemplate[] = [
             max-width: 400px;
             margin: 0 auto;
         }
-        .field { margin-bottom: 1rem; }
-        .field__label {
-            display: block;
-            margin-bottom: 0.35rem;
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-tertiary);
-        }
-        .field__input {
-            width: 100%;
-            padding: 0.6rem 0.75rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.82rem;
-            box-sizing: border-box;
-        }
-        .field__input:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 1px var(--accent-cyan-mid);
-        }
+        .field { width: 100%; margin-bottom: 0.5rem; }
         .onboard__form-actions {
             display: flex;
             gap: 0.75rem;
             justify-content: flex-end;
             margin-top: 1.5rem;
         }
-        .btn {
-            padding: 0.5rem 1.25rem;
-            border-radius: var(--radius);
-            font-size: 0.78rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid;
-            font-family: inherit;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary {
-            background: linear-gradient(135deg, var(--accent-cyan-dim), var(--accent-cyan-subtle));
-            color: var(--accent-cyan);
-            border-color: var(--accent-cyan-glow);
-        }
-        .btn--primary:hover:not(:disabled) {
-            background: linear-gradient(135deg, var(--accent-cyan-mid), var(--accent-cyan-tint));
-            box-shadow: 0 0 20px var(--accent-cyan-dim);
-        }
-        .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn--ghost {
-            background: transparent;
-            color: var(--text-secondary);
-            border-color: var(--border-bright);
-        }
-        .btn--ghost:hover { background: var(--bg-hover); }
         .btn--large {
             padding: 0.75rem 2rem;
             font-size: 0.9rem;

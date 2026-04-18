@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
 import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
@@ -12,14 +13,14 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-project-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe, PageShellComponent],
+    imports: [RouterLink, MatButtonModule, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe, PageShellComponent],
     template: `
         @if (project(); as p) {
             <app-page-shell [title]="p.name" icon="projects" [subtitle]="p.description"
                 [breadcrumbs]="[{label: 'Projects', route: '/agents/projects'}, {label: p.name}]">
                 <ng-container actions>
-                    <a class="btn btn--secondary" [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
-                    <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                    <a mat-stroked-button [routerLink]="['/agents/projects', p.id, 'edit']">Edit</a>
+                    <button mat-stroked-button color="warn" (click)="onDelete()">Delete</button>
                 </ng-container>
 
                 <div class="detail__info">
@@ -41,7 +42,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                 <div class="detail__section">
                     <div class="detail__section-header">
                         <h3>Sessions</h3>
-                        <a class="btn btn--primary btn--sm" [routerLink]="['/sessions', 'new']"
+                        <a mat-flat-button color="primary" [routerLink]="['/sessions', 'new']"
                            [queryParams]="{ projectId: p.id }">New Session</a>
                     </div>
                     @if (sessions().length === 0) {
@@ -65,18 +66,6 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         }
     `,
     styles: `
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
-        .btn--sm { padding: 0.4rem 0.75rem; font-size: 0.75rem; min-height: 32px; }
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .detail__info dd { margin: 0; color: var(--text-primary); }

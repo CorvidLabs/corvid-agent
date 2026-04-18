@@ -1,4 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { RepoBlocklistService } from '../../core/services/repo-blocklist.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -8,7 +11,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
 @Component({
     selector: 'app-repo-blocklist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
+    imports: [MatButtonModule, MatFormFieldModule, MatInputModule, RelativeTimePipe, SkeletonComponent, TooltipDirective, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -21,20 +24,26 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
             </div>
 
             <div class="add-form">
-                <input
-                    class="input"
-                    type="text"
-                    placeholder="owner/repo or owner/*"
-                    [value]="newRepo()"
-                    (input)="newRepo.set(toInputValue($event))" />
-                <input
-                    class="input input--reason"
-                    type="text"
-                    placeholder="Reason (optional)"
-                    [value]="newReason()"
-                    (input)="newReason.set(toInputValue($event))" />
+                <mat-form-field appearance="outline" class="add-form__field">
+                    <mat-label>Repository</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="owner/repo or owner/*"
+                        [value]="newRepo()"
+                        (input)="newRepo.set(toInputValue($event))" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="add-form__field add-form__field--reason">
+                    <mat-label>Reason (optional)</mat-label>
+                    <input
+                        matInput
+                        type="text"
+                        placeholder="Reason (optional)"
+                        [value]="newReason()"
+                        (input)="newReason.set(toInputValue($event))" />
+                </mat-form-field>
                 <button
-                    class="btn btn--primary"
+                    mat-flat-button color="primary"
                     [disabled]="!newRepo().trim()"
                     (click)="add()">Block</button>
             </div>
@@ -65,7 +74,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
                             </div>
                             <div class="list__item-meta">
                                 <span>{{ entry.createdAt | relativeTime }}</span>
-                                <button class="btn btn--danger btn--small" (click)="remove(entry.repo)">Remove</button>
+                                <button mat-stroked-button color="warn" (click)="remove(entry.repo)">Remove</button>
                             </div>
                         </div>
                     }
@@ -78,25 +87,9 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
         .page__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3); }
         .page__header h2 { margin: 0; color: var(--text-primary); font-size: var(--text-xl); }
         .count { color: var(--text-tertiary); font-weight: 400; font-size: var(--text-base); }
-        .add-form { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; }
-        .input {
-            flex: 1; padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); color: var(--text-primary); font-family: inherit; font-size: var(--text-base);
-            min-height: 48px;
-        }
-        .input::placeholder { color: var(--text-tertiary); }
-        .input--reason { max-width: 340px; min-width: 160px; }
-        .btn {
-            padding: var(--space-3) var(--space-5); border-radius: var(--radius); font-size: var(--text-sm); font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s; background: transparent; min-height: 48px;
-        }
-        .btn:disabled { opacity: 0.4; cursor: default; }
-        .btn--primary { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--danger { color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
-        .btn--small { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); min-height: 40px; }
+        .add-form { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); flex-wrap: wrap; align-items: flex-start; }
+        .add-form__field { flex: 1; min-width: 0; }
+        .add-form__field--reason { max-width: 340px; min-width: 160px; }
         .error { color: var(--accent-red); font-size: var(--text-base); margin-bottom: var(--space-4); }
         .list { display: flex; flex-direction: column; gap: var(--space-4); }
         .list__item {

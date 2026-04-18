@@ -11,6 +11,7 @@ import {
     OnInit,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
@@ -144,7 +145,7 @@ interface AgentTestRow {
 @Component({
     selector: 'app-flock-challenges',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RelativeTimePipe, SkeletonComponent, EmptyStateComponent, PageShellComponent],
+    imports: [DecimalPipe, MatButtonModule, RelativeTimePipe, SkeletonComponent, EmptyStateComponent, PageShellComponent],
     template: `
         <app-page-shell title="Challenges" icon="challenges">
             <ng-container actions>
@@ -358,7 +359,7 @@ interface AgentTestRow {
                                 }
 
                                 <div class="ch-detail__actions">
-                                    <button class="btn btn--secondary btn--sm" (click)="goToAgent(row.agent.id)">
+                                    <button mat-stroked-button (click)="goToAgent(row.agent.id)">
                                         View Agent
                                     </button>
                                 </div>

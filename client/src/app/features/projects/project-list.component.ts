@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -10,11 +11,11 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-project-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
+    imports: [RouterLink, MatButtonModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective, PageShellComponent],
     template: `
         <app-page-shell title="Projects" icon="projects">
             <ng-container actions>
-                <a class="btn btn--primary" routerLink="/agents/projects/new">New Project</a>
+                <a mat-flat-button color="primary" routerLink="/agents/projects/new">New Project</a>
             </ng-container>
 
             @if (projectService.loading()) {
@@ -49,13 +50,6 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         </app-page-shell>
     `,
     styles: `
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .empty { color: var(--text-tertiary); }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
