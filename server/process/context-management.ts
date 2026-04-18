@@ -139,10 +139,10 @@ export function truncateCouncilContext(
  * conversation within the context window.
  */
 const COMPRESSION_TIERS = [
-  { name: 'tier1', threshold: 0.6, description: 'light tool result summarization' },
-  { name: 'tier2', threshold: 0.75, description: 'reduce recent window + summarize discarded' },
-  { name: 'tier3', threshold: 0.85, description: 'aggressive compression to 4 exchanges' },
-  { name: 'tier4', threshold: 0.9, description: 'full context summary + last 2 exchanges' },
+  { name: 'tier1', threshold: 0.7, description: 'light tool result summarization' },
+  { name: 'tier2', threshold: 0.8, description: 'reduce recent window + summarize discarded' },
+  { name: 'tier3', threshold: 0.88, description: 'aggressive compression to 4 exchanges' },
+  { name: 'tier4', threshold: 0.93, description: 'full context summary + last 2 exchanges' },
 ] as const;
 
 export type ConversationMessage = {
@@ -191,27 +191,37 @@ export function summarizeConversation(
     points.push(`Original request: ${firstRequest}${userMessages[0].content.length > 500 ? '...' : ''}`);
   }
 
-  // Extract tool usage summary
+  // Extract file paths from tool results and assistant messages
+  const filePaths = extractMentionedFilePaths(messages);
+  if (filePaths.length > 0) {
+    const listed = filePaths.slice(0, 20).join(', ');
+    const extra = filePaths.length > 20 ? ` ... and ${filePaths.length - 20} more` : '';
+    points.push(`Files touched: ${listed}${extra}`);
+  }
+
+  // Extract key decisions and outcomes from assistant messages
+  const assistantMessages = messages.filter((m) => m.role === 'assistant');
+  const decisions = extractKeyDecisions(assistantMessages);
+  if (decisions.length > 0) {
+    points.push(`Key decisions/findings:\n${decisions.map((d) => `  - ${d}`).join('\n')}`);
+  }
+
+  // Extract in-progress work status from the last few assistant messages
+  if (assistantMessages.length > 0) {
+    const recentAssistant = assistantMessages.slice(-3);
+    for (const msg of recentAssistant) {
+      const conclusion = msg.content.slice(0, 600).replace(/\n/g, ' ').trim();
+      points.push(`Last assistant response: ${conclusion}${msg.content.length > 600 ? '...' : ''}`);
+    }
+  }
+
+  // Extract tool usage summary with specifics
   const toolMessages = messages.filter((m) => m.role === 'tool');
   if (toolMessages.length > 0) {
     points.push(`Tools used: ${toolMessages.length} tool calls executed.`);
   }
 
-  // Extract key assistant conclusions (last few assistant messages)
-  const assistantMessages = messages.filter((m) => m.role === 'assistant');
-  if (assistantMessages.length > 1) {
-    // Include the last 3 assistant messages for better continuity
-    const recentAssistant = assistantMessages.slice(-3);
-    for (const msg of recentAssistant) {
-      const conclusion = msg.content.slice(0, 400).replace(/\n/g, ' ').trim();
-      points.push(`Last assistant response: ${conclusion}${msg.content.length > 400 ? '...' : ''}`);
-    }
-  } else if (assistantMessages.length === 1) {
-    const conclusion = assistantMessages[0].content.slice(0, 400).replace(/\n/g, ' ').trim();
-    points.push(`Last assistant response: ${conclusion}${assistantMessages[0].content.length > 400 ? '...' : ''}`);
-  }
-
-  // Summarize intermediate user follow-ups — keep more context
+  // Summarize intermediate user follow-ups
   if (userMessages.length > 1) {
     const followUps = userMessages.slice(1).map((m) => {
       const text = m.content.slice(0, 200).replace(/\n/g, ' ').trim();
@@ -227,6 +237,52 @@ export function summarizeConversation(
   }
 
   return `[Context Summary]\n${points.join('\n')}`;
+}
+
+const FILE_PATH_PATTERN = /(?:^|\s|['"`])(\/?(?:[\w.-]+\/){1,10}[\w.-]+\.[\w]+)/g;
+const GIT_FILE_PATTERN = /(?:modified|created|deleted|renamed):\s+([\w./-]+)/g;
+
+function extractMentionedFilePaths(messages: Array<{ role: string; content: string }>): string[] {
+  const paths = new Set<string>();
+  for (const msg of messages) {
+    if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
+    let match: RegExpExecArray | null;
+    FILE_PATH_PATTERN.lastIndex = 0;
+    while ((match = FILE_PATH_PATTERN.exec(msg.content)) !== null) {
+      const p = match[1];
+      if (p.includes('/') && !p.startsWith('http') && !p.startsWith('//')) {
+        paths.add(p);
+      }
+    }
+    GIT_FILE_PATTERN.lastIndex = 0;
+    while ((match = GIT_FILE_PATTERN.exec(msg.content)) !== null) {
+      paths.add(match[1]);
+    }
+  }
+  return [...paths];
+}
+
+function extractKeyDecisions(assistantMessages: Array<{ content: string }>): string[] {
+  const decisions: string[] = [];
+  const decisionPatterns = [
+    /(?:root cause|the issue|the problem|the bug)[:\s]+(.{20,200}?)(?:\.|$)/gi,
+    /(?:fixed|resolved|implemented|added|removed|changed|updated)[:\s]+(.{20,200}?)(?:\.|$)/gi,
+    /(?:decided to|going to|plan is to|approach is to)[:\s]+(.{20,200}?)(?:\.|$)/gi,
+  ];
+  for (const msg of assistantMessages.slice(-6)) {
+    for (const pattern of decisionPatterns) {
+      pattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(msg.content)) !== null) {
+        const decision = match[0].slice(0, 200).replace(/\n/g, ' ').trim();
+        if (!decisions.includes(decision)) {
+          decisions.push(decision);
+        }
+        if (decisions.length >= 8) return decisions;
+      }
+    }
+  }
+  return decisions;
 }
 
 /**
@@ -292,10 +348,10 @@ function trimMessagesTier2(messages: ConversationMessage[], _systemPrompt?: stri
 /**
  * Trim conversation history using progressive compression tiers.
  *
- * Tier 1 (60%): Summarize tool results older than 5 messages (200 char max).
- * Tier 2 (75%): Reduce recent window dynamically, summarize discarded results.
- * Tier 3 (85%): Keep only last 4 exchanges (8 messages), one-line tool summaries.
- * Tier 4 (90%): Replace all with context summary + last 2 exchanges (4 messages).
+ * Tier 1 (70%): Summarize tool results older than 5 messages (200 char max).
+ * Tier 2 (80%): Reduce recent window dynamically, summarize discarded results.
+ * Tier 3 (88%): Keep only last 4 exchanges (8 messages), one-line tool summaries.
+ * Tier 4 (93%): Replace all with context summary + last 2 exchanges (4 messages).
  *
  * Also triggers on message count exceeding MAX_MESSAGES.
  */

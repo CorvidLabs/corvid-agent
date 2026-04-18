@@ -42,7 +42,7 @@ Context management helpers for direct-process sessions. Handles token estimation
 
 1. **Token estimation heuristic**: Code-heavy text (>8% code-like chars) uses 3 chars/token; prose uses 4 chars/token
 2. **Tool result capped at 30% context**: `calculateMaxToolResultChars()` limits any single tool result to 30% of context window, scaling down further under budget pressure. Minimum 1,000 chars
-3. **Progressive compression tiers**: Tier 1 (60%) light tool summarization, Tier 2 (75%) reduce window + summarize discarded, Tier 3 (85%) aggressive 4-exchange keep, Tier 4 (90%) full summary + 2 exchanges
+3. **Progressive compression tiers**: Tier 1 (70%) light tool summarization, Tier 2 (80%) reduce window + summarize discarded, Tier 3 (88%) aggressive 4-exchange keep, Tier 4 (93%) full summary + 2 exchanges
 4. **Count-based trim at >40 messages**: `trimMessages()` triggers Tier 2 when message count exceeds `MAX_MESSAGES` (40)
 5. **Council context truncation**: `truncateCouncilContext()` triggers at 70% of `OLLAMA_NUM_CTX` (default 16384), keeping first user message + last 4 messages
 6. **Warning thresholds**: 50% (info), 70% (warning), 85% (critical)
@@ -51,13 +51,13 @@ Context management helpers for direct-process sessions. Handles token estimation
 
 ### Scenario: Tier 1 light compression
 
-- **Given** context usage is between 60% and 75%
+- **Given** context usage is between 70% and 80%
 - **When** `trimMessages()` is called
 - **Then** tool results older than 5 messages are compressed to 200 chars max
 
 ### Scenario: Tier 4 full summary
 
-- **Given** context usage exceeds 90%
+- **Given** context usage exceeds 93%
 - **When** `trimMessages()` is called
 - **Then** all messages are replaced with a context summary + last 2 exchanges (4 messages)
 

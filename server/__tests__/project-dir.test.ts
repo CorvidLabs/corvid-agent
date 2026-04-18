@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -27,9 +28,8 @@ function makeTestProject(overrides: Partial<Project> = {}): Project {
 
 beforeEach(() => {
   mkdirSync(TEST_BASE, { recursive: true });
-  // Create a minimal git repo for testing (needs .git dir for validation)
   mkdirSync(FAKE_REPO, { recursive: true });
-  mkdirSync(resolve(FAKE_REPO, '.git'), { recursive: true });
+  execSync('git init', { cwd: FAKE_REPO, stdio: 'ignore' });
 });
 
 afterEach(() => {
@@ -88,10 +88,11 @@ describe('clone_on_demand strategy', () => {
     expect(result.ephemeral).toBe(false);
   });
 
-  test('reuses existing clone if .git exists', async () => {
+  test('reuses existing clone if valid git repo exists', async () => {
     const cloneBase = resolve(TEST_BASE, 'clones');
     const cloneDir = resolve(cloneBase, 'testproject');
-    mkdirSync(resolve(cloneDir, '.git'), { recursive: true });
+    mkdirSync(cloneDir, { recursive: true });
+    execSync('git init', { cwd: cloneDir, stdio: 'ignore' });
 
     const project = makeTestProject({
       dirStrategy: 'clone_on_demand',
@@ -99,9 +100,7 @@ describe('clone_on_demand strategy', () => {
       baseClonePath: cloneBase,
     });
 
-    // git pull will fail since it's not a real repo, but the reuse path is taken
     const result = await resolveProjectDir(project);
-    // Even if pull fails, the directory is returned (it's existing)
     expect(result.dir).toBe(cloneDir);
     expect(result.ephemeral).toBe(false);
   });
