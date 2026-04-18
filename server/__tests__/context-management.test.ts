@@ -8,6 +8,7 @@ import {
   estimateTokens,
   getContextBudget,
   isContextOverflowError,
+  summarizeConsumedToolResults,
   summarizeConversation,
   trimMessages,
   truncateCouncilContext,
@@ -47,10 +48,12 @@ describe('estimateTokens', () => {
   });
 
   it('estimates code at ~3 chars per token', () => {
-    const code = 'function foo(x: number): string { return x.toString(); }';
-    const codeIndicators = (code.match(/[{}();=<>[\]|&!+\-*/\\^~`]/g) || []).length;
-    expect(codeIndicators / code.length).toBeGreaterThan(0.08);
-    expect(estimateTokens(code)).toBe(Math.ceil(code.length / 3));
+    // Pure code with high symbol density should use ~3 ch/tok
+    const code = 'if(x){y=z+1;a=b*c;d=e/f;g=h|i;j=k&l;m=~n;o=p^q;}';
+    const tokens = estimateTokens(code);
+    const ratio = code.length / tokens;
+    expect(ratio).toBeGreaterThanOrEqual(2.8);
+    expect(ratio).toBeLessThanOrEqual(3.2);
   });
 
   it('code estimation produces more tokens than prose for same length', () => {
@@ -58,6 +61,37 @@ describe('estimateTokens', () => {
     const prose = 'a'.repeat(length);
     const code = '{x=1;}'.repeat(Math.ceil(length / 6)).slice(0, length);
     expect(estimateTokens(code)).toBeGreaterThan(estimateTokens(prose));
+  });
+
+  it('estimates JSON at ~2.5 chars per token (denser than code)', () => {
+    const json = JSON.stringify({
+      name: 'test',
+      version: '1.0',
+      dependencies: { foo: '1.0', bar: '2.0', baz: '3.0', qux: '4.0' },
+      scripts: { build: 'tsc', test: 'bun test', lint: 'biome check', dev: 'bun run dev' },
+    });
+    const tokens = estimateTokens(json);
+    const ratio = json.length / tokens;
+    expect(ratio).toBeLessThan(3.5);
+  });
+
+  it('estimates YAML at denser-than-prose ratios for dense YAML', () => {
+    // Dense YAML with many key: value pairs triggers structured detection
+    const yaml = Array.from({ length: 20 }, (_, i) => `key${i}: value${i}`).join('\n');
+    const tokens = estimateTokens(yaml);
+    const ratio = yaml.length / tokens;
+    expect(ratio).toBeLessThan(3.5);
+  });
+
+  it('blends ratios for mixed code/prose content', () => {
+    const mixed = `Here is some prose about the function.
+The implementation handles edge cases.
+if (x > 0) { return x + 1; }
+Otherwise it falls back.`;
+    const tokens = estimateTokens(mixed);
+    const ratio = mixed.length / tokens;
+    expect(ratio).toBeGreaterThanOrEqual(3);
+    expect(ratio).toBeLessThanOrEqual(4);
   });
 });
 
@@ -403,6 +437,82 @@ describe('summarizeConversation', () => {
     const summary = summarizeConversation(messages);
     expect(summary).toContain('Files touched');
     expect(summary).toContain('../lib/utils');
+  });
+});
+
+// ── summarizeConsumedToolResults ──────────────────────────────────────────
+
+describe('summarizeConsumedToolResults', () => {
+  it('summarizes large tool results followed by assistant response', () => {
+    const bigResult = '/server/lib/foo.ts\n' + 'x'.repeat(800);
+    const messages: ConversationMessage[] = [
+      { role: 'user', content: 'read the file' },
+      { role: 'tool', content: bigResult },
+      { role: 'assistant', content: 'I found the file' },
+      { role: 'user', content: 'ok' },
+      { role: 'assistant', content: 'next' },
+      { role: 'user', content: 'continue' },
+      { role: 'assistant', content: 'done' },
+      { role: 'user', content: 'final' },
+      { role: 'assistant', content: 'complete' },
+      { role: 'user', content: 'end' },
+    ];
+    const count = summarizeConsumedToolResults(messages, 500, 2);
+    expect(count).toBe(1);
+    expect(messages[1].content).toContain('[Summarized tool result');
+    expect(messages[1].content).toContain('/server/lib/foo.ts');
+    expect(messages[1].content.length).toBeLessThan(bigResult.length);
+  });
+
+  it('does not touch tool results within the recent window', () => {
+    const bigResult = 'z'.repeat(1000);
+    const messages: ConversationMessage[] = [
+      { role: 'user', content: 'do stuff' },
+      { role: 'tool', content: bigResult },
+      { role: 'assistant', content: 'done' },
+    ];
+    const count = summarizeConsumedToolResults(messages, 500, 6);
+    expect(count).toBe(0);
+    expect(messages[1].content).toBe(bigResult);
+  });
+
+  it('does not summarize small tool results', () => {
+    const messages: ConversationMessage[] = [
+      { role: 'user', content: 'check' },
+      { role: 'tool', content: 'OK' },
+      { role: 'assistant', content: 'good' },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: `msg ${i}`,
+      })),
+    ];
+    expect(summarizeConsumedToolResults(messages, 500, 2)).toBe(0);
+  });
+
+  it('preserves error indicators in summary', () => {
+    const toolResult = 'Error: something broke\n' + 'details '.repeat(100);
+    const messages: ConversationMessage[] = [
+      { role: 'user', content: 'check' },
+      { role: 'tool', content: toolResult },
+      { role: 'assistant', content: 'found error' },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: `msg ${i}`,
+      })),
+    ];
+    summarizeConsumedToolResults(messages, 500, 2);
+    expect(messages[1].content).toContain('contained errors');
+  });
+
+  it('does not summarize tool results without a following assistant message', () => {
+    const messages: ConversationMessage[] = [
+      { role: 'tool', content: 'x'.repeat(1000) },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        role: 'user' as const,
+        content: `msg ${i}`,
+      })),
+    ];
+    expect(summarizeConsumedToolResults(messages, 500, 2)).toBe(0);
   });
 });
 
