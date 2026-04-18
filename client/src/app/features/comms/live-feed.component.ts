@@ -58,7 +58,7 @@ interface FeedEntry {
                     />
                 </mat-form-field>
                 @if (activeThreadFilter()) {
-                    <button class="btn btn--filter" (click)="clearThreadFilter()">
+                    <button mat-stroked-button (click)="clearThreadFilter()">
                         thread:{{ activeThreadFilter()!.slice(0, 6) }} ✕
                     </button>
                 }
