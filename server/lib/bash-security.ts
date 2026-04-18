@@ -271,6 +271,69 @@ export function detectDangerousPatterns(command: string): DangerousPatternResult
   return { isDangerous: false };
 }
 
+// ── Git branch isolation validation ─────────────────────────────────────
+
+/**
+ * Detects git branch creation commands that violate chat/* isolation rules.
+ * Blocks creation of branches outside chat/* pattern.
+ */
+export function detectGitBranchViolation(command: string): DangerousPatternResult {
+  // Only check if it's a git command
+  if (!/^\s*git\b/.test(command.trim())) {
+    return { isDangerous: false };
+  }
+
+  const tokens = tokenizeBashCommand(command);
+  const gitIndex = tokens.findIndex((t) => t === 'git');
+  if (gitIndex === -1) return { isDangerous: false };
+
+  // Check for branch-creation commands
+  const nextToken = tokens[gitIndex + 1];
+
+  // Pattern 1: git checkout -b <branch>
+  if (nextToken === 'checkout') {
+    const bIndex = tokens.indexOf('-b', gitIndex);
+    if (bIndex !== -1 && bIndex + 1 < tokens.length) {
+      const branchName = tokens[bIndex + 1];
+      if (!branchName.startsWith('chat/')) {
+        return {
+          isDangerous: true,
+          reason: `Session branch isolation: cannot create branch "${branchName}" outside chat/* pattern`,
+        };
+      }
+    }
+  }
+
+  // Pattern 2: git switch -c <branch>
+  if (nextToken === 'switch') {
+    const cIndex = tokens.indexOf('-c', gitIndex);
+    if (cIndex !== -1 && cIndex + 1 < tokens.length) {
+      const branchName = tokens[cIndex + 1];
+      if (!branchName.startsWith('chat/')) {
+        return {
+          isDangerous: true,
+          reason: `Session branch isolation: cannot create branch "${branchName}" outside chat/* pattern`,
+        };
+      }
+    }
+  }
+
+  // Pattern 3: git branch <branch> (creates without checking out)
+  if (nextToken === 'branch') {
+    const branchToken = tokens[gitIndex + 2];
+    if (branchToken && !branchToken.startsWith('-')) {
+      if (!branchToken.startsWith('chat/')) {
+        return {
+          isDangerous: true,
+          reason: `Session branch isolation: cannot create branch "${branchToken}" outside chat/* pattern`,
+        };
+      }
+    }
+  }
+
+  return { isDangerous: false };
+}
+
 // ── Main entry point ────────────────────────────────────────────────────
 
 export interface BashCommandAnalysis {
@@ -278,21 +341,24 @@ export interface BashCommandAnalysis {
   paths: string[];
   hasDangerousPatterns: boolean;
   reason?: string;
+  gitBranchViolation?: boolean;
 }
 
 /**
  * Full analysis of a bash command: tokenize, extract paths, check for
- * dangerous patterns.
+ * dangerous patterns, and validate git branch isolation rules.
  */
 export function analyzeBashCommand(command: string): BashCommandAnalysis {
   const tokens = tokenizeBashCommand(command);
   const paths = extractPathsFromCommand(command);
   const danger = detectDangerousPatterns(command);
+  const branchIssue = detectGitBranchViolation(command);
 
   return {
     tokens,
     paths,
-    hasDangerousPatterns: danger.isDangerous,
-    reason: danger.reason,
+    hasDangerousPatterns: danger.isDangerous || branchIssue.isDangerous,
+    reason: danger.reason || branchIssue.reason,
+    gitBranchViolation: branchIssue.isDangerous,
   };
 }
