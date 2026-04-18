@@ -1,6 +1,10 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
@@ -13,7 +17,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
 @Component({
     selector: 'app-council-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective, GovernanceDashboardComponent],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, SkeletonComponent, TooltipDirective, GovernanceDashboardComponent],
     template: `
         @if (council(); as c) {
             <div class="page">
@@ -23,8 +27,8 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         <p class="page__desc">{{ c.description }}</p>
                     </div>
                     <div class="page__actions">
-                        <a class="btn btn--secondary" [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
-                        <button class="btn btn--danger" (click)="onDelete()">Delete</button>
+                        <a mat-stroked-button [routerLink]="['/sessions/councils', c.id, 'edit']">Edit</a>
+                        <button mat-stroked-button color="warn" (click)="onDelete()">Delete</button>
                     </div>
                 </div>
 
@@ -55,25 +59,21 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                 <div class="detail__launch">
                     <h3>Launch Council</h3>
                     <div class="launch-form">
-                        <select
-                            class="launch-select"
-                            [(ngModel)]="selectedProjectId"
-                            aria-label="Select a project"
-                        >
-                            <option value="" disabled>Select project...</option>
-                            @for (project of projectService.projects(); track project.id) {
-                                <option [value]="project.id">{{ project.name }}</option>
-                            }
-                        </select>
-                        <textarea
-                            class="launch-textarea"
-                            [(ngModel)]="launchPrompt"
-                            placeholder="Enter the prompt for the council..."
-                            rows="4"
-                            aria-label="Council prompt"
-                        ></textarea>
-                        <button
-                            class="btn btn--primary"
+                        <mat-form-field appearance="outline">
+                            <mat-label>Project</mat-label>
+                            <mat-select [(ngModel)]="selectedProjectId">
+                                @for (project of projectService.projects(); track project.id) {
+                                    <mat-option [value]="project.id">{{ project.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                        <mat-form-field appearance="outline">
+                            <mat-label>Council Prompt</mat-label>
+                            <textarea matInput [(ngModel)]="launchPrompt"
+                                placeholder="Enter the prompt for the council..."
+                                rows="4"></textarea>
+                        </mat-form-field>
+                        <button mat-flat-button color="primary"
                             [disabled]="!selectedProjectId || !launchPrompt || launching()"
                             (click)="onLaunch()"
                         >{{ launching() ? 'Launching...' : 'Launch Council' }}</button>
@@ -120,18 +120,6 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
         .page__actions { display: flex; gap: 0.5rem; }
-        .btn {
-            padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
-        }
-        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
-        .btn--danger:hover { background: var(--accent-red-dim); }
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .detail__info dd { margin: 0; color: var(--text-primary); }
@@ -144,13 +132,8 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         }
         .detail__launch { margin-top: 2rem; }
         .detail__launch h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
-        .launch-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 600px; }
-        .launch-select, .launch-textarea {
-            padding: var(--space-2); border: 1px solid var(--border-bright); border-radius: var(--radius);
-            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
-        }
-        .launch-select:focus, .launch-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .launch-textarea { resize: vertical; min-height: 80px; }
+        .launch-form { display: flex; flex-direction: column; gap: 0.25rem; max-width: 600px; }
+        .launch-form mat-form-field { width: 100%; }
         .detail__governance { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
         .detail__launches { margin-top: 2rem; }
         .detail__launches h3 { margin: 0 0 0.75rem; color: var(--text-primary); }

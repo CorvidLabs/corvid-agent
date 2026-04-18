@@ -9,6 +9,7 @@ import {
     ElementRef,
     viewChild,
 } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import type { ApprovalRequestWire } from '@shared/ws-protocol';
 
 export interface ApprovalDecision {
@@ -19,6 +20,7 @@ export interface ApprovalDecision {
 @Component({
     selector: 'app-approval-dialog',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [MatButtonModule],
     template: `
         <div class="approval-overlay" role="alertdialog" aria-labelledby="approval-title" aria-describedby="approval-desc">
             <div class="approval-dialog" #dialogEl>
@@ -33,14 +35,12 @@ export interface ApprovalDecision {
                     <div class="approval-dialog__description">{{ request().description }}</div>
                 </div>
                 <div class="approval-dialog__actions">
-                    <button
-                        class="btn btn--allow"
+                    <button mat-flat-button color="primary"
                         (click)="onAllow()"
                         #allowBtn>
                         Allow
                     </button>
-                    <button
-                        class="btn btn--deny"
+                    <button mat-stroked-button color="warn"
                         (click)="onDeny()">
                         Deny
                     </button>
@@ -118,20 +118,7 @@ export interface ApprovalDecision {
             display: flex;
             gap: 0.75rem;
         }
-        .btn {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            min-height: 44px;
-            border-radius: var(--radius);
-            font-size: 0.8rem;
-            font-weight: 700;
-            cursor: pointer;
-            border: 1px solid;
-            font-family: inherit;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            transition: background 0.15s, box-shadow 0.15s;
-        }
+        .approval-dialog__actions button { flex: 1; }
         @media (max-width: 360px) {
             .approval-dialog {
                 width: 95vw;
@@ -143,32 +130,6 @@ export interface ApprovalDecision {
             .approval-dialog__actions {
                 flex-direction: column;
             }
-        }
-        .btn--allow {
-            background: transparent;
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-        .btn--allow:hover {
-            background: rgba(34, 204, 136, 0.12);
-            box-shadow: 0 0 12px rgba(34, 204, 136, 0.25);
-        }
-        .btn--allow:focus-visible {
-            outline: 2px solid var(--accent-green);
-            outline-offset: 2px;
-        }
-        .btn--deny {
-            background: transparent;
-            color: var(--accent-red);
-            border-color: var(--accent-red);
-        }
-        .btn--deny:hover {
-            background: var(--accent-red-dim);
-            box-shadow: 0 0 12px var(--accent-red-border);
-        }
-        .btn--deny:focus-visible {
-            outline: 2px solid var(--accent-red);
-            outline-offset: 2px;
         }
     `,
 })

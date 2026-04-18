@@ -1,6 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { ApiService } from '../../core/services/api.service';
@@ -13,105 +18,104 @@ import { firstValueFrom } from 'rxjs';
 @Component({
     selector: 'app-agent-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, PageShellComponent],
+    imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatCheckboxModule, PageShellComponent],
     template: `
         <app-page-shell [title]="id() ? 'Edit Agent' : 'New Agent'" icon="agents"
             [breadcrumbs]="[{label: 'Agents', route: '/agents'}, {label: id() ? 'Edit' : 'New'}]">
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
-                <div class="form__field">
-                    <label for="name" class="form__label">Name</label>
-                    <input id="name" formControlName="name" class="form__input"
-                           [attr.aria-describedby]="form.get('name')?.invalid && form.get('name')?.touched ? 'name-error' : null" />
+                <mat-form-field appearance="outline">
+                    <mat-label>Name</mat-label>
+                    <input matInput formControlName="name" />
                     @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-                        <span id="name-error" class="form__error" role="alert">Agent name is required.</span>
+                        <mat-error>Agent name is required.</mat-error>
                     }
-                </div>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="description" class="form__label">Description</label>
-                    <textarea id="description" formControlName="description" class="form__input form__textarea"
-                              rows="3"></textarea>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Description</mat-label>
+                    <textarea matInput formControlName="description" rows="3"></textarea>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="provider" class="form__label">Provider</label>
-                    <select id="provider" formControlName="provider" class="form__input" (change)="onProviderChange()">
-                        <option value="">Default (Anthropic)</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Provider</mat-label>
+                    <mat-select formControlName="provider" (selectionChange)="onProviderChange()">
+                        <mat-option value="">Default (Anthropic)</mat-option>
                         @for (p of providers(); track p.type) {
-                            <option [value]="p.type">{{ p.name }}</option>
+                            <mat-option [value]="p.type">{{ p.name }}</mat-option>
                         }
-                    </select>
-                </div>
+                    </mat-select>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="model" class="form__label">Model</label>
-                    <select id="model" formControlName="model" class="form__input">
-                        <option value="">Default</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Model</mat-label>
+                    <mat-select formControlName="model">
+                        <mat-option value="">Default</mat-option>
                         @for (m of models(); track m) {
-                            <option [value]="m">{{ m }}</option>
+                            <mat-option [value]="m">{{ m }}</mat-option>
                         }
-                    </select>
+                    </mat-select>
                     @if (loadingModels()) {
-                        <span class="form__hint">Loading models...</span>
+                        <mat-hint>Loading models...</mat-hint>
                     }
-                </div>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="permissionMode" class="form__label">Permission Mode</label>
-                    <select id="permissionMode" formControlName="permissionMode" class="form__input">
-                        <option value="default">Default</option>
-                        <option value="plan">Plan</option>
-                        <option value="auto-edit">Auto Edit</option>
-                        <option value="full-auto">Full Auto</option>
-                    </select>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Permission Mode</mat-label>
+                    <mat-select formControlName="permissionMode">
+                        <mat-option value="default">Default</mat-option>
+                        <mat-option value="plan">Plan</mat-option>
+                        <mat-option value="auto-edit">Auto Edit</mat-option>
+                        <mat-option value="full-auto">Full Auto</mat-option>
+                    </mat-select>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="systemPrompt" class="form__label">System Prompt</label>
-                    <textarea id="systemPrompt" formControlName="systemPrompt" class="form__input form__textarea"
-                              rows="8" placeholder="Custom system instructions..."></textarea>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>System Prompt</mat-label>
+                    <textarea matInput formControlName="systemPrompt" rows="8"
+                              placeholder="Custom system instructions..."></textarea>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="appendPrompt" class="form__label">Append Prompt</label>
-                    <textarea id="appendPrompt" formControlName="appendPrompt" class="form__input form__textarea"
-                              rows="6" placeholder="Appended to the system prompt..."></textarea>
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Append Prompt</mat-label>
+                    <textarea matInput formControlName="appendPrompt" rows="6"
+                              placeholder="Appended to the system prompt..."></textarea>
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="allowedTools" class="form__label">Allowed Tools (comma-separated)</label>
-                    <input id="allowedTools" formControlName="allowedTools" class="form__input"
-                           placeholder="Read, Write, Bash, ..." />
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Allowed Tools (comma-separated)</mat-label>
+                    <input matInput formControlName="allowedTools" placeholder="Read, Write, Bash, ..." />
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="disallowedTools" class="form__label">Disallowed Tools (comma-separated)</label>
-                    <input id="disallowedTools" formControlName="disallowedTools" class="form__input" />
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Disallowed Tools (comma-separated)</mat-label>
+                    <input matInput formControlName="disallowedTools" />
+                </mat-form-field>
 
-                <div class="form__field">
-                    <label for="maxBudgetUsd" class="form__label">Max Budget (USD)</label>
-                    <input id="maxBudgetUsd" formControlName="maxBudgetUsd" type="number" step="0.01"
-                           class="form__input" placeholder="Leave empty for unlimited" />
-                </div>
+                <mat-form-field appearance="outline">
+                    <mat-label>Max Budget (USD)</mat-label>
+                    <input matInput formControlName="maxBudgetUsd" type="number" step="0.01"
+                           placeholder="Leave empty for unlimited" />
+                </mat-form-field>
 
                 <fieldset class="form__fieldset">
                     <legend class="form__legend">Appearance</legend>
                     <div class="form__field">
-                        <label for="displayColor" class="form__label">Accent Color</label>
+                        <label class="form__label">Accent Color</label>
                         <div class="color-picker">
-                            <input id="displayColor" formControlName="displayColor" type="color"
+                            <input formControlName="displayColor" type="color"
                                    class="color-picker__input"
                                    [value]="form.get('displayColor')?.value || '#00e5ff'" />
-                            <input formControlName="displayColor" class="form__input color-picker__hex"
-                                   placeholder="#00e5ff" maxlength="7"
-                                   aria-label="Hex color value" />
-                            <button type="button" class="btn btn--secondary btn--sm" (click)="clearColor()"
+                            <mat-form-field appearance="outline" class="color-picker__hex">
+                                <input matInput formControlName="displayColor"
+                                       placeholder="#00e5ff" maxlength="7"
+                                       aria-label="Hex color value" />
+                            </mat-form-field>
+                            <button mat-stroked-button type="button" (click)="clearColor()"
                                     aria-label="Reset to auto-generated color">Reset</button>
                         </div>
                     </div>
                     <div class="form__field">
-                        <label for="displayIcon" class="form__label">Icon / Emoji</label>
+                        <label class="form__label">Icon / Emoji</label>
                         <div class="icon-picker">
                             @for (emoji of commonEmoji; track emoji) {
                                 <button type="button"
@@ -123,61 +127,59 @@ import { firstValueFrom } from 'rxjs';
                                     {{ emoji }}
                                 </button>
                             }
-                            <input id="displayIcon" formControlName="displayIcon" class="form__input icon-picker__custom"
-                                   placeholder="Custom..." maxlength="32" aria-label="Custom icon or emoji" />
+                            <mat-form-field appearance="outline" class="icon-picker__custom">
+                                <input matInput formControlName="displayIcon"
+                                       placeholder="Custom..." maxlength="32" aria-label="Custom icon or emoji" />
+                            </mat-form-field>
                         </div>
                     </div>
-                    <div class="form__field">
-                        <label for="avatarUrl" class="form__label">Avatar URL</label>
-                        <input id="avatarUrl" formControlName="avatarUrl" class="form__input"
+                    <mat-form-field appearance="outline">
+                        <mat-label>Avatar URL</mat-label>
+                        <input matInput formControlName="avatarUrl"
                                placeholder="https://example.com/avatar.png" type="url" />
-                        @if (form.get('avatarUrl')?.value) {
-                            <div class="avatar-preview">
-                                <img [src]="form.get('avatarUrl')?.value" alt="Avatar preview"
-                                     class="avatar-preview__img" (error)="onAvatarError($event)" />
-                            </div>
-                        }
-                    </div>
+                    </mat-form-field>
+                    @if (form.get('avatarUrl')?.value) {
+                        <div class="avatar-preview">
+                            <img [src]="form.get('avatarUrl')?.value" alt="Avatar preview"
+                                 class="avatar-preview__img" (error)="onAvatarError($event)" />
+                        </div>
+                    }
                 </fieldset>
 
                 <fieldset class="form__fieldset">
                     <legend class="form__legend">AlgoChat</legend>
-                    <label class="form__checkbox">
-                        <input type="checkbox" formControlName="algochatEnabled" />
-                        Enable AlgoChat for this agent
-                    </label>
-                    <label class="form__checkbox">
-                        <input type="checkbox" formControlName="algochatAuto" />
-                        Auto-respond to incoming messages
-                    </label>
+                    <mat-checkbox formControlName="algochatEnabled">Enable AlgoChat for this agent</mat-checkbox>
+                    <mat-checkbox formControlName="algochatAuto">Auto-respond to incoming messages</mat-checkbox>
                 </fieldset>
 
-                <div class="form__field">
-                    <label for="defaultProjectId" class="form__label">Default Project</label>
-                    <select id="defaultProjectId" formControlName="defaultProjectId" class="form__input">
-                        <option [ngValue]="null">None (use global default)</option>
+                <mat-form-field appearance="outline">
+                    <mat-label>Default Project</mat-label>
+                    <mat-select formControlName="defaultProjectId">
+                        <mat-option [value]="null">None (use global default)</mat-option>
                         @for (project of projects(); track project.id) {
-                            <option [ngValue]="project.id">{{ project.name }}</option>
+                            <mat-option [value]="project.id">{{ project.name }}</mat-option>
                         }
-                    </select>
-                </div>
+                    </mat-select>
+                </mat-form-field>
 
                 <div class="form__actions">
-                    <button type="submit" class="btn btn--primary" [disabled]="form.invalid || saving()">
+                    <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || saving()">
                         {{ saving() ? 'Saving...' : 'Save' }}
                     </button>
-                    <button type="button" class="btn btn--secondary" (click)="onCancel()">Cancel</button>
+                    <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
                 </div>
             </form>
         </app-page-shell>
     `,
     styles: `
         :host { max-width: 640px; display: block; }
-        .form__textarea { min-height: 5em; line-height: 1.5; }
-        .form__hint { font-style: italic; }
-        .form__fieldset { background: var(--bg-surface); }
-        .form__legend { color: var(--accent-magenta); }
-        .form__checkbox input[type="checkbox"] { accent-color: var(--accent-cyan); }
+        .form { display: flex; flex-direction: column; gap: 0.25rem; }
+        mat-form-field { width: 100%; }
+        .form__fieldset { background: var(--bg-surface); padding: 1rem; border: 1px solid var(--border); border-radius: 8px; margin: 0.5rem 0; }
+        .form__legend { color: var(--accent-magenta); font-weight: 600; }
+        .form__field { margin-bottom: 0.75rem; }
+        .form__label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        mat-checkbox { display: block; margin: 0.25rem 0; }
         .color-picker { display: flex; align-items: center; gap: 0.5rem; }
         .color-picker__input {
             width: 44px; height: 44px; padding: 2px; border: 1px solid var(--border-bright);
@@ -185,7 +187,7 @@ import { firstValueFrom } from 'rxjs';
         }
         .color-picker__input::-webkit-color-swatch-wrapper { padding: 2px; }
         .color-picker__input::-webkit-color-swatch { border-radius: var(--radius-sm); border: none; }
-        .color-picker__hex { width: 100px; font-family: var(--font-mono); }
+        .color-picker__hex { width: 120px; }
         .icon-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
         .icon-picker__option {
             width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
@@ -195,12 +197,13 @@ import { firstValueFrom } from 'rxjs';
         .icon-picker__option:hover { border-color: var(--border-bright); background: var(--bg-hover); }
         .icon-picker__option--active { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .icon-picker__option:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
-        .icon-picker__custom { width: 100px; }
+        .icon-picker__custom { width: 120px; }
         .avatar-preview { margin-top: 0.5rem; }
         .avatar-preview__img {
             width: 64px; height: 64px; border-radius: var(--radius);
             border: 1px solid var(--border-bright); object-fit: cover;
         }
+        .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
     `,
 })
 export class AgentFormComponent implements OnInit {
