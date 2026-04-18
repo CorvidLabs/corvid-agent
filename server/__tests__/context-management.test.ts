@@ -346,6 +346,64 @@ describe('summarizeConversation', () => {
     expect(summary).toContain('10 total');
     expect(summary).toContain('and 4 more');
   });
+
+  it('extracts file paths from tool results with tool output patterns', () => {
+    const messages = [
+      { role: 'user', content: 'Read the config' },
+      { role: 'tool', content: 'Reading file: /home/user/project/config.ts\nconst port = 3000;' },
+      { role: 'assistant', content: 'The config is at ./src/utils/helper.ts' },
+    ];
+    const summary = summarizeConversation(messages);
+    expect(summary).toContain('Files touched');
+    expect(summary).toContain('/home/user/project/config.ts');
+  });
+
+  it('extracts error messages and resolutions', () => {
+    const messages = [
+      { role: 'user', content: 'Fix the build' },
+      { role: 'tool', content: 'Error: Cannot find module "lodash"' },
+      { role: 'assistant', content: 'fixed by installing the missing dependency with bun add lodash' },
+    ];
+    const summary = summarizeConversation(messages);
+    expect(summary).toContain('Errors/resolutions');
+    expect(summary).toContain('Cannot find module');
+  });
+
+  it('extracts configuration values from env vars', () => {
+    const messages = [
+      { role: 'user', content: 'Check the env' },
+      { role: 'tool', content: 'NODE_ENV=production\nPORT=8080\nDATABASE_URL=postgres://localhost/db' },
+      { role: 'assistant', content: 'Found the config values' },
+    ];
+    const summary = summarizeConversation(messages);
+    expect(summary).toContain('Config values');
+    expect(summary).toContain('NODE_ENV=production');
+    expect(summary).toContain('PORT=8080');
+  });
+
+  it('extracts decisions with approval patterns', () => {
+    const messages = [
+      { role: 'user', content: 'Review the PR' },
+      {
+        role: 'assistant',
+        content:
+          'approved the changes to the auth middleware. discovered that the session token was stored in plaintext.',
+      },
+    ];
+    const summary = summarizeConversation(messages);
+    expect(summary).toContain('Key decisions');
+  });
+
+  it('extracts import-style file paths', () => {
+    const messages = [
+      { role: 'user', content: 'Check imports' },
+      { role: 'tool', content: "import { foo } from '../lib/utils';\nconst bar = require('./config/settings');" },
+      { role: 'assistant', content: 'Found imports' },
+    ];
+    const summary = summarizeConversation(messages);
+    expect(summary).toContain('Files touched');
+    expect(summary).toContain('../lib/utils');
+  });
 });
 
 // ── truncateOldToolResults ────────────────────────────────────────────────

@@ -52,11 +52,12 @@ const log = createLogger('ProcessManager');
 // After this many user messages in a single process lifetime, kill and restart
 // through the capped resume path to keep context size manageable.
 //
-// SDK sessions (Claude Code) handle their own context compression via the SDK's
-// built-in windowing. 40 turns allows longer continuity before we force a reset.
-// The progressive compression tiers in context-management.ts handle intermediate
-// pressure within those 40 turns.
-const MAX_TURNS_BEFORE_CONTEXT_RESET = 40;
+// Rationale: Each "turn" (user message + assistant response + tool calls) grows
+// the in-context prompt significantly. With modern 200k context windows, 20 turns
+// provides enough continuity for multi-turn Discord conversations while staying
+// well within limits. The progressive compression tiers in context-management.ts
+// handle the cases where individual turns are unusually large.
+const MAX_TURNS_BEFORE_CONTEXT_RESET = 20;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 // Circuit breaker: if the last N completions in a row were zero-turn,
