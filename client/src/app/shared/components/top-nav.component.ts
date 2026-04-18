@@ -22,6 +22,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDividerModule } from '@angular/material/divider';
 
 interface NavChild {
     label: string;
@@ -119,6 +120,7 @@ const TABS: NavTab[] = [
         MatButtonModule,
         MatMenuModule,
         MatIconModule,
+        MatDividerModule,
     ],
     template: `
         <mat-toolbar class="topnav" role="navigation" aria-label="Main navigation">
