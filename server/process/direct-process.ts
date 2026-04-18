@@ -295,6 +295,14 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
       return;
     }
 
+    if (!slotAcquired && provider.acquireSlot) {
+      const msg = `Could not acquire model slot for ${model} — timed out waiting`;
+      log.error(msg);
+      onEvent({ type: 'error', error: { message: msg, type: 'slot_timeout' } } as ClaudeStreamEvent);
+      onExit(1, msg);
+      return;
+    }
+
     let iteration = 0;
     let lastToolCallKey = '';
     let lastToolNames = '';
