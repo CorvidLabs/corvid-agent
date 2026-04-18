@@ -800,6 +800,71 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: Hardening the Foundation — Process Decomposition, Leak Fixes, and Performance SLAs -->
+      <article class="post post--full" id="hardening-the-foundation"
+               data-tags="engineering,stability,performance" data-date="2026-04-18"
+               data-search="process decomposition spawner leak timer callback stability performance benchmarks SLA CI optimization security CVE hono protobufjs worktree metric-card progress-bar specsync v4 settings accessibility environment config">
+        <div class="post-meta">
+          <time datetime="2026-04-18">2026-04-18</time>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-stability">STABILITY</span>
+          <span class="post-tag tag-performance">PERFORMANCE</span>
+        </div>
+        <h2><a href="#hardening-the-foundation">Hardening the Foundation &mdash; Process Decomposition, Leak Fixes, and Performance SLAs</a></h2>
+
+        <p><strong>TL;DR:</strong> The process manager got its first major decomposition &mdash; spawning logic extracted into its own module. Timer and callback leaks that degraded long-running instances are fixed. We published v1.0.0 performance benchmarks with formal SLA targets. CI costs dropped 75%. Two CVEs patched. The dashboard gained shared UI primitives and an environment config editor. 30 PRs across three days of infrastructure hardening.</p>
+
+        <h3>Process Manager Decomposition</h3>
+        <p>The process manager (<code>server/process/manager.ts</code>) had grown into the largest module in the codebase &mdash; session lifecycle, SDK integration, approval flows, persona injection, and subprocess spawning all tangled together. We extracted <code>process-spawner.ts</code> as the first cut: all <code>Bun.spawn</code> orchestration, environment setup, and child process management now live in a dedicated module. The decomposition plan is documented in the spec, with further extraction of approval handling and session cleanup queued for follow-up.</p>
+        <p>Why this matters: a 1,500-line module is hard to test, hard to review, and hard to reason about under pressure. Each extraction makes the remaining surface smaller and the extracted piece independently testable.</p>
+
+        <h3>Plugging the Leaks</h3>
+        <p>Long-running corvid-agent instances were slowly accumulating stale timers and orphaned callbacks &mdash; session heartbeat intervals that outlived their sessions, event listeners that were registered but never cleaned up. None of these caused crashes, but they added up: memory creep, spurious log noise, and occasional double-fires on session cleanup.</p>
+        <p>The fix was surgical: every <code>setInterval</code> and <code>setTimeout</code> now has a corresponding cleanup in the session teardown path. Event listener registrations use <code>AbortController</code> signals where possible, so cleanup is automatic when the controller aborts. The session-exit handler also got a fix to properly persist thread session summaries before teardown, closing a window where context could be lost on exit.</p>
+
+        <h3>Performance Benchmarks and SLAs</h3>
+        <p>For the first time, corvid-agent has formal performance targets. We ran benchmarks against the v1.0.0 API surface and SQLite database layer, then published the results as SLA documentation:</p>
+        <ul>
+          <li><strong>API response times</strong> &mdash; p50, p95, and p99 latencies for every route category</li>
+          <li><strong>SQLite throughput</strong> &mdash; read/write operations per second under concurrent agent load</li>
+          <li><strong>Memory baselines</strong> &mdash; per-session and per-agent memory footprints at idle and under load</li>
+        </ul>
+        <p>These aren&rsquo;t aspirational &mdash; they&rsquo;re measured baselines. If a future PR degrades p95 API latency by more than 20%, we&rsquo;ll know. Performance regression testing is now part of the release checklist.</p>
+
+        <h3>CI: 75% Less, Same Coverage</h3>
+        <p>Our GitHub Actions bill was growing linearly with PR volume. The fix: smarter triggering. Tests now only run on the paths they cover &mdash; client changes don&rsquo;t trigger server tests, spec changes don&rsquo;t trigger e2e, and documentation-only PRs skip CI entirely. Dependency update PRs from Dependabot group by category (server vs. client vs. actions) and run only relevant checks. Same coverage, a quarter of the compute.</p>
+
+        <h3>Security Patches</h3>
+        <p>Two CVE fixes landed this cycle:</p>
+        <ul>
+          <li><strong>Hono &ge;4.12.14</strong> (GHSA-458j-xx4x-4375) &mdash; HTML injection in the framework&rsquo;s default error handler. We use Hono for the API layer; the override ensures no transitive dependency pulls in a vulnerable version.</li>
+          <li><strong>protobufjs &ge;7.5.5</strong> (GHSA-xq3m-2v4x-88gg) &mdash; Prototype pollution via crafted protobuf messages. Added as a package override since it&rsquo;s a transitive dependency through the Algorand SDK.</li>
+        </ul>
+        <p>We also added a new verification guideline: when someone claims an external fact changed (new model version, API update, dependency release), agents must now verify the claim before acting on it. No more &ldquo;I stand corrected&rdquo; based on unverified assertions.</p>
+
+        <h3>Dashboard: Shared Primitives</h3>
+        <p>The Angular dashboard had been accumulating near-identical card and progress bar implementations across different views. We extracted two shared components: <code>metric-card</code> (icon, label, value, optional trend indicator) and <code>progress-bar</code> (segmented or continuous, with threshold coloring). Both use Angular signals and are fully theme-aware. The settings page also got an accessibility pass &mdash; larger touch targets, modern sizing, and a new <strong>environment config editor</strong> that lets operators view and edit <code>.env</code>-equivalent settings through the UI.</p>
+
+        <h3>Worktree and Spec Improvements</h3>
+        <p>Worktree creation was failing silently for non-default projects &mdash; the branch naming assumed the project directory matched the repo name, which breaks for multi-project setups. Fixed, along with a context-loss reduction that preserves more conversation state when entering a worktree.</p>
+        <p>On the spec side: spec-sync upgraded from v3.8.0 to v4.2.0, bringing companion files (<code>tasks.md</code> and <code>context.md</code>) alongside each spec. Seven spec PRs landed &mdash; memory TTL mechanics, Discord message-command coverage, conversation-access enforcement boundaries, and process-manager decomposition documentation. The specs aren&rsquo;t just keeping up with the code; they&rsquo;re driving the decomposition.</p>
+
+        <h3>By the Numbers</h3>
+        <ul>
+          <li>30 PRs merged in 3 days</li>
+          <li>1 major module decomposition (process-spawner extracted)</li>
+          <li>2 CVEs patched (Hono, protobufjs)</li>
+          <li>75% CI cost reduction</li>
+          <li>2 shared UI components extracted</li>
+          <li>7 spec documentation PRs</li>
+          <li>1 performance benchmark suite with formal SLAs</li>
+          <li>0 lint errors, 0 type errors, all specs passing</li>
+        </ul>
+
+        <h3>What&rsquo;s Next</h3>
+        <p>The process manager decomposition continues &mdash; approval flow extraction is next, followed by session cleanup. We&rsquo;re also evaluating whether the performance benchmarks should run in CI on every PR or on a nightly cadence. And the v1.0 release is still on the horizon: these hardening passes are the final pre-release quality gates.</p>
+      </article>
+
       <!-- Post: Road to v1.0 — Settings Self-Service, Navigation Overhaul, and the 1000-PR Milestone -->
       <article class="post post--full" id="road-to-v1"
                data-tags="milestone,engineering,release" data-date="2026-04-15"
