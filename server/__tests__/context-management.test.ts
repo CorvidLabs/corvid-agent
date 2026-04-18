@@ -404,12 +404,12 @@ describe('trimMessages', () => {
     expect(messages.length).toBeLessThan(45);
   });
 
-  it('applies tier 1 (light compression) at 60%+ usage', () => {
-    // Need ~60% of 8192 tokens = ~4915 tokens = ~19660 chars prose
+  it('applies tier 1 (light compression) at 70%+ usage', () => {
+    // Need ~70% of 8192 tokens = ~5734 tokens = ~22937 chars prose
     const messages: ConversationMessage[] = [
       { role: 'tool', content: 'A'.repeat(2000) },
       { role: 'tool', content: 'B'.repeat(2000) },
-      { role: 'user', content: 'x'.repeat(16000) },
+      { role: 'user', content: 'x'.repeat(19000) },
       { role: 'assistant', content: 'short' },
       { role: 'user', content: 'short' },
       { role: 'assistant', content: 'short' },
@@ -418,17 +418,14 @@ describe('trimMessages', () => {
       { role: 'user', content: 'short' },
     ];
     trimMessages(messages);
-    // Tool results at index 0,1 should be compressed since they are old
-    // After tier 1, the tool content should be shortened
     expect(messages[0].content.length).toBeLessThan(2000);
   });
 
-  it('applies tier 2 at 75%+ usage', () => {
+  it('applies tier 2 at 80%+ usage', () => {
     const messages: ConversationMessage[] = Array.from({ length: 20 }, (_, i) => ({
       role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: 'x'.repeat(1200), // 20 * 1200/4 = 6000 tokens, 73% of 8192
+      content: 'x'.repeat(1400), // 20 * 1400/4 = 7000 tokens, 85% of 8192
     }));
-    // Push over 75%
     messages.push({ role: 'user', content: 'x'.repeat(2000) });
     trimMessages(messages);
     expect(messages.length).toBeLessThan(21);

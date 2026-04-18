@@ -221,7 +221,7 @@ Side effects on construction:
 3. **Persona/skill prompt injection**: If an agent has a persona, `composePersonaPrompt` is called and injected. Skill bundle prompts from both agent-level and project-level are merged
 4. **Tool permission resolution chain**: Agent base permissions -> merge agent skill bundle tools -> merge project skill bundle tools (only if agent has no explicit `mcpToolPermissions`)
 5. **Provider routing**: Resolved by `resolveProviderRouting()`. If agent has cursor provider but binary is missing, fallback to SDK (clearing Cursor-only models). If no provider and no Claude access, auto-fallback to Ollama. If `OLLAMA_USE_CLAUDE_PROXY=true`, Ollama agents route through SDK (Claude Code) for better tool/reasoning support. SDK process for Claude; direct process for Ollama/other providers
-6. **Context reset**: After `MAX_TURNS_BEFORE_CONTEXT_RESET` (8) user messages, the process is killed and restarted through the resume path with capped message history (last 20 messages). A conversation summary is saved as a memory observation (`source: 'session'`, `relevanceScore: 2.0`) so it can graduate to long-term memory if accessed again
+6. **Context reset**: After `MAX_TURNS_BEFORE_CONTEXT_RESET` (40) user messages, the process is killed and restarted through the resume path with capped message history (last 40 messages). A conversation summary (including file paths modified, key decisions, and work status) is saved as a memory observation (`source: 'session'`, `relevanceScore: 2.0`) so it can graduate to long-term memory if accessed again
 7. **Resume prompt construction**: Builds a `<conversation_history>` block from the last 20 messages (each truncated to 2000 chars), then appends the new prompt. Relevant short-term observations are loaded and injected as a `<relevant_observations>` block to provide context continuity
 7a. **Zero-turn circuit breaker**: If the last `ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD` (3) completions in a row produced zero turns, the session is refused to resume — it is in a death loop
 8. **Auto-restart for AlgoChat**: Non-zero exits from AlgoChat sessions trigger auto-restart with exponential backoff (5s * 3^n, max 3 restarts). Restart counter resets after 10 minutes of stability
@@ -355,7 +355,7 @@ Internal constants (not env-configurable):
 | `AUTO_RESUME_MULTIPLIER` | `3` | Exponential backoff factor |
 | `AUTO_RESUME_CAP_MS` | `3600000` | 1 hour max auto-resume delay |
 | `AUTO_RESUME_MAX_ATTEMPTS` | `10` | Give up after 10 attempts |
-| `MAX_TURNS_BEFORE_CONTEXT_RESET` | `8` | Turns before killing for context reset |
+| `MAX_TURNS_BEFORE_CONTEXT_RESET` | `40` | Turns before killing for context reset |
 | `ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD` | `3` | Consecutive zero-turn completions before refusing to resume |
 | `DISCORD_RESTRICTED_MESSAGE_PREFIX` | `'Discord message:'` | Session name prefix for restricted Discord `/message` sessions |
 

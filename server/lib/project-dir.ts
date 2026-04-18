@@ -8,7 +8,8 @@
  * - worktree: always create a git worktree from the base clone
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -70,6 +71,15 @@ export async function cleanupEphemeralDir(resolved: ResolvedDir): Promise<void> 
   }
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Validate a directory is a functional git repository (not just a .git dir). */
+function isValidGitRepo(dir: string): boolean {
+  if (!existsSync(resolve(dir, '.git'))) return false;
+  const result = spawnSync('git', ['rev-parse', '--git-dir'], { cwd: dir, stdio: 'pipe' });
+  return result.status === 0;
+}
+
 // ─── Strategy implementations ────────────────────────────────────────────────
 
 function resolvePersistent(project: Project): ResolvedDir {
@@ -85,12 +95,11 @@ function resolvePersistent(project: Project): ResolvedDir {
     };
   }
 
-  // Validate it's actually a git repository
-  if (!existsSync(resolve(project.workingDir, '.git'))) {
+  if (!isValidGitRepo(project.workingDir)) {
     return {
       dir: project.workingDir,
       ephemeral: false,
-      error: `Project directory is not a git repository: ${project.workingDir}`,
+      error: `Project directory is not a valid git repository: ${project.workingDir}`,
     };
   }
 
@@ -110,10 +119,14 @@ async function resolveCloneOnDemand(project: Project): Promise<ResolvedDir> {
   mkdirSync(cloneBase, { recursive: true });
 
   if (existsSync(resolve(cloneDir, '.git'))) {
-    // Existing clone — pull latest
-    log.info('Reusing existing clone, pulling latest', { cloneDir });
-    await gitPull(cloneDir);
-    return { dir: cloneDir, ephemeral: false };
+    if (!isValidGitRepo(cloneDir)) {
+      log.warn('Corrupt clone detected, removing and re-cloning', { cloneDir });
+      rmSync(cloneDir, { recursive: true, force: true });
+    } else {
+      log.info('Reusing existing clone, pulling latest', { cloneDir });
+      await gitPull(cloneDir);
+      return { dir: cloneDir, ephemeral: false };
+    }
   }
 
   // Fresh clone
