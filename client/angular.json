@@ -55,6 +55,7 @@
               }
             ],
             "styles": [
+              "src/styles/m3-theme.scss",
               "src/styles.css"
             ]
           },

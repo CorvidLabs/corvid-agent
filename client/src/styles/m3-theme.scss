@@ -1,0 +1,37 @@
+// Angular Material M3 — Corvid dark theme
+// Primary: deep purple-black (corvid/crow-inspired)
+// Secondary: amber (warm accent)
+
+@use '@angular/material' as mat;
+
+// Include the core styles once (resets, elevation, etc.)
+@include mat.core();
+
+// Define the M3 theme — dark, corvid-inspired
+$corvid-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$violet-palette,
+    tertiary: mat.$orange-palette,
+  ),
+  typography: (
+    brand-family: 'Space Grotesk, Inter, system-ui, sans-serif',
+    plain-family: 'Space Grotesk, Inter, system-ui, sans-serif',
+    bold-weight: 700,
+    medium-weight: 500,
+    regular-weight: 400,
+  ),
+  density: (
+    scale: 0,
+  ),
+));
+
+// Emit theme tokens to :root — components opt-in via their own @include mat.xxx-theme()
+:root {
+  @include mat.theme($corvid-theme);
+  @include mat.all-component-themes($corvid-theme);
+
+  // Override Material surface/background to match Corvid palette
+  --mat-app-background-color: #0c0c14;
+  --mat-app-text-color: #e8e6f0;
+}
