@@ -135,4 +135,41 @@ $corvid-theme: mat.define-theme((
   // Badge
   --mat-badge-background-color: #00e5ff;
   --mat-badge-text-color: #0c0c14;
+
+  // Toolbar — transparent to let glassmorphism show through
+  --mat-toolbar-container-background-color: transparent;
+  --mat-toolbar-container-text-color: #e8e6f0;
+
+  // Sidenav
+  --mat-sidenav-container-background-color: #0c0c14;
+  --mat-sidenav-content-background-color: #0c0c14;
+  --mat-sidenav-container-text-color: #e8e6f0;
+  --mat-sidenav-container-divider-color: #222438;
+
+  // Ripple — subtle cyan
+  --mat-ripple-color: rgba(0, 229, 255, 0.08);
+
+  // Autocomplete (future-proofing)
+  --mat-autocomplete-background-color: #191b26;
+
+  // Snackbar (future-proofing)
+  --mdc-snackbar-container-color: #191b26;
+  --mdc-snackbar-supporting-text-color: #e8e6f0;
+  --mat-snack-bar-button-color: #00e5ff;
+
+  // Dialog (future-proofing)
+  --mdc-dialog-container-color: #12131c;
+  --mdc-dialog-subhead-color: #e8e6f0;
+  --mdc-dialog-supporting-text-color: #9490ad;
+
+  // Tooltip
+  --mdc-plain-tooltip-container-color: #191b26;
+  --mdc-plain-tooltip-supporting-text-color: #e8e6f0;
+
+  // Progress bar
+  --mdc-linear-progress-active-indicator-color: #00e5ff;
+  --mdc-linear-progress-track-color: rgba(0, 229, 255, 0.1);
+
+  // Progress spinner
+  --mdc-circular-progress-active-indicator-color: #00e5ff;
 }
