@@ -8,8 +8,8 @@
 /* Sandbox banner */
 .sandbox-banner {
     display: flex; align-items: center; gap: .6rem;
-    background: var(--accent-amber-subtle, rgba(245,158,11,.12));
-    border: 1px solid var(--accent-amber, #f59e0b);
+    background: var(--accent-amber-subtle);
+    border: 1px solid var(--accent-amber);
     border-radius: var(--radius); padding: var(--space-2) .9rem;
     margin-bottom: .75rem; font-size: .8rem;
     color: var(--text-primary);
@@ -18,7 +18,7 @@
 .sandbox-banner__text { line-height: 1.4; }
 .sandbox-banner__text code {
     font-family: var(--font-mono, monospace);
-    background: var(--bg-elevated, rgba(255,255,255,.05));
+    background: var(--bg-raised);
     border-radius: var(--radius-sm); padding: 0 4px;
     font-size: .75rem;
 }
@@ -354,7 +354,7 @@
 
 /* System status */
 .section--status {
-    background: var(--bg-raised); border-color: var(--border-bright, #2a2d4a);
+    background: var(--bg-raised); border-color: var(--border-bright);
 }
 .status-list { display: flex; flex-direction: column; gap: .25rem; }
 .status-row { display: flex; justify-content: space-between; align-items: center; padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; }
@@ -509,7 +509,7 @@
     background: linear-gradient(180deg, rgba(139,92,246,.03) 0%, var(--bg-surface) 30%);
 }
 .widget[data-widget="system-status"] .section {
-    border-top: 2px solid var(--accent-gold, #f5a623);
+    border-top: 2px solid var(--accent-gold);
     background: linear-gradient(180deg, rgba(245,166,35,.03) 0%, var(--bg-raised) 30%);
 }
 
@@ -531,7 +531,7 @@
 .live-badge {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
-    color: var(--accent-green); background: var(--accent-green-dim, rgba(16,185,129,.12));
+    color: var(--accent-green); background: var(--accent-green-dim);
     border: 1px solid var(--accent-green-border); border-radius: 12px;
     padding: 2px 8px; flex-shrink: 0;
 }
@@ -546,7 +546,7 @@
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 20px; height: 20px; padding: 0 6px;
     font-size: .7rem; font-weight: 700;
-    background: var(--accent-green-dim, rgba(16,185,129,.15));
+    background: var(--accent-green-dim);
     border: 1px solid var(--accent-green-border); border-radius: 9px;
     color: var(--accent-green); margin-left: .35rem;
 }
@@ -561,9 +561,9 @@
 .agent-card:hover .agent-card__sparkline { opacity: 0.85; }
 
 /* Sparkline SVG paths */
-.sparkline-area--cyan { fill: var(--accent-cyan-subtle, rgba(6,182,212,.1)); }
-.sparkline-area--amber { fill: var(--accent-amber-subtle, rgba(245,158,11,.1)); }
-.sparkline-area--red { fill: var(--accent-red-subtle, rgba(239,68,68,.1)); }
+.sparkline-area--cyan { fill: var(--accent-cyan-subtle); }
+.sparkline-area--amber { fill: var(--accent-amber-subtle); }
+.sparkline-area--red { fill: var(--accent-red-subtle); }
 .sparkline-area--grey { fill: transparent; }
 
 .sparkline-line--cyan { fill: none; stroke: var(--accent-cyan); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }

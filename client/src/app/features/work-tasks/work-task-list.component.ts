@@ -257,15 +257,13 @@ import { MatIconModule } from '@angular/material/icon';
         }
         .detail-toggle:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
-        .tasks__filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; }
-
         .tasks__search-row {
             display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
         }
         .search-field { flex: 1; min-width: 0; }
         .search-field .mat-mdc-form-field-icon-prefix { padding-right: 0.5rem; color: var(--text-tertiary); }
         .agent-filter-field { width: 160px; flex-shrink: 0; }
-        .agent-filter-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
+        .agent-filter-field { --mat-select-trigger-text-size: 0.75rem; }
 
         .empty {
             text-align: center;

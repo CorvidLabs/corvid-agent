@@ -129,9 +129,8 @@ interface SessionGroup {
 
         .filter-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
         .filter-row mat-button-toggle-group { font-size: 0.75rem; }
-        .filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 12px; line-height: 32px; font-size: 0.75rem; }
         .source-field { width: 140px; flex-shrink: 0; }
-        .source-field ::ng-deep .mat-mdc-select-value { font-size: 0.75rem; }
+        .source-field { --mat-select-trigger-text-size: 0.75rem; }
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 
@@ -176,7 +175,7 @@ interface SessionGroup {
             .filter-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
             .filter-row::-webkit-scrollbar { display: none; }
             .filter-row mat-button-toggle-group { flex-shrink: 0; }
-            .filter-row ::ng-deep .mat-button-toggle-label-content { padding: 0 8px; font-size: 0.65rem; }
+            .filter-row mat-button-toggle-group { --mat-button-toggle-label-text-size: 0.65rem; }
             .source-field { width: 120px; }
         }
     `,

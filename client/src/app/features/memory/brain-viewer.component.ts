@@ -668,8 +668,10 @@ interface ConsolidationResponse {
             flex-shrink: 0;
         }
         .export-panel__chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-        .export-category-field { width: 100%; }
-        .export-category-field .mat-mdc-form-field-infix { padding-top: 8px; padding-bottom: 8px; }
+        .export-category-field {
+            width: 100%;
+            --mat-form-field-container-vertical-padding: 8px;
+        }
         .export-panel button[mat-flat-button] { align-self: flex-end; }
 
         /* ─── Sync Banner ────── */

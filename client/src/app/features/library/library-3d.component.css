@@ -3,7 +3,7 @@
     width: 100%;
     height: clamp(400px, calc(100vh - 160px), 900px);
     min-height: 400px;
-    background: #05050a;
+    background: var(--bg-deep);
     border-radius: var(--radius);
     border: 1px solid var(--border);
     overflow: hidden;
@@ -21,7 +21,7 @@ canvas {
     height: 140px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-bright);
-    background: rgba(5, 5, 10, 0.85);
+    background: var(--overlay-surface);
     backdrop-filter: blur(4px);
     pointer-events: none;
 }
@@ -39,7 +39,7 @@ canvas {
     align-items: center;
     gap: 6px;
     padding: 3px 10px;
-    background: rgba(5, 5, 10, 0.85);
+    background: var(--overlay-surface);
     border: 1px solid var(--border-bright);
     border-radius: 12px;
     font-size: 0.65rem;
@@ -53,7 +53,7 @@ canvas {
     transition: background 0.15s, border-color 0.15s;
 }
 .lib3d__legend-btn:hover {
-    background: rgba(20, 20, 35, 0.9);
+    background: var(--bg-hover);
     border-color: var(--zone-color);
 }
 .lib3d__legend-dot {
@@ -68,7 +68,7 @@ canvas {
     z-index: 20;
     pointer-events: none;
     padding: 4px 10px;
-    background: rgba(5, 5, 10, 0.9);
+    background: var(--overlay-surface);
     border: 1px solid var(--border-bright);
     border-radius: var(--radius);
     font-size: 0.7rem;
@@ -89,7 +89,7 @@ canvas {
     top: 12px;
     right: 12px;
     padding: 4px 12px;
-    background: rgba(5, 5, 10, 0.85);
+    background: var(--overlay-surface);
     border: 1px solid var(--accent-cyan);
     border-radius: 12px;
     font-size: 0.6rem;
