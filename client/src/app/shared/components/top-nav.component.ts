@@ -23,6 +23,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 interface NavChild {
     label: string;
@@ -121,6 +122,7 @@ const TABS: NavTab[] = [
         MatMenuModule,
         MatIconModule,
         MatDividerModule,
+        MatTooltipModule,
     ],
     template: `
         <mat-toolbar class="topnav" role="navigation" aria-label="Main navigation">
@@ -208,7 +210,7 @@ const TABS: NavTab[] = [
                     mat-icon-button
                     class="topnav__help"
                     (click)="openHelp()"
-                    title="Keyboard shortcuts (?)"
+                    matTooltip="Keyboard shortcuts (?)"
                     aria-label="Keyboard shortcuts"
                     type="button">
                     <app-icon name="help" [size]="14" />

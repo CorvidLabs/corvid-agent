@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
@@ -33,7 +34,7 @@ interface FlockStats {
 @Component({
     selector: 'app-flock-directory',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SkeletonComponent, EmptyStateComponent, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatChipsModule],
+    imports: [SkeletonComponent, EmptyStateComponent, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatChipsModule, MatTooltipModule],
     template: `
         <div class="flock-page">
             <!-- Stats Header -->
@@ -101,7 +102,7 @@ interface FlockStats {
                             <mat-option value="attestations">Attestations</mat-option>
                         </mat-select>
                     </mat-form-field>
-                    <button mat-icon-button (click)="toggleSortOrder()" [title]="sortOrder() === 'desc' ? 'Descending' : 'Ascending'">
+                    <button mat-icon-button (click)="toggleSortOrder()" [matTooltip]="sortOrder() === 'desc' ? 'Descending' : 'Ascending'">
                         {{ sortOrder() === 'desc' ? '↓' : '↑' }}
                     </button>
                 </div>
@@ -162,9 +163,9 @@ interface FlockStats {
                                     </div>
                                 }
                                 <div class="flock-card__metrics">
-                                    <span class="flock-card__metric" title="Uptime">↑ {{ agent.uptimePct.toFixed(0) }}%</span>
-                                    <span class="flock-card__metric" title="Attestations">✓ {{ agent.attestationCount }}</span>
-                                    <span class="flock-card__metric" title="Councils">◎ {{ agent.councilParticipations }}</span>
+                                    <span class="flock-card__metric" matTooltip="Uptime">↑ {{ agent.uptimePct.toFixed(0) }}%</span>
+                                    <span class="flock-card__metric" matTooltip="Attestations">✓ {{ agent.attestationCount }}</span>
+                                    <span class="flock-card__metric" matTooltip="Councils">◎ {{ agent.councilParticipations }}</span>
                                 </div>
                             </button>
                         }
@@ -195,7 +196,7 @@ interface FlockStats {
                                 <h2 class="flock-detail__name">{{ agent.name }}</h2>
                                 <span class="flock-detail__status" [attr.data-status]="agent.status">{{ agent.status }}</span>
                             </div>
-                            <button class="flock-detail__close" (click)="selectedAgent.set(null)" title="Close">&times;</button>
+                            <button class="flock-detail__close" (click)="selectedAgent.set(null)" matTooltip="Close">&times;</button>
                         </div>
 
                         @if (agent.description) {
