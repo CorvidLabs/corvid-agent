@@ -6,7 +6,7 @@ import type { AstLanguage } from './types';
 let initialized = false;
 const languageCache = new Map<AstLanguage, Language>();
 
-const WASM_DIR = join(import.meta.dir, '..', '..', 'node_modules', 'tree-sitter-wasms', 'out');
+const WASM_DIR = join(import.meta.dir, '..', '..', 'node_modules', '@vscode', 'tree-sitter-wasm', 'wasm');
 
 const LANGUAGE_WASM_FILES: Record<AstLanguage, string> = {
   typescript: 'tree-sitter-typescript.wasm',
@@ -21,7 +21,7 @@ const LANGUAGE_WASM_FILES: Record<AstLanguage, string> = {
  */
 export async function initParser(): Promise<void> {
   if (initialized) return;
-  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'tree-sitter.wasm');
+  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'web-tree-sitter.wasm');
   await Parser.init({
     locateFile: () => wasmPath,
   } as object);
