@@ -236,6 +236,11 @@ const COLLAPSED_KEY = 'corvid-chat-tabs-collapsed';
             color: var(--accent-cyan);
             border-color: var(--accent-cyan);
         }
+
+        /* Hidden on mobile — bottom nav handles navigation */
+        @media (max-width: 767px) {
+            :host { display: none; }
+        }
     `,
 })
 export class ChatTabBarComponent {

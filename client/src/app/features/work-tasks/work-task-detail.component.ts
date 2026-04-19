@@ -163,16 +163,6 @@ interface DiffFile {
             max-height: 200px; overflow-y: auto;
         }
 
-        /* Syntax highlighting in log content */
-        :host ::ng-deep .log-code-block {
-            display: block; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-            padding: 0.4rem 0.5rem; margin: 0.25rem 0; font-family: var(--font-mono); font-size: 0.65rem;
-            overflow-x: auto; color: var(--text-primary);
-        }
-        :host ::ng-deep .log-code-inline {
-            background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
-            font-family: var(--font-mono); font-size: 0.9em; color: var(--accent-magenta);
-        }
 
         /* Diff viewer */
         .diff-summary { margin-bottom: 0.5rem; }

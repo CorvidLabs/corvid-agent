@@ -9,11 +9,12 @@ import {
     inject,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
     selector: 'app-dir-browser',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule],
+    imports: [MatButtonModule, MatCheckboxModule],
     template: `
         <div class="overlay" (click)="onBackdropClick($event)" (keydown.escape)="onCancel()">
             <div class="browser" role="dialog" aria-label="Browse directories">
@@ -52,10 +53,9 @@ import { MatButtonModule } from '@angular/material/button';
                 }
 
                 <div class="browser__actions">
-                    <label class="browser__toggle">
-                        <input type="checkbox" [checked]="showHidden()" (change)="toggleHidden()" />
+                    <mat-checkbox class="browser__toggle" [checked]="showHidden()" (change)="toggleHidden()">
                         Show hidden
-                    </label>
+                    </mat-checkbox>
                     <div class="browser__buttons">
                         <button mat-flat-button color="primary" (click)="onSelect()">Select</button>
                         <button mat-stroked-button (click)="onCancel()">Cancel</button>
@@ -122,9 +122,7 @@ import { MatButtonModule } from '@angular/material/button';
         }
         .browser__toggle {
             font-size: 0.75rem; color: var(--text-secondary);
-            display: flex; align-items: center; gap: 0.35rem; cursor: pointer;
         }
-        .browser__toggle input { accent-color: var(--accent-cyan); }
         .browser__buttons { display: flex; gap: 0.5rem; }
         .btn {
             padding: 0.4rem var(--space-3); border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;

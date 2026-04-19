@@ -1667,3 +1667,17 @@ select:focus {
     .row-lift:hover,
     .node-chip-interactive:hover { transform: none; }
 }
+
+
+/* ── Dynamic HTML content (innerHTML-injected) ─────────────────────────────
+   These classes are injected at runtime and are not processed by Angular view
+   encapsulation, so they must live in the global stylesheet. */
+.log-code-block {
+    display: block; background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 0.4rem 0.5rem; margin: 0.25rem 0;
+    font-family: var(--font-mono); font-size: 0.65rem; overflow-x: auto; color: var(--text-primary);
+}
+.log-code-inline {
+    background: var(--bg-raised); padding: 1px 4px; border-radius: 3px;
+    font-family: var(--font-mono); font-size: 0.9em; color: var(--accent-magenta);
+}

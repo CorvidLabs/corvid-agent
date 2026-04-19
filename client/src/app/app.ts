@@ -149,12 +149,6 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
         }
 
-        /* Hide chat tab bar on mobile — bottom nav handles navigation */
-        @media (max-width: 767px) {
-            :host ::ng-deep app-chat-tab-bar {
-                display: none;
-            }
-        }
     `,
 })
 export class App implements OnInit, OnDestroy {
