@@ -92,8 +92,9 @@
     "libsodium-wrappers": "^0.8.3",
     "marked": "^18.0.0",
     "opusscript": "^0.1.1",
-    "tree-sitter-wasms": "^0.1.13",
-    "web-tree-sitter": "0.25.10",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "web-tree-sitter": "0.26.8",
     "zod": "^4.3.6"
   },
   "patchedDependencies": {},

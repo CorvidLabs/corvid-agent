@@ -121,7 +121,8 @@ Provides tree-sitter-based parsing of TypeScript and JavaScript source files, ex
 | Module | What is used |
 |--------|-------------|
 | `web-tree-sitter` | `Parser`, `Language`, `Tree`, `Node` — core WASM-based parsing engine |
-| `tree-sitter-wasms` | Pre-built WASM grammar files for TypeScript, JavaScript, TSX |
+| `tree-sitter-typescript` | Pre-built WASM grammar files for TypeScript and TSX |
+| `tree-sitter-javascript` | Pre-built WASM grammar files for JavaScript and JSX |
 | `lib` | `ValidationError` from `server/lib/errors`, `createLogger` from `server/lib/logger` |
 
 ### Consumed By

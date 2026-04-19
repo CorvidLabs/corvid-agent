@@ -18,8 +18,9 @@
 | algosdk | 3.5.2 | None | Algorand SDK |
 | croner | 10.0.1 | None | Cron scheduler |
 | zod | 4.3.5 | None | Schema validation |
-| web-tree-sitter | 0.25.10 | None | WASM-based parser |
-| tree-sitter-wasms | 0.1.13 | None | WASM grammars |
+| web-tree-sitter | 0.26.8 | None | WASM-based parser |
+| tree-sitter-typescript | 0.23.2 | None | WASM grammar (TS/TSX) |
+| tree-sitter-javascript | 0.25.0 | None | WASM grammar (JS/JSX) |
 | @opentelemetry/* | 1.9.0-2.6.0 | None | Observability SDK |
 
 ## Transitive Dependencies — Overrides Applied

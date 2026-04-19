@@ -6,13 +6,25 @@ import type { AstLanguage } from './types';
 let initialized = false;
 const languageCache = new Map<AstLanguage, Language>();
 
-const WASM_DIR = join(import.meta.dir, '..', '..', 'node_modules', 'tree-sitter-wasms', 'out');
-
-const LANGUAGE_WASM_FILES: Record<AstLanguage, string> = {
-  typescript: 'tree-sitter-typescript.wasm',
-  javascript: 'tree-sitter-javascript.wasm',
-  tsx: 'tree-sitter-tsx.wasm',
-  jsx: 'tree-sitter-javascript.wasm', // JSX uses the JS grammar
+const LANGUAGE_WASM_PATHS: Record<AstLanguage, string> = {
+  typescript: join(
+    import.meta.dir,
+    '..',
+    '..',
+    'node_modules',
+    'tree-sitter-typescript',
+    'tree-sitter-typescript.wasm',
+  ),
+  javascript: join(
+    import.meta.dir,
+    '..',
+    '..',
+    'node_modules',
+    'tree-sitter-javascript',
+    'tree-sitter-javascript.wasm',
+  ),
+  tsx: join(import.meta.dir, '..', '..', 'node_modules', 'tree-sitter-typescript', 'tree-sitter-tsx.wasm'),
+  jsx: join(import.meta.dir, '..', '..', 'node_modules', 'tree-sitter-javascript', 'tree-sitter-javascript.wasm'),
 };
 
 /**
@@ -21,7 +33,7 @@ const LANGUAGE_WASM_FILES: Record<AstLanguage, string> = {
  */
 export async function initParser(): Promise<void> {
   if (initialized) return;
-  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'tree-sitter.wasm');
+  const wasmPath = join(import.meta.dir, '..', '..', 'node_modules', 'web-tree-sitter', 'web-tree-sitter.wasm');
   await Parser.init({
     locateFile: () => wasmPath,
   } as object);
@@ -35,8 +47,7 @@ export async function loadLanguage(lang: AstLanguage): Promise<Language> {
   const cached = languageCache.get(lang);
   if (cached) return cached;
 
-  const wasmFile = LANGUAGE_WASM_FILES[lang];
-  const wasmPath = join(WASM_DIR, wasmFile);
+  const wasmPath = LANGUAGE_WASM_PATHS[lang];
   const language = await Language.load(wasmPath);
   languageCache.set(lang, language);
   return language;

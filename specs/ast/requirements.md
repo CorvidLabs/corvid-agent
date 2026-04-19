@@ -28,7 +28,7 @@ spec: ast.spec.md
 
 ## Constraints
 
-- Requires `web-tree-sitter` WASM runtime and `tree-sitter-wasms` grammar files as dependencies
+- Requires `web-tree-sitter` WASM runtime and `tree-sitter-typescript`/`tree-sitter-javascript` grammar packages as dependencies
 - Language WASM files are loaded once and cached in a module-level `Map` for the process lifetime
 - Files are read before stat to avoid TOCTOU race conditions
 - Only TypeScript and JavaScript family languages are supported (no Python, Go, Rust, etc.)
