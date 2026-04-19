@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
@@ -13,7 +14,7 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
+    imports: [FormsModule, MatButtonModule, MatChipsModule, MatFormFieldModule, MatInputModule, EmptyStateComponent, SkeletonComponent, PageShellComponent],
     template: `
         <app-page-shell title="Skill Bundles" icon="skills">
             <button actions class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
@@ -136,7 +137,15 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
                                     } @else {
                                         <div class="bundle-card__tools-list">
                                             <strong>Tools:</strong>
-                                            {{ bundle.tools.join(', ') || 'None' }}
+                                            @if (bundle.tools.length === 0) {
+                                                <span class="bundle-card__tools-empty">None</span>
+                                            } @else {
+                                                <mat-chip-set aria-label="Tools in this bundle">
+                                                    @for (tool of bundle.tools; track tool) {
+                                                        <mat-chip>{{ tool }}</mat-chip>
+                                                    }
+                                                </mat-chip-set>
+                                            }
                                         </div>
                                         @if (bundle.promptAdditions) {
                                             <div class="bundle-card__prompt">
@@ -197,7 +206,8 @@ import { PageShellComponent } from '../../shared/components/page-shell.component
         .bundle-card__meta { font-size: 0.75rem; color: var(--text-secondary); }
         .bundle-card__desc { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-secondary); }
         .bundle-card__details { margin-top: 1rem; padding-top: var(--space-4); border-top: 1px solid var(--border); }
-        .bundle-card__tools-list { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; }
+        .bundle-card__tools-list { font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+        .bundle-card__tools-empty { color: var(--text-tertiary); }
         .bundle-card__prompt pre { font-size: 0.8rem; color: var(--accent-green); white-space: pre-wrap; margin: 0.25rem 0; }
         @media (max-width: 767px) {
             .form-grid { grid-template-columns: 1fr; }
