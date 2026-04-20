@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { z } from 'zod/v4';
 import { createLogger } from '../lib/logger';
 import { buildPluginToolName, loadPluginFromPackage } from './loader';
 import { getGrantedCapabilities, grantAllCapabilities } from './permissions';
@@ -112,14 +113,14 @@ export class PluginRegistry {
   getPluginTools(): Array<{
     name: string;
     description: string;
-    inputSchema: unknown;
+    inputSchema: z.ZodType;
     pluginName: string;
     handler: CorvidPluginTool['handler'];
   }> {
     const tools: Array<{
       name: string;
       description: string;
-      inputSchema: unknown;
+      inputSchema: z.ZodType;
       pluginName: string;
       handler: CorvidPluginTool['handler'];
     }> = [];
