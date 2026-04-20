@@ -24,8 +24,6 @@ import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
 import { removeWorktree } from '../lib/worktree';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
-import type { PluginRegistry } from '../plugins/registry';
-import { buildPluginSdkTools } from '../plugins/sdk-bridge';
 import { LlmProviderRegistry } from '../providers/registry';
 import { hasClaudeAccess } from '../providers/router';
 import type { LlmProviderType } from '../providers/types';
@@ -183,9 +181,6 @@ export class ProcessManager {
   // MCP services — composed container set after AlgoChat init
   private readonly mcpServices = new McpServiceContainer();
 
-  // Plugin registry — injected after bootstrap to provide plugin tools to agents
-  private pluginRegistry: PluginRegistry | null = null;
-
   // Composed managers — delegated concerns
   private readonly timerManager: SessionTimerManager;
   private readonly resilienceManager: SessionResilienceManager;
@@ -255,11 +250,6 @@ export class ProcessManager {
   /** Register MCP-related services so agent sessions get corvid_* tools. */
   setMcpServices(services: McpServices): void {
     this.mcpServices.setServices(services);
-  }
-
-  /** Inject the plugin registry so loaded plugin tools are available to agents. */
-  setPluginRegistry(registry: PluginRegistry): void {
-    this.pluginRegistry = registry;
   }
 
   /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
@@ -616,11 +606,7 @@ export class ProcessManager {
               effectivePermissions,
               schedulerActionType,
             );
-            if (!ctx) return undefined;
-            const pluginSdkTools = this.pluginRegistry
-              ? buildPluginSdkTools(this.pluginRegistry, session.agentId, session.id)
-              : [];
-            return [createCorvidMcpServer(ctx, pluginSdkTools.length > 0 ? pluginSdkTools : undefined)];
+            return ctx ? [createCorvidMcpServer(ctx)] : undefined;
           })()
         : undefined;
 
@@ -1170,11 +1156,7 @@ export class ProcessManager {
                   undefined,
                   effectivePermissions,
                 );
-                if (!ctx) return undefined;
-                const pluginSdkTools = this.pluginRegistry
-                  ? buildPluginSdkTools(this.pluginRegistry, session.agentId, session.id)
-                  : [];
-                return [createCorvidMcpServer(ctx, pluginSdkTools.length > 0 ? pluginSdkTools : undefined)];
+                return ctx ? [createCorvidMcpServer(ctx)] : undefined;
               })()
             : undefined;
         sp = startSdkProcess({
