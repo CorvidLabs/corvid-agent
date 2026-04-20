@@ -133,9 +133,6 @@ const {
   discordBridge,
 } = await bootstrapServices(db, startTime);
 
-// Wire plugin registry into ProcessManager so loaded plugin tools appear in agent sessions
-processManager.setPluginRegistry(pluginRegistry);
-
 // AlgoChat init dependencies (shared by init, switchNetwork, and post-init wiring)
 const algochatInitDeps: AlgoChatInitDeps = {
   db,
