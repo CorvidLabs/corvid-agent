@@ -357,14 +357,14 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
                     @if (agentBundles().length === 0) {
                         <p class="detail__empty">No skill bundles assigned. <a routerLink="/agents/skill-bundles">Manage bundles</a></p>
                     } @else {
-                        <div class="skills-list">
+                        <mat-chip-set aria-label="Assigned skill bundles">
                             @for (ab of agentBundles(); track ab.bundleId) {
-                                <span class="skill-tag">
+                                <mat-chip (removed)="unassignBundle(ab.bundleId)">
                                     {{ getBundleName(ab.bundleId) }}
-                                    <button class="skill-tag__remove" (click)="unassignBundle(ab.bundleId)" title="Remove">&times;</button>
-                                </span>
+                                    <button matChipRemove aria-label="Remove skill bundle">&#x2715;</button>
+                                </mat-chip>
                             }
-                        </div>
+                        </mat-chip-set>
                     }
                 }
             </app-page-shell>
@@ -468,10 +468,6 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'pers
         .persona-info__text { font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0; }
         .skills-assign { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
         .skills-assign__select { flex: 1; }
-        .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .skill-tag { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        .skill-tag__remove { background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0.2rem 0.3rem; min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.6; }
-        .skill-tag__remove:hover { opacity: 1; }
 
         /* Flock Profile */
         .flock-profile { display: flex; flex-direction: column; gap: 1.25rem; }
