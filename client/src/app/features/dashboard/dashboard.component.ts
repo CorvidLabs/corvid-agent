@@ -27,6 +27,9 @@ import { firstValueFrom } from 'rxjs';
 import { friendlyModelName, friendlyProviderName } from '../../shared/format-model';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { ViewModeToggleComponent } from '../../shared/components/view-mode-toggle.component';
+import { ViewModeService } from '../../core/services/view-mode.service';
+import { Dashboard3dComponent } from './dashboard-3d.component';
 
 interface OverviewData {
     totalSessions: number;
@@ -67,7 +70,7 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent, MetricCardComponent, MatButtonModule, MatIconModule],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent, IconComponent, MetricCardComponent, MatButtonModule, MatIconModule, ViewModeToggleComponent, Dashboard3dComponent],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
@@ -117,9 +120,15 @@ interface ActivityEvent {
                     }
                 </div>
                 <div class="dash-toolbar__right">
-                    <button mat-stroked-button (click)="layoutService.customizing.set(!layoutService.customizing())">
-                        {{ layoutService.customizing() ? 'Done' : 'Customize' }}
-                    </button>
+                    <app-view-mode-toggle
+                        [mode]="viewMode()"
+                        ariaLabel="Dashboard view mode"
+                        (modeChange)="viewModeService.setMode('dashboard', $event)" />
+                    @if (viewMode() === 'basic') {
+                        <button mat-stroked-button (click)="layoutService.customizing.set(!layoutService.customizing())">
+                            {{ layoutService.customizing() ? 'Done' : 'Customize' }}
+                        </button>
+                    }
                 </div>
             </div>
 
@@ -154,7 +163,15 @@ interface ActivityEvent {
                 </div>
             }
 
+            <!-- 3D experience view -->
+            @if (viewMode() === '3d') {
+                <app-dashboard-3d
+                    [agentSummaries]="agentSummaries()"
+                    (agentClick)="navigateTo('/agents/' + $event)" />
+            }
+
             <!-- Widget grid: render visible widgets in order -->
+            @if (viewMode() === 'basic') {
             <div class="widget-grid stagger-children">
                 @for (widget of layoutService.visibleWidgets(); track widget.id; let i = $index) {
                     <div class="widget"
@@ -461,6 +478,7 @@ interface ActivityEvent {
                     </div>
                 }
             </div>
+            }
         </div>
         }
     `,
@@ -480,6 +498,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly tourService = inject(GuidedTourService);
 
     protected readonly layoutService = inject(WidgetLayoutService);
+    protected readonly viewModeService = inject(ViewModeService);
+    protected readonly viewMode = this.viewModeService.getMode('dashboard');
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
     protected readonly showWelcome = computed(() =>
