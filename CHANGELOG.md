@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.64.0] - 2026-04-19
+
+**49 PRs merged** — Major Angular Material UI migration, performance & stability hardening, security updates.
+
+### Added
+- **UI:** Angular Material design system (M3 Phase 2-3) with dark theme — complete migration of navigation, session-input, checkbox, and remaining components (#2087, #2090, #2094, #2095, #2105, #2106)
+- **Config:** Editable environment configuration UI for operators (#2040)
+- **Context:** Improved token estimation and proactive context management for longer sessions (#2093)
+- **Ops:** Backup and restore shell scripts for full instance operations (#2035)
+- **Components:** Shared metric-card and progress-bar UI building blocks (#2047)
+
+### Fixed
+- **Security:** Hono HTML injection CVE (>=4.12.14) (#2054); protobufjs arbitrary code execution GHSA-xq3m-2v4x-88gg (#2052)
+- **Stability:** Timer and callback leaks for long-running server stability (#2068); context retention across session resets (#2079); missing .catch() on voice session creation (#2069)
+- **Ollama:** Queue timeout in acquireSlot() to prevent hangs (#2072, #2080)
+- **CI/CD:** Re-enabled E2E tests in pipeline, reduced CI usage ~75% (#2066, #2039); pinned corvid-pet and all GitHub Actions to commit SHAs (#2074)
+- **Worktrees:** Enforce chat/* branch naming during sessions (#2073); support non-default projects (#2067)
+- **Theme:** M3 cyan palette polish and compact density (#2096)
+- **Library:** Exclude standalone entries with matching paginated books (#2033)
+
+### Changed
+- **Specs:** Comprehensive updates — memory TTL mechanics (#2059), discord message-commands (#2060), algochat routing (#2057), conversation-access enforcement (#2056), process decomposition (#2046)
+- **Architecture:** Process manager extracted into focused sub-modules with decomposition plan (#2043, #2046)
+- **Deps:** @anthropic-ai/sdk → 0.90.0 (#2104), @anthropic-ai/claude-agent-sdk → 0.2.114 (#2103), specsync v3.8.0 → v4.2.0 (#2034), web-tree-sitter 0.25.10 → 0.26.8 (#2099)
+- **Documentation:** Performance benchmarks (API, SQLite, SLAs) (#2062); hardening blog post (#2076); Hono CVE security guidance (#2037)
+- **UI:** Navigation simplified (5-item nav, tabbed settings) (#2032)
+
+### Dependency Updates
+- actions-all group +7 updates (#2050)
+- server-minor-patch +2 updates (security) (#2049)
+- client-minor-patch +2 updates (security) (#2048)
+
+**Quality:** 49 PRs, 0 test failures, all specs passing, zero broken commitments.
+
+---
+
 ## [Unreleased] — v1.0.0 Hardening
 
 Post-v1.0.0 infrastructure hardening and reliability improvements.
