@@ -13,6 +13,9 @@ files:
   - server/process/session-exit-handler.ts
   - server/process/event-handler.ts
   - server/process/approval-manager.ts
+  - server/process/approval-flow.ts
+  - server/process/persona-injector.ts
+  - server/process/session-lifecycle.ts
 db_tables:
   - sessions
   - session_messages
@@ -100,6 +103,25 @@ This is the most complex module in the system (~1135 lines after decomposition).
 `EventHandlerDeps` fields: `db`, `eventBus`, `broadcastFn`, `isOwnerAddress`, `getSessionMeta`, `stopProcess`, `resetSessionTimeout`.
 
 `SessionMetaForEvents` fields: `lastActivityAt`, `lastKnownCostUsd`, `source`.
+
+### Exported Functions (from approval-flow.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `buildApprovalRequestEvent` | `(request: ApprovalRequestWire)` | `ClaudeStreamEvent` | Build the event payload for an approval request to emit to session subscribers |
+| `createApprovalRequestHandler` | `(eventBus: ISessionEventBus)` | `(sessionId, request) => void` | Factory that creates the `onApprovalRequest` callback for SDK/direct process spawners |
+| `resolveApproval` | `(approvalManager, requestId, behavior, message?)` | `boolean` | Resolve a pending approval request; returns false if not found |
+| `cancelSessionApprovals` | `(approvalManager, sessionId)` | `void` | Cancel all pending approvals for a session (called on stop/cleanup) |
+
+### Exported Functions (from persona-injector.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `injectPersonaAndSkills` | `(db, opts: PersonaInjectionOptions)` | `ResolvedSessionConfig` | Resolve persona prompt, skill prompt, and tool permissions with structured logging |
+| `resolvePrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve only persona and skill prompts (no tool permission computation) |
+| `resolvePermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve only tool permissions for an agent+project pair |
+
+`PersonaInjectionOptions` fields: `agent`, `agentId`, `projectId`.
 
 ### Exported Functions (from session-exit-handler.ts)
 
@@ -371,3 +393,4 @@ Internal constants (not env-configurable):
 | 2026-04-09 | corvid-agent | Added extracted sub-modules: provider-routing.ts, resume-prompt-builder.ts, event-handler.ts, session-exit-handler.ts (#1940) |
 | 2026-04-14 | corvid-agent | Add 15 missing modules to files list, fix SessionTimerCallbacks/Config types, clarify resolveProviderRouting re-export (#2022) |
 | 2026-04-16 | corvid-agent | Document McpServiceContainer methods/isAvailable, full McpServices/BuildContextOptions fields, startStartupTimeout/clearStartupTimeout, fix applyCostUpdate return type (boolean), fix sendMessage signature (ContentBlockParam[]), add flushActiveSessionSummaries, fix getStats to include startupTimeouts, inline EventHandlerDeps/ExitHandlerDeps fields, remove RoutingDecision duplicate, collapse exported-types table with Source column (#2022) |
+| 2026-04-20 | corvid-agent | Add approval-flow.ts (approval request/response bridge) and persona-injector.ts (persona+skill injection facade); add session-lifecycle.ts to files list; document new exported functions |
