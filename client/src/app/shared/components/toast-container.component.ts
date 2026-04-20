@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 import { NotificationService } from '../../core/services/notification.service';
 import type { NotificationType } from '../../core/models/notification.model';
 
@@ -217,7 +217,7 @@ import type { NotificationType } from '../../core/models/notification.model';
 export class ToastContainerComponent {
     private readonly notificationService = inject(NotificationService);
 
-    readonly notifications = this.notificationService.notifications;
+    readonly notifications = signal<Array<{ id: string; type: NotificationType; message: string; detail?: string; duration?: number }>>([]);
 
     icon(type: NotificationType): string {
         switch (type) {
@@ -228,7 +228,7 @@ export class ToastContainerComponent {
         }
     }
 
-    dismiss(id: string): void {
-        this.notificationService.dismiss(id);
+    dismiss(_id: string): void {
+        this.notificationService.dismiss();
     }
 }
