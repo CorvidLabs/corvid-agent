@@ -116,6 +116,7 @@
     --source-work: #79b8ff;
 
     /* ── Subtle backgrounds — very low opacity for tinted surfaces ── */
+    --accent-cyan-faint: rgba(0, 229, 255, 0.04);
     --accent-cyan-subtle: rgba(0, 229, 255, 0.06);
     --accent-green-faint: rgba(0, 255, 136, 0.04);
     --accent-green-subtle: rgba(0, 255, 136, 0.06);
@@ -127,9 +128,13 @@
     --accent-red-wash: rgba(255, 51, 85, 0.08);
     --accent-red-tint: rgba(255, 51, 85, 0.1);
     --accent-red-mid: rgba(255, 51, 85, 0.2);
+    --accent-amber-faint: rgba(255, 170, 0, 0.03);
     --accent-amber-subtle: rgba(255, 170, 0, 0.06);
+    --accent-magenta-faint: rgba(255, 0, 170, 0.03);
     --accent-magenta-subtle: rgba(255, 0, 170, 0.05);
+    --accent-purple-faint: rgba(167, 139, 250, 0.03);
     --accent-purple-subtle: rgba(167, 139, 250, 0.06);
+    --accent-gold-faint: rgba(245, 166, 35, 0.03);
 
     /* ── Semi-transparent borders — for badges, pills, outlined elements ── */
     --accent-cyan-border: rgba(0, 229, 255, 0.25);
@@ -153,6 +158,10 @@
 
     /* ── Shadows ── */
     --shadow-deep: rgba(0, 0, 0, 0.55);
+    --shadow-card: rgba(0, 0, 0, 0.12);
+    --shadow-card-hover: rgba(0, 0, 0, 0.18);
+    --inset-highlight: rgba(255, 255, 255, 0.04);
+    --inset-highlight-hover: rgba(255, 255, 255, 0.06);
 
     /* Yellow accent (used by some status badges) */
     --accent-yellow: #fbbf24;
