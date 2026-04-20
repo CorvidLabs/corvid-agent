@@ -865,6 +865,43 @@ button:active:not(:disabled) {
     }
 }
 
+/* ── MatSnackBar notification panels ── */
+.notif-snack-panel .mdc-snackbar__surface {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-lg) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+    padding: var(--space-3) var(--space-4) !important;
+    min-width: 280px !important;
+    max-width: 420px !important;
+}
+.notif-snack-panel .mdc-snackbar__label {
+    padding: 0 !important;
+    color: var(--text-primary);
+}
+.notif-snack-panel--success .mdc-snackbar__surface {
+    border-color: var(--accent-green-border);
+    color: var(--accent-green);
+}
+.notif-snack-panel--success .notif-snack__message { color: var(--accent-green); }
+.notif-snack-panel--error .mdc-snackbar__surface {
+    border-color: var(--accent-red-border);
+    color: var(--accent-red);
+}
+.notif-snack-panel--error .notif-snack__message { color: var(--accent-red); }
+.notif-snack-panel--warning .mdc-snackbar__surface {
+    border-color: var(--accent-amber-border);
+    color: var(--accent-amber);
+}
+.notif-snack-panel--warning .notif-snack__message { color: var(--accent-amber); }
+.notif-snack-panel--info .mdc-snackbar__surface {
+    border-color: var(--accent-cyan-border);
+    color: var(--accent-cyan);
+}
+.notif-snack-panel--info .notif-snack__message { color: var(--accent-cyan); }
+
 /* ── WCAG AAA: Touch target sizing (WCAG 2.5.8) ── */
 @media (pointer: coarse) {
     button,

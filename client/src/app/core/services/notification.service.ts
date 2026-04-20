@@ -1,8 +1,7 @@
-import { Injectable, signal, computed } from '@angular/core';
-import type { Notification, NotificationType } from '../models/notification.model';
-
-/** Maximum notifications visible at once */
-const MAX_VISIBLE = 3;
+import { Injectable, inject } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { NotificationSnackComponent } from '../../shared/components/notification-snack.component';
+import type { NotificationType } from '../models/notification.model';
 
 /** Default auto-dismiss durations by type (ms) */
 const DEFAULT_DURATION: Record<NotificationType, number> = {
@@ -12,83 +11,55 @@ const DEFAULT_DURATION: Record<NotificationType, number> = {
     error: 8000,
 };
 
-let nextId = 0;
+/** Panel CSS class per notification type */
+const PANEL_CLASS: Record<NotificationType, string> = {
+    success: 'notif-snack-panel--success',
+    error: 'notif-snack-panel--error',
+    warning: 'notif-snack-panel--warning',
+    info: 'notif-snack-panel--info',
+};
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
-    private readonly _notifications = signal<Notification[]>([]);
-    private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
-
-    /** All active notifications (newest first, capped) */
-    readonly notifications = computed(() =>
-        this._notifications().slice(0, MAX_VISIBLE),
-    );
-
-    /** True when at least one notification is showing */
-    readonly hasNotifications = computed(() => this._notifications().length > 0);
+    private readonly snackBar = inject(MatSnackBar);
 
     // ── Public API ──────────────────────────────────────────────
 
     success(message: string, detail?: string): void {
-        this.add('success', message, detail);
+        this.show('success', message, detail);
     }
 
     error(message: string, detail?: string): void {
-        this.add('error', message, detail);
+        this.show('error', message, detail);
     }
 
     warning(message: string, detail?: string): void {
-        this.add('warning', message, detail);
+        this.show('warning', message, detail);
     }
 
     info(message: string, detail?: string): void {
-        this.add('info', message, detail);
+        this.show('info', message, detail);
     }
 
-    /** Dismiss a single notification by id */
-    dismiss(id: string): void {
-        this.clearTimer(id);
-        this._notifications.update((list) => list.filter((n) => n.id !== id));
+    /** Dismiss the current notification */
+    dismiss(): void {
+        this.snackBar.dismiss();
     }
 
-    /** Dismiss all notifications */
+    /** Dismiss all notifications (same as dismiss for MatSnackBar) */
     dismissAll(): void {
-        for (const id of this.timers.keys()) {
-            this.clearTimer(id);
-        }
-        this._notifications.set([]);
+        this.snackBar.dismiss();
     }
 
     // ── Internals ───────────────────────────────────────────────
 
-    private add(type: NotificationType, message: string, detail?: string, durationOverride?: number): void {
-        const id = `notif-${++nextId}`;
-        const duration = durationOverride ?? DEFAULT_DURATION[type];
-
-        const notification: Notification = {
-            id,
-            type,
-            message,
-            detail,
-            duration,
-            createdAt: Date.now(),
-        };
-
-        // Prepend so newest shows on top
-        this._notifications.update((list) => [notification, ...list]);
-
-        // Schedule auto-dismiss
-        if (duration > 0) {
-            const timer = setTimeout(() => this.dismiss(id), duration);
-            this.timers.set(id, timer);
-        }
-    }
-
-    private clearTimer(id: string): void {
-        const timer = this.timers.get(id);
-        if (timer) {
-            clearTimeout(timer);
-            this.timers.delete(id);
-        }
+    private show(type: NotificationType, message: string, detail?: string): void {
+        this.snackBar.openFromComponent(NotificationSnackComponent, {
+            data: { type, message, detail },
+            duration: DEFAULT_DURATION[type],
+            panelClass: ['notif-snack-panel', PANEL_CLASS[type]],
+            verticalPosition: 'bottom',
+            horizontalPosition: 'right',
+        });
     }
 }

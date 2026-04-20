@@ -6,6 +6,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatIconModule } from '@angular/material/icon';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -25,7 +29,7 @@ type SessionTab = 'conversation' | 'memory' | 'info';
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, SessionMemoryComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe, MatButtonModule, MatTabsModule, MatFormFieldModule, MatInputModule],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, SessionMemoryComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe, MatButtonModule, MatTabsModule, MatFormFieldModule, MatInputModule, MatMenuModule, MatTooltipModule, MatProgressBarModule, MatIconModule],
     template: `
         @if (session(); as s) {
             <div class="session-view">
@@ -46,33 +50,56 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                     </div>
                     <div class="session-view__actions">
                         <div class="export-group">
-                            <button mat-stroked-button (click)="onCopyLog()">
+                            <button mat-stroked-button
+                                (click)="onCopyLog()"
+                                [matTooltip]="logCopied() ? 'Copied!' : 'Copy session log to clipboard'"
+                                matTooltipPosition="below">
                                 {{ logCopied() ? 'Copied!' : 'Copy Log' }}
                             </button>
-                            <button mat-stroked-button (click)="onExportJson()">JSON</button>
-                            <button mat-stroked-button (click)="onExportMarkdown()">MD</button>
+                            <button mat-stroked-button (click)="onExportJson()"
+                                matTooltip="Export as JSON" matTooltipPosition="below">JSON</button>
+                            <button mat-stroked-button (click)="onExportMarkdown()"
+                                matTooltip="Export as Markdown" matTooltipPosition="below">MD</button>
                         </div>
                         @if (s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use') {
-                            <button mat-stroked-button color="warn" (click)="onStop()">Stop</button>
+                            <button mat-stroked-button color="warn" (click)="onStop()"
+                                matTooltip="Stop the running session" matTooltipPosition="below">Stop</button>
                         } @else {
-                            <button mat-flat-button color="primary" (click)="onResume()">Resume</button>
+                            <button mat-flat-button color="primary" (click)="onResume()"
+                                matTooltip="Resume this session" matTooltipPosition="below">Resume</button>
                         }
-                        <button mat-stroked-button (click)="showDeleteConfirm.set(true)">Delete</button>
+                        <button mat-stroked-button (click)="showDeleteConfirm.set(true)"
+                            matTooltip="Delete this session" matTooltipPosition="below">Delete</button>
+                        <!-- Mobile overflow menu using mat-menu -->
                         <div class="mobile-menu-wrapper">
-                            <button mat-stroked-button class="mobile-menu-btn" (click)="showMobileMenu.set(!showMobileMenu())" title="More actions">···</button>
-                            @if (showMobileMenu()) {
-                                <div class="mobile-menu-backdrop" (click)="showMobileMenu.set(false)"></div>
-                                <div class="mobile-menu">
-                                    <button class="mobile-menu__item" (click)="onCopyLog(); showMobileMenu.set(false)">
-                                        {{ logCopied() ? 'Copied!' : 'Copy Log' }}
-                                    </button>
-                                    <button class="mobile-menu__item" (click)="onExportJson(); showMobileMenu.set(false)">Export JSON</button>
-                                    <button class="mobile-menu__item" (click)="onExportMarkdown(); showMobileMenu.set(false)">Export Markdown</button>
-                                </div>
-                            }
+                            <button mat-icon-button class="mobile-menu-btn"
+                                [matMenuTriggerFor]="mobileActionsMenu"
+                                aria-label="More actions"
+                                matTooltip="More actions">
+                                <mat-icon>more_vert</mat-icon>
+                            </button>
+                            <mat-menu #mobileActionsMenu="matMenu">
+                                <button mat-menu-item (click)="onCopyLog()">
+                                    <mat-icon>content_copy</mat-icon>
+                                    <span>{{ logCopied() ? 'Copied!' : 'Copy Log' }}</span>
+                                </button>
+                                <button mat-menu-item (click)="onExportJson()">
+                                    <mat-icon>download</mat-icon>
+                                    <span>Export JSON</span>
+                                </button>
+                                <button mat-menu-item (click)="onExportMarkdown()">
+                                    <mat-icon>description</mat-icon>
+                                    <span>Export Markdown</span>
+                                </button>
+                            </mat-menu>
                         </div>
                     </div>
                 </div>
+
+                <!-- Progress bar for active sessions -->
+                @if (s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use') {
+                    <mat-progress-bar mode="indeterminate" class="session-view__progress" aria-label="Session is active" />
+                }
 
                 <!-- Tab bar -->
                 <mat-tab-group (selectedIndexChange)="onSessionTabChange($event, s.agentId)" [selectedIndex]="sessionTabIndex(s.agentId)">
@@ -158,7 +185,10 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                 </div>
             }
         } @else {
-            <div class="session-view__loading">
+            <div class="session-view__loading" aria-label="Loading session" aria-busy="true">
+                <div class="session-view__loading-spinner">
+                    <mat-progress-bar mode="indeterminate" aria-label="Loading session data" />
+                </div>
                 <div class="skeleton skeleton--title"></div>
                 <div class="skeleton skeleton--line"></div>
                 <div class="skeleton skeleton--line skeleton--short"></div>
@@ -275,24 +305,9 @@ type SessionTab = 'conversation' | 'memory' | 'info';
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Mobile overflow menu */
-        .mobile-menu-wrapper { display: none; position: relative; z-index: 100; }
-        .mobile-menu-btn { font-size: 0.9rem; letter-spacing: 0.15em; }
-        .mobile-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
-        .mobile-menu {
-            position: absolute; right: 0; top: 100%; z-index: 101;
-            background: var(--bg-surface); border: 1px solid var(--border-bright);
-            border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-            min-width: 160px; overflow: hidden; animation: slideUp 0.15s ease;
-        }
-        .mobile-menu__item {
-            display: block; width: 100%; padding: 0.6rem 0.75rem;
-            background: none; border: none; border-bottom: 1px solid var(--border);
-            color: var(--text-primary); font-family: inherit; font-size: 0.75rem;
-            text-align: left; cursor: pointer; transition: background 0.1s;
-        }
-        .mobile-menu__item:last-child { border-bottom: none; }
-        .mobile-menu__item:hover { background: var(--bg-hover); }
+        /* Mobile overflow menu — mat-menu trigger */
+        .mobile-menu-wrapper { display: none; }
+        .mobile-menu-btn { color: var(--text-secondary); }
 
         /* Loading skeleton */
         .session-view__loading { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -307,6 +322,20 @@ type SessionTab = 'conversation' | 'memory' | 'info';
         .skeleton--short { width: 55%; }
         .skeleton--medium { width: 80%; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Progress bar theming */
+        .session-view__progress {
+            --mdc-linear-progress-active-indicator-color: var(--accent-cyan);
+            --mdc-linear-progress-track-color: var(--accent-cyan-dim);
+            flex-shrink: 0;
+        }
+        .session-view__loading-spinner {
+            margin-bottom: 0.5rem;
+        }
+        .session-view__loading-spinner mat-progress-bar {
+            --mdc-linear-progress-active-indicator-color: var(--accent-cyan);
+            --mdc-linear-progress-track-color: var(--accent-cyan-dim);
+        }
 
         @media (max-width: 767px) {
             .mobile-menu-wrapper { display: block; }
@@ -329,7 +358,6 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     protected readonly pendingApproval = signal<ApprovalRequestWire | null>(null);
     protected readonly pendingQuestion = signal<OwnerQuestionWire | null>(null);
     protected readonly showDeleteConfirm = signal(false);
-    protected readonly showMobileMenu = signal(false);
     protected readonly activeTab = signal<SessionTab>('conversation');
 
     protected sessionTabIndex(agentId: string | null | undefined): number {

@@ -18,7 +18,6 @@ import { TopNavComponent } from './shared/components/top-nav.component';
 import { ChatTabBarComponent } from './shared/components/chat-tab-bar.component';
 import { ActivityRailComponent } from './shared/components/activity-rail.component';
 import { CommandPaletteComponent } from './shared/components/command-palette.component';
-import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { GuidedTourComponent } from './shared/components/guided-tour.component';
 import { MobileBottomNavComponent } from './shared/components/mobile-bottom-nav.component';
@@ -31,7 +30,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
     animations: [pageRouteAnimation],
-    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent, MatButtonModule, MatIconModule],
+    imports: [RouterOutlet, TopNavComponent, ChatTabBarComponent, ActivityRailComponent, CommandPaletteComponent, KeyboardShortcutsOverlayComponent, GuidedTourComponent, MobileBottomNavComponent, MatButtonModule, MatIconModule],
     template: `
         <div class="app-layout" [class.app-layout--session]="isSessionView()">
             <app-top-nav />
@@ -76,7 +75,6 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
         <app-command-palette />
         <app-keyboard-shortcuts-overlay />
         <app-guided-tour />
-        <app-toast-container />
     `,
     styles: `
         .app-layout {
