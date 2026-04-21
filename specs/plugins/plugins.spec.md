@@ -7,6 +7,7 @@ files:
   - server/plugins/permissions.ts
   - server/plugins/registry.ts
   - server/plugins/types.ts
+  - server/plugins/sdk-bridge.ts
 db_tables:
   - plugins
   - plugin_capabilities
@@ -54,6 +55,12 @@ Provides a plugin system for corvid-agent: defines the plugin interface, validat
 | `PluginCapabilityRecord` | Interface for a row from the `plugin_capabilities` DB table |
 | `ManifestValidationResult` | Interface: `{ valid: boolean; errors: string[] }` |
 | `LoadResult` | Interface: `{ success: boolean; plugin?: CorvidPlugin; error?: string }` |
+
+### Exported Functions (from sdk-bridge.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `buildPluginSdkTools` | `registry: PluginRegistry, agentId: string, sessionId: string` | `tool[]` | Convert loaded plugin tools into SDK MCP tool definitions so agents can invoke them |
 
 ### Exported Classes
 
