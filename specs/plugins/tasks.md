@@ -4,7 +4,7 @@ spec: plugins.spec.md
 
 ## Active Tasks
 
-- [ ] Plugin system MVP: implement plugin install/enable/disable API routes and wire `PluginRegistry` into MCP tool dispatch (#1489)
+- [x] Plugin system MVP: implement plugin install/enable/disable API routes and wire `PluginRegistry` into MCP tool dispatch (#1489)
 - [ ] Add plugin management UI to the Settings > Integrations panel: list installed plugins, granted capabilities, and load status (#1623)
 - [ ] Document the plugin authoring contract and publish an example plugin package to npm
 - [ ] Sandbox plugin `fs:project-dir` access using Bun's built-in permission model
