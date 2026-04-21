@@ -177,6 +177,40 @@ export function updateMentionSessionActivity(db: Database, botMessageId: string)
 }
 
 /**
+ * Get aggregated message history across all recent sessions in a channel.
+ * Returns messages from the most recent sessions (up to maxMessages), ordered chronologically.
+ * Used for channel-scoped context when creating a new session.
+ */
+export function getChannelMessageHistory(
+  db: Database,
+  channelId: string,
+  maxMessages: number = 40,
+  maxAgeHours: number = 24,
+): Array<{ role: string; content: string; sessionId: string; timestamp: string }> {
+  const rows = db
+    .query(
+      `SELECT sm.role, sm.content, sm.session_id, sm.timestamp
+       FROM session_messages sm
+       INNER JOIN discord_mention_sessions dms ON dms.session_id = sm.session_id
+       WHERE dms.channel_id = ?
+         AND dms.created_at > datetime('now', '-' || ? || ' hours')
+         AND sm.role IN ('user', 'assistant')
+       ORDER BY sm.timestamp DESC
+       LIMIT ?`,
+    )
+    .all(channelId, maxAgeHours, maxMessages) as Array<{
+    role: string;
+    content: string;
+    session_id: string;
+    timestamp: string;
+  }>;
+
+  return rows
+    .reverse()
+    .map((r) => ({ role: r.role, content: r.content, sessionId: r.session_id, timestamp: r.timestamp }));
+}
+
+/**
  * Remove mention session entries older than the specified age.
  * @param maxAgeDays Maximum age in days (default: 7)
  */

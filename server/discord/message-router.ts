@@ -12,8 +12,8 @@ import { recordAudit } from '../db/audit';
 import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-project';
 import { updateDiscordConfig } from '../db/discord-config';
 import {
+  getChannelMessageHistory,
   getLatestMentionSessionByChannel,
-  getLatestSessionIdByChannel,
   getMentionSession,
   saveMentionSession,
   updateMentionSessionActivity,
@@ -443,7 +443,6 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   if (mode === 'work_intake') {
     await handleWorkIntake(ctx, channelId, data.id, userId, text, data.mentions);
   } else {
-    const previousSessionId = getLatestSessionIdByChannel(ctx.db, channelId) ?? undefined;
     await handleMentionReply(
       ctx,
       channelId,
@@ -454,7 +453,6 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
       data.author.id,
       data.author.username,
       data.attachments,
-      previousSessionId,
     );
   }
 }
@@ -494,7 +492,6 @@ async function handleMentionReply(
   authorId?: string,
   authorUsername?: string,
   attachments?: DiscordAttachment[],
-  previousSessionId?: string,
 ): Promise<void> {
   // Dedup: check if a session already exists for this Discord message ID.
   // The in-memory dedup in handleMessage() covers most cases, but can miss
@@ -582,11 +579,8 @@ async function handleMentionReply(
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, `⚠️ ${complexityWarning}`);
   }
 
-  // Build conversation context from previous mention session (if this is a continuation)
-  let previousContext = '';
-  if (previousSessionId) {
-    previousContext = buildMentionSessionContext(ctx.db, previousSessionId);
-  }
+  // Build conversation context from channel history (aggregated across recent sessions)
+  const previousContext = buildChannelContext(ctx.db, channelId);
 
   // Start the process with the text prompt (include attachment URLs so the agent
   // sees image links even though startProcess only accepts strings).
@@ -605,6 +599,7 @@ async function handleMentionReply(
     content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
+    channelId,
   });
 
   const agentName = agent.name;
@@ -691,7 +686,6 @@ async function handleMentionReplyResume(
       authorId,
       authorUsername,
       attachments,
-      sessionId,
     );
     return;
   }
@@ -737,7 +731,6 @@ async function handleMentionReplyResume(
         authorId,
         authorUsername,
         attachments,
-        sessionId,
       );
       return;
     }
@@ -773,24 +766,22 @@ async function handleMentionReplyResume(
 }
 
 /**
- * Build conversation context from a previous mention session.
- * Used when a mention session ends and a new one is created as a continuation,
- * so the new session has full context of what was discussed.
+ * Build conversation context aggregated across all recent sessions in a channel.
+ * Unlike the old single-session approach, this pulls messages from the last 24 hours
+ * across all sessions tied to this channel, giving seamless continuity.
  */
-function buildMentionSessionContext(db: Database, previousSessionId: string): string {
-  const messages = getSessionMessages(db, previousSessionId);
-  const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
+function buildChannelContext(db: Database, channelId: string): string {
+  const messages = getChannelMessageHistory(db, channelId, 40, 24);
+  if (messages.length === 0) return '';
 
-  if (conversational.length === 0) return '';
-
-  const historyLines = conversational.map((m) => {
+  const historyLines = messages.map((m) => {
     const role = m.role === 'user' ? 'User' : 'Assistant';
     const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
     return `[${role}]: ${text}`;
   });
   return [
     '<conversation_history>',
-    'The following is the conversation history from this session. Use it for context when responding to the new message.',
+    'The following is the conversation history from this channel. Use it for context when responding to the new message.',
     '',
     ...historyLines,
     '</conversation_history>',

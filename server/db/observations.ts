@@ -20,6 +20,7 @@ interface ObservationRow {
   graduated_key: string | null;
   created_at: string;
   expires_at: string | null;
+  channel_id: string | null;
 }
 
 function rowToObservation(row: ObservationRow): MemoryObservation {
@@ -37,6 +38,7 @@ function rowToObservation(row: ObservationRow): MemoryObservation {
     graduatedKey: row.graduated_key,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
+    channelId: row.channel_id,
   };
 }
 
@@ -52,6 +54,7 @@ export function recordObservation(
     suggestedKey?: string;
     relevanceScore?: number;
     expiresAt?: string;
+    channelId?: string;
   },
 ): MemoryObservation {
   const id = crypto.randomUUID();
@@ -59,8 +62,8 @@ export function recordObservation(
 
   db.query(
     `INSERT INTO memory_observations
-            (id, agent_id, source, source_id, content, suggested_key, relevance_score, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, agent_id, source, source_id, content, suggested_key, relevance_score, expires_at, channel_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     params.agentId,
@@ -70,6 +73,7 @@ export function recordObservation(
     params.suggestedKey ?? null,
     params.relevanceScore ?? 1.0,
     params.expiresAt ?? defaultExpiry,
+    params.channelId ?? null,
   );
 
   const row = db.query('SELECT * FROM memory_observations WHERE id = ?').get(id) as ObservationRow;
@@ -86,7 +90,7 @@ export function getObservation(db: Database, id: string): MemoryObservation | nu
 export function listObservations(
   db: Database,
   agentId: string,
-  opts?: { status?: ObservationStatus; limit?: number; source?: ObservationSource },
+  opts?: { status?: ObservationStatus; limit?: number; source?: ObservationSource; channelId?: string },
 ): MemoryObservation[] {
   const conditions = ['agent_id = ?'];
   const params: (string | number)[] = [agentId];
@@ -98,6 +102,10 @@ export function listObservations(
   if (opts?.source) {
     conditions.push('source = ?');
     params.push(opts.source);
+  }
+  if (opts?.channelId) {
+    conditions.push('channel_id = ?');
+    params.push(opts.channelId);
   }
 
   const limit = opts?.limit ?? 50;
