@@ -569,6 +569,28 @@ async function handleMentionReply(
     workDir,
   });
 
+  const agentName = agent.name;
+  const agentModel = agent.model || 'unknown';
+  const agentDisplayColor = agent.displayColor;
+  const agentDisplayIcon = agent.displayIcon;
+  const agentAvatarUrl = agent.avatarUrl;
+  const projectNameForFooter = project.name;
+
+  // Track the mention session immediately so channel-based context queries
+  // work even if the bot hasn't replied yet (or crashes before replying).
+  // Uses the user's message ID as a synthetic key; bot reply IDs are added
+  // later via the onBotMessage callback.
+  trackMentionSession(ctx.db, ctx.mentionSessions, `mention:${messageId}`, {
+    sessionId: session.id,
+    agentName,
+    agentModel,
+    projectName: projectNameForFooter,
+    displayColor: agentDisplayColor,
+    displayIcon: agentDisplayIcon,
+    avatarUrl: agentAvatarUrl,
+    channelId,
+  });
+
   // Record channel-project affinity so future @mentions in this channel
   // default to the same project without the user needing to specify it.
   setChannelProjectId(ctx.db, channelId, project.id);
@@ -602,12 +624,6 @@ async function handleMentionReply(
     channelId,
   });
 
-  const agentName = agent.name;
-  const agentModel = agent.model || 'unknown';
-  const agentDisplayColor = agent.displayColor;
-  const agentDisplayIcon = agent.displayIcon;
-  const agentAvatarUrl = agent.avatarUrl;
-  const projectNameForFooter = project.name;
   subscribeForAdaptiveInlineResponse(
     ctx.processManager,
     ctx.delivery,
@@ -1055,7 +1071,10 @@ async function routeToThread(
       typeof contextualContent === 'string'
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
-    ctx.processManager.resumeProcess(session, resumeText);
+    // Inject previous conversation context so the resumed process has history
+    const threadContext = buildPreviousThreadContext(ctx.db, threadId, sessionId);
+    const resumeWithContext = threadContext ? `${threadContext}\n\n${resumeText}` : resumeText;
+    ctx.processManager.resumeProcess(session, resumeWithContext);
     // Only subscribe if the process actually started — resumeProcess may fail
     // (e.g., worktree cleaned up, spawn error) and returns void, so check the map.
     // Without this guard, the zombie check fires 8s later on a never-started process,
