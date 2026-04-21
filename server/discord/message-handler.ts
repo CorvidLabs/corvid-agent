@@ -13,6 +13,7 @@ import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-
 import { updateDiscordConfig } from '../db/discord-config';
 import {
   getLatestMentionSessionByChannel,
+  getLatestSessionIdByChannel,
   getMentionSession,
   saveMentionSession,
   updateMentionSessionActivity,
@@ -443,6 +444,9 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
   if (mode === 'work_intake') {
     await handleWorkIntake(ctx, channelId, data.id, userId, text, data.mentions);
   } else {
+    // Look up the most recent session in this channel for context carryover,
+    // even when the channel-based resume window (60 min) has expired.
+    const previousSessionId = getLatestSessionIdByChannel(ctx.db, channelId) ?? undefined;
     await handleMentionReply(
       ctx,
       channelId,
@@ -453,6 +457,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
       data.author.id,
       data.author.username,
       data.attachments,
+      previousSessionId,
     );
   }
 }

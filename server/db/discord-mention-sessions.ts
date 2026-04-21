@@ -111,12 +111,12 @@ export function getRecentMentionSessions(
  * Look up the most recent mention session in a given channel.
  * Used as a fallback when the user sends a message without using Discord's reply feature.
  * Only returns sessions active within the specified time window.
- * @param maxAgeMinutes Maximum age in minutes (default: 15)
+ * @param maxAgeMinutes Maximum age in minutes (default: 60)
  */
 export function getLatestMentionSessionByChannel(
   db: Database,
   channelId: string,
-  maxAgeMinutes: number = 15,
+  maxAgeMinutes: number = 60,
 ): MentionSessionInfo | null {
   const row = db
     .query(
@@ -146,6 +146,25 @@ export function getLatestMentionSessionByChannel(
     channelId: row.channel_id || undefined,
     conversationOnly: row.conversation_only === 1,
   };
+}
+
+/**
+ * Get the most recent session ID for a channel, regardless of mention session TTL.
+ * Used for context carryover when creating a new session after the resume window expires.
+ * Looks back up to 24 hours.
+ */
+export function getLatestSessionIdByChannel(db: Database, channelId: string): string | null {
+  const row = db
+    .query(
+      `SELECT session_id FROM discord_mention_sessions
+       WHERE channel_id = ?
+         AND COALESCE(last_activity_at, created_at) > datetime('now', '-24 hours')
+       ORDER BY COALESCE(last_activity_at, created_at) DESC
+       LIMIT 1`,
+    )
+    .get(channelId) as { session_id: string } | null;
+
+  return row?.session_id ?? null;
 }
 
 /**
