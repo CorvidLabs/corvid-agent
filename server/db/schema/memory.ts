@@ -29,7 +29,8 @@ export const tables: string[] = [
         status            TEXT NOT NULL DEFAULT 'active',
         graduated_key     TEXT DEFAULT NULL,
         created_at        TEXT DEFAULT (datetime('now')),
-        expires_at        TEXT DEFAULT NULL
+        expires_at        TEXT DEFAULT NULL,
+        channel_id        TEXT DEFAULT NULL
     )`,
 ];
 
@@ -43,6 +44,7 @@ export const indexes: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_observations_status ON memory_observations(agent_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_observations_score ON memory_observations(relevance_score DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_observations_expires ON memory_observations(expires_at) WHERE expires_at IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_observations_channel_id ON memory_observations(channel_id) WHERE channel_id IS NOT NULL`,
 ];
 
 export const virtualTables: string[] = [
