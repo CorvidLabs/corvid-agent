@@ -53,6 +53,9 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `SessionMetaForEvents` | `event-handler.ts` | Session metadata slice needed for event processing |
 | `ExitHandlerDeps` | `session-exit-handler.ts` | Dependencies needed by the exit handler |
 | `SessionMetaForExit` | `session-exit-handler.ts` | Mutable session metadata tracked in-memory for exit processing |
+| `PersonaInjectionOptions` | `persona-injector.ts` | Options for persona/skill injection: agent, agentId, projectId |
+| `SessionLifecycleConfig` | `session-lifecycle.ts` | Config for session lifecycle: sessionTtlMs, cleanupIntervalMs, maxSessionsPerProject |
+| `SessionCleanupStats` | `session-lifecycle.ts` | Stats from a cleanup run: expiredSessions, orphanedProcesses, staleSubscriptions, memoryFreedMB |
 
 ### Exported Classes
 
@@ -63,6 +66,7 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `ApprovalManager` | Manages tool approval queuing, operational mode (normal/queued/paused), and approval/denial flow (from approval-manager.ts) |
 | `SessionResilienceManager` | Handles session recovery: API outage pause/resume, crash restart with exponential backoff, orphan pruning (from session-resilience-manager.ts) |
 | `SessionTimerManager` | Manages timer-based session concerns: stable-period timers, per-session inactivity timeouts, fallback timeout checker (from session-timer-manager.ts) |
+| `SessionLifecycleManager` | Manages session lifecycle: automatic cleanup of expired sessions, memory management, orphan timer cleanup, per-project session limits (from session-lifecycle.ts) |
 
 ### Exported Functions (from manager.ts)
 

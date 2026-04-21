@@ -7,6 +7,7 @@ files:
   - server/plugins/permissions.ts
   - server/plugins/registry.ts
   - server/plugins/types.ts
+  - server/plugins/sdk-bridge.ts
 db_tables:
   - plugins
   - plugin_capabilities

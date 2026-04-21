@@ -47,6 +47,7 @@ files:
   - server/db/migrations/117_discord_channel_project.ts
   - server/db/migrations/118_thread_session_summary.ts
   - server/db/migrations/119_telegram_config.ts
+  - server/db/migrations/120_observation_channel_id.ts
 db_tables:
   - schema_version
 depends_on: []

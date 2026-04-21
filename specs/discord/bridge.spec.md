@@ -16,6 +16,8 @@ files:
   - server/discord/command-handlers/agent-config-commands.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
+  - server/discord/message-router.ts
+  - server/discord/work-dispatch.ts
   - server/discord/permissions.ts
   - server/discord/thread-manager.ts
   - server/discord/types.ts
@@ -228,6 +230,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleMessage` | `(ctx, data)` | `Promise<void>` | Dispatch an incoming Discord message to the appropriate handler |
 | `sendTaskResult` | `(ctx, channelId, task, mentionUserId?)` | `Promise<void>` | Send a task completion/failure embed |
+| `handleWorkIntake` | `(ctx, channelId, messageId, userId, text, mentions?)` | `Promise<void>` | Handle work-intake messages: parse task requests from Discord and create work tasks |
 | `withAuthorContext` | `(text, authorId?, authorUsername?, channelId?)` | `string` | Prefix message text with Discord author context and channel ID for agent identification |
 
 ### Exported Functions (from permissions.ts)

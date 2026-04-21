@@ -321,12 +321,6 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 .describe(
                   'Agent ID to execute and be credited for this task. Defaults to the calling agent. Use corvid_list_agents to discover agent IDs.',
                 ),
-              min_trust_level: z
-                .string()
-                .optional()
-                .describe(
-                  'Minimum trust level the assigned agent must have: "low" (default), "medium", "high", or "verified". Use "high" or "verified" for critical or security-sensitive tasks.',
-                ),
             },
             async (args) => handleCreateWorkTask(ctx, args),
           ),
