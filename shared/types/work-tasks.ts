@@ -70,4 +70,8 @@ export interface CreateWorkTaskInput {
     buddyAgentId: string;
     maxRounds?: number;
   };
+  /** Minimum trust level the assigned agent must have. Defaults to 'low'.
+   *  Use 'medium', 'high', or 'verified' to restrict high-stakes tasks to
+   *  agents that have earned sufficient reputation. */
+  minTrustLevel?: 'low' | 'medium' | 'high' | 'verified';
 }

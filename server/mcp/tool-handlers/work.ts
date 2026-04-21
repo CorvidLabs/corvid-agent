@@ -35,7 +35,14 @@ function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
 
 export async function handleCreateWorkTask(
   ctx: McpToolContext,
-  args: { description: string; project_id?: string; project_name?: string; model_tier?: string; agent_id?: string },
+  args: {
+    description: string;
+    project_id?: string;
+    project_name?: string;
+    model_tier?: string;
+    agent_id?: string;
+    min_trust_level?: string;
+  },
 ): Promise<CallToolResult> {
   if (!ctx.workTaskService) {
     return errorResult('Work task service is not available.');
@@ -60,6 +67,20 @@ export async function handleCreateWorkTask(
   if (args.model_tier && !TIER_MAP[args.model_tier]) {
     return errorResult(
       `Invalid model_tier "${args.model_tier}". Valid values: heavy, standard, light (or opus, sonnet, haiku).`,
+    );
+  }
+
+  // Validate min_trust_level if provided
+  const VALID_TRUST_LEVELS = ['low', 'medium', 'high', 'verified'] as const;
+  type ValidTrustLevel = (typeof VALID_TRUST_LEVELS)[number];
+  const minTrustLevel: ValidTrustLevel | undefined = args.min_trust_level
+    ? (VALID_TRUST_LEVELS as readonly string[]).includes(args.min_trust_level)
+      ? (args.min_trust_level as ValidTrustLevel)
+      : undefined
+    : undefined;
+  if (args.min_trust_level && !minTrustLevel) {
+    return errorResult(
+      `Invalid min_trust_level "${args.min_trust_level}". Valid values: ${VALID_TRUST_LEVELS.join(', ')}.`,
     );
   }
 
@@ -91,6 +112,7 @@ export async function handleCreateWorkTask(
       projectId,
       source: 'agent',
       modelTier: args.model_tier ? TIER_MAP[args.model_tier] : undefined,
+      minTrustLevel,
     });
 
     log.info('MCP create_work_task succeeded', {

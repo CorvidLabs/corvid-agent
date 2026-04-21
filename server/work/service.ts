@@ -325,8 +325,13 @@ export class WorkTaskService {
       throw new NotFoundError('Agent', input.agentId);
     }
 
-    // Reputation gate: block blacklisted/untrusted agents from creating work tasks
-    const repGuard = checkReputationForWorkTask(this._reputationScorer, input.agentId, input.description.slice(0, 100));
+    // Reputation gate: block agents that don't meet trust requirements
+    const repGuard = checkReputationForWorkTask(
+      this._reputationScorer,
+      input.agentId,
+      input.description.slice(0, 100),
+      input.minTrustLevel,
+    );
     if (repGuard.blocked) {
       throw new ValidationError(repGuard.reason ?? 'Agent reputation too low to create work tasks', {
         agentId: input.agentId,
