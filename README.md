@@ -13,9 +13,28 @@ corvid-agent is an open-source AI agent platform that combines LLM-powered codin
 
 ---
 
-## Prerequisites
+## Try it now (no setup required)
 
-Before you start, make sure you have the following installed:
+If you have [Bun](https://bun.sh) installed and either **Claude Code CLI** or **Ollama**, you can run corvid-agent in 30 seconds — no API key, no Docker, no `.env`:
+
+```bash
+git clone https://github.com/CorvidLabs/corvid-agent.git
+cd corvid-agent
+bun install
+bun run try
+```
+
+`bun run try` starts a sandboxed server, auto-detects your AI provider, seeds a demo agent, and opens the dashboard. Press `Ctrl+C` to stop.
+
+> **Need an AI provider?** The fastest options: install [Claude Code](https://claude.ai/code) (uses your existing subscription) or [Ollama](https://ollama.ai) (free, runs locally). No account needed for Ollama.
+
+---
+
+## Full setup (for development)
+
+For production use, on-chain messaging (AlgoChat), and the full dashboard, follow the complete setup.
+
+### Prerequisites
 
 | Tool | Purpose | Install |
 |------|---------|---------|
@@ -26,12 +45,6 @@ Before you start, make sure you have the following installed:
 | **Anthropic API key** | Powers the AI agents (Claude) | [console.anthropic.com](https://console.anthropic.com) |
 
 > **Note:** If you have the Claude Code CLI installed (`claude` on PATH), the server will use your subscription automatically — no API key needed.
-
----
-
-## Quickstart
-
-Get from zero to running in under 10 minutes.
 
 ### 1. Clone and install dependencies
 
