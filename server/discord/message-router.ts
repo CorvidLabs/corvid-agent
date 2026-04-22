@@ -692,17 +692,7 @@ async function handleMentionReplyResume(
 
   if (!session) {
     log.info('Mention-reply session not found, creating new session with context', { sessionId });
-    await handleMentionReply(
-      ctx,
-      channelId,
-      _userId,
-      messageId,
-      text,
-      mentions,
-      authorId,
-      authorUsername,
-      attachments,
-    );
+    await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
     return;
   }
 
@@ -790,11 +780,19 @@ function buildChannelContext(db: Database, channelId: string): string {
   const messages = getChannelMessageHistory(db, channelId, 40, 24);
   if (messages.length === 0) return '';
 
-  const historyLines = messages.map((m) => {
-    const role = m.role === 'user' ? 'User' : 'Assistant';
-    const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-    return `[${role}]: ${text}`;
-  });
+  const historyLines = messages
+    .map((m) => {
+      const role = m.role === 'user' ? 'User' : 'Assistant';
+      // Strip any previously injected <conversation_history> blocks to prevent nesting.
+      // User messages stored from prior turns already contain the full promptWithContext
+      // (including wrapped history), so we must extract only the actual message content.
+      const stripped = m.content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+      const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+      if (!text) return null;
+      return `[${role}]: ${text}`;
+    })
+    .filter((line): line is string => line !== null);
+  if (historyLines.length === 0) return '';
   return [
     '<conversation_history>',
     'The following is the conversation history from this channel. Use it for context when responding to the new message.',
@@ -815,11 +813,14 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
   const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
-    const historyLines = conversational.map((m) => {
-      const role = m.role === 'user' ? 'User' : 'Assistant';
-      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-      return `[${role}]: ${text}`;
-    });
+    const historyLines = conversational
+      .map((m) => {
+        const role = m.role === 'user' ? 'User' : 'Assistant';
+        const stripped = m.content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+        const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+        return `[${role}]: ${text}`;
+      })
+      .filter((line) => !line.endsWith(': '));
     return [
       '<conversation_history>',
       'The following is the conversation history from this session. Use it for context when responding to the new message.',
