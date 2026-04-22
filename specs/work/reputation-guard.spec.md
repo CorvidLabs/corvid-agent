@@ -1,6 +1,6 @@
 ---
 module: reputation-guard
-version: 1
+version: 2
 status: active
 files:
   - server/work/reputation-guard.ts
@@ -12,7 +12,7 @@ depends_on:
 
 ## Purpose
 
-Trust-level gating for work task creation. Prevents blacklisted or untrusted agents from creating work tasks. Part of the v1.0 mainnet roadmap for on-chain accountability and multi-agent coordination (issues #1458.5, #1459).
+Trust-level gating for work task creation. Prevents agents that don't meet a required trust threshold from being assigned work tasks. Part of the v1.0 mainnet roadmap for on-chain accountability and multi-agent coordination (issues #1458.5, #1459).
 
 ## Public API
 
@@ -20,13 +20,14 @@ Trust-level gating for work task creation. Prevents blacklisted or untrusted age
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `MIN_TRUST_FOR_WORK_TASK` | `TrustLevel` | Minimum trust level required to create a work task (currently `'low'`) |
+| `MIN_TRUST_FOR_WORK_TASK` | `TrustLevel` | Default minimum trust level when no per-task override is given (currently `'low'`) |
 
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `checkReputationForWorkTask` | `(scorer: ReputationScorer \| null \| undefined, agentId: string, context?: string)` | `ReputationGuardResult` | Checks whether an agent's reputation permits work task creation; gracefully allows if scorer unavailable |
+| `checkReputationForWorkTask` | `(scorer: ReputationScorer \| null \| undefined, agentId: string, context?: string, minTrustLevel?: TrustLevel)` | `ReputationGuardResult` | Checks whether an agent's reputation meets the required threshold; gracefully allows if scorer unavailable |
+| `meetsMinTrustLevel` | `(actual: TrustLevel, required: TrustLevel)` | `boolean` | Returns true if `actual` is at least as trusted as `required` |
 
 ### Exported Types
 
@@ -34,27 +35,51 @@ Trust-level gating for work task creation. Prevents blacklisted or untrusted age
 |------|-------------|
 | `ReputationGuardResult` | Result of a guard check: `blocked` (boolean), optional `reason` (string), optional `trustLevel` (TrustLevel) |
 
+## Trust Level Ordering
+
+From least to most trusted:
+
+```
+blacklisted → untrusted → low → medium → high → verified
+```
+
+`blacklisted` is a special revocation state treated as below `untrusted`.
+
 ## Invariants
 
-1. Agents with trust level `'blacklisted'` or `'untrusted'` are always blocked.
-2. Agents with trust level `'low'` or above are always allowed.
-3. If no scorer is provided (null/undefined), the check is skipped and the task is allowed.
-4. If scoring throws an error, the task is allowed (non-fatal failure).
-5. `checkReputationForWorkTask` never throws — it returns a result object.
+1. Agents with trust level below `minTrustLevel` are blocked.
+2. The default `minTrustLevel` is `MIN_TRUST_FOR_WORK_TASK` (`'low'`), which blocks only `'blacklisted'` and `'untrusted'` agents.
+3. Callers may raise the bar per-task by passing a higher `minTrustLevel` (`'medium'`, `'high'`, `'verified'`).
+4. If no scorer is provided (null/undefined), the check is skipped and the task is allowed.
+5. If scoring throws an error, the task is allowed (non-fatal failure).
+6. `checkReputationForWorkTask` never throws — it returns a result object.
+7. `meetsMinTrustLevel` uses a fixed ordered list — any trust level not in the list is treated as position -1 (never meets any threshold).
 
 ## Behavioral Examples
 
-### Scenario: Blacklisted agent blocked
+### Scenario: Blacklisted agent blocked (default threshold)
 
 - **Given** an agent with trust level `'blacklisted'`
-- **When** `checkReputationForWorkTask(scorer, agentId)` is called
+- **When** `checkReputationForWorkTask(scorer, agentId)` is called with no `minTrustLevel`
 - **Then** it returns `{ blocked: true, reason: '...', trustLevel: 'blacklisted' }` and logs a warning
 
-### Scenario: Low-trust agent allowed
+### Scenario: Low-trust agent allowed (default threshold)
 
 - **Given** an agent with trust level `'low'`
-- **When** `checkReputationForWorkTask(scorer, agentId)` is called
+- **When** `checkReputationForWorkTask(scorer, agentId)` is called with no `minTrustLevel`
 - **Then** it returns `{ blocked: false, trustLevel: 'low' }`
+
+### Scenario: Medium threshold — low-trust agent blocked
+
+- **Given** an agent with trust level `'low'`
+- **When** `checkReputationForWorkTask(scorer, agentId, ctx, 'medium')` is called
+- **Then** it returns `{ blocked: true, reason: '...', trustLevel: 'low' }`
+
+### Scenario: Medium threshold — medium-trust agent allowed
+
+- **Given** an agent with trust level `'medium'`
+- **When** `checkReputationForWorkTask(scorer, agentId, ctx, 'medium')` is called
+- **Then** it returns `{ blocked: false, trustLevel: 'medium' }`
 
 ### Scenario: No scorer available
 
@@ -68,6 +93,7 @@ Trust-level gating for work task creation. Prevents blacklisted or untrusted age
 |-----------|----------|
 | Scorer is null/undefined | Task allowed, no trust level returned |
 | `computeScore` throws | Task allowed, warning logged |
+| `minTrustLevel` not provided | Defaults to `MIN_TRUST_FOR_WORK_TASK` |
 
 ## Dependencies
 
@@ -83,10 +109,11 @@ Trust-level gating for work task creation. Prevents blacklisted or untrusted age
 
 | Module | What is used |
 |--------|-------------|
-| `work/service` | `checkReputationForWorkTask` called before work task creation |
+| `work/service` | `checkReputationForWorkTask` called before work task creation, with optional per-task threshold from `CreateWorkTaskInput.minTrustLevel` |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-04-05 | corvid-agent | Initial spec for issues #1458.5, #1459 |
+| 2026-04-21 | corvid-agent | v2: add per-task `minTrustLevel` override and `meetsMinTrustLevel` helper (issue #1459) |
