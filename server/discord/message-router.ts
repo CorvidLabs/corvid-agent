@@ -102,6 +102,11 @@ export function withAuthorContext(
   return `[From Discord user: ${authorUsername}${channelSuffix}]\n${text}`;
 }
 
+/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting. */
+export function stripConversationHistory(content: string): string {
+  return content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+}
+
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
 function resolveMentions(
@@ -627,7 +632,6 @@ async function handleMentionReply(
     content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
-    channelId,
   });
 
   subscribeForAdaptiveInlineResponse(
@@ -698,17 +702,7 @@ async function handleMentionReplyResume(
 
   if (!session) {
     log.info('Mention-reply session not found, creating new session with context', { sessionId });
-    await handleMentionReply(
-      ctx,
-      channelId,
-      _userId,
-      messageId,
-      text,
-      mentions,
-      authorId,
-      authorUsername,
-      attachments,
-    );
+    await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
     return;
   }
 
@@ -796,11 +790,16 @@ function buildChannelContext(db: Database, channelId: string): string {
   const messages = getChannelMessageHistory(db, channelId, 40, 24);
   if (messages.length === 0) return '';
 
-  const historyLines = messages.map((m) => {
-    const role = m.role === 'user' ? 'User' : 'Assistant';
-    const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-    return `[${role}]: ${text}`;
-  });
+  const historyLines = messages
+    .map((m) => {
+      const role = m.role === 'user' ? 'User' : 'Assistant';
+      const stripped = stripConversationHistory(m.content);
+      const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+      if (!text) return null;
+      return `[${role}]: ${text}`;
+    })
+    .filter((line): line is string => line !== null);
+  if (historyLines.length === 0) return '';
   return [
     '<conversation_history>',
     'The following is the conversation history from this channel. Use it for context when responding to the new message.',
@@ -823,11 +822,14 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
   const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
-    const historyLines = conversational.map((m) => {
-      const role = m.role === 'user' ? 'User' : 'Assistant';
-      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-      return `[${role}]: ${text}`;
-    });
+    const historyLines = conversational
+      .map((m) => {
+        const role = m.role === 'user' ? 'User' : 'Assistant';
+        const stripped = stripConversationHistory(m.content);
+        const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+        return `[${role}]: ${text}`;
+      })
+      .filter((line) => !line.endsWith(': '));
     let body = historyLines.join('\n');
     if (body.length > MAX_THREAD_CONTEXT_CHARS) {
       body = body.slice(-MAX_THREAD_CONTEXT_CHARS);

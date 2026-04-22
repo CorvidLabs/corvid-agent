@@ -16,6 +16,8 @@ ignore:
   - "server/discord/commands.ts"      # Slash command registration — requires Discord API
   - "server/discord/command-handlers/**"  # Command handlers — require Discord interactions
   - "server/discord/thread-response/**"  # Thread response handlers — require live Discord threads
+  - "server/discord/message-router.ts"  # Message routing — integration-heavy, requires live Discord + DB context
+  - "server/discord/work-dispatch.ts"   # Work dispatch — integration-heavy, requires process manager
 
 comment: false
 

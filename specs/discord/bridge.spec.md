@@ -230,6 +230,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleMessage` | `(ctx, data)` | `Promise<void>` | Dispatch an incoming Discord message to the appropriate handler |
 | `withAuthorContext` | `(text, authorId?, authorUsername?, channelId?)` | `string` | Prefix message text with Discord author context and channel ID for agent identification |
+| `stripConversationHistory` | `(text)` | `string` | Remove nested `<conversation_history>` blocks from message content to prevent compounding context injection |
 | `MentionSessionInfo` | _(interface)_ | — | Session info for mention-reply context (sessionId, agentName, agentModel, projectName, displayIcon, avatarUrl, channelId) |
 | `MessageHandlerContext` | _(interface)_ | — | Context object for message handler delegation |
 
