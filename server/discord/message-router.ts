@@ -102,6 +102,11 @@ export function withAuthorContext(
   return `[From Discord user: ${authorUsername}${channelSuffix}]\n${text}`;
 }
 
+/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting. */
+export function stripConversationHistory(content: string): string {
+  return content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+}
+
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
 function resolveMentions(
@@ -783,10 +788,7 @@ function buildChannelContext(db: Database, channelId: string): string {
   const historyLines = messages
     .map((m) => {
       const role = m.role === 'user' ? 'User' : 'Assistant';
-      // Strip any previously injected <conversation_history> blocks to prevent nesting.
-      // User messages stored from prior turns already contain the full promptWithContext
-      // (including wrapped history), so we must extract only the actual message content.
-      const stripped = m.content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+      const stripped = stripConversationHistory(m.content);
       const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
       if (!text) return null;
       return `[${role}]: ${text}`;
@@ -816,7 +818,7 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
     const historyLines = conversational
       .map((m) => {
         const role = m.role === 'user' ? 'User' : 'Assistant';
-        const stripped = m.content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+        const stripped = stripConversationHistory(m.content);
         const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
         return `[${role}]: ${text}`;
       })
