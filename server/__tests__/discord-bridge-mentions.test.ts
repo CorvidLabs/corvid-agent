@@ -227,6 +227,94 @@ describe('DiscordBridge mention-reply resume', () => {
       cleanup();
     }
   });
+  test('new @mention immediately tracks mention session in DB for channel context', async () => {
+    const pm = createMockProcessManager();
+    createAgent(db, { name: 'TestAgent', model: 'test-model' });
+    createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+    const channelId = '100000000000000001';
+    const config: DiscordBridgeConfig = {
+      botToken: 'test-token',
+      channelId,
+      allowedUserIds: [],
+    };
+    const bridge = new DiscordBridge(db, pm, config);
+    setBotUserId(bridge, '999000000000000001');
+
+    const { cleanup } = mockDiscordRest();
+
+    try {
+      const userMessageId = '200000000000000050';
+      await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+        id: userMessageId,
+        channel_id: channelId,
+        author: { id: 'user-1', username: 'TestUser' },
+        content: '<@999000000000000001> hello there',
+        timestamp: new Date().toISOString(),
+        mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+      });
+
+      // The mention session should be tracked in the DB immediately,
+      // BEFORE the bot replies — so channel-based context queries work.
+      const { getLatestMentionSessionByChannel } = await import('../db/discord-mention-sessions');
+      const channelSession = getLatestMentionSessionByChannel(db, channelId);
+      expect(channelSession).not.toBeNull();
+      expect(channelSession!.agentName).toBe('TestAgent');
+      expect(channelSession!.channelId).toBe(channelId);
+
+      // startProcess should also have been called (new session created)
+      expect(pm.startProcess).toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('channel message history is queryable immediately after mention (no bot reply needed)', async () => {
+    const pm = createMockProcessManager();
+    const { addSessionMessage } = await import('../db/sessions');
+    const { getChannelMessageHistory } = await import('../db/discord-mention-sessions');
+
+    createAgent(db, { name: 'TestAgent', model: 'test-model' });
+    createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+    const channelId = '100000000000000001';
+    const config: DiscordBridgeConfig = {
+      botToken: 'test-token',
+      channelId,
+      allowedUserIds: [],
+    };
+    const bridge = new DiscordBridge(db, pm, config);
+    setBotUserId(bridge, '999000000000000001');
+
+    const { cleanup } = mockDiscordRest();
+
+    try {
+      await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+        id: '200000000000000060',
+        channel_id: channelId,
+        author: { id: 'user-1', username: 'TestUser' },
+        content: '<@999000000000000001> first question',
+        timestamp: new Date().toISOString(),
+        mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+      });
+
+      // Simulate the process storing messages in session_messages
+      const startArgs = (pm.startProcess as ReturnType<typeof mock>).mock.calls[0];
+      const session = startArgs[0] as { id: string };
+      addSessionMessage(db, session.id, 'user', 'first question');
+      addSessionMessage(db, session.id, 'assistant', 'here is my answer');
+
+      // Channel message history should be available immediately because
+      // the mention session was tracked at creation time, not at bot reply time.
+      const history = getChannelMessageHistory(db, channelId);
+      expect(history.length).toBe(2);
+      const contents = history.map((h) => h.content);
+      expect(contents).toContain('first question');
+      expect(contents).toContain('here is my answer');
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 describe('withAuthorContext', () => {
