@@ -331,6 +331,7 @@ export class ProcessManager {
 
     const project = session.projectId ? getProject(this.db, session.projectId) : null;
     if (session.projectId && !project) {
+      this.startingSession.delete(session.id);
       this.eventBus.emit(session.id, {
         type: 'error',
         error: { message: `Project ${session.projectId} not found`, type: 'not_found' },
@@ -650,6 +651,7 @@ export class ProcessManager {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error(`Failed to start SDK process for session ${session.id}`, { error: message });
+      this.startingSession.delete(session.id);
       updateSessionStatus(this.db, session.id, 'error');
       this.eventBus.emit(session.id, {
         type: 'error',
@@ -748,6 +750,7 @@ export class ProcessManager {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error(`Failed to start direct process for session ${session.id}`, { error: message });
+      this.startingSession.delete(session.id);
       updateSessionStatus(this.db, session.id, 'error');
       this.eventBus.emit(session.id, {
         type: 'error',
@@ -783,6 +786,7 @@ export class ProcessManager {
 
     if (resolved.error) {
       log.warn('Resume: failed to resolve project directory', { projectId: project.id, error: resolved.error });
+      this.startingSession.delete(session.id);
       this.eventBus.emit(session.id, {
         type: 'error',
         error: { message: `Failed to resolve project directory: ${resolved.error}`, type: 'dir_resolution_error' },
@@ -876,6 +880,13 @@ export class ProcessManager {
   }
 
   resumeProcess(session: Session, prompt?: string): void {
+    // Clear stale startingSession entries — if the session isn't actually in the
+    // processes map, any leftover startingSession guard from a failed spawn is stale.
+    if (this.startingSession.has(session.id) && !this.processes.has(session.id)) {
+      log.warn(`Clearing stale startingSession guard for session ${session.id}`);
+      this.startingSession.delete(session.id);
+    }
+
     // CRITICAL: Detect stale "running" state — DB says running but no in-memory process.
     // This happens when a process crashes/exits without proper cleanup, or after server restart.
     // Without this check, resume attempts silently fail and the session appears stuck.
