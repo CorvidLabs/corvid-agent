@@ -6,7 +6,6 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { up } from '../db/migrations/095_memory_observations';
-import { up as up120 } from '../db/migrations/120_observation_channel_id';
 import {
   boostObservation,
   countObservations,
@@ -30,7 +29,6 @@ function createTestDb(): Database {
   db.exec(`CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY)`);
   db.prepare('INSERT INTO agents (id) VALUES (?)').run(AGENT_ID);
   up(db);
-  up120(db);
   return db;
 }
 

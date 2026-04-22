@@ -47,7 +47,6 @@ files:
   - server/db/migrations/117_discord_channel_project.ts
   - server/db/migrations/118_thread_session_summary.ts
   - server/db/migrations/119_telegram_config.ts
-  - server/db/migrations/120_observation_channel_id.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -602,17 +601,6 @@ Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` 
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `voting_opened_at` and `voting_deadline` columns to `governance_proposals` (idempotent), creates `proposal_vetoes` table with indexes on `proposal_id` and `tenant_id` |
 | `down` | `(db: Database)` | `void` | Drops `proposal_vetoes` table and indexes, removes `voting_deadline` and `voting_opened_at` columns from `governance_proposals` |
-
-### 120_observation_channel_id.ts
-
-Adds `channel_id` column to `memory_observations` for associating observations with Discord channels. Uses idempotent column-existence check before ALTER TABLE.
-
-**Exported Functions:**
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Adds `channel_id` TEXT column to `memory_observations` (idempotent — checks column existence first), creates partial index `idx_observations_channel_id` |
-| `down` | `(db: Database)` | `void` | Drops the index and `channel_id` column from `memory_observations` |
 
 ## Change Log
 

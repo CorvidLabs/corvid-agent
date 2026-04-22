@@ -626,7 +626,6 @@ async function handleMentionReply(
     content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
-    channelId,
   });
 
   subscribeForAdaptiveInlineResponse(
