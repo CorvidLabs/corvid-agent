@@ -336,6 +336,7 @@ Side effects on construction:
 | SDK/direct process spawn fails | Session status set to `error`, error event emitted |
 | Resume of nonexistent process | Starts a fresh process with resume prompt |
 | `sendMessage` to non-running session | Returns `false` |
+| `sendMessage` to zombie process (`isAlive()=false`) | Returns `false` and evicts process from Map so `resumeProcess` can restart |
 | `resumeSession` for non-paused session | Returns `false` |
 | Max restarts exceeded (3) | Session left in error state, no more retries |
 | Auto-resume max attempts exceeded (10) | Session set to `error`, `auto_resume_exhausted` event emitted |
@@ -423,3 +424,4 @@ Internal constants (not env-configurable):
 | 2026-04-14 | corvid-agent | Add 15 missing modules to files list, fix SessionTimerCallbacks/Config types, clarify resolveProviderRouting re-export (#2022) |
 | 2026-04-16 | corvid-agent | Document McpServiceContainer methods/isAvailable, full McpServices/BuildContextOptions fields, startStartupTimeout/clearStartupTimeout, fix applyCostUpdate return type (boolean), fix sendMessage signature (ContentBlockParam[]), add flushActiveSessionSummaries, fix getStats to include startupTimeouts, inline EventHandlerDeps/ExitHandlerDeps fields, remove RoutingDecision duplicate, collapse exported-types table with Source column (#2022) |
 | 2026-04-20 | corvid-agent | Add approval-flow.ts (approval request/response bridge) and persona-injector.ts (persona+skill injection facade); add session-lifecycle.ts to files list; document new exported functions |
+| 2026-04-22 | corvid-agent | Add `isAlive()` to `SdkProcess` interface; sendMessage evicts zombie processes from Map; orphan pruner detects dead-in-Map processes via `isAlive()` (#2127) |

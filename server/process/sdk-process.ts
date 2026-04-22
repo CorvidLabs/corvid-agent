@@ -152,6 +152,8 @@ export interface SdkProcess {
     content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[],
   ) => boolean;
   kill: () => void;
+  /** Returns true if the process can still accept and process messages. */
+  isAlive: () => boolean;
 }
 
 let nextPseudoPid = 900_000;
@@ -531,7 +533,11 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     q.close();
   }
 
-  return { pid: pseudoPid, sendMessage, kill };
+  function isAlive(): boolean {
+    return !inputDone && !abortController.signal.aborted;
+  }
+
+  return { pid: pseudoPid, sendMessage, kill, isAlive };
 }
 
 export function mapSdkMessageToEvent(message: SDKMessage, sessionId: string): ClaudeStreamEvent | null {

@@ -27,7 +27,7 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 | Type | Description |
 |------|-------------|
 | `SdkProcessOptions` | Full configuration for starting an SDK process: session, project, agent, prompt, callbacks, MCP servers, persona/skill prompts |
-| `SdkProcess` | Running process handle: `{ pid, sendMessage, kill }` |
+| `SdkProcess` | Running process handle: `{ pid, sendMessage, kill, isAlive }` |
 
 ### Exported Constants
 
