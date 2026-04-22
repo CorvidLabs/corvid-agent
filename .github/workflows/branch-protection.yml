@@ -32,10 +32,11 @@ jobs:
           }
 
           PR_REVIEWS=$(echo "$RESULT" | jq -r '.required_pull_request_reviews.required_approving_review_count // "none"')
-          FORCE_PUSH=$(echo "$RESULT" | jq -r '.allow_force_pushes.enabled // false')
-          DELETIONS=$(echo "$RESULT" | jq -r '.allow_deletions.enabled // false')
+          FORCE_PUSH=$(echo "$RESULT" | jq -r '.allow_force_pushes // false')
+          DELETIONS=$(echo "$RESULT" | jq -r '.allow_deletions // false')
           STATUS_CHECKS=$(echo "$RESULT" | jq -r '.required_status_checks.contexts // [] | length')
-          ENFORCE_ADMINS=$(echo "$RESULT" | jq -r '.enforce_admins.enabled // false')
+          STATUS_STRICT=$(echo "$RESULT" | jq -r '.required_status_checks.strict // false')
+          ENFORCE_ADMINS=$(echo "$RESULT" | jq -r '.enforce_admins // false')
           DISMISS_STALE=$(echo "$RESULT" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')
 
           echo "PR reviews required:    $PR_REVIEWS"
@@ -43,6 +44,7 @@ jobs:
           echo "Force push allowed:     $FORCE_PUSH"
           echo "Deletions allowed:      $DELETIONS"
           echo "Status check count:     $STATUS_CHECKS"
+          echo "Status checks strict:   $STATUS_STRICT"
           echo "Enforce admins:         $ENFORCE_ADMINS"
 
           FAIL=0
@@ -60,6 +62,10 @@ jobs:
           fi
           if [ "$STATUS_CHECKS" = "0" ]; then
             echo "::error::No required status checks on main branch"
+            FAIL=1
+          fi
+          if [ "$STATUS_STRICT" != "true" ]; then
+            echo "::error::Status checks not in strict mode (must be up to date before merge)"
             FAIL=1
           fi
           if [ "$ENFORCE_ADMINS" != "true" ]; then

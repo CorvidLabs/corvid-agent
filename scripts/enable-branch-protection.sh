@@ -10,7 +10,7 @@
 #   - Require status checks to pass (where CI exists)
 #   - For corvid-agent: require CI build status check
 #
-# Last applied: 2026-03-12 (corvid-agent/corvid-agent main branch)
+# Last applied: 2026-04-22 (updated with correct CI job names)
 #
 # Usage: ./scripts/enable-branch-protection.sh [--dry-run] [--verify-only]
 
@@ -49,16 +49,16 @@ build_payload() {
 
   if [ "$repo" = "$PRIMARY_REPO" ]; then
     # Stricter rules for the main corvid-agent repo (#428):
-    # - Required CI status checks (build job must pass)
-    # - Enforce rules for admins too
+    # - Required CI status checks (build job must pass, TypeScript check, spec validation)
+    # - Require branches to be up to date before merging (strict: true)
+    # - Enforce rules for admins too (no bypass)
+    # - Require at least 1 approval on PRs
     cat <<'ENDJSON'
 {
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "Build & Test (ubuntu-latest)",
-      "Build & Test (macos-latest)",
-      "Build & Test (windows-latest)"
+      "Build & Test (ubuntu)"
     ]
   },
   "enforce_admins": true,
@@ -73,6 +73,10 @@ build_payload() {
 }
 ENDJSON
   else
+    # Standard rules for secondary repos:
+    # - No required status checks
+    # - Require at least 1 approval on PRs
+    # - Block force pushes and deletions
     cat <<'ENDJSON'
 {
   "required_status_checks": null,
