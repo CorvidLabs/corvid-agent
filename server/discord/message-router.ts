@@ -102,6 +102,11 @@ export function withAuthorContext(
   return `[From Discord user: ${authorUsername}${channelSuffix}]\n${text}`;
 }
 
+/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting. */
+export function stripConversationHistory(content: string): string {
+  return content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+}
+
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
 function resolveMentions(
@@ -569,6 +574,34 @@ async function handleMentionReply(
     workDir,
   });
 
+  const agentName = agent.name;
+  const agentModel = agent.model || 'unknown';
+  const agentDisplayColor = agent.displayColor;
+  const agentDisplayIcon = agent.displayIcon;
+  const agentAvatarUrl = agent.avatarUrl;
+  const projectNameForFooter = project.name;
+
+  // Track the mention session immediately so channel-based context queries
+  // work even if the bot hasn't replied yet (or crashes before replying).
+  // Uses the user's message ID as a synthetic key; bot reply IDs are added
+  // later via the onBotMessage callback.
+  try {
+    trackMentionSession(ctx.db, ctx.mentionSessions, `mention:${messageId}`, {
+      sessionId: session.id,
+      agentName,
+      agentModel,
+      projectName: projectNameForFooter,
+      displayColor: agentDisplayColor,
+      displayIcon: agentDisplayIcon,
+      avatarUrl: agentAvatarUrl,
+      channelId,
+    });
+  } catch (err) {
+    log.warn('trackMentionSession failed, continuing message dispatch', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // Record channel-project affinity so future @mentions in this channel
   // default to the same project without the user needing to specify it.
   setChannelProjectId(ctx.db, channelId, project.id);
@@ -599,15 +632,8 @@ async function handleMentionReply(
     content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
-    channelId,
   });
 
-  const agentName = agent.name;
-  const agentModel = agent.model || 'unknown';
-  const agentDisplayColor = agent.displayColor;
-  const agentDisplayIcon = agent.displayIcon;
-  const agentAvatarUrl = agent.avatarUrl;
-  const projectNameForFooter = project.name;
   subscribeForAdaptiveInlineResponse(
     ctx.processManager,
     ctx.delivery,
@@ -676,17 +702,7 @@ async function handleMentionReplyResume(
 
   if (!session) {
     log.info('Mention-reply session not found, creating new session with context', { sessionId });
-    await handleMentionReply(
-      ctx,
-      channelId,
-      _userId,
-      messageId,
-      text,
-      mentions,
-      authorId,
-      authorUsername,
-      attachments,
-    );
+    await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
     return;
   }
 
@@ -774,11 +790,16 @@ function buildChannelContext(db: Database, channelId: string): string {
   const messages = getChannelMessageHistory(db, channelId, 40, 24);
   if (messages.length === 0) return '';
 
-  const historyLines = messages.map((m) => {
-    const role = m.role === 'user' ? 'User' : 'Assistant';
-    const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-    return `[${role}]: ${text}`;
-  });
+  const historyLines = messages
+    .map((m) => {
+      const role = m.role === 'user' ? 'User' : 'Assistant';
+      const stripped = stripConversationHistory(m.content);
+      const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+      if (!text) return null;
+      return `[${role}]: ${text}`;
+    })
+    .filter((line): line is string => line !== null);
+  if (historyLines.length === 0) return '';
   return [
     '<conversation_history>',
     'The following is the conversation history from this channel. Use it for context when responding to the new message.',
@@ -793,22 +814,31 @@ function buildChannelContext(db: Database, channelId: string): string {
  * Tries three sources in order: actual messages (richest), thread summary, session summary.
  * Call BEFORE deleting the thread session or session record.
  */
+const MAX_THREAD_CONTEXT_CHARS = 8000;
+
 function buildPreviousThreadContext(db: Database, threadId: string, previousSessionId: string): string {
   // 1. Try to load actual messages from the previous session (richest context)
   const messages = getSessionMessages(db, previousSessionId);
   const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
-    const historyLines = conversational.map((m) => {
-      const role = m.role === 'user' ? 'User' : 'Assistant';
-      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
-      return `[${role}]: ${text}`;
-    });
+    const historyLines = conversational
+      .map((m) => {
+        const role = m.role === 'user' ? 'User' : 'Assistant';
+        const stripped = stripConversationHistory(m.content);
+        const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
+        return `[${role}]: ${text}`;
+      })
+      .filter((line) => !line.endsWith(': '));
+    let body = historyLines.join('\n');
+    if (body.length > MAX_THREAD_CONTEXT_CHARS) {
+      body = body.slice(-MAX_THREAD_CONTEXT_CHARS);
+    }
     return [
       '<conversation_history>',
       'The following is the conversation history from this session. Use it for context when responding to the new message.',
       '',
-      ...historyLines,
+      body,
       '</conversation_history>',
     ].join('\n');
   }
@@ -1055,7 +1085,10 @@ async function routeToThread(
       typeof contextualContent === 'string'
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
-    ctx.processManager.resumeProcess(session, resumeText);
+    // Inject previous conversation context so the resumed process has history
+    const threadContext = buildPreviousThreadContext(ctx.db, threadId, sessionId);
+    const resumeWithContext = threadContext ? `${threadContext}\n\n${resumeText}` : resumeText;
+    ctx.processManager.resumeProcess(session, resumeWithContext);
     // Only subscribe if the process actually started — resumeProcess may fail
     // (e.g., worktree cleaned up, spawn error) and returns void, so check the map.
     // Without this guard, the zombie check fires 8s later on a never-started process,

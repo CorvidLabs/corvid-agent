@@ -56,6 +56,12 @@ Provides a plugin system for corvid-agent: defines the plugin interface, validat
 | `ManifestValidationResult` | Interface: `{ valid: boolean; errors: string[] }` |
 | `LoadResult` | Interface: `{ success: boolean; plugin?: CorvidPlugin; error?: string }` |
 
+### Exported Functions (from sdk-bridge.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `buildPluginSdkTools` | `registry: PluginRegistry, agentId: string, sessionId: string` | `tool[]` | Convert loaded plugin tools into SDK MCP tool definitions so agents can invoke them |
+
 ### Exported Classes
 
 | Class | Description |

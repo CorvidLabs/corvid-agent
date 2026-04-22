@@ -50,6 +50,4 @@ export interface MemoryObservation {
   createdAt: string;
   /** Observations expire after this date if not graduated */
   expiresAt: string | null;
-  /** Discord/Telegram channel ID for channel-scoped context */
-  channelId: string | null;
 }

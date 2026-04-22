@@ -6,7 +6,6 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { up as upObservations } from '../db/migrations/095_memory_observations';
-import { up as upObservationChannelId } from '../db/migrations/120_observation_channel_id';
 import { boostObservation, getObservation, recordObservation } from '../db/observations';
 import { MemoryGraduationService } from '../memory/graduation-service';
 
@@ -40,7 +39,6 @@ function createTestDb(): Database {
     `);
 
   upObservations(db);
-  upObservationChannelId(db);
   return db;
 }
 
