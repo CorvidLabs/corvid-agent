@@ -56,7 +56,9 @@ export function buildResumePrompt(
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => {
       const role = m.role === 'user' ? 'User' : 'Assistant';
-      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+      // Strip embedded <conversation_history> blocks to prevent recursive nesting (#2122)
+      const stripped = m.content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\n?/g, '').trim();
+      const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
       return `[${role}]: ${text}`;
     });
 

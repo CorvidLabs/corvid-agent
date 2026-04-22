@@ -781,6 +781,11 @@ async function handleMentionReplyResume(
   );
 }
 
+/** Strip any existing <conversation_history> blocks to prevent recursive nesting. */
+function stripContextTags(text: string): string {
+  return text.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\n?/g, '').trim();
+}
+
 /**
  * Build conversation context aggregated across all recent sessions in a channel.
  * Unlike the old single-session approach, this pulls messages from the last 24 hours
