@@ -569,6 +569,34 @@ async function handleMentionReply(
     workDir,
   });
 
+  const agentName = agent.name;
+  const agentModel = agent.model || 'unknown';
+  const agentDisplayColor = agent.displayColor;
+  const agentDisplayIcon = agent.displayIcon;
+  const agentAvatarUrl = agent.avatarUrl;
+  const projectNameForFooter = project.name;
+
+  // Track the mention session immediately so channel-based context queries
+  // work even if the bot hasn't replied yet (or crashes before replying).
+  // Uses the user's message ID as a synthetic key; bot reply IDs are added
+  // later via the onBotMessage callback.
+  try {
+    trackMentionSession(ctx.db, ctx.mentionSessions, `mention:${messageId}`, {
+      sessionId: session.id,
+      agentName,
+      agentModel,
+      projectName: projectNameForFooter,
+      displayColor: agentDisplayColor,
+      displayIcon: agentDisplayIcon,
+      avatarUrl: agentAvatarUrl,
+      channelId,
+    });
+  } catch (err) {
+    log.warn('trackMentionSession failed, continuing message dispatch', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // Record channel-project affinity so future @mentions in this channel
   // default to the same project without the user needing to specify it.
   setChannelProjectId(ctx.db, channelId, project.id);
@@ -602,12 +630,6 @@ async function handleMentionReply(
     channelId,
   });
 
-  const agentName = agent.name;
-  const agentModel = agent.model || 'unknown';
-  const agentDisplayColor = agent.displayColor;
-  const agentDisplayIcon = agent.displayIcon;
-  const agentAvatarUrl = agent.avatarUrl;
-  const projectNameForFooter = project.name;
   subscribeForAdaptiveInlineResponse(
     ctx.processManager,
     ctx.delivery,
@@ -793,6 +815,8 @@ function buildChannelContext(db: Database, channelId: string): string {
  * Tries three sources in order: actual messages (richest), thread summary, session summary.
  * Call BEFORE deleting the thread session or session record.
  */
+const MAX_THREAD_CONTEXT_CHARS = 8000;
+
 function buildPreviousThreadContext(db: Database, threadId: string, previousSessionId: string): string {
   // 1. Try to load actual messages from the previous session (richest context)
   const messages = getSessionMessages(db, previousSessionId);
@@ -804,11 +828,15 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
       const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
       return `[${role}]: ${text}`;
     });
+    let body = historyLines.join('\n');
+    if (body.length > MAX_THREAD_CONTEXT_CHARS) {
+      body = body.slice(-MAX_THREAD_CONTEXT_CHARS);
+    }
     return [
       '<conversation_history>',
       'The following is the conversation history from this session. Use it for context when responding to the new message.',
       '',
-      ...historyLines,
+      body,
       '</conversation_history>',
     ].join('\n');
   }
@@ -1055,7 +1083,10 @@ async function routeToThread(
       typeof contextualContent === 'string'
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(text, authorId, authorUsername, threadId), attachments);
-    ctx.processManager.resumeProcess(session, resumeText);
+    // Inject previous conversation context so the resumed process has history
+    const threadContext = buildPreviousThreadContext(ctx.db, threadId, sessionId);
+    const resumeWithContext = threadContext ? `${threadContext}\n\n${resumeText}` : resumeText;
+    ctx.processManager.resumeProcess(session, resumeWithContext);
     // Only subscribe if the process actually started — resumeProcess may fail
     // (e.g., worktree cleaned up, spawn error) and returns void, so check the map.
     // Without this guard, the zombie check fires 8s later on a never-started process,

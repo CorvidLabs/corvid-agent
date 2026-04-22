@@ -125,7 +125,19 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `resolvePrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve only persona and skill prompts (no tool permission computation) |
 | `resolvePermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve only tool permissions for an agent+project pair |
 
-`PersonaInjectionOptions` fields: `agent`, `agentId`, `projectId`.
+### Exported Types (from persona-injector.ts)
+
+| Type | Description |
+|------|-------------|
+| `PersonaInjectionOptions` | Options for persona/skill injection: `agent`, `agentId`, `projectId` |
+
+### Exported Types/Classes (from session-lifecycle.ts)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `SessionLifecycleConfig` | interface | Configuration for session lifecycle: `sessionTtlMs`, `cleanupIntervalMs`, `maxSessionsPerProject` |
+| `SessionCleanupStats` | interface | Stats returned from cleanup: `expiredSessions`, `orphanedProcesses`, `staleSubscriptions`, `memoryFreedMB` |
+| `SessionLifecycleManager` | class | Manages automatic cleanup of expired sessions, orphaned processes, and stale subscriptions |
 
 ### Exported Functions (from session-exit-handler.ts)
 

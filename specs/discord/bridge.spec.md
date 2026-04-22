@@ -16,8 +16,6 @@ files:
   - server/discord/command-handlers/agent-config-commands.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
-  - server/discord/message-router.ts
-  - server/discord/work-dispatch.ts
   - server/discord/permissions.ts
   - server/discord/thread-manager.ts
   - server/discord/types.ts
@@ -41,6 +39,8 @@ files:
   - server/discord/voice/voice-session.ts
   - server/discord/voice/audio-player.ts
   - server/discord/voice/audio-receiver.ts
+  - server/discord/message-router.ts
+  - server/discord/work-dispatch.ts
 db_tables:
   - sessions
   - session_messages
@@ -224,14 +224,21 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
 | `sendMessageWithFiles` | `(delivery, botToken, channelId, content, files)` | `Promise<string \| null>` | Send a text message with file attachments via multipart/form-data |
 
-### Exported Functions (from message-handler.ts)
+### Exported Functions (from message-router.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleMessage` | `(ctx, data)` | `Promise<void>` | Dispatch an incoming Discord message to the appropriate handler |
-| `sendTaskResult` | `(ctx, channelId, task, mentionUserId?)` | `Promise<void>` | Send a task completion/failure embed |
-| `handleWorkIntake` | `(ctx, channelId, messageId, userId, text, mentions?)` | `Promise<void>` | Handle work-intake messages: parse task requests from Discord and create work tasks |
 | `withAuthorContext` | `(text, authorId?, authorUsername?, channelId?)` | `string` | Prefix message text with Discord author context and channel ID for agent identification |
+| `MentionSessionInfo` | _(interface)_ | — | Session info for mention-reply context (sessionId, agentName, agentModel, projectName, displayIcon, avatarUrl, channelId) |
+| `MessageHandlerContext` | _(interface)_ | — | Context object for message handler delegation |
+
+### Exported Functions (from work-dispatch.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleWorkIntake` | `(ctx, channelId, userId, username, text, messageId)` | `Promise<void>` | Handle work intake from Discord messages (task creation and dispatch) |
+| `sendTaskResult` | `(ctx, channelId, task, mentionUserId?)` | `Promise<void>` | Send a task completion/failure embed |
 
 ### Exported Functions (from permissions.ts)
 
@@ -394,9 +401,9 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `FooterContext` | `embeds.ts` | Metadata for building rich embed footers (agentName, agentModel?, status?) |
 | `FooterStats` | `embeds.ts` | Optional run statistics for embed footers (filesChanged?, turns?, tools?, commits?) |
 | `DiscordFileAttachment` | `embeds.ts` | File attachment for Discord uploads (name, data, contentType?) |
-| `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
+| `MessageHandlerContext` | `message-router.ts` | Context object for message handler delegation |
 | `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayIcon?, avatarUrl?) |
-| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?, displayIcon?, avatarUrl?) |
+| `MentionSessionInfo` | `message-router.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?, displayIcon?, avatarUrl?, channelId) |
 | `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
 | `ReactionHandlerContext` | `reaction-handler.ts` | Context object for reaction handler (db, botUserId, scorer, mentionSessions, threadSessions) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
