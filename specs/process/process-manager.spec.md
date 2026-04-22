@@ -113,15 +113,28 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `resolveApproval` | `(approvalManager, requestId, behavior, message?)` | `boolean` | Resolve a pending approval request; returns false if not found |
 | `cancelSessionApprovals` | `(approvalManager, sessionId)` | `void` | Cancel all pending approvals for a session (called on stop/cleanup) |
 
-### Exported Functions (from persona-injector.ts)
+### Exported Types and Functions (from persona-injector.ts)
 
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `injectPersonaAndSkills` | `(db, opts: PersonaInjectionOptions)` | `ResolvedSessionConfig` | Resolve persona prompt, skill prompt, and tool permissions with structured logging |
-| `resolvePrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve only persona and skill prompts (no tool permission computation) |
-| `resolvePermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve only tool permissions for an agent+project pair |
+| Export | Kind | Description |
+|--------|------|-------------|
+| `PersonaInjectionOptions` | interface | Options for persona/skill injection: `agent`, `agentId`, `projectId` |
+| `injectPersonaAndSkills` | function | `(db, opts: PersonaInjectionOptions) → ResolvedSessionConfig` — Resolve persona prompt, skill prompt, and tool permissions with structured logging |
+| `resolvePrompts` | function | `(db, agent, projectId) → SessionPrompts` — Resolve only persona and skill prompts (no tool permission computation) |
+| `resolvePermissions` | function | `(db, agentId, projectId) → string[] \| null` — Resolve only tool permissions for an agent+project pair |
 
 `PersonaInjectionOptions` fields: `agent`, `agentId`, `projectId`.
+
+### Exported Types (from session-lifecycle.ts)
+
+| Type | Kind | Description |
+|------|------|-------------|
+| `SessionLifecycleConfig` | interface | Configuration for session TTL, cleanup interval, and max sessions per project |
+| `SessionCleanupStats` | interface | Stats returned from cleanup runs: expired sessions, orphaned processes, stale subscriptions, memory freed |
+| `SessionLifecycleManager` | class | Manages session lifecycle — automatic cleanup of expired sessions, memory management, orphan pruning, per-project session limits |
+
+`SessionLifecycleConfig` fields: `sessionTtlMs`, `cleanupIntervalMs`, `maxSessionsPerProject`.
+
+`SessionCleanupStats` fields: `expiredSessions`, `orphanedProcesses`, `staleSubscriptions`, `memoryFreedMB`.
 
 ### Exported Functions (from session-exit-handler.ts)
 
