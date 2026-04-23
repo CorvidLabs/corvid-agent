@@ -11,6 +11,7 @@ import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
 import { boostObservation, listObservations } from '../db/observations';
 import { getSessionMessages } from '../db/sessions';
+import { stripConversationHistory } from '../lib/strip-conversation-history';
 
 interface SessionMeta {
   contextSummary?: string;
@@ -56,7 +57,8 @@ export function buildResumePrompt(
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => {
       const role = m.role === 'user' ? 'User' : 'Assistant';
-      const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+      const stripped = stripConversationHistory(m.content);
+      const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
       return `[${role}]: ${text}`;
     });
 

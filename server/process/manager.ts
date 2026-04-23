@@ -22,6 +22,7 @@ import {
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
+import { stripConversationHistory } from '../lib/strip-conversation-history';
 import { removeWorktree } from '../lib/worktree';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { PluginRegistry } from '../plugins/registry';
@@ -1255,7 +1256,8 @@ export class ProcessManager {
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => {
         const role = m.role === 'user' ? 'User' : 'Assistant';
-        const text = m.content.length > 2000 ? `${m.content.slice(0, 2000)}...` : m.content;
+        const stripped = stripConversationHistory(m.content);
+        const text = stripped.length > 2000 ? `${stripped.slice(0, 2000)}...` : stripped;
         return `[${role}]: ${text}`;
       });
 

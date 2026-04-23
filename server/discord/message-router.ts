@@ -31,6 +31,7 @@ import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 import { scanForInjection } from '../lib/prompt-injection';
+import { stripConversationHistory } from '../lib/strip-conversation-history';
 import { resolveAndCreateWorktree } from '../lib/worktree';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
@@ -102,10 +103,8 @@ export function withAuthorContext(
   return `[From Discord user: ${authorUsername}${channelSuffix}]\n${text}`;
 }
 
-/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting. */
-export function stripConversationHistory(content: string): string {
-  return content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
-}
+// Re-export for backward compatibility with existing test imports
+export { stripConversationHistory } from '../lib/strip-conversation-history';
 
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
@@ -780,7 +779,6 @@ async function handleMentionReplyResume(
     avatarUrl,
   );
 }
-
 /**
  * Build conversation context aggregated across all recent sessions in a channel.
  * Unlike the old single-session approach, this pulls messages from the last 24 hours
