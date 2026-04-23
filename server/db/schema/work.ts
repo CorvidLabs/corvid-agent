@@ -47,6 +47,20 @@ export const tables: string[] = [
         created_at      TEXT DEFAULT (datetime('now')),
         completed_at    TEXT DEFAULT NULL
     )`,
+
+  `CREATE TABLE IF NOT EXISTS work_task_attestations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id     TEXT NOT NULL,
+        agent_id    TEXT NOT NULL,
+        outcome     TEXT NOT NULL CHECK (outcome IN ('completed', 'failed')),
+        pr_url      TEXT,
+        duration_ms INTEGER,
+        hash        TEXT NOT NULL,
+        payload     TEXT NOT NULL,
+        txid        TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        published_at TEXT
+    )`,
 ];
 
 export const indexes: string[] = [
@@ -59,4 +73,6 @@ export const indexes: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
   `CREATE INDEX IF NOT EXISTS idx_work_tasks_tenant ON work_tasks(tenant_id)`,
   `CREATE INDEX IF NOT EXISTS idx_work_tasks_pending_dispatch ON work_tasks(status, project_id, priority DESC, created_at ASC)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_task_id ON work_task_attestations(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_agent_id ON work_task_attestations(agent_id)`,
 ];

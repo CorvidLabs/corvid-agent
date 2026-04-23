@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 120;
+const SCHEMA_VERSION = 121;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -257,6 +257,24 @@ const MIGRATIONS: Record<number, string[]> = {
     // Add channel_id to memory observations for channel-scoped context
     `ALTER TABLE memory_observations ADD COLUMN channel_id TEXT`,
     `CREATE INDEX IF NOT EXISTS idx_observations_channel_id ON memory_observations(channel_id) WHERE channel_id IS NOT NULL`,
+  ],
+  121: [
+    // Work task attestations: on-chain records of task completion/failure
+    `CREATE TABLE IF NOT EXISTS work_task_attestations (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id     TEXT NOT NULL,
+      agent_id    TEXT NOT NULL,
+      outcome     TEXT NOT NULL CHECK (outcome IN ('completed', 'failed')),
+      pr_url      TEXT,
+      duration_ms INTEGER,
+      hash        TEXT NOT NULL,
+      payload     TEXT NOT NULL,
+      txid        TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      published_at TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_task_id ON work_task_attestations(task_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_agent_id ON work_task_attestations(agent_id)`,
   ],
 };
 
