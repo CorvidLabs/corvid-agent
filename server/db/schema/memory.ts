@@ -30,7 +30,8 @@ export const tables: string[] = [
         graduated_key     TEXT DEFAULT NULL,
         channel_id        TEXT DEFAULT NULL,
         created_at        TEXT DEFAULT (datetime('now')),
-        expires_at        TEXT DEFAULT NULL
+        expires_at        TEXT DEFAULT NULL,
+        channel_id        TEXT DEFAULT NULL
     )`,
 ];
 
