@@ -426,7 +426,11 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
     }
   }
 
-  return { pid, sendMessage, kill };
+  function isAlive(): boolean {
+    return !killed;
+  }
+
+  return { pid, sendMessage, kill, isAlive };
 }
 
 export function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {

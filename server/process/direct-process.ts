@@ -1160,7 +1160,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     });
   }
 
-  return { pid: pseudoPid, sendMessage, kill };
+  function isAlive(): boolean {
+    return !aborted;
+  }
+
+  return { pid: pseudoPid, sendMessage, kill, isAlive };
 }
 
 // ── Nudge system ──────────────────────────────────────────────────────────

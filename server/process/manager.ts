@@ -1392,6 +1392,9 @@ export class ProcessManager {
     const sent = cp.sendMessage(content);
     if (!sent) {
       log.warn(`Failed to write to stdin for session ${sessionId}`);
+      // The process can no longer accept input — remove from Map so that
+      // the caller's subsequent resumeProcess() detects the stale state and restarts.
+      this.processes.delete(sessionId);
       return false;
     }
 
@@ -1957,12 +1960,24 @@ export class ProcessManager {
       .all() as { id: string; pid: number | null }[];
 
     for (const row of stuckSessions) {
-      if (!this.processes.has(row.id) && !this.resilienceManager.isPaused(row.id)) {
+      const cp = this.processes.get(row.id);
+      const notInMap = !cp && !this.resilienceManager.isPaused(row.id);
+      // Also catch processes still in the Map but whose async function has completed
+      // without calling handleExit (e.g., streamInput silently failed after inputDone).
+      const deadInMap = cp && !cp.isAlive() && !this.resilienceManager.isPaused(row.id);
+
+      if (notInMap || deadInMap) {
+        if (deadInMap && cp) {
+          cp.kill(); // Ensure the process is fully stopped
+          this.processes.delete(row.id);
+        }
         updateSessionStatus(this.db, row.id, 'idle');
         updateSessionPid(this.db, row.id, null);
         this.timerManager.cleanupSession(row.id);
         this.approvalManager.cancelSession(row.id);
-        log.warn(`Pruned stuck session ${row.id} (pid=${row.pid}) — DB said running but no process exists`);
+        log.warn(
+          `Pruned stuck session ${row.id} (pid=${row.pid}) — ${deadInMap ? 'process dead but still in Map' : 'DB said running but no process exists'}`,
+        );
         pruned++;
       }
     }

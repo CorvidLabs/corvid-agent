@@ -20,11 +20,12 @@ const AGENT_ID = 'agent-1';
 const PROJECT_ID = 'proj-1';
 let sessionId: string;
 
-function makeMockProcess(sendResult: boolean = true): SdkProcess {
+function makeMockProcess(sendResult: boolean = true, alive: boolean = true): SdkProcess {
   return {
     pid: 999,
     sendMessage: () => sendResult,
     kill: () => {},
+    isAlive: () => alive,
   };
 }
 
@@ -127,6 +128,20 @@ describe('ProcessManager.sendMessage', () => {
     // No message should be persisted
     const messages = db.query('SELECT * FROM session_messages WHERE session_id = ?').all(sessionId);
     expect(messages).toHaveLength(0);
+  });
+
+  test('removes zombie process from Map when sendMessage returns false', () => {
+    // Simulate a zombie: process is in Map but can no longer accept messages (inputDone=true)
+    const zombie = makeMockProcess(false, false);
+    (pm as any).processes.set(sessionId, zombie);
+
+    expect(pm.isRunning(sessionId)).toBe(true);
+
+    const result = pm.sendMessage(sessionId, 'hello');
+    expect(result).toBe(false);
+
+    // Zombie should be evicted from the Map so resumeProcess can restart it
+    expect(pm.isRunning(sessionId)).toBe(false);
   });
 
   test('increments turnCount in session metadata', () => {

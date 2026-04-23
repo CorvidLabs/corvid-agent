@@ -1,19 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { runMigrations } from '../db/schema';
+import { createSession } from '../db/sessions';
 import { type EventCallback, ProcessManager } from '../process/manager';
-
-/**
- * Tests for ProcessManager memory cleanup.
- *
- * These tests verify that in-memory Maps (subscribers, sessionMeta,
- * pausedSessions, etc.) are properly cleaned up when sessions end,
- * preventing unbounded memory growth over the server's lifetime.
- *
- * We use a real in-memory SQLite DB with migrations to satisfy the
- * constructor's DB requirements. We don't spawn real Claude processes —
- * instead we exercise the cleanup paths directly through the public API.
- */
+import type { SdkProcess } from '../process/sdk-process';
 
 let db: Database;
 let pm: ProcessManager;
@@ -242,5 +232,67 @@ describe('memory leak simulation', () => {
     }
 
     expect(pm.getMemoryStats().subscribers).toBe(0);
+  });
+});
+
+function makeMockProcess(alive: boolean = true): SdkProcess {
+  let killed = false;
+  return {
+    pid: 999,
+    sendMessage: () => alive && !killed,
+    kill: () => { killed = true; },
+    isAlive: () => alive && !killed,
+  };
+}
+
+describe('pruneOrphans — zombie detection', () => {
+  const AGENT_ID = 'agent-1';
+  const PROJECT_ID = 'proj-1';
+
+  beforeEach(() => {
+    db.query(`INSERT INTO agents (id, name, model, system_prompt) VALUES (?, 'TestAgent', 'test', 'test')`).run(AGENT_ID);
+    db.query(`INSERT INTO projects (id, name, working_dir) VALUES (?, 'TestProject', '/tmp/test')`).run(PROJECT_ID);
+  });
+
+  test('prunes dead-in-Map zombie process and resets session to idle', () => {
+    const session = createSession(db, { projectId: PROJECT_ID, agentId: AGENT_ID, name: 'Zombie' });
+    db.query(`UPDATE sessions SET status = 'running' WHERE id = ?`).run(session.id);
+
+    const zombie = makeMockProcess(false);
+    (pm as any).processes.set(session.id, zombie);
+
+    const pruned = (pm as any).pruneOrphans();
+    expect(pruned).toBeGreaterThanOrEqual(1);
+
+    expect((pm as any).processes.has(session.id)).toBe(false);
+
+    const row = db.query('SELECT status FROM sessions WHERE id = ?').get(session.id) as { status: string };
+    expect(row.status).toBe('idle');
+  });
+
+  test('does not prune alive process still in Map', () => {
+    const session = createSession(db, { projectId: PROJECT_ID, agentId: AGENT_ID, name: 'Alive' });
+    db.query(`UPDATE sessions SET status = 'running' WHERE id = ?`).run(session.id);
+
+    const alive = makeMockProcess(true);
+    (pm as any).processes.set(session.id, alive);
+
+    (pm as any).pruneOrphans();
+
+    expect((pm as any).processes.has(session.id)).toBe(true);
+
+    const row = db.query('SELECT status FROM sessions WHERE id = ?').get(session.id) as { status: string };
+    expect(row.status).toBe('running');
+  });
+
+  test('prunes DB-running session with no process in Map', () => {
+    const session = createSession(db, { projectId: PROJECT_ID, agentId: AGENT_ID, name: 'Orphan' });
+    db.query(`UPDATE sessions SET status = 'running' WHERE id = ?`).run(session.id);
+
+    const pruned = (pm as any).pruneOrphans();
+    expect(pruned).toBeGreaterThanOrEqual(1);
+
+    const row = db.query('SELECT status FROM sessions WHERE id = ?').get(session.id) as { status: string };
+    expect(row.status).toBe('idle');
   });
 });

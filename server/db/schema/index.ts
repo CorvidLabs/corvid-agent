@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 119;
+const SCHEMA_VERSION = 120;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -252,6 +252,11 @@ const MIGRATIONS: Record<number, string[]> = {
   119: [
     // Telegram runtime configuration (mirrors discord_config pattern)
     ...telegram.tables,
+  ],
+  120: [
+    // Add channel_id to memory observations for channel-scoped context
+    `ALTER TABLE memory_observations ADD COLUMN channel_id TEXT`,
+    `CREATE INDEX IF NOT EXISTS idx_observations_channel_id ON memory_observations(channel_id) WHERE channel_id IS NOT NULL`,
   ],
 };
 
