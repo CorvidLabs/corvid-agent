@@ -19,7 +19,7 @@ fledge templates init my-tool --template rust-cli
 # Or just use it with an existing project — zero config
 cd my-existing-project
 fledge run test      # auto-detects project type, runs tests
-fledge lane ci       # runs the full CI pipeline
+fledge lanes run ci  # runs the full CI pipeline
 fledge review        # AI-powered code review
 fledge release minor # bump version, changelog, tag, push
 ```
@@ -66,7 +66,7 @@ steps = ["lint", "test", "changelog", "build"]
 steps = ["test", "build", { run = "deploy.sh" }]
 ```
 
-Run it with `fledge lane ci`. Each step is timed, parallel groups execute concurrently, and you get a clear report of what passed and what failed. No magic — just composable steps you define and control.
+Run it with `fledge lanes run ci`. Each step is timed, parallel groups execute concurrently, and you get a clear report of what passed and what failed. No magic — just composable steps you define and control.
 
 ## Plugins: Extend As Much As You Want
 
@@ -107,7 +107,7 @@ Now here's where it gets interesting. If you're a human developer who works alon
 
 **Same tools, same workflow, seamless handoff.** When you and an AI agent both use Fledge, you're operating on the same lanes, the same branch conventions, the same project configuration. An agent can pick up where you left off (and vice versa) because the workflow state is the same `fledge.toml`, the same lanes, the same specs.
 
-- You define a `ci` lane → the agent runs the same lane to validate its changes
+- You define a `ci` lane → the agent runs `fledge lanes run ci` to validate its changes
 - You write a spec → the agent runs `fledge spec check` to verify its implementation matches
 - You start a feature branch with `fledge work start` → the agent sees the linked issue, the branch naming, the context
 - The agent opens a PR → you review it with the same `fledge review` command
@@ -120,7 +120,7 @@ At CorvidLabs, our AI agents — CorvidAgent, Magpie, Rook, Jackdaw, and others 
 
 **What this means in practice:**
 
-- **Zero-config defaults** eliminate the setup barrier. An agent can clone a repo and immediately run `fledge run test` or `fledge lane ci` without needing to understand the project's custom build system.
+- **Zero-config defaults** eliminate the setup barrier. An agent can clone a repo and immediately run `fledge run test` or `fledge lanes run ci` without needing to understand the project's custom build system.
 
 - **Structured output everywhere.** Every command supports `--json` output for machine parsing. An agent can run `fledge doctor --json` and programmatically check which tools are missing, or `fledge metrics --json` to analyze code health without scraping terminal output.
 
@@ -148,7 +148,7 @@ Install Fledge:
 
 ```bash
 # Homebrew
-brew install corvidlabs/tap/fledge
+brew install CorvidLabs/tap/fledge
 
 # Cargo
 cargo install fledge
@@ -163,7 +163,7 @@ Try it on an existing project:
 cd your-project
 fledge doctor          # check your environment
 fledge run test        # run tests (auto-detected)
-fledge lane ci         # run the full CI pipeline
+fledge lanes run ci    # run the full CI pipeline
 ```
 
 Or start something new:
@@ -171,7 +171,7 @@ Or start something new:
 ```bash
 fledge templates init my-app --template ts-bun
 cd my-app
-fledge lane ci
+fledge lanes run ci
 ```
 
 **Fledge v0.10.0** is available now. Check out the [docs](https://corvidlabs.github.io/fledge/), the [GitHub repo](https://github.com/CorvidLabs/fledge), and the [community templates](https://github.com/CorvidLabs/fledge-templates).
