@@ -455,9 +455,11 @@ export class MentionPollingService {
       return false;
     }
 
-    // Human-assignment guard: skip if the issue/PR is assigned to someone
+    // Human-assignment guard: skip if the issue is assigned to someone
     // other than the bot. Respect human ownership — only work on things
     // assigned to us, mentioned on, or explicitly requested.
+    // PR mentions (type 'pull_request') bypass this guard — PR authors
+    // commonly self-assign, and that shouldn't prevent review detection.
     const isAssignment = mention.type === 'assignment';
     const isPullRequest = mention.type === 'pull_request' || mention.type === 'review_request';
     if (!isAssignment && !isPullRequest) {
