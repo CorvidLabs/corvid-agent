@@ -11,8 +11,10 @@ files:
   - server/work/validation.ts
   - server/work/repo-map.ts
   - server/work/verification.ts
+  - server/work/task-attestation.ts
 db_tables:
   - work_tasks
+  - work_task_attestations
 depends_on:
   - specs/db/sessions/sessions.spec.md
   - specs/process/process-manager.spec.md
@@ -31,6 +33,14 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | Class | Description |
 |-------|-------------|
 | `WorkTaskService` | Orchestrates the create-branch-execute-validate-PR lifecycle |
+| `WorkTaskAttestation` | Creates and publishes on-chain SHA-256 attestations of work task outcomes (server/work/task-attestation.ts) |
+
+### Exported Types (server/work/task-attestation.ts)
+
+| Type | Description |
+|------|-------------|
+| `WorkTaskAttestationPayload` | Canonical attestation data: `taskId`, `agentId`, `outcome`, `prUrl`, `durationMs`, `completedAt` — this is what gets hashed and published on-chain |
+| `WorkTaskAttestationRecord` | Stored attestation record: `taskId`, `agentId`, `outcome`, `hash`, `payload`, `txid`, `createdAt`, `publishedAt` — returned by `getAttestation()` |
 
 ### Exported Types
 
@@ -206,6 +216,7 @@ The optional `agent_id` parameter on `corvid_create_work_task` allows the callin
 8. **Dependency installation**: `bun install --frozen-lockfile --ignore-scripts` is run in the worktree before execution and before each validation. Falls back to non-frozen if frozen fails. `--ignore-scripts` prevents postinstall hooks from bypassing protected-file checks
 9. **Session linkage**: Each running iteration creates a new session with `workDir` pointing to the worktree
 10. **AlgoChat lifecycle notifications**: Work task lifecycle events (created, completed, failed) are broadcast via AlgoChat `sendOnChainToSelf` when `agentMessenger` is available
+11. **On-chain attestation**: When a task reaches a terminal state (completed or failed) and `agentMessenger` is available, a SHA-256 attestation of the task outcome is created in `work_task_attestations` and published on Algorand with note format `corvid-work:{taskId}:{outcome}:{hash[:16]}`. Attestation failures are non-fatal — they are logged at DEBUG level and do not affect task state
 
 ## Behavioral Examples
 

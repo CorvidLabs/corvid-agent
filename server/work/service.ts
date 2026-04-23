@@ -55,6 +55,7 @@ import {
   handleSessionEnd as _handleSessionEnd,
   type SessionLifecycleContext,
 } from './session-lifecycle';
+import { WorkTaskAttestation } from './task-attestation';
 import { runBunInstall } from './validation';
 
 const log = createLogger('WorkTaskService');
@@ -99,6 +100,9 @@ export class WorkTaskService {
    */
   private _activeClaimMap = new Map<string, string>();
 
+  /** On-chain attestation publisher for work task outcomes. */
+  private _attestation: WorkTaskAttestation;
+
   /** Interval handle for periodic stale worktree cleanup. */
   private _cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -111,6 +115,7 @@ export class WorkTaskService {
     this.db = db;
     this.processManager = processManager;
     this.astParserService = astParserService ?? null;
+    this._attestation = new WorkTaskAttestation(db);
   }
 
   /** Set the agent messenger (set after async AlgoChat init). */
@@ -1133,6 +1138,18 @@ export class WorkTaskService {
             error: err instanceof Error ? err.message : String(err),
           }),
         );
+
+        // Publish a verifiable on-chain attestation of the task outcome (#1458).
+        const messenger = this.agentMessenger;
+        const agentId = task.agentId;
+        this._attestation
+          .attest(task, (note) => messenger.sendOnChainToSelf(agentId, note).then((txid) => txid ?? null))
+          .catch((err) =>
+            log.debug('Work task attestation publish failed (non-fatal)', {
+              taskId: task.id,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          );
       }
 
       const callbacks = this.completionCallbacks.get(taskId);
