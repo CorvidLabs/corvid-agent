@@ -76,7 +76,7 @@ Provides the GitHub polling subsystem for corvid-agent: searches GitHub for @men
 | `fetchRecentComments` | `repo: string, issueNumber: number, username: string, since: string, isPR: boolean, issueData: Record<string, unknown>` | `Promise<DetectedMention[]>` | Fetches recent comments on a specific issue/PR and identifies @mentions |
 | `searchNewIssueMentions` | `repo: string, username: string, since: string` | `Promise<DetectedMention[]>` | Searches for newly created issues that mention the username in their body |
 | `searchAssignedIssues` | `repo: string, username: string, since: string` | `Promise<DetectedMention[]>` | Searches for open issues/PRs recently assigned to the username |
-| `searchPullRequestMentions` | `repo: string, username: string, since: string` | `Promise<DetectedMention[]>` | Searches for open PRs where the user has been requested for review |
+| `searchPullRequestMentions` | `repo: string, username: string, since: string` | `Promise<DetectedMention[]>` | Searches for open PRs needing review: first PRs with explicit review requests, then all open PRs by other authors in watched repos. Results are deduplicated by repo+number |
 | `searchAuthoredPRReviews` | `repo: string, username: string, since: string` | `Promise<DetectedMention[]>` | Searches for open PRs authored by the user and fetches new reviews and review comments on each |
 | `fetchPRReviews` | `repo: string, prNumber: number, username: string, since: string, prTitle: string, prHtmlUrl: string` | `Promise<DetectedMention[]>` | Fetches review submissions (approve/changes_requested/comment) on a specific PR, excluding self-reviews and dismissed reviews |
 | `fetchPRReviewComments` | `repo: string, prNumber: number, username: string, since: string, prTitle: string, prHtmlUrl: string` | `Promise<DetectedMention[]>` | Fetches inline code review comments on a specific PR, excluding self-comments |
@@ -158,6 +158,11 @@ Provides the GitHub polling subsystem for corvid-agent: searches GitHub for @men
 - **When** `ciRetryService.checkAll()` runs
 - **Then** a new session is created with name `Poll: CorvidLabs/corvid-agent #10: <title>` and a detailed prompt instructing the agent to clone, checkout the PR branch, diagnose CI failures, fix, and push
 
+### Scenario: Open PR without explicit review request is detected
+- **Given** a polling config watching `CorvidLabs` org, and an open PR #13 on `CorvidLabs/rita-weather` authored by `0xGaspar` with no review requested from the agent
+- **When** `searchPullRequestMentions('CorvidLabs', 'corvid-agent', sinceDate)` runs
+- **Then** PR #13 is returned as a `pull_request` mention because the second search (`is:pr is:open -author:corvid-agent`) matches it
+
 ### Scenario: Auto-update with dependency changes
 - **Given** origin/main has new commits that changed `bun.lock`
 - **When** `autoUpdateService.check()` runs with no active sessions
@@ -204,3 +209,4 @@ Provides the GitHub polling subsystem for corvid-agent: searches GitHub for @men
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-04-23 | corvid-agent | `searchPullRequestMentions` now runs two searches: explicit review-requested + proactive open-PR detection for non-bot authors. Added behavioral scenario |

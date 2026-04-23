@@ -374,15 +374,18 @@ export class GitHubSearcher {
   async searchPullRequestMentions(repo: string, username: string, since: string): Promise<DetectedMention[]> {
     try {
       const sinceDate = since.split('T')[0];
-      // Search for PRs that involve this user (review-requested, mentioned, assigned)
-      const query = `${repoQualifier(repo)} is:pr is:open review-requested:${username} updated:>=${sinceDate}`;
-      const result = await this.runGh([
+      const mentions: DetectedMention[] = [];
+      const seenNumbers = new Set<string>();
+
+      // Search 1: PRs with explicit review request (original behavior)
+      const reviewQuery = `${repoQualifier(repo)} is:pr is:open review-requested:${username} updated:>=${sinceDate}`;
+      const reviewResult = await this.runGh([
         'api',
         'search/issues',
         '-X',
         'GET',
         '-f',
-        `q=${query}`,
+        `q=${reviewQuery}`,
         '-f',
         'sort=updated',
         '-f',
@@ -391,29 +394,66 @@ export class GitHubSearcher {
         'per_page=20',
       ]);
 
-      if (!result.ok || !result.stdout.trim()) return [];
+      if (reviewResult.ok && reviewResult.stdout.trim()) {
+        const parsed = JSON.parse(reviewResult.stdout) as { items?: Array<Record<string, unknown>> };
+        for (const item of parsed.items ?? []) {
+          const htmlUrl = (item.html_url as string) ?? '';
+          const itemRepo = resolveFullRepo(repo, htmlUrl);
+          const key = `${itemRepo}-${item.number}`;
+          if (seenNumbers.has(key)) continue;
+          seenNumbers.add(key);
+          mentions.push({
+            id: `pr-${key}`,
+            type: 'pull_request',
+            body: (item.body as string) ?? '',
+            sender: ((item.user as Record<string, unknown>)?.login as string) ?? '',
+            number: item.number as number,
+            title: (item.title as string) ?? '',
+            htmlUrl,
+            createdAt: (item.created_at as string) ?? '',
+            isPullRequest: true,
+          });
+        }
+      }
 
-      const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-      const items = parsed.items ?? [];
-      const mentions: DetectedMention[] = [];
+      // Search 2: All open PRs by others in watched repos (proactive review detection).
+      // This catches PRs where no explicit review was requested from us.
+      const openQuery = `${repoQualifier(repo)} is:pr is:open -author:${username} updated:>=${sinceDate}`;
+      const openResult = await this.runGh([
+        'api',
+        'search/issues',
+        '-X',
+        'GET',
+        '-f',
+        `q=${openQuery}`,
+        '-f',
+        'sort=updated',
+        '-f',
+        'order=desc',
+        '-f',
+        'per_page=20',
+      ]);
 
-      for (const item of items) {
-        const body = (item.body as string) ?? '';
-        const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-        const htmlUrl = (item.html_url as string) ?? '';
-        const itemRepo = resolveFullRepo(repo, htmlUrl);
-
-        mentions.push({
-          id: `pr-${itemRepo}-${item.number}`,
-          type: 'pull_request',
-          body,
-          sender,
-          number: item.number as number,
-          title: (item.title as string) ?? '',
-          htmlUrl,
-          createdAt: (item.created_at as string) ?? '',
-          isPullRequest: true,
-        });
+      if (openResult.ok && openResult.stdout.trim()) {
+        const parsed = JSON.parse(openResult.stdout) as { items?: Array<Record<string, unknown>> };
+        for (const item of parsed.items ?? []) {
+          const htmlUrl = (item.html_url as string) ?? '';
+          const itemRepo = resolveFullRepo(repo, htmlUrl);
+          const key = `${itemRepo}-${item.number}`;
+          if (seenNumbers.has(key)) continue;
+          seenNumbers.add(key);
+          mentions.push({
+            id: `pr-${key}`,
+            type: 'pull_request',
+            body: (item.body as string) ?? '',
+            sender: ((item.user as Record<string, unknown>)?.login as string) ?? '',
+            number: item.number as number,
+            title: (item.title as string) ?? '',
+            htmlUrl,
+            createdAt: (item.created_at as string) ?? '',
+            isPullRequest: true,
+          });
+        }
       }
 
       return mentions;

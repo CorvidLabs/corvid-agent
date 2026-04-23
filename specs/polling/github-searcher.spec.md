@@ -52,7 +52,7 @@ Extracted GitHub search logic from MentionPollingService. Searches GitHub for @m
 | `fetchRecentComments` | `(repo, issueNumber, username, since, isPR, issueData)` | `Promise<DetectedMention[]>` | Fetches recent comments on a specific issue/PR and finds @mentions. |
 | `searchNewIssueMentions` | `(repo, username, since)` | `Promise<DetectedMention[]>` | Searches for newly opened issues mentioning the username in their body. |
 | `searchAssignedIssues` | `(repo, username, since)` | `Promise<DetectedMention[]>` | Searches for issues/PRs recently assigned to the username. |
-| `searchPullRequestMentions` | `(repo, username, since)` | `Promise<DetectedMention[]>` | Searches for open PRs with review requested from the user. |
+| `searchPullRequestMentions` | `(repo, username, since)` | `Promise<DetectedMention[]>` | Searches for open PRs needing review: first PRs with explicit review requests, then all open PRs by other authors in watched repos. Results deduplicated by repo+number. |
 | `searchGlobalAuthoredPRReviews` | `(username, since)` | `Promise<DetectedMention[]>` | Searches for review comments on ALL open PRs authored by the agent globally (not repo-scoped). |
 | `searchAuthoredPRReviews` | `(repo, username, since)` | `Promise<DetectedMention[]>` | Searches for reviews on agent-authored PRs within a specific repo. |
 | `fetchPRReviews` | `(repo, prNumber, username, since, prTitle, prHtmlUrl)` | `Promise<DetectedMention[]>` | Fetches review submissions (approve/changes_requested/comment) on a specific PR. |
@@ -96,6 +96,18 @@ Extracted GitHub search logic from MentionPollingService. Searches GitHub for @m
 - **When** `repoQualifier` is called
 - **Then** it returns `repo:CorvidLabs/corvid-agent`
 
+### Scenario: Open PR without explicit review request is detected
+
+- **Given** `repo: 'CorvidLabs'` and an open PR #13 on `CorvidLabs/rita-weather` authored by `0xGaspar` with no review requested from `corvid-agent`
+- **When** `searchPullRequestMentions('CorvidLabs', 'corvid-agent', sinceDate)` runs
+- **Then** PR #13 is returned because the second search (`is:pr is:open -author:corvid-agent`) matches it, even though the first search (`review-requested:corvid-agent`) does not
+
+### Scenario: Duplicate PR across both searches is deduplicated
+
+- **Given** PR #5 has an explicit review request for `corvid-agent` and also matches the open-PR search
+- **When** `searchPullRequestMentions` runs both searches
+- **Then** PR #5 appears only once in the results (deduplicated by repo+number key)
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -127,3 +139,4 @@ Extracted GitHub search logic from MentionPollingService. Searches GitHub for @m
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-13 | corvid-agent | Initial spec (#591) |
+| 2026-04-23 | corvid-agent | `searchPullRequestMentions` now runs two searches (review-requested + proactive open-PR). Added dedup by repo+number, two new behavioral scenarios |
