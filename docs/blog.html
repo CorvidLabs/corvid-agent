@@ -800,6 +800,145 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: Fledge — One CLI for Your Whole Dev Lifecycle -->
+      <article class="post post--full" id="fledge-introduction"
+               data-tags="engineering,release,research" data-date="2026-04-23"
+               data-search="fledge CLI lifecycle scaffold template lanes task runner fastlane replacement rust binary plugin protocol zero-config AI agent human developer release changelog review spec-driven development doctor six stages build develop review ship extend">
+        <div class="post-meta">
+          <time datetime="2026-04-23">2026-04-23</time>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-release">RELEASE</span>
+          <span class="post-tag tag-research">RESEARCH</span>
+        </div>
+        <h2><a href="#fledge-introduction">Fledge: One CLI for Your Whole Dev Lifecycle &mdash; Whether You&rsquo;re Human or AI</a></h2>
+
+        <p><strong>TL;DR:</strong> We built Fledge &mdash; a single Rust binary that replaces your scaffolding tools, task runners, Makefiles, release scripts, and CI glue. Six lifecycle stages (Start, Build, Develop, Review, Ship, Extend), zero-config defaults for 8+ languages, composable lanes, a plugin system, and structured output for AI agents. Works great with no AI at all. Works even better when humans and agents share the same workflow.</p>
+
+        <h3>The Problem</h3>
+        <p>Software development has a tooling problem. Not a lack-of-tools problem &mdash; the opposite. To go from idea to shipped code, you&rsquo;re stitching together a dozen different tools: Cookiecutter for scaffolding, Make or Just for task running, gh for GitHub, custom scripts for changelogs, more scripts for releases, and probably a few more you&rsquo;ve forgotten about. Each one has its own config format, its own mental model, its own way of breaking.</p>
+        <p>We built <strong>Fledge</strong> to replace that entire pile with a single binary.</p>
+
+        <h3>What Is Fledge?</h3>
+        <p>Fledge is a unified CLI tool for the entire development lifecycle, built in Rust. Scaffold a project, build it, review the code, ship a release &mdash; all from one command. It works with Rust, TypeScript, Python, Go, Ruby, Java, Swift, and more, auto-detecting your project type and providing sensible defaults out of the box.</p>
+        <pre><code># Start a new project
+fledge templates init my-tool --template rust-cli
+
+# Or just use it with an existing project &mdash; zero config
+cd my-existing-project
+fledge run test      # auto-detects project type, runs tests
+fledge lanes run ci  # runs the full CI pipeline
+fledge review        # AI-powered code review
+fledge release minor # bump version, changelog, tag, push</code></pre>
+        <p>No config files needed for the common case. Fledge inspects your project, figures out what you&rsquo;re working with, and does the right thing.</p>
+
+        <h3>The Six Stages</h3>
+        <p>Fledge organizes the dev lifecycle into six interconnected stages:</p>
+        <ol>
+          <li><strong>Start</strong> &mdash; Scaffold new projects from built-in or community templates. Six built-in templates (Rust CLI, TypeScript/Bun, Python CLI, Go CLI, TypeScript/Node, static site) plus a growing community collection including Angular, FastAPI, MCP servers, Swift packages, and monorepos.</li>
+          <li><strong>Build</strong> &mdash; A powerful task runner with zero-config defaults. Define custom tasks in <code>fledge.toml</code>, or just let Fledge figure it out. For a Rust project, <code>fledge run test</code> runs <code>cargo test</code>. For a Node project, it runs <code>npm test</code>. No configuration required.</li>
+          <li><strong>Develop</strong> &mdash; Branch management with <code>fledge work</code>, which creates properly-named feature branches, links GitHub issues, and automates PR creation. Plus <code>fledge spec</code> for specification-driven development &mdash; write the spec first, then validate your code matches it.</li>
+          <li><strong>Review</strong> &mdash; AI-powered code review with <code>fledge review</code>, codebase Q&amp;A with <code>fledge ask</code>, code health metrics, dependency audits, and license scanning.</li>
+          <li><strong>Ship</strong> &mdash; Issue and PR management, CI status monitoring, automatic changelog generation from conventional commits, and a full release pipeline that handles version bumping, tagging, and publishing.</li>
+          <li><strong>Extend</strong> &mdash; A plugin system that lets you add custom commands without forking the project.</li>
+        </ol>
+
+        <h3>A Real Fastlane Replacement</h3>
+        <p>If you&rsquo;ve used Fastlane for iOS/Android builds, this will feel familiar &mdash; but better. Fastlane gave mobile developers composable &ldquo;lanes&rdquo; for automating builds, signing, and deployment. Fledge takes that same concept and generalizes it across every language and platform.</p>
+        <p>The difference? With Fastlane, you&rsquo;re locked into the Ruby ecosystem, limited to mobile platforms, and dependent on a massive gem dependency tree. With Fledge, you get a single static binary &mdash; no runtime dependencies, no gem conflicts, no <code>bundle install</code> prayer circles. And your lanes work for Rust, TypeScript, Python, Go, Swift, or anything else.</p>
+        <p><strong>You write your own lanes.</strong> That&rsquo;s the point. Your CI pipeline, your release workflow, your deploy process &mdash; defined in a simple TOML file that anyone on your team can read and modify:</p>
+        <pre><code>[lanes.ci]
+steps = [
+  { parallel = ["fmt", "lint"] },   # run formatting and linting in parallel
+  "test",                            # then tests
+  "build"                            # then build
+]
+fail_fast = true
+
+[lanes.release-prep]
+steps = ["lint", "test", "changelog", "build"]
+
+[lanes.deploy]
+steps = ["test", "build", { run = "deploy.sh" }]</code></pre>
+        <p>Run it with <code>fledge lanes run ci</code>. Each step is timed, parallel groups execute concurrently, and you get a clear report of what passed and what failed. No magic &mdash; just composable steps you define and control.</p>
+
+        <h3>Plugins: Extend As Much As You Want</h3>
+        <p>Fledge uses a git-style plugin model. Drop a <code>fledge-deploy</code> binary on your PATH, and <code>fledge deploy</code> just works.</p>
+        <p>But it goes further than simple subcommands. Plugins use a structured protocol (JSON over stdin/stdout) with a capabilities model &mdash; plugins declare what they need (execute commands, store data, read project metadata) and users approve during installation. No silent privilege escalation.</p>
+        <pre><code>fledge plugins install CorvidLabs/fledge-plugin-deploy
+fledge deploy staging</code></pre>
+        <p>Plugins can also hook into the lifecycle &mdash; running code after <code>fledge work start</code>, before PR creation, or after builds.</p>
+        <p>The plugin system means Fledge never has to say &ldquo;we don&rsquo;t support that.&rdquo; Need custom deployment logic? Write a plugin. Want to integrate with your internal tools? Write a plugin. Have a niche workflow that no general-purpose tool would ever ship? Write a plugin. The core stays lean while the ecosystem grows.</p>
+
+        <h3>For Humans Who Don&rsquo;t Want AI</h3>
+        <p>Let&rsquo;s be clear: <strong>Fledge is a great tool even if you never touch AI features.</strong></p>
+        <p>Not everyone wants an AI code reviewer. Not everyone wants automated PR summaries. And that&rsquo;s fine &mdash; Fledge doesn&rsquo;t force it on you. The AI features (<code>fledge review</code>, <code>fledge ask</code>) are entirely optional. Without them, you still get:</p>
+        <ul>
+          <li><strong>Zero-config task running</strong> across 8+ languages</li>
+          <li><strong>Lanes</strong> that replace your Makefiles, Justfiles, and shell scripts</li>
+          <li><strong>Project scaffolding</strong> from templates with community sharing</li>
+          <li><strong>Branch management</strong> with consistent naming and PR automation</li>
+          <li><strong>Changelog generation</strong> from conventional commits</li>
+          <li><strong>Release pipeline</strong> &mdash; version bump, tag, push, publish in one command</li>
+          <li><strong>Doctor</strong> &mdash; verify your entire toolchain in seconds</li>
+          <li><strong>Dependency audits and license scanning</strong></li>
+          <li><strong>A plugin system</strong> to extend anything</li>
+        </ul>
+        <p>This is a complete dev lifecycle tool on its own merits. No AI subscription required, no API keys needed, no cloud dependency. Just a fast Rust binary that does exactly what you tell it to.</p>
+
+        <h3>For Humans Who DO Want AI</h3>
+        <p>Now here&rsquo;s where it gets interesting. If you&rsquo;re a human developer who works alongside AI agents &mdash; or just wants AI-powered code review &mdash; Fledge becomes the shared interface between you and your AI collaborators.</p>
+        <p><strong>Same tools, same workflow, seamless handoff.</strong> When you and an AI agent both use Fledge, you&rsquo;re operating on the same lanes, the same branch conventions, the same project configuration. An agent can pick up where you left off (and vice versa) because the workflow state is the same <code>fledge.toml</code>, the same lanes, the same specs.</p>
+        <ul>
+          <li>You define a <code>ci</code> lane &rarr; the agent runs <code>fledge lanes run ci</code> to validate its changes</li>
+          <li>You write a spec &rarr; the agent runs <code>fledge spec check</code> to verify its implementation matches</li>
+          <li>You start a feature branch with <code>fledge work start</code> &rarr; the agent sees the linked issue, the branch naming, the context</li>
+          <li>The agent opens a PR &rarr; you review it with the same <code>fledge review</code> command</li>
+        </ul>
+        <p>No translation layer. No &ldquo;the AI uses different tools than I do.&rdquo; One workflow for everyone.</p>
+
+        <h3>Built for AI Agents Too</h3>
+        <p>At CorvidLabs, our AI agents &mdash; CorvidAgent, Magpie, Rook, Jackdaw, and others &mdash; do real software engineering work every day. They create branches, write code, run tests, open PRs, and ship releases. Fledge was designed with them in mind from day one.</p>
+        <ul>
+          <li><strong>Zero-config defaults</strong> eliminate the setup barrier. An agent can clone a repo and immediately run <code>fledge run test</code> or <code>fledge lanes run ci</code> without needing to understand the project&rsquo;s custom build system.</li>
+          <li><strong>Structured output everywhere.</strong> Every command supports <code>--json</code> output for machine parsing. An agent can run <code>fledge doctor --json</code> and programmatically check which tools are missing.</li>
+          <li><strong>Lanes as executable contracts.</strong> When a human defines a <code>ci</code> lane, that same lane runs identically whether triggered by a human, an agent in a worktree, or CI in the cloud. One definition, three contexts, same result.</li>
+          <li><strong>The plugin protocol is agent-native.</strong> JSON-over-stdin/stdout with structured messages means agents can interact with plugins just as naturally as they interact with any other API.</li>
+          <li><strong>Doctor as environment validation.</strong> Before an agent starts work, <code>fledge doctor</code> validates the entire toolchain. Missing compiler? Wrong Node version? The agent knows before writing a single line of code.</li>
+          <li><strong>Spec-driven development bridges intent and implementation.</strong> Agents can run <code>fledge spec check</code> to verify their code changes actually match the specification &mdash; critical for autonomous work where there&rsquo;s no human watching every keystroke.</li>
+        </ul>
+
+        <h3>Security-First</h3>
+        <p>Because agents and humans share the same tools, security is non-negotiable:</p>
+        <ul>
+          <li><strong>Template path traversal protection</strong> &mdash; templates can&rsquo;t write outside the project directory</li>
+          <li><strong>Plugin capability model</strong> &mdash; explicit permission grants, no silent escalation</li>
+          <li><strong>Config file permissions</strong> &mdash; enforced 0600 on sensitive files</li>
+          <li><strong>Token handling</strong> &mdash; credentials are never logged, with multiple secure storage options</li>
+          <li><strong>Post-create hook confirmation</strong> &mdash; template hooks always ask before executing (unless explicitly bypassed for CI)</li>
+        </ul>
+
+        <h3>Getting Started</h3>
+        <pre><code># Homebrew
+brew install CorvidLabs/tap/fledge
+
+# Cargo
+cargo install fledge
+
+# Or curl
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/fledge/main/install.sh | bash</code></pre>
+        <p>Try it on an existing project:</p>
+        <pre><code>cd your-project
+fledge doctor          # check your environment
+fledge run test        # run tests (auto-detected)
+fledge lanes run ci    # run the full CI pipeline</code></pre>
+        <p>Or start something new:</p>
+        <pre><code>fledge templates init my-app --template ts-bun
+cd my-app
+fledge lanes run ci</code></pre>
+        <p><strong>Fledge v0.10.0</strong> is available now. Check out the docs, the GitHub repo, and the community templates.</p>
+        <p><em>Fledge is open source (MIT) and built by CorvidLabs. We&rsquo;d love your feedback &mdash; open an issue, submit a template, or write a plugin. The dev lifecycle is too important to be fragmented.</em></p>
+      </article>
+
       <!-- Post: Hardening the Foundation — Process Decomposition, Leak Fixes, and Performance SLAs -->
       <article class="post post--full" id="hardening-the-foundation"
                data-tags="engineering,stability,performance" data-date="2026-04-18"
