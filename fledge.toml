@@ -1,0 +1,62 @@
+# fledge.toml -- corvid-agent development workflows
+# Project type: bun-typescript (Bun runtime, Angular frontend, SQLite)
+
+[tasks]
+lint = "bun run lint"
+typecheck = "bun x tsc --noEmit --skipLibCheck"
+test = "bun test"
+spec-check = "bun run spec:check"
+build = "bun run build:client"
+lint-fix = "bun run lint:fix"
+format = "bun run format:fix"
+lint-sql = "bun run lint:sql"
+security-scan = "bun run security:scan"
+
+[tasks.dev]
+cmd = "bun --watch server/index.ts"
+description = "Start dev server with hot reload"
+
+[tasks.dev-client]
+cmd = "cd client && bun run start"
+description = "Start Angular dev server"
+
+[tasks.migrate-status]
+cmd = "bun run migrate:status"
+description = "Show database migration status"
+
+[tasks.openapi-validate]
+cmd = "bun run openapi:validate"
+description = "Validate OpenAPI spec against routes"
+
+[lanes.verify]
+description = "Full verification pipeline (what agents run before committing)"
+steps = [
+  { parallel = ["lint", "typecheck"] },
+  "test",
+  "spec-check",
+]
+
+[lanes.ci]
+description = "CI pipeline with client build"
+steps = ["verify", "build"]
+
+[lanes.check]
+description = "Quick quality check (lint + types only)"
+steps = [{ parallel = ["lint", "typecheck"] }]
+
+[lanes.pre-commit]
+description = "Run before committing changes"
+steps = [
+  { parallel = ["lint", "typecheck"] },
+  "test",
+  "spec-check",
+]
+
+[lanes.audit]
+description = "Full quality and security audit"
+fail_fast = false
+steps = ["lint", "typecheck", "test", "spec-check", "lint-sql", "security-scan", "openapi-validate"]
+
+[lanes.fix]
+description = "Auto-fix lint and formatting issues"
+steps = [{ parallel = ["lint-fix", "format"] }]
