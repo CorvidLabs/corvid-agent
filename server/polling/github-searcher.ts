@@ -16,7 +16,7 @@ export interface DetectedMention {
   /** Unique identifier (e.g. comment ID or issue number + timestamp) */
   id: string;
   /** Event type */
-  type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request' | 'assignment';
+  type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request' | 'assignment' | 'review_request';
   /** The comment/issue body containing the @mention */
   body: string;
   /** GitHub username of the author */
@@ -118,10 +118,16 @@ export class GitHubSearcher {
     mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Global allowlist filter (empty = open mode).
-    // Assignment-type mentions bypass the allowlist — the assignment itself
-    // is authorization (someone with repo write access explicitly assigned us).
+    // Authorized mention types bypass the allowlist:
+    // - assignment: someone with write access assigned us
+    // - review_request: someone with write access requested our review
+    // - pull_request_review_comment: feedback on our authored PR
+    // - issue_comment: direct @mention on a repo we're watching
+    // - issues: new issue that explicitly @mentions us
+    // Only 'pull_request' (proactive open-PR detection) is filtered.
+    const bypassesAllowlist = (type: DetectedMention['type']): boolean => type !== 'pull_request';
     const globalFiltered = mentions.filter((m) => {
-      if (m.type === 'assignment') return true;
+      if (bypassesAllowlist(m.type)) return true;
       const allowed = isAllowed(m.sender);
       if (!allowed) {
         log.debug('Filtered mention — sender not in allowlist', {
@@ -135,11 +141,11 @@ export class GitHubSearcher {
     });
 
     // Per-config allowed users filter (further restricts global list).
-    // Assignments still bypass this filter.
+    // Authorized mention types still bypass this filter.
     if (config.allowedUsers.length > 0) {
       const allowed = new Set(config.allowedUsers.map((u) => u.toLowerCase()));
       return globalFiltered.filter((m) => {
-        if (m.type === 'assignment') return true;
+        if (bypassesAllowlist(m.type)) return true;
         return allowed.has(m.sender.toLowerCase());
       });
     }
@@ -405,7 +411,7 @@ export class GitHubSearcher {
 
         mentions.push({
           id: `pr-${itemRepo}-${item.number}`,
-          type: 'pull_request',
+          type: 'review_request',
           body,
           sender,
           number: item.number as number,
