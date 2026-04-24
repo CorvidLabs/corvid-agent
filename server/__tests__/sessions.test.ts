@@ -204,6 +204,34 @@ describe('session messages', () => {
     const session = makeSession();
     expect(getSessionMessages(db, session.id)).toHaveLength(0);
   });
+
+  test('strips conversation_history tags when storing (#2136)', () => {
+    const session = makeSession();
+    const contentWithTags = '<conversation_history>\n[User]: old\n</conversation_history>\nNew question';
+    addSessionMessage(db, session.id, 'user', contentWithTags);
+
+    const msgs = getSessionMessages(db, session.id);
+    expect(msgs[0].content).toBe('New question');
+    expect(msgs[0].content).not.toContain('<conversation_history>');
+  });
+
+  test('strips multiple conversation_history blocks', () => {
+    const session = makeSession();
+    const content = '<conversation_history>a</conversation_history> middle <conversation_history>b</conversation_history> end';
+    addSessionMessage(db, session.id, 'user', content);
+
+    const msgs = getSessionMessages(db, session.id);
+    expect(msgs[0].content).toBe('middle end');
+  });
+
+  test('preserves content without conversation_history tags', () => {
+    const session = makeSession();
+    const content = 'Just a regular message';
+    addSessionMessage(db, session.id, 'user', content);
+
+    const msgs = getSessionMessages(db, session.id);
+    expect(msgs[0].content).toBe('Just a regular message');
+  });
 });
 
 // ── AlgoChat Conversations ──────────────────────────────────────────
