@@ -49,16 +49,16 @@ export const tables: string[] = [
     )`,
 
   `CREATE TABLE IF NOT EXISTS work_task_attestations (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id     TEXT NOT NULL,
-        agent_id    TEXT NOT NULL,
-        outcome     TEXT NOT NULL CHECK (outcome IN ('completed', 'failed')),
-        pr_url      TEXT,
-        duration_ms INTEGER,
-        hash        TEXT NOT NULL,
-        payload     TEXT NOT NULL,
-        txid        TEXT,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id      TEXT NOT NULL,
+        agent_id     TEXT NOT NULL,
+        outcome      TEXT NOT NULL CHECK (outcome IN ('completed', 'failed')),
+        pr_url       TEXT,
+        duration_ms  INTEGER,
+        hash         TEXT NOT NULL,
+        payload      TEXT NOT NULL,
+        txid         TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now')),
         published_at TEXT
     )`,
 ];
