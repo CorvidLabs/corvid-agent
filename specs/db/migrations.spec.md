@@ -48,6 +48,7 @@ files:
   - server/db/migrations/118_thread_session_summary.ts
   - server/db/migrations/119_telegram_config.ts
   - server/db/migrations/120_observation_channel_id.ts
+  - server/db/migrations/121_work_task_attestations.ts
 db_tables:
   - schema_version
 depends_on: []
