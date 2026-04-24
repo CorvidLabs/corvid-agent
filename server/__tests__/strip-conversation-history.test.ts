@@ -22,7 +22,8 @@ describe('stripConversationHistory', () => {
   });
 
   test('strips multiple conversation_history blocks', () => {
-    const input = '<conversation_history>a</conversation_history> middle <conversation_history>b</conversation_history> end';
+    const input =
+      '<conversation_history>a</conversation_history> middle <conversation_history>b</conversation_history> end';
     expect(stripConversationHistory(input)).toBe('middle end');
   });
 
