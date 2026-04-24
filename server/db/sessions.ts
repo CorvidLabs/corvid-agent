@@ -7,6 +7,7 @@ import type {
   UpdateSessionInput,
 } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { stripConversationHistory } from '../lib/strip-conversation-history';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { writeTransaction } from './pool';
 
@@ -264,9 +265,12 @@ export function addSessionMessage(
   content: string,
   costUsd: number = 0,
 ): SessionMessage {
+  // Strip any existing conversation_history tags to prevent nesting (#2136)
+  const cleanContent = stripConversationHistory(content);
+
   const result = db
     .query(`INSERT INTO session_messages (session_id, role, content, cost_usd) VALUES (?, ?, ?, ?)`)
-    .run(sessionId, role, content, costUsd);
+    .run(sessionId, role, cleanContent, costUsd);
 
   const row = db.query('SELECT * FROM session_messages WHERE id = ?').get(result.lastInsertRowid) as MessageRow;
   return rowToMessage(row);
