@@ -36,6 +36,39 @@ describe('stripConversationHistory', () => {
     const input = '<conversation_history>x</conversation_history>   \n\nfollowing text';
     expect(stripConversationHistory(input)).toBe('following text');
   });
+
+  test('handles nested conversation_history blocks (#2136)', () => {
+    const input = [
+      '<conversation_history>',
+      '[User]: <conversation_history>',
+      'channel context here',
+      '</conversation_history>',
+      'actual user message',
+      '[Assistant]: previous response',
+      '</conversation_history>',
+    ].join('\n');
+    expect(stripConversationHistory(input)).toBe('');
+  });
+
+  test('preserves text after nested blocks (#2136)', () => {
+    const input = [
+      '<conversation_history>',
+      'outer start',
+      '<conversation_history>',
+      'inner content',
+      '</conversation_history>',
+      'outer end',
+      '</conversation_history>',
+      '',
+      'real user message here',
+    ].join('\n');
+    expect(stripConversationHistory(input)).toBe('real user message here');
+  });
+
+  test('strips orphaned closing tags from nesting artifacts', () => {
+    const input = 'some text </conversation_history> more text';
+    expect(stripConversationHistory(input)).toBe('some text more text');
+  });
 });
 
 describe('extractConversationTopics', () => {
