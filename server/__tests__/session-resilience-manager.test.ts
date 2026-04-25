@@ -215,7 +215,9 @@ describe('SessionResilienceManager', () => {
   describe('checkApiHealth', () => {
     it('returns a boolean', async () => {
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = () => Promise.resolve(new Response(null, { status: 200 }));
+      const mockFetch = (() => Promise.resolve(new Response(null, { status: 200 }))) as typeof fetch;
+      mockFetch.preconnect = () => {};
+      globalThis.fetch = mockFetch;
       try {
         const result = await manager.checkApiHealth();
         expect(typeof result).toBe('boolean');
