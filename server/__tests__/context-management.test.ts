@@ -444,7 +444,7 @@ describe('summarizeConversation', () => {
 
 describe('summarizeConsumedToolResults', () => {
   it('summarizes large tool results followed by assistant response', () => {
-    const bigResult = '/server/lib/foo.ts\n' + 'x'.repeat(800);
+    const bigResult = `/server/lib/foo.ts\n${'x'.repeat(800)}`;
     const messages: ConversationMessage[] = [
       { role: 'user', content: 'read the file' },
       { role: 'tool', content: bigResult },
@@ -490,7 +490,7 @@ describe('summarizeConsumedToolResults', () => {
   });
 
   it('preserves error indicators in summary', () => {
-    const toolResult = 'Error: something broke\n' + 'details '.repeat(100);
+    const toolResult = `Error: something broke\n${'details '.repeat(100)}`;
     const messages: ConversationMessage[] = [
       { role: 'user', content: 'check' },
       { role: 'tool', content: toolResult },

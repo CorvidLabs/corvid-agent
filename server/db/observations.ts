@@ -86,7 +86,12 @@ export function getObservation(db: Database, id: string): MemoryObservation | nu
 export function listObservations(
   db: Database,
   agentId: string,
-  opts?: { status?: ObservationStatus; limit?: number; source?: ObservationSource },
+  opts?: {
+    status?: ObservationStatus;
+    limit?: number;
+    source?: ObservationSource;
+    sourcePreference?: ObservationSource;
+  },
 ): MemoryObservation[] {
   const conditions = ['agent_id = ?'];
   const params: (string | number)[] = [agentId];
@@ -103,11 +108,19 @@ export function listObservations(
   const limit = opts?.limit ?? 50;
   params.push(limit);
 
+  // When sourcePreference is set, boost relevance_score for matching-source observations
+  // by adding a CASE expression in the ORDER BY clause
+  let orderBy = 'relevance_score DESC, created_at DESC';
+  if (opts?.sourcePreference) {
+    orderBy = `CASE WHEN source = ? THEN relevance_score + 10.0 ELSE relevance_score END DESC, created_at DESC`;
+    params.splice(-1, 0, opts.sourcePreference); // Insert before LIMIT parameter
+  }
+
   const rows = db
     .query(
       `SELECT * FROM memory_observations
          WHERE ${conditions.join(' AND ')}
-         ORDER BY relevance_score DESC, created_at DESC
+         ORDER BY ${orderBy}
          LIMIT ?`,
     )
     .all(...params) as ObservationRow[];
