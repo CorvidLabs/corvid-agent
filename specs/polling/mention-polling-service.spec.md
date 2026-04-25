@@ -58,7 +58,7 @@ Initializes `DedupService` (namespace `polling:triggers`, maxSize 500, TTL 60s),
 9. **Poll date is padded by 1 day**: The `sinceDate` is padded back 24 hours from `lastPollAt` because GitHub search only supports date precision. Dedup relies on processedIds, not date filtering (enforced in `GitHubSearcher`)
 10. **Repo blocklist and off-limits guard**: Mentions from repos on the blocklist (`isRepoBlocked`) or off-limits list (`isRepoOffLimits`) are silently skipped
 11. **Dependency checking**: Issues with `<!-- blocked-by: #N -->` markers are skipped while any blocker issue is still open. Issue state is cached for 5 minutes (`ISSUE_STATE_TTL_MS`)
-12. **Human-assignment guard**: Non-assignment mentions on issues assigned exclusively to humans (not the bot) are skipped to respect human ownership
+12. **Human-assignment guard**: Non-assignment, non-PR mentions on issues assigned exclusively to humans (not the bot) are skipped to respect human ownership. PR mentions (`type: 'pull_request'`) bypass this guard because PR authors commonly self-assign and that should not prevent review detection
 13. **Prompt injection scanning**: Mention bodies from non-bot senders are scanned via `scanGitHubContent`; HIGH/CRITICAL confidence matches are blocked (mention marked as processed to prevent retry loops)
 14. **Acknowledgment comment**: On successful trigger, an immediate acknowledgment comment is posted to the GitHub issue/PR
 15. **Completion tracking**: The service subscribes to session end events; on error or manual stop, a follow-up comment is posted to ensure the issue does not go silent after acknowledgment
@@ -128,6 +128,12 @@ Initializes `DedupService` (namespace `polling:triggers`, maxSize 500, TTL 60s),
 - **When** the human-assignment guard runs
 - **Then** the mention is skipped because the issue is assigned exclusively to humans
 
+### Scenario: PR assigned to human author is still detected
+
+- **Given** PR #13 on `CorvidLabs/rita-weather` is authored and self-assigned by `0xGaspar`, with no review requested from the agent
+- **When** the polling system detects the PR via `searchPullRequestMentions` (proactive open-PR search) and the human-assignment guard runs
+- **Then** the PR is NOT skipped because `pull_request` type mentions bypass the human-assignment guard
+
 ### Scenario: PR/session accumulation over time
 
 - **Given** a high-traffic repo generating many mention-triggered sessions over weeks
@@ -168,6 +174,7 @@ The search paths are delegated to `GitHubSearcher` (in `server/polling/github-se
 | 3 | `searchAssignedIssues` | (always runs) | Issues/PRs assigned to user. Not filtered by event type — always checked |
 | 4 | `searchAuthoredPRReviews` → `fetchPRReviews` | `pull_request_review_comment` | Review submissions (approve/changes_requested/comment) on PRs authored by user |
 | 5 | `searchAuthoredPRReviews` → `fetchPRReviewComments` | `pull_request_review_comment` | Inline code review comments on PRs authored by user |
+| 6 | `searchPullRequestMentions` (proactive) | `pull_request` | Open PRs by other authors in watched repos, even without explicit review request. Deduplicated with review-requested results by repo+number |
 
 ## Dependencies
 
@@ -227,3 +234,4 @@ The search paths are delegated to `GitHubSearcher` (in `server/polling/github-se
 | 2026-02-20 | corvid-agent | Add MAX_TRIGGERS_PER_CYCLE (5), stampede scenario, throttling gaps table, PR accumulation notes |
 | 2026-02-20 | claude | Session guard now only blocks on running/idle sessions, not completed. Follow-up comments on the same issue trigger new sessions correctly |
 | 2026-04-09 | claude | Spec v2: session guard checks only `running` (not idle). Add sub-services (AutoMerge, CIRetry, AutoUpdate), DedupService, GitHubSearcher delegation, dependency checking, human-assignment guard, repo blocklist, prompt injection scanning, acknowledgment/completion comments, event-based schedule triggering, observability context. Update all dependency tables to match actual imports. Add setSchedulerService method, constructor details, new invariants (10-17), new scenarios, new error cases, new config entries |
+| 2026-04-23 | corvid-agent | Human-assignment guard now bypasses `pull_request` type mentions (PR authors self-assigning shouldn't block review detection). Added proactive open-PR search path (#6) and new behavioral scenario |
