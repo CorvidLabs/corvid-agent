@@ -214,9 +214,14 @@ describe('SessionResilienceManager', () => {
 
   describe('checkApiHealth', () => {
     it('returns a boolean', async () => {
-      // This makes a real HTTP call — we just verify it returns a boolean
-      const result = await manager.checkApiHealth();
-      expect(typeof result).toBe('boolean');
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = () => Promise.resolve(new Response(null, { status: 200 }));
+      try {
+        const result = await manager.checkApiHealth();
+        expect(typeof result).toBe('boolean');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 
