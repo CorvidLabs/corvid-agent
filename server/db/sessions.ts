@@ -265,12 +265,11 @@ export function addSessionMessage(
   content: string,
   costUsd: number = 0,
 ): SessionMessage {
-  // Strip any existing conversation_history tags to prevent nesting (#2136)
-  const cleanContent = stripConversationHistory(content);
-
+  // Strip conversation_history tags at storage time to prevent nested tags on resume (#2136)
+  const sanitized = role === 'user' ? stripConversationHistory(content) : content;
   const result = db
     .query(`INSERT INTO session_messages (session_id, role, content, cost_usd) VALUES (?, ?, ?, ?)`)
-    .run(sessionId, role, cleanContent, costUsd);
+    .run(sessionId, role, sanitized, costUsd);
 
   const row = db.query('SELECT * FROM session_messages WHERE id = ?').get(result.lastInsertRowid) as MessageRow;
   return rowToMessage(row);

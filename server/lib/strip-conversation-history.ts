@@ -1,6 +1,15 @@
-/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting (#2122). */
+/** Strip previously injected `<conversation_history>` blocks to prevent recursive nesting (#2122, #2136). */
 export function stripConversationHistory(content: string): string {
-  return content.replace(/<conversation_history>[\s\S]*?<\/conversation_history>\s*/g, '').trim();
+  // Match innermost blocks first (no nested opening tag inside), then loop to collapse nesting.
+  const innermost = /<conversation_history>(?:(?!<conversation_history>)[\s\S])*?<\/conversation_history>\s*/g;
+  let result = content;
+  let prev: string;
+  do {
+    prev = result;
+    result = result.replace(innermost, '');
+  } while (result !== prev);
+  // Strip any orphaned open/close tags left over
+  return result.replace(/<\/?conversation_history>\s*/g, '').trim();
 }
 
 /** Extract main topics from a conversation by looking at user messages. */
