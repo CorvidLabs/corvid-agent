@@ -22,7 +22,7 @@ import {
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 import { cleanupEphemeralDir, type ResolvedDir, resolveProjectDir } from '../lib/project-dir';
-import { stripConversationHistory } from '../lib/strip-conversation-history';
+import { extractConversationTopics, stripConversationHistory } from '../lib/strip-conversation-history';
 import { removeWorktree } from '../lib/worktree';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { PluginRegistry } from '../plugins/registry';
@@ -1961,19 +1961,8 @@ export class ProcessManager {
     }
   }
 
-  /**
-   * Extract main topics from a conversation by looking at user messages.
-   */
   private extractTopics(messages: Array<{ role: string; content: string }>): string[] {
-    const userMessages = messages.filter((m) => m.role === 'user').map((m) => stripConversationHistory(m.content));
-
-    // Simple heuristic: first 2-3 words of first few user messages
-    const topics = new Set<string>();
-    for (const msg of userMessages.slice(0, 3)) {
-      const words = msg.split(/\s+/).slice(0, 2).join(' ');
-      if (words.length > 3) topics.add(words);
-    }
-    return Array.from(topics).slice(0, 3);
+    return extractConversationTopics(messages);
   }
 
   /**
