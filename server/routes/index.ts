@@ -743,6 +743,23 @@ async function handleRoutes(
     return handleMemoryBackfill(db, agentMessenger ?? null);
   }
 
+  // GET /api/memories/attestations?agentId=<id> — list memory attestations for an agent
+  if (url.pathname === '/api/memories/attestations' && req.method === 'GET') {
+    const agentIdParam = url.searchParams.get('agentId');
+    if (!agentIdParam) return json({ error: 'agentId query parameter required' }, 400);
+    const { listMemoryAttestations } = await import('../memory/attestation');
+    return json(listMemoryAttestations(db, agentIdParam));
+  }
+
+  // GET /api/memories/attestations/:agentId/:key — get latest attestation for a specific key
+  const memAttestMatch = url.pathname.match(/^\/api\/memories\/attestations\/([^/]+)\/(.+)$/);
+  if (memAttestMatch && req.method === 'GET') {
+    const [, agentIdParam, keyParam] = memAttestMatch;
+    const { getMemoryAttestation } = await import('../memory/attestation');
+    const att = getMemoryAttestation(db, agentIdParam, decodeURIComponent(keyParam));
+    return att ? json(att) : json({ error: 'No attestation found' }, 404);
+  }
+
   // Model exam routes
   const examResponse = await handleExamRoutes(req, url, db, processManager);
   if (examResponse) return examResponse;

@@ -108,16 +108,19 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
         const { createMemoryAsa, updateMemoryAsa, resolveAsaForKey } = await import('../../memory/arc69-store');
         const existingAsaId = resolveAsaForKey(ctx.db, ctx.agentId, args.key);
 
+        const { createMemoryAttestation } = await import('../../memory/attestation');
         if (existingAsaId) {
           const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, memory.content);
           updateMemoryTxid(ctx.db, memory.id, txid);
           updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+          createMemoryAttestation(ctx.db, ctx.agentId, args.key, txid).catch(() => {});
           return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${existingAsaId}).`);
         } else {
           const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, memory.content);
           updateMemoryTxid(ctx.db, memory.id, txid);
           updateMemoryAsaId(ctx.db, memory.id, asaId);
           updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+          createMemoryAttestation(ctx.db, ctx.agentId, args.key, txid).catch(() => {});
           return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${asaId}).`);
         }
       } catch (err) {
@@ -128,16 +131,19 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
       }
     } else {
       // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
+      const memoryKey = args.key;
       updateMemoryStatus(ctx.db, memory.id, 'pending');
       encryptMemoryContent(memory.content, ctx.serverMnemonic, ctx.network)
         .then((encrypted) => {
-          return ctx.agentMessenger.sendOnChainToSelf(ctx.agentId, `[MEMORY:${args.key}] ${encrypted}`);
+          return ctx.agentMessenger.sendOnChainToSelf(ctx.agentId, `[MEMORY:${memoryKey}] ${encrypted}`);
         })
-        .then((txid) => {
+        .then(async (txid) => {
           if (txid) {
             try {
               updateMemoryTxid(ctx.db, memory.id, txid);
               updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+              const { createMemoryAttestation } = await import('../../memory/attestation');
+              createMemoryAttestation(ctx.db, ctx.agentId, memoryKey, txid).catch(() => {});
             } catch {
               // DB may be closed during test teardown — safe to ignore
             }

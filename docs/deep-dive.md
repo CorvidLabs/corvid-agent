@@ -37,13 +37,13 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | TypeScript LOC | 182,301 |
 | Server modules | 47 |
 | API routes | 55 modules (~236 endpoints) |
-| Database tables | 112 |
-| Database migrations | 44 (squashed baseline) |
+| Database tables | 113 |
+| Database migrations | 45 (squashed baseline) |
 | MCP tools | 56 corvid_* handlers |
 | Unit tests | 4,242 test files |
 | E2E tests | 360 across 33 Playwright specs |
 | Security tests | 232 dedicated |
-| Module specs | 215 .spec.md files |
+| Module specs | 216 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
 | Version | 0.51.0 |

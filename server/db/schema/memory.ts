@@ -1,6 +1,16 @@
 /** Agent memory tables, observation tables, FTS virtual tables, and sync triggers. */
 
 export const tables: string[] = [
+  `CREATE TABLE IF NOT EXISTS memory_attestations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_key   TEXT NOT NULL,
+        agent_id     TEXT NOT NULL,
+        hash         TEXT NOT NULL,
+        payload      TEXT NOT NULL,
+        txid         TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        published_at TEXT
+    )`,
   `CREATE TABLE IF NOT EXISTS agent_memories (
         id         TEXT PRIMARY KEY,
         agent_id   TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -35,6 +45,8 @@ export const tables: string[] = [
 ];
 
 export const indexes: string[] = [
+  `CREATE INDEX IF NOT EXISTS idx_memory_attestations_agent_id ON memory_attestations(agent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_memory_attestations_key ON memory_attestations(memory_key)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
