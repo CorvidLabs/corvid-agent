@@ -857,6 +857,10 @@ export class WorkTaskService {
     return dbListWorkTasks(this.db, agentId, tenantId);
   }
 
+  getAttestation(taskId: string) {
+    return this._attestation.getAttestation(taskId);
+  }
+
   /**
    * Retry a failed work task: reset it to pending and re-execute from scratch.
    */

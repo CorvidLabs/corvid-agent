@@ -59,6 +59,16 @@ export function handleWorkTaskRoutes(
     return handleRetry(retryMatch[1], workTaskService, tenantId);
   }
 
+  // GET /api/work-tasks/:id/attestation — get on-chain attestation record
+  const attestationMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/attestation$/);
+  if (attestationMatch && method === 'GET') {
+    const task = workTaskService.getTask(attestationMatch[1], tenantId);
+    if (!task) return json({ error: 'Work task not found' }, 404);
+    const attestation = workTaskService.getAttestation(attestationMatch[1]);
+    if (!attestation) return json({ error: 'No attestation found for this task' }, 404);
+    return json(attestation);
+  }
+
   // GET /api/work-tasks/:id — get single
   const idMatch = path.match(/^\/api\/work-tasks\/([^/]+)$/);
   if (idMatch && method === 'GET') {
