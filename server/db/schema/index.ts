@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 121;
+const SCHEMA_VERSION = 122;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -275,6 +275,21 @@ const MIGRATIONS: Record<number, string[]> = {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_task_id ON work_task_attestations(task_id)`,
     `CREATE INDEX IF NOT EXISTS idx_work_task_attestations_agent_id ON work_task_attestations(agent_id)`,
+  ],
+  122: [
+    // Memory attestations: on-chain verifiable records of memory promotion events
+    `CREATE TABLE IF NOT EXISTS memory_attestations (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      memory_key   TEXT NOT NULL,
+      agent_id     TEXT NOT NULL,
+      hash         TEXT NOT NULL,
+      payload      TEXT NOT NULL,
+      txid         TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      published_at TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_attestations_agent_id ON memory_attestations(agent_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_attestations_key ON memory_attestations(memory_key)`,
   ],
 };
 
