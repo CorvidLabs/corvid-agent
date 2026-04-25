@@ -170,6 +170,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
 | `onStatusChange` | `(taskId: string, callback: StatusChangeCallback) ` | `void` | Register a status-change callback (fires on branching, running, validating) |
+| `getAttestation` | `(taskId: string)` | `WorkTaskAttestationRecord \| null` | Get the latest on-chain attestation record for a task; returns null if not yet attested |
 | `pruneStaleWorktrees` | `()` | `Promise<void>` | Clean up worktrees for terminal tasks (completed/failed) with leftover worktree_dir; also runs `git worktree prune` |
 | `startPeriodicCleanup` | `()` | `void` | Start a 6-hour interval timer for stale worktree cleanup |
 | `stopPeriodicCleanup` | `()` | `void` | Stop the periodic cleanup timer |

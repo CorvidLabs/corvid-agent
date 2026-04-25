@@ -137,6 +137,51 @@ describe('Work Task Routes', () => {
     expect(svc.retryTask).toHaveBeenCalledWith('task-1', 'default');
   });
 
+  it('GET /api/work-tasks/:id/attestation returns 404 when task not found', async () => {
+    const svc = createMockWorkTaskService();
+    const { req, url } = fakeReq('GET', '/api/work-tasks/nonexistent/attestation');
+    const res = handleWorkTaskRoutes(req, url, svc);
+    expect((res as Response).status).toBe(404);
+    const data = await (res as Response).json();
+    expect(data.error).toContain('Work task not found');
+  });
+
+  it('GET /api/work-tasks/:id/attestation returns 404 when no attestation exists', async () => {
+    const svc = createMockWorkTaskService({
+      getTask: mock(() => ({ id: 'task-1', description: 'fix bug' })),
+      getAttestation: mock(() => null),
+    } as unknown as Partial<WorkTaskService>);
+    const { req, url } = fakeReq('GET', '/api/work-tasks/task-1/attestation');
+    const res = handleWorkTaskRoutes(req, url, svc);
+    expect((res as Response).status).toBe(404);
+    const data = await (res as Response).json();
+    expect(data.error).toContain('No attestation');
+  });
+
+  it('GET /api/work-tasks/:id/attestation returns attestation record', async () => {
+    const attestation = {
+      taskId: 'task-1',
+      agentId: 'agent-1',
+      outcome: 'completed' as const,
+      hash: 'abc123',
+      payload: '{}',
+      txid: 'TXID123',
+      createdAt: '2026-04-24T00:00:00Z',
+      publishedAt: '2026-04-24T00:00:01Z',
+    };
+    const svc = createMockWorkTaskService({
+      getTask: mock(() => ({ id: 'task-1', description: 'fix bug' })),
+      getAttestation: mock(() => attestation),
+    } as unknown as Partial<WorkTaskService>);
+    const { req, url } = fakeReq('GET', '/api/work-tasks/task-1/attestation');
+    const res = handleWorkTaskRoutes(req, url, svc);
+    expect((res as Response).status).toBe(200);
+    const data = await (res as Response).json();
+    expect(data.taskId).toBe('task-1');
+    expect(data.txid).toBe('TXID123');
+    expect(data.outcome).toBe('completed');
+  });
+
   it('returns null for unmatched paths', () => {
     const svc = createMockWorkTaskService();
     const { req, url } = fakeReq('GET', '/api/other');
