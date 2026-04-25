@@ -373,6 +373,7 @@ Every request passes through these stages in order:
 | POST | `/api/work-tasks` | work-tasks.ts | Create new work task |
 | GET | `/api/work-tasks/:id` | work-tasks.ts | Get single work task |
 | POST | `/api/work-tasks/:id/cancel` | work-tasks.ts | Cancel running work task |
+| GET | `/api/work-tasks/:id/attestation` | work-tasks.ts | Get on-chain attestation record for a completed/failed task |
 
 ### Schedules
 
