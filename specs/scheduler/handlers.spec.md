@@ -117,7 +117,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `execMemoryMaintenance` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Archives and summarizes old memories via `summarizeOldMemories` (30-day threshold) |
 | `execReputationAttestation` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Computes reputation score, creates attestation hash, optionally publishes on-chain via AlgoChat |
 | `execFlockReputationRefresh` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Recomputes flock directory reputation scores for all non-deregistered agents |
-| `execOutcomeAnalysis` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Checks open PRs, runs weekly analysis, saves insights to memory |
+| `execOutcomeAnalysis` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Checks open PRs, runs weekly analysis, saves insights to memory, publishes on-chain attestation |
 | `execDailyReview` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `void` | Generates daily activity summary (executions, PRs, health, observations) |
 | `execStatusCheckin` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Evaluates system state, broadcasts `[STATUS_CHECKIN]` summary to AlgoChat |
 | `execCustom` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Creates an agent session with the freeform `action.prompt` and starts the process |
@@ -131,7 +131,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 5. `execWorkTask` requires `ctx.workTaskService` to be non-null; fails with "Work task service not available" otherwise.
 6. `execImprovementLoop` requires `ctx.improvementLoopService` to be non-null; fails with "Improvement loop service not configured" otherwise.
 7. `execReputationAttestation` requires both `ctx.reputationScorer` and `ctx.reputationAttestation` to be non-null. On-chain publishing is two-phase: compute score → create hash → attempt publish via `sendOnChainToSelf` with format `corvid-reputation:{agentId}:{hash}`. Publish is best-effort; failures are silently caught.
-8. `execOutcomeAnalysis` requires `ctx.outcomeTrackerService` to be non-null. Calls three methods in sequence: `checkOpenPrs()`, `analyzeWeekly()`, `saveAnalysisToMemory()`.
+8. `execOutcomeAnalysis` requires `ctx.outcomeTrackerService` to be non-null. Calls three methods in sequence: `checkOpenPrs()`, `analyzeWeekly()`, `saveAnalysisToMemory()`. After building the summary, publishes a best-effort on-chain attestation via `sendOnChainToSelf` with format `corvid-weekly-summary:{agentId}:{YYYY-Www}:{sha256hex}`. Failures are silently caught; completion is not blocked.
 9. `execDailyReview` requires `ctx.dailyReviewService` to be non-null.
 10. `execSendMessage` requires `ctx.agentMessenger` to be non-null.
 11. `execFlockTesting` requires `ctx.agentMessenger` to be non-null; fails with "Agent messenger not configured" otherwise. Tests use hardcoded config `{ mode: 'full', decayPerDay: 0.02 }`.
@@ -203,6 +203,12 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 - **When** `execGitHubCommentMonitor` is called
 - **Then** no Discord notification is sent, and execution is marked `completed` with "No external comments since ..."
 
+### Scenario: Weekly outcome analysis with on-chain attestation
+
+- **Given** `ctx.outcomeTrackerService` is available and `ctx.agentMessenger` is available
+- **When** `execOutcomeAnalysis` is called
+- **Then** open PRs are checked, weekly analysis is run and saved to memory, summary is built, SHA-256 hash is computed, note is published on-chain with format `corvid-weekly-summary:{agentId}:{YYYY-Www}:{hash}`, and execution is marked `completed` with summary including `attestation=` and `txid=`
+
 ### Scenario: Daily review summary
 
 - **Given** `ctx.dailyReviewService` is available and returns execution/PR/health stats
@@ -226,6 +232,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | Discord API returns non-OK | Execution marked `failed` with status code and error body |
 | Handler throws an exception | Caught internally, execution marked `failed` with error message |
 | On-chain publish fails (reputation) | Silently caught; attestation still created off-chain |
+| On-chain publish fails (weekly outcome) | Silently caught; execution still marked `completed` without attestation note |
 
 ## Dependencies
 

@@ -11,13 +11,23 @@ import { summarizeOldMemories } from '../../memory/summarizer';
 import type { HandlerContext } from './types';
 import { resolveProjectId } from './utils';
 
-/** SHA-256 hash of the daily review summary for on-chain attestation. */
+/** SHA-256 hash of a summary string for on-chain attestation. */
 async function hashSummary(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+/** ISO 8601 week string for a given date, e.g. "2026-W17". */
+function isoWeekLabel(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
 export async function execMemoryMaintenance(
@@ -103,7 +113,23 @@ export async function execOutcomeAnalysis(
       .filter(Boolean)
       .join(' ');
 
-    updateExecutionStatus(ctx.db, executionId, 'completed', { result: summary });
+    // Publish weekly activity attestation on-chain (#1458)
+    let attestationNote = '';
+    if (ctx.agentMessenger) {
+      try {
+        const hash = await hashSummary(summary);
+        const week = isoWeekLabel(new Date());
+        const note = `corvid-weekly-summary:${schedule.agentId}:${week}:${hash}`;
+        const txid = await ctx.agentMessenger.sendOnChainToSelf(schedule.agentId, note);
+        attestationNote = txid
+          ? ` attestation=${hash.slice(0, 16)}... txid=${txid}`
+          : ` attestation=${hash.slice(0, 16)}... (off-chain)`;
+      } catch {
+        // On-chain attestation is best-effort
+      }
+    }
+
+    updateExecutionStatus(ctx.db, executionId, 'completed', { result: summary + attestationNote });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });
