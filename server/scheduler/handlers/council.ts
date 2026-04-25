@@ -27,6 +27,7 @@ export async function execCouncilLaunch(
       action.projectId,
       action.description,
       ctx.agentMessenger,
+      { reputationScorer: ctx.reputationScorer },
     );
     updateExecutionStatus(ctx.db, executionId, 'completed', {
       result: `Council launched: ${result.launchId} (${result.sessionIds.length} agents)`,

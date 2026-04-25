@@ -36,6 +36,8 @@ import { createLogger } from '../lib/logger';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import type { EventCallback, ProcessManager } from '../process/manager';
 import { getModelPricing } from '../providers/cost-table';
+import type { ReputationScorer } from '../reputation/scorer';
+import { meetsMinTrustLevel } from '../work/reputation-guard';
 import { assessImpact, GOVERNANCE_TIERS } from './governance';
 import {
   aggregateSessionResponses,
@@ -256,7 +258,7 @@ export function launchCouncil(
   projectId: string,
   prompt: string,
   agentMessenger: AgentMessenger | null,
-  opts?: { voteType?: string; affectedPaths?: string[] },
+  opts?: { voteType?: string; affectedPaths?: string[]; reputationScorer?: ReputationScorer | null },
 ): LaunchCouncilResult {
   const ctx = createEventContext('council');
   return runWithEventContext(ctx, () => {
@@ -308,17 +310,52 @@ export function launchCouncil(
     // Set total discussion rounds upfront so the UI knows from the start
     updateCouncilLaunchDiscussionRound(db, launchId, 0, council.discussionRounds ?? 2);
 
+    // Filter agents by minimum trust level if configured
+    const reputationScorer = opts?.reputationScorer ?? null;
+    let eligibleAgentIds = council.agentIds;
+    if (council.minTrustLevel && reputationScorer) {
+      const minTrust = council.minTrustLevel;
+      const excluded: string[] = [];
+      eligibleAgentIds = council.agentIds.filter((agentId) => {
+        try {
+          const score = reputationScorer.computeScore(agentId);
+          if (!meetsMinTrustLevel(score.trustLevel, minTrust)) {
+            excluded.push(agentId);
+            return false;
+          }
+        } catch {
+          // Scoring failure is non-fatal — include agent by default
+        }
+        return true;
+      });
+      if (excluded.length > 0) {
+        emitLog(
+          db,
+          launchId,
+          'warn',
+          `${excluded.length} agent(s) excluded from council`,
+          `Trust threshold: ${minTrust}. Excluded: ${excluded.join(', ')}`,
+        );
+        log.info('Council reputation gate filtered agents', {
+          councilId,
+          minTrustLevel: minTrust,
+          excluded,
+          eligible: eligibleAgentIds.length,
+        });
+      }
+    }
+
     emitLog(
       db,
       launchId,
       'stage',
       `Council "${council.name}" launched`,
-      `${council.agentIds.length} agents, prompt: "${prompt.slice(0, 100)}"`,
+      `${eligibleAgentIds.length} agents, prompt: "${prompt.slice(0, 100)}"`,
     );
 
     const sessionIds: string[] = [];
 
-    for (const agentId of council.agentIds) {
+    for (const agentId of eligibleAgentIds) {
       const agent = getAgent(db, agentId);
       const agentName = agent?.name ?? agentId.slice(0, 8);
       const session = createSession(db, {

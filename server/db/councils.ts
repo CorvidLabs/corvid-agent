@@ -24,6 +24,7 @@ interface CouncilRow {
   on_chain_mode: string;
   quorum_type: string;
   quorum_threshold: number | null;
+  min_trust_level: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,7 @@ function rowToCouncil(row: CouncilRow, agentIds: string[]): Council {
     onChainMode: (row.on_chain_mode as CouncilOnChainMode) ?? 'full',
     quorumType: (row.quorum_type as CouncilQuorumType) ?? 'majority',
     quorumThreshold: row.quorum_threshold ?? null,
+    minTrustLevel: (row.min_trust_level as Council['minTrustLevel']) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -112,8 +114,8 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
 
   writeTransaction(db, (db) => {
     db.query(
-      `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, quorum_type, quorum_threshold, tenant_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, quorum_type, quorum_threshold, min_trust_level, tenant_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.name,
@@ -123,6 +125,7 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
       input.onChainMode ?? 'full',
       input.quorumType ?? 'majority',
       input.quorumThreshold ?? null,
+      input.minTrustLevel ?? null,
       tenantId,
     );
 
@@ -178,6 +181,10 @@ export function updateCouncil(
     if (input.quorumThreshold !== undefined) {
       fields.push('quorum_threshold = ?');
       values.push(input.quorumThreshold);
+    }
+    if (input.minTrustLevel !== undefined) {
+      fields.push('min_trust_level = ?');
+      values.push(input.minTrustLevel);
     }
 
     if (fields.length > 0) {
