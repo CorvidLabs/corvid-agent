@@ -1253,8 +1253,13 @@ export class ProcessManager {
     }
 
     // Load recent active observations for this agent and increment their access count
+    // Boost observations from the same source as the current session
     const observations = session.agentId
-      ? listObservations(this.db, session.agentId, { status: 'active', limit: 5 })
+      ? listObservations(this.db, session.agentId, {
+          status: 'active',
+          limit: 10,
+          sourcePreference: (session.source as any) || undefined,
+        })
       : [];
     for (const obs of observations) {
       boostObservation(this.db, obs.id, 0);
@@ -1748,6 +1753,11 @@ export class ProcessManager {
     // so resumed sessions can pick up context from the previous conversation
     this.persistConversationSummary(sessionId);
 
+    // Record Discord session completion as an observation for context retention
+    if (meta?.source === 'discord') {
+      this.recordSessionCompletionObservation(sessionId, session, code);
+    }
+
     if (code !== 0) {
       const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
       this.eventBus.emit(sessionId, {
@@ -1894,6 +1904,76 @@ export class ProcessManager {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  /**
+   * Record Discord session completion as an observation.
+   * Captures the discussion topics, conclusions, and assistant's last response
+   * so that future sessions can quickly understand what happened.
+   * Fire-and-forget — errors are logged but do not block cleanup.
+   */
+  private recordSessionCompletionObservation(
+    sessionId: string,
+    session: Session | null,
+    exitCode: number | null,
+  ): void {
+    try {
+      if (!session?.agentId) return;
+
+      const messages = getSessionMessages(this.db, sessionId);
+      const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+      if (conversational.length === 0) return;
+
+      // Get last assistant message for context
+      const lastAssistantMsg = conversational.findLast((m) => m.role === 'assistant');
+      const lastUserMsg = conversational.findLast((m) => m.role === 'user');
+
+      // Build a concise summary: topics + conclusions + last assistant response
+      const topics = this.extractTopics(conversational);
+      const conclusions = lastAssistantMsg ? stripConversationHistory(lastAssistantMsg.content).slice(0, 300) : '';
+      const userRequest = lastUserMsg ? stripConversationHistory(lastUserMsg.content).slice(0, 200) : '';
+
+      const statusStr = exitCode === 0 ? 'completed successfully' : `exited with code ${exitCode}`;
+      const summary = [
+        `Discord session ${statusStr}`,
+        topics.length > 0 ? `Topics: ${topics.join(', ')}` : '',
+        userRequest ? `Last user: ${userRequest}` : '',
+        conclusions ? `Assistant conclusion: ${conclusions}` : '',
+      ]
+        .filter(Boolean)
+        .join(' | ');
+
+      recordObservation(this.db, {
+        agentId: session.agentId,
+        source: 'discord',
+        sourceId: sessionId,
+        content: summary,
+        suggestedKey: `discord-session:${sessionId}`,
+        relevanceScore: 2.0, // Higher score than message observations
+      });
+
+      log.debug('Recorded session completion observation', { sessionId, summary: summary.slice(0, 100) });
+    } catch (err) {
+      log.warn('Failed to record session completion observation', {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Extract main topics from a conversation by looking at user messages.
+   */
+  private extractTopics(messages: Array<{ role: string; content: string }>): string[] {
+    const userMessages = messages.filter((m) => m.role === 'user').map((m) => stripConversationHistory(m.content));
+
+    // Simple heuristic: first 2-3 words of first few user messages
+    const topics = new Set<string>();
+    for (const msg of userMessages.slice(0, 3)) {
+      const words = msg.split(/\s+/).slice(0, 2).join(' ');
+      if (words.length > 3) topics.add(words);
+    }
+    return Array.from(topics).slice(0, 3);
   }
 
   /**

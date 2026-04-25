@@ -316,6 +316,10 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
   // Always append messaging safety — unconditional guard preventing agents from
   // generating scripts to bypass MCP tool-only messaging. See spec invariant #7.
   appendParts.push(getMessagingSafetyPrompt());
+  // Explicit instruction to read observations and conversation history on resume
+  appendParts.push(
+    '## Context Restoration\n\nBefore responding to any message, ALWAYS read the <recent_observations> section (if present) to understand relevant insights from past sessions. Similarly, ALWAYS read the <conversation_history> section (if present) to understand the current discussion context. These sections are critical for maintaining continuity.',
+  );
   // Add channel affinity routing guidance to system prompt
   appendParts.push(getResponseRoutingPrompt());
   // Add worktree isolation context so the agent knows it's in an isolated branch
