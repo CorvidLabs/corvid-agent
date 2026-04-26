@@ -66,6 +66,18 @@ export const tables: string[] = [
         activity_level      INTEGER NOT NULL DEFAULT 0,
         computed_at         TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+
+  `CREATE TABLE IF NOT EXISTS activity_summaries (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        period       TEXT NOT NULL,
+        period_start TEXT NOT NULL,
+        period_end   TEXT NOT NULL,
+        payload      TEXT NOT NULL,
+        hash         TEXT NOT NULL,
+        txid         TEXT,
+        published_at TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
 ];
 
 export const indexes: string[] = [
@@ -78,4 +90,6 @@ export const indexes: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_reputation_history_agent ON reputation_history(agent_id)`,
   `CREATE INDEX IF NOT EXISTS idx_reputation_history_computed ON reputation_history(computed_at)`,
   `CREATE INDEX IF NOT EXISTS idx_reputation_history_agent_time ON reputation_history(agent_id, computed_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_activity_summaries_period ON activity_summaries(period)`,
+  `CREATE INDEX IF NOT EXISTS idx_activity_summaries_hash ON activity_summaries(hash)`,
 ];
