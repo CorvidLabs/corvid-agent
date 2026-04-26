@@ -15,6 +15,7 @@ import { releaseAllLocks } from '../db/repo-locks';
 import { getExecution, getSchedule, updateExecutionStatus, updateSchedule } from '../db/schedules';
 import { createLogger } from '../lib/logger';
 import {
+  execActivitySummary,
   execCodebaseReview,
   execCouncilLaunch,
   execCustom,
@@ -128,6 +129,9 @@ async function dispatchAction(
       break;
     case 'github_comment_monitor':
       await execGitHubCommentMonitor(hctx, executionId, schedule, action);
+      break;
+    case 'activity_summary':
+      await execActivitySummary(hctx, executionId, schedule);
       break;
     case 'custom':
       await execCustom(hctx, executionId, schedule, action);

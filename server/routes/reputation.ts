@@ -13,6 +13,7 @@ import {
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 import { getClientIp } from '../middleware/rate-limit';
+import { ActivitySummaryAttestation } from '../reputation/activity-attestation';
 import type { ReputationAttestation } from '../reputation/attestation';
 import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import type { ReputationScorer } from '../reputation/scorer';
@@ -153,6 +154,16 @@ export function handleReputationRoutes(
     const agentId = feedbackMatch[1];
     const limit = safeNumParam(url.searchParams.get('limit'), 50);
     return handleGetFeedback(agentId, limit, _db);
+  }
+
+  // ─── Activity Summaries ───────────────────────────────────────────────
+
+  if (path === '/api/reputation/summaries' && method === 'GET') {
+    return handleListSummaries(url, _db);
+  }
+
+  if (path === '/api/reputation/summaries' && method === 'POST') {
+    return handleCreateSummary(req, _db);
   }
 
   // ─── Attestation ─────────────────────────────────────────────────────
@@ -572,4 +583,30 @@ function handleGetFeedback(agentId: string, limit: number, db: Database): Respon
       total: aggregate.total ?? 0,
     },
   });
+}
+
+// ─── Activity Summary Handlers ───────────────────────────────────────────────
+
+function handleListSummaries(url: URL, db: Database): Response {
+  try {
+    const period = url.searchParams.get('period') ?? undefined;
+    const limit = safeNumParam(url.searchParams.get('limit'), 30) || 30;
+    const attester = new ActivitySummaryAttestation(db);
+    const summaries = attester.listSummaries(period, limit);
+    return json(summaries);
+  } catch (err) {
+    return handleRouteError(err);
+  }
+}
+
+async function handleCreateSummary(req: Request, db: Database): Promise<Response> {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { period?: string };
+    const period: 'daily' | 'weekly' = body.period === 'weekly' ? 'weekly' : 'daily';
+    const attester = new ActivitySummaryAttestation(db);
+    const result = await attester.createSummary(period);
+    return json({ ok: true, period, ...result }, 201);
+  } catch (err) {
+    return handleRouteError(err);
+  }
 }

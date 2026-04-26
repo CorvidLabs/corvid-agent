@@ -121,6 +121,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `execOutcomeAnalysis` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Checks open PRs, runs weekly analysis, saves insights to memory, publishes on-chain attestation |
 | `execDailyReview` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `void` | Generates daily activity summary (executions, PRs, health, observations) |
 | `execStatusCheckin` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Evaluates system state, broadcasts `[STATUS_CHECKIN]` summary to AlgoChat |
+| `execActivitySummary` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Builds daily or weekly activity metrics, stores in `activity_summaries` table, publishes on-chain attestation |
 | `execCustom` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Creates an agent session with the freeform `action.prompt` and starts the process |
 
 ## Invariants
