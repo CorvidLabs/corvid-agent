@@ -82,7 +82,6 @@ export async function handleLaunchCouncil(
       ctx.agentMessenger ?? null,
       {
         voteType: args.governanceTier === 'governance' ? 'governance' : 'standard',
-        reputationScorer: ctx.reputationScorer,
       },
     );
 

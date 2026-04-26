@@ -259,7 +259,7 @@ export function handleCouncilRoutes(
       const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
       if (roleDenied) return roleDenied;
     }
-    return handleLaunch(req, db, processManager, id, agentMessenger ?? null, reputationScorer);
+    return handleLaunch(req, db, processManager, id, agentMessenger ?? null);
   }
 
   if (action === 'launches' && method === 'GET') {
@@ -305,7 +305,6 @@ async function handleLaunch(
   processManager: ProcessManager,
   councilId: string,
   agentMessenger: AgentMessenger | null,
-  reputationScorer?: ReputationScorer | null,
 ): Promise<Response> {
   try {
     const data = await parseBodyOrThrow(req, LaunchCouncilSchema);
@@ -315,7 +314,6 @@ async function handleLaunch(
     const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger, {
       voteType: data.voteType,
       affectedPaths: data.affectedPaths,
-      reputationScorer,
     });
     return json(result, 201);
   } catch (err) {
