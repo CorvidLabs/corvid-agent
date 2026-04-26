@@ -151,6 +151,38 @@ describe('listObservations', () => {
     const list = listObservations(db, 'no-such-agent');
     expect(list).toHaveLength(0);
   });
+
+  test('sourcePreference boosts matching-source observations in sort order', () => {
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'session',
+      content: 'session obs',
+      relevanceScore: 2.0,
+    });
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'discord obs',
+      relevanceScore: 2.0,
+    });
+
+    // Without preference, both have equal score — order is by created_at DESC
+    const noPreference = listObservations(db, AGENT_ID);
+    expect(noPreference).toHaveLength(2);
+
+    // With discord preference, discord obs should come first despite equal base score
+    const withPreference = listObservations(db, AGENT_ID, { sourcePreference: 'discord' });
+    expect(withPreference).toHaveLength(2);
+    expect(withPreference[0].content).toBe('discord obs');
+    expect(withPreference[1].content).toBe('session obs');
+  });
+
+  test('sourcePreference does not filter out non-matching sources', () => {
+    recordObservation(db, { agentId: AGENT_ID, source: 'session', content: 'session only' });
+    const list = listObservations(db, AGENT_ID, { sourcePreference: 'discord' });
+    expect(list).toHaveLength(1);
+    expect(list[0].content).toBe('session only');
+  });
 });
 
 describe('searchObservations', () => {

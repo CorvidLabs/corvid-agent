@@ -284,7 +284,7 @@ export function detectGitBranchViolation(command: string): DangerousPatternResul
   }
 
   const tokens = tokenizeBashCommand(command);
-  const gitIndex = tokens.findIndex((t) => t === 'git');
+  const gitIndex = tokens.indexOf('git');
   if (gitIndex === -1) return { isDangerous: false };
 
   // Check for branch-creation commands

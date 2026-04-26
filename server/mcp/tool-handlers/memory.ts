@@ -114,7 +114,10 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
           updateMemoryTxid(ctx.db, memory.id, txid);
           updateMemoryStatus(ctx.db, memory.id, 'confirmed');
           createMemoryAttestation(ctx.db, ctx.agentId, args.key, txid).catch((err) =>
-            log.warn('Memory attestation failed', { key: args.key, error: err instanceof Error ? err.message : String(err) })
+            log.warn('Memory attestation failed', {
+              key: args.key,
+              error: err instanceof Error ? err.message : String(err),
+            }),
           );
           return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${existingAsaId}).`);
         } else {
@@ -123,7 +126,10 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
           updateMemoryAsaId(ctx.db, memory.id, asaId);
           updateMemoryStatus(ctx.db, memory.id, 'confirmed');
           createMemoryAttestation(ctx.db, ctx.agentId, args.key, txid).catch((err) =>
-            log.warn('Memory attestation failed', { key: args.key, error: err instanceof Error ? err.message : String(err) })
+            log.warn('Memory attestation failed', {
+              key: args.key,
+              error: err instanceof Error ? err.message : String(err),
+            }),
           );
           return textResult(`Memory "${args.key}" promoted to long-term storage (ASA: ${asaId}).`);
         }
@@ -148,7 +154,10 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
               updateMemoryStatus(ctx.db, memory.id, 'confirmed');
               const { createMemoryAttestation } = await import('../../memory/attestation');
               createMemoryAttestation(ctx.db, ctx.agentId, memoryKey, txid).catch((err) =>
-                log.warn('Memory attestation failed', { key: memoryKey, error: err instanceof Error ? err.message : String(err) })
+                log.warn('Memory attestation failed', {
+                  key: memoryKey,
+                  error: err instanceof Error ? err.message : String(err),
+                }),
               );
             } catch {
               // DB may be closed during test teardown — safe to ignore

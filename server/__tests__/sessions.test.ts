@@ -217,7 +217,8 @@ describe('session messages', () => {
 
   test('strips multiple conversation_history blocks', () => {
     const session = makeSession();
-    const content = '<conversation_history>a</conversation_history> middle <conversation_history>b</conversation_history> end';
+    const content =
+      '<conversation_history>a</conversation_history> middle <conversation_history>b</conversation_history> end';
     addSessionMessage(db, session.id, 'user', content);
 
     const msgs = getSessionMessages(db, session.id);

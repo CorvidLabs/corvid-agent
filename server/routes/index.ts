@@ -891,13 +891,15 @@ async function handleMemoryBackfill(db: Database, agentMessenger: AgentMessenger
         updateMemoryTxid(db, row.id, txid);
       }
       results.push({ id: row.id, key: row.key, agentId: row.agent_id, txid });
-    } catch (_err) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn('Failed to publish memory', { id: row.id, key: row.key, agentId: row.agent_id, error: message });
       results.push({
         id: row.id,
         key: row.key,
         agentId: row.agent_id,
         txid: null,
-        error: 'Failed to publish memory',
+        error: message,
       });
     }
   }

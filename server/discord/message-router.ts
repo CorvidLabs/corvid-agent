@@ -628,7 +628,7 @@ async function handleMentionReply(
     agentId: agent.id,
     source: 'discord',
     sourceId: session.id,
-    content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 200)}`,
+    content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 500)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
   });
@@ -781,11 +781,11 @@ async function handleMentionReplyResume(
 }
 /**
  * Build conversation context aggregated across all recent sessions in a channel.
- * Unlike the old single-session approach, this pulls messages from the last 24 hours
+ * Unlike the old single-session approach, this pulls messages from the last 72 hours
  * across all sessions tied to this channel, giving seamless continuity.
  */
 function buildChannelContext(db: Database, channelId: string): string {
-  const messages = getChannelMessageHistory(db, channelId, 40, 24);
+  const messages = getChannelMessageHistory(db, channelId, 60, 72);
   if (messages.length === 0) return '';
 
   const historyLines = messages

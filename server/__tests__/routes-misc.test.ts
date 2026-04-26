@@ -172,3 +172,54 @@ describe('CORS Preflight', () => {
     expect(res!.headers.get('Access-Control-Allow-Methods')).toContain('GET');
   });
 });
+
+describe('Memory Backfill', () => {
+  it('POST /api/memories/backfill returns 503 when no agentMessenger', async () => {
+    const pm = createMockPM();
+    const req = fakeReq('POST', '/api/memories/backfill');
+    const res = await handleRequest(req, db, pm, null, null, null);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(503);
+    const data = await res!.json();
+    expect(data.error).toContain('not available');
+  });
+
+  it('POST /api/memories/backfill returns ok when no pending memories', async () => {
+    const pm = createMockPM();
+    const mockMessenger = { sendOnChainToSelf: mock(() => 'tx123') } as any;
+    const req = fakeReq('POST', '/api/memories/backfill');
+    const res = await handleRequest(req, db, pm, null, null, mockMessenger);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.ok).toBe(true);
+    expect(data.backfilled).toBe(0);
+  });
+
+  it('POST /api/memories/backfill surfaces real error message on failure', async () => {
+    const memId = crypto.randomUUID();
+    db.query(
+      "INSERT INTO agent_memories (id, agent_id, key, content, status) VALUES (?, ?, 'test-key', 'test-content', 'pending')",
+    ).run(memId, agentId);
+
+    const pm = createMockPM();
+    const mockMessenger = {
+      sendOnChainToSelf: mock(() => {
+        throw new Error('Localnet unreachable');
+      }),
+    } as any;
+    const req = fakeReq('POST', '/api/memories/backfill');
+    const res = await handleRequest(req, db, pm, null, null, mockMessenger);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.ok).toBe(true);
+    expect(data.results).toBeArrayOfSize(1);
+    const result = data.results[0];
+    expect(result.txid).toBeNull();
+    expect(result.error).toBeDefined();
+    expect(result.error).not.toBe('Failed to publish memory');
+
+    db.query('DELETE FROM agent_memories WHERE id = ?').run(memId);
+  });
+});

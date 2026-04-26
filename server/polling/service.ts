@@ -455,11 +455,14 @@ export class MentionPollingService {
       return false;
     }
 
-    // Human-assignment guard: skip if the issue/PR is assigned to someone
+    // Human-assignment guard: skip if the issue is assigned to someone
     // other than the bot. Respect human ownership — only work on things
     // assigned to us, mentioned on, or explicitly requested.
+    // PR mentions (type 'pull_request') bypass this guard — PR authors
+    // commonly self-assign, and that shouldn't prevent review detection.
     const isAssignment = mention.type === 'assignment';
-    if (!isAssignment) {
+    const isPullRequest = mention.type === 'pull_request' || mention.type === 'review_request';
+    if (!isAssignment && !isPullRequest) {
       const assignees = await this.getIssueAssignees(fullRepo, mention.number);
       const botUsername = config.mentionUsername;
       const assignedToOthers = assignees.filter((a) => a !== botUsername);
@@ -596,7 +599,7 @@ export class MentionPollingService {
 
     const contextType = mention.isPullRequest ? 'PR' : 'Issue';
     const isAssignment = mention.type === 'assignment';
-    const isPullRequestReview = mention.type === 'pull_request';
+    const isPullRequestReview = mention.type === 'pull_request' || mention.type === 'review_request';
     // corvid_create_work_task only works for the platform's own repo
     const homeRepo =
       process.env.GITHUB_OWNER && process.env.GITHUB_REPO

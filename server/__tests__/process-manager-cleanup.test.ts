@@ -240,7 +240,9 @@ function makeMockProcess(alive: boolean = true): SdkProcess {
   return {
     pid: 999,
     sendMessage: () => alive && !killed,
-    kill: () => { killed = true; },
+    kill: () => {
+      killed = true;
+    },
     isAlive: () => alive && !killed,
   };
 }
@@ -250,7 +252,9 @@ describe('pruneOrphans — zombie detection', () => {
   const PROJECT_ID = 'proj-1';
 
   beforeEach(() => {
-    db.query(`INSERT INTO agents (id, name, model, system_prompt) VALUES (?, 'TestAgent', 'test', 'test')`).run(AGENT_ID);
+    db.query(`INSERT INTO agents (id, name, model, system_prompt) VALUES (?, 'TestAgent', 'test', 'test')`).run(
+      AGENT_ID,
+    );
     db.query(`INSERT INTO projects (id, name, working_dir) VALUES (?, 'TestProject', '/tmp/test')`).run(PROJECT_ID);
   });
 
