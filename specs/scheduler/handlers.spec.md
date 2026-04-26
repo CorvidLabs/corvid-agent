@@ -117,6 +117,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `execMemoryMaintenance` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Archives and summarizes old memories via `summarizeOldMemories` (30-day threshold) |
 | `execReputationAttestation` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Computes reputation score, creates attestation hash, optionally publishes on-chain via AlgoChat |
 | `execFlockReputationRefresh` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Recomputes flock directory reputation scores for all non-deregistered agents |
+| `execEstablishedEvaluation` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Evaluates all non-disabled agents for ESTABLISHED tier auto-upgrade; upgrades those meeting all thresholds (30+ days, 10+ completed tasks, score ≥ 70) |
 | `execOutcomeAnalysis` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Checks open PRs, runs weekly analysis, saves insights to memory, publishes on-chain attestation |
 | `execDailyReview` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `void` | Generates daily activity summary (executions, PRs, health, observations) |
 | `execStatusCheckin` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Evaluates system state, broadcasts `[STATUS_CHECKIN]` summary to AlgoChat |
@@ -137,6 +138,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 11. `execFlockTesting` requires `ctx.agentMessenger` to be non-null; fails with "Agent messenger not configured" otherwise. Tests use hardcoded config `{ mode: 'full', decayPerDay: 0.02 }`.
 12. `execFlockTesting` skips testing the schedule's own agent (self-test prevention via wallet address comparison).
 12a. `execFlockReputationRefresh` instantiates `FlockDirectoryService` directly (no context dependency) and calls `recomputeAllReputations()`. No service null-check needed.
+12b. `execEstablishedEvaluation` instantiates `IdentityVerification` directly from `ctx.db` (no context dependency). Queries all non-disabled agents (`disabled = 0`), calls `evaluateEstablished(agentId)` for each, and counts newly upgraded agents by comparing tier before and after. Result format: `"Evaluated N agent(s): M upgraded to ESTABLISHED."` with an appended list of upgraded IDs if any. No service null-check needed.
 13. `execCouncilLaunch` requires `councilId`, `projectId`, and `description` in the action; fails if any is missing.
 14. `execStarRepos` and `execForkRepos` require `action.repos` to be non-empty. Repos are starred/forked sequentially, not in parallel.
 15. `execSendMessage` requires `toAgentId` and `message` in the action.
@@ -215,6 +217,18 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 - **When** `execDailyReview` is called
 - **Then** execution is marked `completed` with a summary of completed/failed executions, opened/merged/closed PRs, uptime, and observations
 
+### Scenario: ESTABLISHED evaluation — agent upgrades
+
+- **Given** 3 agents exist; 2 meet all ESTABLISHED thresholds (30+ days, 10+ completed tasks, score ≥ 70) and 1 is too new
+- **When** `execEstablishedEvaluation` is called
+- **Then** the 2 eligible agents are upgraded to ESTABLISHED via `IdentityVerification.evaluateEstablished`, and execution is marked `completed` with "Evaluated 3 agent(s): 2 upgraded to ESTABLISHED." including the upgraded IDs
+
+### Scenario: ESTABLISHED evaluation — no eligible agents
+
+- **Given** all agents are below thresholds or already ESTABLISHED
+- **When** `execEstablishedEvaluation` is called
+- **Then** no tiers change and execution is marked `completed` with "Evaluated N agent(s): 0 upgraded to ESTABLISHED."
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -258,6 +272,7 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `server/flock-directory/service` | `FlockDirectoryService` for flock_testing agent listing |
 | `server/flock-directory/testing/runner` | `FlockTestRunner` for flock_testing challenge execution |
 | `server/db/github-allowlist` | `listGitHubAllowlist` for github_comment_monitor team filtering |
+| `server/reputation/identity-verification` | `IdentityVerification` for evaluate_established tier upgrades |
 
 ### Consumed By
 
@@ -275,3 +290,4 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | 2026-03-23 | corvid-agent | Added `execDiscordPost` handler for direct Discord channel posting |
 | 2026-03-31 | corvid-agent | Added `execFlockReputationRefresh` handler for automatic flock reputation refresh |
 | 2026-04-09 | corvid-agent | Added `execGitHubCommentMonitor` handler for external GitHub comment monitoring |
+| 2026-04-26 | corvid-agent | Added `execEstablishedEvaluation` handler for daily ESTABLISHED tier auto-upgrade check |
