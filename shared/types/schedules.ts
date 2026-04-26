@@ -21,6 +21,7 @@ export type ScheduleActionType =
   | 'flock_reputation_refresh'
   | 'discord_post'
   | 'github_comment_monitor'
+  | 'activity_summary'
   | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
