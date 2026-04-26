@@ -3,12 +3,12 @@
  * outcome_analysis, daily_review, status_checkin, activity_summary, custom.
  */
 import type { AgentSchedule, ScheduleAction } from '../../../shared/types';
-import { ActivitySummaryAttestation } from '../../reputation/activity-attestation';
 import { getAgent } from '../../db/agents';
 import { updateExecutionStatus } from '../../db/schedules';
 import { createSession } from '../../db/sessions';
 import { FlockDirectoryService } from '../../flock-directory/service';
 import { summarizeOldMemories } from '../../memory/summarizer';
+import { ActivitySummaryAttestation } from '../../reputation/activity-attestation';
 import type { HandlerContext } from './types';
 import { resolveProjectId } from './utils';
 
