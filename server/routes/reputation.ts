@@ -192,7 +192,10 @@ function buildAuditGuide(): AuditGuide {
       'CorvidAgent publishes cryptographic attestations on Algorand for every significant agent action. ' +
       'Any external observer can independently verify what agents have done, when, and with what outcome.',
     network: {
-      localnet: { description: 'Development — Docker-based local Algorand network', indexerUrl: 'http://localhost:8980' },
+      localnet: {
+        description: 'Development — Docker-based local Algorand network',
+        indexerUrl: 'http://localhost:8980',
+      },
       mainnet: { description: 'Production — Algorand mainnet', indexerUrl: 'https://mainnet-idx.algonode.cloud' },
     },
     noteFormats: [
@@ -204,7 +207,8 @@ function buildAuditGuide(): AuditGuide {
           { name: 'agentId', description: 'Internal agent identifier (UUID or slug)' },
           { name: 'sha256hex', description: 'Full 64-character SHA-256 hex of the payload JSON' },
         ],
-        payloadSchema: '{ agentId, overallScore, trustLevel, components: { taskCompletion, peerRating, creditPattern, securityCompliance, activityLevel }, computedAt }',
+        payloadSchema:
+          '{ agentId, overallScore, trustLevel, components: { taskCompletion, peerRating, creditPattern, securityCompliance, activityLevel }, computedAt }',
         verifySteps: [
           'Fetch the transaction from the Algorand indexer by txid',
           'Base64-decode the note field',
@@ -233,7 +237,8 @@ function buildAuditGuide(): AuditGuide {
       {
         prefix: 'corvid-weekly-summary',
         format: 'corvid-weekly-summary:{agentId}:{weekLabel}:{sha256hex}',
-        description: 'Weekly outcome analysis attestation. Published each week summarising sessions, PRs, health, and observations.',
+        description:
+          'Weekly outcome analysis attestation. Published each week summarising sessions, PRs, health, and observations.',
         fields: [
           { name: 'agentId', description: 'Internal agent identifier' },
           { name: 'weekLabel', description: 'ISO week string, e.g. 2026-W17' },
@@ -249,7 +254,8 @@ function buildAuditGuide(): AuditGuide {
       {
         prefix: 'corvid-daily-review',
         format: 'corvid-daily-review:{agentId}:{date}:{sha256hex}',
-        description: 'Daily review attestation. Published each day with execution stats, PR counts, health uptime, and observations.',
+        description:
+          'Daily review attestation. Published each day with execution stats, PR counts, health uptime, and observations.',
         fields: [
           { name: 'agentId', description: 'Internal agent identifier' },
           { name: 'date', description: 'Review date in YYYY-MM-DD format' },
@@ -273,7 +279,8 @@ function buildAuditGuide(): AuditGuide {
           { name: 'description', description: 'Always "corvid-agent memory" for identification' },
           { name: 'note', description: 'ARC-69 JSON metadata containing the memory value (base64-encoded)' },
         ],
-        payloadSchema: '{ standard: "arc69", description: "corvid-agent memory", properties: { key, value, updatedAt } }',
+        payloadSchema:
+          '{ standard: "arc69", description: "corvid-agent memory", properties: { key, value, updatedAt } }',
         verifySteps: [
           'Query indexer for assets created by the agent wallet with unit-name CMEM',
           'Fetch the latest ARC-69 metadata from the most recent asset configuration transaction',
@@ -327,11 +334,31 @@ function buildAuditGuide(): AuditGuide {
         'const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");',
     },
     tools: [
-      { name: 'algosdk', url: 'https://developer.algorand.org/docs/sdks/', description: 'Official Algorand SDK for Node.js, Python, Go, Java' },
-      { name: 'algokit', url: 'https://developer.algorand.org/algokit/', description: 'All-in-one Algorand development toolkit' },
-      { name: 'Pera Explorer', url: 'https://explorer.perawallet.app/', description: 'Algorand mainnet block explorer' },
-      { name: 'DappFlow', url: 'https://app.dappflow.org/explorer/home', description: 'Algorand explorer with ARC-69 metadata support' },
-      { name: 'AlgoNode Indexer', url: 'https://mainnet-idx.algonode.cloud/v2/transactions', description: 'Free public Algorand indexer API' },
+      {
+        name: 'algosdk',
+        url: 'https://developer.algorand.org/docs/sdks/',
+        description: 'Official Algorand SDK for Node.js, Python, Go, Java',
+      },
+      {
+        name: 'algokit',
+        url: 'https://developer.algorand.org/algokit/',
+        description: 'All-in-one Algorand development toolkit',
+      },
+      {
+        name: 'Pera Explorer',
+        url: 'https://explorer.perawallet.app/',
+        description: 'Algorand mainnet block explorer',
+      },
+      {
+        name: 'DappFlow',
+        url: 'https://app.dappflow.org/explorer/home',
+        description: 'Algorand explorer with ARC-69 metadata support',
+      },
+      {
+        name: 'AlgoNode Indexer',
+        url: 'https://mainnet-idx.algonode.cloud/v2/transactions',
+        description: 'Free public Algorand indexer API',
+      },
     ],
   };
 }

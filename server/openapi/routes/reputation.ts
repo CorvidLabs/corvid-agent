@@ -177,7 +177,13 @@ export const reputationRoutes: RouteEntry[] = [
           version: '1.0',
           description: 'CorvidAgent publishes cryptographic attestations on Algorand...',
           noteFormats: [{ prefix: 'corvid-reputation', format: 'corvid-reputation:{agentId}:{sha256hex}' }],
-          indexerQueries: [{ description: 'Find all reputation attestations', method: 'GET', path: '/v2/accounts/{walletAddress}/transactions' }],
+          indexerQueries: [
+            {
+              description: 'Find all reputation attestations',
+              method: 'GET',
+              path: '/v2/accounts/{walletAddress}/transactions',
+            },
+          ],
           hashVerification: { algorithm: 'SHA-256', encoding: 'hex (64 lowercase characters)' },
           tools: [{ name: 'AlgoNode Indexer', url: 'https://mainnet-idx.algonode.cloud/v2/transactions' }],
         },
