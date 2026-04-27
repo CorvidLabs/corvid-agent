@@ -82,3 +82,26 @@ export interface ReputationHistoryPoint {
     components: ReputationComponents;
     computedAt: string;
 }
+
+export interface ActivitySummary {
+    id: number;
+    period: string;
+    periodStart: string;
+    periodEnd: string;
+    payload: string;
+    hash: string;
+    txid: string | null;
+    publishedAt: string | null;
+    createdAt: string;
+}
+
+export interface MemoryAttestation {
+    id: number;
+    memoryKey: string;
+    agentId: string;
+    hash: string;
+    payload: string;
+    txid: string | null;
+    createdAt: string;
+    publishedAt: string | null;
+}

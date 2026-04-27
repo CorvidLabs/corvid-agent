@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
-import type { ReputationScore, ReputationEvent, ScoreExplanation, AgentReputationStats, ReputationHistoryPoint } from '../models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation } from '../models/reputation.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -96,6 +96,27 @@ export class ReputationService {
     async getHistory(agentId: string, days = 90): Promise<ReputationHistoryPoint[]> {
         return firstValueFrom(
             this.api.get<ReputationHistoryPoint[]>(`/reputation/history/${agentId}?days=${days}`),
+        );
+    }
+
+    async getActivitySummaries(period?: string, limit = 10): Promise<ActivitySummary[]> {
+        const params = new URLSearchParams();
+        if (period) params.set('period', period);
+        params.set('limit', String(limit));
+        return firstValueFrom(
+            this.api.get<ActivitySummary[]>(`/reputation/summaries?${params}`),
+        );
+    }
+
+    async getMemoryAttestations(agentId: string, limit = 20): Promise<MemoryAttestation[]> {
+        return firstValueFrom(
+            this.api.get<MemoryAttestation[]>(`/memories/attestations?agentId=${agentId}&limit=${limit}`),
+        );
+    }
+
+    async triggerActivitySummary(period: 'daily' | 'weekly'): Promise<{ ok: boolean; hash: string; txid: string | null }> {
+        return firstValueFrom(
+            this.api.post<{ ok: boolean; hash: string; txid: string | null }>('/reputation/summaries', { period }),
         );
     }
 }

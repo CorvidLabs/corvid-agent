@@ -10,7 +10,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { MetricCardComponent } from '../../shared/components/metric-card.component';
-import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint } from '../../core/models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
@@ -23,6 +23,12 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                 [disabled]="computing()"
                 (click)="onComputeAll()">
                 {{ computing() ? 'Computing...' : 'Compute All' }}
+            </button>
+            <button actions
+                mat-stroked-button
+                [disabled]="triggeringSummary()"
+                (click)="onTriggerSummary('daily')">
+                {{ triggeringSummary() ? 'Publishing…' : 'Publish Daily Summary' }}
             </button>
 
             @if (reputationService.loading()) {
@@ -138,6 +144,27 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                                 </div>
                             </div>
                         }
+                    </div>
+                }
+
+                @if (activitySummaries().length > 0) {
+                    <div class="summaries-section">
+                        <h4>On-chain Activity Summaries</h4>
+                        <div class="summaries-list">
+                            @for (s of activitySummaries(); track s.id) {
+                                <div class="summary-row">
+                                    <span class="summary-period" [attr.data-period]="s.period">{{ s.period }}</span>
+                                    <span class="summary-dates">{{ formatDate(s.periodStart) }} – {{ formatDate(s.periodEnd) }}</span>
+                                    <span class="summary-hash" title="{{ s.hash }}">{{ s.hash.slice(0, 12) }}…</span>
+                                    @if (s.txid) {
+                                        <span class="summary-txid on-chain" title="{{ s.txid }}">{{ s.txid.slice(0, 8) }}… ✓</span>
+                                    } @else {
+                                        <span class="summary-txid pending">local only</span>
+                                    }
+                                    <span class="summary-time">{{ s.createdAt | relativeTime }}</span>
+                                </div>
+                            }
+                        </div>
                     </div>
                 }
 
@@ -260,6 +287,24 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                                 <p class="attestation">Attestation: <code>{{ s.attestationHash }}</code></p>
                             } @else {
                                 <button mat-flat-button color="primary" (click)="onCreateAttestation(s.agentId)">Create Attestation</button>
+                            }
+
+                            @if (memoryAttestations().length > 0) {
+                                <h4>On-chain Memory Attestations</h4>
+                                <div class="chain-list">
+                                    @for (att of memoryAttestations(); track att.id) {
+                                        <div class="chain-row">
+                                            <span class="chain-key">{{ att.memoryKey }}</span>
+                                            <span class="chain-hash" title="{{ att.hash }}">{{ att.hash.slice(0, 12) }}…</span>
+                                            @if (att.txid) {
+                                                <span class="chain-txid on-chain" title="{{ att.txid }}">{{ att.txid.slice(0, 8) }}… ✓</span>
+                                            } @else {
+                                                <span class="chain-txid pending">pending</span>
+                                            }
+                                            <span class="chain-time">{{ att.createdAt | relativeTime }}</span>
+                                        </div>
+                                    }
+                                </div>
                             }
                         }
 
@@ -653,11 +698,57 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .compare-mini-fill[data-color="orange"] { background: var(--accent-orange); }
         .compare-mini-val { font-size: 0.7rem; color: var(--text-primary); text-align: right; }
 
+        /* Activity summaries */
+        .summaries-section { margin-top: 1.5rem; }
+        .summaries-section h4 { margin: 0 0 0.75rem; color: var(--text-primary); }
+        .summaries-list {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .summary-row {
+            display: grid; grid-template-columns: 60px 1fr 100px 90px 80px;
+            align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem;
+            font-size: 0.78rem; border-bottom: 1px solid var(--border);
+        }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-period {
+            font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            padding: 2px 6px; border-radius: 3px; text-align: center;
+            background: var(--bg-raised); color: var(--text-secondary);
+        }
+        .summary-period[data-period="daily"] { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .summary-period[data-period="weekly"] { color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+        .summary-dates { color: var(--text-secondary); font-size: 0.72rem; }
+        .summary-hash { font-family: monospace; font-size: 0.72rem; color: var(--text-secondary); }
+        .summary-txid, .chain-txid { font-family: monospace; font-size: 0.72rem; }
+        .summary-txid.on-chain, .chain-txid.on-chain { color: var(--accent-green); }
+        .summary-txid.pending, .chain-txid.pending { color: var(--text-tertiary); font-style: italic; }
+        .summary-time { color: var(--text-tertiary); font-size: 0.7rem; text-align: right; }
+
+        /* Memory attestations */
+        .chain-list {
+            display: flex; flex-direction: column; gap: 0; margin-top: 0.5rem;
+            border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+        }
+        .chain-row {
+            display: grid; grid-template-columns: 1fr 110px 90px 70px;
+            align-items: center; gap: 0.75rem; padding: 0.4rem 0.75rem;
+            font-size: 0.78rem; border-bottom: 1px solid var(--border);
+        }
+        .chain-row:last-child { border-bottom: none; }
+        .chain-key { font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chain-hash { font-family: monospace; font-size: 0.72rem; color: var(--text-secondary); }
+        .chain-time { color: var(--text-tertiary); font-size: 0.7rem; text-align: right; }
+
         @media (max-width: 767px) {
             .card-grid { grid-template-columns: 1fr; }
             .agent-card__body { flex-direction: column; align-items: center; }
             .component-bars { width: 100%; }
             .compare-mini-bar { grid-template-columns: 60px 1fr 24px; }
+            .summary-row { grid-template-columns: 55px 1fr 80px; }
+            .summary-hash, .summary-txid { display: none; }
+            .chain-row { grid-template-columns: 1fr 70px; }
+            .chain-hash, .chain-time { display: none; }
         }
     `,
 })
@@ -675,6 +766,9 @@ export class ReputationComponent implements OnInit {
     protected readonly history = signal<ReputationHistoryPoint[]>([]);
     protected readonly showComponents = signal(false);
     protected readonly compareMode = signal(false);
+    protected readonly activitySummaries = signal<ActivitySummary[]>([]);
+    protected readonly memoryAttestations = signal<MemoryAttestation[]>([]);
+    protected readonly triggeringSummary = signal(false);
 
     protected readonly trendWidth = 400;
     protected readonly trendHeight = 80;
@@ -848,6 +942,7 @@ export class ReputationComponent implements OnInit {
         } catch {
             this.loadError.set(true);
         }
+        this.reputationService.getActivitySummaries(undefined, 10).then(s => this.activitySummaries.set(s)).catch(() => {});
     }
 
     protected getAgentName(agentId: string): string {
@@ -906,6 +1001,7 @@ export class ReputationComponent implements OnInit {
         this.explanation.set(null);
         this.stats.set(null);
         this.history.set([]);
+        this.memoryAttestations.set([]);
         try {
             const score = await this.reputationService.getScore(agentId);
             this.selectedScore.set(score);
@@ -914,6 +1010,7 @@ export class ReputationComponent implements OnInit {
                 this.reputationService.getExplanation(agentId).then(ex => this.explanation.set(ex)),
                 this.reputationService.getStats(agentId).then(s => this.stats.set(s)).catch(() => {}),
                 this.reputationService.getHistory(agentId).then(h => this.history.set(h)).catch(() => {}),
+                this.reputationService.getMemoryAttestations(agentId).then(a => this.memoryAttestations.set(a)).catch(() => {}),
             ]);
         } catch {
             this.selectedScore.set(null);
@@ -941,5 +1038,24 @@ export class ReputationComponent implements OnInit {
         } catch {
             this.notify.error('Failed to create attestation');
         }
+    }
+
+    async onTriggerSummary(period: 'daily' | 'weekly'): Promise<void> {
+        this.triggeringSummary.set(true);
+        try {
+            await this.reputationService.triggerActivitySummary(period);
+            const summaries = await this.reputationService.getActivitySummaries(undefined, 10);
+            this.activitySummaries.set(summaries);
+            this.notify.success(`${period === 'daily' ? 'Daily' : 'Weekly'} summary published`);
+        } catch {
+            this.notify.error('Failed to publish summary');
+        } finally {
+            this.triggeringSummary.set(false);
+        }
+    }
+
+    protected formatDate(iso: string): string {
+        const d = new Date(iso);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
     }
 }
