@@ -105,3 +105,30 @@ export interface MemoryAttestation {
     createdAt: string;
     publishedAt: string | null;
 }
+
+export interface AuditGuideNoteFormat {
+    prefix: string;
+    format: string;
+    description: string;
+    fields: { name: string; description: string }[];
+    payloadSchema: string;
+    verifySteps: string[];
+}
+
+export interface AuditGuideIndexerQuery {
+    description: string;
+    method: string;
+    path: string;
+    queryParams: Record<string, string>;
+    note: string;
+}
+
+export interface AuditGuide {
+    version: string;
+    description: string;
+    network: Record<string, { description: string; indexerUrl: string }>;
+    noteFormats: AuditGuideNoteFormat[];
+    indexerQueries: AuditGuideIndexerQuery[];
+    hashVerification: { algorithm: string; encoding: string; example: string };
+    tools: { name: string; url: string; description: string }[];
+}

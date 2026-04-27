@@ -176,7 +176,191 @@ export function handleReputationRoutes(
     }
   }
 
+  // ─── Audit Guide ───────────────────────────────────────────────────────
+
+  if (path === '/api/reputation/audit-guide' && method === 'GET') {
+    return json(buildAuditGuide());
+  }
+
   return null;
+}
+
+function buildAuditGuide(): AuditGuide {
+  return {
+    version: '1.0',
+    description:
+      'CorvidAgent publishes cryptographic attestations on Algorand for every significant agent action. ' +
+      'Any external observer can independently verify what agents have done, when, and with what outcome.',
+    network: {
+      localnet: { description: 'Development — Docker-based local Algorand network', indexerUrl: 'http://localhost:8980' },
+      mainnet: { description: 'Production — Algorand mainnet', indexerUrl: 'https://mainnet-idx.algonode.cloud' },
+    },
+    noteFormats: [
+      {
+        prefix: 'corvid-reputation',
+        format: 'corvid-reputation:{agentId}:{sha256hex}',
+        description: 'Reputation score attestation. Published when an agent reputation score is committed on-chain.',
+        fields: [
+          { name: 'agentId', description: 'Internal agent identifier (UUID or slug)' },
+          { name: 'sha256hex', description: 'Full 64-character SHA-256 hex of the payload JSON' },
+        ],
+        payloadSchema: '{ agentId, overallScore, trustLevel, components: { taskCompletion, peerRating, creditPattern, securityCompliance, activityLevel }, computedAt }',
+        verifySteps: [
+          'Fetch the transaction from the Algorand indexer by txid',
+          'Base64-decode the note field',
+          'The last 64 characters are the SHA-256 hash',
+          'Reconstruct the payload: JSON.stringify({ agentId, overallScore, trustLevel, components, computedAt })',
+          'Compute SHA-256 of the payload and compare with the hash in the note',
+        ],
+      },
+      {
+        prefix: 'corvid-memory',
+        format: 'corvid-memory:{agentId}:{memoryKey}:{hash16}',
+        description: 'Memory promotion attestation. Published when a memory is promoted to long-term on-chain storage.',
+        fields: [
+          { name: 'agentId', description: 'Internal agent identifier' },
+          { name: 'memoryKey', description: 'Key of the promoted memory (e.g. feedback-testing)' },
+          { name: 'hash16', description: 'First 16 characters of the SHA-256 hash of the promotion payload' },
+        ],
+        payloadSchema: '{ memoryKey, agentId, promotedAt }',
+        verifySteps: [
+          'Query indexer for transactions from the agent wallet with note-prefix corvid-memory:',
+          'Decode the note to get the memoryKey and hash16',
+          'Reconstruct payload: JSON.stringify({ memoryKey, agentId, promotedAt })',
+          'Compute SHA-256 and verify the first 16 chars match hash16',
+        ],
+      },
+      {
+        prefix: 'corvid-weekly-summary',
+        format: 'corvid-weekly-summary:{agentId}:{weekLabel}:{sha256hex}',
+        description: 'Weekly outcome analysis attestation. Published each week summarising sessions, PRs, health, and observations.',
+        fields: [
+          { name: 'agentId', description: 'Internal agent identifier' },
+          { name: 'weekLabel', description: 'ISO week string, e.g. 2026-W17' },
+          { name: 'sha256hex', description: 'SHA-256 hash of the weekly summary text' },
+        ],
+        payloadSchema: 'Plain text summary string (hashed as UTF-8)',
+        verifySteps: [
+          'Query indexer with note-prefix corvid-weekly-summary: and the wallet address',
+          'Decode the note and extract weekLabel and hash',
+          'Compute SHA-256 of the summary text and compare',
+        ],
+      },
+      {
+        prefix: 'corvid-daily-review',
+        format: 'corvid-daily-review:{agentId}:{date}:{sha256hex}',
+        description: 'Daily review attestation. Published each day with execution stats, PR counts, health uptime, and observations.',
+        fields: [
+          { name: 'agentId', description: 'Internal agent identifier' },
+          { name: 'date', description: 'Review date in YYYY-MM-DD format' },
+          { name: 'sha256hex', description: 'SHA-256 hash of the daily review summary text' },
+        ],
+        payloadSchema: 'Plain text summary string (hashed as UTF-8)',
+        verifySteps: [
+          'Query indexer with note-prefix corvid-daily-review: and the wallet address',
+          'Decode the note and extract the date and hash',
+          'Compute SHA-256 of the review summary text and compare',
+        ],
+      },
+      {
+        prefix: 'arc69-memory',
+        format: 'ARC-69 ASA (Asset) with description "corvid-agent memory"',
+        description:
+          'Long-term memory stored as an Algorand Standard Asset using the ARC-69 metadata standard. ' +
+          'Each memory key maps to an on-chain ASA whose note field contains the encrypted memory value.',
+        fields: [
+          { name: 'assetName', description: 'Memory key used as the ASA name' },
+          { name: 'description', description: 'Always "corvid-agent memory" for identification' },
+          { name: 'note', description: 'ARC-69 JSON metadata containing the memory value (base64-encoded)' },
+        ],
+        payloadSchema: '{ standard: "arc69", description: "corvid-agent memory", properties: { key, value, updatedAt } }',
+        verifySteps: [
+          'Query indexer for assets created by the agent wallet with unit-name CMEM',
+          'Fetch the latest ARC-69 metadata from the most recent asset configuration transaction',
+          'The note field contains base64-encoded ARC-69 JSON with the memory value',
+        ],
+      },
+    ],
+    indexerQueries: [
+      {
+        description: 'Find all reputation attestations for a wallet address',
+        method: 'GET',
+        path: '/v2/accounts/{walletAddress}/transactions',
+        queryParams: { 'note-prefix': Buffer.from('corvid-reputation:').toString('base64') },
+        note: 'note-prefix must be URL-encoded base64 of "corvid-reputation:"',
+      },
+      {
+        description: 'Find all memory attestations',
+        method: 'GET',
+        path: '/v2/accounts/{walletAddress}/transactions',
+        queryParams: { 'note-prefix': Buffer.from('corvid-memory:').toString('base64') },
+        note: 'note-prefix must be URL-encoded base64 of "corvid-memory:"',
+      },
+      {
+        description: 'Find weekly summary attestations',
+        method: 'GET',
+        path: '/v2/accounts/{walletAddress}/transactions',
+        queryParams: { 'note-prefix': Buffer.from('corvid-weekly-summary:').toString('base64') },
+        note: 'note-prefix must be URL-encoded base64 of "corvid-weekly-summary:"',
+      },
+      {
+        description: 'Fetch a specific transaction by txid',
+        method: 'GET',
+        path: '/v2/transactions/{txid}',
+        queryParams: {},
+        note: 'Returns the full transaction including the base64-encoded note field',
+      },
+      {
+        description: 'Find ARC-69 memory assets owned by a wallet',
+        method: 'GET',
+        path: '/v2/accounts/{walletAddress}/assets',
+        queryParams: {},
+        note: 'Filter by unit-name=CMEM to find corvid-agent memory assets',
+      },
+    ],
+    hashVerification: {
+      algorithm: 'SHA-256',
+      encoding: 'hex (64 lowercase characters)',
+      example:
+        'const payload = JSON.stringify({ agentId, overallScore, trustLevel, components, computedAt });\n' +
+        'const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));\n' +
+        'const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");',
+    },
+    tools: [
+      { name: 'algosdk', url: 'https://developer.algorand.org/docs/sdks/', description: 'Official Algorand SDK for Node.js, Python, Go, Java' },
+      { name: 'algokit', url: 'https://developer.algorand.org/algokit/', description: 'All-in-one Algorand development toolkit' },
+      { name: 'Pera Explorer', url: 'https://explorer.perawallet.app/', description: 'Algorand mainnet block explorer' },
+      { name: 'DappFlow', url: 'https://app.dappflow.org/explorer/home', description: 'Algorand explorer with ARC-69 metadata support' },
+      { name: 'AlgoNode Indexer', url: 'https://mainnet-idx.algonode.cloud/v2/transactions', description: 'Free public Algorand indexer API' },
+    ],
+  };
+}
+
+interface AuditGuideNoteFormat {
+  prefix: string;
+  format: string;
+  description: string;
+  fields: { name: string; description: string }[];
+  payloadSchema: string;
+  verifySteps: string[];
+}
+
+interface AuditGuideIndexerQuery {
+  description: string;
+  method: string;
+  path: string;
+  queryParams: Record<string, string>;
+  note: string;
+}
+
+interface AuditGuide {
+  version: string;
+  description: string;
+  network: Record<string, { description: string; indexerUrl: string }>;
+  noteFormats: AuditGuideNoteFormat[];
+  indexerQueries: AuditGuideIndexerQuery[];
+  hashVerification: { algorithm: string; encoding: string; example: string };
+  tools: { name: string; url: string; description: string }[];
 }
 
 async function handleRecordEvent(req: Request, scorer: ReputationScorer): Promise<Response> {
