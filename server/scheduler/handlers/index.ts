@@ -11,6 +11,7 @@ export { execImprovementLoop } from './improvement';
 export {
   execCustom,
   execDailyReview,
+  execEstablishedEvaluation,
   execFlockReputationRefresh,
   execMemoryMaintenance,
   execOutcomeAnalysis,

@@ -21,6 +21,7 @@ import {
   execDailyReview,
   execDependencyAudit,
   execDiscordPost,
+  execEstablishedEvaluation,
   execFlockReputationRefresh,
   execFlockTesting,
   execForkRepos,
@@ -103,6 +104,9 @@ async function dispatchAction(
       break;
     case 'flock_reputation_refresh':
       await execFlockReputationRefresh(hctx, executionId, schedule);
+      break;
+    case 'evaluate_established':
+      await execEstablishedEvaluation(hctx, executionId, schedule);
       break;
     case 'outcome_analysis':
       await execOutcomeAnalysis(hctx, executionId, schedule);
