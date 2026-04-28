@@ -26,6 +26,7 @@ import { searchOpenPrsForIssue } from '../github/operations';
 import { ConflictError, NotFoundError, ValidationError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 import { createWorktree } from '../lib/worktree';
+import type { NotificationService } from '../notifications/service';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -68,6 +69,7 @@ export class WorkTaskService {
   private processManager: ProcessManager;
   private astParserService: AstParserService | null;
   private agentMessenger: AgentMessenger | null = null;
+  private notificationService: NotificationService | null = null;
   private conflictResolver: FlockConflictResolver | null = null;
   private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
   private statusChangeCallbacks: Map<string, Set<StatusChangeCallback>> = new Map();
@@ -121,6 +123,11 @@ export class WorkTaskService {
   /** Set the agent messenger (set after async AlgoChat init). */
   setAgentMessenger(messenger: AgentMessenger): void {
     this.agentMessenger = messenger;
+  }
+
+  /** Set the notification service (injected after bootstrap). */
+  setNotificationService(service: NotificationService): void {
+    this.notificationService = service;
   }
 
   /** Set the flock conflict resolver (set after flock directory init). */
@@ -1112,12 +1119,14 @@ export class WorkTaskService {
   }
 
   private _lifecycleCtx(): SessionLifecycleContext {
+    const ns = this.notificationService;
     return {
       db: this.db,
       processManager: this.processManager,
       notifyCallbacks: (taskId) => this.notifyCallbacks(taskId),
       notifyStatusChange: (taskId) => this.fireStatusChange(taskId),
       subscribeForCompletion: (taskId, sessionId) => this.subscribeForCompletion(taskId, sessionId),
+      notifyOwner: ns ? (params) => ns.notify(params).then(() => undefined) : null,
     };
   }
 

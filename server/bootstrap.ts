@@ -317,6 +317,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
 
   // ── Notifications ────────────────────────────────────────────────────
   const notificationService = new NotificationService(db);
+  workTaskService.setNotificationService(notificationService);
   const questionDispatcher = new QuestionDispatcher(db);
   const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
 
