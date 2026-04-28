@@ -172,3 +172,23 @@
 **Ollama total gaps: 3** | **Cursor total gaps: 8**
 
 Cursor has significantly more gaps due to being implemented as a process spawner rather than a proper `LlmProvider`. The highest-priority action is implementing `CursorProvider` as a first-class `LlmProvider`.
+
+---
+
+## 11. Release Gate
+
+Before each release, the provider quality gate must be cleared. Use the following resources:
+
+| Resource | Purpose |
+|---|---|
+| [provider-quality-scorecard.md](provider-quality-scorecard.md) | One-page go/no-go gate — fill in before release |
+| [provider-parity-runbook.md](provider-parity-runbook.md) | Step-by-step instructions for running the validation |
+| [provider-regression-template.md](provider-regression-template.md) | File a regression report for any blocking failure |
+
+**Release is blocked if:**
+- Any automated test in `server/__tests__/` covering providers, buddy, or council fails
+- Ollama or Cursor standalone success rate drops below its block threshold
+- Any failure injection scenario does not behave as specified
+- Parity gap count increased versus the previous release
+
+The scorecard must show ✅ GO (all blocking sections pass) before a release tag is cut.
