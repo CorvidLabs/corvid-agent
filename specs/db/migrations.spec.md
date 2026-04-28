@@ -51,7 +51,7 @@ files:
   - server/db/migrations/121_work_task_attestations.ts
   - server/db/migrations/122_memory_attestations.ts
   - server/db/migrations/123_council_min_trust_level.ts
-  - server/db/migrations/124_activity_summaries.ts
+  - server/db/migrations/123_activity_summaries.ts
 db_tables:
   - schema_version
 depends_on: []
