@@ -251,3 +251,106 @@ describe('Validation loop iteration control', () => {
     expect(afterSecond!.iterationCount).toBe(3);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. Owner notification on max-iteration failure
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Owner notification on max-iteration failure', () => {
+  async function createRunningTask(opts?: { description?: string }) {
+    const { agent, project } = createTestAgentAndProject();
+    queueSuccessfulSpawns(2);
+
+    const task = await service.create({
+      agentId: agent.id,
+      description: opts?.description ?? 'Test notification task',
+      projectId: project.id,
+    });
+
+    expect(task.status).toBe('running');
+    return { task, agent, project };
+  }
+
+  test('notifyOwner is called when max iterations are hit', async () => {
+    const notifyOwnerCalls: Parameters<
+      NonNullable<Parameters<typeof service.setNotificationService>[0]['notify']>
+    >[0][] = [];
+    const mockNotificationService = {
+      notify: async (params: { agentId: string; title?: string; message: string; level: string }) => {
+        notifyOwnerCalls.push(params);
+        return { notificationId: 'test-id', channels: [] };
+      },
+    } as unknown as Parameters<typeof service.setNotificationService>[0];
+
+    service.setNotificationService(mockNotificationService);
+
+    const { task } = await createRunningTask({ description: 'Fix the critical bug in auth module' });
+
+    // Set iteration to max so the next failure triggers notification
+    updateWorkTaskStatus(db, task.id, 'running', { iterationCount: 3 });
+
+    // Queue failing validation
+    queueSpawn(0); // bun install
+    queueSpawn(1, 'TS2339: Property foo does not exist', ''); // tsc fails
+    queueSpawn(1, '', 'test failures'); // bun test fails
+
+    simulateSessionEnd(task.sessionId!, 'Attempted fix');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('failed');
+
+    // Owner notification should have been fired
+    expect(notifyOwnerCalls.length).toBeGreaterThanOrEqual(1);
+    const notification = notifyOwnerCalls[0];
+    expect(notification.level).toBe('error');
+    expect(notification.title).toContain('3 iteration');
+    expect(notification.message).toContain('Fix the critical bug in auth module');
+    expect(notification.message).toContain('Sonnet');
+  });
+
+  test('notifyOwner is NOT called for intermediate validation failures', async () => {
+    const notifyOwnerCalls: unknown[] = [];
+    const mockNotificationService = {
+      notify: async (params: unknown) => {
+        notifyOwnerCalls.push(params);
+        return { notificationId: 'test-id', channels: [] };
+      },
+    } as unknown as Parameters<typeof service.setNotificationService>[0];
+
+    service.setNotificationService(mockNotificationService);
+
+    const { task } = await createRunningTask();
+
+    // Iteration 1 (under cap of 3) — should NOT notify
+    queueSpawn(0); // bun install
+    queueSpawn(1, 'tsc error', ''); // tsc fails
+    queueSpawn(1, '', 'test error'); // bun test fails
+
+    simulateSessionEnd(task.sessionId!, 'First attempt');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const afterFirst = getWorkTask(db, task.id);
+    expect(afterFirst!.status).toBe('running');
+    expect(afterFirst!.iterationCount).toBe(2);
+    expect(notifyOwnerCalls.length).toBe(0);
+  });
+
+  test('missing notifyOwner (null) does not crash on max-iteration failure', async () => {
+    // No notification service set — service.notifyOwner is null
+    const { task } = await createRunningTask();
+
+    updateWorkTaskStatus(db, task.id, 'running', { iterationCount: 3 });
+
+    queueSpawn(0); // bun install
+    queueSpawn(1, 'tsc error', ''); // tsc fails
+    queueSpawn(1, '', 'test failures'); // bun test fails
+
+    simulateSessionEnd(task.sessionId!, 'Tried to fix');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const updatedTask = getWorkTask(db, task.id);
+    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.error).toContain('Validation failed after 3');
+  });
+});

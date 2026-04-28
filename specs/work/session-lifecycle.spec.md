@@ -21,7 +21,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 | Type | Description |
 |------|-------------|
-| `SessionLifecycleContext` | Context object providing `db`, `processManager`, `notifyCallbacks`, and `subscribeForCompletion` |
+| `SessionLifecycleContext` | Context object providing `db`, `processManager`, `notifyCallbacks`, `subscribeForCompletion`, and optional `notifyOwner` |
 
 ### Exported Functions
 
@@ -38,8 +38,9 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 1. **Validation before finalization**: `handleSessionEnd` always runs validation before finalizing; tasks without a `validationDir` skip straight to `finalizeTask`
 2. **Iteration cap**: Validation failures spawn new iterations only up to `WORK_MAX_ITERATIONS` (default 3); beyond that the task is marked `failed`
-3. **PR URL fallback**: `finalizeTask` first checks session output for a PR URL, then falls back to `createPrFallback`; failure of both results in task failure
-4. **Worktree cleanup on terminal states**: Both success and failure paths call `cleanupWorktree` to remove the worktree directory while preserving the branch
+3. **Owner notification on cap**: When the iteration cap is reached and the task is marked `failed`, `notifyOwner` is called (if present in context) with an `error`-level message summarising the failure and suggesting a retry at a higher model tier
+4. **PR URL fallback**: `finalizeTask` first checks session output for a PR URL, then falls back to `createPrFallback`; failure of both results in task failure
+5. **Worktree cleanup on terminal states**: Both success and failure paths call `cleanupWorktree` to remove the worktree directory while preserving the branch
 
 ## Behavioral Examples
 
@@ -62,6 +63,14 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 - **When** validation fails again
 - **Then** the task is marked `failed` with the validation output in the error field
 - **And** the worktree is cleaned up
+- **And** `notifyOwner` is called with an `error`-level message that includes the task description and truncated validation output
+
+### Scenario: Validation fails at iteration limit — no notification service
+
+- **Given** a work task on iteration 3 and `notifyOwner` is `null` in the context
+- **When** validation fails again
+- **Then** the task is marked `failed` with the validation output in the error field
+- **And** the worktree is cleaned up (same as before; absence of `notifyOwner` is safe)
 
 ### Scenario: Fallback PR creation
 
@@ -115,4 +124,5 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-04-28 | corvid-agent | Add `notifyOwner` to `SessionLifecycleContext`; notify on iteration-cap failure (#2165) |
 | 2026-03-23 | corvid-agent | Initial spec — extracted from work-task-service.spec.md |

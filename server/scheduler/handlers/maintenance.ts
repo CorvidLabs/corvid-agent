@@ -230,7 +230,6 @@ export async function execFlockReputationRefresh(
   }
 }
 
-<<<<<<< HEAD
 export async function execEstablishedEvaluation(
   ctx: HandlerContext,
   executionId: string,
@@ -255,7 +254,13 @@ export async function execEstablishedEvaluation(
     const suffix = upgraded > 0 ? ` Upgraded: ${upgradedIds.join(', ')}.` : '';
     updateExecutionStatus(ctx.db, executionId, 'completed', {
       result: `Evaluated ${agents.length} agent(s): ${upgraded} upgraded to ESTABLISHED.${suffix}`,
-=======
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });
+  }
+}
+
 export async function execActivitySummary(
   ctx: HandlerContext,
   executionId: string,
@@ -278,7 +283,6 @@ export async function execActivitySummary(
 
     updateExecutionStatus(ctx.db, executionId, 'completed', {
       result: `Activity summary created: period=${period} hash=${hash.slice(0, 16)}...${txid ? ` txid=${txid}` : ' (off-chain)'}`,
->>>>>>> 893cccf8 (feat: daily/weekly activity summary attestations (#1458))
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
