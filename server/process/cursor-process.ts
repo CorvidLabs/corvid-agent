@@ -480,40 +480,40 @@ export function buildArgs(project: Project, agent: Agent | null, worktree?: stri
  * Extract a human-readable description from a cursor-agent tool_call event.
  * Returns e.g. "Reading package.json" or "Running: git status"
  */
-type CursorToolArgs = { args?: Record<string, string | undefined> };
-type CursorToolCallMap = Record<string, CursorToolArgs | undefined>;
+type CursorToolEntry = { args?: { path?: string; command?: string; pattern?: string } } | null | undefined;
+type CursorToolCallMap = Record<string, CursorToolEntry>;
 
 export function describeCursorToolCall(event: unknown): string | null {
   if (!event || typeof event !== 'object') return null;
   const tc = (event as Record<string, unknown>).tool_call;
   if (!tc || typeof tc !== 'object') return null;
-  const call = tc as CursorToolCallMap;
+  const toolCall = tc as CursorToolCallMap;
 
-  if (call.readToolCall) {
-    const path = call.readToolCall.args?.path;
+  if (toolCall.readToolCall) {
+    const path = toolCall.readToolCall.args?.path;
     return path ? `Reading ${basename(path)}` : 'Reading file';
   }
-  if (call.writeToolCall) {
-    const path = call.writeToolCall.args?.path;
+  if (toolCall.writeToolCall) {
+    const path = toolCall.writeToolCall.args?.path;
     return path ? `Writing ${basename(path)}` : 'Writing file';
   }
-  if (call.editToolCall) {
-    const path = call.editToolCall.args?.path;
+  if (toolCall.editToolCall) {
+    const path = toolCall.editToolCall.args?.path;
     return path ? `Editing ${basename(path)}` : 'Editing file';
   }
-  if (call.shellToolCall || call.terminalToolCall) {
-    const cmd = (call.shellToolCall ?? call.terminalToolCall)?.args?.command;
+  if (toolCall.shellToolCall || toolCall.terminalToolCall) {
+    const cmd = (toolCall.shellToolCall ?? toolCall.terminalToolCall)?.args?.command;
     return cmd ? `Running: ${cmd.slice(0, 60)}` : 'Running command';
   }
-  if (call.globToolCall || call.listFilesToolCall) {
+  if (toolCall.globToolCall || toolCall.listFilesToolCall) {
     return 'Listing files';
   }
-  if (call.grepToolCall || call.searchToolCall) {
-    const pattern = (call.grepToolCall ?? call.searchToolCall)?.args?.pattern;
+  if (toolCall.grepToolCall || toolCall.searchToolCall) {
+    const pattern = (toolCall.grepToolCall ?? toolCall.searchToolCall)?.args?.pattern;
     return pattern ? `Searching: ${pattern.slice(0, 50)}` : 'Searching files';
   }
 
-  const toolName = Object.keys(call)[0]?.replace(/ToolCall$/, '');
+  const toolName = Object.keys(toolCall)[0]?.replace(/ToolCall$/, '');
   return toolName ? `Using ${toolName}` : null;
 }
 
