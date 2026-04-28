@@ -1,3 +1,5 @@
+import type { TrustLevel } from './reputation';
+
 export type CouncilOnChainMode = 'off' | 'attestation' | 'full';
 
 export type CouncilQuorumType = 'majority' | 'supermajority' | 'unanimous';
@@ -14,6 +16,8 @@ export interface Council {
   quorumType: CouncilQuorumType;
   /** Custom quorum threshold (0.0–1.0). Overrides governance tier default when set. */
   quorumThreshold: number | null;
+  /** Minimum trust level agents must have to participate. Null means no gating. */
+  minTrustLevel: TrustLevel | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +31,7 @@ export interface CreateCouncilInput {
   onChainMode?: CouncilOnChainMode;
   quorumType?: CouncilQuorumType;
   quorumThreshold?: number | null;
+  minTrustLevel?: TrustLevel | null;
 }
 
 export interface UpdateCouncilInput {
@@ -38,6 +43,7 @@ export interface UpdateCouncilInput {
   onChainMode?: CouncilOnChainMode;
   quorumType?: CouncilQuorumType;
   quorumThreshold?: number | null;
+  minTrustLevel?: TrustLevel | null;
 }
 
 export type CouncilStage = 'responding' | 'discussing' | 'reviewing' | 'synthesizing' | 'complete';

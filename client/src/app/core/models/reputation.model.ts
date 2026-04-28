@@ -82,3 +82,53 @@ export interface ReputationHistoryPoint {
     components: ReputationComponents;
     computedAt: string;
 }
+
+export interface ActivitySummary {
+    id: number;
+    period: string;
+    periodStart: string;
+    periodEnd: string;
+    payload: string;
+    hash: string;
+    txid: string | null;
+    publishedAt: string | null;
+    createdAt: string;
+}
+
+export interface MemoryAttestation {
+    id: number;
+    memoryKey: string;
+    agentId: string;
+    hash: string;
+    payload: string;
+    txid: string | null;
+    createdAt: string;
+    publishedAt: string | null;
+}
+
+export interface AuditGuideNoteFormat {
+    prefix: string;
+    format: string;
+    description: string;
+    fields: { name: string; description: string }[];
+    payloadSchema: string;
+    verifySteps: string[];
+}
+
+export interface AuditGuideIndexerQuery {
+    description: string;
+    method: string;
+    path: string;
+    queryParams: Record<string, string>;
+    note: string;
+}
+
+export interface AuditGuide {
+    version: string;
+    description: string;
+    network: Record<string, { description: string; indexerUrl: string }>;
+    noteFormats: AuditGuideNoteFormat[];
+    indexerQueries: AuditGuideIndexerQuery[];
+    hashVerification: { algorithm: string; encoding: string; example: string };
+    tools: { name: string; url: string; description: string }[];
+}

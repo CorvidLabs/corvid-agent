@@ -112,9 +112,7 @@ describe('extractConversationTopics', () => {
   });
 
   test('strips conversation history tags before extracting', () => {
-    const messages = [
-      { role: 'user', content: '<conversation_history>old</conversation_history> Deploy the fix now' },
-    ];
+    const messages = [{ role: 'user', content: '<conversation_history>old</conversation_history> Deploy the fix now' }];
     const topics = extractConversationTopics(messages);
     expect(topics).toEqual(['Deploy the']);
   });

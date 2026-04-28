@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 122;
+const SCHEMA_VERSION = 123;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -290,6 +290,10 @@ const MIGRATIONS: Record<number, string[]> = {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_memory_attestations_agent_id ON memory_attestations(agent_id)`,
     `CREATE INDEX IF NOT EXISTS idx_memory_attestations_key ON memory_attestations(memory_key)`,
+  ],
+  123: [
+    // Council reputation gating: minimum trust level required for council participation
+    `ALTER TABLE councils ADD COLUMN min_trust_level TEXT`,
   ],
 };
 
