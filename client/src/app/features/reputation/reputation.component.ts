@@ -10,7 +10,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state.compone
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { PageShellComponent } from '../../shared/components/page-shell.component';
 import { MetricCardComponent } from '../../shared/components/metric-card.component';
-import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation } from '../../core/models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation, AuditGuide } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
@@ -411,6 +411,72 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                     </div>
                 }
             }
+
+            <div class="audit-guide-section">
+                <div class="audit-guide-toggle" (click)="onToggleAuditGuide()">
+                    <span class="audit-guide-toggle__label">On-Chain Verification Guide</span>
+                    <span class="audit-guide-toggle__chevron">{{ showAuditGuide() ? '▲' : '▼' }}</span>
+                </div>
+                @if (showAuditGuide()) {
+                    @if (auditGuideLoading()) {
+                        <div class="audit-guide-loading">Loading guide…</div>
+                    } @else if (auditGuide(); as guide) {
+                        <div class="audit-guide">
+                            <p class="audit-guide__desc">{{ guide.description }}</p>
+
+                            <h5>Algorand Note Formats</h5>
+                            <div class="audit-formats">
+                                @for (fmt of guide.noteFormats; track fmt.prefix) {
+                                    <div class="audit-format">
+                                        <div class="audit-format__header">
+                                            <code class="audit-format__prefix">{{ fmt.prefix }}</code>
+                                            <span class="audit-format__desc">{{ fmt.description }}</span>
+                                        </div>
+                                        <code class="audit-format__pattern">{{ fmt.format }}</code>
+                                        <div class="audit-format__steps">
+                                            <span class="audit-format__steps-label">Verify:</span>
+                                            <ol>
+                                                @for (step of fmt.verifySteps; track $index) {
+                                                    <li>{{ step }}</li>
+                                                }
+                                            </ol>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <h5>Indexer API Queries</h5>
+                            <div class="audit-queries">
+                                @for (q of guide.indexerQueries; track q.description) {
+                                    <div class="audit-query">
+                                        <span class="audit-query__desc">{{ q.description }}</span>
+                                        <code class="audit-query__path">{{ q.method }} {{ q.path }}</code>
+                                        @if (q.note) {
+                                            <span class="audit-query__note">{{ q.note }}</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <h5>Hash Verification</h5>
+                            <div class="audit-hash">
+                                <p>Algorithm: <strong>{{ guide.hashVerification.algorithm }}</strong> · Encoding: <strong>{{ guide.hashVerification.encoding }}</strong></p>
+                                <pre class="audit-hash__code">{{ guide.hashVerification.example }}</pre>
+                            </div>
+
+                            <h5>Tools</h5>
+                            <div class="audit-tools">
+                                @for (tool of guide.tools; track tool.name) {
+                                    <div class="audit-tool">
+                                        <strong>{{ tool.name }}</strong>
+                                        <span>{{ tool.description }}</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
         </app-page-shell>
     `,
     styles: `
@@ -740,6 +806,81 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .chain-hash { font-family: monospace; font-size: 0.72rem; color: var(--text-secondary); }
         .chain-time { color: var(--text-tertiary); font-size: 0.7rem; text-align: right; }
 
+        /* Audit guide */
+        .audit-guide-section {
+            margin-top: 2rem;
+            border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+        }
+        .audit-guide-toggle {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 1rem; cursor: pointer; background: var(--bg-surface);
+            user-select: none;
+        }
+        .audit-guide-toggle:hover { background: var(--bg-raised); }
+        .audit-guide-toggle__label {
+            font-size: 0.82rem; font-weight: 600; color: var(--text-primary);
+            letter-spacing: 0.02em;
+        }
+        .audit-guide-toggle__chevron { font-size: 0.7rem; color: var(--text-secondary); }
+        .audit-guide-loading { padding: 1rem; color: var(--text-secondary); font-size: 0.82rem; }
+        .audit-guide {
+            padding: 1rem 1.25rem; background: var(--bg-surface);
+            border-top: 1px solid var(--border);
+        }
+        .audit-guide__desc {
+            font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 1rem; line-height: 1.5;
+        }
+        .audit-guide h5 {
+            font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-secondary); margin: 1rem 0 0.5rem;
+        }
+        .audit-guide h5:first-of-type { margin-top: 0; }
+        .audit-formats { display: flex; flex-direction: column; gap: 0.75rem; }
+        .audit-format {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+        }
+        .audit-format__header {
+            display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.4rem; flex-wrap: wrap;
+        }
+        .audit-format__prefix {
+            font-size: 0.72rem; background: var(--bg-surface); padding: 1px 6px;
+            border-radius: 3px; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); white-space: nowrap;
+        }
+        .audit-format__desc { font-size: 0.78rem; color: var(--text-secondary); }
+        .audit-format__pattern {
+            display: block; font-size: 0.72rem; color: var(--accent-green);
+            background: var(--bg-surface); padding: 0.3rem 0.5rem; border-radius: 3px;
+            border: 1px solid var(--border); margin-bottom: 0.5rem; word-break: break-all;
+        }
+        .audit-format__steps { font-size: 0.75rem; }
+        .audit-format__steps-label { color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.25rem; }
+        .audit-format__steps ol { margin: 0; padding-left: 1.25rem; }
+        .audit-format__steps li { color: var(--text-secondary); margin-bottom: 0.15rem; line-height: 1.4; }
+        .audit-queries { display: flex; flex-direction: column; gap: 0.5rem; }
+        .audit-query {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.5rem 0.75rem;
+        }
+        .audit-query__desc { font-size: 0.78rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem; }
+        .audit-query__path {
+            font-size: 0.72rem; color: var(--accent-yellow); display: block; word-break: break-all; margin-bottom: 0.2rem;
+        }
+        .audit-query__note { font-size: 0.68rem; color: var(--text-tertiary); font-style: italic; display: block; }
+        .audit-hash { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; }
+        .audit-hash p { margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--text-secondary); }
+        .audit-hash__code {
+            font-size: 0.72rem; background: var(--bg-surface); padding: 0.5rem; border-radius: 3px;
+            border: 1px solid var(--border); white-space: pre-wrap; word-break: break-all;
+            color: var(--accent-green); margin: 0;
+        }
+        .audit-tools { display: flex; flex-direction: column; gap: 0.35rem; }
+        .audit-tool {
+            display: flex; gap: 0.75rem; font-size: 0.78rem; align-items: baseline;
+        }
+        .audit-tool strong { color: var(--text-primary); white-space: nowrap; }
+        .audit-tool span { color: var(--text-secondary); }
+
         @media (max-width: 767px) {
             .card-grid { grid-template-columns: 1fr; }
             .agent-card__body { flex-direction: column; align-items: center; }
@@ -769,6 +910,9 @@ export class ReputationComponent implements OnInit {
     protected readonly activitySummaries = signal<ActivitySummary[]>([]);
     protected readonly memoryAttestations = signal<MemoryAttestation[]>([]);
     protected readonly triggeringSummary = signal(false);
+    protected readonly auditGuide = signal<AuditGuide | null>(null);
+    protected readonly auditGuideLoading = signal(false);
+    protected readonly showAuditGuide = signal(false);
 
     protected readonly trendWidth = 400;
     protected readonly trendHeight = 80;
@@ -1037,6 +1181,22 @@ export class ReputationComponent implements OnInit {
             this.notify.success('Attestation created');
         } catch {
             this.notify.error('Failed to create attestation');
+        }
+    }
+
+    async onToggleAuditGuide(): Promise<void> {
+        const next = !this.showAuditGuide();
+        this.showAuditGuide.set(next);
+        if (next && !this.auditGuide()) {
+            this.auditGuideLoading.set(true);
+            try {
+                const guide = await this.reputationService.getAuditGuide();
+                this.auditGuide.set(guide);
+            } catch {
+                // guide remains null; panel stays open showing nothing
+            } finally {
+                this.auditGuideLoading.set(false);
+            }
         }
     }
 

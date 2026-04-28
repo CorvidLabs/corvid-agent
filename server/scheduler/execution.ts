@@ -15,12 +15,14 @@ import { releaseAllLocks } from '../db/repo-locks';
 import { getExecution, getSchedule, updateExecutionStatus, updateSchedule } from '../db/schedules';
 import { createLogger } from '../lib/logger';
 import {
+  execActivitySummary,
   execCodebaseReview,
   execCouncilLaunch,
   execCustom,
   execDailyReview,
   execDependencyAudit,
   execDiscordPost,
+  execEstablishedEvaluation,
   execFlockReputationRefresh,
   execFlockTesting,
   execForkRepos,
@@ -104,6 +106,9 @@ async function dispatchAction(
     case 'flock_reputation_refresh':
       await execFlockReputationRefresh(hctx, executionId, schedule);
       break;
+    case 'evaluate_established':
+      await execEstablishedEvaluation(hctx, executionId, schedule);
+      break;
     case 'outcome_analysis':
       await execOutcomeAnalysis(hctx, executionId, schedule);
       break;
@@ -124,6 +129,9 @@ async function dispatchAction(
       break;
     case 'github_comment_monitor':
       await execGitHubCommentMonitor(hctx, executionId, schedule, action);
+      break;
+    case 'activity_summary':
+      await execActivitySummary(hctx, executionId, schedule);
       break;
     case 'custom':
       await execCustom(hctx, executionId, schedule, action);

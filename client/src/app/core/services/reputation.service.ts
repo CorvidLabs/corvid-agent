@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
-import type { ReputationScore, ReputationEvent, ScoreExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation } from '../models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, AgentReputationStats, ReputationHistoryPoint, ActivitySummary, MemoryAttestation, AuditGuide } from '../models/reputation.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -117,6 +117,12 @@ export class ReputationService {
     async triggerActivitySummary(period: 'daily' | 'weekly'): Promise<{ ok: boolean; hash: string; txid: string | null }> {
         return firstValueFrom(
             this.api.post<{ ok: boolean; hash: string; txid: string | null }>('/reputation/summaries', { period }),
+        );
+    }
+
+    async getAuditGuide(): Promise<AuditGuide> {
+        return firstValueFrom(
+            this.api.get<AuditGuide>('/reputation/audit-guide'),
         );
     }
 }

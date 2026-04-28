@@ -482,6 +482,7 @@ Every request passes through these stages in order:
 | GET | `/api/reputation/identity/:agentId` | reputation.ts | Get identity verification for agent |
 | PUT | `/api/reputation/identity/:agentId` | reputation.ts | Set identity verification tier |
 | POST | `/api/reputation/attestation/:agentId` | reputation.ts | Create reputation attestation |
+| GET | `/api/reputation/audit-guide` | reputation.ts | On-chain verification guide with note formats, indexer queries, and hash verification steps |
 
 ### Billing
 
