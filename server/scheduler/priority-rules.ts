@@ -29,6 +29,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
   evaluate_established: 'lightweight',
   discord_post: 'lightweight',
   github_comment_monitor: 'lightweight',
+  activity_summary: 'lightweight',
   custom: 'feature_work',
 };
 

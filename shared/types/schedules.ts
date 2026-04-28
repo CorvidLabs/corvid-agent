@@ -22,6 +22,7 @@ export type ScheduleActionType =
   | 'evaluate_established'
   | 'discord_post'
   | 'github_comment_monitor'
+  | 'activity_summary'
   | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';

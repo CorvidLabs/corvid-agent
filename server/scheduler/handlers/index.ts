@@ -9,6 +9,7 @@ export { execForkRepos, execGithubSuggest, execReviewPrs, execStarRepos } from '
 export { execGitHubCommentMonitor } from './github-comment-monitor';
 export { execImprovementLoop } from './improvement';
 export {
+  execActivitySummary,
   execCustom,
   execDailyReview,
   execEstablishedEvaluation,
