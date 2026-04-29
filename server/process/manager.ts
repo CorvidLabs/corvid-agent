@@ -1258,7 +1258,7 @@ export class ProcessManager {
       ? listObservations(this.db, session.agentId, {
           status: 'active',
           limit: 10,
-          sourcePreference: (session.source as any) || undefined,
+          sourcePreference: (['discord', 'telegram', 'algochat'] as const).find((s) => s === session.source),
         })
       : [];
     for (const obs of observations) {
