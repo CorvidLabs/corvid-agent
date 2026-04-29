@@ -82,6 +82,36 @@ describe('getHealthCheck', () => {
     expect(result.dependencies.llm).toBeDefined();
   });
 
+  test('llm dependency has per-provider status', async () => {
+    const deps = createDeps();
+    const result = await getHealthCheck(deps);
+
+    const llm = result.dependencies.llm;
+    expect(llm).toBeDefined();
+    expect(['healthy', 'degraded']).toContain(llm.status);
+    const providers = llm.providers as Record<string, string>;
+    expect(providers).toBeDefined();
+    expect(['available', 'unavailable', 'not_configured']).toContain(providers.anthropic);
+    expect(['available', 'unavailable', 'not_configured']).toContain(providers.openrouter);
+    expect(['available', 'unavailable', 'not_configured']).toContain(providers.ollama);
+    expect(['available', 'unavailable', 'not_configured']).toContain(providers.cursor);
+  });
+
+  test('llm health gate includes getRegisteredProviders in deps when provided', async () => {
+    const deps = createDeps({
+      getRegisteredProviders: () => ['anthropic', 'openrouter'],
+    });
+    const result = await getHealthCheck(deps);
+    // Status is determined by registered provider availability, not structure
+    expect(['healthy', 'degraded']).toContain(result.dependencies.llm.status);
+    // Providers object still always has all 4 keys regardless of filter
+    const providers = result.dependencies.llm.providers as Record<string, string>;
+    expect(providers.anthropic).toBeDefined();
+    expect(providers.openrouter).toBeDefined();
+    expect(providers.ollama).toBeDefined();
+    expect(providers.cursor).toBeDefined();
+  });
+
   test('returns unhealthy when database is down', async () => {
     const brokenDb = createTestDb();
     brokenDb.close();

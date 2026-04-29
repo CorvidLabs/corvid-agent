@@ -17,6 +17,8 @@ export interface HealthCheckDeps {
   getMentionPollingStats: () => Record<string, unknown>;
   getWorkflowStats: () => Record<string, unknown>;
   getAuthConfig?: () => AuthConfig | null;
+  /** Returns the list of provider type names currently registered in the registry. */
+  getRegisteredProviders?: () => string[];
 }
 
 /** Cached health check result with TTL. */
@@ -74,31 +76,54 @@ async function checkAlgorand(isConnected: boolean): Promise<DependencyHealth> {
   return { status: 'healthy', configured: true };
 }
 
-async function checkLlmProviders(): Promise<DependencyHealth> {
-  const hasAnthropic = hasClaudeAccess();
+type ProviderAvailability = 'available' | 'unavailable' | 'not_configured';
+
+async function checkLlmProviders(registeredProviders?: string[]): Promise<DependencyHealth> {
   const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
-  // Check Ollama connectivity (lightweight, local)
-  let ollamaStatus: 'healthy' | 'unhealthy' = 'unhealthy';
-  try {
-    const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) });
-    if (resp.ok) ollamaStatus = 'healthy';
-  } catch {
-    // Ollama not running is fine if Anthropic is available
-  }
+  const [ollamaReachable, cursorInstalled] = await Promise.all([
+    fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3_000) })
+      .then((r) => r.ok)
+      .catch(() => false),
+    Promise.resolve(
+      (() => {
+        try {
+          const bin =
+            process.env.CURSOR_AGENT_BIN || Bun.which('cursor-agent') || `${process.env.HOME}/.local/bin/cursor-agent`;
+          return Bun.file(bin).size > 0;
+        } catch {
+          return false;
+        }
+      })(),
+    ),
+  ]);
 
-  if (hasAnthropic || ollamaStatus === 'healthy') {
-    return {
-      status: 'healthy',
-      anthropic: hasAnthropic ? 'healthy' : 'not_configured',
-      ollama: ollamaStatus,
-    };
-  }
-  return {
-    status: 'degraded',
-    error: 'no LLM provider available',
-    anthropic: 'not_configured',
+  const anthropicStatus: ProviderAvailability = hasClaudeAccess() ? 'available' : 'not_configured';
+  const openrouterStatus: ProviderAvailability = process.env.OPENROUTER_API_KEY ? 'available' : 'not_configured';
+  const ollamaStatus: ProviderAvailability = ollamaReachable ? 'available' : 'unavailable';
+  const cursorStatus: ProviderAvailability = cursorInstalled ? 'available' : 'not_configured';
+
+  const registered = registeredProviders ?? [];
+  const providers: Record<string, ProviderAvailability> = {
+    anthropic: anthropicStatus,
+    openrouter: openrouterStatus,
     ollama: ollamaStatus,
+    cursor: cursorStatus,
+  };
+
+  // Only providers that are actually registered contribute to the health gate.
+  // If no providers are registered yet (cold start), fall back to any available.
+  const relevantStatuses =
+    registered.length > 0
+      ? registered.map((p) => (providers[p] as ProviderAvailability | undefined) ?? 'not_configured')
+      : Object.values(providers);
+
+  const anyAvailable = relevantStatuses.some((s) => s === 'available');
+
+  return {
+    status: anyAvailable ? 'healthy' : 'degraded',
+    error: anyAvailable ? undefined : 'no LLM provider available',
+    providers,
   };
 }
 
@@ -203,11 +228,13 @@ export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheck
     return cachedResult;
   }
 
+  const registeredProviders = deps.getRegisteredProviders?.();
+
   const [database, github, algorand, llm] = await Promise.all([
     checkDatabase(deps.db),
     checkGitHub(),
     checkAlgorand(deps.isAlgoChatConnected()),
-    checkLlmProviders(),
+    checkLlmProviders(registeredProviders),
   ]);
 
   const apiKey = checkApiKey(deps.getAuthConfig);
