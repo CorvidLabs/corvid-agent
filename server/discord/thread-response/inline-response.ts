@@ -7,6 +7,7 @@ import {
   agentColor,
   buildAgentAuthor,
   buildFooterText,
+  type ContextUsage,
   collapseCodeBlocks,
   hexColorToInt,
   sendEmbed,
@@ -43,6 +44,7 @@ export function subscribeForInlineResponse(
   const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
   const ACK_DELAY_MS = 5000;
   let receivedAnyActivity = false; // tracks any activity (content OR tool use)
+  let latestContextUsage: ContextUsage | undefined;
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
   const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
 
@@ -121,7 +123,7 @@ export function subscribeForInlineResponse(
         description: parts[i],
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
       };
       if (i === 0) {
         sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
@@ -156,6 +158,17 @@ export function subscribeForInlineResponse(
 
     if (event.type === 'tool_status') {
       receivedAnyActivity = true;
+    }
+
+    if (event.type === 'context_usage') {
+      const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
+      if (usage.estimatedTokens != null && usage.contextWindow != null && usage.usagePercent != null) {
+        latestContextUsage = {
+          estimatedTokens: usage.estimatedTokens,
+          contextWindow: usage.contextWindow,
+          usagePercent: usage.usagePercent,
+        };
+      }
     }
 
     if (event.type === 'result') {

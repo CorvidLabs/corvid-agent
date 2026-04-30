@@ -8,6 +8,7 @@ import {
   buildActionRow,
   buildAgentAuthor,
   buildFooterText,
+  type ContextUsage,
   collapseCodeBlocks,
   type DiscordFileAttachment,
   editEmbed,
@@ -59,6 +60,7 @@ export function subscribeForAdaptiveInlineResponse(
   // Progress embed state — only created when tool use is detected
   let progressMessageId: string | null = null;
   let progressMode = false;
+  let latestContextUsage: ContextUsage | undefined;
 
   // Keep typing indicator alive continuously until response completes
   const typingInterval = setInterval(() => {
@@ -119,7 +121,7 @@ export function subscribeForAdaptiveInlineResponse(
         description: parts[i],
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
       };
       if (i === 0) {
         sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
@@ -145,7 +147,12 @@ export function subscribeForAdaptiveInlineResponse(
       description: 'Working on your request...',
       color: 0x5865f2,
       author,
-      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
+      footer: {
+        text: buildFooterText(
+          { agentName, agentModel, sessionId, projectName, status: 'starting...' },
+          latestContextUsage,
+        ),
+      },
     })
       .then((msgId) => {
         progressMessageId = msgId;
@@ -186,7 +193,7 @@ export function subscribeForAdaptiveInlineResponse(
           image: { url: `attachment://${filename}` },
           color,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
         },
         [attachment],
       );
@@ -233,7 +240,12 @@ export function subscribeForAdaptiveInlineResponse(
             description: `\u23f3 ${statusText}`,
             color: 0x5865f2,
             author,
-            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'working...' },
+                latestContextUsage,
+              ),
+            },
           }).catch((err) => {
             log.debug('Progress embed edit failed', {
               channelId,
@@ -241,6 +253,17 @@ export function subscribeForAdaptiveInlineResponse(
             });
           });
         }
+      }
+    }
+
+    if (event.type === 'context_usage') {
+      const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
+      if (usage.estimatedTokens != null && usage.contextWindow != null && usage.usagePercent != null) {
+        latestContextUsage = {
+          estimatedTokens: usage.estimatedTokens,
+          contextWindow: usage.contextWindow,
+          usagePercent: usage.usagePercent,
+        };
       }
     }
 
@@ -255,7 +278,12 @@ export function subscribeForAdaptiveInlineResponse(
               description: '\u2705 Done',
               color: 0x57f287,
               author,
-              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+              footer: {
+                text: buildFooterText(
+                  { agentName, agentModel, sessionId, projectName, status: 'done' },
+                  latestContextUsage,
+                ),
+              },
             }).catch((err) => {
               log.debug('Final progress embed edit failed', {
                 channelId,
@@ -273,7 +301,7 @@ export function subscribeForAdaptiveInlineResponse(
             {
               description: 'Reply to continue here, or start a thread for a longer conversation.',
               color: 0x95a5a6,
-              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
             },
             [
               buildActionRow({
@@ -338,7 +366,12 @@ export function subscribeForAdaptiveInlineResponse(
           description,
           color: errColor,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+          footer: {
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: errorType },
+              latestContextUsage,
+            ),
+          },
         }).catch((err) => {
           log.debug('Error embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
         });
@@ -348,7 +381,12 @@ export function subscribeForAdaptiveInlineResponse(
           description,
           color: errColor,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+          footer: {
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: errorType },
+              latestContextUsage,
+            ),
+          },
         }).catch((err) => {
           log.debug('Error embed send failed', { channelId, error: err instanceof Error ? err.message : String(err) });
         });
