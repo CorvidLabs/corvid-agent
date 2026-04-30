@@ -17,6 +17,8 @@ export interface Session {
   councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
   workDir: string | null;
   creditsConsumed: number;
+  lastContextTokens: number | null;
+  lastContextWindow: number | null;
   createdAt: string;
   updatedAt: string;
 }
