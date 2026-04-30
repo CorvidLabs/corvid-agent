@@ -55,6 +55,7 @@
     "protobufjs": ">=7.5.5",
     "qs": ">=6.14.2",
     "typescript": "~5.9.3",
+    "zod": "~4.3.6",
   },
   "packages": {
     "@algorandfoundation/algokit-utils": ["@algorandfoundation/algokit-utils@9.2.0", "", { "dependencies": { "buffer": "^6.0.3" }, "peerDependencies": { "algosdk": "^3.5.2" } }, "sha512-jILpK3PlSJ55crS8+Dl7iIiADEj/VowokTGSVEEneDG41XM3jMmogGVpCNipBil/YAGC2eh2yc4l9iHnfQdT/g=="],
