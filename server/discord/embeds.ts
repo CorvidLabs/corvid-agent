@@ -185,7 +185,7 @@ export function formatContextUsage(usage: ContextUsage): string {
   const emoji = pct >= 80 ? '🔴' : pct >= 60 ? '🟠' : pct >= 40 ? '🟡' : pct >= 20 ? '🟢' : '⚪';
   const used = formatTokenCount(usage.estimatedTokens);
   const max = formatTokenCount(usage.contextWindow);
-  return `${emoji} ${pct.toFixed(1)}% (${used}/${max})`;
+  return `${emoji} ${Math.round(pct)}% (${used}/${max})`;
 }
 
 function formatTokenCount(tokens: number): string {
