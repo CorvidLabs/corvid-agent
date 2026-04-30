@@ -799,9 +799,14 @@ export class ProcessManager {
 
     const effectiveProject = { ...project, workingDir: resolved.dir };
 
-    // Save the user message and build resume prompt
+    // Save the user message and increment turn count
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
+      const newTurns = (session.totalTurns ?? 0) + 1;
+      updateSessionTurns(this.db, session.id, newTurns);
+      session.totalTurns = newTurns;
+      const existingMeta = this.sessionMeta.get(session.id);
+      if (existingMeta) existingMeta.turnCount = newTurns;
     }
     const resumePrompt = this.buildResumePrompt(session, prompt);
 
