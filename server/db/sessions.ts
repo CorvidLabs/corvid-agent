@@ -265,8 +265,8 @@ export function addSessionMessage(
   content: string,
   costUsd: number = 0,
 ): SessionMessage {
-  // Strip conversation_history tags at storage time to prevent nested tags on resume (#2136)
-  const sanitized = role === 'user' ? stripConversationHistory(content) : content;
+  // Strip conversation_history tags from all roles at storage time to prevent nested tags on resume (#2136, #2180)
+  const sanitized = stripConversationHistory(content);
   const result = db
     .query(`INSERT INTO session_messages (session_id, role, content, cost_usd) VALUES (?, ?, ?, ?)`)
     .run(sessionId, role, sanitized, costUsd);
