@@ -577,7 +577,7 @@ function extractContextUsageFromResult(
     const contextWindow = primary.contextWindow || getContextBudget(model);
     const estimatedTokens = primary.inputTokens;
     if (estimatedTokens > 0) {
-      const usagePercent = (estimatedTokens / contextWindow) * 100;
+      const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
       return { estimatedTokens, contextWindow, usagePercent };
     }
     log.debug('modelUsage has 0 inputTokens, falling through', {
@@ -591,7 +591,7 @@ function extractContextUsageFromResult(
   if (success.usage?.input_tokens) {
     const contextWindow = getContextBudget(model);
     const estimatedTokens = success.usage.input_tokens;
-    const usagePercent = (estimatedTokens / contextWindow) * 100;
+    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
     return { estimatedTokens, contextWindow, usagePercent };
   }
 

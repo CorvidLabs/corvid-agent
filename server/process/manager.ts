@@ -835,11 +835,13 @@ export class ProcessManager {
     this.startingSession.delete(session.id);
     this.processes.set(session.id, process);
     const now = Date.now();
+    const prevMeta = this.sessionMeta.get(session.id);
     this.sessionMeta.set(session.id, {
       startedAt: now,
       source: (session as { source?: string }).source ?? 'web',
-      restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
-      lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
+      restartCount: prevMeta?.restartCount ?? 0,
+      lastKnownCostUsd: prevMeta?.lastKnownCostUsd ?? 0,
+      lastContextUsagePercent: prevMeta?.lastContextUsagePercent,
       turnCount: 0,
       lastActivityAt: now,
     });
@@ -868,6 +870,33 @@ export class ProcessManager {
       type: 'session_started',
       session_id: session.id,
     } as ClaudeStreamEvent);
+
+    // Emit context usage immediately for resumed sessions so Discord footers
+    // show a real percentage from the start instead of 0%.
+    const meta = this.sessionMeta.get(session.id);
+    if (meta && !meta.lastContextUsagePercent) {
+      const fallback = this.computeFallbackContextUsage(session.id);
+      if (fallback) {
+        meta.lastContextUsagePercent = fallback.usagePercent;
+        this.eventBus.emit(session.id, {
+          type: 'context_usage',
+          session_id: session.id,
+          ...fallback,
+        } as ClaudeStreamEvent);
+      }
+    } else if (meta?.lastContextUsagePercent) {
+      // Carry-over from in-process restart — re-emit so listeners pick it up
+      const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+      const contextWindow = getContextBudget(agent?.model);
+      const estimatedTokens = Math.round((meta.lastContextUsagePercent / 100) * contextWindow);
+      this.eventBus.emit(session.id, {
+        type: 'context_usage',
+        session_id: session.id,
+        estimatedTokens,
+        contextWindow,
+        usagePercent: meta.lastContextUsagePercent,
+      } as ClaudeStreamEvent);
+    }
   }
 
   private handleApprovalRequest(sessionId: string, request: ApprovalRequestWire): void {
@@ -1630,7 +1659,7 @@ export class ProcessManager {
 
       const contextWindow = getContextBudget(agent?.model);
       const estimatedTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-      const usagePercent = (estimatedTokens / contextWindow) * 100;
+      const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
       log.debug('Computed fallback context usage from conversation history', {
         sessionId: sessionId.slice(0, 8),
         estimatedTokens,
