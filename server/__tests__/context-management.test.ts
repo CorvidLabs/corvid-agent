@@ -691,7 +691,7 @@ describe('determineWarningLevel', () => {
 
   it('includes percentage in message', () => {
     expect(determineWarningLevel(50)!.message).toContain('50%');
-    expect(determineWarningLevel(70)!.message).toContain('trimming');
-    expect(determineWarningLevel(85)!.message).toContain('exhaustion');
+    expect(determineWarningLevel(70)!.message).toContain('/compact');
+    expect(determineWarningLevel(85)!.message).toContain('auto-compact');
   });
 });
