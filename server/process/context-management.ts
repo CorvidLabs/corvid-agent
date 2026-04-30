@@ -691,10 +691,13 @@ export function determineWarningLevel(
   if (usagePercent >= 85) {
     return {
       level: 'critical',
-      message: `Context usage at ${usagePercent}% — session at risk of exhaustion. Consider starting a new session.`,
+      message: `Context usage at ${usagePercent}% — auto-compact imminent. Use /compact to compact now, or start a new session.`,
     };
   } else if (usagePercent >= 70) {
-    return { level: 'warning', message: `Context usage at ${usagePercent}% — message trimming will start soon.` };
+    return {
+      level: 'warning',
+      message: `Context usage at ${usagePercent}% — getting full. Use /compact to free space.`,
+    };
   } else if (usagePercent >= 50) {
     return { level: 'info', message: `Context usage at ${usagePercent}%.` };
   }

@@ -121,6 +121,14 @@ export async function handleSessionRoutes(
     return handleEscalate(req, db, id, tenantId, workTaskService ?? null);
   }
 
+  if (action === 'compact' && method === 'POST') {
+    const compacted = processManager.compactSession(id);
+    if (compacted) {
+      return json({ ok: true, message: 'Session compacted — will restart with condensed context.' });
+    }
+    return json({ error: 'Session not running or not found' }, 404);
+  }
+
   return null;
 }
 

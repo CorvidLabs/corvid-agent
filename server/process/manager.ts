@@ -52,20 +52,14 @@ import type { EventCallback } from './interfaces';
 
 const log = createLogger('ProcessManager');
 
-// After this many user messages in a single process lifetime, kill and restart
-// through the capped resume path to keep context size manageable.
-//
-// Rationale: Each "turn" (user message + assistant response + tool calls) grows
-// the in-context prompt significantly. With modern 200k context windows, 20 turns
-// provides enough continuity for multi-turn Discord conversations while staying
-// well within limits. The progressive compression tiers in context-management.ts
-// handle the cases where individual turns are unusually large.
-const MAX_TURNS_BEFORE_CONTEXT_RESET = 20;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 // Circuit breaker: if the last N completions in a row were zero-turn,
 // refuse to resume — the session is in a death loop.
 const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
+
+/** Auto-compact the session when context usage reaches this percentage. */
+const AUTO_COMPACT_THRESHOLD = 90;
 
 /** Result of a provider routing decision — exported for testing. */
 export interface RoutingDecision {
@@ -160,6 +154,8 @@ interface SessionMeta {
   lastActivityAt: number;
   /** Context summary from previous session lifetime, used on context reset. */
   contextSummary?: string;
+  /** Last known context window usage percentage, updated on context_usage events. */
+  lastContextUsagePercent?: number;
 }
 
 export class ProcessManager {
@@ -913,51 +909,10 @@ export class ProcessManager {
     }
 
     if (this.processes.has(session.id)) {
-      const meta = this.sessionMeta.get(session.id);
-      if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
-        log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
-
-        // Generate a context summary from existing messages before killing
-        try {
-          const existingMessages = getSessionMessages(this.db, session.id);
-          if (existingMessages.length > 0) {
-            const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
-            const projectContext = ctxProject
-              ? { name: ctxProject.name, workingDir: ctxProject.workingDir }
-              : undefined;
-            const summary = summarizeConversation(existingMessages, projectContext);
-            meta.contextSummary = summary;
-            log.info(`Generated context summary for session ${session.id} (${summary.length} chars)`);
-
-            // Save as short-term observation for memory graduation
-            if (session.agentId) {
-              this.saveContextSummaryObservation(session, summary);
-            }
-          }
-        } catch (err) {
-          log.warn(`Failed to generate context summary for session ${session.id}`, { error: err });
-        }
-
-        this.eventBus.emit(session.id, {
-          type: 'session_error',
-          session_id: session.id,
-          error: {
-            message: 'Session context limit reached — restarting with fresh context.',
-            errorType: 'context_exhausted',
-            severity: 'info',
-            recoverable: true,
-          },
-        } as ClaudeStreamEvent);
-        const cp = this.processes.get(session.id);
-        cp?.kill();
-        this.processes.delete(session.id);
-        updateSessionPid(this.db, session.id, null);
-      } else {
-        if (prompt) {
-          this.sendMessage(session.id, prompt);
-        }
-        return;
+      if (prompt) {
+        this.sendMessage(session.id, prompt);
       }
+      return;
     }
 
     // Circuit breaker: detect zero-turn death loops.
@@ -1226,7 +1181,7 @@ export class ProcessManager {
       source: (session as { source?: string }).source ?? 'web',
       restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
       lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
-      turnCount: 0,
+      turnCount: session.totalTurns ?? 0,
       lastActivityAt: now,
     });
     const proc = this.processes.get(session.id);
@@ -1237,6 +1192,57 @@ export class ProcessManager {
 
     this.timerManager.startStableTimer(session.id);
     this.timerManager.startSessionTimeout(session.id);
+  }
+
+  compactSession(sessionId: string): boolean {
+    const session = getSession(this.db, sessionId);
+    if (!session) return false;
+
+    const cp = this.processes.get(sessionId);
+    if (!cp) return false;
+
+    const meta = this.sessionMeta.get(sessionId);
+    log.info(`Compacting session ${sessionId}`, {
+      turnCount: meta?.turnCount,
+      contextUsage: meta?.lastContextUsagePercent,
+    });
+
+    try {
+      const existingMessages = getSessionMessages(this.db, sessionId);
+      if (existingMessages.length > 0) {
+        const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
+        const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
+        const summary = summarizeConversation(existingMessages, projectContext);
+        if (meta) {
+          meta.contextSummary = summary;
+        }
+        updateSessionSummary(this.db, sessionId, summary);
+        log.info(`Generated compaction summary for session ${sessionId} (${summary.length} chars)`);
+
+        if (session.agentId) {
+          this.saveContextSummaryObservation(session, summary);
+        }
+      }
+    } catch (err) {
+      log.warn(`Failed to generate compaction summary for session ${sessionId}`, { error: err });
+    }
+
+    this.eventBus.emit(sessionId, {
+      type: 'session_error',
+      session_id: sessionId,
+      error: {
+        message: 'Context compacted — restarting with condensed context.',
+        errorType: 'context_compacted',
+        severity: 'info',
+        recoverable: true,
+      },
+    } as ClaudeStreamEvent);
+
+    cp.kill();
+    this.processes.delete(sessionId);
+    updateSessionPid(this.db, sessionId, null);
+
+    return true;
   }
 
   private buildResumePrompt(session: Session, newPrompt?: string): string {
@@ -1404,6 +1410,10 @@ export class ProcessManager {
     sessionId: string,
     content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[],
   ): boolean {
+    if (typeof content === 'string' && content.trim().toLowerCase() === '/compact') {
+      return this.compactSession(sessionId);
+    }
+
     const cp = this.processes.get(sessionId);
     if (!cp) return false;
 
@@ -1635,6 +1645,18 @@ export class ProcessManager {
 
     if (event.type === 'result' && 'metrics' in event && event.metrics) {
       this.persistDirectSessionMetrics(sessionId, event.metrics);
+    }
+
+    // Track context usage and auto-compact at threshold
+    if (event.type === 'context_usage' && meta) {
+      const usage = event as { usagePercent?: number };
+      if (usage.usagePercent != null) {
+        meta.lastContextUsagePercent = usage.usagePercent;
+        if (usage.usagePercent >= AUTO_COMPACT_THRESHOLD) {
+          log.info(`Auto-compacting session ${sessionId} at ${usage.usagePercent}% context usage`);
+          this.compactSession(sessionId);
+        }
+      }
     }
 
     this.eventBus.emit(sessionId, event);
