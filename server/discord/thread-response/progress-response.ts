@@ -7,6 +7,7 @@ import {
   agentColor,
   buildAgentAuthor,
   buildFooterText,
+  type ContextUsage,
   collapseCodeBlocks,
   type DiscordFileAttachment,
   editEmbed,
@@ -48,6 +49,8 @@ export function subscribeForInlineProgressResponse(
   const TYPING_REFRESH_MS = 8000;
   const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
   let receivedAnyActivity = false;
+  let latestContextUsage: ContextUsage | undefined;
+  let lastProgressDescription = 'Working on your request...';
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
   const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
   let progressMessageId: string | null = null;
@@ -57,7 +60,12 @@ export function subscribeForInlineProgressResponse(
     description: 'Working on your request...',
     color: 0x5865f2, // blurple
     author,
-    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
+    footer: {
+      text: buildFooterText(
+        { agentName, agentModel, sessionId, projectName, status: 'starting...' },
+        latestContextUsage,
+      ),
+    },
   })
     .then((msgId) => {
       progressMessageId = msgId;
@@ -129,7 +137,7 @@ export function subscribeForInlineProgressResponse(
         description: parts[i],
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
       };
       if (i === 0) {
         sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
@@ -175,7 +183,7 @@ export function subscribeForInlineProgressResponse(
           image: { url: `attachment://${filename}` },
           color,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
         },
         [attachment],
       );
@@ -213,14 +221,20 @@ export function subscribeForInlineProgressResponse(
       const statusText = event.statusMessage.trim();
       if (statusText) {
         receivedAnyActivity = true;
+        lastProgressDescription = `\u23f3 ${statusText}`;
         const now = Date.now();
         if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
           lastStatusTime = now;
           editEmbed(delivery, botToken, channelId, progressMessageId, {
-            description: `\u23f3 ${statusText}`,
+            description: lastProgressDescription,
             color: 0x5865f2,
             author,
-            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'working...' },
+                latestContextUsage,
+              ),
+            },
           }).catch((err) => {
             log.debug('Progress embed edit failed', {
               channelId,
@@ -228,6 +242,59 @@ export function subscribeForInlineProgressResponse(
             });
           });
         }
+      }
+    }
+
+    if (event.type === 'context_usage') {
+      const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
+      if (usage.estimatedTokens != null && usage.contextWindow != null && usage.usagePercent != null) {
+        latestContextUsage = {
+          estimatedTokens: usage.estimatedTokens,
+          contextWindow: usage.contextWindow,
+          usagePercent: usage.usagePercent,
+        };
+        const now = Date.now();
+        if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
+          lastStatusTime = now;
+          editEmbed(delivery, botToken, channelId, progressMessageId, {
+            description: lastProgressDescription,
+            color: 0x5865f2,
+            author,
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'working...' },
+                latestContextUsage,
+              ),
+            },
+          }).catch((err) => {
+            log.debug('Context usage embed edit failed', {
+              channelId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+      }
+    }
+
+    if (event.type === 'context_warning') {
+      const warning = event as { level?: string; message?: string; usagePercent?: number };
+      if (warning.level === 'critical') {
+        sendEmbed(delivery, botToken, channelId, {
+          description: `\u26a0\ufe0f ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
+          color: 0xf0b232,
+          author,
+          footer: {
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: 'context warning' },
+              latestContextUsage,
+            ),
+          },
+        }).catch((err) => {
+          log.debug('Context warning embed failed', {
+            channelId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
       }
     }
 
@@ -242,7 +309,12 @@ export function subscribeForInlineProgressResponse(
               description: '\u2705 Done',
               color: 0x57f287, // green
               author,
-              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+              footer: {
+                text: buildFooterText(
+                  { agentName, agentModel, sessionId, projectName, status: 'done' },
+                  latestContextUsage,
+                ),
+              },
             }).catch((err) => {
               log.debug('Final progress embed edit failed', {
                 channelId,
