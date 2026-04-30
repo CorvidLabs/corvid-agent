@@ -46,7 +46,8 @@ Context management helpers for direct-process sessions. Handles token estimation
 3. **Progressive compression tiers**: Proactive (60%) summarize consumed tool results, Tier 1 (70%) light tool summarization, Tier 2 (80%) reduce window + summarize discarded, Tier 3 (88%) aggressive 4-exchange keep, Tier 4 (93%) full summary + 2 exchanges
 4. **Count-based trim at >40 messages**: `trimMessages()` triggers Tier 2 when message count exceeds `MAX_MESSAGES` (40)
 5. **Council context truncation**: `truncateCouncilContext()` triggers at 70% of `OLLAMA_NUM_CTX` (default 16384), keeping first user message + last 4 messages
-6. **Warning thresholds**: 50% (info), 70% (warning), 85% (critical)
+6. **Warning thresholds**: 50% (info), 70% (warning — mentions `/compact`), 85% (critical — mentions `/compact` and auto-compact)
+7. **No turn-based context reset**: Context lifetime is governed by capacity-based compaction in `ProcessManager`, not arbitrary turn limits. Auto-compacts sessions at 90% context usage
 
 ## Behavioral Examples
 
@@ -61,6 +62,18 @@ Context management helpers for direct-process sessions. Handles token estimation
 - **Given** context usage exceeds 93%
 - **When** `trimMessages()` is called
 - **Then** all messages are replaced with a context summary + last 2 exchanges (4 messages)
+
+### Scenario: Auto-compact at 90% usage
+
+- **Given** a running session with context usage at 91%
+- **When** a `context_usage` event is received by the ProcessManager
+- **Then** the session is compacted: a conversation summary is generated, the process is killed, and it restarts with the summary injected as context
+
+### Scenario: Manual /compact command
+
+- **Given** a running session at any context usage level
+- **When** the user sends `/compact` as a message
+- **Then** the session is compacted the same way as auto-compact
 
 ### Scenario: Council context truncation
 
