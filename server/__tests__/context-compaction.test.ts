@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { determineWarningLevel } from '../process/context-management';
 
 describe('context compaction', () => {
   test('MAX_TURNS_BEFORE_CONTEXT_RESET constant is removed', async () => {
@@ -26,5 +27,25 @@ describe('auto-compact at 90%', () => {
     const managerSource = await Bun.file('server/process/manager.ts').text();
     expect(managerSource).toContain("event.type === 'context_usage'");
     expect(managerSource).toContain('AUTO_COMPACT_THRESHOLD');
+  });
+});
+
+describe('warning messages mention /compact', () => {
+  test('70% warning mentions /compact', () => {
+    const result = determineWarningLevel(72);
+    expect(result).not.toBeNull();
+    expect(result!.message).toContain('/compact');
+  });
+
+  test('85% critical warning mentions /compact', () => {
+    const result = determineWarningLevel(87);
+    expect(result).not.toBeNull();
+    expect(result!.message).toContain('/compact');
+  });
+
+  test('50% info does not mention /compact', () => {
+    const result = determineWarningLevel(55);
+    expect(result).not.toBeNull();
+    expect(result!.message).not.toContain('/compact');
   });
 });
