@@ -214,8 +214,9 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `editEmbed` | `(delivery, botToken, channelId, messageId, embed)` | `Promise<void>` | Edit an existing embed message in-place via PATCH |
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildAgentAuthor` | `(identity: AgentIdentity)` | `DiscordEmbedAuthor` | Build a Discord embed author block from agent identity (icon emoji + avatar URL) |
-| `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a clean footer: `agentName` or `agentName · status` |
-| `buildFooterWithStats` | `(ctx: FooterContext, stats?: FooterStats)` | `string` | Build footer with session context AND run stats (files, turns, tools, commits) |
+| `buildFooterText` | `(ctx: FooterContext, contextUsage?: ContextUsage)` | `string` | Build a clean footer: `agentName · status \| 🟢 32% (64k/200k)` |
+| `buildFooterWithStats` | `(ctx: FooterContext, stats: FooterStats, contextUsage?: ContextUsage)` | `string` | Build footer with session context, run stats, and optional context usage |
+| `formatContextUsage` | `(usage: ContextUsage)` | `string` | Format context usage as compact emoji+%+fraction (e.g. `🟢 32% (64k/200k)`) |
 | `ensureDiscordEmbedRenderable` | `(embed)` | `DiscordEmbed` | Clamp embed fields/description to Discord size limits so the API never rejects |
 | `hexColorToInt` | `(hex: string)` | `number \| null` | Convert a hex color string (e.g. '#ff00aa') to a Discord embed color integer |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
@@ -410,6 +411,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `AgentIdentity` | `embeds.ts` | Agent identity for building personalized embed authors (agentName, displayIcon?, avatarUrl?) |
 | `FooterContext` | `embeds.ts` | Metadata for building rich embed footers (agentName, agentModel?, status?) |
 | `FooterStats` | `embeds.ts` | Optional run statistics for embed footers (filesChanged?, turns?, tools?, commits?) |
+| `ContextUsage` | `embeds.ts` | Context window usage data for footer display (usagePercent, estimatedTokens, contextWindow) |
 | `DiscordFileAttachment` | `embeds.ts` | File attachment for Discord uploads (name, data, contentType?) |
 | `MessageHandlerContext` | `message-router.ts` | Context object for message handler delegation |
 | `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?, displayIcon?, avatarUrl?) |

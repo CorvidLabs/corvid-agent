@@ -10,6 +10,7 @@ import {
   buildAgentAuthor,
   buildFooterText,
   buildFooterWithStats,
+  type ContextUsage,
   collapseCodeBlocks,
   type DiscordFileAttachment,
   editEmbed,
@@ -64,6 +65,7 @@ export function subscribeForResponseWithEmbed(
   let receivedAnyActivity = false; // tracks any activity (content OR tool use)
   let sentErrorMessage = false; // dedup: prevent repeated error messages for same session
   const startTime = Date.now();
+  let latestContextUsage: ContextUsage | undefined;
 
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
   const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
@@ -78,7 +80,7 @@ export function subscribeForResponseWithEmbed(
       description,
       color: embedColor ?? 0x95a5a6,
       author,
-      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }) },
+      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }, latestContextUsage) },
     };
     if (progressMessageId) {
       await editEmbed(delivery, botToken, threadId, progressMessageId, embed);
@@ -124,7 +126,12 @@ export function subscribeForResponseWithEmbed(
             description: 'The agent session ended unexpectedly. Send a message to resume.',
             color: 0xff3355,
             author,
-            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'crashed' },
+                latestContextUsage,
+              ),
+            },
           }).catch((err) => {
             log.warn('Failed to update progress embed with crash', {
               threadId,
@@ -140,7 +147,12 @@ export function subscribeForResponseWithEmbed(
               description: 'The agent session ended unexpectedly. Send a message to resume.',
               color: 0xff3355,
               author,
-              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
+              footer: {
+                text: buildFooterText(
+                  { agentName, agentModel, sessionId, projectName, status: 'crashed' },
+                  latestContextUsage,
+                ),
+              },
             },
             [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
           ).catch((err) => {
@@ -191,7 +203,7 @@ export function subscribeForResponseWithEmbed(
         description: part,
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
       });
     }
   };
@@ -224,7 +236,7 @@ export function subscribeForResponseWithEmbed(
           image: { url: `attachment://${filename}` },
           color,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
         },
         [attachment],
       );
@@ -296,6 +308,17 @@ export function subscribeForResponseWithEmbed(
       }
     }
 
+    if (event.type === 'context_usage') {
+      const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
+      if (usage.estimatedTokens != null && usage.contextWindow != null && usage.usagePercent != null) {
+        latestContextUsage = {
+          estimatedTokens: usage.estimatedTokens,
+          contextWindow: usage.contextWindow,
+          usagePercent: usage.usagePercent,
+        };
+      }
+    }
+
     if (event.type === 'context_warning') {
       const warning = event as { level?: string; message?: string; usagePercent?: number };
       if (warning.level === 'critical') {
@@ -304,7 +327,10 @@ export function subscribeForResponseWithEmbed(
           color: 0xf0b232, // yellow/warning
           author,
           footer: {
-            text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'context warning' }),
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: 'context warning' },
+              latestContextUsage,
+            ),
           },
         }).catch((err) => {
           log.debug('Context warning embed failed', {
@@ -328,7 +354,12 @@ export function subscribeForResponseWithEmbed(
           description: '✅ Done',
           color: 0x57f287,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+          footer: {
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: 'done' },
+              latestContextUsage,
+            ),
+          },
         }).catch((err) => {
           log.debug('Progress done edit failed', { threadId, error: err instanceof Error ? err.message : String(err) });
         });
@@ -463,7 +494,7 @@ export function subscribeForResponseWithEmbed(
             color: 0x57f287,
             author,
             ...(fields.length > 0 ? { fields } : {}),
-            footer: { text: buildFooterWithStats(footerCtx, footerStats) },
+            footer: { text: buildFooterWithStats(footerCtx, footerStats, latestContextUsage) },
           },
           [buildActionRow(...buttons)],
         );
@@ -493,7 +524,12 @@ export function subscribeForResponseWithEmbed(
           description,
           color: errColor,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+          footer: {
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName, status: errorType },
+              latestContextUsage,
+            ),
+          },
         }).catch((err) => {
           log.debug('Session error embed edit failed', {
             threadId,
@@ -510,7 +546,12 @@ export function subscribeForResponseWithEmbed(
             description,
             color: errColor,
             author,
-            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: errorType },
+                latestContextUsage,
+              ),
+            },
           },
           [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
         ).catch((err) => {
