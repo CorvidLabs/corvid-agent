@@ -15,3 +15,16 @@ describe('turn counter persistence', () => {
     expect(managerSource).toMatch(/this\.processes\.set\(session\.id, sp\);[\s\S]*?turnCount: session\.totalTurns/);
   });
 });
+
+describe('auto-compact at 90%', () => {
+  test('compactSession method exists on ProcessManager', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    expect(managerSource).toContain('compactSession(');
+  });
+
+  test('handleEvent tracks context_usage and triggers compaction at 90%', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    expect(managerSource).toContain("event.type === 'context_usage'");
+    expect(managerSource).toContain('AUTO_COMPACT_THRESHOLD');
+  });
+});

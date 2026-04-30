@@ -58,6 +58,9 @@ const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 // refuse to resume — the session is in a death loop.
 const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
 
+/** Auto-compact the session when context usage reaches this percentage. */
+const AUTO_COMPACT_THRESHOLD = 90;
+
 /** Result of a provider routing decision — exported for testing. */
 export interface RoutingDecision {
   /** Which provider to use (sdk, cursor, ollama). */
@@ -151,6 +154,8 @@ interface SessionMeta {
   lastActivityAt: number;
   /** Context summary from previous session lifetime, used on context reset. */
   contextSummary?: string;
+  /** Last known context window usage percentage, updated on context_usage events. */
+  lastContextUsagePercent?: number;
 }
 
 export class ProcessManager {
@@ -1189,6 +1194,57 @@ export class ProcessManager {
     this.timerManager.startSessionTimeout(session.id);
   }
 
+  compactSession(sessionId: string): boolean {
+    const session = getSession(this.db, sessionId);
+    if (!session) return false;
+
+    const cp = this.processes.get(sessionId);
+    if (!cp) return false;
+
+    const meta = this.sessionMeta.get(sessionId);
+    log.info(`Compacting session ${sessionId}`, {
+      turnCount: meta?.turnCount,
+      contextUsage: meta?.lastContextUsagePercent,
+    });
+
+    try {
+      const existingMessages = getSessionMessages(this.db, sessionId);
+      if (existingMessages.length > 0) {
+        const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
+        const projectContext = ctxProject ? { name: ctxProject.name, workingDir: ctxProject.workingDir } : undefined;
+        const summary = summarizeConversation(existingMessages, projectContext);
+        if (meta) {
+          meta.contextSummary = summary;
+        }
+        updateSessionSummary(this.db, sessionId, summary);
+        log.info(`Generated compaction summary for session ${sessionId} (${summary.length} chars)`);
+
+        if (session.agentId) {
+          this.saveContextSummaryObservation(session, summary);
+        }
+      }
+    } catch (err) {
+      log.warn(`Failed to generate compaction summary for session ${sessionId}`, { error: err });
+    }
+
+    this.eventBus.emit(sessionId, {
+      type: 'session_error',
+      session_id: sessionId,
+      error: {
+        message: 'Context compacted — restarting with condensed context.',
+        errorType: 'context_compacted',
+        severity: 'info',
+        recoverable: true,
+      },
+    } as ClaudeStreamEvent);
+
+    cp.kill();
+    this.processes.delete(sessionId);
+    updateSessionPid(this.db, sessionId, null);
+
+    return true;
+  }
+
   private buildResumePrompt(session: Session, newPrompt?: string): string {
     const messages = getSessionMessages(this.db, session.id);
     const meta = this.sessionMeta.get(session.id);
@@ -1585,6 +1641,18 @@ export class ProcessManager {
 
     if (event.type === 'result' && 'metrics' in event && event.metrics) {
       this.persistDirectSessionMetrics(sessionId, event.metrics);
+    }
+
+    // Track context usage and auto-compact at threshold
+    if (event.type === 'context_usage' && meta) {
+      const usage = event as { usagePercent?: number };
+      if (usage.usagePercent != null) {
+        meta.lastContextUsagePercent = usage.usagePercent;
+        if (usage.usagePercent >= AUTO_COMPACT_THRESHOLD) {
+          log.info(`Auto-compacting session ${sessionId} at ${usage.usagePercent}% context usage`);
+          this.compactSession(sessionId);
+        }
+      }
     }
 
     this.eventBus.emit(sessionId, event);
