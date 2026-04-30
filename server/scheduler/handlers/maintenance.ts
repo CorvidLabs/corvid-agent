@@ -1,6 +1,6 @@
 /**
  * Maintenance schedule action handlers: memory_maintenance, reputation_attestation,
- * outcome_analysis, daily_review, status_checkin, custom.
+ * outcome_analysis, daily_review, status_checkin, activity_summary, custom.
  */
 import type { AgentSchedule, ScheduleAction } from '../../../shared/types';
 import { getAgent } from '../../db/agents';
@@ -8,6 +8,8 @@ import { updateExecutionStatus } from '../../db/schedules';
 import { createSession } from '../../db/sessions';
 import { FlockDirectoryService } from '../../flock-directory/service';
 import { summarizeOldMemories } from '../../memory/summarizer';
+import { ActivitySummaryAttestation } from '../../reputation/activity-attestation';
+import { IdentityVerification } from '../../reputation/identity-verification';
 import type { HandlerContext } from './types';
 import { resolveProjectId } from './utils';
 
@@ -221,6 +223,66 @@ export async function execFlockReputationRefresh(
     const updated = flockService.recomputeAllReputations();
     updateExecutionStatus(ctx.db, executionId, 'completed', {
       result: `Flock reputation refresh completed: ${updated} agents updated.`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });
+  }
+}
+
+export async function execEstablishedEvaluation(
+  ctx: HandlerContext,
+  executionId: string,
+  _schedule: AgentSchedule,
+): Promise<void> {
+  try {
+    const identityVerification = new IdentityVerification(ctx.db);
+    const agents = ctx.db.query('SELECT id FROM agents WHERE disabled = 0').all() as { id: string }[];
+
+    let upgraded = 0;
+    const upgradedIds: string[] = [];
+
+    for (const agent of agents) {
+      const beforeTier = identityVerification.getTier(agent.id);
+      const afterTier = identityVerification.evaluateEstablished(agent.id);
+      if (afterTier === 'ESTABLISHED' && beforeTier !== 'ESTABLISHED') {
+        upgraded++;
+        upgradedIds.push(agent.id);
+      }
+    }
+
+    const suffix = upgraded > 0 ? ` Upgraded: ${upgradedIds.join(', ')}.` : '';
+    updateExecutionStatus(ctx.db, executionId, 'completed', {
+      result: `Evaluated ${agents.length} agent(s): ${upgraded} upgraded to ESTABLISHED.${suffix}`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    updateExecutionStatus(ctx.db, executionId, 'failed', { result: message });
+  }
+}
+
+export async function execActivitySummary(
+  ctx: HandlerContext,
+  executionId: string,
+  schedule: AgentSchedule,
+): Promise<void> {
+  const attester = new ActivitySummaryAttestation(ctx.db);
+  const period: 'daily' | 'weekly' =
+    (schedule.actions?.[0] as { focusArea?: string } | undefined)?.focusArea === 'weekly' ? 'weekly' : 'daily';
+
+  try {
+    let sendTx: ((note: string) => Promise<string>) | undefined;
+    if (ctx.agentMessenger) {
+      sendTx = async (note: string) => {
+        const txid = await ctx.agentMessenger!.sendOnChainToSelf(schedule.agentId, note);
+        return txid ?? '';
+      };
+    }
+
+    const { hash, txid } = await attester.createSummary(period, sendTx);
+
+    updateExecutionStatus(ctx.db, executionId, 'completed', {
+      result: `Activity summary created: period=${period} hash=${hash.slice(0, 16)}...${txid ? ` txid=${txid}` : ' (off-chain)'}`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

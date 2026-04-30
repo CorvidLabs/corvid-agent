@@ -44,6 +44,14 @@
     }
   },
   "files": {
-    "includes": ["server/**", "!server/public", "!server/flock-directory/contract", "shared/**", "scripts/**", "src/**"]
+    "includes": [
+      "server/**",
+      "!server/public",
+      "!server/flock-directory/contract",
+      "shared/**",
+      "scripts/**",
+      "src/**",
+      "!!**/fledge"
+    ]
   }
 }

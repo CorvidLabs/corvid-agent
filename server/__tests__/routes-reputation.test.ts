@@ -421,6 +421,33 @@ describe('Reputation Routes', () => {
     expect(data.feedbackTotal.total).toBe(0);
   });
 
+  // ─── Audit Guide ──────────────────────────────────────────────────────
+
+  it('GET /api/reputation/audit-guide returns structured guide', async () => {
+    const { req, url } = fakeReq('GET', '/api/reputation/audit-guide');
+    const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(200);
+    const data = await res!.json();
+    expect(data.version).toBe('1.0');
+    expect(data.description).toContain('CorvidAgent');
+    expect(data.network).toBeDefined();
+    expect(data.network.localnet).toBeDefined();
+    expect(data.network.mainnet).toBeDefined();
+    expect(Array.isArray(data.noteFormats)).toBe(true);
+    expect(data.noteFormats.length).toBeGreaterThanOrEqual(4);
+    const reputationFormat = data.noteFormats.find((f: { prefix: string }) => f.prefix === 'corvid-reputation');
+    expect(reputationFormat).toBeDefined();
+    expect(reputationFormat.format).toContain('{agentId}');
+    expect(reputationFormat.fields.length).toBeGreaterThanOrEqual(2);
+    expect(reputationFormat.verifySteps.length).toBeGreaterThanOrEqual(3);
+    expect(Array.isArray(data.indexerQueries)).toBe(true);
+    expect(data.indexerQueries.length).toBeGreaterThanOrEqual(3);
+    expect(data.hashVerification.algorithm).toBe('SHA-256');
+    expect(Array.isArray(data.tools)).toBe(true);
+    expect(data.tools.length).toBeGreaterThanOrEqual(1);
+  });
+
   // ─── Unmatched path ──────────────────────────────────────────────────────
 
   it('returns null for unmatched paths', () => {

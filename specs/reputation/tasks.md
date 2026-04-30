@@ -6,7 +6,7 @@ spec: scorer.spec.md
 
 - [ ] On-chain transparency: surface reputation attestation history and component breakdown in the Observe > Reputation dashboard view (#1458)
 - [ ] Add reputation score trend chart using historical snapshots from `getHistory` (default 90 days)
-- [ ] Implement `evaluateEstablished` auto-upgrade check as a scheduled daily job (currently computed on-demand only)
+- [x] Implement `evaluateEstablished` auto-upgrade check as a scheduled daily job (currently computed on-demand only)
 - [ ] Grow the flock: publish attestations to testnet/mainnet for agents participating in cross-instance collaboration (#1459)
 
 ## Completed Tasks

@@ -58,6 +58,7 @@ export interface SessionLifecycleContext {
   notifyCallbacks: (taskId: string) => void;
   notifyStatusChange: (taskId: string) => void;
   subscribeForCompletion: (taskId: string, sessionId: string) => void;
+  notifyOwner: ((params: { agentId: string; title: string; message: string; level: string }) => Promise<void>) | null;
 }
 
 export async function handleSessionEnd(
@@ -92,12 +93,31 @@ export async function handleSessionEnd(
   log.warn('Validation failed', { taskId, iteration, maxIterations: WORK_MAX_ITERATIONS });
 
   if (iteration >= WORK_MAX_ITERATIONS) {
-    // Max iterations reached — fail the task
+    // Max iterations reached — fail the task and alert the owner
     updateWorkTaskStatus(ctx.db, taskId, 'failed', {
       error: `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`,
       summary: sanitizeSessionSummary(sessionOutput, 500),
     });
     await cleanupWorktree(ctx.db, taskId);
+
+    if (ctx.notifyOwner && task.agentId) {
+      const shortDesc = task.description.slice(0, 120);
+      const shortError = validation.output.slice(0, 500).trim();
+      ctx
+        .notifyOwner({
+          agentId: task.agentId,
+          title: `Work task failed after ${iteration} iteration(s)`,
+          message: `Task: "${shortDesc}"\n\nValidation output:\n${shortError}\n\nConsider retrying with a higher model tier (Sonnet → Opus).`,
+          level: 'error',
+        })
+        .catch((err) => {
+          log.warn('Owner notification failed (non-fatal)', {
+            taskId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    }
+
     ctx.notifyCallbacks(taskId);
     return;
   }

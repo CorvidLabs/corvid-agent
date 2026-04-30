@@ -50,6 +50,8 @@ files:
   - server/db/migrations/120_observation_channel_id.ts
   - server/db/migrations/121_work_task_attestations.ts
   - server/db/migrations/122_memory_attestations.ts
+  - server/db/migrations/123_council_min_trust_level.ts
+  - server/db/migrations/123_activity_summaries.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -616,10 +618,22 @@ Adds `channel_id` column to `memory_observations` for associating observations w
 | `up` | `(db: Database)` | `void` | Adds `channel_id` TEXT column to `memory_observations` (idempotent — checks column existence first), creates partial index `idx_observations_channel_id` |
 | `down` | `(db: Database)` | `void` | Drops the index and `channel_id` column from `memory_observations` |
 
+### 123_council_min_trust_level.ts
+
+Adds `min_trust_level` column to `councils` for reputation-gated council participation. When set, agents below the specified trust level are excluded from the council during launch.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `min_trust_level` TEXT column to `councils` (idempotent — checks column existence first via PRAGMA table_info) |
+| `down` | `(_db: Database)` | `void` | No-op (SQLite DROP COLUMN compatibility) |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-04-26 | corvid-agent | Add migration 123 (council_min_trust_level) to spec coverage |
 | 2026-04-20 | corvid-agent | Add migration 120 to spec coverage |
 | 2026-04-08 | corvid-agent | Fix duplicate migration 115: renumber governance to 116, add algochat_unique_participant spec |
 | 2026-04-08 | corvid-agent | Add migration 115, proposal-expiry to spec coverage |
