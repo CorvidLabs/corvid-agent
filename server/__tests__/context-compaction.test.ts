@@ -15,6 +15,33 @@ describe('turn counter persistence', () => {
     // Look for the pattern after "this.processes.set(session.id, sp)" (in resumeProcess)
     expect(managerSource).toMatch(/this\.processes\.set\(session\.id, sp\);[\s\S]*?turnCount: session\.totalTurns/);
   });
+
+  test('applyCostUpdateIfPresent uses cumulative meta.turnCount, not SDK num_turns', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    // The cost update should use the in-memory cumulative turn count, not the SDK's per-run value
+    expect(managerSource).toContain('meta?.turnCount ?? event.num_turns');
+  });
+
+  test('session_exited event does not include total_cost_usd (avoids zeroing DB)', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    // The exit event should NOT carry total_cost_usd: 0 — that would trigger updateSessionCost(db, id, 0, 0)
+    const exitEventMatch = managerSource.match(/type:\s*['"]session_exited['"][\s\S]*?\}\s*as\s*ClaudeStreamEvent/);
+    expect(exitEventMatch).toBeTruthy();
+    expect(exitEventMatch![0]).not.toContain('total_cost_usd');
+  });
+});
+
+describe('fallback context usage', () => {
+  test('computeFallbackContextUsage method exists on ProcessManager', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    expect(managerSource).toContain('computeFallbackContextUsage');
+  });
+
+  test('fallback is triggered when context_usage has 0 estimated tokens', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    expect(managerSource).toContain('estimatedTokens === 0');
+    expect(managerSource).toContain('computeFallbackContextUsage');
+  });
 });
 
 describe('auto-compact at 90%', () => {

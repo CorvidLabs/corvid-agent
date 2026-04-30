@@ -32,6 +32,7 @@ import { hasClaudeAccess } from '../providers/router';
 import type { LlmProviderType } from '../providers/types';
 import { ApprovalManager } from './approval-manager';
 import type { ApprovalRequestWire } from './approval-types';
+import { estimateTokens, getContextBudget } from './context-management';
 import { hasCursorAccess as hasCursorCli } from './cursor-process';
 import { startDirectProcess, summarizeConversation } from './direct-process';
 import { SessionEventBus } from './event-bus';
@@ -1527,7 +1528,10 @@ export class ProcessManager {
   ): boolean {
     if (event.total_cost_usd === undefined) return true;
 
-    updateSessionCost(this.db, sessionId, event.total_cost_usd, event.num_turns ?? 0);
+    // Use cumulative in-memory turn count — the SDK's num_turns resets each process run
+    const meta = this.sessionMeta.get(sessionId);
+    const cumulativeTurns = meta?.turnCount ?? event.num_turns ?? 0;
+    updateSessionCost(this.db, sessionId, event.total_cost_usd, cumulativeTurns);
 
     const costMeta = this.sessionMeta.get(sessionId);
     if (costMeta) {
@@ -1614,6 +1618,36 @@ export class ProcessManager {
     }
   }
 
+  private computeFallbackContextUsage(
+    sessionId: string,
+  ): { estimatedTokens: number; contextWindow: number; usagePercent: number; messagesCount: number } | null {
+    try {
+      const session = getSession(this.db, sessionId);
+      if (!session) return null;
+      const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+      const messages = getSessionMessages(this.db, sessionId);
+      if (messages.length === 0) return null;
+
+      const contextWindow = getContextBudget(agent?.model);
+      const estimatedTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+      const usagePercent = (estimatedTokens / contextWindow) * 100;
+      log.debug('Computed fallback context usage from conversation history', {
+        sessionId: sessionId.slice(0, 8),
+        estimatedTokens,
+        contextWindow,
+        usagePercent: usagePercent.toFixed(1),
+        messagesCount: messages.length,
+      });
+      return { estimatedTokens, contextWindow, usagePercent, messagesCount: messages.length };
+    } catch (err) {
+      log.warn('Failed to compute fallback context usage', {
+        sessionId: sessionId.slice(0, 8),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
   private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
     const meta = this.sessionMeta.get(sessionId);
     if (meta) {
@@ -1649,13 +1683,42 @@ export class ProcessManager {
 
     // Track context usage and auto-compact at threshold
     if (event.type === 'context_usage' && meta) {
-      const usage = event as { usagePercent?: number };
-      if (usage.usagePercent != null) {
+      const usage = event as { estimatedTokens?: number; usagePercent?: number };
+      if (usage.usagePercent != null && usage.usagePercent > 0) {
         meta.lastContextUsagePercent = usage.usagePercent;
         if (usage.usagePercent >= AUTO_COMPACT_THRESHOLD) {
           log.info(`Auto-compacting session ${sessionId} at ${usage.usagePercent}% context usage`);
           this.compactSession(sessionId);
         }
+      } else if (usage.estimatedTokens === 0 || usage.usagePercent === 0) {
+        // SDK returned 0 tokens — compute from conversation history as fallback
+        const fallback = this.computeFallbackContextUsage(sessionId);
+        if (fallback) {
+          meta.lastContextUsagePercent = fallback.usagePercent;
+          this.eventBus.emit(sessionId, {
+            type: 'context_usage',
+            session_id: sessionId,
+            ...fallback,
+          } as ClaudeStreamEvent);
+          if (fallback.usagePercent >= AUTO_COMPACT_THRESHOLD) {
+            log.info(`Auto-compacting session ${sessionId} at ${fallback.usagePercent}% context usage (fallback)`);
+            this.compactSession(sessionId);
+          }
+          return;
+        }
+      }
+    }
+
+    // If result arrives and we still have no context usage, emit a fallback
+    if (event.type === 'result' && meta && !meta.lastContextUsagePercent) {
+      const fallback = this.computeFallbackContextUsage(sessionId);
+      if (fallback) {
+        meta.lastContextUsagePercent = fallback.usagePercent;
+        this.eventBus.emit(sessionId, {
+          type: 'context_usage',
+          session_id: sessionId,
+          ...fallback,
+        } as ClaudeStreamEvent);
       }
     }
 
@@ -1798,9 +1861,8 @@ export class ProcessManager {
       type: 'session_exited',
       session_id: sessionId,
       result: 'exited',
-      total_cost_usd: 0,
       duration_ms: 0,
-      num_turns: 0,
+      num_turns: meta?.turnCount ?? 0,
     } as ClaudeStreamEvent);
 
     // Clean up chat worktrees (work task worktrees are cleaned by WorkTaskService)
