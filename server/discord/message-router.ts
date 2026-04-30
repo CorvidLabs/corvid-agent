@@ -783,6 +783,8 @@ async function handleMentionReplyResume(
     avatarUrl,
   );
 }
+const MAX_CHANNEL_CONTEXT_CHARS = 8000;
+
 /**
  * Build conversation context aggregated across all recent sessions in a channel.
  * Unlike the old single-session approach, this pulls messages from the last 72 hours
@@ -792,7 +794,16 @@ function buildChannelContext(db: Database, channelId: string): string {
   const messages = getChannelMessageHistory(db, channelId, 60, 72);
   if (messages.length === 0) return '';
 
-  const historyLines = messages
+  // Deduplicate by role+content to avoid repeated messages from overlapping sessions (#2181)
+  const seen = new Set<string>();
+  const unique = messages.filter((m) => {
+    const key = `${m.role}\x00${m.content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  let historyLines = unique
     .map((m) => {
       const role = m.role === 'user' ? 'User' : 'Assistant';
       const stripped = stripConversationHistory(m.content);
@@ -802,6 +813,14 @@ function buildChannelContext(db: Database, channelId: string): string {
     })
     .filter((line): line is string => line !== null);
   if (historyLines.length === 0) return '';
+
+  // Truncate at message boundaries (drop oldest) to stay within cap (#2178)
+  let totalChars = historyLines.reduce((sum, l) => sum + l.length + 1, 0);
+  while (historyLines.length > 1 && totalChars > MAX_CHANNEL_CONTEXT_CHARS) {
+    totalChars -= historyLines[0].length + 1;
+    historyLines = historyLines.slice(1);
+  }
+
   return [
     '<conversation_history>',
     'The following is the conversation history from this channel. Use it for context when responding to the new message.',
@@ -824,7 +843,7 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
   const conversational = messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-20);
 
   if (conversational.length > 0) {
-    const historyLines = conversational
+    let historyLines = conversational
       .map((m) => {
         const role = m.role === 'user' ? 'User' : 'Assistant';
         const stripped = stripConversationHistory(m.content);
@@ -832,10 +851,13 @@ function buildPreviousThreadContext(db: Database, threadId: string, previousSess
         return `[${role}]: ${text}`;
       })
       .filter((line) => !line.endsWith(': '));
-    let body = historyLines.join('\n');
-    if (body.length > MAX_THREAD_CONTEXT_CHARS) {
-      body = body.slice(-MAX_THREAD_CONTEXT_CHARS);
+    // Truncate at message boundaries (drop oldest) instead of slicing raw string (#2179)
+    let totalChars = historyLines.reduce((sum, l) => sum + l.length + 1, 0);
+    while (historyLines.length > 1 && totalChars > MAX_THREAD_CONTEXT_CHARS) {
+      totalChars -= historyLines[0].length + 1;
+      historyLines = historyLines.slice(1);
     }
+    const body = historyLines.join('\n');
     return [
       '<conversation_history>',
       'The following is the conversation history from this session. Use it for context when responding to the new message.',
