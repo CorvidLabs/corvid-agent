@@ -18,6 +18,7 @@ import {
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
+import { getContextBudget } from './context-management';
 import { prependRoutingContext } from './direct-process';
 import { BASH_WRITE_OPERATORS, extractFilePathsFromInput, isProtectedPath } from './protected-paths';
 import type { ClaudeStreamEvent } from './types';
@@ -452,6 +453,19 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         });
         // Successful message received — reset API error counter
         consecutiveApiErrors = 0;
+
+        // Emit context_usage before result so Discord embeds can include it in the footer
+        if (message.type === 'result') {
+          const contextUsage = extractContextUsageFromResult(message, agent?.model);
+          if (contextUsage) {
+            onEvent({
+              type: 'context_usage',
+              session_id: session.id,
+              ...contextUsage,
+            } as ClaudeStreamEvent);
+          }
+        }
+
         const event = mapSdkMessageToEvent(message, session.id);
         if (event) {
           onEvent(event);
@@ -542,6 +556,51 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
   }
 
   return { pid: pseudoPid, sendMessage, kill, isAlive };
+}
+
+/**
+ * Extract context usage from an SDK result message using per-iteration token data.
+ */
+function extractContextUsageFromResult(
+  message: SDKMessage,
+  model?: string,
+): { estimatedTokens: number; contextWindow: number; usagePercent: number } | null {
+  const result = message as import('@anthropic-ai/claude-agent-sdk').SDKResultMessage;
+  if (result.subtype !== 'success') return null;
+
+  const success = result as import('@anthropic-ai/claude-agent-sdk').SDKResultSuccess;
+
+  // Try modelUsage first — it has contextWindow per model
+  const modelEntries = Object.values(success.modelUsage ?? {});
+  if (modelEntries.length > 0) {
+    const primary = modelEntries[0];
+    const contextWindow = primary.contextWindow || getContextBudget(model);
+    const estimatedTokens = primary.inputTokens;
+    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+    return { estimatedTokens, contextWindow, usagePercent };
+  }
+
+  // Fall back to usage.iterations — last iteration's input_tokens is the current context size
+  const iterations = success.usage?.iterations;
+  if (iterations && iterations.length > 0) {
+    const lastIter = iterations[iterations.length - 1];
+    if ('input_tokens' in lastIter) {
+      const contextWindow = getContextBudget(model);
+      const estimatedTokens = lastIter.input_tokens;
+      const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+      return { estimatedTokens, contextWindow, usagePercent };
+    }
+  }
+
+  // Final fallback to cumulative input_tokens
+  if (success.usage?.input_tokens) {
+    const contextWindow = getContextBudget(model);
+    const estimatedTokens = success.usage.input_tokens;
+    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+    return { estimatedTokens, contextWindow, usagePercent };
+  }
+
+  return null;
 }
 
 export function mapSdkMessageToEvent(message: SDKMessage, sessionId: string): ClaudeStreamEvent | null {
