@@ -944,7 +944,7 @@ describe('progress-response real-time context usage', () => {
 
       // Should have edited the progress embed with usage in the footer
       const editWithUsage = calls.find(
-        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.footer?.text?.includes('25%'),
+        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.footer?.text?.includes('25.0%'),
       );
       expect(editWithUsage).toBeDefined();
     } finally {
@@ -995,7 +995,7 @@ describe('progress-response real-time context usage', () => {
       const edits = calls.filter((c: any) => c.method === 'edit');
       const lastEdit = edits[edits.length - 1] as any;
       expect(lastEdit.data.embeds[0].description).toContain('Reading file...');
-      expect(lastEdit.data.embeds[0].footer.text).toContain('45%');
+      expect(lastEdit.data.embeds[0].footer.text).toContain('45.0%');
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-2')?.callback;
       if (cb) cb('session-ctx-2', { type: 'result', result: '' });
@@ -1167,7 +1167,7 @@ describe('progress-response real-time context usage', () => {
         (c: any) =>
           c.method === 'edit' &&
           c.data?.embeds?.[0]?.description === '✅ Done' &&
-          c.data?.embeds?.[0]?.footer?.text?.includes('75%'),
+          c.data?.embeds?.[0]?.footer?.text?.includes('75.0%'),
       );
       expect(doneEdit).toBeDefined();
     } finally {

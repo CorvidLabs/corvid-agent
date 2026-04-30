@@ -178,13 +178,14 @@ export interface ContextUsage {
 
 /**
  * Format context usage as a compact footer segment.
- * Example: `🟢 32% (64k/200k)`
+ * Example: `🟢 32.5% (64k/200k)`
  */
 export function formatContextUsage(usage: ContextUsage): string {
-  const emoji = usage.usagePercent >= 80 ? '🔴' : usage.usagePercent >= 50 ? '🟡' : '🟢';
+  const pct = (usage.estimatedTokens / usage.contextWindow) * 100;
+  const emoji = pct >= 80 ? '🔴' : pct >= 60 ? '🟠' : pct >= 40 ? '🟡' : pct >= 20 ? '🟢' : '⚪';
   const used = formatTokenCount(usage.estimatedTokens);
   const max = formatTokenCount(usage.contextWindow);
-  return `${emoji} ${usage.usagePercent}% (${used}/${max})`;
+  return `${emoji} ${pct.toFixed(1)}% (${used}/${max})`;
 }
 
 function formatTokenCount(tokens: number): string {
