@@ -522,6 +522,42 @@ describe('Session Routes', () => {
     });
   });
 
+  // ─── POST /api/sessions/:id/compact ─────────────────────────────────────
+
+  describe('POST /api/sessions/:id/compact', () => {
+    it('returns 200 when compactSession succeeds', async () => {
+      const pm = createMockPM({ compactSession: mock(() => true) });
+      const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Compact Me' });
+      const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+      const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/compact`);
+      const res = await handleSessionRoutes(req, url, db, pm);
+      expect(res!.status).toBe(200);
+      const data = await res!.json();
+      expect(data.ok).toBe(true);
+      expect(data.message).toContain('compacted');
+    });
+
+    it('returns 404 when compactSession fails (not running)', async () => {
+      const pm = createMockPM({ compactSession: mock(() => false) });
+      const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', { projectId, name: 'Not Running' });
+      const session = await (await handleSessionRoutes(cReq, cUrl, db, pm))!.json();
+
+      const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/compact`);
+      const res = await handleSessionRoutes(req, url, db, pm);
+      expect(res!.status).toBe(404);
+      const data = await res!.json();
+      expect(data.error).toContain('not running');
+    });
+
+    it('returns 404 for unknown session ID', async () => {
+      const pm = createMockPM({ compactSession: mock(() => false) });
+      const { req, url } = fakeReq('POST', '/api/sessions/nonexistent/compact');
+      const res = await handleSessionRoutes(req, url, db, pm);
+      expect(res!.status).toBe(404);
+    });
+  });
+
   // ─── Ollama complexity warning ──────────────────────────────────────────
 
   describe('Ollama complexity warning on session create', () => {
