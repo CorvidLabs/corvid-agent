@@ -837,17 +837,20 @@ export class ProcessManager {
     this.processes.set(session.id, process);
     const now = Date.now();
     const prevMeta = this.sessionMeta.get(session.id);
+    const dbTurns = session.totalTurns ?? 0;
+    const resumedTurnCount = Math.max(prevMeta?.turnCount ?? 0, dbTurns, 1);
     this.sessionMeta.set(session.id, {
       startedAt: now,
       source: (session as { source?: string }).source ?? 'web',
       restartCount: prevMeta?.restartCount ?? 0,
       lastKnownCostUsd: prevMeta?.lastKnownCostUsd ?? 0,
       lastContextUsagePercent: prevMeta?.lastContextUsagePercent,
-      turnCount: 0,
+      turnCount: resumedTurnCount,
       lastActivityAt: now,
     });
     updateSessionPid(this.db, session.id, process.pid);
     updateSessionStatus(this.db, session.id, 'running');
+    updateSessionTurns(this.db, session.id, resumedTurnCount);
 
     const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as {
       status: string;
