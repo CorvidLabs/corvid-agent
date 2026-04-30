@@ -35,6 +35,7 @@ export interface SessionMetaForEvents {
   lastActivityAt: number;
   lastKnownCostUsd: number;
   source: string;
+  turnCount: number;
 }
 
 /**
@@ -48,9 +49,10 @@ export function applyCostUpdate(
 ): boolean {
   if (event.total_cost_usd === undefined) return true;
 
-  updateSessionCost(deps.db, sessionId, event.total_cost_usd, event.num_turns ?? 0);
-
+  // Use cumulative in-memory turn count — the SDK's num_turns resets each process run
   const meta = deps.getSessionMeta(sessionId);
+  const cumulativeTurns = meta?.turnCount ?? event.num_turns ?? 0;
+  updateSessionCost(deps.db, sessionId, event.total_cost_usd, cumulativeTurns);
   if (meta) {
     const delta = event.total_cost_usd - meta.lastKnownCostUsd;
     if (delta > 0) {

@@ -576,29 +576,31 @@ function extractContextUsageFromResult(
     const primary = modelEntries[0];
     const contextWindow = primary.contextWindow || getContextBudget(model);
     const estimatedTokens = primary.inputTokens;
-    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
-    return { estimatedTokens, contextWindow, usagePercent };
-  }
-
-  // Fall back to usage.iterations — last iteration's input_tokens is the current context size
-  const iterations = success.usage?.iterations;
-  if (iterations && iterations.length > 0) {
-    const lastIter = iterations[iterations.length - 1];
-    if ('input_tokens' in lastIter) {
-      const contextWindow = getContextBudget(model);
-      const estimatedTokens = lastIter.input_tokens;
-      const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+    if (estimatedTokens > 0) {
+      const usagePercent = (estimatedTokens / contextWindow) * 100;
       return { estimatedTokens, contextWindow, usagePercent };
     }
+    log.debug('modelUsage has 0 inputTokens, falling through', {
+      model,
+      keys: Object.keys(success.modelUsage ?? {}),
+      contextWindow: primary.contextWindow,
+    });
   }
 
-  // Final fallback to cumulative input_tokens
+  // Fall back to cumulative input_tokens from usage
   if (success.usage?.input_tokens) {
     const contextWindow = getContextBudget(model);
     const estimatedTokens = success.usage.input_tokens;
-    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+    const usagePercent = (estimatedTokens / contextWindow) * 100;
     return { estimatedTokens, contextWindow, usagePercent };
   }
+
+  log.debug('No context usage data available from SDK result', {
+    model,
+    hasModelUsage: modelEntries.length > 0,
+    hasUsage: !!success.usage,
+    inputTokens: success.usage?.input_tokens,
+  });
 
   return null;
 }
