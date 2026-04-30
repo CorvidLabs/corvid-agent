@@ -18,6 +18,7 @@ import {
   updateSessionPid,
   updateSessionStatus,
   updateSessionSummary,
+  updateSessionTurns,
 } from '../db/sessions';
 import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
@@ -1467,7 +1468,10 @@ export class ProcessManager {
     addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
 
     const meta = this.sessionMeta.get(sessionId);
-    if (meta) meta.turnCount++;
+    if (meta) {
+      meta.turnCount++;
+      updateSessionTurns(this.db, sessionId, meta.turnCount);
+    }
 
     return true;
   }
