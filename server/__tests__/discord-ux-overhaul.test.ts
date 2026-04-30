@@ -902,3 +902,276 @@ describe('message-handler reactions', () => {
     }
   });
 });
+
+describe('progress-response real-time context usage', () => {
+  test('context_usage event triggers progress embed edit with usage in footer', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-1',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      // Wait for the initial progress embed to be sent
+      await waitForCall((c: any) => c.method === 'send');
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-1')!.callback;
+
+      // Wait past debounce so context_usage update isn't throttled
+      await new Promise((r) => setTimeout(r, 3200));
+
+      // Send context_usage event
+      callback('session-ctx-1', {
+        type: 'context_usage',
+        estimatedTokens: 50000,
+        contextWindow: 200000,
+        usagePercent: 25,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Should have edited the progress embed with usage in the footer
+      const editWithUsage = calls.find(
+        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.footer?.text?.includes('25%'),
+      );
+      expect(editWithUsage).toBeDefined();
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-1')?.callback;
+      if (cb) cb('session-ctx-1', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('context_usage edit preserves last tool_status description', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-2',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+      );
+
+      await waitForCall((c: any) => c.method === 'send');
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-2')!.callback;
+
+      // Send a tool_status to set the description
+      callback('session-ctx-2', { type: 'tool_status', statusMessage: 'Reading file...' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Wait past debounce
+      await new Promise((r) => setTimeout(r, 3200));
+
+      // Now send context_usage — the description should still say "Reading file..."
+      callback('session-ctx-2', {
+        type: 'context_usage',
+        estimatedTokens: 90000,
+        contextWindow: 200000,
+        usagePercent: 45,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Find the edit triggered by context_usage (after the tool_status edit)
+      const edits = calls.filter((c: any) => c.method === 'edit');
+      const lastEdit = edits[edits.length - 1] as any;
+      expect(lastEdit.data.embeds[0].description).toContain('Reading file...');
+      expect(lastEdit.data.embeds[0].footer.text).toContain('45%');
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-2')?.callback;
+      if (cb) cb('session-ctx-2', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('context_usage is debounced — rapid events do not spam edits', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-3',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+      );
+
+      await waitForCall((c: any) => c.method === 'send');
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-3')!.callback;
+
+      // Wait past initial debounce
+      await new Promise((r) => setTimeout(r, 3200));
+
+      // Record baseline edit count before sending rapid events
+      const editsBefore = calls.filter((c: any) => c.method === 'edit').length;
+
+      // Rapidly send multiple context_usage events
+      for (let i = 0; i < 5; i++) {
+        callback('session-ctx-3', {
+          type: 'context_usage',
+          estimatedTokens: 10000 * (i + 1),
+          contextWindow: 200000,
+          usagePercent: 5 * (i + 1),
+        });
+      }
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Only 1 new edit should have been made (debounced), not 5
+      const editsAfterSend = calls.filter((c: any) => c.method === 'edit').length;
+      expect(editsAfterSend - editsBefore).toBe(1);
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-3')?.callback;
+      if (cb) cb('session-ctx-3', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('context_warning sends warning embed for critical level', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-4',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+      );
+
+      await waitForCall((c: any) => c.method === 'send');
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-4')!.callback;
+
+      callback('session-ctx-4', {
+        type: 'context_warning',
+        level: 'critical',
+        usagePercent: 92,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Should send a new warning embed with yellow color
+      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
+      expect(warningEmbed).toBeDefined();
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-4')?.callback;
+      if (cb) cb('session-ctx-4', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('context_warning ignores non-critical levels', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-5',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+      );
+
+      await waitForCall((c: any) => c.method === 'send');
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-5')!.callback;
+
+      callback('session-ctx-5', {
+        type: 'context_warning',
+        level: 'warning',
+        usagePercent: 70,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+
+      // No warning embed should be sent (only critical level triggers it)
+      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
+      expect(warningEmbed).toBeUndefined();
+    } finally {
+      const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-5')?.callback;
+      if (cb) cb('session-ctx-5', { type: 'result', result: '' });
+      cleanup();
+    }
+  });
+
+  test('result embed footer includes final context usage', async () => {
+    const { subscribeForInlineProgressResponse } = await import('../discord/thread-response/progress-response');
+    const pm = createMockProcessManager();
+    const delivery = new DeliveryTracker();
+    const { calls, cleanup, waitForCall } = installSnowflakeMock();
+
+    try {
+      subscribeForInlineProgressResponse(
+        pm,
+        delivery,
+        'test-token',
+        'session-ctx-6',
+        CHANNEL_ID,
+        MSG_ID,
+        'TestAgent',
+        'test-model',
+      );
+
+      await waitForCall((c: any) => c.method === 'send');
+      // Let the .then() callback set progressMessageId
+      await new Promise((r) => setTimeout(r, 50));
+      const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-6')!.callback;
+
+      // Send context_usage before result
+      callback('session-ctx-6', {
+        type: 'context_usage',
+        estimatedTokens: 150000,
+        contextWindow: 200000,
+        usagePercent: 75,
+      });
+
+      // Send result — the Done edit is inside flush().then(), so wait for async chain
+      callback('session-ctx-6', { type: 'result', result: '' });
+      await new Promise((r) => setTimeout(r, 1000));
+
+      // The "Done" edit should include context usage
+      const doneEdit = calls.find(
+        (c: any) =>
+          c.method === 'edit' &&
+          c.data?.embeds?.[0]?.description === '✅ Done' &&
+          c.data?.embeds?.[0]?.footer?.text?.includes('75%'),
+      );
+      expect(doneEdit).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+});
