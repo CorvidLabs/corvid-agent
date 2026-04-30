@@ -52,15 +52,6 @@ import type { EventCallback } from './interfaces';
 
 const log = createLogger('ProcessManager');
 
-// After this many user messages in a single process lifetime, kill and restart
-// through the capped resume path to keep context size manageable.
-//
-// Rationale: Each "turn" (user message + assistant response + tool calls) grows
-// the in-context prompt significantly. With modern 200k context windows, 20 turns
-// provides enough continuity for multi-turn Discord conversations while staying
-// well within limits. The progressive compression tiers in context-management.ts
-// handle the cases where individual turns are unusually large.
-const MAX_TURNS_BEFORE_CONTEXT_RESET = 20;
 const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 
 // Circuit breaker: if the last N completions in a row were zero-turn,
@@ -913,51 +904,10 @@ export class ProcessManager {
     }
 
     if (this.processes.has(session.id)) {
-      const meta = this.sessionMeta.get(session.id);
-      if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
-        log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
-
-        // Generate a context summary from existing messages before killing
-        try {
-          const existingMessages = getSessionMessages(this.db, session.id);
-          if (existingMessages.length > 0) {
-            const ctxProject = session.projectId ? getProject(this.db, session.projectId) : null;
-            const projectContext = ctxProject
-              ? { name: ctxProject.name, workingDir: ctxProject.workingDir }
-              : undefined;
-            const summary = summarizeConversation(existingMessages, projectContext);
-            meta.contextSummary = summary;
-            log.info(`Generated context summary for session ${session.id} (${summary.length} chars)`);
-
-            // Save as short-term observation for memory graduation
-            if (session.agentId) {
-              this.saveContextSummaryObservation(session, summary);
-            }
-          }
-        } catch (err) {
-          log.warn(`Failed to generate context summary for session ${session.id}`, { error: err });
-        }
-
-        this.eventBus.emit(session.id, {
-          type: 'session_error',
-          session_id: session.id,
-          error: {
-            message: 'Session context limit reached — restarting with fresh context.',
-            errorType: 'context_exhausted',
-            severity: 'info',
-            recoverable: true,
-          },
-        } as ClaudeStreamEvent);
-        const cp = this.processes.get(session.id);
-        cp?.kill();
-        this.processes.delete(session.id);
-        updateSessionPid(this.db, session.id, null);
-      } else {
-        if (prompt) {
-          this.sendMessage(session.id, prompt);
-        }
-        return;
+      if (prompt) {
+        this.sendMessage(session.id, prompt);
       }
+      return;
     }
 
     // Circuit breaker: detect zero-turn death loops.
