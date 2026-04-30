@@ -1410,6 +1410,10 @@ export class ProcessManager {
     sessionId: string,
     content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[],
   ): boolean {
+    if (typeof content === 'string' && content.trim().toLowerCase() === '/compact') {
+      return this.compactSession(sessionId);
+    }
+
     const cp = this.processes.get(sessionId);
     if (!cp) return false;
 

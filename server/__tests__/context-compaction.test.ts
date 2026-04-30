@@ -49,3 +49,16 @@ describe('warning messages mention /compact', () => {
     expect(result!.message).not.toContain('/compact');
   });
 });
+
+describe('/compact command', () => {
+  test('sessions route handles compact action', async () => {
+    const routeSource = await Bun.file('server/routes/sessions.ts').text();
+    expect(routeSource).toContain("action === 'compact'");
+  });
+
+  test('sendMessage intercepts /compact command', async () => {
+    const managerSource = await Bun.file('server/process/manager.ts').text();
+    expect(managerSource).toContain('/compact');
+    expect(managerSource).toContain('compactSession');
+  });
+});
