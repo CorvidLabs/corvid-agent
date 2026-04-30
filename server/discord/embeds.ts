@@ -169,12 +169,36 @@ export interface FooterStats {
   commits?: number;
 }
 
+/** Context window usage data for footer display. */
+export interface ContextUsage {
+  usagePercent: number;
+  estimatedTokens: number;
+  contextWindow: number;
+}
+
+/**
+ * Format context usage as a compact footer segment.
+ * Example: `🟢 32% (64k/200k)`
+ */
+export function formatContextUsage(usage: ContextUsage): string {
+  const emoji = usage.usagePercent >= 80 ? '🔴' : usage.usagePercent >= 50 ? '🟡' : '🟢';
+  const used = formatTokenCount(usage.estimatedTokens);
+  const max = formatTokenCount(usage.contextWindow);
+  return `${emoji} ${usage.usagePercent}% (${used}/${max})`;
+}
+
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k`;
+  return String(tokens);
+}
+
 /**
  * Build a detailed footer string with full session context.
- * Format: `AgentName · model · project · sid:XXXXXX · status`
+ * Format: `AgentName · model · project · sid:XXXXXX · status | 🟢 32% (64k/200k)`
  * Segments are omitted when their value is not provided.
  */
-export function buildFooterText(ctx: FooterContext): string {
+export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage): string {
   const parts: string[] = [ctx.agentName];
   if (ctx.agentModel) {
     parts.push(ctx.agentModel);
@@ -188,14 +212,18 @@ export function buildFooterText(ctx: FooterContext): string {
   if (ctx.status) {
     parts.push(ctx.status);
   }
-  return parts.join(' · ');
+  const base = parts.join(' · ');
+  if (contextUsage) {
+    return `${base} | ${formatContextUsage(contextUsage)}`;
+  }
+  return base;
 }
 
 /**
  * Build a footer with session context AND run stats.
- * Format: `AgentName · model · project · sid:XXXXXX · status | 5 files · 12 turns · 38 tools`
+ * Format: `AgentName · model · sid:XXXXXX · status | 5 files · 12 turns · 38 tools | 🟢 32% (64k/200k)`
  */
-export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): string {
+export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats, contextUsage?: ContextUsage): string {
   const base = buildFooterText(ctx);
   const statParts: string[] = [];
   if (stats.filesChanged && stats.filesChanged > 0) {
@@ -210,8 +238,10 @@ export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats): st
   if (stats.commits && stats.commits > 0) {
     statParts.push(`${stats.commits} commits`);
   }
-  if (statParts.length === 0) return base;
-  return `${base} | ${statParts.join(' · ')}`;
+  const segments: string[] = [base];
+  if (statParts.length > 0) segments.push(statParts.join(' · '));
+  if (contextUsage) segments.push(formatContextUsage(contextUsage));
+  return segments.join(' | ');
 }
 
 export async function respondToInteraction(interaction: RepliableInteraction, content: string): Promise<void> {
