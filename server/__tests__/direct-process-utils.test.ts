@@ -418,7 +418,7 @@ describe('determineWarningLevel', () => {
   it('returns warning at 70%', () => {
     const result = determineWarningLevel(70);
     expect(result!.level).toBe('warning');
-    expect(result!.message).toContain('trimming');
+    expect(result!.message).toContain('/compact');
   });
 
   it('returns warning between 70-84%', () => {
@@ -429,7 +429,7 @@ describe('determineWarningLevel', () => {
   it('returns critical at 85%', () => {
     const result = determineWarningLevel(85);
     expect(result!.level).toBe('critical');
-    expect(result!.message).toContain('exhaustion');
+    expect(result!.message).toContain('auto-compact');
   });
 
   it('returns critical above 85%', () => {
