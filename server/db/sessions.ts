@@ -31,6 +31,8 @@ interface SessionRow {
   council_role: string | null;
   work_dir: string | null;
   credits_consumed: number;
+  last_context_tokens: number | null;
+  last_context_window: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +72,8 @@ function rowToSession(row: SessionRow): Session {
     councilRole: (row.council_role as Session['councilRole']) ?? null,
     workDir: row.work_dir ?? null,
     creditsConsumed: row.credits_consumed ?? 0,
+    lastContextTokens: row.last_context_tokens ?? null,
+    lastContextWindow: row.last_context_window ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -210,6 +214,12 @@ export function updateSessionCost(db: Database, id: string, costUsd: number, tur
 
 export function updateSessionTurns(db: Database, id: string, turns: number): void {
   db.query("UPDATE sessions SET total_turns = ?, updated_at = datetime('now') WHERE id = ?").run(turns, id);
+}
+
+export function updateSessionContextTokens(db: Database, id: string, tokens: number, contextWindow: number): void {
+  db.query(
+    "UPDATE sessions SET last_context_tokens = ?, last_context_window = ?, updated_at = datetime('now') WHERE id = ?",
+  ).run(tokens, contextWindow, id);
 }
 
 export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: number): void {

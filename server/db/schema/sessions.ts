@@ -46,6 +46,8 @@ export const tables: string[] = [
         council_role      TEXT DEFAULT NULL,
         work_dir          TEXT DEFAULT NULL,
         credits_consumed  REAL DEFAULT 0,
+        last_context_tokens          INTEGER DEFAULT NULL,
+        last_context_window          INTEGER DEFAULT NULL,
         restart_pending              INTEGER NOT NULL DEFAULT 0,
         server_restart_initiated_at  TEXT DEFAULT NULL,
         conversation_summary         TEXT DEFAULT NULL,

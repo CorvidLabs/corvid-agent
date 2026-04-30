@@ -306,8 +306,11 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     return;
   }
 
-  // Prompt injection scan
-  const injectionResult = scanForInjection(text);
+  // Prompt injection scan (skip for admins only)
+  const injectionResult =
+    permLevel >= PermissionLevel.ADMIN
+      ? { blocked: false, matches: [], confidence: 'NONE' as const }
+      : scanForInjection(text);
   if (injectionResult.blocked) {
     log.warn('Blocked message: prompt injection detected', {
       userId,

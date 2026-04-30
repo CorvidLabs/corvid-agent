@@ -14,6 +14,7 @@ import {
   getParticipantForSession,
   getSession,
   getSessionMessages,
+  updateSessionContextTokens,
   updateSessionCost,
   updateSessionPid,
   updateSessionStatus,
@@ -884,14 +885,27 @@ export class ProcessManager {
     // show a real percentage from the start instead of 0%.
     const meta = this.sessionMeta.get(session.id);
     if (meta && !meta.lastContextUsagePercent) {
-      const fallback = this.computeFallbackContextUsage(session.id);
-      if (fallback) {
-        meta.lastContextUsagePercent = fallback.usagePercent;
+      // Prefer persisted real token count from DB over estimation
+      if (session.lastContextTokens && session.lastContextWindow) {
+        const usagePercent = Math.round((session.lastContextTokens / session.lastContextWindow) * 100);
+        meta.lastContextUsagePercent = usagePercent;
         this.eventBus.emit(session.id, {
           type: 'context_usage',
           session_id: session.id,
-          ...fallback,
+          estimatedTokens: session.lastContextTokens,
+          contextWindow: session.lastContextWindow,
+          usagePercent,
         } as ClaudeStreamEvent);
+      } else {
+        const fallback = this.computeFallbackContextUsage(session.id);
+        if (fallback) {
+          meta.lastContextUsagePercent = fallback.usagePercent;
+          this.eventBus.emit(session.id, {
+            type: 'context_usage',
+            session_id: session.id,
+            ...fallback,
+          } as ClaudeStreamEvent);
+        }
       }
     } else if (meta?.lastContextUsagePercent) {
       // Carry-over from in-process restart — re-emit so listeners pick it up
@@ -1724,9 +1738,12 @@ export class ProcessManager {
 
     // Track context usage and auto-compact at threshold
     if (event.type === 'context_usage' && meta) {
-      const usage = event as { estimatedTokens?: number; usagePercent?: number };
+      const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
       if (usage.usagePercent != null && usage.usagePercent > 0) {
         meta.lastContextUsagePercent = usage.usagePercent;
+        if (usage.estimatedTokens && usage.contextWindow) {
+          updateSessionContextTokens(this.db, sessionId, usage.estimatedTokens, usage.contextWindow);
+        }
         if (usage.usagePercent >= AUTO_COMPACT_THRESHOLD) {
           log.info(`Auto-compacting session ${sessionId} at ${usage.usagePercent}% context usage`);
           this.compactSession(sessionId);
