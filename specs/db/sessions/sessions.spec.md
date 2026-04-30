@@ -35,6 +35,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionPid` | `(db: Database, id: string, pid: number \| null)` | `void` | Update the OS process ID (null when process exits) |
 | `updateSessionStatus` | `(db: Database, id: string, status: string)` | `void` | Set session status (idle, running, stopped, error, paused) |
 | `updateSessionCost` | `(db: Database, id: string, costUsd: number, turns: number)` | `void` | Update cumulative cost and turn count |
+| `updateSessionTurns` | `(db: Database, id: string, turns: number)` | `void` | Update turn count independently of cost (for immediate persistence on user message) |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
 | `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for cross-session context carry-over |
 | `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session |
@@ -120,7 +121,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession` |
+| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession` |
 | `server/work/service.ts` | `createSession` |
 | `server/scheduler/service.ts` | `createSession` |
 | `server/routes/sessions.ts` | All session CRUD functions |

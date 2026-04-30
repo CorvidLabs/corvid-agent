@@ -208,6 +208,10 @@ export function updateSessionCost(db: Database, id: string, costUsd: number, tur
   );
 }
 
+export function updateSessionTurns(db: Database, id: string, turns: number): void {
+  db.query("UPDATE sessions SET total_turns = ?, updated_at = datetime('now') WHERE id = ?").run(turns, id);
+}
+
 export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: number): void {
   db.query(
     "UPDATE sessions SET total_algo_spent = total_algo_spent + ?, updated_at = datetime('now') WHERE id = ?",
