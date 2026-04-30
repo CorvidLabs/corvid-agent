@@ -53,7 +53,13 @@ export class AutoUpdateService {
         stdout: 'pipe',
         stderr: 'pipe',
       });
-      if (fetchResult.exitCode !== 0) return;
+      if (fetchResult.exitCode !== 0) {
+        log.warn('git fetch failed — skipping auto-update check', {
+          exitCode: fetchResult.exitCode,
+          stderr: fetchResult.stderr.toString().trim(),
+        });
+        return;
+      }
 
       // Only auto-update if we're on the main branch
       const currentBranch = Bun.spawnSync(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
