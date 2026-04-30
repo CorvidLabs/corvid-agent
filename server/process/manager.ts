@@ -1176,7 +1176,7 @@ export class ProcessManager {
       source: (session as { source?: string }).source ?? 'web',
       restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
       lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
-      turnCount: 0,
+      turnCount: session.totalTurns ?? 0,
       lastActivityAt: now,
     });
     const proc = this.processes.get(session.id);
