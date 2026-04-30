@@ -728,7 +728,11 @@ async function handleMentionReplyResume(
       typeof contextualContent === 'string'
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername, channelId), attachments);
-    ctx.processManager.resumeProcess(session, resumeText);
+    // Re-inject channel context on resume so the agent sees messages posted by other users
+    // since the last exchange — mirrors the new-session path at buildChannelContext call above.
+    const channelContext = buildChannelContext(ctx.db, channelId);
+    const resumeTextWithContext = channelContext ? `${channelContext}\n\n${resumeText}` : resumeText;
+    ctx.processManager.resumeProcess(session, resumeTextWithContext);
 
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
     if (!ctx.processManager.isRunning(sessionId)) {
